@@ -203,11 +203,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   RenderFrameHostDelegate* delegate() { return delegate_; }
   FrameTreeNode* frame_tree_node() { return frame_tree_node_; }
 
-  // Sets this RenderFrameHost's loading state.
-  void set_is_loading(bool is_loading) {
-    is_loading_ = is_loading;
-  }
-
   // Returns this RenderFrameHost's loading state. This method is only used by
   // FrameTreeNode. The proper way to check whether a frame is loading is to
   // call FrameTreeNode::IsLoading.
@@ -422,6 +417,14 @@ class CONTENT_EXPORT RenderFrameHostImpl
                         const CommonNavigationParams& common_params,
                         const RequestNavigationParams& request_params);
 
+  // PlzNavigate
+  // Indicates that a navigation failed and that this RenderFrame should display
+  // an error page.
+  void FailedNavigation(const CommonNavigationParams& common_params,
+                        const RequestNavigationParams& request_params,
+                        bool has_stale_copy_in_cache,
+                        int error_code);
+
   // Sets up the Mojo connection between this instance and its associated render
   // frame if it has not yet been set up.
   void SetUpMojoIfNeeded();
@@ -521,6 +524,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void OnAccessibilitySnapshotResponse(int callback_id,
                                        const ui::AXTreeUpdate& snapshot);
   void OnToggleFullscreen(bool enter_fullscreen);
+  void OnDidStartLoading(bool to_different_document);
+  void OnDidStopLoading();
+  void OnDidChangeLoadProgress(double load_progress);
 
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
   void OnShowPopup(const FrameHostMsg_ShowPopup_Params& params);
@@ -666,6 +672,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // Indicates whether this RenderFrameHost is in the process of loading a
   // document or not.
   bool is_loading_;
+
+  // PlzNavigate
+  // Used to track whether a commit is expected in this frame. Only used in
+  // tests.
+  bool pending_commit_;
 
   // Used to swap out or shut down this RFH when the unload event is taking too
   // long to execute, depending on the number of active frames in the

@@ -22,6 +22,7 @@ namespace extensions {
 
 namespace {
 
+const char kTestGaiaId[] = "gaia-id-testuser@gmail.com";
 const char kAttemptClickAuthMessage[] = "attemptClickAuth";
 const char kTestExtensionId[] = "lkegkdgachcnekllcdfkijonogckdnjo";
 const char kTestUser[] = "testuser@gmail.com";
@@ -49,7 +50,7 @@ class ScreenlockPrivateApiTest : public ExtensionApiTest,
 
   void SetUpOnMainThread() override {
     SigninManagerFactory::GetForProfile(profile())
-        ->SetAuthenticatedUsername(kTestUser);
+        ->SetAuthenticatedAccountInfo(kTestGaiaId, kTestUser);
     ProfileInfoCache& info_cache =
         g_browser_process->profile_manager()->GetProfileInfoCache();
     size_t index = info_cache.GetIndexOfProfileWithPath(profile()->GetPath());
@@ -93,11 +94,20 @@ class ScreenlockPrivateApiTest : public ExtensionApiTest,
   DISALLOW_COPY_AND_ASSIGN(ScreenlockPrivateApiTest);
 };
 
-IN_PROC_BROWSER_TEST_F(ScreenlockPrivateApiTest, LockUnlock) {
+// Time out under MSan. http://crbug.com/478091
+#if defined(MEMORY_SANITIZER)
+#define MAYBE_LockUnlock DISABLED_LockUnlock
+#define MAYBE_AuthType DISABLED_AuthType
+#else
+#define MAYBE_LockUnlock LockUnlock
+#define MAYBE_AuthType AuthType
+#endif
+
+IN_PROC_BROWSER_TEST_F(ScreenlockPrivateApiTest, MAYBE_LockUnlock) {
   RunTest("screenlock_private/lock_unlock");
 }
 
-IN_PROC_BROWSER_TEST_F(ScreenlockPrivateApiTest, AuthType) {
+IN_PROC_BROWSER_TEST_F(ScreenlockPrivateApiTest, MAYBE_AuthType) {
   RunTest("screenlock_private/auth_type");
 }
 

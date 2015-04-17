@@ -10,6 +10,7 @@
 #include "base/basictypes.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
 #include "content/public/browser/web_contents_observer.h"
+#include "content/public/test/mock_render_process_host.h"
 #include "content/public/test/test_renderer_host.h"
 #include "content/test/test_render_view_host.h"
 #include "ui/base/page_transition_types.h"
@@ -45,8 +46,9 @@ class TestRenderFrameHost : public RenderFrameHostImpl,
                       int flags);
   ~TestRenderFrameHost() override;
 
-  // RenderFrameHostImpl overrides (same values, but in Test* types)
+  // RenderFrameHostImpl overrides (same values, but in Test*/Mock* types)
   TestRenderViewHost* GetRenderViewHost() override;
+  MockRenderProcessHost* GetProcess() override;
 
   // RenderFrameHostTester implementation.
   TestRenderFrameHost* AppendChild(const std::string& frame_name) override;
@@ -86,6 +88,9 @@ class TestRenderFrameHost : public RenderFrameHostImpl,
       const base::FilePath* file_path_for_history_item,
       const std::vector<GURL>& redirects);
 
+  // Simulate a renderer-initiated navigation up until commit.
+  void NavigateAndCommitRendererInitiated(int page_id, const GURL& url);
+
   // With the current navigation logic this method is a no-op.
   // PlzNavigate: this method simulates receiving a BeginNavigation IPC.
   void SendRendererInitiatedNavigationRequest(const GURL& url,
@@ -113,6 +118,10 @@ class TestRenderFrameHost : public RenderFrameHostImpl,
   // also simulate a server redirect to |redirect_url|. If the URL is empty the
   // redirect step is ignored.
   void PrepareForCommitWithServerRedirect(const GURL& redirect_url);
+
+  // PlzNavigate
+  void set_pending_commit(bool pending) { pending_commit_ = pending; }
+  bool pending_commit() const { return pending_commit_; }
 
  private:
   TestRenderFrameHostCreationObserver child_creation_observer_;

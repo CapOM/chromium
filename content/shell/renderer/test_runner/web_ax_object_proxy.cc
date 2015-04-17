@@ -622,7 +622,11 @@ void WebAXObjectProxy::NotificationReceived(
 
   v8::Isolate* isolate = blink::mainThreadIsolate();
 
+#ifdef WEB_FRAME_USES_V8_LOCAL
+  v8::Local<v8::Value> argv[] = {
+#else
   v8::Handle<v8::Value> argv[] = {
+#endif
     v8::String::NewFromUtf8(isolate, notification_name.data(),
                             v8::String::kNormalString,
                             notification_name.size()),
@@ -1164,7 +1168,7 @@ int WebAXObjectProxy::WordStart(int character_index) {
   if (accessibility_object_.role() != blink::WebAXRoleStaticText)
     return -1;
 
-  int word_start, word_end;
+  int word_start = 0, word_end = 0;
   GetBoundariesForOneWord(accessibility_object_, character_index,
                           word_start, word_end);
   return word_start;
@@ -1175,7 +1179,7 @@ int WebAXObjectProxy::WordEnd(int character_index) {
   if (accessibility_object_.role() != blink::WebAXRoleStaticText)
     return -1;
 
-  int word_start, word_end;
+  int word_start = 0, word_end = 0;
   GetBoundariesForOneWord(accessibility_object_, character_index,
                           word_start, word_end);
   return word_end;

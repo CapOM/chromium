@@ -92,6 +92,8 @@ class GuestViewManager : public content::BrowserPluginGuestManager,
       int element_instance_id) override;
   bool ForEachGuest(content::WebContents* owner_web_contents,
                     const GuestCallback& callback) override;
+  content::WebContents* GetFullPageGuest(
+      content::WebContents* embedder_web_contents) override;
 
  protected:
   friend class GuestViewBase;
@@ -103,6 +105,11 @@ class GuestViewManager : public content::BrowserPluginGuestManager,
 
   // Can be overriden in tests.
   virtual void RemoveGuest(int guest_instance_id);
+
+  // Indicates whether the provided |guest| can be used in the context it has
+  // been created.
+  bool IsGuestAvailableToContext(GuestViewBase* guest,
+                                 std::string* owner_extension_id);
 
   content::WebContents* GetGuestByInstanceID(int guest_instance_id);
 
@@ -118,6 +125,9 @@ class GuestViewManager : public content::BrowserPluginGuestManager,
   // We disallow adding new guest with instance IDs that were previously removed
   // from this manager using RemoveGuest.
   bool CanUseGuestInstanceID(int guest_instance_id);
+
+  static bool GetFullPageGuestHelper(content::WebContents** result,
+                                     content::WebContents* guest_web_contents);
 
   // Static factory instance (always NULL for non-test).
   static GuestViewManagerFactory* factory_;

@@ -613,7 +613,7 @@ DownloadInterruptReason ResourceDispatcherHostImpl::BeginDownload(
 
   SetReferrerForRequest(request.get(), referrer);
 
-  int extra_load_flags = net::LOAD_IS_DOWNLOAD;
+  int extra_load_flags = net::LOAD_NORMAL;
   if (prefer_cache) {
     // If there is upload data attached, only retrieve from cache because there
     // is no current mechanism to prompt the user for their consent for a
@@ -1870,7 +1870,7 @@ void ResourceDispatcherHostImpl::BeginNavigationRequest(
           info.common_params.url,
           resource_type,
           resource_context))) {
-    loader->NotifyRequestFailed(net::ERR_ABORTED);
+    loader->NotifyRequestFailed(false, net::ERR_ABORTED);
     return;
   }
 

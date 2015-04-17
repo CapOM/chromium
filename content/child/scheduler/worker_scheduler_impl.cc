@@ -18,6 +18,7 @@ WorkerSchedulerImpl::WorkerSchedulerImpl(
               this,
               "worker.scheduler",
               TRACE_DISABLED_BY_DEFAULT("worker.scheduler"),
+              "WorkerSchedulerIdlePeriod",
               SchedulerHelper::TASK_QUEUE_COUNT,
               base::TimeDelta::FromMilliseconds(300)) {
   initialized_ = false;
@@ -50,6 +51,11 @@ WorkerSchedulerImpl::IdleTaskRunner() {
 bool WorkerSchedulerImpl::CanExceedIdleDeadlineIfRequired() const {
   DCHECK(initialized_);
   return helper_.CanExceedIdleDeadlineIfRequired();
+}
+
+bool WorkerSchedulerImpl::ShouldYieldForHighPriorityWork() {
+  // We don't consider any work as being high priority on workers.
+  return false;
 }
 
 void WorkerSchedulerImpl::AddTaskObserver(

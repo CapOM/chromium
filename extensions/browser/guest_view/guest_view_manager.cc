@@ -14,10 +14,12 @@
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/result_codes.h"
 #include "content/public/common/url_constants.h"
-#include "extensions/browser/extension_system.h"
 #include "extensions/browser/guest_view/guest_view_base.h"
 #include "extensions/browser/guest_view/guest_view_manager_factory.h"
-#include "extensions/common/extension_messages.h"
+#include "extensions/browser/process_manager.h"
+#include "extensions/browser/process_map.h"
+#include "extensions/common/features/feature.h"
+#include "extensions/common/features/feature_provider.h"
 #include "extensions/common/guest_view/guest_view_constants.h"
 #include "net/base/escape.h"
 #include "url/gurl.h"
@@ -186,6 +188,14 @@ bool GuestViewManager::ForEachGuest(WebContents* owner_web_contents,
   return false;
 }
 
+WebContents* GuestViewManager::GetFullPageGuest(
+    WebContents* embedder_web_contents) {
+  WebContents* result = nullptr;
+  ForEachGuest(embedder_web_contents,
+               base::Bind(&GuestViewManager::GetFullPageGuestHelper, &result));
+  return result;
+}
+
 void GuestViewManager::AddGuest(int guest_instance_id,
                                 WebContents* guest_web_contents) {
   CHECK(!ContainsKey(guest_web_contents_by_instance_id_, guest_instance_id));
@@ -229,6 +239,31 @@ void GuestViewManager::RemoveGuest(int guest_instance_id) {
   }
 }
 
+bool GuestViewManager::IsGuestAvailableToContext(
+    GuestViewBase* guest,
+    std::string* owner_extension_id) {
+  const Feature* feature =
+      FeatureProvider::GetAPIFeature(guest->GetAPINamespace());
+  CHECK(feature);
+
+  ProcessMap* process_map = ProcessMap::Get(context_);
+  CHECK(process_map);
+
+  const Extension* owner_extension = ProcessManager::Get(context_)->
+      GetExtensionForWebContents(guest->owner_web_contents());
+  *owner_extension_id = owner_extension ? owner_extension->id() : std::string();
+
+  // Ok for |owner_extension| to be nullptr, the embedder might be WebUI.
+  Feature::Availability availability = feature->IsAvailableToContext(
+      owner_extension,
+      process_map->GetMostLikelyContextType(
+          owner_extension,
+          guest->owner_web_contents()->GetRenderProcessHost()->GetID()),
+      guest->GetOwnerSiteURL());
+
+  return availability.is_available();
+}
+
 content::WebContents* GuestViewManager::GetGuestByInstanceID(
     int guest_instance_id) {
   auto it = guest_web_contents_by_instance_id_.find(guest_instance_id);
@@ -256,6 +291,18 @@ bool GuestViewManager::CanUseGuestInstanceID(int guest_instance_id) {
   if (guest_instance_id <= last_instance_id_removed_)
     return false;
   return !ContainsKey(removed_instance_ids_, guest_instance_id);
+}
+
+// static
+bool GuestViewManager::GetFullPageGuestHelper(
+    content::WebContents** result,
+    content::WebContents* guest_web_contents) {
+  auto guest_view = GuestViewBase::FromWebContents(guest_web_contents);
+  if (guest_view && guest_view->is_full_page_plugin()) {
+    *result = guest_web_contents;
+    return true;
+  }
+  return false;
 }
 
 bool GuestViewManager::CanEmbedderAccessInstanceID(

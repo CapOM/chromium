@@ -188,9 +188,9 @@ class Yahoo(WebsiteTest):
 
   def Login(self):
     self.GoTo("https://login.yahoo.com")
-    self.FillUsernameInto("#username")
-    self.FillPasswordInto("#passwd")
-    self.Submit("#passwd")
+    self.FillUsernameInto("#login-username")
+    self.FillPasswordInto("#login-passwd")
+    self.Click("#login-signin")
 
 
 class Yandex(WebsiteTest):
@@ -373,14 +373,10 @@ class Flipkart(WebsiteTest):
     self.Submit("#login_password")
 
 
-# Iframe, password saved but not autofilled.
 class Instagram(WebsiteTest):
 
   def Login(self):
     self.GoTo("https://instagram.com/accounts/login/")
-    self.Wait(5)
-    frame = self.driver.find_element_by_css_selector(".hiFrame")
-    self.driver.switch_to_frame(frame)
     self.FillUsernameInto("#lfFieldInputUsername")
     self.FillPasswordInto("#lfFieldInputPassword")
     self.Submit(".lfSubmit")
@@ -485,7 +481,8 @@ all_tests = {
 }
 
 
-def SaveResults(environment_tests_results, environment_save_path):
+def SaveResults(environment_tests_results, environment_save_path,
+                save_only_failures):
   """Save the test results in an xml file.
 
   Args:
@@ -499,15 +496,16 @@ def SaveResults(environment_tests_results, environment_save_path):
   if environment_save_path:
     xml = "<result>"
     for (name, test_type, success, failure_log) in environment_tests_results:
-      xml += (
-          "<test name='{0}' successful='{1}' type='{2}'>{3}</test>".format(
-              name, success, test_type, failure_log))
+      if not (save_only_failures and success):
+        xml += (
+            "<test name='{0}' successful='{1}' type='{2}'>{3}</test>".format(
+                name, success, test_type, failure_log))
     xml += "</result>"
     with open(environment_save_path, "w") as save_file:
       save_file.write(xml)
 
 def RunTest(chrome_path, chromedriver_path, profile_path,
-            environment_passwords_path, website_test_name, test_type):
+            environment_passwords_path, website_test_name, test_case_name):
   """Runs the test for the specified website.
 
   Args:
@@ -526,8 +524,7 @@ def RunTest(chrome_path, chromedriver_path, profile_path,
         fails, or if the website name is not known.
   """
 
-  enable_automatic_password_saving = (
-      test_type == WebsiteTest.TEST_TYPE_SAVE_AND_AUTOFILL)
+  enable_automatic_password_saving = (test_case_name == "SaveAndAutofillTest")
   environment = Environment(chrome_path, chromedriver_path, profile_path,
                             environment_passwords_path,
                             enable_automatic_password_saving)
@@ -537,7 +534,7 @@ def RunTest(chrome_path, chromedriver_path, profile_path,
   else:
     raise Exception("Test name {} is unknown.".format(website_test_name))
 
-  environment.RunTestsOnSites(test_type)
+  environment.RunTestsOnSites(test_case_name)
   environment.Quit()
   return environment.tests_results
 
@@ -563,27 +560,32 @@ def main():
       help="Set the usernames/passwords path (required).", required=True)
   parser.add_argument("--save-path", action="store", dest="save_path",
                       help="Write the results in a file.")
-  parser.add_argument("test", help="Test to be run.")
-
+  parser.add_argument("--save-only-failures",
+                      help="Only save logs for failing tests.",
+                      dest="save_only_failures", action="store_true",
+  parser.add_argument("website", help="Website test name on which"
+                      "tests should be run.")
+  parser.add_argument("--test-cases-to-run", help="Names of test cases which"
+                      "should be run. Currently supported test cases are:"
+                      "PromptFailTest, PromptSuccessTest, SaveAndAutofillTest",
+                      dest="test_cases_to_run", action="store", nargs="*")
   args = parser.parse_args()
 
   save_path = None
   if args.save_path:
     save_path = args.save_path
 
-  tests_results = RunTest(
-      args.chrome_path, args.chromedriver_path, args.profile_path,
-      args.passwords_path, args.test, WebsiteTest.TEST_TYPE_PROMPT_FAIL)
+  test_cases_to_run = args.test_cases_to_run or\
+      ("PromptFailTest", "PromptSuccessTest", "SaveAndAutofillTest")
 
-  tests_results += RunTest(
-      args.chrome_path, args.chromedriver_path, args.profile_path,
-      args.passwords_path, args.test, WebsiteTest.TEST_TYPE_PROMPT_SUCCESS)
+  for test_case in test_cases_to_run:
+    tests_results = RunTest(
+        args.chrome_path, args.chromedriver_path, args.profile_path,
+        args.passwords_path, args.website, test_case)
 
-  tests_results += RunTest(
-      args.chrome_path, args.chromedriver_path, args.profile_path,
-      args.passwords_path, args.test, WebsiteTest.TEST_TYPE_SAVE_AND_AUTOFILL)
 
-  SaveResults(tests_results, save_path)
+  SaveResults(tests_results, save_path,
+              save_only_failures=args.save_only_failures)
 
 if __name__ == "__main__":
   main()

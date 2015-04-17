@@ -34,7 +34,8 @@ scoped_ptr<VideoLayerImpl> VideoLayerImpl::Create(
   DCHECK(tree_impl->proxy()->IsImplThread());
 
   scoped_refptr<VideoFrameProviderClientImpl> provider_client_impl =
-      VideoFrameProviderClientImpl::Create(provider);
+      VideoFrameProviderClientImpl::Create(
+          provider, tree_impl->GetVideoFrameControllerClient());
 
   return make_scoped_ptr(
       new VideoLayerImpl(tree_impl, id, provider_client_impl, video_rotation));
@@ -380,7 +381,7 @@ void VideoLayerImpl::DidDraw(ResourceProvider* resource_provider) {
     frame_resources_.clear();
   }
 
-  provider_client_impl_->PutCurrentFrame(frame_);
+  provider_client_impl_->PutCurrentFrame();
   frame_ = nullptr;
 
   provider_client_impl_->ReleaseLock();

@@ -101,11 +101,12 @@ class OverscrollNavigationOverlayTest : public RenderViewHostImplTestHarness {
     // Performs BACK navigation, sets image from layer_delegate_ on
     // image_delegate_.
     GetOverlay()->OnOverscrollCompleting();
+    main_test_rfh()->PrepareForCommit();
     if (window) {
-      EXPECT_TRUE(contents()->cross_navigation_pending());
+      EXPECT_TRUE(contents()->CrossProcessNavigationPending());
       EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::BACK);
     } else {
-      EXPECT_FALSE(contents()->cross_navigation_pending());
+      EXPECT_FALSE(contents()->CrossProcessNavigationPending());
       EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::NONE);
     }
     window->SetBounds(gfx::Rect(root_window()->bounds().size()));
@@ -236,7 +237,7 @@ TEST_F(OverscrollNavigationOverlayTest, CancelNavigation) {
   EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::BACK);
 
   GetOverlay()->OnOverscrollCancelled();
-  EXPECT_FALSE(contents()->cross_navigation_pending());
+  EXPECT_FALSE(contents()->CrossProcessNavigationPending());
   EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::NONE);
 }
 
@@ -251,8 +252,9 @@ TEST_F(OverscrollNavigationOverlayTest, CancelAfterSuccessfulNavigation) {
   GetOverlay()->OnOverscrollCancelled();
   EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::NONE);
 
-  EXPECT_TRUE(contents()->cross_navigation_pending());
-  contents()->CommitPendingNavigation();
+  EXPECT_TRUE(contents()->CrossProcessNavigationPending());
+  main_test_rfh()->SendNavigate(
+      1, contents()->GetController().GetPendingEntry()->GetURL());
   EXPECT_EQ(contents()->GetURL(), third());
 }
 
@@ -266,7 +268,8 @@ TEST_F(OverscrollNavigationOverlayTest, Navigation_PaintUpdate) {
   // for the previous page, so we should still be observing.
   EXPECT_TRUE(GetOverlay()->web_contents());
 
-  contents()->CommitPendingNavigation();
+  main_test_rfh()->SendNavigate(
+      1, contents()->GetController().GetPendingEntry()->GetURL());
   ReceivePaintUpdate();
 
   // Navigation was committed and the paint update was received - we should no
@@ -288,7 +291,8 @@ TEST_F(OverscrollNavigationOverlayTest, Navigation_LoadingUpdate) {
   contents()->TestSetIsLoading(true);
   contents()->TestSetIsLoading(false);
   EXPECT_FALSE(GetOverlay()->web_contents());
-  contents()->CommitPendingNavigation();
+  main_test_rfh()->SendNavigate(
+      1, contents()->GetController().GetPendingEntry()->GetURL());
   EXPECT_EQ(contents()->GetURL(), third());
 }
 

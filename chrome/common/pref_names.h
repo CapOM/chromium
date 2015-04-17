@@ -291,7 +291,6 @@ extern const char kEnabledLabsExperiments[];
 extern const char kEnableAutoSpellCorrect[];
 extern const char kSavingBrowserHistoryDisabled[];
 extern const char kAllowDeletingBrowserHistory[];
-extern const char kForceSafeSearch[];
 extern const char kForceGoogleSafeSearch[];
 extern const char kForceYouTubeSafetyMode[];
 extern const char kRecordHistory[];
@@ -677,7 +676,7 @@ extern const char kLogoutStartedLast[];
 extern const char kConsumerManagementStage[];
 extern const char kNewOobe[];
 extern const char kConsumerManagementEnrollmentStage[];
-extern const char kWebviewSigninEnabled[];
+extern const char kWebviewSigninDisabled[];
 #endif  // defined(OS_CHROMEOS)
 
 extern const char kClearPluginLSODataEnabled[];

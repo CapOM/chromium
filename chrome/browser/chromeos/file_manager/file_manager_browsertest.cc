@@ -1159,6 +1159,14 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE,
                                     "tabindexFocusDirectorySelected")));
 
+INSTANTIATE_TEST_CASE_P(
+    TabindexOpenDialog,
+    FileManagerBrowserTest,
+    ::testing::Values(
+        TestParameter(NOT_IN_GUEST_MODE, "tabindexOpenDialogDrive"),
+        TestParameter(NOT_IN_GUEST_MODE, "tabindexOpenDialogDownloads"),
+        TestParameter(IN_GUEST_MODE, "tabindexOpenDialogDownloads")));
+
 // Fails on official build. http://crbug.com/429294
 // Disabled under MSAN as well. http://crbug.com/468980.
 #if !defined(NDEBUG) || defined(OFFICIAL_BUILD) || defined(MEMORY_SANITIZER)
@@ -1216,6 +1224,7 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
 
 // Structure to describe an account info.
 struct TestAccountInfo {
+  const char* const gaia_id;
   const char* const email;
   const char* const hash;
   const char* const display_name;
@@ -1228,10 +1237,10 @@ enum {
 };
 
 static const TestAccountInfo kTestAccounts[] = {
-  {"__dummy__@invalid.domain", "hashdummy", "Dummy Account"},
-  {"alice@invalid.domain", "hashalice", "Alice"},
-  {"bob@invalid.domain", "hashbob", "Bob"},
-  {"charlie@invalid.domain", "hashcharlie", "Charlie"},
+    {"gaia-id-d", "__dummy__@invalid.domain", "hashdummy", "Dummy Account"},
+    {"gaia-id-a", "alice@invalid.domain", "hashalice", "Alice"},
+    {"gaia-id-b", "bob@invalid.domain", "hashbob", "Bob"},
+    {"gaia-id-c", "charlie@invalid.domain", "hashcharlie", "Charlie"},
 };
 
 // Test fixture class for testing multi-profile features.
@@ -1284,8 +1293,8 @@ class MultiProfileFileManagerBrowserTest : public FileManagerBrowserTestBase {
     user_manager->SaveUserDisplayName(info.email,
                                       base::UTF8ToUTF16(info.display_name));
     SigninManagerFactory::GetForProfile(
-        chromeos::ProfileHelper::GetProfileByUserIdHash(info.hash))->
-            SetAuthenticatedUsername(info.email);
+        chromeos::ProfileHelper::GetProfileByUserIdHash(info.hash))
+        ->SetAuthenticatedAccountInfo(info.gaia_id, info.email);
   }
 
  private:

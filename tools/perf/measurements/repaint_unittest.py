@@ -9,6 +9,7 @@ from telemetry.unittest_util import options_for_unittests
 from telemetry.unittest_util import page_test_test_case
 
 from measurements import repaint
+from page_sets import repaint_helpers
 
 
 class TestRepaintPage(page_module.Page):
@@ -17,7 +18,7 @@ class TestRepaintPage(page_module.Page):
                                           page_set, base_dir)
 
   def RunPageInteractions(self, action_runner):
-    action_runner.RepaintContinuously(seconds=2)
+    repaint_helpers.Repaint(action_runner)
 
 
 class RepaintUnitTest(page_test_test_case.PageTestTestCase):

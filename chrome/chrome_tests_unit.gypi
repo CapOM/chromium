@@ -70,7 +70,6 @@
       'browser/content_settings/content_settings_origin_identifier_value_map_unittest.cc',
       'browser/content_settings/content_settings_policy_provider_unittest.cc',
       'browser/content_settings/content_settings_pref_provider_unittest.cc',
-      'browser/content_settings/content_settings_supervised_provider_unittest.cc',
       'browser/content_settings/content_settings_usages_state_unittest.cc',
       'browser/content_settings/cookie_settings_unittest.cc',
       'browser/content_settings/host_content_settings_map_unittest.cc',
@@ -415,9 +414,9 @@
       'browser/ui/cocoa/extensions/extension_install_prompt_test_utils.mm',
       'browser/ui/cocoa/extensions/extension_install_view_controller_unittest.mm',
       'browser/ui/cocoa/extensions/extension_installed_bubble_controller_unittest.mm',
-      'browser/ui/cocoa/extensions/extension_toolbar_icon_surfacing_bubble_mac_unittest.mm',
       'browser/ui/cocoa/extensions/media_galleries_dialog_cocoa_unittest.mm',
       'browser/ui/cocoa/extensions/test_toolbar_actions_bar_helper_cocoa.mm',
+      'browser/ui/cocoa/extensions/toolbar_actions_bar_bubble_mac_unittest.mm',
       'browser/ui/cocoa/find_bar/find_bar_bridge_unittest.mm',
       'browser/ui/cocoa/find_bar/find_bar_cocoa_controller_unittest.mm',
       'browser/ui/cocoa/find_bar/find_bar_text_field_cell_unittest.mm',
@@ -559,6 +558,7 @@
       'common/mac/mock_launchd.cc',
       'common/mac/mock_launchd.h',
       'common/mac/objc_zombie_unittest.mm',
+      'common/origin_util_unittest.cc',
       'common/partial_circular_buffer_unittest.cc',
       'common/pref_names_util_unittest.cc',
       'common/search_urls_unittest.cc',
@@ -952,7 +952,6 @@
       # New Task Manager Tests Sources:
       'browser/task_management/providers/browser_process_task_unittest.cc',
       'browser/task_management/providers/child_process_task_unittest.cc',
-      
       # Old Task Manager Tests Sources:
       'browser/task_manager/task_manager_unittest.cc',
       'browser/task_manager/task_manager_util_unittest.cc',
@@ -1205,6 +1204,7 @@
       'browser/chromeos/file_system_provider/operations/abort_unittest.cc',
       'browser/chromeos/file_system_provider/operations/add_watcher_unittest.cc',
       'browser/chromeos/file_system_provider/operations/close_file_unittest.cc',
+      'browser/chromeos/file_system_provider/operations/configure_unittest.cc',
       'browser/chromeos/file_system_provider/operations/copy_entry_unittest.cc',
       'browser/chromeos/file_system_provider/operations/create_directory_unittest.cc',
       'browser/chromeos/file_system_provider/operations/create_file_unittest.cc',
@@ -1401,6 +1401,7 @@
       'browser/ui/webui/theme_source_unittest.cc',
     ],
     'chrome_unit_tests_supervised_user_sources': [
+      'browser/content_settings/content_settings_supervised_provider_unittest.cc',
       'browser/supervised_user/child_accounts/family_info_fetcher_unittest.cc',
       'browser/supervised_user/child_accounts/permission_request_creator_apiary_unittest.cc',
       'browser/supervised_user/experimental/supervised_user_async_url_checker_unittest.cc',
@@ -1431,7 +1432,7 @@
       'browser/font_family_cache_unittest.cc',
       'browser/importer/firefox_profile_lock_unittest.cc',
       'browser/importer/profile_writer_unittest.cc',
-      # Android uses a different invaliator.
+      # Android uses a different invalidator.
       'browser/invalidation/gcm_invalidation_bridge_unittest.cc',
       'browser/invalidation/ticl_profile_settings_provider_unittest.cc',
       'browser/media_galleries/fileapi/native_media_file_util_unittest.cc',
@@ -1509,6 +1510,8 @@
       'browser/ui/toolbar/recent_tabs_builder_test_helper.cc',
       'browser/ui/toolbar/recent_tabs_builder_test_helper.h',
       'browser/ui/toolbar/recent_tabs_sub_menu_model_unittest.cc',
+      'browser/ui/toolbar/test_toolbar_actions_bar_bubble_delegate.cc',
+      'browser/ui/toolbar/test_toolbar_actions_bar_bubble_delegate.h',
       'browser/ui/toolbar/test_toolbar_actions_bar_helper.h',
       'browser/ui/toolbar/test_toolbar_model.cc',
       'browser/ui/toolbar/test_toolbar_model.h',
@@ -2181,7 +2184,7 @@
             }],
           ],
         }],
-        ['enable_one_click_signin==1', {        
+        ['enable_one_click_signin==1', {
           'sources': [
             'browser/ui/sync/one_click_signin_sync_observer_unittest.cc',
             'browser/ui/sync/one_click_signin_sync_starter_unittest.cc',
@@ -2242,18 +2245,6 @@
           'dependencies': [
             'browser/ui/libgtk2ui/libgtk2ui.gyp:gtk2ui',
             '../build/linux/system.gyp:gio',
-          ],
-          'conditions': [
-            ['component != "shared_library"', {
-              # TODO(erg): This file does not compile in shared library mode
-              # because it is reaching into the internals of libgtk2ui, which
-              # shouldn't be linked with the rest of chrome. This should either
-              # be fixed by creating a separate unit test target, or by deleting
-              # the test.
-              'sources': [
-                'browser/ui/libgtk2ui/x11_input_method_context_impl_gtk2_unittest.cc',
-              ],
-            }],
           ],
         }],
         ['use_aura==1 or toolkit_views==1', {
@@ -2585,7 +2576,7 @@
             }],
           ],
         }],
-        ['OS != "android" and (use_nss == 1 or use_openssl_certs == 1)', {
+        ['OS != "android" and (use_nss_certs == 1 or use_openssl_certs == 1)', {
           'sources': [
             'common/net/x509_certificate_model_unittest.cc',
           ],

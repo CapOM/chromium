@@ -253,8 +253,6 @@
       'browser/browsing_data/cookies_tree_model.h',
       'browser/browsing_data/local_data_container.cc',
       'browser/browsing_data/local_data_container.h',
-      'browser/caps/generate_state_json.h',
-      'browser/caps/generate_state_json.cc',
       'browser/character_encoding.cc',
       'browser/character_encoding.h',
       'browser/chrome_browser_application_mac.h',
@@ -586,8 +584,6 @@
       'browser/prerender/prerender_link_manager.h',
       'browser/prerender/prerender_link_manager_factory.cc',
       'browser/prerender/prerender_link_manager_factory.h',
-      'browser/prerender/prerender_local_predictor.cc',
-      'browser/prerender/prerender_local_predictor.h',
       'browser/prerender/prerender_manager.cc',
       'browser/prerender/prerender_manager.h',
       'browser/prerender/prerender_manager_factory.cc',
@@ -809,8 +805,6 @@
       'browser/signin/signin_global_error.h',
       'browser/signin/signin_global_error_factory.cc',
       'browser/signin/signin_global_error_factory.h',
-      'browser/sync/sync_global_error_factory.cc',
-      'browser/sync/sync_global_error_factory.h',
     ],
     # Everything but Android, iOS, and CrOS.
     'chrome_browser_desktop_sources': [
@@ -1775,6 +1769,8 @@
       'browser/metrics/time_ticks_experiment_win.h',
       'browser/metrics/variations/generated_resources_map.h',
       'browser/metrics/variations/generated_resources_map_lookup.cc',
+      'browser/metrics/variations/url_constants.cc',
+      'browser/metrics/variations/url_constants.h',
       'browser/metrics/variations/variations_registry_syncer_win.cc',
       'browser/metrics/variations/variations_registry_syncer_win.h',
       'browser/metrics/variations/variations_request_scheduler.cc',
@@ -2023,8 +2019,6 @@
       'browser/renderer_host/pepper/pepper_isolated_file_system_message_filter.h',
       'browser/renderer_host/pepper/pepper_output_protection_message_filter.cc',
       'browser/renderer_host/pepper/pepper_output_protection_message_filter.h',
-      'browser/renderer_host/pepper/pepper_talk_host.cc',
-      'browser/renderer_host/pepper/pepper_talk_host.h',
     ],
     'chrome_browser_plugin_installation_sources': [
       'browser/plugins/plugin_installer.cc',
@@ -2111,6 +2105,8 @@
       'browser/policy/cloud/user_policy_signin_service.h',
       'browser/sync/sync_global_error.cc',
       'browser/sync/sync_global_error.h',
+      'browser/sync/sync_global_error_factory.cc',
+      'browser/sync/sync_global_error_factory.h',
       'browser/upgrade_detector_impl.cc',
       'browser/upgrade_detector_impl.h',
     ],
@@ -2858,6 +2854,10 @@
       'browser/sync/sync_type_preference_provider.h',
     ],
     'chrome_browser_task_manager_sources': [
+      # Stats collection for CAPS (uses old task manager):
+      'browser/caps/generate_state_json.cc',
+      'browser/caps/generate_state_json.h',
+
       # New Task Manager Sources:
       'browser/task_management/providers/browser_process_task_provider.cc',
       'browser/task_management/providers/browser_process_task_provider.h',
@@ -2872,7 +2872,7 @@
       'browser/task_management/providers/task_provider.h',
       'browser/task_management/providers/task.cc',
       'browser/task_management/providers/task.h',
-      
+
       # Old Task Manager Sources:
       'browser/task_manager/background_information.cc',
       'browser/task_manager/background_information.h',
@@ -3423,7 +3423,7 @@
             '../components/components.gyp:crash_component',
           ],
         }],
-        ['use_nss==1', {
+        ['use_nss_certs==1', {
           'sources': [ '<@(chrome_browser_nss_sources)' ],
           'conditions': [
             ['chromeos==1', {

@@ -187,7 +187,7 @@ class AdbWrapper(object):
     devices = (AdbWrapper(line[0]) for line in lines if len(line) == 2)
 
     def matches_all_filters(device):
-      for f in filters:
+      for f in filters or ():
         if not f(device):
           logging.info('Device %s failed filter %s', device.GetDeviceSerial(),
                        f.__name__)

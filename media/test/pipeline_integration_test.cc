@@ -91,10 +91,13 @@ const int kAppendWholeFile = -1;
 const int kAppendTimeSec = 1;
 const int kAppendTimeMs = kAppendTimeSec * 1000;
 const int k320WebMFileDurationMs = 2736;
+#if !defined(DISABLE_EME_TESTS)
+const int k320EncWebMFileDurationMs = 2737;
+#endif  // !defined(DISABLE_EME_TESTS)
 const int k640WebMFileDurationMs = 2749;
 const int kOpusEndTrimmingWebMFileDurationMs = 2741;
 const int kVP9WebMFileDurationMs = 2736;
-const int kVP8AWebMFileDurationMs = 2733;
+const int kVP8AWebMFileDurationMs = 2734;
 
 #if defined(USE_PROPRIETARY_CODECS)
 #if !defined(DISABLE_EME_TESTS)
@@ -631,12 +634,8 @@ class PipelineIntegrationTestHost : public mojo::test::ApplicationTestBase,
 
   void SetUp() override {
     ApplicationTestBase::SetUp();
-
-    // TODO(dalecurtis): For some reason this isn't done...
-    if (!base::CommandLine::InitializedForCurrentProcess()) {
-      base::CommandLine::Init(0, NULL);
+    if (!IsMediaLibraryInitialized())
       InitializeMediaLibraryForTesting();
-    }
   }
 
  protected:
@@ -681,8 +680,6 @@ class PipelineIntegrationTest : public PipelineIntegrationTestHost {
                    base::Unretained(this)),
         base::Bind(&PipelineIntegrationTest::OnBufferingStateChanged,
                    base::Unretained(this)),
-        base::Bind(&PipelineIntegrationTest::OnVideoFramePaint,
-                   base::Unretained(this)),
         base::Closure(), base::Bind(&PipelineIntegrationTest::OnAddTextTrack,
                                     base::Unretained(this)),
         base::Bind(&PipelineIntegrationTest::OnWaitingForDecryptionKey,
@@ -726,8 +723,6 @@ class PipelineIntegrationTest : public PipelineIntegrationTestHost {
         base::Bind(&PipelineIntegrationTest::OnMetadata,
                    base::Unretained(this)),
         base::Bind(&PipelineIntegrationTest::OnBufferingStateChanged,
-                   base::Unretained(this)),
-        base::Bind(&PipelineIntegrationTest::OnVideoFramePaint,
                    base::Unretained(this)),
         base::Closure(), base::Bind(&PipelineIntegrationTest::OnAddTextTrack,
                                     base::Unretained(this)),
@@ -1063,7 +1058,7 @@ TEST_F(PipelineIntegrationTest,
   EXPECT_EQ(1u, pipeline_->GetBufferedTimeRanges().size());
   EXPECT_EQ(0, pipeline_->GetBufferedTimeRanges().start(0).InMilliseconds());
   // The second video was not added, so its time has not been added.
-  EXPECT_EQ(k320WebMFileDurationMs,
+  EXPECT_EQ(k320EncWebMFileDurationMs,
             pipeline_->GetBufferedTimeRanges().end(0).InMilliseconds());
 
   Play();

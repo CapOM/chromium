@@ -8,6 +8,7 @@
 #include "base/prefs/pref_service.h"
 #include "base/prefs/scoped_user_pref_update.h"
 #include "base/stl_util.h"
+#include "base/values.h"
 #include "chrome/browser/chromeos/file_system_provider/mount_path_util.h"
 #include "chrome/browser/chromeos/file_system_provider/observer.h"
 #include "chrome/browser/chromeos/file_system_provider/provided_file_system.h"
@@ -16,8 +17,11 @@
 #include "chrome/browser/chromeos/file_system_provider/registry_interface.h"
 #include "chrome/browser/chromeos/file_system_provider/service_factory.h"
 #include "chrome/browser/chromeos/file_system_provider/throttled_file_system.h"
+#include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/common/permissions/api_permission.h"
+#include "extensions/common/permissions/permissions_data.h"
 #include "storage/browser/fileapi/external_mount_points.h"
 #include "storage/common/fileapi/file_system_mount_option.h"
 
@@ -38,6 +42,13 @@ ProvidedFileSystemInterface* CreateProvidedFileSystem(
 }
 
 }  // namespace
+
+ProvidingExtensionInfo::ProvidingExtensionInfo()
+    : can_configure(false), can_add(false) {
+}
+
+ProvidingExtensionInfo::~ProvidingExtensionInfo() {
+}
 
 Service::Service(Profile* profile,
                  extensions::ExtensionRegistry* extension_registry)
@@ -245,6 +256,28 @@ bool Service::RequestUnmount(const std::string& extension_id,
   return true;
 }
 
+bool Service::RequestMount(const std::string& extension_id) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+
+  extensions::EventRouter* const event_router =
+      extensions::EventRouter::Get(profile_);
+  DCHECK(event_router);
+
+  if (!event_router->ExtensionHasEventListener(
+          extension_id, extensions::api::file_system_provider::
+                            OnMountRequested::kEventName)) {
+    return false;
+  }
+
+  event_router->DispatchEventToExtension(
+      extension_id,
+      make_scoped_ptr(new extensions::Event(
+          extensions::api::file_system_provider::OnMountRequested::kEventName,
+          scoped_ptr<base::ListValue>(nullptr))));
+
+  return true;
+}
+
 std::vector<ProvidedFileSystemInfo> Service::GetProvidedFileSystemInfoList() {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -268,6 +301,39 @@ ProvidedFileSystemInterface* Service::GetProvidedFileSystem(
     return NULL;
 
   return file_system_it->second;
+}
+
+std::vector<ProvidingExtensionInfo> Service::GetProvidingExtensionInfoList()
+    const {
+  extensions::ExtensionRegistry* const registry =
+      extensions::ExtensionRegistry::Get(profile_);
+  DCHECK(registry);
+
+  extensions::EventRouter* const router =
+      extensions::EventRouter::Get(profile_);
+  DCHECK(router);
+
+  std::vector<ProvidingExtensionInfo> result;
+  for (const auto& extension : registry->enabled_extensions()) {
+    if (!extension->permissions_data()->HasAPIPermission(
+            extensions::APIPermission::kFileSystemProvider)) {
+      continue;
+    }
+
+    ProvidingExtensionInfo info;
+    info.extension_id = extension->id();
+    info.name = extension->name();
+    info.can_configure = router->ExtensionHasEventListener(
+        extension->id(), extensions::api::file_system_provider::
+                             OnConfigureRequested::kEventName);
+    info.can_add = router->ExtensionHasEventListener(
+        extension->id(),
+        extensions::api::file_system_provider::OnMountRequested::kEventName);
+
+    result.push_back(info);
+  }
+
+  return result;
 }
 
 void Service::OnExtensionUnloaded(

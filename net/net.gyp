@@ -170,16 +170,13 @@
           'sources!': [
             # See bug http://crbug.com/344533.
             'disk_cache/blockfile/index_table_v3_unittest.cc',
-            # No res_ninit() et al on Android, so this doesn't make a lot of
-            # sense.
-            'dns/dns_config_service_posix_unittest.cc',
           ],
           'dependencies': [
             'net_javatests',
             'net_test_jni_headers',
           ],
         }],
-        [ 'use_nss != 1', {
+        [ 'use_nss_certs != 1', {
           'sources!': [
             'ssl/client_cert_store_chromeos_unittest.cc',
             'ssl/client_cert_store_nss_unittest.cc',
@@ -401,12 +398,6 @@
               'disk_cache/blockfile/index_table_v3_unittest.cc',
             ],
         }],
-        [ 'OS == "android"', {
-            'sources!': [
-              'dns/dns_config_service_posix_unittest.cc',
-            ],
-          },
-        ],
         ['OS == "android"', {
           # TODO(mmenke):  This depends on test_support_base, which depends on
           #                icu.  Figure out a way to remove that dependency.
@@ -549,8 +540,8 @@
         'http/http_transaction_test_util.h',
         'log/captured_net_log_entry.cc',
         'log/captured_net_log_entry.h',
-        'log/capturing_net_log.cc',
-        'log/capturing_net_log.h',
+        'log/test_net_log.cc',
+        'log/test_net_log.h',
         'log/capturing_net_log_observer.cc',
         'log/capturing_net_log_observer.h',
         'proxy/mock_proxy_resolver.cc',
@@ -607,7 +598,7 @@
             '../third_party/protobuf/protobuf.gyp:py_proto',
           ],
         }],
-        ['use_openssl == 0 and (use_nss == 1 or OS == "ios")', {
+        ['use_openssl == 0 and (use_nss_certs == 1 or OS == "ios")', {
           'conditions': [
             [ 'desktop_linux == 1 or chromeos == 1', {
               'dependencies': [
@@ -651,7 +642,7 @@
               'dns/mock_mdns_socket_factory.h'
             ]
         }],
-        [ 'use_nss != 1', {
+        [ 'use_nss_certs != 1', {
             'sources!': [
               'test/cert_test_util_nss.cc',
             ],

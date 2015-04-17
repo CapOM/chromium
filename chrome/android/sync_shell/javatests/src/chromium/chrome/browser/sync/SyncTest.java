@@ -6,6 +6,7 @@ package org.chromium.chrome.browser.sync;
 
 import android.accounts.Account;
 import android.app.Activity;
+import android.content.Context;
 import android.test.suitebuilder.annotation.LargeTest;
 import android.util.Log;
 
@@ -16,6 +17,7 @@ import org.chromium.base.test.util.Feature;
 import org.chromium.chrome.browser.identity.UniqueIdentificationGenerator;
 import org.chromium.chrome.browser.identity.UniqueIdentificationGeneratorFactory;
 import org.chromium.chrome.browser.identity.UuidBasedUniqueIdentificationGenerator;
+import org.chromium.chrome.browser.signin.AccountIdProvider;
 import org.chromium.chrome.shell.ChromeShellActivity;
 import org.chromium.chrome.shell.ChromeShellTestBase;
 import org.chromium.chrome.test.util.browser.sync.SyncTestUtil;
@@ -58,6 +60,22 @@ public class SyncTest extends ChromeShellTestBase {
 
         clearAppData();
 
+        // Setup fake mapper from accountNames to Ids.
+        ThreadUtils.runOnUiThreadBlocking(new Runnable() {
+            @Override
+            public void run() {
+                if (AccountIdProvider.getInstance() != null) {
+                    return;
+                }
+
+                AccountIdProvider.setInstance(new AccountIdProvider() {
+                    public String getAccountId(Context ctx, String accountName) {
+                        return "gaia-id-" + accountName;
+                    }
+                });
+            }
+        });
+
         // Mock out the account manager on the device.
         mContext = new SyncTestUtil.SyncTestContext(getInstrumentation().getTargetContext());
         mAccountManager = new MockAccountManager(mContext, getInstrumentation().getContext());
@@ -90,6 +108,16 @@ public class SyncTest extends ChromeShellTestBase {
         });
 
         super.tearDown();
+    }
+
+    /**
+     * This is a regression test for http://crbug.com/475299.
+     */
+    @LargeTest
+    @Feature({"Sync"})
+    public void testGcmInitialized() throws Throwable {
+        setupTestAccountAndSignInToSync(FOREIGN_SESSION_TEST_MACHINE_ID);
+        assertTrue(ChromeSigninController.get(mContext).isGcmInitialized());
     }
 
     @LargeTest
@@ -278,6 +306,23 @@ public class SyncTest extends ChromeShellTestBase {
         assertLocalEntityCount("Typed URLs", 1);
 
         // TODO(pvalenzuela): Also verify that the downloaded typed URL matches the one that was
+        // injected. This data should be retrieved from the Sync node browser data.
+    }
+
+    @LargeTest
+    @Feature({"Sync"})
+    public void testDownloadBookmark() throws InterruptedException {
+        setupTestAccountAndSignInToSync(FOREIGN_SESSION_TEST_MACHINE_ID);
+        // 3 bookmark folders exist by default: Bookmarks Bar, Other Bookmarks, Mobile Bookmarks.
+        assertLocalEntityCount("Bookmarks", 3);
+
+        mFakeServerHelper.injectBookmarkEntity(
+                "Title", "http://chromium.org", mFakeServerHelper.getBookmarkBarFolderId());
+
+        SyncTestUtil.triggerSyncAndWaitForCompletion(mContext);
+        assertLocalEntityCount("Bookmarks", 4);
+
+        // TODO(pvalenzuela): Also verify that the downloaded bookmark matches the one that was
         // injected. This data should be retrieved from the Sync node browser data.
     }
 

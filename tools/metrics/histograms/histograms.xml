@@ -2378,6 +2378,25 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="BrowserRenderProcessHost.ChildCrashes" enum="RendererType">
+  <owner>wfh@chromium.org</owner>
+  <summary>Count of renderer process crashes grouped by type.</summary>
+</histogram>
+
+<histogram name="BrowserRenderProcessHost.ChildKills" enum="RendererType">
+  <owner>wfh@chromium.org</owner>
+  <summary>Count of renderer process kills grouped by type.</summary>
+</histogram>
+
+<histogram name="BrowserRenderProcessHost.DisconnectedAlive"
+    enum="RendererType">
+  <owner>wfh@chromium.org</owner>
+  <summary>
+    Count of renderer process crashes that we miscounted because we took the
+    exit code too early. Grouped by type.
+  </summary>
+</histogram>
+
 <histogram name="Canvas.ContextType" enum="CanvasContextType">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -3316,11 +3335,63 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram
+    name="Compositing.DisplayListRecordingSource.UpdateInvalidatedAreaPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Area of invalidated content, in pixels, divided by update (i.e. record), in
+    milliseconds. Recorded when display list recording source is updated.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.DisplayListRecordingSource.UpdateUs"
+    units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent updating (i.e. recording) a display list, in microseconds.
+    Recorded when display list is updated.
+  </summary>
+</histogram>
+
 <histogram name="Compositing.NumActiveLayers">
   <owner>dneto@chromium.org</owner>
   <summary>
     The number of layers in the active tree for each compositor frame. This is
     logged once per frame, before the frame is drawn.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.PicturePile.UpdateInvalidatedAreaPerMs"
+    units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Area of invalidated content, in pixels, divided by update (i.e. record), in
+    milliseconds. Recorded when picture pile is updated.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.PicturePile.UpdateUs" units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent updating (i.e. recording) a picture pile, in microseconds.
+    Recorded when picture pile is updated.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.RasterTask.RasterPixelsPerMs" units="pixels/ms">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Rasterized area, in pixels, divided by rasterization time, in milliseconds,
+    of a compositor rasterization task. Recorded after the task finishes.
+  </summary>
+</histogram>
+
+<histogram name="Compositing.RasterTask.RasterUs" units="microseconds">
+  <owner>paint-dev@chromium.org</owner>
+  <summary>
+    Time spent completing a compositor rasterization task, in microseconds.
+    Recorded after the task finishes.
   </summary>
 </histogram>
 
@@ -3742,23 +3813,40 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Cookie.TimeDatabaseMigrationToV5" units="ms">
+  <obsolete>
+    Deprecated as of 04/2015. The migration has finished for most users.
+  </obsolete>
   <owner>erikwright@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v4 database to v5.</summary>
 </histogram>
 
 <histogram name="Cookie.TimeDatabaseMigrationToV6" units="ms">
+  <obsolete>
+    Deprecated as of 04/2015. The migration has finished for most users.
+  </obsolete>
   <owner>erikwright@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v5 database to v6.</summary>
 </histogram>
 
 <histogram name="Cookie.TimeDatabaseMigrationToV7" units="ms">
+  <obsolete>
+    Deprecated as of 04/2015. The migration has finished for most users.
+  </obsolete>
   <owner>erikwright@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v6 database to v7.</summary>
 </histogram>
 
 <histogram name="Cookie.TimeDatabaseMigrationToV8" units="ms">
+  <obsolete>
+    Deprecated as of 04/2015. The migration has finished for most users.
+  </obsolete>
   <owner>erikwright@chromium.org</owner>
   <summary>The amount of time (ms) to migrate a v7 database to v8.</summary>
+</histogram>
+
+<histogram name="Cookie.TimeDatabaseMigrationToV9" units="ms">
+  <owner>erikchen@chromium.org</owner>
+  <summary>The amount of time (ms) to migrate a v8 database to v9.</summary>
 </histogram>
 
 <histogram name="Cookie.TimeGet" units="ms">
@@ -3845,6 +3933,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     when it gets removed and used to investigate the audio glitch/skip problem
     on Chrome OS.
   </summary>
+</histogram>
+
+<histogram name="CrashExitCodes.Extension" enum="CrashExitCodes">
+  <owner>wfh@chromium.org</owner>
+  <summary>The exit codes for crashed extension processes.</summary>
+</histogram>
+
+<histogram name="CrashExitCodes.Renderer" enum="CrashExitCodes">
+  <owner>wfh@chromium.org</owner>
+  <summary>The exit codes for crashed renderer processes.</summary>
 </histogram>
 
 <histogram name="CrashReport.BreakpadCrashDumpOutcome" enum="DumpOutcome">
@@ -11635,6 +11733,25 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="History.FirstSetTopSitesDeltaSize">
+  <owner>yiyaoliu@chromium.org</owner>
+  <summary>
+    The count of differences between cached top sites and up-to-date top sites
+    when function TopSitesImpl::SetTopSites is firstly called at startup.
+  </summary>
+</histogram>
+
+<histogram name="History.FirstUpdateTime" units="milliseconds">
+  <owner>yiyaoliu@chromium.org</owner>
+  <summary>
+    The amount of time for function
+    history::TopSitesBackend::UpdateTopSitesOnDBThread to execute when this
+    function is called during startup. Excludes the case where local
+    TopSitesDatabase db_ is unavailable, i.e. where the update doesn't really
+    happen.
+  </summary>
+</histogram>
+
 <histogram name="History.HistoryServiceInitTime" units="milliseconds">
   <owner>rkaplow@chromium.org</owner>
   <summary>
@@ -11732,6 +11849,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="History.UpdateTopSitesOnDBThreadTime" units="milliseconds">
+  <obsolete>
+    Deprecated because only the execution time at startup is of interest. See
+    histogram History.UpdateTopSitesOnDBThread_Startup_Time.
+  </obsolete>
   <owner>yiyaoliu@chromium.org</owner>
   <summary>
     The amount of time for function
@@ -18709,6 +18830,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.HttpHeaderParserEvent" enum="HttpHeaderParserEvent">
+  <owner>mmenke@chromium.org</owner>
+  <summary>
+    Records the frequency with which a number of hacky HTTP header parsing rules
+    are invoked.  This histogram should be removed after we have enough data to
+    know if we can remove the hacks.
+  </summary>
+</histogram>
+
 <histogram name="net.HttpIdentSrcURL" units="requests">
   <owner>tsepez@chromium.org</owner>
   <summary>
@@ -24222,6 +24352,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Notifications.AuthorDataSizeKB" units="KB">
+  <owner>peter@chromium.org</owner>
+  <summary>
+    The size, in kilobytes, of the author-provided data associated with a Web
+    Notification. Recorded when a persistent Web Notification is being shown by
+    the developer.
+  </summary>
+</histogram>
+
 <histogram name="Notifications.Database.DeleteResult"
     enum="NotificationDatabaseStatus">
   <owner>peter@chromium.org</owner>
@@ -24249,11 +24388,29 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Notifications.Database.OpenAfterCorruptionResult"
+    enum="NotificationDatabaseStatus">
+  <owner>peter@chromium.org</owner>
+  <summary>
+    Records the result status codes of opening the Web Notification database
+    after it has been destroyed in response to data corruption.
+  </summary>
+</histogram>
+
 <histogram name="Notifications.Database.OpenResult"
     enum="NotificationDatabaseStatus">
   <owner>peter@chromium.org</owner>
   <summary>
     Records the result status codes of opening the Web Notification database.
+  </summary>
+</histogram>
+
+<histogram name="Notifications.Database.ReadForServiceWorkerResult"
+    enum="NotificationDatabaseStatus">
+  <owner>peter@chromium.org</owner>
+  <summary>
+    Records the result status codes of reading data of all notifications
+    associated with a Service Worker from the Web Notification database.
   </summary>
 </histogram>
 
@@ -25320,6 +25477,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram
+    name="PasswordManager.EmptyUsernames.FormWithoutUsernameFieldIsPasswordChangeForm"
+    enum="PasswordManagerEmptyUsernamePasswordChangeForm">
+  <owner>msramek@chromium.org</owner>
+  <owner>vasilii@chromium.org</owner>
+  <summary>
+    When parsing a password form, and no username field is detected, whether
+    this was a password change form.
+  </summary>
+</histogram>
+
 <histogram name="PasswordManager.EmptyUsernames.OfferedToSave"
     enum="PasswordManagerShowEmptyUsername">
   <owner>vasilii@chromium.org</owner>
@@ -25333,6 +25501,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>vasilii@chromium.org</owner>
   <summary>
     When parsing a password form, whether a username field is detected.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.EmptyUsernames.WithoutCorrespondingNonempty">
+  <owner>msramek@chromium.org</owner>
+  <owner>vasilii@chromium.org</owner>
+  <summary>
+    Number of password forms with empty username in the Login Database for which
+    there is not another password form from the same realm with a nonempty
+    username. In other words, number of password forms with empty username which
+    we do not suspect to be reauthentication forms.
   </summary>
 </histogram>
 
@@ -29024,6 +29203,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Prerender.LocalPredictorEvent"
     enum="PrerenderLocalPredictorEvents">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     Enumeration of what events related to the local predictor have occurred
@@ -29032,6 +29214,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Prerender.LocalPredictorLoggedInLookupTime"
     units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     Time to perform the LoggedIn Lookup for the local predictor. This operation
@@ -29041,6 +29226,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Prerender.LocalPredictorPrefetchMatchPLT" units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     The PrerenderLocalPredictor uses local browsing history and the prerender
@@ -29054,6 +29242,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Prerender.LocalPredictorServiceLookupTime"
     units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     Time to perform the Service Lookup for the local predictor. This operation
@@ -29063,6 +29254,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Prerender.LocalPredictorTimeUntilUsed" units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     Time from when a prerendered page is started to when it is first used due to
@@ -29072,6 +29266,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Prerender.LocalPredictorURLLookupTime" units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     Time to perform the URL Lookup for the local predictor. This operation
@@ -29665,6 +29862,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Prerender.SimulatedLocalBrowsingBaselinePLT"
     units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     For simulated local browsing prerendering, the baseline PLT of pages without
@@ -29673,6 +29873,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Prerender.SimulatedLocalBrowsingPLT" units="milliseconds">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     For simulated local browsing prerendering, the estimated PLT of pages with
@@ -29699,6 +29902,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Prerender.TabHelperEvent" enum="PrerenderTabHelperEvents">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <owner>tburkard@chromium.org</owner>
   <summary>
     Enumeration of what events related to the TabHelper class have occurred.
@@ -38851,6 +39057,36 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Startup.BrowserMessageLoopStartHardFaultCount" units="faults">
+  <owner>chrisha@chromium.org</owner>
+  <summary>
+    The number of hard faults incurred in the browser process from startup to
+    start of the main thread's message loop, not including first runs of the
+    browser. This is only reported on Windows 7 and greater.
+  </summary>
+</histogram>
+
+<histogram name="Startup.BrowserMessageLoopStartHardFaultCount.FirstRun"
+    units="faults">
+  <owner>chrisha@chromium.org</owner>
+  <summary>
+    The number of hard faults incurred in the browser process from startup to
+    start of the main thread's message loop on first run. This is only reported
+    on Windows 7 and greater.
+  </summary>
+</histogram>
+
+<histogram name="Startup.BrowserMessageLoopStartHardFaultCount.Success"
+    enum="BooleanSuccess">
+  <owner>chrisha@chromium.org</owner>
+  <summary>
+    If OS support was detected (Windows 7 and greater) indicates whether it was
+    possible to determine the number of hard faults that have occurred in the
+    process from startup to start of the main thread's message loop. This can
+    fail because the underlying call is inherently racy.
+  </summary>
+</histogram>
+
 <histogram name="Startup.BrowserMessageLoopStartTime">
   <owner>jeremy@chromium.org</owner>
   <summary>
@@ -47522,6 +47758,74 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Hash Mismatch"/>
 </enum>
 
+<enum name="CrashExitCodes" type="int">
+  <int value="2" label="RESULT_CODE_HUNG"/>
+  <int value="3" label="RESULT_CODE_KILLED_BAD_MESSAGE"/>
+  <int value="4" label="RESULT_CODE_INVALID_CMDLINE_URL"/>
+  <int value="5" label="RESULT_CODE_BAD_PROCESS_TYPE"/>
+  <int value="6" label="RESULT_CODE_MISSING_DATA"/>
+  <int value="7" label="RESULT_CODE_SHELL_INTEGRATION_FAILED"/>
+  <int value="8" label="RESULT_CODE_MACHINE_LEVEL_INSTALL_EXISTS"/>
+  <int value="9" label="RESULT_CODE_UNINSTALL_CHROME_ALIVE"/>
+  <int value="10" label="RESULT_CODE_UNINSTALL_USER_CANCEL"/>
+  <int value="11" label="RESULT_CODE_UNINSTALL_DELETE_PROFILE"/>
+  <int value="12" label="RESULT_CODE_UNSUPPORTED_PARAM"/>
+  <int value="13" label="RESULT_CODE_IMPORTER_HUNG"/>
+  <int value="14" label="RESULT_CODE_RESPAWN_FAILED"/>
+  <int value="15" label="RESULT_CODE_NORMAL_EXIT_EXP1"/>
+  <int value="16" label="RESULT_CODE_NORMAL_EXIT_EXP2"/>
+  <int value="17" label="RESULT_CODE_NORMAL_EXIT_EXP3"/>
+  <int value="18" label="RESULT_CODE_NORMAL_EXIT_EXP4"/>
+  <int value="19" label="RESULT_CODE_NORMAL_EXIT_CANCEL"/>
+  <int value="20" label="RESULT_CODE_PROFILE_IN_USE"/>
+  <int value="21" label="RESULT_CODE_PACK_EXTENSION_ERROR"/>
+  <int value="22" label="RESULT_CODE_UNINSTALL_EXTENSION_ERROR"/>
+  <int value="23" label="RESULT_CODE_NORMAL_EXIT_PROCESS_NOTIFIED"/>
+  <int value="25" label="RESULT_CODE_INSTALL_FROM_WEBSTORE_ERROR_2"/>
+  <int value="27" label="RESULT_CODE_EULA_REFUSED"/>
+  <int value="28" label="RESULT_CODE_SXS_MIGRATION_FAILED"/>
+  <int value="29" label="RESULT_CODE_ACTION_DISALLOWED_BY_POLICY"/>
+  <int value="30" label="RESULT_CODE_INVALID_SANDBOX_STATE"/>
+  <int value="7006" label="SBOX_FATAL_INTEGRITY"/>
+  <int value="7007" label="SBOX_FATAL_DROPTOKEN"/>
+  <int value="7008" label="SBOX_FATAL_FLUSHANDLES"/>
+  <int value="7009" label="SBOX_FATAL_CACHEDISABLE"/>
+  <int value="7010" label="SBOX_FATAL_CLOSEHANDLES"/>
+  <int value="7011" label="SBOX_FATAL_MITIGATION"/>
+  <int value="7012" label="SBOX_FATAL_MEMORY_EXCEEDED"/>
+  <int value="529697949" label="CPP_EH_EXCEPTION"/>
+  <int value="533692099" label="STATUS_GUARD_PAGE_VIOLATION"/>
+  <int value="1073740791" label="STATUS_STACK_BUFFER_OVERRUN"/>
+  <int value="1073741510" label="STATUS_CONTROL_C_EXIT"/>
+  <int value="1073741515" label="STATUS_DLL_NOT_FOUND"/>
+  <int value="1073741571" label="STATUS_STACK_OVERFLOW"/>
+  <int value="1073741674" label="STATUS_PRIVILEGED_INSTRUCTION"/>
+  <int value="1073741675" label="STATUS_INTEGER_OVERFLOW"/>
+  <int value="1073741676" label="STATUS_INTEGER_DIVIDE_BY_ZERO"/>
+  <int value="1073741677" label="STATUS_FLOAT_UNDERFLOW"/>
+  <int value="1073741678" label="STATUS_FLOAT_STACK_CHECK"/>
+  <int value="1073741679" label="STATUS_FLOAT_OVERFLOW"/>
+  <int value="1073741680" label="STATUS_FLOAT_INVALID_OPERATION"/>
+  <int value="1073741681" label="STATUS_FLOAT_INEXACT_RESULT"/>
+  <int value="1073741682" label="STATUS_FLOAT_DIVIDE_BY_ZERO"/>
+  <int value="1073741683" label="STATUS_FLOAT_DENORMAL_OPERAND"/>
+  <int value="1073741684" label="STATUS_ARRAY_BOUNDS_EXCEEDED"/>
+  <int value="1073741783" label="STATUS_INVALID_UNWIND_TARGET"/>
+  <int value="1073741786" label="STATUS_INVALID_DISPOSITION"/>
+  <int value="1073741787" label="STATUS_NONCONTINUABLE_EXCEPTION"/>
+  <int value="1073741790" label="STATUS_ACCESS_DENIED"/>
+  <int value="1073741795" label="STATUS_ILLEGAL_INSTRUCTION"/>
+  <int value="1073741801" label="STATUS_NO_MEMORY"/>
+  <int value="1073741811" label="STATUS_INVALID_PARAMETER"/>
+  <int value="1073741816" label="STATUS_INVALID_HANDLE"/>
+  <int value="1073741818" label="STATUS_IN_PAGE_ERROR"/>
+  <int value="1073741819" label="STATUS_ACCESS_VIOLATION"/>
+  <int value="1073741829" label="STATUS_SEGMENT_NOTIFICATION"/>
+  <int value="2147483644" label="STATUS_SINGLE_STEP"/>
+  <int value="2147483645" label="STATUS_BREAKPOINT"/>
+  <int value="2147483646" label="STATUS_DATATYPE_MISALIGNMENT"/>
+</enum>
+
 <enum name="CrosDisksArchiveType" type="int">
   <int value="0" label="Unknown"/>
   <int value="1" label="ZIP"/>
@@ -50554,6 +50858,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1000" label="DEVELOPERPRIVATE_GETPROFILECONFIGURATION"/>
   <int value="1001" label="DEVELOPERPRIVATE_UPDATEPROFILECONFIGURATION"/>
   <int value="1002" label="SOCKETS_UDP_SETBROADCAST"/>
+  <int value="1003" label="FILEMANAGERPRIVATE_GETPROVIDINGEXTENSIONS"/>
+  <int value="1004" label="WEBVIEWINTERNAL_ADDCONTENTSCRIPTS"/>
+  <int value="1005" label="WEBVIEWINTERNAL_REMOVECONTENTSCRIPTS"/>
+  <int value="1006" label="DEVELOPERPRIVATE_REPAIREXTENSION"/>
+  <int value="1007" label="DEVELOPERPRIVATE_SHOWOPTIONS"/>
+  <int value="1008" label="DEVELOPERPRIVATE_SHOWPATH"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -51630,13 +51940,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="746" label="TabStopProperty"/>
   <int value="747" label="TabStopAttribute"/>
   <int value="748" label="LegacyConst"/>
+  <int value="749" label="SVGFilterRes"/>
   <int value="750" label="V8Permissions_Query_Method"/>
+  <int value="751" label="LegacyCSSValueIntrinsic"/>
+  <int value="752" label="LegacyCSSValueMinIntrinsic"/>
+  <int value="753" label="WebkitCanvas"/>
   <int value="754" label="V8HTMLInputElement_Autocapitalize_AttributeGetter"/>
   <int value="755" label="V8HTMLInputElement_Autocapitalize_AttributeSetter"/>
   <int value="756"
       label="V8HTMLTextAreaElement_Autocapitalize_AttributeGetter"/>
   <int value="757"
       label="V8HTMLTextAreaElement_Autocapitalize_AttributeSetter"/>
+  <int value="758" label="SVGHrefBaseVal"/>
+  <int value="759" label="SVGHrefAnimVal"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -52730,6 +53046,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="13" label="Negotiate Secure Proxy"/>
   <int value="14" label="Negotiate Server"/>
   <int value="15" label="Negotiate Secure Server"/>
+</enum>
+
+<enum name="HttpHeaderParserEvent" type="int">
+  <int value="0" label="PARSER_INVOKED"/>
+  <int value="1" label="HTTP_09_RESPONSE"/>
+  <int value="2" label="ALLOWED_TRUNCATED_HEADERS"/>
+  <int value="3" label="SKIPPED_WS_PREFIX"/>
+  <int value="4" label="SKIPPED_NON_WS_PREFIX"/>
 </enum>
 
 <enum name="HttpPipelineStatus" type="int">
@@ -57745,6 +58069,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="No username field"/>
 </enum>
 
+<enum name="PasswordManagerEmptyUsernamePasswordChangeForm" type="int">
+  <int value="0" label="Not a password change form"/>
+  <int value="1" label="A password change form"/>
+</enum>
+
 <enum name="PasswordManagerOsPasswordStatus" type="int">
   <int value="0" label="Unknown"/>
   <int value="1" label="Unsupported platform"/>
@@ -58271,6 +58600,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderCookieSendType" type="int">
+  <obsolete>
+    Deprecated March 13 2015.
+  </obsolete>
   <int value="0" label="no cookies sent"/>
   <int value="1" label="first party cookies sent"/>
   <int value="2" label="third party cookies sent"/>
@@ -58278,6 +58610,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderCookieStatus" type="int">
+  <obsolete>
+    Deprecated March 13 2015.
+  </obsolete>
   <int value="0" label="no action"/>
   <int value="1" label="[main frame send]"/>
   <int value="2" label="[main frame change]"/>
@@ -58298,6 +58633,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderEvent" type="int">
+  <obsolete>
+    Deprecated Dec 12 2014.
+  </obsolete>
   <int value="0" label="Swapin no delegate"/>
   <int value="1" label="Swapin candidate"/>
   <int value="2" label="Swapin candidate namespace matces"/>
@@ -58389,6 +58727,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderLocalPredictorEvents" type="int">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <int value="0" label="Constructed"/>
   <int value="1" label="Init scheduled"/>
   <int value="2" label="Init started"/>
@@ -58490,6 +58831,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderLocalVisitCoreTransition" type="int">
+  <obsolete>
+    Deprecated Nov 16 2012
+  </obsolete>
   <int value="0" label="LINK"/>
   <int value="1" label="TYPED"/>
   <int value="2" label="AUTO_BOOKMARK"/>
@@ -58504,6 +58848,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderLocalVisitEvents" type="int">
+  <obsolete>
+    Deprecated Nov 16 2012
+  </obsolete>
   <int value="0" label="V1_VISIT"/>
   <int value="1" label="V1_PRERENDER_STARTED_1"/>
   <int value="2" label="V1_PRERENDER_USED_1"/>
@@ -58524,6 +58871,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderMode" type="int">
+  <obsolete>
+    deprecated Nov 16 2012
+  </obsolete>
   <int value="0" label="PRERENDER_MODE_DISABLED"/>
   <int value="1" label="PRERENDER_MODE_ENABLED"/>
   <int value="2" label="PRERENDER_MODE_EXPERIMENT_CONTROL_GROUP"/>
@@ -58536,6 +58886,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderPageviewEvents" type="int">
+  <obsolete>
+    deprecated Nov 16 2012
+  </obsolete>
   <int value="0" label="PAGEVIEW_EVENT_NEW_URL"/>
   <int value="1" label="PAGEVIEW_EVENT_TOP_SITE_NEW_URL"/>
   <int value="2" label="PAGEVIEW_EVENT_LOAD_START"/>
@@ -58564,6 +58917,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PrerenderTabHelperEvents" type="int">
+  <obsolete>
+    Deprecated April 2015
+  </obsolete>
   <int value="0" label="Table requested"/>
   <int value="1" label="Table present"/>
   <int value="2" label="Mainframe change"/>
@@ -59671,6 +60027,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="Cast Generic Media Player"/>
   <int value="1" label="Cast YouTube Player"/>
   <int value="2" label="Non-Cast YouTube Player"/>
+</enum>
+
+<enum name="RendererType" type="int">
+  <int value="1" label="Normal renderer"/>
+  <int value="2" label="Extension renderer"/>
 </enum>
 
 <enum name="RenderViewContextMenuItem" type="int">
@@ -61123,29 +61484,71 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="26" label="SQLITE_NOTADB">
     File opened that is not a database file
   </int>
+  <int value="27" label="SQLITE_NOTICE">Notifications from sqlite3_log()</int>
+  <int value="28" label="SQLITE_WARNING">Warnings from sqlite3_log()</int>
   <int value="100" label="SQLITE_ROW">sqlite3_step() has another row ready</int>
   <int value="101" label="SQLITE_DONE">
     sqlite3_step() has finished executing
   </int>
   <int value="261" label="SQLITE_BUSY_RECOVERY">TBD</int>
   <int value="262" label="SQLITE_LOCKED_SHAREDCACHE">TBD</int>
+  <int value="264" label="SQLITE_READONLY_RECOVERY">TBD</int>
   <int value="266" label="SQLITE_IOERR_READ">Error reading from file</int>
+  <int value="267" label="SQLITE_CORRUPT_VTAB">TBD</int>
   <int value="270" label="SQLITE_CANTOPEN_NOTEMPDIR">TBD</int>
+  <int value="275" label="SQLITE_CONSTRAINT_CHECK">TBD</int>
+  <int value="279" label="SQLITE_AUTH_USER">TBD</int>
+  <int value="283" label="SQLITE_NOTICE_RECOVER_WAL">TBD</int>
+  <int value="284" label="SQLITE_WARNING_AUTOINDEX">TBD</int>
+  <int value="516" label="SQLITE_ABORT_ROLLBACK">TBD</int>
+  <int value="517" label="SQLITE_BUSY_SNAPSHOT">TBD</int>
+  <int value="520" label="SQLITE_READONLY_CANTLOCK">TBD</int>
   <int value="522" label="SQLITE_IOERR_SHORT_READ">Short read from file</int>
+  <int value="526" label="SQLITE_CANTOPEN_ISDIR">
+    Database file is directory
+  </int>
+  <int value="531" label="SQLITE_CONSTRAINT_COMMITHOOK">TBD</int>
+  <int value="539" label="SQLITE_NOTICE_RECOVER_ROLLBACK">TBD</int>
+  <int value="776" label="SQLITE_READONLY_ROLLBACK">
+    Cannot rollback due to readonly file
+  </int>
   <int value="778" label="SQLITE_IOERR_WRITE">
     Error writing to file (other than SQLITE_FULL)
   </int>
+  <int value="782" label="SQLITE_CANTOPEN_FULLPATH">TBD</int>
+  <int value="787" label="SQLITE_CONSTRAINT_FOREIGNKEY">
+    Constraint failure due to foreign key violation
+  </int>
+  <int value="1032" label="SQLITE_READONLY_DBMOVED">
+    Readonly because database file was moved or unlinked while open
+  </int>
   <int value="1034" label="SQLITE_IOERR_FSYNC">Error syncing to disk</int>
+  <int value="1038" label="SQLITE_CANTOPEN_CONVPATH">TBD</int>
+  <int value="1043" label="SQLITE_CONSTRAINT_FUNCTION">TBD</int>
   <int value="1290" label="SQLITE_IOERR_DIR_FSYNC">
     Error syncing directory changes to disk
   </int>
+  <int value="1299" label="SQLITE_CONSTRAINT_NOTNULL">
+    NOTNULL constraint violated
+  </int>
   <int value="1546" label="SQLITE_IOERR_TRUNCATE">Error truncating file</int>
+  <int value="1555" label="SQLITE_CONSTRAINT_PRIMARYKEY">
+    Primary key not unique
+  </int>
   <int value="1802" label="SQLITE_IOERR_FSTAT">Error reading file metadata</int>
+  <int value="1811" label="SQLITE_CONSTRAINT_TRIGGER">
+    Constraint failed due to trigger raise
+  </int>
   <int value="2058" label="SQLITE_IOERR_UNLOCK">Error unlocking file</int>
+  <int value="2067" label="SQLITE_CONSTRAINT_UNIQUE">
+    Unique constraint failed
+  </int>
   <int value="2314" label="SQLITE_IOERR_RDLOCK">
     Error getting read lock - should not be possible
   </int>
+  <int value="2323" label="SQLITE_CONSTRAINT_VTAB">TBD</int>
   <int value="2570" label="SQLITE_IOERR_DELETE">Error deleting file</int>
+  <int value="2579" label="SQLITE_CONSTRAINT_ROWID">Rowid not unique</int>
   <int value="2826" label="SQLITE_IOERR_BLOCKED">
     Deadlock due to other process access to SQLite files
   </int>
@@ -61164,6 +61567,12 @@ To add a new entry, add it with any value and run test to compute valid value.
     Error in stat while mmapping file
   </int>
   <int value="5130" label="SQLITE_IOERR_SHMLOCK">Unused</int>
+  <int value="5386" label="SQLITE_IOERR_SHMMAP">TBD</int>
+  <int value="5642" label="SQLITE_IOERR_SEEK">TBD</int>
+  <int value="5898" label="SQLITE_IOERR_DELETE_NOENT">TBD</int>
+  <int value="6154" label="SQLITE_IOERR_MMAP">TBD</int>
+  <int value="6410" label="SQLITE_IOERR_GETTEMPPATH">TBD</int>
+  <int value="6666" label="SQLITE_IOERR_CONVPATH">TBD</int>
 </enum>
 
 <enum name="SqliteIOERRCode" type="int">
@@ -66608,7 +67017,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="gws" label="GWS triggered prerender."/>
   <suffix name="externalrequest" label="Externally triggered prerender."/>
   <suffix name="Instant" label="Instant search prerender."/>
-  <suffix name="localpredictor" label="Local predictor triggered prerender."/>
+  <suffix name="localpredictor" label="Local predictor triggered prerender.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
   <suffix name="omnibox" label="Triggered from the omnibox."/>
   <suffix name="wash" label="Multiple sources could have triggered."/>
   <suffix name="web" label="Link triggered prerender."/>

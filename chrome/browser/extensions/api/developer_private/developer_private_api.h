@@ -15,6 +15,8 @@
 #include "chrome/browser/extensions/error_console/error_console.h"
 #include "chrome/browser/extensions/extension_uninstall_dialog.h"
 #include "chrome/browser/extensions/pack_extension_job.h"
+#include "chrome/common/extensions/webstore_install_result.h"
+#include "extensions/browser/app_window/app_window_registry.h"
 #include "extensions/browser/browser_context_keyed_api_factory.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_registry_observer.h"
@@ -62,7 +64,8 @@ typedef std::vector<linked_ptr<developer::ItemInspectView> >
 
 class DeveloperPrivateEventRouter : public ExtensionRegistryObserver,
                                     public ErrorConsole::Observer,
-                                    public ProcessManagerObserver {
+                                    public ProcessManagerObserver,
+                                    public AppWindowRegistry::Observer {
  public:
   explicit DeveloperPrivateEventRouter(Profile* profile);
   ~DeveloperPrivateEventRouter() override;
@@ -98,11 +101,17 @@ class DeveloperPrivateEventRouter : public ExtensionRegistryObserver,
       const std::string& extension_id,
       content::RenderFrameHost* render_frame_host) override;
 
+  // AppWindowRegistry::Observer:
+  void OnAppWindowAdded(AppWindow* window) override;
+  void OnAppWindowRemoved(AppWindow* window) override;
+
   ScopedObserver<ExtensionRegistry, ExtensionRegistryObserver>
       extension_registry_observer_;
   ScopedObserver<ErrorConsole, ErrorConsole::Observer> error_console_observer_;
   ScopedObserver<ProcessManager, ProcessManagerObserver>
       process_manager_observer_;
+  ScopedObserver<AppWindowRegistry, AppWindowRegistry::Observer>
+      app_window_registry_observer_;
 
   Profile* profile_;
 
@@ -174,18 +183,20 @@ class DeveloperPrivateAPIFunction : public ChromeUIThreadExtensionFunction {
   // Returns the extension with the given |id| from the registry, including
   // all possible extensions (enabled, disabled, terminated, etc).
   const Extension* GetExtensionById(const std::string& id);
+
+  // Returns the extension with the given |id| from the registry, only checking
+  // enabled extensions.
+  const Extension* GetEnabledExtensionById(const std::string& id);
 };
 
-class DeveloperPrivateAutoUpdateFunction : public ChromeSyncExtensionFunction {
+class DeveloperPrivateAutoUpdateFunction : public DeveloperPrivateAPIFunction {
  public:
   DECLARE_EXTENSION_FUNCTION("developerPrivate.autoUpdate",
                              DEVELOPERPRIVATE_AUTOUPDATE)
 
  protected:
   ~DeveloperPrivateAutoUpdateFunction() override;
-
-  // ExtensionFunction:
-  bool RunSync() override;
+  ResponseAction Run() override;
 };
 
 class DeveloperPrivateGetItemsInfoFunction
@@ -473,6 +484,41 @@ class DeveloperPrivateDeleteExtensionErrorsFunction
 
  protected:
   ~DeveloperPrivateDeleteExtensionErrorsFunction() override;
+  ResponseAction Run() override;
+};
+
+class DeveloperPrivateRepairExtensionFunction
+    : public DeveloperPrivateAPIFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("developerPrivate.repairExtension",
+                             DEVELOPERPRIVATE_REPAIREXTENSION);
+
+ protected:
+  ~DeveloperPrivateRepairExtensionFunction() override;
+  ResponseAction Run() override;
+
+  void OnReinstallComplete(bool success,
+                           const std::string& error,
+                           webstore_install::Result result);
+};
+
+class DeveloperPrivateShowOptionsFunction : public DeveloperPrivateAPIFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("developerPrivate.showOptions",
+                             DEVELOPERPRIVATE_SHOWOPTIONS);
+
+ protected:
+  ~DeveloperPrivateShowOptionsFunction() override;
+  ResponseAction Run() override;
+};
+
+class DeveloperPrivateShowPathFunction : public DeveloperPrivateAPIFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("developerPrivate.showPath",
+                             DEVELOPERPRIVATE_SHOWPATH);
+
+ protected:
+  ~DeveloperPrivateShowPathFunction() override;
   ResponseAction Run() override;
 };
 

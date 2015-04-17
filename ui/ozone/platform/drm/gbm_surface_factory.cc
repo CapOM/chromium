@@ -92,12 +92,6 @@ intptr_t GbmSurfaceFactory::GetNativeDisplay() {
 #endif
 }
 
-int GbmSurfaceFactory::GetDrmFd() {
-  scoped_refptr<GbmDevice> gbm = GetGbmDevice(gfx::kNullAcceleratedWidget);
-  DCHECK(gbm);
-  return gbm->get_fd();
-}
-
 const int32* GbmSurfaceFactory::GetEGLSurfaceProperties(
     const int32* desired_list) {
   static const int32 kConfigAttribs[] = {EGL_BUFFER_SIZE,
@@ -197,14 +191,9 @@ bool GbmSurfaceFactory::ScheduleOverlayPlane(
     LOG(ERROR) << "ScheduleOverlayPlane passed NULL buffer.";
     return false;
   }
-  HardwareDisplayController* hdc =
-      screen_manager_->GetWindow(widget)->GetController();
-  if (!hdc)
-    return true;
-
-  hdc->QueueOverlayPlane(OverlayPlane(pixmap->buffer(), plane_z_order,
-                                      plane_transform, display_bounds,
-                                      crop_rect));
+  screen_manager_->GetWindow(widget)->QueueOverlayPlane(
+      OverlayPlane(pixmap->buffer(), plane_z_order, plane_transform,
+                   display_bounds, crop_rect));
   return true;
 }
 

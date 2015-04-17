@@ -456,10 +456,10 @@
         (optional, read-only)
         <span class="type">string</span>
       </span>
-      The current error state for this network. Error states are provided by
-      the system and are not explicitly defined here. They may or may not be
-      human-readable. This field will be empty or absent if the network is not
-      in an error state.
+      The current error state for this network, if any. Error states are
+      provided by the system and are not explicitly defined here. They may or
+      may not be human-readable. This field will be empty or absent if the
+      network is not in an error state.
     </dd>
 
     <dt class="field">MacAddress</dt>
@@ -722,6 +722,17 @@
       connections. If <span class="value">WEP-PSK</span> is used, the passphrase
       must be of the format 0x&lt;hex-number&gt;, where &lt;hex-number&gt; is
       40, 104, 128, or 232 bits.
+    </dd>
+
+    <dt class="field">RoamThreshold</dt>
+    <dd>
+      <span class="field_meta">
+        (optional)
+        <span class="type">integer</span>
+      </span>
+      The roam threshold for this network, which is the signal-to-noise value
+      (in dB) below which we will attempt to roam to a new network. If this
+      value is not set, the default value will be used.
     </dd>
 
     <dt class="field">Security</dt>

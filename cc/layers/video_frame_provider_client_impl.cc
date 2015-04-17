@@ -13,13 +13,18 @@ namespace cc {
 
 // static
 scoped_refptr<VideoFrameProviderClientImpl>
-VideoFrameProviderClientImpl::Create(VideoFrameProvider* provider) {
-  return make_scoped_refptr(new VideoFrameProviderClientImpl(provider));
+VideoFrameProviderClientImpl::Create(VideoFrameProvider* provider,
+                                     VideoFrameControllerClient* client) {
+  return make_scoped_refptr(new VideoFrameProviderClientImpl(provider, client));
 }
 
 VideoFrameProviderClientImpl::VideoFrameProviderClientImpl(
-    VideoFrameProvider* provider)
-    : provider_(provider), active_video_layer_(nullptr), stopped_(false) {
+    VideoFrameProvider* provider,
+    VideoFrameControllerClient* client)
+    : provider_(provider),
+      client_(client),
+      active_video_layer_(nullptr),
+      stopped_(false) {
   // This only happens during a commit on the compositor thread while the main
   // thread is blocked. That makes this a thread-safe call to set the video
   // frame provider client that does not require a lock. The same is true of
@@ -59,6 +64,7 @@ void VideoFrameProviderClientImpl::Stop() {
     provider_->SetVideoFrameProviderClient(nullptr);
     provider_ = nullptr;
   }
+  client_->RemoveVideoFrameController(this);
   active_video_layer_ = nullptr;
   stopped_ = true;
 }
@@ -78,11 +84,10 @@ VideoFrameProviderClientImpl::AcquireLockAndCurrentFrame() {
   return provider_->GetCurrentFrame();
 }
 
-void VideoFrameProviderClientImpl::PutCurrentFrame(
-    const scoped_refptr<media::VideoFrame>& frame) {
+void VideoFrameProviderClientImpl::PutCurrentFrame() {
   DCHECK(thread_checker_.CalledOnValidThread());
   provider_lock_.AssertAcquired();
-  provider_->PutCurrentFrame(frame);
+  provider_->PutCurrentFrame();
 }
 
 void VideoFrameProviderClientImpl::ReleaseLock() {
@@ -104,6 +109,16 @@ void VideoFrameProviderClientImpl::StopUsingProvider() {
   provider_ = nullptr;
 }
 
+void VideoFrameProviderClientImpl::StartRendering() {
+  // TODO(dalecurtis, sunnyps): Hook this method up to control when to start
+  // observing vsync intervals. http://crbug.com/336733
+}
+
+void VideoFrameProviderClientImpl::StopRendering() {
+  // TODO(dalecurtis, sunnyps): Hook this method up to control when to stop
+  // observing vsync intervals. http://crbug.com/336733
+}
+
 void VideoFrameProviderClientImpl::DidReceiveFrame() {
   TRACE_EVENT1("cc",
                "VideoFrameProviderClientImpl::DidReceiveFrame",
@@ -123,6 +138,11 @@ void VideoFrameProviderClientImpl::DidUpdateMatrix(const float* matrix) {
       matrix[3], matrix[7], matrix[11], matrix[15]);
   if (active_video_layer_)
     active_video_layer_->SetNeedsRedraw();
+}
+
+void VideoFrameProviderClientImpl::OnBeginFrame(const BeginFrameArgs& args) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  NOTIMPLEMENTED();
 }
 
 }  // namespace cc

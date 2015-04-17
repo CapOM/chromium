@@ -682,8 +682,14 @@
 
         # NSS usage.
         ['(OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris") and use_openssl==0', {
+          'use_nss_certs%': 1,
+          # TODO(davidben): use_nss is deprecated and will be removed. See
+          # https://crbug.com/462040.
           'use_nss%': 1,
         }, {
+          'use_nss_certs%': 0,
+          # TODO(davidben): use_nss is deprecated and will be removed. See
+          # https://crbug.com/462040.
           'use_nss%': 0,
         }],
 
@@ -861,7 +867,7 @@
         # are using a custom toolchain and need to control -B in ldflags.
         # Do not use 32-bit gold on 32-bit hosts as it runs out address space
         # for component=static_library builds.
-        ['OS=="linux" and (target_arch=="x64" or target_arch=="arm")', {
+        ['(OS=="linux" or OS=="android") and (target_arch=="x64" or target_arch=="arm")', {
           'linux_use_bundled_gold%': 1,
         }, {
           'linux_use_bundled_gold%': 0,
@@ -1086,6 +1092,7 @@
     'use_openssl%': '<(use_openssl)',
     'use_openssl_certs%': '<(use_openssl_certs)',
     'use_nss%': '<(use_nss)',
+    'use_nss_certs%': '<(use_nss_certs)',
     'use_udev%': '<(use_udev)',
     'os_bsd%': '<(os_bsd)',
     'os_posix%': '<(os_posix)',
@@ -2030,8 +2037,8 @@
       ['use_ash==1', {
         'grit_defines': ['-D', 'use_ash'],
       }],
-      ['use_nss==1', {
-        'grit_defines': ['-D', 'use_nss'],
+      ['use_nss_certs==1', {
+        'grit_defines': ['-D', 'use_nss_certs'],
       }],
       ['use_ozone==1', {
         'grit_defines': ['-D', 'use_ozone'],
@@ -2148,20 +2155,31 @@
         'grit_defines': ['-D', 'enable_service_discovery'],
         'enable_service_discovery%': 1
       }],
-      ['clang_use_chrome_plugins==1 and OS!="win"', {
+      ['clang_use_chrome_plugins==1', {
         'variables': {
           'conditions': [
-            ['OS=="mac" or OS=="ios"', {
-              'clang_lib_path%': '<!(cd <(DEPTH) && pwd -P)/third_party/llvm-build/Release+Asserts/lib/libFindBadConstructs.dylib',
-            }, { # OS != "mac" or OS != "ios"
-              'clang_lib_path%': '<!(cd <(DEPTH) && pwd -P)/third_party/llvm-build/Release+Asserts/lib/libFindBadConstructs.so',
-            }],
+            ['OS!="win"', {
+              'variables': {
+                'conditions': [
+                  ['OS=="mac" or OS=="ios"', {
+                    'clang_lib_path%': '<!(cd <(DEPTH) && pwd -P)/third_party/llvm-build/Release+Asserts/lib/libFindBadConstructs.dylib',
+                  }, { # OS != "mac" or OS != "ios"
+                    'clang_lib_path%': '<!(cd <(DEPTH) && pwd -P)/third_party/llvm-build/Release+Asserts/lib/libFindBadConstructs.so',
+                  }],
+                ],
+              },
+              'clang_dynlib_flags%': '-Xclang -load -Xclang <(clang_lib_path) ',
+            }, { # OS == "win"
+              # On Windows, the plugin is built directly into clang, so there's
+              # no need to load it dynamically.
+              'clang_dynlib_flags%': '',
+            }]
           ],
         },
         # If you change these, also change build/config/clang/BUILD.gn.
         'clang_chrome_plugins_flags%':
-          '-Xclang -load -Xclang <(clang_lib_path)'
-          ' -Xclang -add-plugin -Xclang find-bad-constructs',
+          '<(clang_dynlib_flags)'
+          '-Xclang -add-plugin -Xclang find-bad-constructs',
       }],
       ['asan==1 or msan==1 or lsan==1 or tsan==1', {
         'clang%': 1,
@@ -2214,9 +2232,9 @@
       }],
 
       ['OS=="win"', {
-        # The Clang plugins don't currently work on Windows.
+        # The Blink GC plugin doesn't currently work on Windows.
         # TODO(hans): One day, this will work. (crbug.com/82385)
-        'clang_use_chrome_plugins%': 0,
+        'blink_gc_plugin%': 0,
       }],
 
       # On valgrind bots, override the optimizer settings so we don't inline too
@@ -2997,7 +3015,8 @@
       ['<(use_glib)==1 and >(nacl_untrusted_build)==0', {
         'defines': ['USE_GLIB=1'],
       }],
-      ['<(use_nss)==1 and >(nacl_untrusted_build)==0', {
+      ['<(use_nss_certs)==1 and >(nacl_untrusted_build)==0', {
+        # TODO(davidben): Rename this to USE_NSS_CERTS. https://crbug.com/462040
         'defines': ['USE_NSS=1'],
       }],
       ['<(chromeos)==1 and >(nacl_untrusted_build)==0', {
@@ -3994,6 +4013,8 @@
                           '-no-integrated-as',
                           '-B<(android_toolchain)',  # Else /usr/bin/as gets picked up.
                         ],
+                      }],
+                      ['clang==1 and linux_use_bundled_gold==0', {
                         'ldflags': [
                           # Let clang find the ld.gold in the NDK.
                           '--gcc-toolchain=<(android_toolchain)/..',
@@ -4514,11 +4535,16 @@
               '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
             ],
           }],
-          ['linux_use_bundled_gold==1', {
+          ['linux_use_bundled_gold==1 and '
+           'not (clang==0 and (use_lto==1 or use_lto_o2==1))', {
             # Put our binutils, which contains gold in the search path. We pass
             # the path to gold to the compiler. gyp leaves unspecified what the
             # cwd is when running the compiler, so the normal gyp path-munging
             # fails us. This hack gets the right path.
+            #
+            # Disabled when using GCC LTO because GCC also uses the -B search
+            # path at link time to find "as", and our bundled "as" can only
+            # target x86.
             'ldflags': [
               '-B<!(cd <(DEPTH) && pwd -P)/<(binutils_dir)',
             ],
@@ -4665,7 +4691,6 @@
               '-fstack-protector',
               '-fno-short-enums',
               '-finline-limit=64',
-              '-Wa,--noexecstack',
               '<@(release_extra_cflags)',
               '--sysroot=<(android_ndk_sysroot)',
               # NOTE: The stlport header include paths below are specified in
@@ -5608,6 +5633,13 @@
                 'WarnAsError': 'false',
                 'AdditionalOptions': [
                   '/fallback',
+                ],
+              },
+            }],
+            ['clang==1 and clang_use_chrome_plugins==1', {
+              'VCCLCompilerTool': {
+                'AdditionalOptions': [
+                  '<@(clang_chrome_plugins_flags)',
                 ],
               },
             }],

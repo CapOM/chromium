@@ -25,7 +25,7 @@ LLVM_WIN_REVISION = 'HEAD'
 # in bringup. Use a pinned revision to make it slightly more stable.
 if (re.search(r'\b(asan)=1', os.environ.get('GYP_DEFINES', '')) and
     not 'LLVM_FORCE_HEAD_REVISION' in os.environ):
-  LLVM_WIN_REVISION = '234701'
+  LLVM_WIN_REVISION = '235098'
 
 # Path constants. (All of these should be absolute paths.)
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -313,7 +313,7 @@ def main():
 
   parser = argparse.ArgumentParser(description='Build Clang.')
   parser.add_argument('--no-clobber', dest='clobber', action='store_false')
-  parser.add_argument('--tools', nargs='*', default=[])
+  parser.add_argument('--tools', nargs='*', default=['plugins'])
   # For now, this flag is only used for the non-Windows flow, but argparser gets
   # mad if it sees a flag it doesn't recognize.
   parser.add_argument('--if-needed', action='store_true')

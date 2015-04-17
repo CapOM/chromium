@@ -682,6 +682,32 @@ base.RepeatingTimer.prototype.dispose = function() {
 };
 
 /**
+ * A disposable one shot timer.
+ *
+ * @param {Function} callback
+ * @param {number} timeout
+ *
+ * @constructor
+ * @implements {base.Disposable}
+ */
+base.OneShotTimer = function(callback, timeout) {
+  var that = this;
+
+  /** @private */
+  this.timerId_ = window.setTimeout(function() {
+    that.timerId_ = null;
+    callback();
+  }, timeout);
+};
+
+base.OneShotTimer.prototype.dispose = function() {
+  if (this.timerId_ !== null) {
+    window.clearTimeout(this.timerId_);
+    this.timerId_ = null;
+  }
+};
+
+/**
   * Converts UTF-8 string to ArrayBuffer.
   *
   * @param {string} string
@@ -744,6 +770,16 @@ base.jsonParseSafe = function(jsonString) {
   } catch (err) {
     return undefined;
   }
+};
+
+/**
+ * Return the current time as a formatted string suitable for logging.
+ *
+ * @return {string} The current time, formatted as the standard ISO string.
+ *     [yyyy-mm-ddDhh:mm:ss.xyz]
+ */
+base.timestamp = function() {
+  return '[' + new Date().toISOString() + ']';
 };
 
 /**

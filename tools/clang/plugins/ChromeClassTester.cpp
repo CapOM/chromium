@@ -7,6 +7,8 @@
 
 #include "ChromeClassTester.h"
 
+#include <algorithm>
+
 #include "clang/AST/AST.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/Basic/SourceManager.h"
@@ -93,9 +95,13 @@ void ChromeClassTester::emitWarning(SourceLocation loc,
   std::string err;
   err = "[chromium-style] ";
   err += raw_error;
+  // TODO(dcheng): Re-enable -Werror for these diagnostics on Windows once all
+  // the pre-existing warnings are cleaned up. https://crbug.com/467287
   DiagnosticIDs::Level level =
+#if !defined(LLVM_ON_WIN32)
       diagnostic().getWarningsAsErrors() ?
       DiagnosticIDs::Error :
+#endif
       DiagnosticIDs::Warning;
   unsigned id = diagnostic().getDiagnosticIDs()->getCustomDiagID(level, err);
   DiagnosticBuilder builder = diagnostic().Report(full, id);
@@ -232,6 +238,9 @@ std::string ChromeClassTester::GetNamespaceImpl(const DeclContext* context,
 }
 
 bool ChromeClassTester::InBannedDirectory(SourceLocation loc) {
+  if (instance().getSourceManager().isInSystemHeader(loc))
+    return true;
+
   std::string filename;
   if (!GetFilename(loc, &filename)) {
     // If the filename cannot be determined, simply treat this as a banned
@@ -250,7 +259,7 @@ bool ChromeClassTester::InBannedDirectory(SourceLocation loc) {
     return true;
   }
 
-#ifdef LLVM_ON_UNIX
+#if defined(LLVM_ON_UNIX)
   // We need to munge the paths so that they are relative to the repository
   // srcroot. We first resolve the symlinktastic relative path and then
   // remove our known srcroot from it if needed.
@@ -258,6 +267,10 @@ bool ChromeClassTester::InBannedDirectory(SourceLocation loc) {
   if (realpath(filename.c_str(), resolvedPath)) {
     filename = resolvedPath;
   }
+#endif
+
+#if defined(LLVM_ON_WIN32)
+  std::replace(filename.begin(), filename.end(), '\\', '/');
 #endif
 
   for (const std::string& banned_dir : banned_directories_) {

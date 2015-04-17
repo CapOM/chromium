@@ -50,6 +50,17 @@ struct MountOptions;
 // Registers preferences to remember registered file systems between reboots.
 void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
 
+// Holds information for a providing extension.
+struct ProvidingExtensionInfo {
+  ProvidingExtensionInfo();
+  ~ProvidingExtensionInfo();
+
+  std::string extension_id;
+  std::string name;
+  bool can_configure;
+  bool can_add;
+};
+
 // Manages and registers the file system provider service. Maintains provided
 // file systems.
 class Service : public KeyedService,
@@ -93,11 +104,15 @@ class Service : public KeyedService,
                                       const std::string& file_system_id,
                                       UnmountReason reason);
 
-  // Requests unmounting of the file system. The callback is called when the
-  // request is accepted or rejected, with an error code. Returns false if the
-  // request could not been created, true otherwise.
+  // Requests unmounting of the file system. Returns false if the request could
+  // not been created, true otherwise.
   bool RequestUnmount(const std::string& extension_id,
                       const std::string& file_system_id);
+
+  // Requests mounting a new file system by the providing extension with
+  // |extension_id|. Returns false if the request could not been created, true
+  // otherwise.
+  bool RequestMount(const std::string& extension_id);
 
   // Returns a list of information of all currently provided file systems. All
   // items are copied.
@@ -113,6 +128,10 @@ class Service : public KeyedService,
   // |mount_point_name|. If not found, then returns NULL.
   ProvidedFileSystemInterface* GetProvidedFileSystem(
       const std::string& mount_point_name);
+
+  // Returns a list of information of all currently installed providing
+  // extensions.
+  std::vector<ProvidingExtensionInfo> GetProvidingExtensionInfoList() const;
 
   // Adds and removes observers.
   void AddObserver(Observer* observer);

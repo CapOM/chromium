@@ -67,6 +67,10 @@ TestRenderViewHost* TestRenderFrameHost::GetRenderViewHost() {
       RenderFrameHostImpl::GetRenderViewHost());
 }
 
+MockRenderProcessHost* TestRenderFrameHost::GetProcess() {
+  return static_cast<MockRenderProcessHost*>(RenderFrameHostImpl::GetProcess());
+}
+
 TestRenderFrameHost* TestRenderFrameHost::AppendChild(
     const std::string& frame_name) {
   OnCreateChildFrame(GetProcess()->GetNextRoutingID(), frame_name,
@@ -200,6 +204,13 @@ void TestRenderFrameHost::SendNavigateWithParameters(
   OnDidCommitProvisionalLoad(msg);
 }
 
+void TestRenderFrameHost::NavigateAndCommitRendererInitiated(int page_id,
+                                                             const GURL& url) {
+  SendRendererInitiatedNavigationRequest(url, false);
+  PrepareForCommit();
+  SendNavigate(page_id, url);
+}
+
 void TestRenderFrameHost::SendRendererInitiatedNavigationRequest(
     const GURL& url,
     bool has_user_gesture) {
@@ -229,14 +240,13 @@ void TestRenderFrameHost::PrepareForCommitWithServerRedirect(
   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kEnableBrowserSideNavigation)) {
     // Non PlzNavigate
-    SendBeforeUnloadACK(true);
+    if (IsWaitingForBeforeUnloadACK())
+      SendBeforeUnloadACK(true);
     return;
   }
 
   // PlzNavigate
-  NavigationRequest* request =
-      static_cast<NavigatorImpl*>(frame_tree_node_->navigator())
-          ->GetNavigationRequestForNodeForTesting(frame_tree_node_);
+  NavigationRequest* request = frame_tree_node_->navigation_request();
   CHECK(request);
 
   // Simulate a beforeUnload ACK from the renderer if the browser is waiting for

@@ -23,6 +23,7 @@
 #include "components/user_manager/user_manager.h"
 #include "ui/base/ime/chromeos/ime_keyboard.h"
 #include "ui/base/ime/chromeos/input_method_manager.h"
+#include "ui/events/devices/device_data_manager.h"
 #include "ui/events/event.h"
 #include "ui/events/event_utils.h"
 #include "ui/events/keycodes/keyboard_code_conversion.h"
@@ -30,12 +31,7 @@
 
 #if defined(USE_X11)
 #include <X11/extensions/XInput2.h>
-#include <X11/Xatom.h>
 #include <X11/Xlib.h>
-
-#ifndef XI_PROP_PRODUCT_ID
-#define XI_PROP_PRODUCT_ID "Device Product ID"
-#endif
 
 // Get rid of macros from Xlib.h that conflicts with other parts of the code.
 #undef RootWindow
@@ -249,7 +245,53 @@ void EventRewriter::BuildRewrittenKeyEvent(
     ui::KeyboardCode key_code,
     int flags,
     scoped_ptr<ui::Event>* rewritten_event) {
-  ui::KeyEvent* rewritten_key_event = new ui::KeyEvent(key_event);
+  ui::KeyEvent* rewritten_key_event = NULL;
+#if defined(USE_X11)
+  XEvent* xev = key_event.native_event();
+  if (xev) {
+    XEvent xkeyevent;
+    // Convert all XI2-based key events into X11 core-based key events,
+    // until consumers no longer depend on receiving X11 core events.
+    if (xev->type == GenericEvent)
+      ui::InitXKeyEventFromXIDeviceEvent(*xev, &xkeyevent);
+    else
+      xkeyevent.xkey = xev->xkey;
+
+    unsigned int original_x11_keycode = xkeyevent.xkey.keycode;
+    // Update native event to match rewritten |ui::Event|.
+    // The X11 keycode represents a physical key position, so it shouldn't
+    // change unless we have actually changed keys, not just modifiers.
+    // This is one guard against problems like crbug.com/390263.
+    if (key_event.key_code() != key_code) {
+      xkeyevent.xkey.keycode =
+          XKeyCodeForWindowsKeyCode(key_code, flags, gfx::GetXDisplay());
+    }
+    ui::KeyEvent x11_key_event(&xkeyevent);
+    rewritten_key_event = new ui::KeyEvent(x11_key_event);
+
+    // For numpad keys, the key char should always NOT be changed because
+    // XKeyCodeForWindowsKeyCode method cannot handle non-US keyboard layout.
+    // The correct key char can be got from original X11 keycode but not for the
+    // rewritten X11 keycode.
+    // For Shift+NumpadKey cases, use the rewritten X11 keycode (US layout).
+    // Please see crbug.com/335644.
+    if (key_code >= ui::VKEY_NUMPAD0 && key_code <= ui::VKEY_DIVIDE) {
+      XEvent numpad_xevent;
+      numpad_xevent.xkey = xkeyevent.xkey;
+      // Remove the shift state before getting key char.
+      // Because X11/XKB sometimes returns unexpected key char for
+      // Shift+NumpadKey. e.g. Shift+Numpad_4 returns 'D', etc.
+      numpad_xevent.xkey.state &= ~ShiftMask;
+      numpad_xevent.xkey.state |= Mod2Mask;  // Always set NumLock mask.
+      if (!(flags & ui::EF_SHIFT_DOWN))
+        numpad_xevent.xkey.keycode = original_x11_keycode;
+      rewritten_key_event->set_character(
+          ui::GetCharacterFromXEvent(&numpad_xevent));
+    }
+  }
+#endif
+  if (!rewritten_key_event)
+    rewritten_key_event = new ui::KeyEvent(key_event);
   rewritten_key_event->set_flags(flags);
   rewritten_key_event->set_key_code(key_code);
 #if defined(USE_X11)
@@ -890,73 +932,17 @@ EventRewriter::DeviceType EventRewriter::KeyboardDeviceAddedInternal(
 }
 
 EventRewriter::DeviceType EventRewriter::KeyboardDeviceAdded(int device_id) {
-#if defined(USE_X11)
-  DCHECK_NE(XIAllDevices, device_id);
-  DCHECK_NE(XIAllMasterDevices, device_id);
-  if (device_id == XIAllDevices || device_id == XIAllMasterDevices) {
-    LOG(ERROR) << "Unexpected device_id passed: " << device_id;
+  if (!ui::DeviceDataManager::HasInstance())
     return kDeviceUnknown;
-  }
-
-  Atom product_id_atom =
-      XInternAtom(gfx::GetXDisplay(), XI_PROP_PRODUCT_ID, 1);
-
-  int ndevices_return = 0;
-  XIDeviceInfo* device_info =
-      XIQueryDevice(gfx::GetXDisplay(), device_id, &ndevices_return);
-
-  // Since |device_id| is neither XIAllDevices nor XIAllMasterDevices,
-  // the number of devices found should be either 0 (not found) or 1.
-  if (!device_info) {
-    LOG(ERROR) << "XIQueryDevice: Device ID " << device_id << " is unknown.";
-    return kDeviceUnknown;
-  }
-
-  DeviceType dev_type = kDeviceUnknown;
-  DCHECK_EQ(1, ndevices_return);
-  for (int i = 0; i < ndevices_return; ++i) {
-    // Get keyboard product and vendor id.
-    int vendor_id = kUnknownVendorId;
-    int product_id = kUnknownProductId;
-    uint32* product_info = NULL;
-    Atom type;
-    int format_return;
-    unsigned long num_items_return;
-    unsigned long bytes_after_return;
-    if (XIGetProperty(gfx::GetXDisplay(),
-                      device_info[i].deviceid,
-                      product_id_atom,
-                      0,
-                      2,
-                      0,
-                      XA_INTEGER,
-                      &type,
-                      &format_return,
-                      &num_items_return,
-                      &bytes_after_return,
-                      reinterpret_cast<unsigned char **>(&product_info)) == 0 &&
-        product_info) {
-      vendor_id = product_info[0];
-      product_id = product_info[1];
+  const std::vector<ui::KeyboardDevice>& keyboards =
+      ui::DeviceDataManager::GetInstance()->keyboard_devices();
+  for (const auto& keyboard : keyboards) {
+    if (keyboard.id == device_id) {
+      return KeyboardDeviceAddedInternal(
+          keyboard.id, keyboard.name, keyboard.vendor_id, keyboard.product_id);
     }
-
-    DCHECK_EQ(device_id, device_info[i].deviceid);  // see the comment above.
-    DCHECK(device_info[i].name);
-    dev_type = KeyboardDeviceAddedInternal(device_info[i].deviceid,
-                                           device_info[i].name,
-                                           vendor_id,
-                                           product_id);
   }
-  XIFreeDeviceInfo(device_info);
-  return dev_type;
-#else
-  // TODO(spang): Figure out where we can get keyboard vendor/product id from in
-  // Ozone/Freon version.
-  return KeyboardDeviceAddedInternal(device_id,
-                                     "keyboard",
-                                     kUnknownVendorId,
-                                     kUnknownProductId);
-#endif
+  return kDeviceUnknown;
 }
 
 }  // namespace chromeos

@@ -969,7 +969,7 @@ if (!is_android) {
       # Runtime dependencies.
       data_deps += [
         "//media/cdm/ppapi:clearkeycdmadapter",
-        "//third_party/widevine/cdm:adapter",
+        "//third_party/widevine/cdm:widevinecdmadapter",
       ]
     }
     if (!enable_print_preview) {
@@ -1161,7 +1161,7 @@ if (!is_android) {
     if (enable_pepper_cdms) {
       data_deps = [
         "//media/cdm/ppapi:clearkeycdmadapter",
-        "//third_party/widevine/cdm:adapter",
+        "//third_party/widevine/cdm:widevinecdmadapter",
       ]
     }
   }
@@ -1360,13 +1360,6 @@ if (!is_android) {
         "//chrome/browser/ui/libgtk2ui",
         "//build/config/linux:gio",
       ]
-      if (!is_component_build) {
-        # TODO(erg): This file does not compile in shared library mode because
-        # it is reaching into the internals of libgtk2ui, which shouldn't be
-        # linked with the rest of chrome. This should either be fixed by
-        # creating a separate unit test target, or by deleting the test.
-        sources += [ "../browser/ui/libgtk2ui/x11_input_method_context_impl_gtk2_unittest.cc" ]
-      }
     }
 
     if (enable_task_manager) {

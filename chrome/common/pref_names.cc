@@ -880,12 +880,6 @@ const char kSavingBrowserHistoryDisabled[] = "history.saving_disabled";
 // permitted.
 const char kAllowDeletingBrowserHistory[] = "history.deleting_enabled";
 
-// Boolean controlling whether SafeSearch is mandatory for Google Web Searches
-// and also whether Safety Mode is mandatory on YouTube.
-// DEPRECATED: This is replaced by kForceGoogleSafeSearch and
-// kForceYouTubeSafetyMode, and still exists for legacy reasons only.
-const char kForceSafeSearch[] = "settings.force_safesearch";
-
 // Boolean controlling whether SafeSearch is mandatory for Google Web Searches.
 const char kForceGoogleSafeSearch[] = "settings.force_google_safesearch";
 
@@ -1919,9 +1913,8 @@ const char kConsumerManagementStage[] = "consumer_management.stage";
 const char kNewOobe[] = "NewOobe";
 
 // A boolean pref. If set to true, experimental webview based signin flow
-// activated.
-const char kWebviewSigninEnabled[] =
-    "webview_signin_enabled";
+// is deactivated.
+const char kWebviewSigninDisabled[] = "webview_signin_disabled";
 #endif  // defined(OS_CHROMEOS)
 
 // Whether there is a Flash version installed that supports clearing LSO data.

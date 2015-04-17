@@ -138,8 +138,6 @@
       'browser/ui/browser_commands_mac.cc',
       'browser/ui/browser_commands_mac.h',
       'browser/ui/browser_dialogs.h',
-      'browser/ui/browser_instant_controller.cc',
-      'browser/ui/browser_instant_controller.h',
       'browser/ui/browser_mac.cc',
       'browser/ui/browser_mac.h',
       'browser/ui/browser_navigator.cc',
@@ -215,8 +213,6 @@
       'browser/ui/proximity_auth/proximity_auth_error_bubble.cc',
       'browser/ui/proximity_auth/proximity_auth_error_bubble.h',
       'browser/ui/screen_capture_notification_ui.h',
-      'browser/ui/search/instant_controller.cc',
-      'browser/ui/search/instant_controller.h',
       'browser/ui/search/instant_page.cc',
       'browser/ui/search/instant_page.h',
       'browser/ui/search/instant_search_prerenderer.cc',
@@ -527,11 +523,6 @@
       'browser/ui/auto_login_infobar_delegate.h',
       'browser/ui/screen_capture_notification_ui_stub.cc',
     ],
-    # Files shared between CrOS, desktop linux, and Android.
-    'chrome_browser_ui_android_linux_sources': [
-      'browser/ui/certificate_dialogs.cc',
-      'browser/ui/certificate_dialogs.h',
-    ],
     # Cross-platform ash sources.
     'chrome_browser_ui_ash_sources': [
       'browser/ui/ash/app_list/app_list_controller_ash.cc',
@@ -716,9 +707,11 @@
     # ChromeOS-only sources that don't end in _chromeos or live in a chromeos
     # directory.
     'chrome_browser_ui_chromeos_sources': [
-      # On chromeos, file manager extension handles the file open/save dialog.
       'browser/ui/app_list/search/launcher_search/launcher_search_provider.cc',
       'browser/ui/app_list/search/launcher_search/launcher_search_provider.h',
+      'browser/ui/app_list/search/launcher_search/launcher_search_result.cc',
+      'browser/ui/app_list/search/launcher_search/launcher_search_result.h',
+      # On chromeos, file manager extension handles the file open/save dialog.
       'browser/ui/views/select_file_dialog_extension.cc',
       'browser/ui/views/select_file_dialog_extension.h',
       'browser/ui/views/select_file_dialog_extension_factory.cc',
@@ -989,10 +982,10 @@
       'browser/ui/cocoa/extensions/extension_installed_bubble_controller.mm',
       'browser/ui/cocoa/extensions/extension_keybinding_registry_cocoa.h',
       'browser/ui/cocoa/extensions/extension_keybinding_registry_cocoa.mm',
+      'browser/ui/cocoa/extensions/extension_message_bubble_bridge.h',
+      'browser/ui/cocoa/extensions/extension_message_bubble_bridge.mm',
       'browser/ui/cocoa/extensions/extension_popup_controller.h',
       'browser/ui/cocoa/extensions/extension_popup_controller.mm',
-      'browser/ui/cocoa/extensions/extension_toolbar_icon_surfacing_bubble_mac.h',
-      'browser/ui/cocoa/extensions/extension_toolbar_icon_surfacing_bubble_mac.mm',
       'browser/ui/cocoa/extensions/extension_uninstall_dialog_cocoa.mm',
       'browser/ui/cocoa/extensions/extension_view_mac.h',
       'browser/ui/cocoa/extensions/extension_view_mac.mm',
@@ -1000,6 +993,8 @@
       'browser/ui/cocoa/extensions/media_galleries_dialog_cocoa.mm',
       'browser/ui/cocoa/extensions/media_gallery_list_entry_view.h',
       'browser/ui/cocoa/extensions/media_gallery_list_entry_view.mm',
+      'browser/ui/cocoa/extensions/toolbar_actions_bar_bubble_mac.h',
+      'browser/ui/cocoa/extensions/toolbar_actions_bar_bubble_mac.mm',
       'browser/ui/cocoa/extensions/windowed_install_dialog_controller.h',
       'browser/ui/cocoa/extensions/windowed_install_dialog_controller.mm',
       'browser/ui/cocoa/external_protocol_dialog.h',
@@ -1351,6 +1346,8 @@
     ],
     # Counts desktop Linux and ChromeOS.
     'chrome_browser_ui_linux_sources': [
+      'browser/ui/certificate_dialogs.cc',
+      'browser/ui/certificate_dialogs.h',
       'browser/ui/startup/autolaunch_prompt.cc',
       'browser/ui/views/apps/chrome_app_window_client_views.cc',
       'browser/ui/webui/certificate_viewer_ui.cc',
@@ -1492,6 +1489,8 @@
       'browser/ui/browser_content_setting_bubble_model_delegate.h',
       'browser/ui/browser_finder.cc',
       'browser/ui/browser_finder.h',
+      'browser/ui/browser_instant_controller.cc',
+      'browser/ui/browser_instant_controller.h',
       'browser/ui/browser_iterator.cc',
       'browser/ui/browser_iterator.h',
       'browser/ui/browser_list.cc',
@@ -1607,6 +1606,8 @@
       'browser/ui/sad_tab_types.h',
       'browser/ui/scoped_tabbed_browser_displayer.cc',
       'browser/ui/scoped_tabbed_browser_displayer.h',
+      'browser/ui/search/instant_controller.cc',
+      'browser/ui/search/instant_controller.h',
       'browser/ui/search/search_delegate.cc',
       'browser/ui/search/search_delegate.h',
       'browser/ui/search/search_ui.cc',
@@ -2601,6 +2602,10 @@
       'browser/ui/extensions/extension_install_ui_factory.h',
       'browser/ui/extensions/extension_installed_bubble.cc',
       'browser/ui/extensions/extension_installed_bubble.h',
+      'browser/ui/extensions/extension_message_bubble_factory.cc',
+      'browser/ui/extensions/extension_message_bubble_factory.h',
+      'browser/ui/extensions/extension_toolbar_icon_surfacing_bubble_delegate.cc',
+      'browser/ui/extensions/extension_toolbar_icon_surfacing_bubble_delegate.h',
       'browser/ui/webui/extensions/chromeos/kiosk_apps_handler.cc',
       'browser/ui/webui/extensions/chromeos/kiosk_apps_handler.h',
       'browser/ui/webui/extensions/extension_basic_info.cc',
@@ -2929,7 +2934,7 @@
             '../ui/gl/gl.gyp:gl',
           ],
         }],
-        ['use_nss==1', {
+        ['use_nss_certs==1', {
           'sources': [ '<@(chrome_browser_ui_nss_sources)' ],
         }],
         ['enable_themes==0', {
@@ -2939,9 +2944,6 @@
         }],
         ['enable_print_preview==1', {
           'sources': [ '<@(chrome_browser_ui_print_preview_sources)' ],
-        }],
-        ['OS=="linux" or OS=="android"', {
-          'sources': [ '<@(chrome_browser_ui_android_linux_sources)' ],
         }],
         ['OS=="android"', {
           'dependencies': [

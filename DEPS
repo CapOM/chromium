@@ -34,20 +34,20 @@ vars = {
   'llvm_url': 'http://src.chromium.org/llvm-project',
   'llvm_git': 'https://llvm.googlesource.com',
   'webkit_trunk': 'http://src.chromium.org/blink/trunk',
-  'webkit_revision': '41273373cd7f55e3c66a7781e3a8943a84c99cdc', # from svn revision 193794
+  'webkit_revision': 'e49d160d26bf9526fb258673d625b6c267ac2c29', # from svn revision 193892
   'chromium_git': 'https://chromium.googlesource.com',
   'chromiumos_git': 'https://chromium.googlesource.com/chromiumos',
   'pdfium_git': 'https://pdfium.googlesource.com',
   'skia_git': 'https://skia.googlesource.com',
   'boringssl_git': 'https://boringssl.googlesource.com',
-  'libvpx_revision': '1fff3e3550a605f7edf72280ed8fcaa83eeb586e',
+  'libvpx_revision': '0816cf21b0f04c1d2cf86b4e3d120a49e4ac8fa6',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': 'ddb714b09a5f84e870dfc650b6da4197fd36d9c2',
+  'skia_revision': 'ca1a22ee534f0fcabed7fa06cbf3ea5068b489da',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   'v8_branch': 'trunk',
-  'v8_revision': '826e9c273bc1feb50b92b9c012ed008b030d9d03',
+  'v8_revision': 'a92502697e37054c783b2ea7feaf321c9b49fe8b',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -66,7 +66,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
-  'pdfium_revision': 'eddab4425614e49146f904f00da4a664ba4b581b',
+  'pdfium_revision': 'b3300162a1ebacc973ff9793029caf4db9a4f5e5',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling openmax_dl
   # and whatever else without interference from each other.
@@ -94,7 +94,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling NaCl
   # and whatever else without interference from each other.
-  'nacl_revision': 'bd095c3ad5f1f25a9c6f44b7f38cec89383a5c33',
+  'nacl_revision': '11953a35fcd4f999b097a343bc49d89f94af21a8',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -108,7 +108,7 @@ allowed_hosts = [
 
 deps = {
   'src/breakpad/src':
-   Var('chromium_git') + '/external/google-breakpad/src.git' + '@' + '2c37c225e729d6ada72d5ffd808406db9c916985', # from svn revision 1434
+   Var('chromium_git') + '/external/google-breakpad/src.git' + '@' + 'ad88d965aa35dabdfe0cded39f72dde9e4a3591e', # from svn revision 1447
 
   'src/buildtools':
    Var('chromium_git') + '/chromium/buildtools.git' + '@' +  Var('buildtools_revision'),
@@ -210,7 +210,7 @@ deps = {
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '104f872faf2cd809cdada885a1e39be85e5b3316',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '1d4447b2562e96490cb80249086e253a4f4c7909', # commit position 9001
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '7df77d81d16adc73f6c86ef7d9df70e71b65b0eb', # commit position 9020
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -234,7 +234,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'c49056d6694584d00f87481cd041490c9c27604d', # commit position 9005
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '8c72e1c4cdfcf65fe515881722043c9f226cbf54', # commit position 9024
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -263,7 +263,7 @@ deps = {
    Var('chromium_git') + '/chromium/tools/deps2git.git' + '@' + 'f04828eb0b5acd3e7ad983c024870f17f17b06d9',
 
   'src/third_party/webpagereplay':
-   Var('chromium_git') + '/external/github.com/chromium/web-page-replay.git' + '@' + '94d7e2a265facfbb0570a9a7fd6c335c774ee866',
+   Var('chromium_git') + '/external/github.com/chromium/web-page-replay.git' + '@' + '4e4d540a18c099e2ad805696072f95815f313c0e',
 
   'src/third_party/pywebsocket/src':
     Var('chromium_git') + '/external/pywebsocket/src.git' + '@' + 'cb349e87ddb30ff8d1fa1a89be39cec901f4a29c',
@@ -410,7 +410,7 @@ deps_os = {
 
     # For Linux and Chromium OS.
     'src/third_party/cros_system_api':
-     Var('chromium_git') + '/chromiumos/platform/system_api.git' + '@' + 'b5515b112c2800763f96e8c851b6f7b9e0acba1c',
+     Var('chromium_git') + '/chromiumos/platform/system_api.git' + '@' + 'beb554763c188ae8f0518de6d55661248c907218',
 
     # Note that this is different from Android's freetype repo.
     'src/third_party/freetype2/src':

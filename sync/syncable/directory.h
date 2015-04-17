@@ -55,16 +55,6 @@ enum InvariantCheckLevel {
 // Although Directory's kernel_ is exposed via public accessor it should be
 // treated as pseudo-private.
 class SYNC_EXPORT Directory {
-  friend class SyncableDirectoryTest;
-  friend class syncer::TestUserShare;
-  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest, ManageDeleteJournals);
-  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest,
-                           TakeSnapshotGetsAllDirtyHandlesTest);
-  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest,
-                           TakeSnapshotGetsOnlyDirtyHandlesTest);
-  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest,
-                           TakeSnapshotGetsMetahandlesToPurge);
-
  public:
   typedef std::vector<int64> Metahandles;
 
@@ -312,9 +302,6 @@ class SYNC_EXPORT Directory {
 
   ModelTypeSet InitialSyncEndedTypes();
   bool InitialSyncEndedForType(ModelType type);
-  bool InitialSyncEndedForType(BaseTransaction* trans, ModelType type);
-
-  const std::string& name() const { return kernel_->name; }
 
   // (Account) Store birthday is opaque to the client, so we keep it in the
   // format it is in the proto buffer in case we switch to a binary birthday
@@ -336,12 +323,6 @@ class SYNC_EXPORT Directory {
   // Returns a pointer to our cryptographer. Does not transfer ownership.
   // Not thread safe, so should only be accessed while holding a transaction.
   Cryptographer* GetCryptographer(const BaseTransaction* trans);
-
-  // Returns true if the directory had encountered an unrecoverable error.
-  // Note: Any function in |Directory| that can be called without holding a
-  // transaction need to check if the Directory already has an unrecoverable
-  // error on it.
-  bool unrecoverable_error_set(const BaseTransaction* trans) const;
 
   // Called to immediately report an unrecoverable error (but don't
   // propagate it up).
@@ -540,6 +521,16 @@ class SYNC_EXPORT Directory {
   const Kernel* kernel() const;
 
  private:
+  friend class SyncableDirectoryTest;
+  friend class syncer::TestUserShare;
+  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest, ManageDeleteJournals);
+  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest,
+                           TakeSnapshotGetsAllDirtyHandlesTest);
+  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest,
+                           TakeSnapshotGetsOnlyDirtyHandlesTest);
+  FRIEND_TEST_ALL_PREFIXES(SyncableDirectoryTest,
+                           TakeSnapshotGetsMetahandlesToPurge);
+
   // You'll notice that some of the methods below are private overloads of the
   // public ones declared above. The general pattern is that the public overload
   // constructs a ScopedKernelLock before calling the corresponding private
@@ -628,9 +619,18 @@ class SYNC_EXPORT Directory {
                             ModelType type,
                             std::vector<int64>* result);
 
+  // Returns true if the initial sync for |type| has completed.
+  bool InitialSyncEndedForType(BaseTransaction* trans, ModelType type);
+
   // Stops sending events to the delegate and the transaction
   // observer.
   void Close();
+
+  // Returns true if the directory had encountered an unrecoverable error.
+  // Note: Any function in |Directory| that can be called without holding a
+  // transaction need to check if the Directory already has an unrecoverable
+  // error on it.
+  bool unrecoverable_error_set(const BaseTransaction* trans) const;
 
   Kernel* kernel_;
 

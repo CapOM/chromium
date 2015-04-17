@@ -44,14 +44,6 @@ struct ColumnSpec;
 // in tests.  The concrete class used in non-test scenarios is
 // OnDiskDirectoryBackingStore.
 class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
-  friend class DirectoryBackingStoreTest;
-  FRIEND_TEST_ALL_PREFIXES(DirectoryBackingStoreTest,
-                           IncreaseDatabasePageSizeFrom4KTo32K);
-  FRIEND_TEST_ALL_PREFIXES(DirectoryBackingStoreTest,
-                           CatastrophicErrorHandler_KeptAcrossReset);
-  FRIEND_TEST_ALL_PREFIXES(DirectoryBackingStoreTest,
-                           CatastrophicErrorHandler_Invocation);
-
  public:
   explicit DirectoryBackingStore(const std::string& dir_name);
   virtual ~DirectoryBackingStore();
@@ -106,41 +98,30 @@ class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
   DirectoryBackingStore(const std::string& dir_name,
                         sql::Connection* connection);
 
-  // General Directory initialization and load helpers.
+  // An accessor for the underlying sql::Connection. Avoid using outside of
+  // tests.
+  sql::Connection* db();
+
+  // Return true if the DB is open.
+  bool IsOpen() const;
+
+  // Open the DB at |path|.
+  // Return true on success, false on failure.
+  bool Open(const base::FilePath& path);
+
+  // Open an in memory DB.
+  // Return true on success, false on failure.
+  bool OpenInMemory();
+
+  // Initialize database tables. Return true on success, false on error.
   bool InitializeTables();
-  bool CreateTables();
 
-  // Create 'share_info' or 'temp_share_info' depending on value of
-  // is_temporary. Returns an sqlite
-  bool CreateShareInfoTable(bool is_temporary);
-
-  bool CreateShareInfoTableVersion71(bool is_temporary);
-  // Create 'metas' or 'temp_metas' depending on value of is_temporary. Also
-  // create a 'deleted_metas' table using same schema.
-  bool CreateMetasTable(bool is_temporary);
-  bool CreateModelsTable();
-  bool CreateV71ModelsTable();
-  bool CreateV75ModelsTable();
-  bool CreateV81ModelsTable();
-
-  // Drops a table if it exists, harmless if the table did not already exist.
-  bool SafeDropTable(const char* table_name);
-
-  // Load helpers for entries and attributes.
+  // Load helpers for entries and attributes. Return true on success, false on
+  // error.
   bool LoadEntries(Directory::MetahandlesMap* handles_map,
                    MetahandleSet* metahandles_to_purge);
   bool LoadDeleteJournals(JournalIndex* delete_journals);
   bool LoadInfo(Directory::KernelLoadInfo* info);
-  bool SafeToPurgeOnLoading(const EntryKernel& entry) const;
-
-  // Save/update helpers for entries.  Return false if sqlite commit fails.
-  static bool SaveEntryToDB(sql::Statement* save_statement,
-                            const EntryKernel& entry);
-  bool SaveNewEntryToDB(const EntryKernel& entry);
-  bool UpdateEntryToDB(const EntryKernel& entry);
-
-  // Close save_dbhandle_.  Broken out for testing.
-  void EndSave();
 
   enum EntryTable {
     METAS_TABLE,
@@ -149,9 +130,6 @@ class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
   // Removes each entry whose metahandle is in |handles| from the table
   // specified by |from| table. Does synchronous I/O.  Returns false on error.
   bool DeleteEntries(EntryTable from, const MetahandleSet& handles);
-
-  // Drop all tables in preparation for reinitialization.
-  void DropAllTables();
 
   // Serialization helpers for ModelType.  These convert between
   // the ModelType enum and the values we persist in the database to identify
@@ -162,11 +140,6 @@ class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
 
   static std::string GenerateCacheGUID();
 
-  // Runs an integrity check on the current database.  If the
-  // integrity check fails, false is returned and error is populated
-  // with an error message.
-  bool CheckIntegrity(sqlite3* handle, std::string* error) const;
-
   // Checks that the references between sync nodes is consistent.
   static bool VerifyReferenceIntegrity(
       const Directory::MetahandlesMap* handles_map);
@@ -175,13 +148,6 @@ class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
   bool RefreshColumns();
   bool SetVersion(int version);
   int GetVersion();
-
-  bool MigrateToSpecifics(const char* old_columns,
-                          const char* specifics_column,
-                          void(*handler_function) (
-                              sql::Statement* old_value_query,
-                              int old_value_column,
-                              sync_pb::EntitySpecifics* mutable_new_value));
 
   // Individual version migrations.
   bool MigrateVersion67To68();
@@ -213,11 +179,57 @@ class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
   // Destroys the existing Connection and creates a new one.
   void ResetAndCreateConnection();
 
-  scoped_ptr<sql::Connection> db_;
-
  private:
+  friend class TestDirectoryBackingStore;
+  friend class DirectoryBackingStoreTest;
+  FRIEND_TEST_ALL_PREFIXES(DirectoryBackingStoreTest,
+                           IncreaseDatabasePageSizeFrom4KTo32K);
+  FRIEND_TEST_ALL_PREFIXES(DirectoryBackingStoreTest,
+                           CatastrophicErrorHandler_KeptAcrossReset);
+  FRIEND_TEST_ALL_PREFIXES(DirectoryBackingStoreTest,
+                           CatastrophicErrorHandler_Invocation);
+
+  // Drop all tables in preparation for reinitialization.
+  void DropAllTables();
+
+  bool SafeToPurgeOnLoading(const EntryKernel& entry) const;
+
+  // Drops a table if it exists, harmless if the table did not already exist.
+  bool SafeDropTable(const char* table_name);
+
+  bool CreateTables();
+
+  // Create 'share_info' or 'temp_share_info' depending on value of
+  // is_temporary. Returns true on success, false on error.
+  bool CreateShareInfoTable(bool is_temporary);
+  bool CreateShareInfoTableVersion71(bool is_temporary);
+
+  // Create 'metas' or 'temp_metas' depending on value of is_temporary. Also
+  // create a 'deleted_metas' table using same schema. Returns true on success,
+  // false on error.
+  bool CreateMetasTable(bool is_temporary);
+
+  // Returns true on success, false on error.
+  bool CreateModelsTable();
+  bool CreateV71ModelsTable();
+  bool CreateV75ModelsTable();
+  bool CreateV81ModelsTable();
+
+  // Returns true on success, false on error.
+  bool MigrateToSpecifics(const char* old_columns,
+                          const char* specifics_column,
+                          void(*handler_function) (
+                              sql::Statement* old_value_query,
+                              int old_value_column,
+                              sync_pb::EntitySpecifics* mutable_new_value));
+
+  // Returns true on success, false on error.
   bool Vacuum();
+
+  // Returns true on success, false on error.
   bool IncreasePageSizeTo32K();
+
+  // Returns true on success, false on error.
   bool GetDatabasePageSize(int* page_size);
 
   // Prepares |save_statement| for saving entries in |table|.
@@ -226,6 +238,8 @@ class SYNC_EXPORT_PRIVATE DirectoryBackingStore : public base::NonThreadSafe {
 
   const std::string dir_name_;
   const int database_page_size_;
+
+  scoped_ptr<sql::Connection> db_;
   sql::Statement save_meta_statement_;
   sql::Statement save_delete_journal_statement_;
 

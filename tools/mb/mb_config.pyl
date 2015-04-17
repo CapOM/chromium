@@ -22,8 +22,10 @@
     'gn_release_bot': ['gn', 'release_bot'],
     'gn_release_bot_x86': ['gn', 'release_bot', 'x86'],
     'gn_release_trybot': ['gn', 'release_trybot'],
+    'gn_release_trybot_x86': ['gn', 'release_trybot', 'x86'],
     'gn_debug_bot': ['gn', 'debug_bot'],
-    'gn_debug_bot_win_x86': ['gn', 'debug_static_bot', 'x86'],
+    'gn_debug_static_bot': ['gn', 'debug_static_bot'],
+    'gn_debug_static_bot_x86': ['gn', 'debug_static_bot', 'x86'],
     'gyp_release_bot': ['gyp', 'release_bot'],
   },
   
@@ -135,6 +137,7 @@
   'masters': {
     'chromium.chromiumos': {
       'Linux ChromiumOS GN': 'chromeos_gn_release_bot',
+      'Linux ChromiumOS GN (dbg)': 'chromeos_gn_debug_bot',
     },
     'chromium.linux': {
       'Android GN': 'android_gn_release_bot',
@@ -145,15 +148,17 @@
     },
     'chromium.mac': {
       'Mac GN': 'gn_release_bot',
-      'Mac GN (dbg)': 'gn_debug_bot',
+      'Mac GN (dbg)': 'gn_debug_static_bot',
     },
     'chromium.win': {
+      'Win x64 GN': 'gn_release_bot',
+      'Win x64 GN (dbg)': 'gn_debug_static_bot',
       'Win8 GN': 'gn_release_bot_x86',
-      'Win8 GN (dbg)': 'gn_debug_bot_win_x86',
+      'Win8 GN (dbg)': 'gn_debug_static_bot_x86',
     },
     'chromium.webkit': {
-      'Android GN': 'gn_release_bot',
-      'Android GN (dbg)': 'gn_debug_bot',
+      'Android GN': 'android_gn_release_bot',
+      'Android GN (dbg)': 'android_gn_debug_bot',
       'Linux GN': 'gn_release_bot',
       'Linux GN (dbg)': 'gn_debug_bot'
     },
@@ -172,13 +177,15 @@
       'linux_chromium_gn_upload_x86': 'gn_release_bot_x86',
     },
     'tryserver.chromium.mac': {
-      'mac_chromium_gn_dbg': 'gn_debug_bot',
+      'mac_chromium_gn_dbg': 'gn_debug_static_bot',
       'mac_chromium_gn_rel': 'gn_release_trybot',
       'mac_chromium_gn_upload': 'gn_release_bot',
     },
     'tryserver.chromium.win': {
-      'win8_chromium_gn_dbg': 'gn_debug_bot',
-      'win8_chromium_gn_rel': 'gn_release_trybot',
+      'win_chromium_gn_x64_dbg': 'gn_debug_static_bot',
+      'win_chromium_gn_x64_rel': 'gn_release_trybot',
+      'win8_chromium_gn_dbg': 'gn_debug_static_bot_x86',
+      'win8_chromium_gn_rel': 'gn_release_trybot_x86',
       'win8_chromium_gn_upload': 'gn_release_bot',
     },
   },

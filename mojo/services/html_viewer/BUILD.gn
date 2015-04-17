@@ -76,6 +76,8 @@ source_set("lib") {
     "webmediaplayer_factory.h",
     "webmimeregistry_impl.cc",
     "webmimeregistry_impl.h",
+    "webnotificationmanager_impl.cc",
+    "webnotificationmanager_impl.h",
     "webscheduler_impl.cc",
     "webscheduler_impl.h",
     "websockethandle_impl.cc",
@@ -98,6 +100,7 @@ source_set("lib") {
     "//cc",
     "//cc/blink",
     "//cc/surfaces",
+    "//components/webcrypto",
     "//gin",
     "//media",
     "//media/blink",
@@ -164,6 +167,8 @@ if (is_android) {
       "//base",
       "//ui/gfx:gfx_jni_headers",
     ]
+
+    data_deps = [ "//mojo/services/network:network" ]
   }
 
   generate_jni("html_viewer_jni_headers") {
@@ -200,6 +205,7 @@ if (is_android) {
     deps = [
       ":lib",
     ]
+    data_deps = [ "//mojo/services/network:network" ]
   }
 }
 
@@ -230,13 +236,4 @@ mojo_native_application("apptests") {
     "//net:test_support",
     "//testing/gtest",
   ]
-
-  # TODO(msw): Move this to mojo/application:test_support; see crbug.com/477104.
-  data_deps = []
-  if (is_android) {
-    data_deps += [ "//mojo/android" ]
-  }
-  if (!is_component_build) {
-    data_deps += [ "//mojo/shell:mojo_shell" ]
-  }
 }

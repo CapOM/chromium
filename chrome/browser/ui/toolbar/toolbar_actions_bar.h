@@ -7,6 +7,7 @@
 
 #include "base/macros.h"
 #include "base/memory/scoped_vector.h"
+#include "base/memory/weak_ptr.h"
 #include "base/scoped_observer.h"
 #include "chrome/browser/extensions/extension_toolbar_model.h"
 #include "chrome/browser/ui/toolbar/toolbar_actions_bar_bubble_delegate.h"
@@ -35,8 +36,7 @@ class ToolbarActionViewController;
 // (fka wrench) menu. The main bar can have only a single row of icons with
 // flexible width, whereas the overflow bar has multiple rows of icons with a
 // fixed width (the width of the menu).
-class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer,
-                          public ToolbarActionsBarBubbleDelegate {
+class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer {
  public:
   // A struct to contain the platform settings.
   struct PlatformSettings {
@@ -122,9 +122,6 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer,
                   int dropped_index,
                   DragType drag_type);
 
-  // Returns true if the info bubble about the toolbar redesign should be shown.
-  bool ShouldShowInfoBubble();
-
   const std::vector<ToolbarActionViewController*>& toolbar_actions() const {
     return toolbar_actions_.get();
   }
@@ -176,10 +173,6 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer,
   void OnToolbarModelInitialized() override;
   Browser* GetBrowser() override;
 
-  // ToolbarActionsBarBubbleDelegate:
-  void OnToolbarActionsBarBubbleShown() override;
-  void OnToolbarActionsBarBubbleClosed(CloseAction action) override;
-
   // Resizes the delegate (if necessary) to the preferred size using the given
   // |tween_type| and optionally suppressing the chevron.
   void ResizeDelegate(gfx::Tween::Type tween_type, bool suppress_chevron);
@@ -197,6 +190,9 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer,
 
   // Sets |overflowed_action_wants_to_run_| to the proper value.
   void SetOverflowedActionWantsToRun();
+
+  // Shows an extension message bubble, if any should be shown.
+  void MaybeShowExtensionBubble();
 
   bool in_overflow_mode() const { return main_bar_ != nullptr; }
 
@@ -246,6 +242,12 @@ class ToolbarActionsBar : public extensions::ExtensionToolbarModel::Observer,
 
   // True if an action in the overflow menu wants to run.
   bool overflowed_action_wants_to_run_;
+
+  // True if we have checked to see if there is an extension bubble that should
+  // be displayed, and, if there is, shown that bubble.
+  bool checked_extension_bubble_;
+
+  base::WeakPtrFactory<ToolbarActionsBar> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(ToolbarActionsBar);
 };

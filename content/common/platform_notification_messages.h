@@ -22,7 +22,7 @@
 // Defines the pair of [persistent notification id] => [notification data] used
 // when getting the notifications for a given Service Worker registration.
 using PersistentNotificationInfo =
-    std::pair<std::string, content::PlatformNotificationData>;
+    std::pair<int64_t, content::PlatformNotificationData>;
 
 #endif  // CONTENT_COMMON_PLATFORM_NOTIFICATION_MESSAGES_H_
 
@@ -43,6 +43,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::PlatformNotificationData)
   IPC_STRUCT_TRAITS_MEMBER(tag)
   IPC_STRUCT_TRAITS_MEMBER(icon)
   IPC_STRUCT_TRAITS_MEMBER(silent)
+  IPC_STRUCT_TRAITS_MEMBER(data)
 IPC_STRUCT_TRAITS_END()
 
 // Messages sent from the browser to the renderer.

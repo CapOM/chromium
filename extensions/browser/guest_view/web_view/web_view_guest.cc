@@ -35,8 +35,10 @@
 #include "extensions/browser/api/guest_view/web_view/web_view_internal_api.h"
 #include "extensions/browser/api/web_request/web_request_api.h"
 #include "extensions/browser/extension_system.h"
+#include "extensions/browser/guest_view/guest_view_event.h"
 #include "extensions/browser/guest_view/guest_view_manager.h"
 #include "extensions/browser/guest_view/web_view/web_view_constants.h"
+#include "extensions/browser/guest_view/web_view/web_view_content_script_manager.h"
 #include "extensions/browser/guest_view/web_view/web_view_permission_helper.h"
 #include "extensions/browser/guest_view/web_view/web_view_permission_types.h"
 #include "extensions/browser/guest_view/web_view/web_view_renderer_state.h"
@@ -308,7 +310,7 @@ void WebViewGuest::DidDropLink(const GURL& url) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetString(guestview::kUrl, url.spec());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventDropLink, args.Pass()));
+      new GuestViewEvent(webview::kEventDropLink, args.Pass()));
 }
 
 void WebViewGuest::DidInitialize(const base::DictionaryValue& create_params) {
@@ -368,7 +370,7 @@ void WebViewGuest::ClearDataInternal(base::Time remove_since,
 void WebViewGuest::GuestViewDidStopLoading() {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventLoadStop, args.Pass()));
+      new GuestViewEvent(webview::kEventLoadStop, args.Pass()));
 }
 
 void WebViewGuest::EmbedderFullscreenToggled(bool entered_fullscreen) {
@@ -441,7 +443,7 @@ void WebViewGuest::GuestSizeChangedDueToAutoSize(const gfx::Size& old_size,
   args->SetInteger(webview::kNewHeight, new_size.height());
   args->SetInteger(webview::kNewWidth, new_size.width());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventSizeChanged, args.Pass()));
+      new GuestViewEvent(webview::kEventSizeChanged, args.Pass()));
 }
 
 bool WebViewGuest::IsAutoSizeSupported() const {
@@ -461,7 +463,7 @@ void WebViewGuest::GuestZoomChanged(double old_zoom_level,
   args->SetDouble(webview::kOldZoomFactor, old_zoom_factor);
   args->SetDouble(webview::kNewZoomFactor, new_zoom_factor);
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventZoomChange, args.Pass()));
+      new GuestViewEvent(webview::kEventZoomChange, args.Pass()));
 }
 
 void WebViewGuest::WillDestroy() {
@@ -481,14 +483,14 @@ bool WebViewGuest::AddMessageToConsole(WebContents* source,
   args->SetInteger(webview::kLine, line_no);
   args->SetString(webview::kSourceId, source_id);
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventConsoleMessage, args.Pass()));
+      new GuestViewEvent(webview::kEventConsoleMessage, args.Pass()));
   return true;
 }
 
 void WebViewGuest::CloseContents(WebContents* source) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventClose, args.Pass()));
+      new GuestViewEvent(webview::kEventClose, args.Pass()));
 }
 
 void WebViewGuest::FindReply(WebContents* source,
@@ -541,7 +543,7 @@ void WebViewGuest::LoadProgressChanged(content::WebContents* source,
   args->SetString(guestview::kUrl, web_contents()->GetURL().spec());
   args->SetDouble(webview::kProgress, progress);
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventLoadProgress, args.Pass()));
+      new GuestViewEvent(webview::kEventLoadProgress, args.Pass()));
 }
 
 void WebViewGuest::LoadAbort(bool is_top_level,
@@ -554,7 +556,7 @@ void WebViewGuest::LoadAbort(bool is_top_level,
   args->SetInteger(guestview::kCode, error_code);
   args->SetString(guestview::kReason, error_type);
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventLoadAbort, args.Pass()));
+      new GuestViewEvent(webview::kEventLoadAbort, args.Pass()));
 }
 
 void WebViewGuest::CreateNewGuestWebViewWindow(
@@ -602,7 +604,7 @@ void WebViewGuest::RendererResponsive(content::WebContents* source) {
   args->SetInteger(webview::kProcessId,
                    web_contents()->GetRenderProcessHost()->GetID());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventResponsive, args.Pass()));
+      new GuestViewEvent(webview::kEventResponsive, args.Pass()));
 }
 
 void WebViewGuest::RendererUnresponsive(content::WebContents* source) {
@@ -610,7 +612,7 @@ void WebViewGuest::RendererUnresponsive(content::WebContents* source) {
   args->SetInteger(webview::kProcessId,
                    web_contents()->GetRenderProcessHost()->GetID());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventUnresponsive, args.Pass()));
+      new GuestViewEvent(webview::kEventUnresponsive, args.Pass()));
 }
 
 void WebViewGuest::Observe(int type,
@@ -759,7 +761,7 @@ void WebViewGuest::DidCommitProvisionalLoadForFrame(
   args->SetInteger(webview::kInternalProcessId,
                    web_contents()->GetRenderProcessHost()->GetID());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventLoadCommit, args.Pass()));
+      new GuestViewEvent(webview::kEventLoadCommit, args.Pass()));
 
   find_helper_.CancelAllFindSessions();
 
@@ -787,7 +789,7 @@ void WebViewGuest::DidStartProvisionalLoadForFrame(
   args->SetString(guestview::kUrl, validated_url.spec());
   args->SetBoolean(guestview::kIsTopLevel, !render_frame_host->GetParent());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventLoadStart, args.Pass()));
+      new GuestViewEvent(webview::kEventLoadStart, args.Pass()));
 }
 
 void WebViewGuest::DocumentLoadedInFrame(
@@ -805,7 +807,7 @@ void WebViewGuest::RenderProcessGone(base::TerminationStatus status) {
                    web_contents()->GetRenderProcessHost()->GetID());
   args->SetString(webview::kReason, TerminationStatusToString(status));
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventExit, args.Pass()));
+      new GuestViewEvent(webview::kEventExit, args.Pass()));
 }
 
 void WebViewGuest::UserAgentOverrideSet(const std::string& user_agent) {
@@ -833,13 +835,13 @@ void WebViewGuest::ReportFrameNameChange(const std::string& name) {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   args->SetString(webview::kName, name);
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventFrameNameChanged, args.Pass()));
+      new GuestViewEvent(webview::kEventFrameNameChanged, args.Pass()));
 }
 
 void WebViewGuest::LoadHandlerCalled() {
   scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventContentLoad, args.Pass()));
+      new GuestViewEvent(webview::kEventContentLoad, args.Pass()));
 }
 
 void WebViewGuest::LoadRedirect(const GURL& old_url,
@@ -850,7 +852,7 @@ void WebViewGuest::LoadRedirect(const GURL& old_url,
   args->SetString(webview::kNewURL, new_url.spec());
   args->SetString(webview::kOldURL, old_url.spec());
   DispatchEventToView(
-      new GuestViewBase::Event(webview::kEventLoadRedirect, args.Pass()));
+      new GuestViewEvent(webview::kEventLoadRedirect, args.Pass()));
 }
 
 void WebViewGuest::PushWebViewStateToIOThread() {
@@ -871,6 +873,13 @@ void WebViewGuest::PushWebViewStateToIOThread() {
   web_view_info.partition_id = partition_id;
   web_view_info.owner_extension_id = owner_extension_id();
   web_view_info.rules_registry_id = rules_registry_id_;
+
+  // Get content scripts IDs added by the guest.
+  WebViewContentScriptManager* manager =
+      WebViewContentScriptManager::Get(browser_context());
+  DCHECK(manager);
+  web_view_info.content_script_ids = manager->GetContentScriptIDSet(
+      web_view_info.embedder_process_id, web_view_info.instance_id);
 
   content::BrowserThread::PostTask(
       content::BrowserThread::IO,
@@ -1399,7 +1408,7 @@ void WebViewGuest::SetFullscreenState(bool is_fullscreen) {
     // on the embedder.
     scoped_ptr<base::DictionaryValue> args(new base::DictionaryValue());
     DispatchEventToView(
-        new GuestViewBase::Event(webview::kEventExitFullscreen, args.Pass()));
+        new GuestViewEvent(webview::kEventExitFullscreen, args.Pass()));
   }
   // Since we changed fullscreen state, sending a Resize message ensures that
   // renderer/ sees the change.

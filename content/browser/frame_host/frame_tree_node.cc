@@ -7,8 +7,10 @@
 #include <queue>
 
 #include "base/command_line.h"
+#include "base/profiler/scoped_tracker.h"
 #include "base/stl_util.h"
 #include "content/browser/frame_host/frame_tree.h"
+#include "content/browser/frame_host/navigation_request.h"
 #include "content/browser/frame_host/navigator.h"
 #include "content/browser/frame_host/render_frame_host_impl.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
@@ -26,11 +28,14 @@ typedef base::hash_map<int64, FrameTreeNode*> FrameTreeNodeIDMap;
 base::LazyInstance<FrameTreeNodeIDMap> g_frame_tree_node_id_map =
     LAZY_INSTANCE_INITIALIZER;
 
-}  // namespace
+// These values indicate the loading progress status. The minimum progress
+// value matches what Blink's ProgressTracker has traditionally used for a
+// minimum progress value.
+const double kLoadingProgressNotStarted = 0.0;
+const double kLoadingProgressMinimum = 0.1;
+const double kLoadingProgressDone = 1.0;
 
-const double FrameTreeNode::kLoadingProgressNotStarted = 0.0;
-const double FrameTreeNode::kLoadingProgressMinimum = 0.1;
-const double FrameTreeNode::kLoadingProgressDone = 1.0;
+}  // namespace
 
 int64 FrameTreeNode::next_frame_tree_node_id_ = 1;
 
@@ -71,10 +76,6 @@ FrameTreeNode::~FrameTreeNode() {
   frame_tree_->FrameRemoved(this);
 
   g_frame_tree_node_id_map.Get().erase(frame_tree_node_id_);
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableBrowserSideNavigation)) {
-    navigator_->CancelNavigation(this);
-  }
 }
 
 bool FrameTreeNode::IsMainFrame() const {
@@ -172,6 +173,94 @@ bool FrameTreeNode::CommitPendingSandboxFlags() {
       effective_sandbox_flags_ != replication_state_.sandbox_flags;
   effective_sandbox_flags_ = replication_state_.sandbox_flags;
   return did_change_flags;
+}
+
+void FrameTreeNode::SetNavigationRequest(
+    scoped_ptr<NavigationRequest> navigation_request) {
+  CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kEnableBrowserSideNavigation));
+  ResetNavigationRequest(false);
+  // TODO(clamy): perform the StartLoading logic here.
+  navigation_request_ = navigation_request.Pass();
+}
+
+void FrameTreeNode::ResetNavigationRequest(bool is_commit) {
+  CHECK(base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kEnableBrowserSideNavigation));
+  // Upon commit the current NavigationRequest will be reset. There should be no
+  // cleanup performed since the navigation is still ongoing. If the reset
+  // corresponds to a cancelation, the RenderFrameHostManager should clean up
+  // any speculative RenderFrameHost it created for the navigation.
+  if (navigation_request_ && !is_commit) {
+    // TODO(clamy): perform the StopLoading logic.
+    render_manager_.CleanUpNavigation();
+  }
+  navigation_request_.reset();
+}
+
+bool FrameTreeNode::has_started_loading() const {
+  return loading_progress_ != kLoadingProgressNotStarted;
+}
+
+void FrameTreeNode::reset_loading_progress() {
+  loading_progress_ = kLoadingProgressNotStarted;
+}
+
+void FrameTreeNode::DidStartLoading(bool to_different_document) {
+  // Any main frame load to a new document should reset the load progress since
+  // it will replace the current page and any frames. The WebContents will
+  // be notified when DidChangeLoadProgress is called.
+  if (to_different_document && IsMainFrame())
+    frame_tree_->ResetLoadProgress();
+
+  // Notify the WebContents.
+  if (!frame_tree_->IsLoading())
+    navigator()->GetDelegate()->DidStartLoading(this, to_different_document);
+
+  // Set initial load progress and update overall progress. This will notify
+  // the WebContents of the load progress change.
+  DidChangeLoadProgress(kLoadingProgressMinimum);
+
+  // Notify the RenderFrameHostManager of the event.
+  render_manager()->OnDidStartLoading();
+}
+
+void FrameTreeNode::DidStopLoading() {
+  // TODO(erikchen): Remove ScopedTracker below once crbug.com/465796 is fixed.
+  tracked_objects::ScopedTracker tracking_profile1(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "465796 FrameTreeNode::DidStopLoading::Start"));
+
+  // Set final load progress and update overall progress. This will notify
+  // the WebContents of the load progress change.
+  DidChangeLoadProgress(kLoadingProgressDone);
+
+  // TODO(erikchen): Remove ScopedTracker below once crbug.com/465796 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "465796 FrameTreeNode::DidStopLoading::WCIDidStopLoading"));
+
+  // Notify the WebContents.
+  if (!frame_tree_->IsLoading())
+    navigator()->GetDelegate()->DidStopLoading();
+
+  // TODO(erikchen): Remove ScopedTracker below once crbug.com/465796 is fixed.
+  tracked_objects::ScopedTracker tracking_profile3(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "465796 FrameTreeNode::DidStopLoading::RFHMDidStopLoading"));
+
+  // Notify the RenderFrameHostManager of the event.
+  render_manager()->OnDidStopLoading();
+
+  // TODO(erikchen): Remove ScopedTracker below once crbug.com/465796 is fixed.
+  tracked_objects::ScopedTracker tracking_profile4(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "465796 FrameTreeNode::DidStopLoading::End"));
+}
+
+void FrameTreeNode::DidChangeLoadProgress(double load_progress) {
+  loading_progress_ = load_progress;
+  frame_tree_->UpdateLoadProgress();
 }
 
 }  // namespace content
