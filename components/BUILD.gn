@@ -36,6 +36,7 @@ group("all_components") {
     "//components/data_reduction_proxy/core/browser",
     "//components/data_reduction_proxy/core/common",
     "//components/device_event_log",
+    "//components/devtools_http_handler",
     "//components/dom_distiller/core",
     "//components/domain_reliability",
     "//components/enhanced_bookmarks",
@@ -70,6 +71,7 @@ group("all_components") {
     "//components/pdf/browser",
     "//components/pdf/common",
     "//components/pdf/renderer",
+    "//components/plugins/common",
     "//components/plugins/renderer",
     "//components/policy",
     "//components/power",
@@ -95,6 +97,7 @@ group("all_components") {
     "//components/translate/core/browser",
     "//components/translate/core/common",
     "//components/ui/zoom:ui_zoom",
+    "//components/undo",
     "//components/update_client",
     "//components/url_fixer",
     "//components/url_matcher",
@@ -257,6 +260,7 @@ test("components_unittests") {
     "//components/data_reduction_proxy/core/browser:unit_tests",
     "//components/data_reduction_proxy/core/common:unit_tests",
     "//components/device_event_log:unit_tests",
+    "//components/devtools_http_handler:unit_tests",
     "//components/dom_distiller/core:unit_tests",
     "//components/domain_reliability:unit_tests",
     "//components/favicon_base:unit_tests",
@@ -267,6 +271,7 @@ test("components_unittests") {
     "//components/omnibox:unit_tests",
     "//components/ownership:unit_tests",
     "//components/packed_ct_ev_whitelist:unit_tests",
+    "//components/undo:unit_tests",
     "//components/update_client:unit_tests",
     "//components/variations:unit_tests",
     "//components/web_resource:unit_tests",
@@ -297,6 +302,9 @@ test("components_unittests") {
   }
   if (is_win) {
     deps += [ "//components/browser_watcher:unit_tests" ]
+  }
+  if (is_ios) {
+    deps -= [ "//components/devtools_http_handler:unit_tests" ]
   }
 }
 

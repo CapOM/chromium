@@ -66,10 +66,6 @@ static_library("leveldatabase") {
     "src/include/leveldb/table_builder.h",
     "src/include/leveldb/write_batch.h",
     "src/port/port.h",
-    "src/port/port_example.h",
-
-    #"src/port/port_posix.cc",  # We use the chromium port instead of this.
-    #"src/port/port_posix.h",
     "src/table/block.cc",
     "src/table/block.h",
     "src/table/block_builder.cc",
@@ -106,8 +102,6 @@ static_library("leveldatabase") {
     "src/util/random.h",
     "src/util/status.cc",
   ]
-
-  defines += [ "USE_SNAPPY=1" ]
 
   configs -= [ "//build/config/compiler:chromium_code" ]
   configs += [ "//build/config/compiler:no_chromium_code" ]

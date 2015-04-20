@@ -24,8 +24,31 @@ remoting.DesktopRemotingActivity = function(parentActivity) {
   this.parentActivity_ = parentActivity;
   /** @private {remoting.DesktopConnectedView} */
   this.connectedView_ = null;
+  /** @private */
+  this.sessionFactory_ = new remoting.ClientSessionFactory(
+      document.querySelector('#client-container .client-plugin-container'),
+      remoting.app_capabilities());
   /** @private {remoting.ClientSession} */
   this.session_ = null;
+};
+
+/**
+ * Initiates a connection.
+ *
+ * @param {remoting.Host} host the Host to connect to.
+ * @param {remoting.CredentialsProvider} credentialsProvider
+ * @param {boolean=} opt_suppressOfflineError
+ * @return {void} Nothing.
+ */
+remoting.DesktopRemotingActivity.prototype.start =
+    function(host, credentialsProvider, opt_suppressOfflineError) {
+  var that = this;
+  this.sessionFactory_.createSession(this).then(
+    function(/** remoting.ClientSession */ session) {
+      that.session_ = session;
+      session.logHostOfflineErrors(!opt_suppressOfflineError);
+      session.connect(host, credentialsProvider);
+  });
 };
 
 remoting.DesktopRemotingActivity.prototype.stop = function() {
@@ -46,8 +69,6 @@ remoting.DesktopRemotingActivity.prototype.onConnected =
     remoting.toolbar.preview();
   }
 
-  this.session_ = connectionInfo.session();
-
   this.connectedView_ = new remoting.DesktopConnectedView(
       document.getElementById('client-container'), connectionInfo);
 
@@ -57,7 +78,7 @@ remoting.DesktopRemotingActivity.prototype.onConnected =
     connectionInfo.plugin().setRemapKeys('0x0700e4>0x0700e7');
   }
 
-  if (connectionInfo.session().hasCapability(
+  if (connectionInfo.plugin().hasCapability(
           remoting.ClientSession.Capability.VIDEO_RECORDER)) {
     var recorder = new remoting.VideoFrameRecorder();
     connectionInfo.plugin().extensions().register(recorder);
@@ -100,6 +121,7 @@ remoting.DesktopRemotingActivity.prototype.onError = function(error) {
 remoting.DesktopRemotingActivity.prototype.dispose = function() {
   base.dispose(this.connectedView_);
   this.connectedView_ = null;
+  base.dispose(this.session_);
   this.session_ = null;
 };
 

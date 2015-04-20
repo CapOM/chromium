@@ -22,17 +22,11 @@
   'target_defaults': {
     'defines': [
       'LEVELDB_PLATFORM_CHROMIUM=1',
-      'USE_SNAPPY=1',
     ],
     'include_dirs': [
       '.',
       'src/',
       'src/include/',
-    ],
-    'conditions': [
-      ['OS!="win"', {
-        'sources/': [ ['exclude', '_win.(h|cc)$'], ],
-      }],
     ],
   },
   'targets': [
@@ -118,9 +112,6 @@
         'src/include/leveldb/table_builder.h',
         'src/include/leveldb/write_batch.h',
         'src/port/port.h',
-        'src/port/port_example.h',
-        'src/port/port_posix.cc',
-        'src/port/port_posix.h',
         'src/table/block.cc',
         'src/table/block.h',
         'src/table/block_builder.cc',
@@ -156,9 +147,6 @@
         'src/util/options.cc',
         'src/util/random.h',
         'src/util/status.cc',
-      ],
-      'sources/': [
-        ['exclude', '_(example|posix)\\.(h|cc)$'],
       ],
     },
     {

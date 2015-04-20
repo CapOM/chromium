@@ -1018,10 +1018,12 @@ function computeParentFolderForNewItem() {
 
 /**
  * Callback for rename folder and edit command. This starts editing for
- * selected item.
+ * the passed in target, or the selected item.
+ * @param {EventTarget=} opt_target The target to start editing. If absent or
+ *     null, the selected item will be edited instead.
  */
-function editSelectedItem() {
-  if (document.activeElement == bmm.tree) {
+function editItem(opt_target) {
+  if ((opt_target || document.activeElement) == bmm.tree) {
     bmm.tree.selectedItem.editing = true;
   } else {
     var li = bmm.list.getListItem(bmm.list.selectedItem);
@@ -1257,7 +1259,7 @@ function getFilteredSelectedBookmarkIds(opt_target) {
  */
 function handleCommand(e) {
   var command = e.command;
-  var target;
+  var target = assertInstanceof(e.target, HTMLElement);
   switch (command.id) {
     case 'import-menu-command':
       recordUserAction('Import');
@@ -1286,20 +1288,17 @@ function handleCommand(e) {
     case 'open-in-new-tab-command':
     case 'open-in-background-tab-command':
       recordUserAction('OpenInNewTab');
-      openBookmarks(LinkKind.BACKGROUND_TAB,
-          assertInstanceof(e.target, HTMLElement));
+      openBookmarks(LinkKind.BACKGROUND_TAB, target);
       break;
 
     case 'open-in-new-window-command':
       recordUserAction('OpenInNewWindow');
-      openBookmarks(LinkKind.WINDOW,
-          assertInstanceof(e.target, HTMLElement));
+      openBookmarks(LinkKind.WINDOW, target);
       break;
 
     case 'open-incognito-window-command':
       recordUserAction('OpenIncognito');
-      openBookmarks(LinkKind.INCOGNITO,
-          assertInstanceof(e.target, HTMLElement));
+      openBookmarks(LinkKind.INCOGNITO, target);
       break;
 
     case 'delete-from-folders-menu-command':
@@ -1345,17 +1344,16 @@ function handleCommand(e) {
       chrome.bookmarkManagerPrivate.sortChildren(bmm.list.parentId);
       break;
 
-    case 'rename-folder-command':
-      editSelectedItem();
-      break;
 
     case 'rename-folder-from-folders-menu-command':
-      bmm.tree.selectedItem.editing = true;
+      target = bmm.tree;
+    case 'rename-folder-command':
+      editItem(target);
       break;
 
     case 'edit-command':
       recordUserAction('Edit');
-      editSelectedItem();
+      editItem();
       break;
 
     case 'new-folder-from-folders-menu-command':

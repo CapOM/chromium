@@ -155,7 +155,6 @@ source_set("ui") {
     deps += [ "//ppapi/proxy:ipc" ]
   }
   if (safe_browsing_mode == 1) {
-    defines += [ "FULL_SAFE_BROWSING" ]
     deps += [
       "//chrome/browser/safe_browsing:chunk_proto",
       "//chrome/common/safe_browsing:proto",
@@ -412,6 +411,11 @@ source_set("ui") {
             gypi_values.chrome_browser_ui_google_now_non_android_sources,
             ".",
             "//chrome")
+  }
+  if (enable_media_router) {
+    sources += rebase_path(gypi_values.chrome_browser_ui_media_router_sources,
+                           ".",
+                           "//chrome")
   }
   if (enable_webrtc) {
     sources += rebase_path(gypi_values.chrome_browser_ui_webrtc_sources,

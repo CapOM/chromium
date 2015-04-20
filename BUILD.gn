@@ -12,7 +12,6 @@ import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
 import("//build/module_args/v8.gni")
-import("//remoting/remoting_host.gni")
 
 if (is_android) {
   import("//build/config/android/config.gni")
@@ -63,7 +62,7 @@ group("gn_all") {
     "//ipc:ipc_tests",
     "//ipc/mojo:ipc_mojo_unittests",
     "//jingle:jingle_unittests",
-    "//mandoline",
+    "//mandoline:mandoline_all",
     "//media:media_unittests",
     "//media/cast:cast_unittests",
     "//mojo",
@@ -139,10 +138,6 @@ group("gn_all") {
     deps += [ "//extensions/shell:app_shell_unittests" ]
   }
 
-  if (enable_me2me_host) {
-    deps += [ "//remoting/host:remoting_me2me_host" ]
-  }
-
   if (enable_media_router) {
     deps += [
       "//chrome/browser/media/router/",
@@ -150,14 +145,8 @@ group("gn_all") {
     ]
   }
 
-  if (enable_remoting_host) {
-    deps += [
-      "//remoting:remoting_unittests",
-      "//remoting:remoting_perftests",
-      "//remoting/host",
-      "//remoting/host:remoting_start_host",
-      "//remoting/host/it2me:remote_assistance_host",
-    ]
+  if (enable_remoting) {
+    deps += [ "//remoting:remoting_all" ]
   }
 
   if (toolkit_views) {
@@ -666,45 +655,27 @@ group("gn_mojo_targets") {
     # and figure out how cross-platform they are
     deps = [
       "//chrome/browser/ui/webui/omnibox:mojo_bindings_python",
-      "//chrome/browser/ui/webui/omnibox:mojo_bindings_dart",
-      "//content/public/common:mojo_bindings_dart",
       "//content/public/common:mojo_bindings_python",
-      "//content/common:mojo_bindings_dart",
       "//content/common:mojo_bindings_python",
-      "//content/test:web_ui_test_mojo_bindings_dart",
       "//content/test:web_ui_test_mojo_bindings_python",
       "//device/battery:mojo_bindings_python",
-      "//device/battery:mojo_bindings_dart",
-      "//device/vibration:mojo_bindings_dart",
       "//device/vibration:mojo_bindings_python",
       "//ipc/mojo:ipc_mojo_perftests",
-      "//ipc/mojo:client_channel_dart",
       "//ipc/mojo:client_channel_python",
-      "//media/mojo/interfaces:interfaces_dart",
       "//media/mojo/interfaces:interfaces_python",
       "//media/mojo/services:cdm_service",
       "//media/mojo:tests",
-      "//net/interfaces:interfaces_dart",
+      "//mojo/services:apptests",
+      "//mojo/services:tests",
       "//net/interfaces:interfaces_python",
       "//third_party/mojo/src/mojo/edk/js/test:js_integration_tests",
-      "//third_party/mojo/src/mojo/edk/js/tests:js_to_cpp_bindings_dart",
       "//third_party/mojo/src/mojo/edk/js/tests:js_to_cpp_bindings_python",
       "//third_party/mojo/src/mojo/public/python:packaged_application",
       "//third_party/mojo/src/mojo/public/python:packaged_bindings",
       "//third_party/mojo/src/mojo/public/cpp/application:test_support_standalone",
-      "//third_party/mojo_services/src/accessibility/public/interfaces:interfaces_dart",
       "//third_party/mojo_services/src/accessibility/public/interfaces:interfaces_python",
-      "//third_party/mojo_services/src/window_manager/public/interfaces:interfaces_dart",
       "//third_party/mojo_services/src/window_manager/public/interfaces:interfaces_python",
     ]
-
-    if (!is_debug) {
-      deps += [
-        "//mojo/services/html_viewer:apptests",
-        "//mojo/services/html_viewer:tests",
-        "//mojo/services/network:apptests",
-      ]
-    }
   }
 }
 

@@ -58,6 +58,9 @@ per-file data_reduction_proxy*=jeremyim@chromium.org
 per-file devtools_bridge.gyp=mnaganov@chromium.org
 per-file devtools_bridge.gyp=serya@chromium.org
 
+per-file devtools_http_handler.gyp*=dgozman@chromium.org
+per-file devtools_http_handler.gyp*=pfeldman@chromium.org
+
 per-file network_hints*=jar@chromium.org
 per-file network_hints*=ttuttle@chromium.org
 
@@ -256,11 +259,10 @@ per-file translate_strings.grdp=toyoshim@chromium.org
 
 per-file startup_metric_utils.gypi=jeremy@chromium.org
 
+per-file undo.gypi=sky@chromium.org
+per-file undo.gypi=tom.cassiotis@gmail.com
 per-file undo_strings.grdp=sky@chromium.org
 per-file undo_strings.grdp=tom.cassiotis@gmail.com
-
-# For refactoring only during componentization of //chrome/browser/undo.
-per-file undo_strings.grdp=sdefresne@chromium.org
 
 per-file user_manager.gypi=antrim@chromium.org
 per-file user_manager.gypi=dpolukhin@chromium.org

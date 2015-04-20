@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Keep in sync with remoting/webapp/files.gni.
+
 {
   'variables': {
 
@@ -37,7 +39,6 @@
       'webapp/crd/js/mock_host_list_api.js',
       'webapp/crd/js/mock_identity.js',
       'webapp/crd/js/mock_oauth2_api.js',
-      'webapp/crd/js/mock_session_connector.js',
       'webapp/crd/js/mock_signal_strategy.js',
     ],
     'remoting_webapp_browsertest_js_proto_files': [
@@ -72,6 +73,7 @@
       'webapp/base/js/protocol_extension_manager_unittest.js',
       'webapp/crd/js/apps_v2_migration_unittest.js',
       'webapp/crd/js/desktop_viewport_unittest.js',
+      'webapp/crd/js/client_session_factory_unittest.js',
       'webapp/crd/js/dns_blackhole_checker_unittest.js',
       'webapp/crd/js/error_unittest.js',
       'webapp/crd/js/fallback_signal_strategy_unittest.js',
@@ -79,6 +81,7 @@
       'webapp/crd/js/gcd_client_with_mock_xhr_unittest.js',
       'webapp/crd/js/host_controller_unittest.js',
       'webapp/crd/js/host_daemon_facade_unittest.js',
+      'webapp/crd/js/host_list_api_impl_unittest.js',
       'webapp/crd/js/host_table_entry_unittest.js',
       'webapp/crd/js/identity_unittest.js',
       'webapp/crd/js/l10n_unittest.js',
@@ -93,7 +96,10 @@
     'remoting_webapp_unittests_js_mock_files': [
       # Some proto files can be repurposed as simple mocks for the unittests.
       # Note that some defs in chrome_proto are overwritten by chrome_mocks.
+      'webapp/crd/js/mock_client_plugin.js',
       'webapp/crd/js/mock_host_daemon_facade.js',
+      'webapp/crd/js/mock_host_list_api.js',
+      'webapp/crd/js/mock_identity.js',
       'webapp/crd/js/mock_signal_strategy.js',
       'webapp/js_proto/chrome_proto.js',
       'webapp/js_proto/chrome_mocks.js',
@@ -155,14 +161,13 @@
       'webapp/crd/js/client_plugin_impl.js',
       'webapp/crd/js/client_plugin_host_desktop_impl.js',
       'webapp/crd/js/client_session.js',
+      'webapp/crd/js/client_session_factory.js',
       'webapp/crd/js/clipboard.js',
       'webapp/crd/js/connected_view.js',
       'webapp/crd/js/connection_info.js',
       'webapp/crd/js/credentials_provider.js',
       'webapp/crd/js/desktop_connected_view.js',
       'webapp/crd/js/host_desktop.js',
-      'webapp/crd/js/session_connector.js',
-      'webapp/crd/js/session_connector_impl.js',
       'webapp/crd/js/smart_reconnector.js',
       'webapp/crd/js/video_frame_recorder.js',
     ],

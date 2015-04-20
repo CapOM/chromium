@@ -983,10 +983,6 @@ const char kSbDisableDownloadProtection[] =
 const char kSbDisableExtensionBlacklist[] =
     "safebrowsing-disable-extension-blacklist";
 
-// Disables safebrowsing feature that provides a side-effect free whitelist.
-const char kSbDisableSideEffectFreeWhitelist[] =
-    "safebrowsing-disable-side-effect-free-whitelist";
-
 // Causes the process to run as a service process.
 const char kServiceProcess[]                = "service";
 
@@ -1207,9 +1203,6 @@ const char kDisableZeroSuggest[] = "disable-zero-suggest";
 // Enable the accessibility tab switcher.
 const char kEnableAccessibilityTabSwitcher[] =
     "enable-accessibility-tab-switcher";
-
-// Enables app install alerts.
-const char kEnableAppInstallAlerts[]        = "enable-app-install-alerts";
 
 // Enables Contextual Search.
 const char kEnableContextualSearch[]        = "enable-contextual-search";

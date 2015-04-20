@@ -1442,6 +1442,10 @@
       'browser/ui/startup/autolaunch_prompt.cc',
       'browser/ui/web_contents_sizer.mm',
     ],
+    'chrome_browser_ui_media_router_sources': [
+      'browser/ui/toolbar/media_router_action.h',
+      'browser/ui/toolbar/media_router_action.cc',
+    ],
     'chrome_browser_ui_non_mac_sources': [
       'browser/ui/web_contents_sizer.cc',
     ],
@@ -2841,9 +2845,6 @@
           ],
         }],
         ['safe_browsing==1', {
-          'defines': [
-            'FULL_SAFE_BROWSING',
-          ],
           'dependencies': [
             'safe_browsing_chunk_proto',
             'safe_browsing_proto',
@@ -3124,6 +3125,9 @@
         }],
         ['enable_google_now==1 and OS!="android"', {
           'sources': [ '<@(chrome_browser_ui_google_now_non_android_sources)' ],
+        }],
+        ['enable_media_router==1', {
+          'sources': [ '<@(chrome_browser_ui_media_router_sources)' ],
         }],
         ['enable_supervised_users==0', {
           'sources!': [

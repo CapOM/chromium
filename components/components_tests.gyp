@@ -94,6 +94,7 @@
       'content_settings/core/browser/content_settings_provider_unittest.cc',
       'content_settings/core/browser/content_settings_rule_unittest.cc',
       'content_settings/core/browser/content_settings_utils_unittest.cc',
+      'content_settings/core/browser/plugins_field_trial_unittest.cc',
       'content_settings/core/common/content_settings_pattern_parser_unittest.cc',
       'content_settings/core/common/content_settings_pattern_unittest.cc',
     ],
@@ -126,6 +127,9 @@
     ],
     'device_event_log_unittest_sources': [
       'device_event_log/device_event_log_impl_unittest.cc',
+    ],
+    'devtools_http_handler_unittest_sources': [
+      'devtools_http_handler/devtools_http_handler_unittest.cc',
     ],
     'dom_distiller_unittest_sources': [
       'dom_distiller/content/dom_distiller_viewer_source_unittest.cc',
@@ -161,6 +165,10 @@
     'favicon_unittest_sources': [
       'favicon/content/content_favicon_driver_unittest.cc',
       'favicon/core/favicon_handler_unittest.cc',
+    ],
+    'undo_unittest_sources': [
+      'undo/bookmark_undo_service_test.cc',
+      'undo/undo_manager_test.cc',
     ],
 
     # Note: GN tests converted to here, need to do the rest.
@@ -649,6 +657,7 @@
         '<@(suggestions_unittest_sources)',
         '<@(sync_driver_unittest_sources)',
         '<@(translate_unittest_sources)',
+        '<@(undo_unittest_sources)',
         '<@(update_client_unittest_sources)',
         '<@(url_fixer_unittest_sources)',
         '<@(url_matcher_unittest_sources)',
@@ -759,6 +768,7 @@
         'components.gyp:translate_core_common',
         'components.gyp:translate_core_language_detection',
         'components.gyp:ui_zoom',
+        'components.gyp:undo_component',
         'components.gyp:update_client',
         'components.gyp:update_client_test_support',
         'components.gyp:url_fixer',
@@ -800,6 +810,7 @@
         }],
         ['OS != "ios"', {
           'sources': [
+            '<@(devtools_http_handler_unittest_sources)',
             '<@(error_page_unittest_sources)',
             '<@(navigation_interception_unittest_sources)',
             '<@(network_hints_unittest_sources)',
@@ -817,6 +828,7 @@
             'components.gyp:autofill_content_renderer',
             'components.gyp:autofill_content_test_support',
             'components.gyp:data_reduction_proxy_content_browser',
+            'components.gyp:devtools_http_handler',
             'components.gyp:dom_distiller_content',
             'components.gyp:error_page_renderer',
             'components.gyp:favicon_content',
@@ -1149,6 +1161,8 @@
             '../testing/gtest.gyp:gtest',
             'components.gyp:autofill_content_browser',
             'components.gyp:autofill_content_renderer',
+            'components.gyp:content_settings_core_browser',
+            'components.gyp:content_settings_core_common',
             'components.gyp:dom_distiller_content',
             'components.gyp:dom_distiller_core',
             'components.gyp:password_manager_content_renderer',

@@ -34,7 +34,7 @@ vars = {
   'llvm_url': 'http://src.chromium.org/llvm-project',
   'llvm_git': 'https://llvm.googlesource.com',
   'webkit_trunk': 'http://src.chromium.org/blink/trunk',
-  'webkit_revision': 'e49d160d26bf9526fb258673d625b6c267ac2c29', # from svn revision 193892
+  'webkit_revision': 'f13b8795b3ead2a96e666276a35afb0d8dd634e0', # from svn revision 194040
   'chromium_git': 'https://chromium.googlesource.com',
   'chromiumos_git': 'https://chromium.googlesource.com/chromiumos',
   'pdfium_git': 'https://pdfium.googlesource.com',
@@ -42,12 +42,12 @@ vars = {
   'boringssl_git': 'https://boringssl.googlesource.com',
   'libvpx_revision': '0816cf21b0f04c1d2cf86b4e3d120a49e4ac8fa6',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': 'ca1a22ee534f0fcabed7fa06cbf3ea5068b489da',
+  'skia_revision': 'f61475e95d9bb38f741f9e51221c086250b9ad72',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   'v8_branch': 'trunk',
-  'v8_revision': 'a92502697e37054c783b2ea7feaf321c9b49fe8b',
+  'v8_revision': '48a8a7443322ba5288ebc6dd12040bbfaa850506',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -58,7 +58,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '4a1858b84998f3cfac03a08dbf5b826a8d68650a',
+  'angle_revision': '8d95b741c56cc05cfba65d1a98496c5623c6b47f',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
@@ -94,7 +94,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling NaCl
   # and whatever else without interference from each other.
-  'nacl_revision': '11953a35fcd4f999b097a343bc49d89f94af21a8',
+  'nacl_revision': '8e6981959f76f5480f74b2b4819d3b260b1b2062',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -132,7 +132,7 @@ deps = {
    Var('chromium_git') + '/crashpad/crashpad.git' + '@' + '1baff4ff92fe1a1ead6b88b5f01633a4f0b6b51c',
 
   'src/third_party/trace-viewer':
-   Var('chromium_git') + '/external/trace-viewer.git' + '@' + '07909fe53e549b42634142ef07d1eb970d94b3d3',
+   Var('chromium_git') + '/external/trace-viewer.git' + '@' + '337d7911f38529a2a42c5e6c13240076c3fc7d17',
 
   'src/third_party/WebKit':
    Var('chromium_git') + '/chromium/blink.git' + '@' +  Var('webkit_revision'),
@@ -210,7 +210,7 @@ deps = {
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '104f872faf2cd809cdada885a1e39be85e5b3316',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '7df77d81d16adc73f6c86ef7d9df70e71b65b0eb', # commit position 9020
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'b0e40f3acddbc205818c8f0109095053e1626fe4', # commit position 9029
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -234,7 +234,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '8c72e1c4cdfcf65fe515881722043c9f226cbf54', # commit position 9024
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '647d7226458ac2abc675eeeb2395151e660dee4d', # commit position 9030
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -442,7 +442,7 @@ deps_os = {
      Var('chromium_git') + '/external/android_protobuf.git' + '@' + '94f522f907e3f34f70d9e7816b947e62fddbb267',
 
     'src/third_party/android_tools':
-     Var('chromium_git') + '/android_tools.git' + '@' + 'a1ffd63322c438627d78ea56eb73fb8779e06950',
+     Var('chromium_git') + '/android_tools.git' + '@' + 'bba2299128013f79b900983f405a65d9b6bdb2fa',
 
     'src/third_party/apache-mime4j':
      Var('chromium_git') + '/chromium/deps/apache-mime4j.git' + '@' + '28cb1108bff4b6cf0a2e86ff58b3d025934ebe3a',
@@ -727,7 +727,7 @@ hooks = [
     'action': ['python',
                'src/build/get_syzygy_binaries.py',
                '--output-dir=src/third_party/kasko',
-               '--revision=3278b959bdf6c9aa4b326a38e8b953e566c1ec58',
+               '--revision=584b8e476d6ffdf291d7df9d134bd9747f8a1d32',
                '--resource=kasko.zip',
                '--resource=kasko_symbols.zip',
                '--overwrite',

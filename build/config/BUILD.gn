@@ -126,10 +126,7 @@ config("feature_flags") {
       defines += [ "USE_OPENSSL_CERTS=1" ]
     }
   } else if (use_nss_certs) {
-    # USE_NSS really means "use nss for certificate validation and storage"
-    # (like USE_OPENSSL_CERTS) and not "we're linking to NSS." It might be nice
-    # to rename this but we're hoping to transition away from NSS.
-    defines += [ "USE_NSS=1" ]
+    defines += [ "USE_NSS_CERTS=1" ]
   }
   if (use_ozone) {
     defines += [ "USE_OZONE=1" ]
@@ -230,6 +227,15 @@ config("feature_flags") {
   }
   if (enable_video_hole) {
     defines += [ "VIDEO_HOLE=1" ]
+  }
+  if (safe_browsing_mode == 1) {
+    defines += [ "FULL_SAFE_BROWSING" ]
+    defines += [ "SAFE_BROWSING_CSD" ]
+    defines += [ "SAFE_BROWSING_DB_LOCAL" ]
+    defines += [ "SAFE_BROWSING_SERVICE" ]
+  } else if (safe_browsing_mode == 2) {
+    defines += [ "MOBILE_SAFE_BROWSING" ]
+    defines += [ "SAFE_BROWSING_SERVICE" ]
   }
 }
 

@@ -683,14 +683,8 @@
         # NSS usage.
         ['(OS=="linux" or OS=="freebsd" or OS=="openbsd" or OS=="solaris") and use_openssl==0', {
           'use_nss_certs%': 1,
-          # TODO(davidben): use_nss is deprecated and will be removed. See
-          # https://crbug.com/462040.
-          'use_nss%': 1,
         }, {
           'use_nss_certs%': 0,
-          # TODO(davidben): use_nss is deprecated and will be removed. See
-          # https://crbug.com/462040.
-          'use_nss%': 0,
         }],
 
         # When OpenSSL is used for SSL and crypto on Unix-like systems, use
@@ -1091,7 +1085,6 @@
     'use_libpci%': '<(use_libpci)',
     'use_openssl%': '<(use_openssl)',
     'use_openssl_certs%': '<(use_openssl_certs)',
-    'use_nss%': '<(use_nss)',
     'use_nss_certs%': '<(use_nss_certs)',
     'use_udev%': '<(use_udev)',
     'os_bsd%': '<(os_bsd)',
@@ -2995,6 +2988,27 @@
       ['v8_use_external_startup_data==1', {
        'defines': ['V8_USE_EXTERNAL_STARTUP_DATA'],
       }],
+
+      # SAFE_BROWSING_SERVICE - browser manages a safe-browsing service.
+      # SAFE_BROWSING_DB_LOCAL - service manages a local database.
+      # SAFE_BROWSING_DB_REMOTE - service talks via API to a database
+      # SAFE_BROWSING_CSD - enable client-side phishing detection.
+      ['safe_browsing==1', {
+        # TODO(nparker): Remove existing uses of FULL_SAFE_BROWSING
+        'defines': [
+          'FULL_SAFE_BROWSING',
+          'SAFE_BROWSING_CSD',
+          'SAFE_BROWSING_DB_LOCAL',
+          'SAFE_BROWSING_SERVICE',
+        ],
+      }],
+      ['safe_browsing==2', {
+        'defines': [
+          # TODO(nparker): Remove existing uses of MOBILE_SAFE_BROWSING
+          'MOBILE_SAFE_BROWSING',
+          'SAFE_BROWSING_SERVICE',
+        ],
+      }],
     ],  # conditions for 'target_defaults'
     'target_conditions': [
       ['<(use_libpci)==1', {
@@ -3016,8 +3030,7 @@
         'defines': ['USE_GLIB=1'],
       }],
       ['<(use_nss_certs)==1 and >(nacl_untrusted_build)==0', {
-        # TODO(davidben): Rename this to USE_NSS_CERTS. https://crbug.com/462040
-        'defines': ['USE_NSS=1'],
+        'defines': ['USE_NSS_CERTS=1'],
       }],
       ['<(chromeos)==1 and >(nacl_untrusted_build)==0', {
         'defines': ['OS_CHROMEOS=1'],

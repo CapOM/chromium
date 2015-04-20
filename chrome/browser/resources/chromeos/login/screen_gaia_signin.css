@@ -31,6 +31,10 @@ throbber-notice {
   display: block;
 }
 
+.new-gaia-flow #gaia-loading {
+  margin-top: -38px;
+}
+
 #gaia-signin.full-width {
   padding: 75px 0 0;
 }
@@ -307,6 +311,6 @@ html /deep/ #forgotPasswordDlg {
   width: 350px;
 }
 
-html /deep/ #forgotPasswordDlg paper-button[autofocus] {
+html /deep/ #forgotPasswordDlg gaia-paper-button[autofocus] {
   color: rgb(66, 133, 244);
 }

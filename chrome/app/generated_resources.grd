@@ -269,6 +269,9 @@ are declared in build/common.gypi.
         <part file="chromeos_strings.grdp" />
       </if>
 
+      <!-- Media Router specific strings -->
+      <part file="media_router_strings.grdp" />
+
       <!-- TODO add all of your "string table" messages here.  Remember to
       change nontranslateable parts of the messages into placeholders (using the
       <ph> element).  You can also use the 'grit add' tool to help you identify
@@ -6262,12 +6265,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_DISABLE_ACCELERATED_VIDEO_DECODE_DESCRIPTION" desc="Description for the flag to disable accelerated video decode where available.">
         Disables hardware-accelerated video decode where available.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_CARRIER_SWITCHING" desc="Name for the flag to set to enable mobile carrier switching.">
-        Enable switching between mobile carriers.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_CARRIER_SWITCHING_DESCRIPTION" desc="Description for the flag to set to enable carrier switching.">
-        Allows the user to switch between mobile carriers from the UI. Warning: The Sprint carrier will ONLY work for users with an existing Sprint plan.
       </message>
       <message name="IDS_FLAGS_DISABLE_CLOUD_IMPORT" desc="Name for the flag to disable cloud import feature.">
         Disable Cloud Import.
@@ -12873,12 +12870,12 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <if expr="chromeos">
         <!-- The URL for the Google mailto service. -->
         <message name="IDS_GOOGLE_MAILTO_HANDLER_URL">
-          https:////mail.google.com//mail//?extsrc=mailto&amp;url=%s
+          https://mail.google.com/mail/?extsrc=mailto&amp;url=%s
         </message>
 
         <!-- The URL for the Google webcal service. -->
         <message name="IDS_GOOGLE_WEBCAL_HANDLER_URL">
-          https:////www.google.com//calendar//render?cid=%s
+          https://www.google.com/calendar/render?cid=%s
         </message>
       </if>
 
@@ -15158,14 +15155,6 @@ After you create a new supervised user, you can manage their settings at any tim
         </message>
         <message name="IDS_FLAGS_ENABLE_EMBEDDEDSEARCH_API_DESCRIPTION" desc="Describes an about:flags experiment for enabling EmbeddedSearch API in the search results page">
          If enabled, EmbeddedSearch API will be used to submit search queries in the search results page.
-        </message>
-
-        <!-- App install alerts strings -->
-        <message name="IDS_FLAGS_ENABLE_APP_INSTALL_ALERTS_NAME" desc="Title for the flag to allow app install alerts">
-          Enable app install alerts
-        </message>
-        <message name="IDS_FLAGS_ENABLE_APP_INSTALL_ALERTS_DESCRIPTION" desc="Description to allow app install alerts">
-          If enabled, websites will be parsed for app install alert meta tags.
         </message>
 
         <!-- Flag strings for seccomp-bpf sandbox flag. -->

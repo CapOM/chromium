@@ -72,14 +72,9 @@ remoting.Me2MeActivity.prototype.connect_ = function(suppressHostOfflineError) {
   remoting.setMode(remoting.AppMode.CLIENT_CONNECTING);
   base.dispose(this.desktopActivity_);
   this.desktopActivity_ = new remoting.DesktopRemotingActivity(this);
-  var connector = remoting.SessionConnector.factory.createConnector(
-        document.getElementById('client-container'),
-        remoting.app_capabilities(),
-        this.desktopActivity_);
-
-  connector.connect(
-      remoting.Application.Mode.ME2ME,
-      this.host_, this.createCredentialsProvider_(), suppressHostOfflineError);
+  remoting.app.setConnectionMode(remoting.Application.Mode.ME2ME);
+  this.desktopActivity_.start(this.host_, this.createCredentialsProvider_(),
+                              suppressHostOfflineError);
 };
 
 /**
@@ -159,8 +154,7 @@ remoting.Me2MeActivity.prototype.onConnected = function(connectionInfo) {
   this.retryOnHostOffline_ = true;
 
   var plugin = connectionInfo.plugin();
-  var session = connectionInfo.session();
-  if (session.hasCapability(remoting.ClientSession.Capability.CAST)) {
+  if (plugin.hasCapability(remoting.ClientSession.Capability.CAST)) {
     plugin.extensions().register(new remoting.CastExtensionHandler());
   }
   plugin.extensions().register(new remoting.GnubbyAuthHandler());

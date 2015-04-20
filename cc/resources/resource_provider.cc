@@ -1301,8 +1301,6 @@ void ResourceProvider::DestroyChildInternal(ChildMap::iterator it,
     resources_for_child.push_back(id);
   }
 
-  // If the child is going away, don't consider any resources in use.
-  child.in_use_resources.clear();
   child.marked_for_deletion = true;
 
   DeleteAndReturnUnusedResourcesToChild(it, style, resources_for_child);
@@ -1401,46 +1399,24 @@ void ResourceProvider::ReceiveFromChild(
 
 void ResourceProvider::DeclareUsedResourcesFromChild(
     int child,
-    const ResourceIdArray& resources_from_child) {
+    const ResourceIdSet& resources_from_child) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
   ChildMap::iterator child_it = children_.find(child);
   DCHECK(child_it != children_.end());
   Child& child_info = child_it->second;
   DCHECK(!child_info.marked_for_deletion);
-  child_info.in_use_resources.clear();
-
-  for (size_t i = 0; i < resources_from_child.size(); ++i) {
-    ResourceIdMap::iterator it =
-        child_info.child_to_parent_map.find(resources_from_child[i]);
-    DCHECK(it != child_info.child_to_parent_map.end());
-
-    ResourceId local_id = it->second;
-    DCHECK(!GetResource(local_id)->marked_for_deletion);
-    child_info.in_use_resources.insert(local_id);
-  }
 
   ResourceIdArray unused;
   for (ResourceIdMap::iterator it = child_info.child_to_parent_map.begin();
        it != child_info.child_to_parent_map.end();
        ++it) {
     ResourceId local_id = it->second;
-    bool resource_is_in_use = child_info.in_use_resources.count(local_id) > 0;
+    bool resource_is_in_use = resources_from_child.count(it->first) > 0;
     if (!resource_is_in_use)
       unused.push_back(local_id);
   }
   DeleteAndReturnUnusedResourcesToChild(child_it, NORMAL, unused);
-}
-
-// static
-bool ResourceProvider::CompareResourceMapIteratorsByChildId(
-    const std::pair<ReturnedResource, ResourceMap::iterator>& a,
-    const std::pair<ReturnedResource, ResourceMap::iterator>& b) {
-  const ResourceMap::iterator& a_it = a.second;
-  const ResourceMap::iterator& b_it = b.second;
-  const Resource& a_resource = a_it->second;
-  const Resource& b_resource = b_it->second;
-  return a_resource.child_id < b_resource.child_id;
 }
 
 void ResourceProvider::ReceiveReturnsFromParent(
@@ -1448,36 +1424,16 @@ void ResourceProvider::ReceiveReturnsFromParent(
   DCHECK(thread_checker_.CalledOnValidThread());
   GLES2Interface* gl = ContextGL();
 
-  int child_id = 0;
-  ResourceIdArray resources_for_child;
+  base::hash_map<int, ResourceIdArray> resources_for_child;
 
-  std::vector<std::pair<ReturnedResource, ResourceMap::iterator>>
-      sorted_resources;
-
-  for (ReturnedResourceArray::const_iterator it = resources.begin();
-       it != resources.end();
-       ++it) {
-    ResourceId local_id = it->id;
+  for (const ReturnedResource& returned : resources) {
+    ResourceId local_id = returned.id;
     ResourceMap::iterator map_iterator = resources_.find(local_id);
-
     // Resource was already lost (e.g. it belonged to a child that was
     // destroyed).
     if (map_iterator == resources_.end())
       continue;
 
-    sorted_resources.push_back(
-        std::pair<ReturnedResource, ResourceMap::iterator>(*it, map_iterator));
-  }
-
-  std::sort(sorted_resources.begin(),
-            sorted_resources.end(),
-            CompareResourceMapIteratorsByChildId);
-
-  ChildMap::iterator child_it = children_.end();
-  for (size_t i = 0; i < sorted_resources.size(); ++i) {
-    ReturnedResource& returned = sorted_resources[i].first;
-    ResourceMap::iterator& map_iterator = sorted_resources[i].second;
-    ResourceId local_id = map_iterator->first;
     Resource* resource = &map_iterator->second;
 
     CHECK_GE(resource->exported_count, returned.count);
@@ -1515,28 +1471,13 @@ void ResourceProvider::ReceiveReturnsFromParent(
     }
 
     DCHECK(resource->origin == Resource::DELEGATED);
-    // Delete the resource and return it to the child it came from one.
-    if (resource->child_id != child_id) {
-      if (child_id) {
-        DCHECK_NE(resources_for_child.size(), 0u);
-        DCHECK(child_it != children_.end());
-        DeleteAndReturnUnusedResourcesToChild(child_it, NORMAL,
-                                              resources_for_child);
-        resources_for_child.clear();
-      }
-
-      child_it = children_.find(resource->child_id);
-      DCHECK(child_it != children_.end());
-      child_id = resource->child_id;
-    }
-    resources_for_child.push_back(local_id);
+    resources_for_child[resource->child_id].push_back(local_id);
   }
 
-  if (child_id) {
-    DCHECK_NE(resources_for_child.size(), 0u);
+  for (const auto& children : resources_for_child) {
+    ChildMap::iterator child_it = children_.find(children.first);
     DCHECK(child_it != children_.end());
-    DeleteAndReturnUnusedResourcesToChild(child_it, NORMAL,
-                                          resources_for_child);
+    DeleteAndReturnUnusedResourcesToChild(child_it, NORMAL, children.second);
   }
 }
 
@@ -1615,7 +1556,6 @@ void ResourceProvider::DeleteAndReturnUnusedResourcesToChild(
     Resource& resource = it->second;
 
     DCHECK(!resource.locked_for_write);
-    DCHECK_EQ(0u, child_info->in_use_resources.count(local_id));
     DCHECK(child_info->parent_to_child_map.count(local_id));
 
     ResourceId child_id = child_info->parent_to_child_map[local_id];

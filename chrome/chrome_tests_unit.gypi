@@ -1532,9 +1532,6 @@
       'browser/ui/window_sizer/window_sizer_common_unittest.cc',
       'browser/ui/window_sizer/window_sizer_unittest.cc',
       'browser/ui/zoom/zoom_controller_unittest.cc',
-      # Bookmark undo is not used on Android.
-      'browser/undo/bookmark_undo_service_test.cc',
-      'browser/undo/undo_manager_test.cc',
       # The importer code is not used on Android.
       'common/importer/firefox_importer_utils_unittest.cc',
       # No service process (which also requires multiprocess lock).
@@ -2304,7 +2301,6 @@
         ['safe_browsing==1', {
           # TODO(sgurun): enable tests for safe_browsing==2.
           'sources': [ '<@(chrome_unit_tests_full_safe_browsing_sources)' ],
-          'defines': [ 'FULL_SAFE_BROWSING' ],
           'dependencies': [
             'ipc_protobuf_message_test_proto',
           ],

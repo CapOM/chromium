@@ -130,6 +130,7 @@ source_set("browser") {
     "//components/translate/core/browser",
     "//components/translate/core/common",
     "//components/ui/zoom:ui_zoom",
+    "//components/undo",
     "//components/update_client",
     "//components/url_fixer",
     "//components/user_prefs",
@@ -238,12 +239,14 @@ source_set("browser") {
       "//components/autofill/content/browser",
       "//components/browsing_data",
       "//components/data_reduction_proxy/content/browser",
+      "//components/devtools_http_handler",
       "//components/dom_distiller/content",
       "//components/favicon/content",
       "//components/history/content/browser",
       "//components/keyed_service/content",
       "//components/navigation_interception",
       "//components/password_manager/content/browser",
+      "//components/plugins/common",
       "//components/precache/content",
       "//components/sessions:sessions_content",
       "//components/storage_monitor",
@@ -433,10 +436,7 @@ source_set("browser") {
           rebase_path(gypi_values.chrome_browser_safe_browsing_full_sources,
                       ".",
                       "//chrome")
-      defines += [ "FULL_SAFE_BROWSING" ]
       deps += [ "//chrome/common/safe_browsing:proto" ]
-    } else if (safe_browsing_mode == 2) {
-      defines += [ "MOBILE_SAFE_BROWSING" ]
     }
   }
 

@@ -63,6 +63,8 @@
       'public/test/mock_special_storage_policy.h',
       'public/test/mock_storage_client.cc',
       'public/test/mock_storage_client.h',
+      'public/test/ppapi_test_utils.cc',
+      'public/test/ppapi_test_utils.h',
       'public/test/render_view_test.cc',
       'public/test/render_view_test.h',
       'public/test/render_widget_test.cc',
@@ -336,6 +338,7 @@
       'browser/appcache/mock_appcache_storage.h',
       'browser/appcache/mock_appcache_storage_unittest.cc',
       'browser/background_sync/background_sync_manager_unittest.cc',
+      'browser/background_sync/background_sync_network_observer_unittest.cc',      
       'browser/browser_thread_unittest.cc',
       'browser/browser_url_handler_impl_unittest.cc',
       'browser/byte_stream_unittest.cc',
@@ -355,7 +358,6 @@
       'browser/device_sensors/data_fetcher_shared_memory_base_unittest.cc',
       'browser/device_sensors/sensor_manager_android_unittest.cc',
       'browser/device_sensors/sensor_manager_chromeos_unittest.cc',
-      'browser/devtools/devtools_http_handler_unittest.cc',
       'browser/devtools/devtools_manager_unittest.cc',
       'browser/devtools/shared_worker_devtools_manager_unittest.cc',
       'browser/dom_storage/dom_storage_area_unittest.cc',
@@ -817,6 +819,7 @@
       'conditions': [
         ['enable_plugins==0', {
           'sources!': [
+            'public/test/ppapi_test_utils.cc',
             'test/ppapi_unittest.cc',
           ],
         }],
