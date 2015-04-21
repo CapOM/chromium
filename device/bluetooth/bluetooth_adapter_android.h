@@ -50,6 +50,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid
       const device::BluetoothAudioSink::ErrorCallback& error_callback) override;
 
  protected:
+  BluetoothAdapterAndroid();
   ~BluetoothAdapterAndroid();
 
   // BluetoothAdapter:
@@ -69,6 +70,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid
 
   std::string address_;
   std::string name_;
+
+  // Task runner from the thread this object is created on.
+  scoped_refptr<base::SequencedTaskRunner> ui_task_runner_;
 
   // Note: This should remain the last member so it'll be destroyed and
   // invalidate its weak pointers before any other members are destroyed.

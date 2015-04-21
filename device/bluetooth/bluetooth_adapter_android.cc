@@ -33,49 +33,55 @@ void BluetoothAdapterAndroid::SetName(const std::string& name,
 }
 
 bool BluetoothAdapterAndroid::IsInitialized() const {
-  return false;
+  NOTIMPLEMENTED();
 }
 
 bool BluetoothAdapterAndroid::IsPresent() const {
-  return false;
+  NOTIMPLEMENTED();
 }
 
 bool BluetoothAdapterAndroid::IsPowered() const {
-  return false;
+  NOTIMPLEMENTED();
 }
 
 void BluetoothAdapterAndroid::SetPowered(bool powered,
                                          const base::Closure& callback,
                                          const ErrorCallback& error_callback) {
+  NOTIMPLEMENTED();
 }
 
 bool BluetoothAdapterAndroid::IsDiscoverable() const {
-  return false;
+  NOTIMPLEMENTED();
 }
 
 void BluetoothAdapterAndroid::SetDiscoverable(
     bool discoverable,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
+  NOTIMPLEMENTED();
 }
 
 bool BluetoothAdapterAndroid::IsDiscovering() const {
-  return false;
+  NOTIMPLEMENTED();
 }
 
 void BluetoothAdapterAndroid::DeleteOnCorrectThread() const {
-  delete this;
+  if (ui_task_runner_->RunsTasksOnCurrentThread() ||
+      !ui_task_runner_->DeleteSoon(FROM_HERE, this))
+    delete this;
 }
 
 void BluetoothAdapterAndroid::StartDiscoverySessionWithFilter(
     scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
     const DiscoverySessionCallback& callback,
     const ErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::StartDiscoverySession(
     const DiscoverySessionCallback& callback,
     const ErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::CreateRfcommService(
@@ -83,6 +89,7 @@ void BluetoothAdapterAndroid::CreateRfcommService(
     const ServiceOptions& options,
     const CreateServiceCallback& callback,
     const CreateServiceErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::CreateL2capService(
@@ -90,12 +97,17 @@ void BluetoothAdapterAndroid::CreateL2capService(
     const ServiceOptions& options,
     const CreateServiceCallback& callback,
     const CreateServiceErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::RegisterAudioSink(
     const BluetoothAudioSink::Options& options,
     const AcquiredCallback& callback,
     const BluetoothAudioSink::ErrorCallback& error_callback) {
+}
+
+BluetoothAdapterAndroid::BluetoothAdapterAndroid() {
+  ui_task_runner_ = base::ThreadTaskRunnerHandle::Get();
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
