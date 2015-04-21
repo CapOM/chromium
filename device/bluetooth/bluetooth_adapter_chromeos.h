@@ -66,8 +66,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // BluetoothAdapter:
   void Shutdown() override;
   void DeleteOnCorrectThread() const override;
-  void AddObserver(device::BluetoothAdapter::Observer* observer) override;
-  void RemoveObserver(device::BluetoothAdapter::Observer* observer) override;
   std::string GetAddress() const override;
   std::string GetName() const override;
   void SetName(const std::string& name,
@@ -169,6 +167,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // a call to BlueZ is pending.
   typedef std::pair<base::Closure, ErrorCallback> DiscoveryCallbackPair;
   typedef std::queue<DiscoveryCallbackPair> DiscoveryCallbackQueue;
+
+  // Callback pair for the profile registration queue.
+  typedef std::pair<base::Closure, ErrorCompletionCallback>
+      RegisterProfileCompletionPair;
 
   BluetoothAdapterChromeOS();
   ~BluetoothAdapterChromeOS() override;
@@ -336,9 +338,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // Object path of the adapter we track.
   dbus::ObjectPath object_path_;
 
-  // List of observers interested in event notifications from us.
-  ObserverList<device::BluetoothAdapter::Observer> observers_;
-
   // Instance of the D-Bus agent object used for pairing, initialized with
   // our own class as its delegate.
   scoped_ptr<BluetoothAgentServiceProvider> agent_;
@@ -349,10 +348,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
 
   // The profiles we have registered with the bluetooth daemon.
   std::map<device::BluetoothUUID, BluetoothAdapterProfileChromeOS*> profiles_;
-
-  // Callback pair for the profile registration queue.
-  typedef std::pair<base::Closure, ErrorCompletionCallback>
-      RegisterProfileCompletionPair;
 
   // Queue of delegates waiting for a profile to register.
   std::map<device::BluetoothUUID, std::vector<RegisterProfileCompletionPair>*>
