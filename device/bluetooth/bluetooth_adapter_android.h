@@ -8,6 +8,10 @@
 #include "base/memory/weak_ptr.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 
+namespace base {
+class SequencedTaskRunner;
+}  // namespace base
+
 namespace device {
 
 // The BluetoothAdapterAndroid class implements BluetoothAdapter for the

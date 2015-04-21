@@ -4,6 +4,8 @@
 
 #include "device/bluetooth/bluetooth_adapter_android.h"
 
+#include "base/sequenced_task_runner.h"
+
 namespace device {
 
 // static
