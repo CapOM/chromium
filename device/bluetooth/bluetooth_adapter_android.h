@@ -35,8 +35,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid
  public:
   // BluetoothAdapter:
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
-  void AddObserver(device::BluetoothAdapter::Observer* observer) override;
-  void RemoveObserver(device::BluetoothAdapter::Observer* observer) override;
   std::string GetAddress() const override;
   std::string GetName() const override;
   void SetName(const std::string& name,
