@@ -170,6 +170,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   typedef std::pair<base::Closure, ErrorCallback> DiscoveryCallbackPair;
   typedef std::queue<DiscoveryCallbackPair> DiscoveryCallbackQueue;
 
+  // Callback pair for the profile registration queue.
+  typedef std::pair<base::Closure, ErrorCompletionCallback>
+      RegisterProfileCompletionPair;
+
   BluetoothAdapterChromeOS();
   ~BluetoothAdapterChromeOS() override;
 
@@ -349,10 +353,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
 
   // The profiles we have registered with the bluetooth daemon.
   std::map<device::BluetoothUUID, BluetoothAdapterProfileChromeOS*> profiles_;
-
-  // Callback pair for the profile registration queue.
-  typedef std::pair<base::Closure, ErrorCompletionCallback>
-      RegisterProfileCompletionPair;
 
   // Queue of delegates waiting for a profile to register.
   std::map<device::BluetoothUUID, std::vector<RegisterProfileCompletionPair>*>
