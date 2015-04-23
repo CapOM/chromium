@@ -109,7 +109,7 @@ void SetDisplayPropertiesOnHost(AshWindowTreeHost* ash_host,
   const char kInternalProp[] = "_CHROME_DISPLAY_INTERNAL";
   const char kCARDINAL[] = "CARDINAL";
   int xrandr_rotation = RR_Rotate_0;
-  switch (info.rotation()) {
+  switch (info.GetActiveRotation()) {
     case gfx::Display::ROTATE_0:
       xrandr_rotation = RR_Rotate_0;
       break;
@@ -140,7 +140,7 @@ void SetDisplayPropertiesOnHost(AshWindowTreeHost* ash_host,
     scale *= kCursorMultiplierForExternalDisplays;
 
   ui::CursorController::GetInstance()->SetCursorConfigForWindow(
-      host->GetAcceleratedWidget(), info.rotation(), scale);
+      host->GetAcceleratedWidget(), info.GetActiveRotation(), scale);
 #endif
 #endif
   scoped_ptr<RootWindowTransformer> transformer(
@@ -340,7 +340,6 @@ void DisplayController::InitDisplays() {
       RootWindowController::CreateForSecondaryDisplay(ash_host);
     }
   }
-  UpdateHostWindowNames();
 
   FOR_EACH_OBSERVER(Observer, observers_, OnDisplaysInitialized());
 }
@@ -436,10 +435,9 @@ void DisplayController::ToggleMirrorMode() {
   Shell* shell = Shell::GetInstance();
   DisplayConfiguratorAnimation* animation =
       shell->display_configurator_animation();
-  animation->StartFadeOutAnimation(
-      base::Bind(&DisplayController::SetMirrorModeAfterAnimation,
-                 weak_ptr_factory_.GetWeakPtr(),
-                 !display_manager->IsMirrored()));
+  animation->StartFadeOutAnimation(base::Bind(
+      &DisplayController::SetMirrorModeAfterAnimation,
+      weak_ptr_factory_.GetWeakPtr(), !display_manager->IsInMirrorMode()));
 #endif
 }
 
@@ -481,10 +479,10 @@ void DisplayController::SetPrimaryDisplay(
     const gfx::Display& new_primary_display) {
   DisplayManager* display_manager = GetDisplayManager();
   DCHECK(new_primary_display.is_valid());
-  DCHECK(display_manager->IsActiveDisplay(new_primary_display));
+  DCHECK(display_manager->GetDisplayForId(new_primary_display.id()).is_valid());
 
   if (!new_primary_display.is_valid() ||
-      !display_manager->IsActiveDisplay(new_primary_display)) {
+      !display_manager->GetDisplayForId(new_primary_display.id()).is_valid()) {
     LOG(ERROR) << "Invalid or non-existent display is requested:"
                << new_primary_display.ToString();
     return;
@@ -781,7 +779,7 @@ void DisplayController::PostDisplayConfigurationChange() {
   DisplayLayoutStore* layout_store = display_manager->layout_store();
   if (display_manager->num_connected_displays() > 1) {
     DisplayIdPair pair = display_manager->GetCurrentDisplayIdPair();
-    layout_store->UpdateMirrorStatus(pair, display_manager->IsMirrored());
+    layout_store->UpdateMirrorStatus(pair, display_manager->IsInMirrorMode());
     DisplayLayout layout = layout_store->GetRegisteredDisplayLayout(pair);
 
     if (Shell::GetScreen()->GetNumDisplays() > 1 ) {
@@ -798,7 +796,6 @@ void DisplayController::PostDisplayConfigurationChange() {
     }
   }
   FOR_EACH_OBSERVER(Observer, observers_, OnDisplayConfigurationChanged());
-  UpdateHostWindowNames();
   UpdateMouseLocationAfterDisplayChange();
 }
 
@@ -845,23 +842,6 @@ void DisplayController::OnFadeOutForSwapDisplayFinished() {
 
 void DisplayController::SetMirrorModeAfterAnimation(bool mirror) {
   GetDisplayManager()->SetMirrorMode(mirror);
-}
-
-void DisplayController::UpdateHostWindowNames() {
-#if defined(USE_X11)
-  // crbug.com/120229 - set the window title for the primary dislpay
-  // to "aura_root_0" so gtalk can find the primary root window to broadcast.
-  // TODO(jhorwich) Remove this once Chrome supports window-based broadcasting.
-  aura::Window* primary = Shell::GetPrimaryRootWindow();
-  aura::Window::Windows root_windows = Shell::GetAllRootWindows();
-  for (size_t i = 0; i < root_windows.size(); ++i) {
-    std::string name =
-        root_windows[i] == primary ? "aura_root_0" : "aura_root_x";
-    gfx::AcceleratedWidget xwindow =
-        root_windows[i]->GetHost()->GetAcceleratedWidget();
-    XStoreName(gfx::GetXDisplay(), xwindow, name.c_str());
-  }
-#endif
 }
 
 }  // namespace ash

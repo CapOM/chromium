@@ -24,7 +24,6 @@
 #include "content/browser/browser_plugin/browser_plugin_embedder.h"
 #include "content/browser/browser_plugin/browser_plugin_guest.h"
 #include "content/browser/child_process_security_policy_impl.h"
-#include "content/browser/devtools/devtools_manager.h"
 #include "content/browser/dom_storage/dom_storage_context_wrapper.h"
 #include "content/browser/dom_storage/session_storage_namespace_impl.h"
 #include "content/browser/download/download_stats.h"
@@ -660,7 +659,7 @@ void WebContentsImpl::SendToAllFrames(IPC::Message* message) {
   delete message;
 }
 
-RenderViewHost* WebContentsImpl::GetRenderViewHost() const {
+RenderViewHostImpl* WebContentsImpl::GetRenderViewHost() const {
   return GetRenderManager()->current_host();
 }
 
@@ -792,7 +791,7 @@ bool WebContentsImpl::IsFullAccessibilityModeForTesting() const {
 void WebContentsImpl::SetParentNativeViewAccessible(
 gfx::NativeViewAccessible accessible_parent) {
   accessible_parent_ = accessible_parent;
-  RenderFrameHostImpl* rfh = static_cast<RenderFrameHostImpl*>(GetMainFrame());
+  RenderFrameHostImpl* rfh = GetMainFrame();
   if (rfh)
     rfh->SetParentNativeViewAccessible(accessible_parent);
 }
@@ -1069,11 +1068,9 @@ void WebContentsImpl::WasShown() {
 
   // The resize rect might have changed while this was inactive -- send the new
   // one to make sure it's up to date.
-  RenderViewHostImpl* rvh =
-      static_cast<RenderViewHostImpl*>(GetRenderViewHost());
-  if (rvh) {
+  RenderViewHostImpl* rvh = GetRenderViewHost();
+  if (rvh)
     rvh->ResizeRectChanged(GetRootWindowResizerRect());
-  }
 
   // Restore power save blocker if there are active video players running.
   if (!active_video_players_.empty() && !video_power_save_blocker_)
@@ -1127,15 +1124,12 @@ void WebContentsImpl::WasUnOccluded() {
 
 bool WebContentsImpl::NeedToFireBeforeUnload() {
   // TODO(creis): Should we fire even for interstitial pages?
-  return WillNotifyDisconnection() &&
-      !ShowingInterstitialPage() &&
-      !static_cast<RenderViewHostImpl*>(
-          GetRenderViewHost())->SuddenTerminationAllowed();
+  return WillNotifyDisconnection() && !ShowingInterstitialPage() &&
+         !GetRenderViewHost()->SuddenTerminationAllowed();
 }
 
 void WebContentsImpl::DispatchBeforeUnload(bool for_cross_site_transition) {
-  static_cast<RenderFrameHostImpl*>(GetMainFrame())->DispatchBeforeUnload(
-      for_cross_site_transition);
+  GetMainFrame()->DispatchBeforeUnload(for_cross_site_transition);
 }
 
 void WebContentsImpl::Stop() {
@@ -1384,7 +1378,7 @@ void WebContentsImpl::RenderWidgetGotFocus(
 void WebContentsImpl::RenderWidgetWasResized(
     RenderWidgetHostImpl* render_widget_host,
     bool width_changed) {
-  RenderFrameHostImpl* rfh = static_cast<RenderFrameHostImpl*>(GetMainFrame());
+  RenderFrameHostImpl* rfh = GetMainFrame();
   if (!rfh || render_widget_host != rfh->GetRenderWidgetHost())
     return;
 
@@ -1796,8 +1790,8 @@ WebContentsImpl* WebContentsImpl::GetCreatedWindow(int route_id) {
 
   // Resume blocked requests for both the RenderViewHost and RenderFrameHost.
   // TODO(brettw): It seems bogus to reach into here and initialize the host.
-  static_cast<RenderViewHostImpl*>(new_contents->GetRenderViewHost())->Init();
-  static_cast<RenderFrameHostImpl*>(new_contents->GetMainFrame())->Init();
+  new_contents->GetRenderViewHost()->Init();
+  new_contents->GetMainFrame()->Init();
 
   return new_contents;
 }
@@ -1919,14 +1913,14 @@ void WebContentsImpl::DidSendScreenRects(RenderWidgetHostImpl* rwh) {
 
 BrowserAccessibilityManager*
     WebContentsImpl::GetRootBrowserAccessibilityManager() {
-  RenderFrameHostImpl* rfh = static_cast<RenderFrameHostImpl*>(GetMainFrame());
-  return rfh ? rfh->browser_accessibility_manager() : NULL;
+  RenderFrameHostImpl* rfh = GetMainFrame();
+  return rfh ? rfh->browser_accessibility_manager() : nullptr;
 }
 
 BrowserAccessibilityManager*
     WebContentsImpl::GetOrCreateRootBrowserAccessibilityManager() {
-  RenderFrameHostImpl* rfh = static_cast<RenderFrameHostImpl*>(GetMainFrame());
-  return rfh ? rfh->GetOrCreateBrowserAccessibilityManager() : NULL;
+  RenderFrameHostImpl* rfh = GetMainFrame();
+  return rfh ? rfh->GetOrCreateBrowserAccessibilityManager() : nullptr;
 }
 
 void WebContentsImpl::UpdatePreferredSize(const gfx::Size& pref_size) {
@@ -2212,7 +2206,7 @@ void WebContentsImpl::FocusThroughTabTraversal(bool reverse) {
     fullscreen_view->Focus();
     return;
   }
-  GetRenderViewHostImpl()->SetInitialFocus(reverse);
+  GetRenderViewHost()->SetInitialFocus(reverse);
 }
 
 bool WebContentsImpl::ShowingInterstitialPage() const {
@@ -2352,8 +2346,8 @@ void WebContentsImpl::DragSourceEndedAt(int client_x, int client_y,
     browser_plugin_embedder_->DragSourceEndedAt(client_x, client_y,
         screen_x, screen_y, operation);
   if (GetRenderViewHost())
-    GetRenderViewHostImpl()->DragSourceEndedAt(client_x, client_y,
-        screen_x, screen_y, operation);
+    GetRenderViewHost()->DragSourceEndedAt(client_x, client_y, screen_x,
+                                           screen_y, operation);
 }
 
 void WebContentsImpl::DidGetResourceResponseStart(
@@ -2393,7 +2387,7 @@ void WebContentsImpl::NotifyWebContentsFocused() {
 
 void WebContentsImpl::SystemDragEnded() {
   if (GetRenderViewHost())
-    GetRenderViewHostImpl()->DragSourceSystemDragEnded();
+    GetRenderViewHost()->DragSourceSystemDragEnded();
   if (browser_plugin_embedder_.get())
     browser_plugin_embedder_->SystemDragEnded();
 }
@@ -2449,8 +2443,9 @@ bool WebContentsImpl::GotResponseToLockMouseRequest(bool allowed) {
   if (GetBrowserPluginGuest())
     return GetBrowserPluginGuest()->LockMouse(allowed);
 
-  return GetRenderViewHost() ?
-      GetRenderViewHostImpl()->GotResponseToLockMouseRequest(allowed) : false;
+  return GetRenderViewHost()
+             ? GetRenderViewHost()->GotResponseToLockMouseRequest(allowed)
+             : false;
 }
 
 bool WebContentsImpl::HasOpener() const {
@@ -2540,7 +2535,7 @@ void WebContentsImpl::GetManifest(const GetManifestCallback& callback) {
 
 void WebContentsImpl::ExitFullscreen() {
   // Clean up related state and initiate the fullscreen exit.
-  GetRenderViewHostImpl()->RejectMouseLockOrUnlockIfNecessary();
+  GetRenderViewHost()->RejectMouseLockOrUnlockIfNecessary();
   ExitFullscreenMode();
 }
 
@@ -3077,6 +3072,15 @@ void WebContentsImpl::OnDidDownloadImage(
 
 void WebContentsImpl::OnUpdateFaviconURL(
     const std::vector<FaviconURL>& candidates) {
+  // We get updated favicon URLs after the page stops loading. If a cross-site
+  // navigation occurs while a page is still loading, the initial page
+  // may stop loading and send us updated favicon URLs after the navigation
+  // for the new page has committed.
+  RenderViewHostImpl* rvhi =
+      static_cast<RenderViewHostImpl*>(render_view_message_source_);
+  if (!rvhi->is_active())
+    return;
+
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     DidUpdateFaviconURL(candidates));
 }
@@ -3561,8 +3565,6 @@ void WebContentsImpl::RenderViewCreated(RenderViewHost* render_view_host) {
 
   FOR_EACH_OBSERVER(
       WebContentsObserver, observers_, RenderViewCreated(render_view_host));
-
-  DevToolsManager::GetInstance()->RenderViewCreated(this, render_view_host);
 }
 
 void WebContentsImpl::RenderViewReady(RenderViewHost* rvh) {
@@ -4003,7 +4005,7 @@ void WebContentsImpl::RendererUnresponsive(RenderViewHost* render_view_host) {
     return;
   }
 
-  if (!GetRenderViewHostImpl() || !GetRenderViewHostImpl()->IsRenderViewLive())
+  if (!GetRenderViewHost() || !GetRenderViewHost()->IsRenderViewLive())
     return;
 
   if (delegate_)
@@ -4312,10 +4314,6 @@ bool WebContentsImpl::IsHidden() {
 
 RenderFrameHostManager* WebContentsImpl::GetRenderManager() const {
   return frame_tree_.root()->render_manager();
-}
-
-RenderViewHostImpl* WebContentsImpl::GetRenderViewHostImpl() {
-  return static_cast<RenderViewHostImpl*>(GetRenderViewHost());
 }
 
 BrowserPluginGuest* WebContentsImpl::GetBrowserPluginGuest() const {

@@ -1040,14 +1040,10 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
                       TestParameter(NOT_IN_GUEST_MODE, "traverseDrive")));
 
 // Slow tests are disabled on debug build. http://crbug.com/327719
-// Disabled under MSAN as well. http://crbug.com/468980.
-#if !defined(NDEBUG) || defined(MEMORY_SANITIZER)
-#define MAYBE_SuggestAppDialog DISABLED_SuggestAppDialog
-#else
-#define MAYBE_SuggestAppDialog SuggestAppDialog
-#endif
+// Disabled under MSAN, ASAN, and LSAN as well. http://crbug.com/479757.
+// Flakes often: http://crbug.com/479757
 WRAPPED_INSTANTIATE_TEST_CASE_P(
-    MAYBE_SuggestAppDialog,
+    DISABLED_SuggestAppDialog,
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE, "suggestAppDialog")));
 
@@ -1153,14 +1149,16 @@ INSTANTIATE_TEST_CASE_P(
                                     "tabindexFocusDownloads"),
                       TestParameter(IN_GUEST_MODE, "tabindexFocusDownloads")));
 
+// http://crbug.com/469061
 INSTANTIATE_TEST_CASE_P(
-    TabindexFocusDirectorySelected,
+    DISABLED_TabindexFocusDirectorySelected,
     FileManagerBrowserTest,
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE,
                                     "tabindexFocusDirectorySelected")));
 
+// http://crbug.com/480491
 INSTANTIATE_TEST_CASE_P(
-    TabindexOpenDialog,
+    DISABLED_TabindexOpenDialog,
     FileManagerBrowserTest,
     ::testing::Values(
         TestParameter(NOT_IN_GUEST_MODE, "tabindexOpenDialogDrive"),

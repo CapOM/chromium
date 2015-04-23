@@ -20,7 +20,6 @@
 #include "ash/shelf/shelf_constants.h"
 #include "ash/shelf/shelf_delegate.h"
 #include "ash/shelf/shelf_icon_observer.h"
-#include "ash/shelf/shelf_item_delegate.h"
 #include "ash/shelf/shelf_item_delegate_manager.h"
 #include "ash/shelf/shelf_layout_manager.h"
 #include "ash/shelf/shelf_menu_model.h"
@@ -306,16 +305,6 @@ void ReflectItemStatus(const ShelfItem& item, ShelfButton* button) {
       button->ClearState(ShelfButton::STATE_RUNNING);
       button->AddState(ShelfButton::STATE_ATTENTION);
       break;
-  }
-}
-
-void RecordIconActivatedAction(const ui::Event& event) {
-  if (event.IsMouseEvent()) {
-    Shell::GetInstance()->metrics()->RecordUserMetricsAction(
-        UMA_LAUNCHER_BUTTON_PRESSED_WITH_MOUSE);
-  } else if (event.IsGestureEvent()) {
-    Shell::GetInstance()->metrics()->RecordUserMetricsAction(
-        UMA_LAUNCHER_BUTTON_PRESSED_WITH_TOUCH);
   }
 }
 
@@ -1693,7 +1682,7 @@ void ShelfView::ButtonPressed(views::Button* sender, const ui::Event& event) {
 
   if (sender == overflow_button_) {
     ToggleOverflowBubble();
-    RecordIconActivatedAction(event);
+    RecordIconActivatedSource(event);
     return;
   }
 
@@ -1752,16 +1741,44 @@ void ShelfView::ButtonPressed(views::Button* sender, const ui::Event& event) {
         break;
     }
 
-    RecordIconActivatedAction(event);
+    RecordIconActivatedSource(event);
 
-    ShelfItemDelegate* item_delegate =
-        item_manager_->GetShelfItemDelegate(model_->items()[view_index].id);
-    if (!item_delegate->ItemSelected(event)) {
+    ShelfItemDelegate::PerformedAction performed_action =
+        item_manager_->GetShelfItemDelegate(model_->items()[view_index].id)
+            ->ItemSelected(event);
+
+    RecordIconActivatedAction(performed_action);
+
+    if (performed_action != ShelfItemDelegate::kNewWindowCreated)
       ShowListMenuForView(model_->items()[view_index], sender, event);
-    } else {
+  }
+}
+
+void ShelfView::RecordIconActivatedSource(const ui::Event& event) {
+  if (event.IsMouseEvent()) {
+    Shell::GetInstance()->metrics()->RecordUserMetricsAction(
+        UMA_LAUNCHER_BUTTON_PRESSED_WITH_MOUSE);
+  } else if (event.IsGestureEvent()) {
+    Shell::GetInstance()->metrics()->RecordUserMetricsAction(
+        UMA_LAUNCHER_BUTTON_PRESSED_WITH_TOUCH);
+  }
+}
+
+void ShelfView::RecordIconActivatedAction(
+    ShelfItemDelegate::PerformedAction performed_action) {
+  switch (performed_action) {
+    case ShelfItemDelegate::kNoAction:
+    case ShelfItemDelegate::kExistingWindowMinimized:
+    case ShelfItemDelegate::kAppListMenuShown:
+      break;
+    case ShelfItemDelegate::kNewWindowCreated:
       Shell::GetInstance()->metrics()->RecordUserMetricsAction(
           UMA_LAUNCHER_LAUNCH_TASK);
-    }
+      break;
+    case ShelfItemDelegate::kExistingWindowActivated:
+      Shell::GetInstance()->metrics()->RecordUserMetricsAction(
+          UMA_LAUNCHER_SWITCH_TASK);
+      break;
   }
 }
 

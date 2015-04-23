@@ -32,7 +32,7 @@ namespace test {
 
 namespace {
 
-const char kStreamUrl[] = "http://www.google.com/";
+const char kStreamUrl[] = "http://www.example.org/";
 const char kPostBody[] = "\0hello!\xff";
 const size_t kPostBodyLength = arraysize(kPostBody);
 const base::StringPiece kPostBodyStringPiece(kPostBody, kPostBodyLength);
@@ -51,9 +51,8 @@ class SpdyStreamTest : public ::testing::Test,
         offset_(0) {}
 
   base::WeakPtr<SpdySession> CreateDefaultSpdySession() {
-    SpdySessionKey key(HostPortPair("www.google.com", 80),
-                       ProxyServer::Direct(),
-                       PRIVACY_MODE_DISABLED);
+    SpdySessionKey key(HostPortPair("www.example.org", 80),
+                       ProxyServer::Direct(), PRIVACY_MODE_DISABLED);
     return CreateInsecureSpdySession(session_, key, BoundNetLog());
   }
 
@@ -294,14 +293,13 @@ TEST_P(SpdyStreamTest, StreamError) {
   EXPECT_TRUE(data.at_write_eof());
 
   // Check that the NetLog was filled reasonably.
-  net::TestNetLog::CapturedEntryList entries;
+  TestNetLog::CapturedEntryList entries;
   log.GetEntries(&entries);
   EXPECT_LT(0u, entries.size());
 
   // Check that we logged SPDY_STREAM_ERROR correctly.
-  int pos = net::ExpectLogContainsSomewhere(
-      entries, 0, net::NetLog::TYPE_HTTP2_STREAM_ERROR,
-      net::NetLog::PHASE_NONE);
+  int pos = ExpectLogContainsSomewhere(
+      entries, 0, NetLog::TYPE_HTTP2_STREAM_ERROR, NetLog::PHASE_NONE);
 
   int stream_id2;
   ASSERT_TRUE(entries[pos].GetIntegerValue("stream_id", &stream_id2));

@@ -94,8 +94,7 @@ bool g_default_can_use_cookies = true;
 // completed.
 //
 // This functions fixes both those cases.
-void ConvertRealLoadTimesToBlockingTimes(
-    net::LoadTimingInfo* load_timing_info) {
+void ConvertRealLoadTimesToBlockingTimes(LoadTimingInfo* load_timing_info) {
   DCHECK(!load_timing_info->request_start.is_null());
 
   // Earliest time possible for the request to be blocking on connect events.
@@ -116,7 +115,7 @@ void ConvertRealLoadTimesToBlockingTimes(
 
   // Make sure connection times are after start and proxy times.
 
-  net::LoadTimingInfo::ConnectTiming* connect_timing =
+  LoadTimingInfo::ConnectTiming* connect_timing =
       &load_timing_info->connect_timing;
   if (!connect_timing->dns_start.is_null()) {
     DCHECK(!connect_timing->dns_end.is_null());
@@ -517,6 +516,10 @@ void URLRequest::Start() {
     return;
   }
 
+  // TODO(mmenke): Remove ScopedTracker below once crbug.com/456327 is fixed.
+  tracked_objects::ScopedTracker tracking_profile2(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION("456327 URLRequest::Start 2"));
+
   StartJob(URLRequestJobManager::GetInstance()->CreateJob(
       this, network_delegate_));
 }
@@ -590,6 +593,10 @@ void URLRequest::BeforeRequestComplete(int error) {
 }
 
 void URLRequest::StartJob(URLRequestJob* job) {
+  // TODO(mmenke): Remove ScopedTracker below once crbug.com/456327 is fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION("456327 URLRequest::StartJob"));
+
   DCHECK(!is_pending_);
   DCHECK(!job_.get());
 
@@ -881,7 +888,7 @@ void URLRequest::OrphanJob() {
 int URLRequest::Redirect(const RedirectInfo& redirect_info) {
   // Matches call in NotifyReceivedRedirect.
   OnCallToDelegateComplete();
-  if (net_log_.IsLogging()) {
+  if (net_log_.GetCaptureMode().enabled()) {
     net_log_.AddEvent(
         NetLog::TYPE_URL_REQUEST_REDIRECTED,
         NetLog::StringCallback("location",

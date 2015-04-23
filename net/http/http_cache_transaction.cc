@@ -53,6 +53,8 @@ using base::Time;
 using base::TimeDelta;
 using base::TimeTicks;
 
+namespace net {
+
 namespace {
 
 // TODO(ricea): Move this to HttpResponseHeaders once it is standardised.
@@ -83,9 +85,9 @@ class SharedChainData : public base::RefCounted<SharedChainData> {
 // TODO(brandonsalmon): Remove this when cache keys are stored
 // and no longer have to be recomputed to retrieve the OSCertHandle
 // from the disk.
-std::string GetCacheKeyForCert(net::X509Certificate::OSCertHandle cert_handle) {
-  net::SHA1HashValue fingerprint =
-      net::X509Certificate::CalculateFingerprint(cert_handle);
+std::string GetCacheKeyForCert(X509Certificate::OSCertHandle cert_handle) {
+  SHA1HashValue fingerprint =
+      X509Certificate::CalculateFingerprint(cert_handle);
 
   return "cert:" +
          base::HexEncode(fingerprint.data, arraysize(fingerprint.data));
@@ -100,7 +102,7 @@ void OnCertReadIOComplete(
     int dist_from_root,
     bool is_leaf,
     const scoped_refptr<SharedChainData>& shared_chain_data,
-    net::X509Certificate::OSCertHandle cert_handle) {
+    X509Certificate::OSCertHandle cert_handle) {
   // If |num_pending_ops| is one, this was the last pending read operation
   // for this chain of certificates. The total time used to read the chain
   // can be calculated by subtracting the starting time from Now().
@@ -174,10 +176,9 @@ bool NonErrorResponse(int status_code) {
 // Error codes that will be considered indicative of a page being offline/
 // unreachable for LOAD_FROM_CACHE_IF_OFFLINE.
 bool IsOfflineError(int error) {
-  return (error == net::ERR_NAME_NOT_RESOLVED ||
-          error == net::ERR_INTERNET_DISCONNECTED ||
-          error == net::ERR_ADDRESS_UNREACHABLE ||
-          error == net::ERR_CONNECTION_TIMED_OUT);
+  return (
+      error == ERR_NAME_NOT_RESOLVED || error == ERR_INTERNET_DISCONNECTED ||
+      error == ERR_ADDRESS_UNREACHABLE || error == ERR_CONNECTION_TIMED_OUT);
 }
 
 // Enum for UMA, indicating the status (with regard to offline mode) of
@@ -210,15 +211,15 @@ enum RequestOfflineStatus {
 void RecordOfflineStatus(int load_flags, RequestOfflineStatus status) {
   // Restrict to main frame to keep statistics close to
   // "would have shown them something useful if offline mode was enabled".
-  if (load_flags & net::LOAD_MAIN_FRAME) {
+  if (load_flags & LOAD_MAIN_FRAME) {
     UMA_HISTOGRAM_ENUMERATION("HttpCache.OfflineStatus", status,
                               OFFLINE_STATUS_MAX_ENTRIES);
   }
 }
 
 void RecordNoStoreHeaderHistogram(int load_flags,
-                                  const net::HttpResponseInfo* response) {
-  if (load_flags & net::LOAD_MAIN_FRAME) {
+                                  const HttpResponseInfo* response) {
+  if (load_flags & LOAD_MAIN_FRAME) {
     UMA_HISTOGRAM_BOOLEAN(
         "Net.MainFrameNoStore",
         response->headers->HasHeaderValue("cache-control", "no-store"));
@@ -226,9 +227,9 @@ void RecordNoStoreHeaderHistogram(int load_flags,
 }
 
 base::Value* NetLogAsyncRevalidationInfoCallback(
-    const net::NetLog::Source& source,
-    const net::HttpRequestInfo* request,
-    net::NetLog::LogLevel log_level) {
+    const NetLog::Source& source,
+    const HttpRequestInfo* request,
+    NetLogCaptureMode capture_mode) {
   base::DictionaryValue* dict = new base::DictionaryValue();
   source.AddToEventParameters(dict);
 
@@ -245,8 +246,6 @@ enum ExternallyConditionalizedType {
 };
 
 }  // namespace
-
-namespace net {
 
 struct HeaderNameAndValue {
   const char* name;
@@ -1645,7 +1644,7 @@ int HttpCache::Transaction::DoTruncateCachedData() {
   next_state_ = STATE_TRUNCATE_CACHED_DATA_COMPLETE;
   if (!entry_)
     return OK;
-  if (net_log_.IsLogging())
+  if (net_log_.GetCaptureMode().enabled())
     net_log_.BeginEvent(NetLog::TYPE_HTTP_CACHE_WRITE_DATA);
   // Truncate the stream.
   return WriteToEntry(kResponseContentIndex, 0, NULL, 0, io_callback_);
@@ -1653,7 +1652,7 @@ int HttpCache::Transaction::DoTruncateCachedData() {
 
 int HttpCache::Transaction::DoTruncateCachedDataComplete(int result) {
   if (entry_) {
-    if (net_log_.IsLogging()) {
+    if (net_log_.GetCaptureMode().enabled()) {
       net_log_.EndEventWithNetErrorCode(NetLog::TYPE_HTTP_CACHE_WRITE_DATA,
                                         result);
     }
@@ -1668,14 +1667,14 @@ int HttpCache::Transaction::DoTruncateCachedMetadata() {
   if (!entry_)
     return OK;
 
-  if (net_log_.IsLogging())
+  if (net_log_.GetCaptureMode().enabled())
     net_log_.BeginEvent(NetLog::TYPE_HTTP_CACHE_WRITE_INFO);
   return WriteToEntry(kMetadataIndex, 0, NULL, 0, io_callback_);
 }
 
 int HttpCache::Transaction::DoTruncateCachedMetadataComplete(int result) {
   if (entry_) {
-    if (net_log_.IsLogging()) {
+    if (net_log_.GetCaptureMode().enabled()) {
       net_log_.EndEventWithNetErrorCode(NetLog::TYPE_HTTP_CACHE_WRITE_INFO,
                                         result);
     }
@@ -1812,7 +1811,7 @@ int HttpCache::Transaction::DoCacheWriteResponse() {
           "422516 HttpCache::Transaction::DoCacheWriteResponse"));
 
   if (entry_) {
-    if (net_log_.IsLogging())
+    if (net_log_.GetCaptureMode().enabled())
       net_log_.BeginEvent(NetLog::TYPE_HTTP_CACHE_WRITE_INFO);
   }
   return WriteResponseInfoToEntry(false);
@@ -1820,7 +1819,7 @@ int HttpCache::Transaction::DoCacheWriteResponse() {
 
 int HttpCache::Transaction::DoCacheWriteTruncatedResponse() {
   if (entry_) {
-    if (net_log_.IsLogging())
+    if (net_log_.GetCaptureMode().enabled())
       net_log_.BeginEvent(NetLog::TYPE_HTTP_CACHE_WRITE_INFO);
   }
   return WriteResponseInfoToEntry(true);
@@ -1831,7 +1830,7 @@ int HttpCache::Transaction::DoCacheWriteResponseComplete(int result) {
   target_state_ = STATE_NONE;
   if (!entry_)
     return OK;
-  if (net_log_.IsLogging()) {
+  if (net_log_.GetCaptureMode().enabled()) {
     net_log_.EndEventWithNetErrorCode(NetLog::TYPE_HTTP_CACHE_WRITE_INFO,
                                       result);
   }
@@ -1883,7 +1882,7 @@ int HttpCache::Transaction::DoCacheReadData() {
   DCHECK(entry_);
   next_state_ = STATE_CACHE_READ_DATA_COMPLETE;
 
-  if (net_log_.IsLogging())
+  if (net_log_.GetCaptureMode().enabled())
     net_log_.BeginEvent(NetLog::TYPE_HTTP_CACHE_READ_DATA);
   if (partial_.get()) {
     return partial_->CacheRead(entry_->disk_entry, read_buf_.get(), io_buf_len_,
@@ -1896,7 +1895,7 @@ int HttpCache::Transaction::DoCacheReadData() {
 }
 
 int HttpCache::Transaction::DoCacheReadDataComplete(int result) {
-  if (net_log_.IsLogging()) {
+  if (net_log_.GetCaptureMode().enabled()) {
     net_log_.EndEventWithNetErrorCode(NetLog::TYPE_HTTP_CACHE_READ_DATA,
                                       result);
   }
@@ -1927,7 +1926,7 @@ int HttpCache::Transaction::DoCacheWriteData(int num_bytes) {
   next_state_ = STATE_CACHE_WRITE_DATA_COMPLETE;
   write_len_ = num_bytes;
   if (entry_) {
-    if (net_log_.IsLogging())
+    if (net_log_.GetCaptureMode().enabled())
       net_log_.BeginEvent(NetLog::TYPE_HTTP_CACHE_WRITE_DATA);
   }
 
@@ -1936,7 +1935,7 @@ int HttpCache::Transaction::DoCacheWriteData(int num_bytes) {
 
 int HttpCache::Transaction::DoCacheWriteDataComplete(int result) {
   if (entry_) {
-    if (net_log_.IsLogging()) {
+    if (net_log_.GetCaptureMode().enabled()) {
       net_log_.EndEventWithNetErrorCode(NetLog::TYPE_HTTP_CACHE_WRITE_DATA,
                                         result);
     }
@@ -2756,9 +2755,9 @@ int HttpCache::Transaction::WriteResponseInfoToEntry(bool truncated) {
   // blocking page is shown.  An alternative would be to reverse-map the cert
   // status to a net error and replay the net error.
   if ((response_.headers->HasHeaderValue("cache-control", "no-store")) ||
-      net::IsCertStatusError(response_.ssl_info.cert_status)) {
+      IsCertStatusError(response_.ssl_info.cert_status)) {
     DoneWritingToEntry(false);
-    if (net_log_.IsLogging())
+    if (net_log_.GetCaptureMode().enabled())
       net_log_.EndEvent(NetLog::TYPE_HTTP_CACHE_WRITE_INFO);
     return OK;
   }

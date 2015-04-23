@@ -17,6 +17,10 @@
 #import "ui/base/cocoa/window_size_constants.h"
 #include "ui/native_theme/native_theme.h"
 
+namespace {
+BOOL g_animations_enabled = false;
+}
+
 @class ExtensionMessageBubbleButton;
 
 @interface ToolbarActionsBarBubbleMac ()
@@ -81,7 +85,7 @@
                        parentWindow:parentWindow
                          anchoredAt:anchorPoint])) {
     acknowledged_ = NO;
-    [window setCanBecomeKeyWindow:NO];
+    [window setInfoBubbleCanBecomeKeyWindow:NO];
     delegate_ = delegate.Pass();
 
     ui::NativeTheme* nativeTheme = ui::NativeTheme::instance();
@@ -91,9 +95,16 @@
         gfx::SkColorToCalibratedNSColor(nativeTheme->GetSystemColor(
             ui::NativeTheme::kColorId_DialogBackground))];
 
+    if (!g_animations_enabled)
+      [window setAllowedAnimations:info_bubble::kAnimateNone];
+
     [self layout];
   }
   return self;
+}
+
++ (void)setAnimationEnabledForTesting:(BOOL)enabled {
+  g_animations_enabled = enabled;
 }
 
 - (IBAction)showWindow:(id)sender {

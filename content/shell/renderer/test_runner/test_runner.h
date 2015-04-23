@@ -534,20 +534,19 @@ class TestRunner : public WebTestRunner,
   // Set the mock geofencing position while running a layout test.
   void SetGeofencingMockPosition(double latitude, double longitude);
 
+  // Sets the permission's |name| to |value| for a given {origin, embedder}
+  // tuple.
+  void SetPermission(const std::string& name,
+                     const std::string& value,
+                     const GURL& origin,
+                     const GURL& embedding_origin);
+
   // Calls setlocale(LC_ALL, ...) for a specified locale.
   // Resets between tests.
   void SetPOSIXLocale(const std::string& locale);
 
   // MIDI function to control permission handling.
   void SetMIDIAccessorResult(bool result);
-  void SetMIDISysexPermission(bool value);
-
-  // Grants permission for desktop notifications to an origin
-  void GrantWebNotificationPermission(const GURL& origin,
-                                      bool permission_granted);
-
-  // Clears all previously granted Web Notification permissions.
-  void ClearWebNotificationPermissions();
 
   // Simulates a click on a Web Notification.
   void SimulateWebNotificationClick(const std::string& title);
@@ -584,12 +583,6 @@ class TestRunner : public WebTestRunner,
   // is no image at that point, calls the callback with (0, 0, empty_snapshot).
   void CopyImageAtAndCapturePixelsAsyncThen(
       int x, int y, const v8::Handle<v8::Function> callback);
-
-  // Sets the origin's permission to use the Push API to granted or denied.
-  void SetPushMessagingPermission(const GURL& origin, bool allowed);
-
-  // Clears all previously granted Push API permissions.
-  void ClearPushMessagingPermissions();
 
   void GetManifestThen(v8::Handle<v8::Function> callback);
 

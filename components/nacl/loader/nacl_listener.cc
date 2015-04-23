@@ -28,13 +28,9 @@
 #include "ipc/ipc_switches.h"
 #include "ipc/ipc_sync_channel.h"
 #include "ipc/ipc_sync_message_filter.h"
-#include "mojo/nacl/mojo_syscall.h"
 #include "native_client/src/public/chrome_main.h"
 #include "native_client/src/public/nacl_app.h"
 #include "native_client/src/public/nacl_desc.h"
-#include "third_party/mojo/src/mojo/edk/embedder/embedder.h"
-#include "third_party/mojo/src/mojo/edk/embedder/platform_support.h"
-#include "third_party/mojo/src/mojo/edk/embedder/simple_platform_support.h"
 
 #if defined(OS_POSIX)
 #include "base/file_descriptor_posix.h"
@@ -67,6 +63,12 @@ void FatalLogHandler(const char* data, size_t bytes) {
   memcpy((char*)g_listener->crash_info_shmem_memory() + sizeof(uint32_t),
          data,
          copy_bytes);
+}
+
+void LoadStatusCallback(int load_status) {
+  g_listener->trusted_listener()->Send(
+      new NaClRendererMsg_ReportLoadStatus(
+          static_cast<NaClErrorCode>(load_status)));
 }
 
 #if defined(OS_MACOSX)
@@ -420,6 +422,7 @@ void NaClListener::OnStart(const nacl::NaClStartParams& params) {
   args->debug_stub_server_port_selected_handler_func =
       DebugStubPortSelectedHandler;
 #endif
+  args->load_status_handler_func = LoadStatusCallback;
 #if defined(OS_LINUX)
   args->prereserved_sandbox_size = prereserved_sandbox_size_;
 #endif
@@ -430,16 +433,6 @@ void NaClListener::OnStart(const nacl::NaClStartParams& params) {
   args->nexe_desc = NaClDescCreateWithFilePathMetadata(nexe_file,
                                                        file_path_str.c_str());
 
-  if (params.enable_mojo) {
-    // InjectMojo adds a file descriptor to the process that allows Mojo calls
-    // to use an implementation defined outside the NaCl sandbox. See
-    // //mojo/nacl for implementation details.
-    InjectMojo(nap);
-  } else {
-    // When Mojo isn't enabled, we inject a file descriptor that intentionally
-    // fails on any imc_sendmsg() call to make debugging easier.
-    InjectDisabledMojo(nap);
-  }
   // TODO(yusukes): Support pre-opening resource files.
   CHECK(params.prefetched_resource_files.empty());
 

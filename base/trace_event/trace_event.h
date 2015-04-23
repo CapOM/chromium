@@ -144,11 +144,11 @@
 //   class MyData : public base::trace_event::ConvertableToTraceFormat {
 //    public:
 //     MyData() {}
-//     virtual void AppendAsTraceFormat(std::string* out) const override {
+//     void AppendAsTraceFormat(std::string* out) const override {
 //       out->append("{\"foo\":1}");
 //     }
 //    private:
-//     virtual ~MyData() {}
+//     ~MyData() override {}
 //     DISALLOW_COPY_AND_ASSIGN(MyData);
 //   };
 //
@@ -601,6 +601,12 @@
         TRACE_EVENT_PHASE_ASYNC_BEGIN, category_group, name, id, \
         static_cast<int>(base::PlatformThread::CurrentId()), \
         timestamp, TRACE_EVENT_FLAG_NONE)
+#define TRACE_EVENT_COPY_ASYNC_BEGIN_WITH_TIMESTAMP0(category_group, \
+        name, id, timestamp) \
+    INTERNAL_TRACE_EVENT_ADD_WITH_ID_TID_AND_TIMESTAMP( \
+        TRACE_EVENT_PHASE_ASYNC_BEGIN, category_group, name, id, \
+        static_cast<int>(base::PlatformThread::CurrentId()), \
+        timestamp, TRACE_EVENT_FLAG_COPY)
 
 // Records a single ASYNC_STEP_INTO event for |step| immediately. If the
 // category is not enabled, then this does nothing. The |name| and |id| must

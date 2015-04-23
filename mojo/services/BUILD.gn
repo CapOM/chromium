@@ -7,37 +7,37 @@ import("//build/config/ui.gni")
 group("services") {
   deps = [
     "//mojo/services/network/public/interfaces",
-    "//third_party/mojo_services/src/clipboard/public/interfaces",
+    "//components/clipboard/public/interfaces",
+    "//components/native_viewport/public/interfaces",
+    "//components/surfaces/public/interfaces",
+    "//components/view_manager/public/interfaces",
     "//third_party/mojo_services/src/content_handler/public/interfaces",
-    "//third_party/mojo_services/src/geometry/public/interfaces",
-    "//third_party/mojo_services/src/input_events/public/interfaces",
-    "//third_party/mojo_services/src/native_viewport/public/interfaces",
     "//third_party/mojo_services/src/navigation/public/interfaces",
-    "//third_party/mojo_services/src/surfaces/public/interfaces",
-    "//third_party/mojo_services/src/view_manager/public/interfaces",
+    "//ui/mojo/events:interfaces",
+    "//ui/mojo/geometry:interfaces",
   ]
 
   if (!is_component_build) {
     deps += [
-      "//mojo/services/clipboard",
-      "//mojo/services/html_viewer",
-      "//mojo/services/kiosk_wm:window_manager",
-      "//mojo/services/native_viewport",
+      "//components/clipboard",
+      "//components/html_viewer",
+      "//components/kiosk_wm:window_manager",
+      "//components/native_viewport",
+      "//components/surfaces",
+      "//components/view_manager",
+      "//components/window_manager:lib",
       "//mojo/services/network",
-      "//mojo/services/surfaces",
       "//mojo/services/tracing",
-      "//mojo/services/view_manager",
-      "//mojo/services/window_manager:lib",
     ]
 
     # TODO(GYP): Make this work.
     if (is_mac) {
       deps -= [
-        "//mojo/services/html_viewer",
-        "//mojo/services/kiosk_wm:window_manager",
-        "//mojo/services/native_viewport",
-        "//mojo/services/view_manager",
-        "//mojo/services/window_manager:lib",
+        "//components/html_viewer",
+        "//components/kiosk_wm:window_manager",
+        "//components/native_viewport",
+        "//components/view_manager",
+        "//components/window_manager:lib",
       ]
     }
   }
@@ -50,17 +50,15 @@ group("tests") {
   ]
   if (!is_component_build) {
     deps += [
-      "//mojo/services/html_viewer:tests",
-      "//mojo/services/view_manager:view_manager_service_unittests",
-      "//mojo/services/window_manager:window_manager_unittests",
+      "//components/html_viewer:tests",
+      "//components/view_manager:view_manager_service_unittests",
     ]
 
     # TODO(GYP): Make this work.
     if (is_mac) {
       deps -= [
-        "//mojo/services/html_viewer:tests",
-        "//mojo/services/view_manager:view_manager_service_unittests",
-        "//mojo/services/window_manager:window_manager_unittests",
+        "//components/html_viewer:tests",
+        "//components/view_manager:view_manager_service_unittests",
       ]
     }
   }
@@ -73,19 +71,19 @@ group("apptests") {
   ]
   if (!is_component_build) {
     deps += [
-      "//mojo/services/clipboard:apptests",
-      "//mojo/services/html_viewer:apptests",
+      "//components/clipboard:apptests",
+      "//components/html_viewer:apptests",
+      "//components/view_manager:apptests",
+      "//components/window_manager:apptests",
       "//mojo/services/network:apptests",
-      "//mojo/services/view_manager:apptests",
-      "//mojo/services/window_manager:apptests",
     ]
 
     # TODO(GYP): Make this work.
     if (is_mac) {
       deps -= [
-        "//mojo/services/html_viewer:apptests",
-        "//mojo/services/view_manager:apptests",
-        "//mojo/services/window_manager:apptests",
+        "//components/html_viewer:apptests",
+        "//components/view_manager:apptests",
+        "//components/window_manager:apptests",
       ]
     }
   }

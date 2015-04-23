@@ -6,16 +6,17 @@
 
 #include <string>
 
+#include "base/bind.h"
+#include "base/bind_helpers.h"
 #include "base/metrics/histogram.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/single_thread_task_runner.h"
 #include "base/strings/string_util.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_configurator.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_config_values.h"
-#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_store.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_creator.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params.h"
 #include "net/base/load_flags.h"
-#include "net/http/http_network_layer.h"
 #include "net/proxy/proxy_server.h"
 #include "net/url_request/url_fetcher.h"
 #include "net/url_request/url_fetcher_delegate.h"
@@ -53,42 +54,21 @@ namespace data_reduction_proxy {
 // Checks if the secure proxy is allowed by the carrier by sending a probe.
 class SecureProxyChecker : public net::URLFetcherDelegate {
  public:
-  SecureProxyChecker(net::URLRequestContext* url_request_context,
-                     scoped_refptr<base::SingleThreadTaskRunner> io_task_runner)
-      : io_task_runner_(io_task_runner) {
-    DCHECK(io_task_runner_->BelongsToCurrentThread());
-
-    url_request_context_.reset(new net::URLRequestContext());
-    url_request_context_->CopyFrom(url_request_context);
-
-    net::HttpNetworkSession::Params params_modified =
-        *(url_request_context_->GetNetworkSessionParams());
-    params_modified.enable_quic = false;
-    params_modified.next_protos = net::NextProtosWithSpdyAndQuic(false, false);
-
-    http_network_layer_.reset(new net::HttpNetworkLayer(
-        new net::HttpNetworkSession(params_modified)));
-    url_request_context_->set_http_transaction_factory(
-        http_network_layer_.get());
-
-    url_request_context_getter_ = new net::TrivialURLRequestContextGetter(
-        url_request_context_.get(), io_task_runner_);
-  }
+  SecureProxyChecker(net::URLRequestContextGetter* url_request_context_getter)
+      : url_request_context_getter_(url_request_context_getter) {}
 
   void OnURLFetchComplete(const net::URLFetcher* source) override {
-    DCHECK(io_task_runner_->BelongsToCurrentThread());
     DCHECK_EQ(source, fetcher_.get());
     net::URLRequestStatus status = source->GetStatus();
 
     std::string response;
     source->GetResponseAsString(&response);
 
-    fetcher_callback_.Run(response, status);
+    fetcher_callback_.Run(response, status, source->GetResponseCode());
   }
 
   void CheckIfSecureProxyIsAllowed(const GURL& secure_proxy_check_url,
                                    FetcherResponseCallback fetcher_callback) {
-    DCHECK(io_task_runner_->BelongsToCurrentThread());
     fetcher_.reset(net::URLFetcher::Create(secure_proxy_check_url,
                                            net::URLFetcher::GET, this));
     fetcher_->SetLoadFlags(net::LOAD_DISABLE_CACHE | net::LOAD_BYPASS_PROXY);
@@ -111,11 +91,7 @@ class SecureProxyChecker : public net::URLFetcherDelegate {
   ~SecureProxyChecker() override {}
 
  private:
-  scoped_refptr<base::SingleThreadTaskRunner> io_task_runner_;
-
   scoped_refptr<net::URLRequestContextGetter> url_request_context_getter_;
-  scoped_ptr<net::URLRequestContext> url_request_context_;
-  scoped_ptr<net::HttpNetworkLayer> http_network_layer_;
 
   // The URLFetcher being used for the secure proxy check.
   scoped_ptr<net::URLFetcher> fetcher_;
@@ -129,7 +105,7 @@ DataReductionProxyConfig::DataReductionProxyConfig(
     net::NetLog* net_log,
     scoped_ptr<DataReductionProxyConfigValues> config_values,
     DataReductionProxyConfigurator* configurator,
-    DataReductionProxyEventStore* event_store)
+    DataReductionProxyEventCreator* event_creator)
     : restricted_by_carrier_(false),
       disabled_on_vpn_(false),
       unreachable_(false),
@@ -139,11 +115,11 @@ DataReductionProxyConfig::DataReductionProxyConfig(
       io_task_runner_(io_task_runner),
       net_log_(net_log),
       configurator_(configurator),
-      event_store_(event_store),
+      event_creator_(event_creator),
       url_request_context_getter_(nullptr) {
   DCHECK(io_task_runner);
   DCHECK(configurator);
-  DCHECK(event_store);
+  DCHECK(event_creator);
 }
 
 DataReductionProxyConfig::~DataReductionProxyConfig() {
@@ -396,11 +372,14 @@ void DataReductionProxyConfig::LogProxyState(bool enabled,
 }
 
 void DataReductionProxyConfig::HandleSecureProxyCheckResponse(
-    const std::string& response, const net::URLRequestStatus& status) {
+    const std::string& response,
+    const net::URLRequestStatus& status,
+    int http_response_code) {
   DCHECK(io_task_runner_->BelongsToCurrentThread());
-  if (event_store_) {
-    event_store_->EndSecureProxyCheck(bound_net_log_, status.error());
-  }
+  bool success_response = ("OK" == response.substr(0, 2));
+  if (event_creator_)
+    event_creator_->EndSecureProxyCheck(bound_net_log_, status.error(),
+                                        http_response_code, success_response);
 
   if (status.status() == net::URLRequestStatus::FAILED) {
     if (status.error() == net::ERR_INTERNET_DISCONNECTED) {
@@ -414,7 +393,7 @@ void DataReductionProxyConfig::HandleSecureProxyCheckResponse(
                                 std::abs(status.error()));
   }
 
-  if ("OK" == response.substr(0, 2)) {
+  if (success_response) {
     DVLOG(1) << "The data reduction proxy is unrestricted.";
 
     if (enabled_by_user_) {
@@ -508,16 +487,14 @@ void DataReductionProxyConfig::SecureProxyCheck(
   DCHECK(io_task_runner_->BelongsToCurrentThread());
   bound_net_log_ = net::BoundNetLog::Make(
       net_log_, net::NetLog::SOURCE_DATA_REDUCTION_PROXY);
-
-  if (event_store_) {
-    event_store_->BeginSecureProxyCheck(
+  if (event_creator_) {
+    event_creator_->BeginSecureProxyCheck(
         bound_net_log_, config_values_->secure_proxy_check_url());
   }
 
   if (!secure_proxy_checker_) {
-    DCHECK(url_request_context_getter_->GetURLRequestContext());
-    secure_proxy_checker_.reset(new SecureProxyChecker(
-        url_request_context_getter_->GetURLRequestContext(), io_task_runner_));
+    secure_proxy_checker_.reset(
+        new SecureProxyChecker(url_request_context_getter_));
   }
   secure_proxy_checker_->CheckIfSecureProxyIsAllowed(secure_proxy_check_url,
                                                      fetcher_callback);

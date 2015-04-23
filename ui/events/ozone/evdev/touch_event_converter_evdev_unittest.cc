@@ -53,7 +53,6 @@ class MockTouchEventConverterEvdev : public TouchEventConverterEvdev {
  public:
   MockTouchEventConverterEvdev(int fd,
                                base::FilePath path,
-                               const EventDeviceInfo& devinfo,
                                DeviceEventDispatcherEvdev* dispatcher);
   ~MockTouchEventConverterEvdev() override {}
 
@@ -112,14 +111,8 @@ class MockDeviceEventDispatcherEvdev : public DeviceEventDispatcherEvdev {
 MockTouchEventConverterEvdev::MockTouchEventConverterEvdev(
     int fd,
     base::FilePath path,
-    const EventDeviceInfo& devinfo,
     DeviceEventDispatcherEvdev* dispatcher)
-    : TouchEventConverterEvdev(fd,
-                               path,
-                               1,
-                               INPUT_DEVICE_UNKNOWN,
-                               devinfo,
-                               dispatcher) {
+    : TouchEventConverterEvdev(fd, path, 1, INPUT_DEVICE_UNKNOWN, dispatcher) {
   int fds[2];
 
   if (pipe(fds))
@@ -164,24 +157,22 @@ class TouchEventConverterEvdevTest : public testing::Test {
     // Device creation happens on a worker thread since it may involve blocking
     // operations. Simulate that by creating it before creating a UI message
     // loop.
-    EventDeviceInfo devinfo;
     dispatcher_.reset(new ui::MockDeviceEventDispatcherEvdev(
         base::Bind(&TouchEventConverterEvdevTest::DispatchCallback,
                    base::Unretained(this))));
-    device_ = new ui::MockTouchEventConverterEvdev(
-        events_in_, base::FilePath(kTestDevicePath), devinfo,
-        dispatcher_.get());
+    device_.reset(new ui::MockTouchEventConverterEvdev(
+        events_in_, base::FilePath(kTestDevicePath), dispatcher_.get()));
     loop_ = new base::MessageLoopForUI;
 
     ui::DeviceDataManager::CreateInstance();
   }
 
   void TearDown() override {
-    delete device_;
+    device_.reset();
     delete loop_;
   }
 
-  ui::MockTouchEventConverterEvdev* device() { return device_; }
+  ui::MockTouchEventConverterEvdev* device() { return device_.get(); }
 
   unsigned size() { return dispatched_events_.size(); }
   const ui::TouchEventParams& dispatched_event(unsigned index) {
@@ -189,11 +180,15 @@ class TouchEventConverterEvdevTest : public testing::Test {
     return dispatched_events_[index];
   }
 
-  void ClearDispatchedEvents() { dispatched_events_.clear(); }
+  void ClearDispatchedEvents() {
+    dispatched_events_.clear();
+  }
+
+  void DestroyDevice() { device_.reset(); }
 
  private:
   base::MessageLoop* loop_;
-  ui::MockTouchEventConverterEvdev* device_;
+  scoped_ptr<ui::MockTouchEventConverterEvdev> device_;
   scoped_ptr<ui::MockDeviceEventDispatcherEvdev> dispatcher_;
 
   int events_out_;
@@ -499,6 +494,44 @@ TEST_F(TouchEventConverterEvdevTest, ShouldResumeExistingContactsOnStart) {
   EXPECT_FLOAT_EQ(50.f, ev.radii.x());
   EXPECT_FLOAT_EQ(0.f, ev.radii.y());
   EXPECT_FLOAT_EQ(0.50196081f, ev.pressure);
+}
+
+TEST_F(TouchEventConverterEvdevTest, ShouldReleaseContactsOnStop) {
+  ui::MockTouchEventConverterEvdev* dev = device();
+
+  InitPixelTouchscreen(dev);
+
+  // Captured from Chromebook Pixel (Link).
+  timeval time;
+  time = {1429651083, 686882};
+  struct input_event mock_kernel_queue_press[] = {
+      {time, EV_ABS, ABS_MT_TRACKING_ID, 0},
+      {time, EV_ABS, ABS_MT_POSITION_X, 1003},
+      {time, EV_ABS, ABS_MT_POSITION_Y, 749},
+      {time, EV_ABS, ABS_MT_PRESSURE, 50},
+      {time, EV_ABS, ABS_MT_TOUCH_MAJOR, 116},
+      {time, EV_KEY, BTN_TOUCH, 1},
+      {time, EV_ABS, ABS_X, 1003},
+      {time, EV_ABS, ABS_Y, 749},
+      {time, EV_ABS, ABS_PRESSURE, 50},
+      {time, EV_SYN, SYN_REPORT, 0},
+  };
+
+  dev->ConfigureReadMock(mock_kernel_queue_press,
+                         arraysize(mock_kernel_queue_press), 0);
+  dev->ReadNow();
+  EXPECT_EQ(1u, size());
+
+  ui::TouchEventParams ev1 = dispatched_event(0);
+  EXPECT_EQ(ET_TOUCH_PRESSED, ev1.type);
+  EXPECT_EQ(0, ev1.slot);
+
+  DestroyDevice();
+  EXPECT_EQ(2u, size());
+
+  ui::TouchEventParams ev2 = dispatched_event(1);
+  EXPECT_EQ(ET_TOUCH_RELEASED, ev2.type);
+  EXPECT_EQ(0, ev2.slot);
 }
 
 // crbug.com/407386

@@ -124,7 +124,7 @@ bool ConvertValueToDisplayMode(const base::DictionaryValue* dict,
 
 base::DictionaryValue* ConvertDisplayModeToValue(int64 display_id,
                                                  const ash::DisplayMode& mode) {
-  bool is_internal = GetDisplayManager()->IsInternalDisplayId(display_id);
+  bool is_internal = gfx::Display::InternalDisplayId() == display_id;
   base::DictionaryValue* result = new base::DictionaryValue();
   gfx::Size size_dip = mode.GetSizeInDIP(is_internal);
   result->SetInteger("width", size_dip.width());
@@ -260,7 +260,7 @@ void DisplayOptionsHandler::SendAllDisplayInfo() {
 void DisplayOptionsHandler::SendDisplayInfo(
     const std::vector<gfx::Display>& displays) {
   DisplayManager* display_manager = GetDisplayManager();
-  base::FundamentalValue mirroring(display_manager->IsMirrored());
+  base::FundamentalValue mirroring(display_manager->IsInMirrorMode());
 
   int64 primary_id = ash::Shell::GetScreen()->GetPrimaryDisplay().id();
   base::ListValue js_displays;
@@ -279,7 +279,7 @@ void DisplayOptionsHandler::SendDisplayInfo(
     js_display->SetBoolean("isPrimary", display.id() == primary_id);
     js_display->SetBoolean("isInternal", display.IsInternal());
     js_display->SetInteger("orientation",
-                           static_cast<int>(display_info.rotation()));
+                           static_cast<int>(display_info.GetActiveRotation()));
 
     base::ListValue* js_resolutions = new base::ListValue();
     for (const ash::DisplayMode& display_mode : display_info.display_modes()) {
@@ -438,7 +438,8 @@ void DisplayOptionsHandler::HandleSetOrientation(const base::ListValue* args) {
 
   content::RecordAction(
       base::UserMetricsAction("Options_DisplaySetOrientation"));
-  ash::ScreenRotationAnimator(display_id).Rotate(new_rotation);
+  ash::ScreenRotationAnimator(display_id)
+      .Rotate(new_rotation, gfx::Display::ROTATION_SOURCE_USER);
 }
 
 void DisplayOptionsHandler::HandleSetColorProfile(const base::ListValue* args) {

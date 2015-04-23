@@ -41,7 +41,6 @@
 #include "third_party/WebKit/public/web/WebInputElement.h"
 #include "third_party/WebKit/public/web/WebKit.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
-#include "third_party/WebKit/public/web/WebMIDIClientMock.h"
 #include "third_party/WebKit/public/web/WebPageOverlay.h"
 #include "third_party/WebKit/public/web/WebScriptSource.h"
 #include "third_party/WebKit/public/web/WebSecurityPolicy.h"
@@ -105,15 +104,9 @@ class InvokeCallbackTask : public WebMethodTask<TestRunner> {
 
     v8::Context::Scope context_scope(context);
 
-#ifdef WEB_FRAME_USES_V8_LOCAL
-    scoped_ptr<v8::Local<v8::Value>[]> local_argv;
-    if (argc_) {
-      local_argv.reset(new v8::Local<v8::Value>[argc_]);
-#else
     scoped_ptr<v8::Handle<v8::Value>[]> local_argv;
     if (argc_) {
         local_argv.reset(new v8::Handle<v8::Value>[argc_]);
-#endif
         for (int i = 0; i < argc_; ++i)
           local_argv[i] = v8::Local<v8::Value>::New(isolate, argv_[i]);
     }
@@ -283,7 +276,6 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
                        v8::Handle<v8::Function> callback);
   void SetPOSIXLocale(const std::string& locale);
   void SetMIDIAccessorResult(bool result);
-  void SetMIDISysexPermission(bool value);
   void GrantWebNotificationPermission(gin::Arguments* args);
   void ClearWebNotificationPermissions();
   void SimulateWebNotificationClick(const std::string& title);
@@ -307,12 +299,14 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
                                             v8::Handle<v8::Function> callback);
   void SetCustomTextOutput(std::string output);
   void SetViewSourceForFrame(const std::string& name, bool enabled);
-  void SetPushMessagingPermission(const std::string& origin, bool allowed);
-  void ClearPushMessagingPermissions();
   void SetBluetoothMockDataSet(const std::string& dataset_name);
   void SetGeofencingMockProvider(bool service_available);
   void ClearGeofencingMockProvider();
   void SetGeofencingMockPosition(double latitude, double longitude);
+  void SetPermission(const std::string& name,
+                     const std::string& value,
+                     const std::string& origin,
+                     const std::string& embedding_origin);
 
   std::string PlatformName();
   std::string TooltipText();
@@ -528,8 +522,6 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("setPOSIXLocale", &TestRunnerBindings::SetPOSIXLocale)
       .SetMethod("setMIDIAccessorResult",
                  &TestRunnerBindings::SetMIDIAccessorResult)
-      .SetMethod("setMIDISysexPermission",
-                 &TestRunnerBindings::SetMIDISysexPermission)
       .SetMethod("grantWebNotificationPermission",
                  &TestRunnerBindings::GrantWebNotificationPermission)
       .SetMethod("clearWebNotificationPermissions",
@@ -558,10 +550,6 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::SetCustomTextOutput)
       .SetMethod("setViewSourceForFrame",
                  &TestRunnerBindings::SetViewSourceForFrame)
-      .SetMethod("setPushMessagingPermission",
-                 &TestRunnerBindings::SetPushMessagingPermission)
-      .SetMethod("clearPushMessagingPermissions",
-                 &TestRunnerBindings::ClearPushMessagingPermissions)
       .SetMethod("setBluetoothMockDataSet",
                  &TestRunnerBindings::SetBluetoothMockDataSet)
       .SetMethod("forceNextWebGLContextCreationToFail",
@@ -572,6 +560,7 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::ClearGeofencingMockProvider)
       .SetMethod("setGeofencingMockPosition",
                  &TestRunnerBindings::SetGeofencingMockPosition)
+      .SetMethod("setPermission", &TestRunnerBindings::SetPermission)
 
       // Properties.
       .SetProperty("platformName", &TestRunnerBindings::PlatformName)
@@ -1331,25 +1320,10 @@ void TestRunnerBindings::SetMIDIAccessorResult(bool result) {
     runner_->SetMIDIAccessorResult(result);
 }
 
-void TestRunnerBindings::SetMIDISysexPermission(bool value) {
-  if (runner_)
-    runner_->SetMIDISysexPermission(value);
-}
-
 void TestRunnerBindings::GrantWebNotificationPermission(gin::Arguments* args) {
-  if (runner_) {
-    std::string origin;
-    bool permission_granted = true;
-    args->GetNext(&origin);
-    args->GetNext(&permission_granted);
-    return runner_->GrantWebNotificationPermission(GURL(origin),
-                                                   permission_granted);
-  }
 }
 
 void TestRunnerBindings::ClearWebNotificationPermissions() {
-  if (runner_)
-    runner_->ClearWebNotificationPermissions();
 }
 
 void TestRunnerBindings::SimulateWebNotificationClick(
@@ -1436,17 +1410,6 @@ void TestRunnerBindings::SetViewSourceForFrame(const std::string& name,
   }
 }
 
-void TestRunnerBindings::SetPushMessagingPermission(const std::string& origin,
-                                                    bool allowed) {
-  if (runner_)
-    runner_->SetPushMessagingPermission(GURL(origin), allowed);
-}
-
-void TestRunnerBindings::ClearPushMessagingPermissions() {
-  if (runner_)
-    runner_->ClearPushMessagingPermissions();
-}
-
 void TestRunnerBindings::SetGeofencingMockProvider(bool service_available) {
   if (runner_)
     runner_->SetGeofencingMockProvider(service_available);
@@ -1461,6 +1424,17 @@ void TestRunnerBindings::SetGeofencingMockPosition(double latitude,
                                                    double longitude) {
   if (runner_)
     runner_->SetGeofencingMockPosition(latitude, longitude);
+}
+
+void TestRunnerBindings::SetPermission(const std::string& name,
+                                       const std::string& value,
+                                       const std::string& origin,
+                                       const std::string& embedding_origin) {
+  if (!runner_)
+    return;
+
+  return runner_->SetPermission(
+      name, value, GURL(origin), GURL(embedding_origin));
 }
 
 std::string TestRunnerBindings::PlatformName() {
@@ -1654,6 +1628,7 @@ void TestRunner::Reset() {
     delegate_->ResetScreenOrientation();
     delegate_->SetBluetoothMockDataSet("");
     delegate_->ClearGeofencingMockProvider();
+    delegate_->ResetPermissions();
     ResetBatteryStatus();
     ResetDeviceLight();
   }
@@ -2823,26 +2798,19 @@ void TestRunner::SetGeofencingMockPosition(double latitude, double longitude) {
   delegate_->SetGeofencingMockPosition(latitude, longitude);
 }
 
+void TestRunner::SetPermission(const std::string& name,
+                               const std::string& value,
+                               const GURL& origin,
+                               const GURL& embedding_origin) {
+  delegate_->SetPermission(name, value, origin, embedding_origin);
+}
+
 void TestRunner::SetPOSIXLocale(const std::string& locale) {
   delegate_->SetLocale(locale);
 }
 
 void TestRunner::SetMIDIAccessorResult(bool result) {
   midi_accessor_result_ = result;
-}
-
-void TestRunner::SetMIDISysexPermission(bool value) {
-  for (auto* window : test_interfaces_->GetWindowList())
-    window->GetMIDIClientMock()->setSysexPermission(value);
-}
-
-void TestRunner::GrantWebNotificationPermission(const GURL& origin,
-                                                bool permission_granted) {
-  delegate_->GrantWebNotificationPermission(origin, permission_granted);
-}
-
-void TestRunner::ClearWebNotificationPermissions() {
-  delegate_->ClearWebNotificationPermissions();
 }
 
 void TestRunner::SimulateWebNotificationClick(const std::string& title) {
@@ -2984,14 +2952,6 @@ void TestRunner::CapturePixelsCallback(scoped_ptr<InvokeCallbackTask> task,
 
   task->SetArguments(3, argv);
   InvokeCallback(task.Pass());
-}
-
-void TestRunner::SetPushMessagingPermission(const GURL& origin, bool allowed) {
-  delegate_->SetPushMessagingPermission(origin, allowed);
-}
-
-void TestRunner::ClearPushMessagingPermissions() {
-  delegate_->ClearPushMessagingPermissions();
 }
 
 void TestRunner::LocationChangeDone() {

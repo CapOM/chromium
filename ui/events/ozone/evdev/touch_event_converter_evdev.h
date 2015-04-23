@@ -30,7 +30,6 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
                            base::FilePath path,
                            int id,
                            InputDeviceType type,
-                           const EventDeviceInfo& devinfo,
                            DeviceEventDispatcherEvdev* dispatcher);
   ~TouchEventConverterEvdev() override;
 
@@ -38,6 +37,7 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
   bool HasTouchscreen() const override;
   gfx::Size GetTouchscreenSize() const override;
   int GetTouchPoints() const override;
+  void OnStopped() override;
 
   // Unsafe part of initialization.
   virtual void Initialize(const EventDeviceInfo& info);
@@ -64,6 +64,9 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
                    EventType event_type,
                    const base::TimeDelta& delta);
   void ReportEvents(base::TimeDelta delta);
+
+  void UpdateTrackingId(int slot, int tracking_id);
+  void ReleaseTouches();
 
   // Normalize pressure value to [0, 1].
   float ScalePressure(int32_t value);

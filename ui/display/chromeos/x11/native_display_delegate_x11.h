@@ -86,8 +86,11 @@ class DISPLAY_EXPORT NativeDisplayDelegateX11 : public NativeDisplayDelegate {
                  const gfx::Point& origin,
                  const ConfigureCallback& callback) override;
   void CreateFrameBuffer(const gfx::Size& size) override;
-  bool GetHDCPState(const DisplaySnapshot& output, HDCPState* state) override;
-  bool SetHDCPState(const DisplaySnapshot& output, HDCPState state) override;
+  void GetHDCPState(const DisplaySnapshot& output,
+                    const GetHDCPStateCallback& callback) override;
+  void SetHDCPState(const DisplaySnapshot& output,
+                    HDCPState state,
+                    const SetHDCPStateCallback& callback) override;
   std::vector<ColorCalibrationProfile> GetAvailableColorCalibrationProfiles(
       const DisplaySnapshot& output) override;
   bool SetColorCalibrationProfile(const DisplaySnapshot& output,
@@ -118,6 +121,10 @@ class DISPLAY_EXPORT NativeDisplayDelegateX11 : public NativeDisplayDelegate {
   void UpdateCrtcsForNewFramebuffer(const gfx::Size& min_screen_size);
 
   bool ConfigureCrtc(RRCrtc crtc, RRMode mode, RROutput output, int x, int y);
+
+  // Helper functions that perform the actual HDCP requests.
+  bool GetHDCPState(const DisplaySnapshot& output, HDCPState* state);
+  bool SetHDCPState(const DisplaySnapshot& output, HDCPState state);
 
   // Returns whether |id| is configured to preserve aspect when scaling.
   bool IsOutputAspectPreservingScaling(RROutput id);

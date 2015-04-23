@@ -657,6 +657,17 @@ void LoadKeymap(const std::string& layout_name,
 }
 #endif
 
+KeyboardCode DomCodeToUsLayoutKeyboardCode(DomCode dom_code) {
+  DomKey dummy_dom_key;
+  base::char16 dummy_character;
+  KeyboardCode key_code;
+  if (DomCodeToUsLayoutMeaning(dom_code, EF_NONE, &dummy_dom_key,
+                               &dummy_character, &key_code)) {
+    return key_code;
+  }
+  return VKEY_UNKNOWN;
+}
+
 }  // anonymous namespace
 
 XkbKeyCodeConverter::XkbKeyCodeConverter() {
@@ -775,21 +786,19 @@ bool XkbKeyboardLayoutEngine::Lookup(DomCode dom_code,
       *key_code = DifficultKeyboardCode(dom_code, flags, xkb_keycode, xkb_flags,
                                         xkb_keysym, *dom_key, *character);
       if (*key_code == VKEY_UNKNOWN)
-        *key_code = DomCodeToNonLocatedKeyboardCode(dom_code);
+        *key_code = DomCodeToUsLayoutKeyboardCode(dom_code);
     }
-
-    if ((flags & EF_CONTROL_DOWN) == EF_CONTROL_DOWN) {
-      // Use GetCharacterFromKeyCode() to set |character| to 0x0 for key codes
-      // that we do not care about.
-      *character = GetCharacterFromKeyCode(*key_code, flags);
-    }
+    // If the Control key is down, only allow ASCII control characters to be
+    // returned, regardless of the key layout. crbug.com/450849
+    if ((flags & EF_CONTROL_DOWN) && (*character >= 0x20))
+      *character = 0;
   } else if (*dom_key == DomKey::DEAD) {
     *character = DeadXkbKeySymToCombiningCharacter(xkb_keysym);
-    *key_code = DomCodeToNonLocatedKeyboardCode(dom_code);
+    *key_code = DomCodeToUsLayoutKeyboardCode(dom_code);
   } else {
     *key_code = NonPrintableDomKeyToKeyboardCode(*dom_key);
     if (*key_code == VKEY_UNKNOWN)
-      *key_code = DomCodeToNonLocatedKeyboardCode(dom_code);
+      *key_code = DomCodeToUsLayoutKeyboardCode(dom_code);
   }
   return true;
 }

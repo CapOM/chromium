@@ -91,10 +91,6 @@ const char kDisableBackingStoreLimit[]      = "disable-backing-store-limit";
 // features.
 const char kDisableBlinkFeatures[]          = "disable-blink-features";
 
-// Disable the Blink Scheduler. Ensures there's no reordering of blink tasks.
-// This switch is intended only for performance tests.
-const char kDisableBlinkScheduler[]         = "disable-blink-scheduler";
-
 // Disable the creation of compositing layers when it would prevent LCD text.
 const char kDisablePreferCompositingToLCDText[] =
     "disable-prefer-compositing-to-lcd-text";
@@ -907,12 +903,6 @@ const char kEnableWebRtcStunOrigin[]        = "enable-webrtc-stun-origin";
 // Override the maximum framerate as can be specified in calls to getUserMedia.
 // This flag expects a value.  Example: --max-gum-fps=17.5
 const char kWebRtcMaxCaptureFramerate[]     = "max-gum-fps";
-
-#if defined(OS_LINUX) || defined(OS_MACOSX)
-// Enables Video Capture Device captured data uploaded to Texture for zero-copy
-// capture pipeline.
-const char kEnableWebRtcCaptureToTexture[] = "enable-webrtc-capture-to-texture";
-#endif
 #endif
 
 #if defined(OS_ANDROID)

@@ -70,14 +70,15 @@ bool IsGtestTestFixture(const CXXRecordDecl* decl) {
   return decl->getQualifiedNameAsString() == "testing::Test";
 }
 
+// Generates a fixit hint to remove the 'virtual' keyword.
+// Unfortunately, there doesn't seem to be a good way to determine the source
+// location of the 'virtual' keyword. It's available in Declarator, but that
+// isn't accessible from the AST. So instead, make an educated guess that the
+// first token is probably the virtual keyword. Strictly speaking, this doesn't
+// have to be true, but it probably will be.
+// TODO(dcheng): Add a warning to force virtual to always appear first ;-)
 FixItHint FixItRemovalForVirtual(const SourceManager& manager,
                                  const CXXMethodDecl* method) {
-  // Unfortunately, there doesn't seem to be a good way to determine the
-  // location of the 'virtual' keyword. It's available in Declarator, but that
-  // isn't accessible from the AST. So instead, make an educated guess that the
-  // first token is probably the virtual keyword. Strictly speaking, this
-  // doesn't have to be true, but it probably will be.
-  // TODO(dcheng): Add a warning to force virtual to always appear first ;-)
   SourceRange range(method->getLocStart());
   // Get the spelling loc just in case it was expanded from a macro.
   SourceRange spelling_range(manager.getSpellingLoc(range.getBegin()));
@@ -413,32 +414,68 @@ void FindBadConstructsConsumer::CheckVirtualSpecifiers(
 
   // Complain if a method is annotated virtual && (override || final).
   if (has_virtual && (override_attr || final_attr)) {
-    diagnostic().Report(method->getLocStart(),
-                        diag_redundant_virtual_specifier_)
-        << "'virtual'"
-        << (override_attr ? static_cast<Attr*>(override_attr) : final_attr)
-        << FixItRemovalForVirtual(manager, method);
+    // ... but only if virtual does not originate in a macro from a banned file.
+    // Note this is just an educated guess: the assumption here is that any
+    // macro for declaring methods will probably be at the start of the method's
+    // source range.
+    if (!InBannedDirectory(manager.getSpellingLoc(method->getLocStart()))) {
+      diagnostic().Report(method->getLocStart(),
+                          diag_redundant_virtual_specifier_)
+          << "'virtual'"
+          << (override_attr ? static_cast<Attr*>(override_attr) : final_attr)
+          << FixItRemovalForVirtual(manager, method);
+    }
   }
 
   // Complain if a method is an override and is not annotated with override or
   // final.
   if (is_override && !override_attr && !final_attr) {
-    SourceRange type_info_range =
-        method->getTypeSourceInfo()->getTypeLoc().getSourceRange();
-    FullSourceLoc loc(type_info_range.getBegin(), manager);
-
-    // Build the FixIt insertion point after the end of the method definition,
-    // including any const-qualifiers and attributes, and before the opening
-    // of the l-curly-brace (if inline) or the semi-color (if a declaration).
-    SourceLocation spelling_end =
-        manager.getSpellingLoc(type_info_range.getEnd());
-    if (spelling_end.isValid()) {
-      SourceLocation token_end =
-          Lexer::getLocForEndOfToken(spelling_end, 0, manager, LangOptions());
-      diagnostic().Report(token_end, diag_method_requires_override_)
-          << FixItHint::CreateInsertion(token_end, " override");
+    SourceRange range = method->getSourceRange();
+    SourceLocation loc;
+    if (method->hasInlineBody()) {
+      loc = method->getBody()->getSourceRange().getBegin();
     } else {
-      diagnostic().Report(loc, diag_method_requires_override_);
+      // TODO(dcheng): We should probably use ASTContext's LangOptions here.
+      LangOptions lang_options;
+      loc = Lexer::getLocForEndOfToken(
+          manager.getSpellingLoc(range.getEnd()), 0,
+          manager, lang_options);
+      // The original code used the ending source loc of TypeSourceInfo's
+      // TypeLoc. Unfortunately, this breaks down in the presence of attributes.
+      // Attributes often appear at the end of a TypeLoc, e.g.
+      //   virtual ULONG __stdcall AddRef()
+      // has a TypeSourceInfo that looks something like:
+      //   ULONG AddRef() __attribute(stdcall)
+      // so a fix-it insertion would be generated to insert 'override' after
+      // __stdcall in the code as written.
+      // While using the spelling loc of the CXXMethodDecl fixes attribute
+      // handling, it breaks handling of "= 0" and similar constructs.. To work
+      // around this, scan backwards in the source text for a '=' or ')' token
+      // and adjust the location as needed...
+      for (SourceLocation l = loc.getLocWithOffset(-1);
+           l != manager.getLocForStartOfFile(manager.getFileID(loc));
+           l = l.getLocWithOffset(-1)) {
+        l = Lexer::GetBeginningOfToken(l, manager, lang_options);
+        Token token;
+        // getRawToken() returns *true* on failure. In that case, just give up
+        // and don't bother generating a possibly incorrect fix-it.
+        if (Lexer::getRawToken(l, token, manager, lang_options, true)) {
+          loc = SourceLocation();
+          break;
+        }
+        if (token.is(tok::r_paren)) {
+          break;
+        } else if (token.is(tok::equal)) {
+          loc = l;
+          break;
+        }
+      }
+    }
+    if (loc.isValid()) {
+      diagnostic().Report(loc, diag_method_requires_override_)
+          << FixItHint::CreateInsertion(loc, " override");
+    } else {
+      diagnostic().Report(range.getBegin(), diag_method_requires_override_);
     }
   }
 

@@ -25,7 +25,6 @@
         'use_openssl': 1,
       },
       'dependencies': [
-        '<(DEPTH)/native_client/tools.gyp:prep_toolchain',
         '<(DEPTH)/native_client_sdk/native_client_sdk_untrusted.gyp:nacl_io_untrusted',
         '<(DEPTH)/third_party/expat/expat_nacl.gyp:expat_nacl',
         '<(DEPTH)/third_party/boringssl/boringssl_nacl.gyp:boringssl_nacl',
@@ -38,7 +37,6 @@
         'HAVE_OPENSSL_SSL_H',
         'NO_MAIN_THREAD_WRAPPING',
         'NO_SOUND_SYSTEM',
-        'POSIX',
         'WEBRTC_POSIX',
         'SRTP_RELATIVE_PATH',
         'SSL_USE_OPENSSL',
@@ -287,7 +285,6 @@
           'GTEST_RELATIVE_PATH',
           'NO_MAIN_THREAD_WRAPPING',
           'NO_SOUND_SYSTEM',
-          'POSIX',
           'WEBRTC_POSIX',
           'SRTP_RELATIVE_PATH',
           'SSL_USE_OPENSSL',

@@ -19,14 +19,18 @@ group("remoting_all") {
   deps = [
     #"//remoting:remoting_browser_test_resources",
     "//remoting:remoting_unittests",
-
-    #"//remoting:remoting_webapp",
-    "//remoting/webapp:html",
-
     #"//remoting:remoting_webapp_unittests",
     #"//app_remoting_test.gyp:ar_sample_test_driver",
     #"//app_remoting_webapp.gyp:ar_sample_app",
   ]
+
+  if ((is_linux && !is_chromeos) || is_mac) {
+    deps += [
+      # TODO(gyp) Enable this for Windows once the webapp can be built without
+      # exceeding the 8k cmd line limit on Windows.
+      "//remoting/webapp",
+    ]
+  }
 
   if (is_win) {
     deps += [
@@ -136,10 +140,8 @@ source_set("test_support") {
   }
 }
 
-# TODO(GYP) remoting_unittests on Mac/Windows. Currently this fails with a
-# duplicate resource error on linking on Windows. Just needs to be checked on
-# Mac.
-if (!is_win && !is_mac) {
+# TODO(GYP) remoting_unittests on Mac. Needs to be tested.
+if (!is_mac) {
   test("remoting_unittests") {
     # Sources not included in one of the more specific unit_tests deps.
     sources = [
@@ -186,6 +188,7 @@ if (!is_win && !is_mac) {
       deps += [
         "//remoting/codec:unit_tests",
         "//remoting/host:unit_tests",
+        "//ui/gfx",
       ]
     }
 

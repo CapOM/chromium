@@ -476,12 +476,12 @@ void UserSessionManager::RestoreActiveSessions() {
 }
 
 bool UserSessionManager::UserSessionsRestored() const {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   return user_sessions_restored_;
 }
 
 bool UserSessionManager::UserSessionsRestoreInProgress() const {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   return user_sessions_restore_in_progress_;
 }
 
@@ -673,13 +673,13 @@ bool UserSessionManager::CheckEasyUnlockKeyOps(const base::Closure& callback) {
 
 void UserSessionManager::AddSessionStateObserver(
     chromeos::UserSessionStateObserver* observer) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   session_state_observer_list_.AddObserver(observer);
 }
 
 void UserSessionManager::RemoveSessionStateObserver(
     chromeos::UserSessionStateObserver* observer) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   session_state_observer_list_.RemoveObserver(observer);
 }
 
@@ -788,15 +788,16 @@ void UserSessionManager::OnProfilePrepared(Profile* profile,
   RestorePendingUserSessions();
 }
 
-void UserSessionManager::ChildAccountStatusReceivedCallback() {
-  StopChildStatusObserving();
+void UserSessionManager::ChildAccountStatusReceivedCallback(Profile* profile) {
+  StopChildStatusObserving(profile);
 }
 
-void UserSessionManager::StopChildStatusObserving() {
-  if (!waiting_for_child_account_status_) {
+void UserSessionManager::StopChildStatusObserving(Profile* profile) {
+  if (!waiting_for_child_account_status_ &&
+      !SessionStartupPref::TypeIsManaged(profile->GetPrefs())) {
     InitializeStartUrls();
-    waiting_for_child_account_status_ = false;
   }
+  waiting_for_child_account_status_ = false;
 }
 
 void UserSessionManager::CreateUserSession(const UserContext& user_context,
@@ -1149,13 +1150,12 @@ void UserSessionManager::InitializeStartUrls() const {
 bool UserSessionManager::InitializeUserSession(Profile* profile) {
   ChildAccountService* child_service =
       ChildAccountServiceFactory::GetForProfile(profile);
-  child_service->AddChildStatusReceivedCallback(base::Bind(
-      &UserSessionManager::ChildAccountStatusReceivedCallback,
-      weak_factory_.GetWeakPtr()));
+  child_service->AddChildStatusReceivedCallback(
+      base::Bind(&UserSessionManager::ChildAccountStatusReceivedCallback,
+                 weak_factory_.GetWeakPtr(), profile));
   base::MessageLoopProxy::current()->PostDelayedTask(
-      FROM_HERE,
-      base::Bind(&UserSessionManager::StopChildStatusObserving,
-                 weak_factory_.GetWeakPtr()),
+      FROM_HERE, base::Bind(&UserSessionManager::StopChildStatusObserving,
+                            weak_factory_.GetWeakPtr(), profile),
       base::TimeDelta::FromMilliseconds(kFlagsFetchingLoginTimeoutMs));
 
   user_manager::UserManager* user_manager = user_manager::UserManager::Get();
@@ -1254,8 +1254,14 @@ void UserSessionManager::RestoreAuthSessionImpl(
 
   // Authentication request context may not be available if user was not
   // signing in with GAIA webview (i.e. webview instance hasn't been
-  // initialized at all). Use fallback request context.
-  if (!auth_request_context) {
+  // initialized at all). Use fallback request context if authenticator was
+  // provided.
+  // Authenticator instance may not be initialized for session
+  // restore case when Chrome is restarting after crash or to apply custom user
+  // flags. In that case auth_request_context will be nullptr which is accepted
+  // by RestoreSession() for session restore case.
+  if (!auth_request_context &&
+      (authenticator_.get() && authenticator_->authentication_context())) {
     auth_request_context =
         authenticator_->authentication_context()->GetRequestContext();
   }

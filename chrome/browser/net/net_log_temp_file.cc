@@ -22,8 +22,8 @@ NetLogTempFile::NetLogTempFile(ChromeNetLog* chrome_net_log)
 }
 
 NetLogTempFile::~NetLogTempFile() {
-  if (net_log_logger_)
-    net_log_logger_->StopObserving(nullptr);
+  if (write_to_file_observer_)
+    write_to_file_observer_->StopObserving(nullptr);
 }
 
 void NetLogTempFile::ProcessCommand(Command command) {
@@ -93,19 +93,20 @@ base::DictionaryValue* NetLogTempFile::GetState() {
   return dict;
 }
 
-net::NetLog::LogLevel NetLogTempFile::GetLogLevelForLogType(LogType log_type) {
+net::NetLogCaptureMode NetLogTempFile::GetCaptureModeForLogType(
+    LogType log_type) {
   switch (log_type) {
   case LOG_TYPE_LOG_BYTES:
-    return net::NetLog::LOG_ALL;
+    return net::NetLogCaptureMode::IncludeSocketBytes();
   case LOG_TYPE_NORMAL:
-    return net::NetLog::LOG_ALL_BUT_BYTES;
+    return net::NetLogCaptureMode::IncludeCookiesAndCredentials();
   case LOG_TYPE_STRIP_PRIVATE_DATA:
-    return net::NetLog::LOG_STRIP_PRIVATE_DATA;
+    return net::NetLogCaptureMode::Default();
   case LOG_TYPE_NONE:
   case LOG_TYPE_UNKNOWN:
     NOTREACHED();
   }
-  return net::NetLog::LOG_STRIP_PRIVATE_DATA;
+  return net::NetLogCaptureMode::Default();
 }
 
 bool NetLogTempFile::EnsureInit() {
@@ -144,10 +145,10 @@ void NetLogTempFile::StartNetLog(LogType log_type) {
   state_ = STATE_LOGGING;
 
   scoped_ptr<base::Value> constants(NetInternalsUI::GetConstants());
-  net_log_logger_.reset(new net::WriteToFileNetLogObserver());
-  net_log_logger_->set_log_level(GetLogLevelForLogType(log_type));
-  net_log_logger_->StartObserving(chrome_net_log_, file.Pass(), constants.get(),
-                                  nullptr);
+  write_to_file_observer_.reset(new net::WriteToFileNetLogObserver());
+  write_to_file_observer_->set_capture_mode(GetCaptureModeForLogType(log_type));
+  write_to_file_observer_->StartObserving(chrome_net_log_, file.Pass(),
+                                  constants.get(), nullptr);
 }
 
 void NetLogTempFile::StopNetLog() {
@@ -155,8 +156,8 @@ void NetLogTempFile::StopNetLog() {
   if (state_ != STATE_LOGGING)
     return;
 
-  net_log_logger_->StopObserving(nullptr);
-  net_log_logger_.reset();
+  write_to_file_observer_->StopObserving(nullptr);
+  write_to_file_observer_.reset();
   state_ = STATE_NOT_LOGGING;
 }
 

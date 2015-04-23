@@ -7,10 +7,6 @@
 
 class PrefService;
 
-namespace infobars {
-class InfoBarManager;
-}
-
 namespace net {
 class URLRequestContextGetter;
 }
@@ -34,6 +30,7 @@ namespace ios {
 
 class ChromeBrowserProvider;
 class StringProvider;
+class UpdatableResourceProvider;
 
 // Setter and getter for the provider. The provider should be set early, before
 // any browser code is called.
@@ -51,11 +48,11 @@ class ChromeBrowserProvider {
   virtual net::URLRequestContextGetter* GetSystemURLRequestContext();
   // Gets the local state.
   virtual PrefService* GetLocalState();
+  // Returns an UpdatableResourceProvider instance.
+  virtual UpdatableResourceProvider* GetUpdatableResourceProvider();
   // Returns an instance of an infobar view. The caller is responsible for
   // initializing the returned object and releasing it when appropriate.
   virtual InfoBarViewPlaceholder* CreateInfoBarView();
-  // Gets the infobar manager associated with |web_state|.
-  virtual infobars::InfoBarManager* GetInfoBarManager(web::WebState* web_state);
   // Returns an instance of a string provider.
   virtual StringProvider* GetStringProvider();
   // Displays the Translate settings screen.

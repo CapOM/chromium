@@ -492,9 +492,6 @@ WebAXObjectProxy::GetObjectTemplateBuilder(v8::Isolate* isolate) {
                    &WebAXObjectProxy::SelectionStartLineNumber)
       .SetProperty("selectionEndLineNumber",
                    &WebAXObjectProxy::SelectionEndLineNumber)
-      .SetProperty("insertionPointLineNumber",
-                   &WebAXObjectProxy::InsertionPointLineNumber)
-      .SetProperty("selectedTextRange", &WebAXObjectProxy::SelectedTextRange)
       .SetProperty("isEnabled", &WebAXObjectProxy::IsEnabled)
       .SetProperty("isRequired", &WebAXObjectProxy::IsRequired)
       .SetProperty("isFocused", &WebAXObjectProxy::IsFocused)
@@ -513,6 +510,8 @@ WebAXObjectProxy::GetObjectTemplateBuilder(v8::Isolate* isolate) {
       .SetProperty("isValid", &WebAXObjectProxy::IsValid)
       .SetProperty("isReadOnly", &WebAXObjectProxy::IsReadOnly)
       .SetProperty("orientation", &WebAXObjectProxy::Orientation)
+      .SetProperty("posInSet", &WebAXObjectProxy::PosInSet)
+      .SetProperty("setSize", &WebAXObjectProxy::SetSize)
       .SetProperty("clickPointX", &WebAXObjectProxy::ClickPointX)
       .SetProperty("clickPointY", &WebAXObjectProxy::ClickPointY)
       .SetProperty("rowCount", &WebAXObjectProxy::RowCount)
@@ -622,11 +621,7 @@ void WebAXObjectProxy::NotificationReceived(
 
   v8::Isolate* isolate = blink::mainThreadIsolate();
 
-#ifdef WEB_FRAME_USES_V8_LOCAL
-  v8::Local<v8::Value> argv[] = {
-#else
   v8::Handle<v8::Value> argv[] = {
-#endif
     v8::String::NewFromUtf8(isolate, notification_name.data(),
                             v8::String::kNormalString,
                             notification_name.size()),
@@ -745,23 +740,6 @@ int WebAXObjectProxy::SelectionEndLineNumber() {
   return accessibility_object_.selectionEndLineNumber();
 }
 
-// TODO(nektar): Remove this function after updating tests.
-int WebAXObjectProxy::InsertionPointLineNumber() {
-  accessibility_object_.updateLayoutAndCheckValidity();
-  if (!accessibility_object_.isFocused())
-    return -1;
-  return accessibility_object_.selectionEndLineNumber();
-}
-
-// TODO(nektar): Remove this function after updating tests.
-std::string WebAXObjectProxy::SelectedTextRange() {
-  accessibility_object_.updateLayoutAndCheckValidity();
-  unsigned selection_start = accessibility_object_.selectionStart();
-  unsigned selection_end = accessibility_object_.selectionEnd();
-  return base::StringPrintf("{%d, %d}",
-                            selection_start, selection_end - selection_start);
-}
-
 bool WebAXObjectProxy::IsEnabled() {
   accessibility_object_.updateLayoutAndCheckValidity();
   return accessibility_object_.isEnabled();
@@ -851,6 +829,16 @@ std::string WebAXObjectProxy::Orientation() {
     return "AXOrientation: AXHorizontalOrientation";
 
   return std::string();
+}
+
+int WebAXObjectProxy::PosInSet() {
+  accessibility_object_.updateLayoutAndCheckValidity();
+  return accessibility_object_.posInSet();
+}
+
+int WebAXObjectProxy::SetSize() {
+  accessibility_object_.updateLayoutAndCheckValidity();
+  return accessibility_object_.setSize();
 }
 
 int WebAXObjectProxy::ClickPointX() {

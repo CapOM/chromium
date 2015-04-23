@@ -100,8 +100,6 @@ SupervisedUserCreationScreen::SupervisedUserCreationScreen(
     BaseScreenDelegate* base_screen_delegate,
     SupervisedUserCreationScreenHandler* actor)
     : BaseScreen(base_screen_delegate),
-      ImageRequest(content::BrowserThread::GetMessageLoopProxyForThread(
-          content::BrowserThread::UI)),
       actor_(actor),
       on_error_screen_(false),
       manager_signin_in_progress_(false),
@@ -210,6 +208,10 @@ void SupervisedUserCreationScreen::FinishFlow() {
       ->GetSessionManagerClient()
       ->NotifySupervisedUserCreationFinished();
   controller_->FinishCreation();
+}
+
+void SupervisedUserCreationScreen::HideFlow() {
+  Hide();
 }
 
 void SupervisedUserCreationScreen::AuthenticateManager(
@@ -589,7 +591,7 @@ void SupervisedUserCreationScreen::OnGetSupervisedUsers(
 
 void SupervisedUserCreationScreen::OnPhotoTaken(
     const std::string& raw_data) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   user_photo_ = gfx::ImageSkia();
   ImageDecoder::Cancel(this);
   ImageDecoder::Start(this, raw_data);

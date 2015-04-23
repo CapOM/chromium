@@ -287,9 +287,7 @@ bool AddTransformNodeIfNeeded(
   }
 
   node->data.local = layer->transform();
-  node->data.pre_local.Translate3d(-layer->transform_origin().x(),
-                                   -layer->transform_origin().y(),
-                                   -layer->transform_origin().z());
+  node->data.update_pre_local_transform(layer->transform_origin());
 
   node->data.needs_local_transform_update = true;
   data_from_ancestor.transform_tree->UpdateTransforms(node->id);
@@ -414,6 +412,12 @@ void BuildPropertyTreesTopLevelInternal(LayerType* root_layer,
       data_for_recursion.clip_tree->Insert(root_clip, 0);
   BuildPropertyTreesInternal(root_layer, data_for_recursion);
   property_trees->needs_rebuild = false;
+
+  // The transform tree is kept up-to-date as it is built, but the
+  // combined_clips stored in the clip tree aren't computed during tree
+  // building.
+  property_trees->transform_tree.set_needs_update(false);
+  property_trees->clip_tree.set_needs_update(true);
 }
 
 void PropertyTreeBuilder::BuildPropertyTrees(

@@ -22,7 +22,7 @@ class NetLog;
 namespace data_reduction_proxy {
 
 class DataReductionProxyConfigurator;
-class DataReductionProxyEventStore;
+class DataReductionProxyEventCreator;
 class DataReductionProxyMutableConfigValues;
 class TestDataReductionProxyParams;
 
@@ -39,7 +39,7 @@ class TestDataReductionProxyConfig : public DataReductionProxyConfig {
       scoped_refptr<base::SingleThreadTaskRunner> network_task_runner,
       net::NetLog* net_log,
       DataReductionProxyConfigurator* configurator,
-      DataReductionProxyEventStore* event_store);
+      DataReductionProxyEventCreator* event_creator);
 
   // Creates a |TestDataReductionProxyConfig| with the provided |config_values|.
   // This permits any DataReductionProxyConfigValues to be used (such as
@@ -49,7 +49,7 @@ class TestDataReductionProxyConfig : public DataReductionProxyConfig {
       scoped_refptr<base::SingleThreadTaskRunner> task_runner,
       net::NetLog* net_log,
       DataReductionProxyConfigurator* configurator,
-      DataReductionProxyEventStore* event_store);
+      DataReductionProxyEventCreator* event_creator);
 
   ~TestDataReductionProxyConfig() override;
 
@@ -92,7 +92,7 @@ class MockDataReductionProxyConfig : public TestDataReductionProxyConfig {
       scoped_refptr<base::SingleThreadTaskRunner> network_task_runner,
       net::NetLog* net_log,
       DataReductionProxyConfigurator* configurator,
-      DataReductionProxyEventStore* event_store);
+      DataReductionProxyEventCreator* event_creator);
   ~MockDataReductionProxyConfig();
 
   MOCK_METHOD1(RecordSecureProxyCheckFetchResult,
@@ -125,12 +125,6 @@ class MockDataReductionProxyConfig : public TestDataReductionProxyConfig {
                           bool alternative_enabled,
                           bool restricted,
                           bool at_startup) override;
-
-  // HandleSecureProxyCheckResponse should always call
-  // RecordSecureProxyCheckFetchResult exactly once.
-  void HandleSecureProxyCheckResponse(
-      const std::string& response,
-      const net::URLRequestStatus& status) override;
 };
 
 }  // namespace data_reduction_proxy

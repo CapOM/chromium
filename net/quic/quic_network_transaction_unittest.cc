@@ -67,18 +67,26 @@ namespace test {
 // Simplify ownership issues and the interaction with the MockSocketFactory.
 class MockQuicData {
  public:
+  MockQuicData() : sequence_number_(0) {}
+
   ~MockQuicData() {
     STLDeleteElements(&packets_);
   }
 
-  void AddRead(scoped_ptr<QuicEncryptedPacket> packet) {
+  void AddSynchronousRead(scoped_ptr<QuicEncryptedPacket> packet) {
     reads_.push_back(MockRead(SYNCHRONOUS, packet->data(), packet->length(),
                               sequence_number_++));
     packets_.push_back(packet.release());
   }
 
+  void AddRead(scoped_ptr<QuicEncryptedPacket> packet) {
+    reads_.push_back(
+        MockRead(ASYNC, packet->data(), packet->length(), sequence_number_++));
+    packets_.push_back(packet.release());
+  }
+
   void AddRead(IoMode mode, int rv) {
-    reads_.push_back(MockRead(mode, rv));
+    reads_.push_back(MockRead(mode, rv, sequence_number_++));
   }
 
   void AddWrite(scoped_ptr<QuicEncryptedPacket> packet) {
@@ -87,12 +95,11 @@ class MockQuicData {
     packets_.push_back(packet.release());
   }
 
-  void AddDelayedSocketDataToFactory(MockClientSocketFactory* factory,
-                                     size_t delay) {
+  void AddSocketDataToFactory(MockClientSocketFactory* factory) {
     MockRead* reads = reads_.empty() ? nullptr  : &reads_[0];
     MockWrite* writes = writes_.empty() ? nullptr  : &writes_[0];
-    socket_data_.reset(new DelayedSocketData(
-        delay, reads, reads_.size(), writes, writes_.size()));
+    socket_data_.reset(
+        new SequencedSocketData(reads, reads_.size(), writes, writes_.size()));
     factory->AddSocketDataProvider(socket_data_.get());
   }
 
@@ -394,7 +401,7 @@ TEST_P(QuicNetworkTransactionTest, ForceQuic) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -405,22 +412,20 @@ TEST_P(QuicNetworkTransactionTest, ForceQuic) {
   SendRequestAndExpectQuicResponse("hello!");
 
   // Check that the NetLog was filled reasonably.
-  net::TestNetLog::CapturedEntryList entries;
+  TestNetLog::CapturedEntryList entries;
   net_log_.GetEntries(&entries);
   EXPECT_LT(0u, entries.size());
 
   // Check that we logged a QUIC_SESSION_PACKET_RECEIVED.
-  int pos = net::ExpectLogContainsSomewhere(
-      entries, 0,
-      net::NetLog::TYPE_QUIC_SESSION_PACKET_RECEIVED,
-      net::NetLog::PHASE_NONE);
+  int pos = ExpectLogContainsSomewhere(
+      entries, 0, NetLog::TYPE_QUIC_SESSION_PACKET_RECEIVED,
+      NetLog::PHASE_NONE);
   EXPECT_LT(0, pos);
 
   // ... and also a TYPE_QUIC_SESSION_PACKET_HEADER_RECEIVED.
-  pos = net::ExpectLogContainsSomewhere(
-      entries, 0,
-      net::NetLog::TYPE_QUIC_SESSION_PACKET_HEADER_RECEIVED,
-      net::NetLog::PHASE_NONE);
+  pos = ExpectLogContainsSomewhere(
+      entries, 0, NetLog::TYPE_QUIC_SESSION_PACKET_HEADER_RECEIVED,
+      NetLog::PHASE_NONE);
   EXPECT_LT(0, pos);
 
   std::string packet_sequence_number;
@@ -429,10 +434,9 @@ TEST_P(QuicNetworkTransactionTest, ForceQuic) {
   EXPECT_EQ("1", packet_sequence_number);
 
   // ... and also a QUIC_SESSION_STREAM_FRAME_RECEIVED.
-  pos = net::ExpectLogContainsSomewhere(
-      entries, 0,
-      net::NetLog::TYPE_QUIC_SESSION_STREAM_FRAME_RECEIVED,
-      net::NetLog::PHASE_NONE);
+  pos = ExpectLogContainsSomewhere(
+      entries, 0, NetLog::TYPE_QUIC_SESSION_STREAM_FRAME_RECEIVED,
+      NetLog::PHASE_NONE);
   EXPECT_LT(0, pos);
 
   int log_stream_id;
@@ -457,7 +461,7 @@ TEST_P(QuicNetworkTransactionTest, QuicProxy) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // There is no need to set up an alternate protocol job, because
   // no attempt will be made to speak to the proxy over TCP.
@@ -474,7 +478,7 @@ TEST_P(QuicNetworkTransactionTest, ForceQuicWithErrorConnecting) {
   MockQuicData mock_quic_data;
   mock_quic_data.AddRead(ASYNC, ERR_SOCKET_NOT_CONNECTED);
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 0);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   CreateSession();
 
@@ -533,7 +537,7 @@ TEST_P(QuicNetworkTransactionTest, UseAlternateProtocolForQuic) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -568,7 +572,7 @@ TEST_P(QuicNetworkTransactionTest, AlternateProtocolDifferentPort) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -603,7 +607,7 @@ TEST_P(QuicNetworkTransactionTest, ConfirmAlternativeService) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -652,7 +656,7 @@ TEST_P(QuicNetworkTransactionTest, UseAlternateProtocolProbabilityForQuic) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -736,7 +740,7 @@ TEST_P(QuicNetworkTransactionTest, UseAlternateProtocolForQuicForHttps) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -819,7 +823,7 @@ TEST_P(QuicNetworkTransactionTest, ZeroRTTWithHttpRace) {
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
 
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -842,7 +846,7 @@ TEST_P(QuicNetworkTransactionTest, ZeroRTTWithNoHttpRace) {
       ConstructDataPacket(2, kClientDataStreamId1, false, true, 0, "hello!"));
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // In order for a new QUIC session to be established via alternate-protocol
   // without racing an HTTP connection, we need the host resolution to happen
@@ -916,7 +920,7 @@ TEST_P(QuicNetworkTransactionTest, ZeroRTTWithConfirmationRequired) {
       ConstructDataPacket(2, kClientDataStreamId1, false, true, 0, "hello!"));
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
   mock_quic_data.AddRead(SYNCHRONOUS, 0);  // EOF
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 1);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // The non-alternate protocol job needs to hang in order to guarantee that
   // the alternate-protocol job will "win".
@@ -1133,12 +1137,12 @@ TEST_P(QuicNetworkTransactionTest, BrokenAlternateProtocolOnConnectFailure) {
 
 TEST_P(QuicNetworkTransactionTest, ConnectionCloseDuringConnect) {
   MockQuicData mock_quic_data;
-  mock_quic_data.AddRead(ConstructConnectionClosePacket(1));
+  mock_quic_data.AddSynchronousRead(ConstructConnectionClosePacket(1));
   mock_quic_data.AddWrite(
       ConstructRequestHeadersPacket(1, kClientDataStreamId1, true, true,
                                     GetRequestHeaders("GET", "http", "/")));
   mock_quic_data.AddWrite(ConstructAckPacket(2, 1));
-  mock_quic_data.AddDelayedSocketDataToFactory(&socket_factory_, 0);
+  mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
   // When the QUIC connection fails, we will try the request again over HTTP.
   MockRead http_reads[] = {

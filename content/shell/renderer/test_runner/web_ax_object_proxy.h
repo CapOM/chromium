@@ -73,10 +73,6 @@ class WebAXObjectProxy : public gin::Wrappable<WebAXObjectProxy> {
   int SelectionEnd();
   int SelectionStartLineNumber();
   int SelectionEndLineNumber();
-  // TODO(nektar): Remove this function after updating tests.
-  int InsertionPointLineNumber();
-  // TODO(nektar): Remove this function after updating tests.
-  std::string SelectedTextRange();
   bool IsEnabled();
   bool IsRequired();
   bool IsFocused();
@@ -94,6 +90,8 @@ class WebAXObjectProxy : public gin::Wrappable<WebAXObjectProxy> {
   bool IsValid();
   bool IsReadOnly();
   std::string Orientation();
+  int PosInSet();
+  int SetSize();
   int ClickPointX();
   int ClickPointY();
   int32_t RowCount();

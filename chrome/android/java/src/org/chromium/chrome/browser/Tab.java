@@ -36,7 +36,6 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuParams;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorWrapper;
 import org.chromium.chrome.browser.contextmenu.EmptyChromeContextMenuItemDelegate;
-import org.chromium.chrome.browser.dom_distiller.DomDistillerFeedbackReporter;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.metrics.UmaSessionStats;
@@ -181,7 +180,6 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private ContentViewClient mContentViewClient;
     private WebContentsObserver mWebContentsObserver;
     private TabChromeWebContentsDelegateAndroid mWebContentsDelegate;
-    private DomDistillerFeedbackReporter mDomDistillerFeedbackReporter;
 
     /**
      * If this tab was opened from another tab, store the id of the tab that
@@ -476,7 +474,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * ContentViewClient that provides basic tab functionality and is meant to be extended
      * by child classes.
      */
-    protected class TabContentViewClient extends ChromeContentViewClient {
+    protected class TabContentViewClient extends ContentViewClient {
         @Override
         public void onUpdateTitle(String title) {
             updateTitle(title);
@@ -1488,10 +1486,6 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         updateTitle();
         removeSadTabIfPresent();
 
-        if (getContentViewCore() != null) {
-            getContentViewCore().stopCurrentAccessibilityNotifications();
-        }
-
         clearHungRendererState();
 
         for (TabObserver observer : mObservers) observer.onPageLoadStarted(this);
@@ -1547,7 +1541,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      */
     protected void initContentViewCore(WebContents webContents) {
         ContentViewCore cvc = new ContentViewCore(mContext);
-        ContentView cv = ContentView.newInstance(mContext, cvc);
+        ContentView cv = new ContentView(mContext, cvc);
         cv.setContentDescription(mContext.getResources().getString(
                 R.string.accessibility_content_view));
         cvc.initialize(cv, cv, webContents, getWindowAndroid());
@@ -1601,9 +1595,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         if (mInfoBarContainer == null) {
             // The InfoBarContainer needs to be created after the ContentView has been natively
             // initialized.
-            WebContents webContents = mContentViewCore.getWebContents();
-            mInfoBarContainer = new InfoBarContainer(
-                    mContext, getId(), mContentViewParent, webContents, this);
+            mInfoBarContainer = new InfoBarContainer(mContext, getId(), mContentViewParent, this);
         } else {
             mInfoBarContainer.onParentViewChanged(getId(), mContentViewParent);
         }
@@ -1611,10 +1603,6 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
         mSwipeRefreshHandler = new SwipeRefreshHandler(mContext);
         mSwipeRefreshHandler.setContentViewCore(mContentViewCore);
-
-        if (DomDistillerFeedbackReporter.isEnabled() && mDomDistillerFeedbackReporter == null) {
-            mDomDistillerFeedbackReporter = new DomDistillerFeedbackReporter(this);
-        }
 
         for (TabObserver observer : mObservers) observer.onContentChanged(this);
 
@@ -2161,11 +2149,12 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /** This is currently called when committing a pre-rendered page. */
+    @VisibleForTesting
     @CalledByNative
-    private void swapWebContents(
+    public void swapWebContents(
             WebContents webContents, boolean didStartLoad, boolean didFinishLoad) {
         ContentViewCore cvc = new ContentViewCore(mContext);
-        ContentView cv = ContentView.newInstance(mContext, cvc);
+        ContentView cv = new ContentView(mContext, cvc);
         cv.setContentDescription(mContext.getResources().getString(
                 R.string.accessibility_content_view));
         cvc.initialize(cv, cv, webContents, getWindowAndroid());
@@ -2221,11 +2210,6 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private void setNativePtr(long nativePtr) {
         assert mNativeTabAndroid == 0;
         mNativeTabAndroid = nativePtr;
-    }
-
-    @CalledByNative
-    private long getNativeInfoBarContainer() {
-        return getInfoBarContainer().getNative();
     }
 
     /**

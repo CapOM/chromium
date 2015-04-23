@@ -52,9 +52,9 @@ base::string16 GetDisplaySize(int64 display_id) {
 
   // We don't show display size for mirrored display. Fallback
   // to empty string if this happens on release build.
-  bool mirrored_display = display_manager->mirrored_display_id() == display_id;
-  DCHECK(!mirrored_display);
-  if (mirrored_display)
+  bool mirroring = display_manager->mirroring_display_id() == display_id;
+  DCHECK(!mirroring);
+  if (mirroring)
     return base::string16();
 
   DCHECK(display->is_valid());
@@ -66,7 +66,7 @@ base::string16 GetDisplaySize(int64 display_id) {
 base::string16 GetDisplayInfoLine(int64 display_id) {
   const DisplayInfo& display_info =
       GetDisplayManager()->GetDisplayInfo(display_id);
-  if (GetDisplayManager()->mirrored_display_id() == display_id)
+  if (GetDisplayManager()->mirroring_display_id() == display_id)
     return GetDisplayName(display_id);
 
   base::string16 size_text = GetDisplaySize(display_id);
@@ -92,9 +92,9 @@ base::string16 GetAllDisplayInfo() {
   std::vector<base::string16> lines;
   int64 internal_id = gfx::Display::kInvalidDisplayID;
   // Make sure to show the internal display first.
-  if (display_manager->HasInternalDisplay() &&
-      display_manager->IsInternalDisplayId(
-          display_manager->first_display_id())) {
+  if (gfx::Display::HasInternalDisplay() &&
+      gfx::Display::InternalDisplayId() ==
+          display_manager->first_display_id()) {
     internal_id = display_manager->first_display_id();
     lines.push_back(GetDisplayInfoLine(internal_id));
   }
@@ -186,7 +186,7 @@ class DisplayView : public ActionableView {
   // mirroring.
   static base::string16 GetExternalDisplayName() {
     DisplayManager* display_manager = GetDisplayManager();
-    DCHECK(!display_manager->IsMirrored());
+    DCHECK(!display_manager->IsInMirrorMode());
 
     int64 external_id = gfx::Display::kInvalidDisplayID;
     for (size_t i = 0; i < display_manager->GetNumDisplays(); ++i) {
@@ -207,7 +207,7 @@ class DisplayView : public ActionableView {
     base::string16 name = GetDisplayName(external_id);
     const DisplayInfo& display_info =
         display_manager->GetDisplayInfo(external_id);
-    if (display_info.rotation() != gfx::Display::ROTATE_0 ||
+    if (display_info.GetActiveRotation() != gfx::Display::ROTATE_0 ||
         display_info.configured_ui_scale() != 1.0f ||
         !display_info.overscan_insets_in_dip().empty()) {
       name = l10n_util::GetStringFUTF16(
@@ -228,7 +228,7 @@ class DisplayView : public ActionableView {
       base::string16* additional_message_out) {
     DisplayManager* display_manager = GetDisplayManager();
     if (display_manager->GetNumDisplays() > 1) {
-      if (GetDisplayManager()->HasInternalDisplay()) {
+      if (gfx::Display::HasInternalDisplay()) {
         return l10n_util::GetStringFUTF16(
             IDS_ASH_STATUS_TRAY_DISPLAY_EXTENDED, GetExternalDisplayName());
       }
@@ -236,19 +236,19 @@ class DisplayView : public ActionableView {
           IDS_ASH_STATUS_TRAY_DISPLAY_EXTENDED_NO_INTERNAL);
     }
 
-    if (display_manager->IsMirrored()) {
-      if (GetDisplayManager()->HasInternalDisplay()) {
+    if (display_manager->IsInMirrorMode()) {
+      if (gfx::Display::HasInternalDisplay()) {
         return l10n_util::GetStringFUTF16(
             IDS_ASH_STATUS_TRAY_DISPLAY_MIRRORING,
-            GetDisplayName(display_manager->mirrored_display_id()));
+            GetDisplayName(display_manager->mirroring_display_id()));
       }
       return l10n_util::GetStringUTF16(
           IDS_ASH_STATUS_TRAY_DISPLAY_MIRRORING_NO_INTERNAL);
     }
 
     int64 primary_id = Shell::GetScreen()->GetPrimaryDisplay().id();
-    if (display_manager->HasInternalDisplay() &&
-        !display_manager->IsInternalDisplayId(primary_id)) {
+    if (gfx::Display::HasInternalDisplay() &&
+        !(gfx::Display::InternalDisplayId() == primary_id)) {
       if (additional_message_out) {
         *additional_message_out = l10n_util::GetStringUTF16(
             IDS_ASH_STATUS_TRAY_DISPLAY_DOCKED_DESCRIPTION);
@@ -263,10 +263,10 @@ class DisplayView : public ActionableView {
   bool ShouldShowFirstDisplayInfo() const {
     const DisplayInfo& display_info = GetDisplayManager()->GetDisplayInfo(
         GetDisplayManager()->first_display_id());
-    return display_info.rotation() != gfx::Display::ROTATE_0 ||
-        display_info.configured_ui_scale() != 1.0f ||
-        !display_info.overscan_insets_in_dip().empty() ||
-        display_info.has_overscan();
+    return display_info.GetActiveRotation() != gfx::Display::ROTATE_0 ||
+           display_info.configured_ui_scale() != 1.0f ||
+           !display_info.overscan_insets_in_dip().empty() ||
+           display_info.has_overscan();
   }
 
   // Overridden from ActionableView.
@@ -340,9 +340,10 @@ bool TrayDisplay::GetDisplayMessageForNotification(
           GetDisplaySize(iter->first));
       return true;
     }
-    if (iter->second.rotation() != old_iter->second.rotation()) {
+    if (iter->second.GetActiveRotation() !=
+        old_iter->second.GetActiveRotation()) {
       int rotation_text_id = 0;
-      switch (iter->second.rotation()) {
+      switch (iter->second.GetActiveRotation()) {
         case gfx::Display::ROTATE_0:
           rotation_text_id = IDS_ASH_STATUS_TRAY_DISPLAY_STANDARD_ORIENTATION;
           break;

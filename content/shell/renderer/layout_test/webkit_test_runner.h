@@ -88,12 +88,7 @@ class WebKitTestRunner : public RenderViewObserver,
   void EvaluateInWebInspector(long call_id, const std::string& script) override;
   void ClearAllDatabases() override;
   void SetDatabaseQuota(int quota) override;
-  void GrantWebNotificationPermission(const GURL& origin,
-                                      bool permission_granted) override;
-  void ClearWebNotificationPermissions() override;
   void SimulateWebNotificationClick(const std::string& title) override;
-  void SetPushMessagingPermission(const GURL& origin, bool allowed) override;
-  void ClearPushMessagingPermissions() override;
   void SetDeviceScaleFactor(float factor) override;
   void SetDeviceColorProfile(const std::string& name) override;
   void SetBluetoothMockDataSet(const std::string& name) override;
@@ -114,6 +109,11 @@ class WebKitTestRunner : public RenderViewObserver,
                        const std::string& frame_name) override;
   bool AllowExternalPages() override;
   std::string DumpHistoryForWindow(WebTestProxyBase* proxy) override;
+  void SetPermission(const std::string& name,
+                     const std::string& value,
+                     const GURL& origin,
+                     const GURL& embedding_origin) override;
+  void ResetPermissions() override;
 
   void Reset();
 

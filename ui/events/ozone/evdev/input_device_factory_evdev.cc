@@ -101,7 +101,7 @@ scoped_ptr<EventConverterEvdev> CreateConverter(
   // Touchscreen: use TouchEventConverterEvdev.
   if (devinfo.HasTouchscreen()) {
     scoped_ptr<TouchEventConverterEvdev> converter(new TouchEventConverterEvdev(
-        fd, params.path, params.id, type, devinfo, params.dispatcher));
+        fd, params.path, params.id, type, params.dispatcher));
     converter->Initialize(devinfo);
     return converter.Pass();
   }
@@ -130,7 +130,7 @@ void OpenInputDevice(scoped_ptr<OpenInputDeviceParams> params,
   const base::FilePath& path = params->path;
   scoped_ptr<EventConverterEvdev> converter;
 
-  TRACE_EVENT1("ozone", "OpenInputDevice", "path", path.value());
+  TRACE_EVENT1("evdev", "OpenInputDevice", "path", path.value());
 
   int fd = open(path.value().c_str(), O_RDWR | O_NONBLOCK);
   if (fd < 0) {
@@ -170,7 +170,7 @@ void OpenInputDevice(scoped_ptr<OpenInputDeviceParams> params,
 // run it on the FILE thread.
 void CloseInputDevice(const base::FilePath& path,
                       scoped_ptr<EventConverterEvdev> converter) {
-  TRACE_EVENT1("ozone", "CloseInputDevice", "path", path.value());
+  TRACE_EVENT1("evdev", "CloseInputDevice", "path", path.value());
   converter.reset();
 }
 
@@ -232,7 +232,7 @@ void InputDeviceFactoryEvdev::AttachInputDevice(
   if (converter.get()) {
     const base::FilePath& path = converter->path();
 
-    TRACE_EVENT1("ozone", "AttachInputDevice", "path", path.value());
+    TRACE_EVENT1("evdev", "AttachInputDevice", "path", path.value());
     DCHECK(task_runner_->RunsTasksOnCurrentThread());
 
     // If we have an existing device, detach it. We don't want two
@@ -255,7 +255,7 @@ void InputDeviceFactoryEvdev::AttachInputDevice(
 }
 
 void InputDeviceFactoryEvdev::DetachInputDevice(const base::FilePath& path) {
-  TRACE_EVENT1("ozone", "DetachInputDevice", "path", path.value());
+  TRACE_EVENT1("evdev", "DetachInputDevice", "path", path.value());
   DCHECK(task_runner_->RunsTasksOnCurrentThread());
 
   // Remove device from map.
@@ -423,7 +423,8 @@ void InputDeviceFactoryEvdev::NotifyTouchscreensUpdated() {
   std::vector<TouchscreenDevice> touchscreens;
   for (auto it = converters_.begin(); it != converters_.end(); ++it) {
     if (it->second->HasTouchscreen()) {
-      touchscreens.push_back(TouchscreenDevice(it->second->input_device(),
+      touchscreens.push_back(TouchscreenDevice(
+          it->second->id(), it->second->type(),
           it->second->GetTouchscreenSize(), it->second->GetTouchPoints()));
     }
   }
@@ -435,7 +436,7 @@ void InputDeviceFactoryEvdev::NotifyKeyboardsUpdated() {
   std::vector<KeyboardDevice> keyboards;
   for (auto it = converters_.begin(); it != converters_.end(); ++it) {
     if (it->second->HasKeyboard()) {
-      keyboards.push_back(KeyboardDevice(it->second->input_device()));
+      keyboards.push_back(KeyboardDevice(it->second->id(), it->second->type()));
     }
   }
 
@@ -445,9 +446,8 @@ void InputDeviceFactoryEvdev::NotifyKeyboardsUpdated() {
 void InputDeviceFactoryEvdev::NotifyMouseDevicesUpdated() {
   std::vector<InputDevice> mice;
   for (auto it = converters_.begin(); it != converters_.end(); ++it) {
-    if (it->second->HasMouse()) {
-      mice.push_back(it->second->input_device());
-    }
+    if (it->second->HasMouse())
+      mice.push_back(InputDevice(it->second->id(), it->second->type()));
   }
 
   dispatcher_->DispatchMouseDevicesUpdated(mice);
@@ -456,9 +456,8 @@ void InputDeviceFactoryEvdev::NotifyMouseDevicesUpdated() {
 void InputDeviceFactoryEvdev::NotifyTouchpadDevicesUpdated() {
   std::vector<InputDevice> touchpads;
   for (auto it = converters_.begin(); it != converters_.end(); ++it) {
-    if (it->second->HasTouchpad()) {
-      touchpads.push_back(it->second->input_device());
-    }
+    if (it->second->HasTouchpad())
+      touchpads.push_back(InputDevice(it->second->id(), it->second->type()));
   }
 
   dispatcher_->DispatchTouchpadDevicesUpdated(touchpads);

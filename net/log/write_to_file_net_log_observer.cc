@@ -18,22 +18,23 @@
 namespace net {
 
 WriteToFileNetLogObserver::WriteToFileNetLogObserver()
-    : log_level_(NetLog::LOG_STRIP_PRIVATE_DATA), added_events_(false) {
+    : capture_mode_(NetLogCaptureMode::Default()), added_events_(false) {
 }
 
 WriteToFileNetLogObserver::~WriteToFileNetLogObserver() {
 }
 
-void WriteToFileNetLogObserver::set_log_level(net::NetLog::LogLevel log_level) {
+void WriteToFileNetLogObserver::set_capture_mode(
+    NetLogCaptureMode capture_mode) {
   DCHECK(!net_log());
-  log_level_ = log_level;
+  capture_mode_ = capture_mode;
 }
 
 void WriteToFileNetLogObserver::StartObserving(
-    net::NetLog* net_log,
+    NetLog* net_log,
     base::ScopedFILE file,
     base::Value* constants,
-    net::URLRequestContext* url_request_context) {
+    URLRequestContext* url_request_context) {
   DCHECK(file.get());
   file_ = file.Pass();
   added_events_ = false;
@@ -62,11 +63,11 @@ void WriteToFileNetLogObserver::StartObserving(
     CreateNetLogEntriesForActiveObjects(contexts, this);
   }
 
-  net_log->DeprecatedAddObserver(this, log_level_);
+  net_log->DeprecatedAddObserver(this, capture_mode_);
 }
 
 void WriteToFileNetLogObserver::StopObserving(
-    net::URLRequestContext* url_request_context) {
+    URLRequestContext* url_request_context) {
   net_log()->DeprecatedRemoveObserver(this);
 
   // End events array.
@@ -87,7 +88,7 @@ void WriteToFileNetLogObserver::StopObserving(
   file_.reset();
 }
 
-void WriteToFileNetLogObserver::OnAddEntry(const net::NetLog::Entry& entry) {
+void WriteToFileNetLogObserver::OnAddEntry(const NetLog::Entry& entry) {
   // Add a comma and newline for every event but the first.  Newlines are needed
   // so can load partial log files by just ignoring the last line.  For this to
   // work, lines cannot be pretty printed.

@@ -147,8 +147,6 @@
       'common/extensions/api/spellcheck/spellcheck_handler.h',
       'common/extensions/api/storage/storage_schema_manifest_handler.cc',
       'common/extensions/api/storage/storage_schema_manifest_handler.h',
-      'common/extensions/api/supervised_user_private/supervised_user_handler.cc',
-      'common/extensions/api/supervised_user_private/supervised_user_handler.h',
       'common/extensions/api/system_indicator/system_indicator_handler.cc',
       'common/extensions/api/system_indicator/system_indicator_handler.h',
       'common/extensions/api/url_handlers/url_handlers_parser.cc',
@@ -634,42 +632,30 @@
         }, {  # OS == ios
           'sources!': [
             'common/net/net_resource_provider.cc',
+          ],
+        }],
+        ['OS == "android" or OS == "ios"', {
+          'sources!': [
             'common/net/x509_certificate_model.cc',
           ],
         }],
-        ['os_posix == 1 and OS != "mac" and OS != "ios" and OS != "android"', {
-            'dependencies': [
-              '../build/linux/system.gyp:ssl',
-            ],
-          },
-        ],
-        ['os_posix != 1 or OS == "mac" or OS == "ios"', {
-            'sources!': [
-              'common/net/x509_certificate_model_nss.cc',
-              'common/net/x509_certificate_model_openssl.cc',
-            ],
-          },
-        ],
-        ['OS == "android"', {
-            'dependencies': [
-              '../third_party/boringssl/boringssl.gyp:boringssl',
-            ],
-            'sources!': [
-              'common/net/x509_certificate_model.cc',
-              'common/net/x509_certificate_model_openssl.cc',
-            ],
-        }],
-        ['use_openssl==1', {
-            'sources!': [
-              'common/net/x509_certificate_model_nss.cc',
-            ],
+        ['use_openssl_certs == 1 and OS != "android"', {
             'dependencies': [
               '<(DEPTH)/third_party/boringssl/boringssl.gyp:boringssl',
             ],
-          },
-          {  # else !use_openssl: remove the unneeded files
+        }, {
             'sources!': [
               'common/net/x509_certificate_model_openssl.cc',
+            ],
+          },
+        ],
+        ['use_nss_certs == 1', {
+            'dependencies': [
+              '../build/linux/system.gyp:ssl',
+            ],
+        }, {
+            'sources!': [
+              'common/net/x509_certificate_model_nss.cc',
             ],
           },
         ],

@@ -26,6 +26,7 @@
 #include "chrome/grit/google_chrome_strings.h"
 #include "components/autofill/core/common/autofill_switches.h"
 #include "components/cloud_devices/common/cloud_devices_switches.h"
+#include "components/dom_distiller/core/dom_distiller_switches.h"
 #include "components/metrics/metrics_hashes.h"
 #include "components/nacl/common/nacl_switches.h"
 #include "components/omnibox/omnibox_switches.h"
@@ -289,6 +290,22 @@ const Experiment::Choice kZeroSuggestExperimentsChoices[] = {
     switches::kEnableZeroSuggestMostVisitedWithoutSerp, ""},
   { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
     switches::kDisableZeroSuggest, ""}
+};
+
+const Experiment::Choice kReaderModeHeuristicsChoices[] = {
+    { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", ""},
+    { IDS_FLAGS_READER_MODE_HEURISTICS_MARKUP,
+      switches::kReaderModeHeuristics,
+      switches::reader_mode_heuristics::kOGArticle },
+    { IDS_FLAGS_READER_MODE_HEURISTICS_ADABOOST,
+      switches::kReaderModeHeuristics,
+      switches::reader_mode_heuristics::kAdaBoost },
+    { IDS_FLAGS_READER_MODE_HEURISTICS_ALWAYS_ON,
+      switches::kReaderModeHeuristics,
+      switches::reader_mode_heuristics::kAlwaysTrue },
+    { IDS_FLAGS_READER_MODE_HEURISTICS_ALWAYS_OFF,
+      switches::kReaderModeHeuristics,
+      switches::reader_mode_heuristics::kNone },
 };
 #endif
 
@@ -937,6 +954,14 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_EASY_UNLOCK_PROXIMITY_DETECTION_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(proximity_auth::switches::kEnableProximityDetection)
+  },
+  {
+    "enable-easy-unlock-bluetooth-low-energy-detection",
+    IDS_FLAGS_ENABLE_EASY_UNLOCK_BLUETOOTH_LOW_ENERGY_DISCOVERY_NAME,
+    IDS_FLAGS_ENABLE_EASY_UNLOCK_BLUETOOTH_LOW_ENERGY_DISCOVERY_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(
+        proximity_auth::switches::kEnableBluetoothLowEnergyDiscovery)
   },
 #endif
 #if defined(USE_ASH)
@@ -1733,6 +1758,13 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kZeroSuggestExperimentsChoices)
   },
   {
+    "reader-mode-heuristics",
+    IDS_FLAGS_READER_MODE_HEURISTICS_NAME,
+    IDS_FLAGS_READER_MODE_HEURISTICS_DESCRIPTION,
+    kOsAndroid,
+    MULTI_VALUE_TYPE(kReaderModeHeuristicsChoices)
+  },
+  {
     "enable-reader-mode-toolbar-icon",
     IDS_FLAGS_READER_MODE_EXPERIMENT_NAME,
     IDS_FLAGS_READER_MODE_EXPERIMENT_DESCRIPTION,
@@ -1770,6 +1802,14 @@ const Experiment kExperiments[] = {
     kOsCrOS | kOsMac | kOsWin | kOsLinux,
     ENABLE_DISABLE_VALUE_TYPE(switches::kEnablePermissionsBubbles,
                               switches::kDisablePermissionsBubbles)
+  },
+  {
+    "enable-site-engagement-service",
+    IDS_FLAGS_ENABLE_SITE_ENGAGEMENT_SERVICE_NAME,
+    IDS_FLAGS_ENABLE_SITE_ENGAGEMENT_SERVICE_DESCRIPTION,
+    kOsAll,
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableSiteEngagementService,
+                              switches::kDisableSiteEngagementService)
   },
   {
     "enable-session-crashed-bubble",

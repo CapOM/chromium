@@ -8,7 +8,6 @@ import sqlite3
 import page_sets
 
 from profile_creators import fast_navigation_profile_extender
-from profile_creators import profile_safe_url_list
 
 class CookieProfileExtender(
     fast_navigation_profile_extender.FastNavigationProfileExtender):
@@ -20,12 +19,13 @@ class CookieProfileExtender(
   """
   _COOKIE_DB_EXPECTED_SIZE = 3300
 
-  def __init__(self):
+  def __init__(self, finder_options):
     # The rate limiting factors are fetching network resources and executing
     # javascript. There's not much to be done about the former, and having one
     # tab per logical core appears close to optimum for the latter.
     maximum_batch_size = multiprocessing.cpu_count()
-    super(CookieProfileExtender, self).__init__(maximum_batch_size)
+    super(CookieProfileExtender, self).__init__(
+        finder_options, maximum_batch_size)
 
     # A list of urls that have not yet been navigated to. This list will shrink
     # over time. Each navigation will add a diminishing number of new cookies,

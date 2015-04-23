@@ -27,9 +27,15 @@ class NativeDisplayObserver;
 typedef base::Callback<void(const std::vector<ui::DisplaySnapshot*>&)>
     GetDisplaysCallback;
 typedef base::Callback<void(bool)> ConfigureCallback;
+typedef base::Callback<void(bool, ui::HDCPState)> GetHDCPStateCallback;
+typedef base::Callback<void(bool)> SetHDCPStateCallback;
 
 // Interface for classes that perform display configuration actions on behalf
 // of DisplayConfigurator.
+// Implementations may perform calls asynchronously. In the case of functions
+// taking callbacks, the callbacks may be called asynchronously when the results
+// are available. The implementations must provide a strong guarantee that the
+// callbacks are always called.
 class DISPLAY_TYPES_EXPORT NativeDisplayDelegate {
  public:
   virtual ~NativeDisplayDelegate() {}
@@ -79,12 +85,13 @@ class DISPLAY_TYPES_EXPORT NativeDisplayDelegate {
   virtual void CreateFrameBuffer(const gfx::Size& size) = 0;
 
   // Gets HDCP state of output.
-  virtual bool GetHDCPState(const ui::DisplaySnapshot& output,
-                            ui::HDCPState* state) = 0;
+  virtual void GetHDCPState(const ui::DisplaySnapshot& output,
+                            const GetHDCPStateCallback& callback) = 0;
 
   // Sets HDCP state of output.
-  virtual bool SetHDCPState(const ui::DisplaySnapshot& output,
-                            ui::HDCPState state) = 0;
+  virtual void SetHDCPState(const ui::DisplaySnapshot& output,
+                            ui::HDCPState state,
+                            const SetHDCPStateCallback& callback) = 0;
 
   // Gets the available list of color calibrations.
   virtual std::vector<ui::ColorCalibrationProfile>

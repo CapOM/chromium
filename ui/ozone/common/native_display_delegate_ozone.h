@@ -33,10 +33,11 @@ class NativeDisplayDelegateOzone : public NativeDisplayDelegate {
                  const gfx::Point& origin,
                  const ConfigureCallback& callback) override;
   void CreateFrameBuffer(const gfx::Size& size) override;
-  bool GetHDCPState(const ui::DisplaySnapshot& output,
-                    ui::HDCPState* state) override;
-  bool SetHDCPState(const ui::DisplaySnapshot& output,
-                    ui::HDCPState state) override;
+  void GetHDCPState(const ui::DisplaySnapshot& output,
+                    const GetHDCPStateCallback& callback) override;
+  void SetHDCPState(const ui::DisplaySnapshot& output,
+                    ui::HDCPState state,
+                    const SetHDCPStateCallback& callback) override;
   std::vector<ui::ColorCalibrationProfile> GetAvailableColorCalibrationProfiles(
       const ui::DisplaySnapshot& output) override;
   bool SetColorCalibrationProfile(

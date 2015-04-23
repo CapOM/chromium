@@ -69,7 +69,6 @@
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/locale_settings.h"
-#include "chromeos/chromeos_switches.h"
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/core/common/policy_namespace.h"
 #include "components/policy/core/common/policy_service.h"
@@ -120,6 +119,7 @@
 #include "chrome/browser/policy/profile_policy_connector.h"
 #include "chrome/browser/policy/profile_policy_connector_factory.h"
 #include "chrome/browser/ui/browser_window.h"
+#include "chromeos/chromeos_switches.h"
 #include "chromeos/dbus/dbus_thread_manager.h"
 #include "chromeos/dbus/power_manager_client.h"
 #include "components/user_manager/user.h"
@@ -1385,12 +1385,22 @@ void BrowserOptionsHandler::SendProfilesInfo() {
 void BrowserOptionsHandler::DeleteProfile(const base::ListValue* args) {
   DCHECK(args);
   const base::Value* file_path_value;
-  if (!args->Get(0, &file_path_value))
+  if (!args->Get(0, &file_path_value)) {
+    NOTREACHED();
     return;
+  }
 
   base::FilePath file_path;
-  if (!base::GetValueAsFilePath(*file_path_value, &file_path))
+  if (!base::GetValueAsFilePath(*file_path_value, &file_path)) {
+    NOTREACHED();
     return;
+  }
+
+  // The Profile Data doesn't get wiped until Chrome closes. Since we promised
+  // that the user's data would be removed, do so immediately. The helper is
+  // invoked from other calls but we only promised we'd do the removal here.
+  profiles::RemoveBrowsingDataForProfile(file_path);
+
   helper::DeleteProfileAtPath(file_path, web_ui());
 }
 

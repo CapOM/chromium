@@ -495,7 +495,7 @@
   ],
   'conditions': [
     # TODO(GYP): make gn_migration.gypi work unconditionally.
-    ['OS=="win" or (OS=="linux" and target_arch=="x64" and chromecast==0)', {
+    ['OS=="mac" or OS=="win" or (OS=="linux" and target_arch=="x64" and chromecast==0)', {
       'includes': [
         'gn_migration.gypi',
       ],
@@ -833,6 +833,7 @@
             '../base/base.gyp:base_unittests_apk',
             '../cc/blink/cc_blink_tests.gyp:cc_blink_unittests_apk',
             '../cc/cc_tests.gyp:cc_unittests_apk',
+            '../components/components_tests.gyp:components_browsertests_apk',
             '../components/components_tests.gyp:components_unittests_apk',
             '../content/content_shell_and_tests.gyp:content_browsertests_apk',
             '../content/content_shell_and_tests.gyp:content_gl_tests_apk',

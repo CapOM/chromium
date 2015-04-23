@@ -68,6 +68,8 @@ class ASH_EXPORT DisplayManager
     virtual void PostDisplayConfigurationChange() = 0;
   };
 
+  typedef std::vector<gfx::Display> DisplayList;
+
   // How the second display will be used.
   // 1) EXTENDED mode extends the desktop to the second dislpay.
   // 2) MIRRORING mode copies the content of the primary display to
@@ -88,13 +90,9 @@ class ASH_EXPORT DisplayManager
     return layout_store_.get();
   }
 
-  gfx::Screen* screen() {
-    return screen_;
-  }
-
   void set_delegate(Delegate* delegate) { delegate_ = delegate; }
 
-  // When set to true, the MonitorManager calls OnDisplayMetricsChanged
+  // When set to true, the DisplayManager calls OnDisplayMetricsChanged
   // even if the display's bounds didn't change. Used to swap primary
   // display.
   void set_force_bounds_changed(bool force_bounds_changed) {
@@ -114,14 +112,6 @@ class ASH_EXPORT DisplayManager
   // Initializes font related params that depends on display
   // configuration.
   void RefreshFontParams();
-
-  // True if the given |display| is currently connected.
-  bool IsActiveDisplay(const gfx::Display& display) const;
-
-  // True if there is an internal display.
-  bool HasInternalDisplay() const;
-
-  bool IsInternalDisplayId(int64 id) const;
 
   // Returns the display layout used for current displays.
   DisplayLayout GetCurrentDisplayLayout();
@@ -151,8 +141,11 @@ class ASH_EXPORT DisplayManager
   // display's bounds change.
   void SetOverscanInsets(int64 display_id, const gfx::Insets& insets_in_dip);
 
-  // Sets the display's rotation.
-  void SetDisplayRotation(int64 display_id, gfx::Display::Rotation rotation);
+  // Sets the display's rotation for the given |source|. The new |rotation| will
+  // also become active.
+  void SetDisplayRotation(int64 display_id,
+                          gfx::Display::Rotation rotation,
+                          gfx::Display::RotationSource source);
 
   // Sets the display's ui scale. Returns true if it's successful, or
   // false otherwise.  TODO(mukai): remove this and merge into
@@ -237,19 +230,21 @@ class ASH_EXPORT DisplayManager
   // when displays are mirrored.
   size_t GetNumDisplays() const;
 
-  const std::vector<gfx::Display>& displays() const { return displays_; }
+  const DisplayList& active_display_list() const {
+    return active_display_list_;
+  }
 
   // Returns the number of connected displays. This returns 2
   // when displays are mirrored.
   size_t num_connected_displays() const { return num_connected_displays_; }
 
   // Returns the mirroring status.
-  bool IsMirrored() const;
-  int64 mirrored_display_id() const { return mirrored_display_id_; }
+  bool IsInMirrorMode() const;
+  int64 mirroring_display_id() const { return mirroring_display_id_; }
 
   // Returns the display used for software mirrroring.
-  const gfx::Display& mirroring_display() const {
-    return mirroring_display_;
+  const gfx::Display& software_mirroring_display() const {
+    return software_mirroring_display_;
   }
 
   // Retuns the display info associated with |display_id|.
@@ -315,17 +310,21 @@ private:
   friend class test::DisplayManagerTestApi;
   friend class test::SystemGestureEventFilterTest;
 
-  typedef std::vector<gfx::Display> DisplayList;
+  typedef std::vector<DisplayInfo> DisplayInfoList;
 
   void set_change_display_upon_host_resize(bool value) {
     change_display_upon_host_resize_ = value;
   }
 
+  // Creates software mirroring display related information. The display
+  // used to mirror the content is removed from the |display_info_list|.
+  void CreateSoftwareMirroringDisplay(DisplayInfoList* display_info_list);
+
   gfx::Display* FindDisplayForId(int64 id);
 
   // Add the mirror display's display info if the software based
   // mirroring is in use.
-  void AddMirrorDisplayInfoIfAny(std::vector<DisplayInfo>* display_info_list);
+  void AddMirrorDisplayInfoIfAny(DisplayInfoList* display_info_list);
 
   // Inserts and update the DisplayInfo according to the overscan
   // state. Note that The DisplayInfo stored in the |internal_display_info_|
@@ -352,7 +351,7 @@ private:
 
   void CreateMirrorWindowIfAny();
 
-  bool HasSoftwareMirroringDisplay();
+  void RunPendingTasksForTest();
 
   static void UpdateDisplayBoundsForLayout(
       const DisplayLayout& layout,
@@ -361,16 +360,14 @@ private:
 
   Delegate* delegate_;  // not owned.
 
-  scoped_ptr<ScreenAsh> screen_ash_;
-  // This is to have an accessor without ScreenAsh definition.
-  gfx::Screen* screen_;
+  scoped_ptr<ScreenAsh> screen_;
 
   scoped_ptr<DisplayLayoutStore> layout_store_;
 
   int64 first_display_id_;
 
   // List of current active displays.
-  DisplayList displays_;
+  DisplayList active_display_list_;
 
   int num_connected_displays_;
 
@@ -390,8 +387,8 @@ private:
   bool change_display_upon_host_resize_;
 
   SecondDisplayMode second_display_mode_;
-  int64 mirrored_display_id_;
-  gfx::Display mirroring_display_;
+  int64 mirroring_display_id_;
+  gfx::Display software_mirroring_display_;
 
   // User preference for rotation lock of the internal display.
   bool registered_internal_display_rotation_lock_;

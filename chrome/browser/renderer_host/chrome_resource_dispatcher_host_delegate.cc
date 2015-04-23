@@ -56,7 +56,7 @@
 #include "net/url_request/url_request.h"
 
 #if !defined(DISABLE_NACL)
-#include "chrome/browser/component_updater/pnacl/pnacl_component_installer.h"
+#include "chrome/browser/component_updater/pnacl_component_installer.h"
 #endif
 
 #if defined(ENABLE_CONFIGURATION_POLICY)
@@ -372,7 +372,7 @@ void ChromeResourceDispatcherHostDelegate::RequestBeginning(
     if (resource_type == content::RESOURCE_TYPE_MAIN_FRAME) {
       throttles->push_back(
           InterceptNavigationDelegate::CreateThrottleFor(request));
-    } else if (resource_type == content::RESOURCE_TYPE_XHR) {
+    } else {
       InterceptNavigationDelegate::UpdateUserGestureCarryoverInfo(request);
     }
   }

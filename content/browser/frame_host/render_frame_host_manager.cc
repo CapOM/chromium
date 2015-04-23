@@ -352,6 +352,13 @@ void RenderFrameHostManager::OnBeforeUnloadACK(
         CancelPending();
       }
 
+      // PlzNavigate: clean up the speculative RenderFrameHost if there is one.
+      if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+              switches::kEnableBrowserSideNavigation) &&
+          speculative_render_frame_host_) {
+        CleanUpNavigation();
+      }
+
       // This is not a cross-process navigation; the tab is being closed.
       render_frame_host_->render_view_host()->ClosePage();
     }
@@ -818,6 +825,17 @@ RenderFrameHostImpl* RenderFrameHostManager::GetFrameHostForNavigation(
     if (!InitRenderView(navigation_rfh->render_view_host(), opener_route_id,
                         MSG_ROUTING_NONE, frame_tree_node_->IsMainFrame())) {
       return nullptr;
+    }
+
+    if (navigation_rfh == render_frame_host_) {
+      // TODO(nasko): This is a very ugly hack. The Chrome extensions process
+      // manager still uses NotificationService and expects to see a
+      // RenderViewHost changed notification after WebContents and
+      // RenderFrameHostManager are completely initialized. This should be
+      // removed once the process manager moves away from NotificationService.
+      // See https://crbug.com/462682.
+      delegate_->NotifyMainFrameSwappedFromRenderManager(
+          nullptr, render_frame_host_->render_view_host());
     }
   }
 

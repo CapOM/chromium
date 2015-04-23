@@ -350,6 +350,10 @@ const char kSafeBrowsingIncidentsSent[] = "safebrowsing.incidents_sent";
 const char kSafeBrowsingExtendedReportingOptInAllowed[] =
     "safebrowsing.extended_reporting_opt_in_allowed";
 
+// Boolean that is true when the SSL interstitial should allow users to
+// proceed anyway. Otherwise, proceeding is not possible.
+const char kSSLErrorOverrideAllowed[] = "ssl.error_override_allowed";
+
 // Enum that specifies whether Incognito mode is:
 // 0 - Enabled. Default behaviour. Default mode is available on demand.
 // 1 - Disabled. Used cannot browse pages in Incognito mode.
@@ -1915,6 +1919,10 @@ const char kNewOobe[] = "NewOobe";
 // A boolean pref. If set to true, experimental webview based signin flow
 // is deactivated.
 const char kWebviewSigninDisabled[] = "webview_signin_disabled";
+
+// A boolean pref. If set to true, then on the network screen we should display
+// whether the WebView-based sign-in flow is active.
+const char kNewLoginUIPopup[] = "new_login_ui_popup";
 #endif  // defined(OS_CHROMEOS)
 
 // Whether there is a Flash version installed that supports clearing LSO data.

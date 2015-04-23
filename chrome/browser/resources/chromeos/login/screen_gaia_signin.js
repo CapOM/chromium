@@ -11,6 +11,11 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
   // lazy portal check should be fired.
   /** @const */ var GAIA_LOADING_PORTAL_SUSSPECT_TIME_SEC = 7;
 
+  // GAIA animation guard timer. Started when GAIA page is loaded
+  // (Authenticator 'ready' event) and is intended to guard against edge cases
+  // when 'showView' message is not generated/received.
+  /** @const */ var GAIA_ANIMATION_GUARD_MILLISEC = 300;
+
   // Maximum Gaia loading time in seconds.
   /** @const */ var MAX_GAIA_LOADING_TIME_SEC = 60;
 
@@ -78,6 +83,22 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
     loadingTimer_: undefined,
 
     /**
+     * Timer id of a guard timer that is fired in case 'showView' message
+     * is not received from GAIA.
+     * @type {number}
+     * @private
+     */
+    loadAnimationGuardTimer_: undefined,
+
+    /**
+     * Whether we've processed 'showView' message - either from GAIA or from
+     * guard timer.
+     * @type {boolean}
+     * @private
+     */
+    showViewProcessed_: undefined,
+
+    /**
      * Whether user can cancel Gaia screen.
      * @type {boolean}
      * @private
@@ -116,7 +137,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
         $('signin-frame').parentNode.replaceChild(webview, $('signin-frame'));
         this.gaiaAuthHost_ = new cr.login.GaiaAuthHost(webview);
 
-        $('newgaia-offline-login').addEventListener('authCompleted',
+        $('offline-gaia').addEventListener('authCompleted',
             this.onAuthCompletedMessage_.bind(this));
       } else {
         this.gaiaAuthHost_ = new cr.login.GaiaAuthHost($('signin-frame'));
@@ -141,6 +162,8 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
           this.missingGaiaInfo_.bind(this);
       this.gaiaAuthHost_.samlApiUsedCallback =
           this.samlApiUsed_.bind(this);
+      this.gaiaAuthHost_.addEventListener('authDomainChange',
+          this.onAuthDomainChange_.bind(this));
       this.gaiaAuthHost_.addEventListener('authFlowChange',
           this.onAuthFlowChange_.bind(this));
       this.gaiaAuthHost_.addEventListener('authCompleted',
@@ -153,9 +176,17 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
         e.preventDefault();
       });
 
+      $('back-button-item').addEventListener('mousedown', function(e) {
+        e.preventDefault();
+      });
+
       $('back-button-item').addEventListener('click', function(e) {
         $('back-button-item').hidden = true;
         $('signin-frame').back();
+        e.preventDefault();
+      });
+
+      $('close-button-item').addEventListener('mousedown', function(e) {
         e.preventDefault();
       });
 
@@ -199,7 +230,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
       this.isLocal_ = value;
       if (this.isNewGaiaFlow) {
         $('signin-frame').hidden = this.isLocal_;
-        $('newgaia-offline-login').hidden = !this.isLocal_;
+        $('offline-gaia').hidden = !this.isLocal_;
       }
       chrome.send('updateOfflineLogin', [value]);
     },
@@ -212,7 +243,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
     showLoadingUI_: function(show) {
       $('gaia-loading').hidden = !show;
       if (this.isNewGaiaFlow && this.isLocal) {
-        $('newgaia-offline-login').hidden = show;
+        $('offline-gaia').hidden = show;
       } else {
         $('signin-frame').hidden = show;
       }
@@ -220,6 +251,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
       $('enterprise-info-container').hidden = show;
       $('gaia-signin-divider').hidden = show;
       this.classList.toggle('loading', show);
+      $('signin-frame').classList.remove('show');
       if (!show)
         this.classList.remove('auth-completed');
     },
@@ -232,7 +264,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
       if (this != Oobe.getInstance().currentScreen)
         return;
       chrome.send('showLoadingTimeoutError');
-      this.loadingTimer_ = window.setTimeout(
+      this.loadingTimer_ = setTimeout(
           this.onLoadingTimeOut_.bind(this),
           (MAX_GAIA_LOADING_TIME_SEC - GAIA_LOADING_PORTAL_SUSSPECT_TIME_SEC) *
           1000);
@@ -253,7 +285,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      */
     clearLoadingTimer_: function() {
       if (this.loadingTimer_) {
-        window.clearTimeout(this.loadingTimer_);
+        clearTimeout(this.loadingTimer_);
         this.loadingTimer_ = undefined;
       }
     },
@@ -264,9 +296,40 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      */
     startLoadingTimer_: function() {
       this.clearLoadingTimer_();
-      this.loadingTimer_ = window.setTimeout(
+      this.loadingTimer_ = setTimeout(
           this.onLoadingSuspiciouslyLong_.bind(this),
           GAIA_LOADING_PORTAL_SUSSPECT_TIME_SEC * 1000);
+    },
+
+    /**
+     * Handler for GAIA animation guard timer.
+     * @private
+     */
+    onLoadAnimationGuardTimer_: function() {
+      this.loadAnimationGuardTimer_ = undefined;
+      this.onShowView_();
+    },
+
+    /**
+     * Clears GAIA animation guard timer.
+     * @private
+     */
+    clearLoadAnimationGuardTimer_: function() {
+      if (this.loadAnimationGuardTimer_) {
+        clearTimeout(this.loadAnimationGuardTimer_);
+        this.loadAnimationGuardTimer_ = undefined;
+      }
+    },
+
+    /**
+     * Sets up GAIA animation guard timer.
+     * @private
+     */
+    startLoadAnimationGuardTimer_: function() {
+      this.clearLoadAnimationGuardTimer_();
+      this.loadAnimationGuardTimer_ = setTimeout(
+          this.onLoadAnimationGuardTimer_.bind(this),
+          GAIA_ANIMATION_GUARD_MILLISEC);
     },
 
     /**
@@ -312,7 +375,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
     onAfterShow: function(data) {
       if (!this.loading && this.isWebviewSignin) {
         if (this.isLocal)
-          $('newgaia-offline-login').focus();
+          $('offline-gaia').focus();
         else
           $('signin-frame').focus();
       }
@@ -468,16 +531,20 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
     },
 
     /**
-     * Invoked when the authFlow property is changed no the gaia host.
+     * Invoked when the authDomain property is changed on the GAIA host.
      */
-    onAuthFlowChange_: function() {
-      var isSAML = this.isSAML();
+    onAuthDomainChange_: function() {
+      $('saml-notice-message').textContent = loadTimeData.getStringF(
+          'samlNotice',
+          this.gaiaAuthHost_.authDomain);
+    },
 
-      if (isSAML) {
-        $('saml-notice-message').textContent = loadTimeData.getStringF(
-            'samlNotice',
-            this.gaiaAuthHost_.authDomain);
-      }
+    /**
+     * Invoked when the authFlow property is changed on the GAIA host.
+     * @param {Event} e Property change event.
+     */
+    onAuthFlowChange_: function(e) {
+      var isSAML = this.isSAML();
 
       this.classList.toggle('no-right-panel', isSAML);
       this.classList.toggle('full-width', isSAML);
@@ -496,17 +563,15 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      * @private
      */
     onAuthReady_: function() {
-      this.loading = false;
+      showViewProcessed_ = false;
+      if (this.isNewGaiaFlow)
+        this.startLoadAnimationGuardTimer_();
+
       this.clearLoadingTimer_();
+      this.loading = false;
 
-      // Show deferred error bubble.
-      if (this.errorBubble_) {
-        this.showErrorBubble(this.errorBubble_[0], this.errorBubble_[1]);
-        this.errorBubble_ = undefined;
-      }
-
-      chrome.send('loginWebuiReady');
-      chrome.send('loginVisible', ['gaia-signin']);
+      if (!this.isNewGaiaFlow)
+        this.onLoginUIVisible_();
 
       // Warm up the user images screen.
       Oobe.getInstance().preloadScreen({id: SCREEN_USER_IMAGE_PICKER});
@@ -536,14 +601,37 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      */
     onBackButton_: function(e) {
       $('back-button-item').hidden = !e.detail;
+      $('login-header-bar').updateUI_();
     },
 
     /**
-     * Invoked when the auth host emits 'showView' event.
+     * Invoked when the auth host emits 'showView' event or when corresponding
+     * guard time fires.
      * @private
      */
     onShowView_: function(e) {
+      if (showViewProcessed_)
+        return;
+
+      showViewProcessed_ = true;
+      this.clearLoadAnimationGuardTimer_();
       $('signin-frame').classList.add('show');
+      this.onLoginUIVisible_();
+    },
+
+    /**
+     * Called when UI is shown.
+     * @private
+     */
+    onLoginUIVisible_: function() {
+      // Show deferred error bubble.
+      if (this.errorBubble_) {
+        this.showErrorBubble(this.errorBubble_[0], this.errorBubble_[1]);
+        this.errorBubble_ = undefined;
+      }
+
+      chrome.send('loginWebuiReady');
+      chrome.send('loginVisible', ['gaia-signin']);
     },
 
     /**
@@ -830,7 +918,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      * should switch to the password screen with error.
      */
     loadOffline: function(params) {
-      var offlineLogin = $('newgaia-offline-login');
+      var offlineLogin = $('offline-gaia');
       var strings = params.localizedStrings;
       offlineLogin.enterpriseInfo = strings['stringEnterpriseInfo'];
       offlineLogin.setEmail(params.email);

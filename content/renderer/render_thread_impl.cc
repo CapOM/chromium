@@ -33,6 +33,7 @@
 #include "cc/blink/web_external_bitmap_impl.h"
 #include "cc/blink/web_layer_impl.h"
 #include "cc/resources/tile_task_worker_pool.h"
+#include "components/scheduler/renderer/renderer_scheduler.h"
 #include "content/child/appcache/appcache_dispatcher.h"
 #include "content/child/appcache/appcache_frontend_impl.h"
 #include "content/child/child_discardable_shared_memory_manager.h"
@@ -104,7 +105,6 @@
 #include "content/renderer/render_process_impl.h"
 #include "content/renderer/render_view_impl.h"
 #include "content/renderer/renderer_blink_platform_impl.h"
-#include "content/renderer/scheduler/renderer_scheduler.h"
 #include "content/renderer/scheduler/resource_dispatch_throttler.h"
 #include "content/renderer/service_worker/embedded_worker_context_message_filter.h"
 #include "content/renderer/service_worker/embedded_worker_dispatcher.h"
@@ -502,7 +502,7 @@ void RenderThreadImpl::Init() {
   dom_storage_dispatcher_.reset(new DomStorageDispatcher());
   main_thread_indexed_db_dispatcher_.reset(new IndexedDBDispatcher(
       thread_safe_sender()));
-  renderer_scheduler_ = RendererScheduler::Create();
+  renderer_scheduler_ = scheduler::RendererScheduler::Create();
   channel()->SetListenerTaskRunner(renderer_scheduler_->DefaultTaskRunner());
   main_thread_cache_storage_dispatcher_.reset(
       new CacheStorageDispatcher(thread_safe_sender()));
@@ -1195,6 +1195,7 @@ void RenderThreadImpl::IdleHandler() {
       --idle_notifications_to_skip_;
     } else {
       base::allocator::ReleaseFreeMemory();
+      discardable_shared_memory_manager()->ReleaseFreeMemory();
     }
     ScheduleIdleHandler(kLongIdleHandlerDelayMs);
     return;
@@ -1442,7 +1443,7 @@ gpu::GpuMemoryBufferManager* RenderThreadImpl::GetGpuMemoryBufferManager() {
   return gpu_memory_buffer_manager();
 }
 
-RendererScheduler* RenderThreadImpl::GetRendererScheduler() {
+scheduler::RendererScheduler* RenderThreadImpl::GetRendererScheduler() {
   return renderer_scheduler_.get();
 }
 
@@ -1765,6 +1766,7 @@ void RenderThreadImpl::OnCreateNewSharedWorker(
 void RenderThreadImpl::OnMemoryPressure(
     base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
   base::allocator::ReleaseFreeMemory();
+  discardable_shared_memory_manager()->ReleaseFreeMemory();
 
   // Do not call into blink if it is not initialized.
   if (blink_platform_impl_) {

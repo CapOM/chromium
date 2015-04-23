@@ -56,7 +56,7 @@ const size_t kMaxAlertsAndErrorsBytes = 2048;
 // Returns event parameters for a PAC error message (line number + message).
 base::Value* NetLogErrorCallback(int line_number,
                                  const base::string16* message,
-                                 NetLog::LogLevel /* log_level */) {
+                                 NetLogCaptureMode /* capture_mode */) {
   base::DictionaryValue* dict = new base::DictionaryValue();
   dict->SetInteger("line_number", line_number);
   dict->SetString("message", *message);
@@ -174,8 +174,10 @@ class ProxyResolverV8Tracing::Job
   bool GetDnsFromLocalCache(const std::string& host, ResolveDnsOperation op,
                             std::string* output, bool* return_value);
 
-  void SaveDnsToLocalCache(const std::string& host, ResolveDnsOperation op,
-                           int net_error, const net::AddressList& addresses);
+  void SaveDnsToLocalCache(const std::string& host,
+                           ResolveDnsOperation op,
+                           int net_error,
+                           const AddressList& addresses);
 
   // Builds a RequestInfo to service the specified PAC DNS operation.
   static HostResolver::RequestInfo MakeDnsRequestInfo(const std::string& host,
@@ -782,7 +784,7 @@ void ProxyResolverV8Tracing::Job::SaveDnsToLocalCache(
     const std::string& host,
     ResolveDnsOperation op,
     int net_error,
-    const net::AddressList& addresses) {
+    const AddressList& addresses) {
   CheckIsOnOriginThread();
 
   // Serialize the result into a string to save to the cache.

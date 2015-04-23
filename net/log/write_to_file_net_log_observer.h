@@ -31,8 +31,8 @@ class NET_EXPORT WriteToFileNetLogObserver : public NetLog::ThreadSafeObserver {
   WriteToFileNetLogObserver();
   ~WriteToFileNetLogObserver() override;
 
-  // Sets the log level to log at. Must be called before StartObserving.
-  void set_log_level(NetLog::LogLevel log_level);
+  // Sets the capture mode to log at. Must be called before StartObserving.
+  void set_capture_mode(NetLogCaptureMode capture_mode);
 
   // Starts observing |net_log| and writes output to |file|.  Must not already
   // be watching a NetLog.  Separate from constructor to enforce thread safety.
@@ -49,7 +49,7 @@ class NET_EXPORT WriteToFileNetLogObserver : public NetLog::ThreadSafeObserver {
   void StartObserving(NetLog* net_log,
                       base::ScopedFILE file,
                       base::Value* constants,
-                      net::URLRequestContext* url_request_context);
+                      URLRequestContext* url_request_context);
 
   // Stops observing net_log().  Must already be watching.  Must be called
   // before destruction of the WriteToFileNetLogObserver and the NetLog.
@@ -57,7 +57,7 @@ class NET_EXPORT WriteToFileNetLogObserver : public NetLog::ThreadSafeObserver {
   // |url_request_context| is an optional argument used to added additional
   // network stack state to the log.  If the context is non-NULL, this must be
   // called on the context's thread.
-  void StopObserving(net::URLRequestContext* url_request_context);
+  void StopObserving(URLRequestContext* url_request_context);
 
   // net::NetLog::ThreadSafeObserver implementation:
   void OnAddEntry(const NetLog::Entry& entry) override;
@@ -65,8 +65,8 @@ class NET_EXPORT WriteToFileNetLogObserver : public NetLog::ThreadSafeObserver {
  private:
   base::ScopedFILE file_;
 
-  // The LogLevel to log at.
-  NetLog::LogLevel log_level_;
+  // The capture mode to log at.
+  NetLogCaptureMode capture_mode_;
 
   // True if OnAddEntry() has been called at least once.
   bool added_events_;

@@ -52,6 +52,7 @@
     'app_launch_network_config';
 /** @const */ var ACCELERATOR_NEW_OOBE = 'new_oobe';
 /** @const */ var ACCELERATOR_TOGGLE_WEBVIEW_SIGNIN = 'toggle_webview_signin';
+/** @const */ var ACCELERATOR_TOGGLE_NEW_LOGIN_UI = 'toggle_new_login_ui';
 
 /* Signin UI state constants. Used to control header bar UI. */
 /** @const */ var SIGNIN_UI_STATE = {
@@ -62,6 +63,7 @@
   SUPERVISED_USER_CREATION_FLOW: 4,
   SAML_PASSWORD_CONFIRM: 5,
   CONSUMER_MANAGEMENT_ENROLLMENT: 6,
+  PASSWORD_CHANGED: 7,
 };
 
 /* Possible UI states of the error screen. */
@@ -408,6 +410,9 @@ cr.define('cr.ui.login', function() {
         if (currentStepId == SCREEN_GAIA_SIGNIN ||
             currentStepId == SCREEN_OOBE_ENROLLMENT)
           chrome.send('toggleWebviewSignin');
+      } else if (name == ACCELERATOR_TOGGLE_NEW_LOGIN_UI) {
+        if (currentStepId == SCREEN_OOBE_NETWORK)
+          chrome.send('toggleNewLoginUI');
       } else if (name == ACCELERATOR_TOGGLE_EASY_BOOTSTRAP) {
         if (currentStepId == SCREEN_GAIA_SIGNIN)
           chrome.send('toggleEasyBootstrap');
@@ -990,6 +995,8 @@ cr.define('cr.ui.login', function() {
       error.appendChild(helpLink);
     }
 
+    error.setAttribute('aria-live', 'assertive');
+
     var currentScreen = Oobe.getInstance().currentScreen;
     if (currentScreen && typeof currentScreen.showErrorBubble === 'function') {
       currentScreen.showErrorBubble(loginAttempts, error);
@@ -1000,9 +1007,11 @@ cr.define('cr.ui.login', function() {
   /**
    * Shows password changed screen that offers migration.
    * @param {boolean} showError Whether to show the incorrect password error.
+   * @param {string} email What user does reauth. Being used for display in the
+   * new UI.
    */
-  DisplayManager.showPasswordChangedScreen = function(showError) {
-    login.PasswordChangedScreen.show(showError);
+  DisplayManager.showPasswordChangedScreen = function(showError, email) {
+    login.PasswordChangedScreen.show(showError, email);
   };
 
   /**
@@ -1046,7 +1055,7 @@ cr.define('cr.ui.login', function() {
    * @param {string} assetId The device asset ID.
    */
   DisplayManager.setEnterpriseInfo = function(messageText, assetId) {
-    $('newgaia-offline-login').enterpriseInfo = messageText;
+    $('offline-gaia').enterpriseInfo = messageText;
     $('enterprise-info-message').textContent = messageText;
     if (messageText) {
       $('enterprise-info').hidden = false;

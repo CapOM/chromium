@@ -31,11 +31,16 @@ scoped_refptr<BluetoothDispatcherHost> BluetoothDispatcherHost::Create() {
   return host;
 }
 
+void BluetoothDispatcherHost::OnDestruct() const {
+  BrowserThread::DeleteOnUIThread::Destruct(this);
+}
+
 bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(BluetoothDispatcherHost, message)
   IPC_MESSAGE_HANDLER(BluetoothHostMsg_RequestDevice, OnRequestDevice)
+  IPC_MESSAGE_HANDLER(BluetoothHostMsg_ConnectGATT, OnConnectGATT)
   IPC_MESSAGE_HANDLER(BluetoothHostMsg_SetBluetoothMockDataSetForTesting,
                       OnSetBluetoothMockDataSetForTesting)
   IPC_MESSAGE_UNHANDLED(handled = false)
@@ -51,12 +56,14 @@ BluetoothDispatcherHost::BluetoothDispatcherHost()
 }
 
 BluetoothDispatcherHost::~BluetoothDispatcherHost() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   // Clear adapter, releasing observer references.
   set_adapter(scoped_refptr<device::BluetoothAdapter>());
 }
 
 void BluetoothDispatcherHost::set_adapter(
     scoped_refptr<device::BluetoothAdapter> adapter) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   if (adapter_.get())
     adapter_->RemoveObserver(this);
   adapter_ = adapter;
@@ -135,6 +142,29 @@ void BluetoothDispatcherHost::OnRequestDeviceOnUI(int thread_id,
     }
   }
   NOTREACHED();
+}
+
+void BluetoothDispatcherHost::OnConnectGATT(
+    int thread_id,
+    int request_id,
+    const std::string& device_instance_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  BrowserThread::PostTask(BrowserThread::UI,
+                          FROM_HERE,
+                          base::Bind(
+                              &BluetoothDispatcherHost::OnConnectGATTOnUI,
+                              this, thread_id, request_id, device_instance_id));
+}
+
+void BluetoothDispatcherHost::OnConnectGATTOnUI(
+    int thread_id,
+    int request_id,
+    const std::string& device_instance_id) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  // TODO(ortuno): Add actual implementation of connectGATT. This needs to be
+  // done after the "allowed devices map" is implemented.
+  Send(new BluetoothMsg_ConnectGATTSuccess(thread_id, request_id,
+                                           device_instance_id));
 }
 
 void BluetoothDispatcherHost::OnSetBluetoothMockDataSetForTesting(

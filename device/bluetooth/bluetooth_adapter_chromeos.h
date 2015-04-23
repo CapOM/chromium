@@ -68,7 +68,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
 
   // BluetoothAdapter:
   void Shutdown() override;
-  void DeleteOnCorrectThread() const override;
   std::string GetAddress() const override;
   std::string GetName() const override;
   void SetName(const std::string& name,
@@ -157,7 +156,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
       device::BluetoothDevice::PairingDelegate* pairing_delegate) override;
 
  private:
-  friend class base::DeleteHelper<BluetoothAdapterChromeOS>;
   friend class BluetoothChromeOSTest;
   friend class BluetoothChromeOSTest_Shutdown_Test;
   friend class BluetoothChromeOSTest_Shutdown_OnStartDiscovery_Test;
@@ -168,8 +166,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // typedef for callback parameters that are passed to AddDiscoverySession
   // and RemoveDiscoverySession. This is used to queue incoming requests while
   // a call to BlueZ is pending.
-  typedef std::pair<base::Closure, ErrorCallback> DiscoveryCallbackPair;
-  typedef std::queue<DiscoveryCallbackPair> DiscoveryCallbackQueue;
+  typedef std::tuple<device::BluetoothDiscoveryFilter*,
+                     base::Closure,
+                     ErrorCallback> DiscoveryParamTuple;
+  typedef std::queue<DiscoveryParamTuple> DiscoveryCallbackQueue;
 
   // Callback pair for the profile registration queue.
   typedef std::pair<base::Closure, ErrorCompletionCallback>
@@ -295,6 +295,17 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
                             const std::string& error_name,
                             const std::string& error_message);
 
+  void OnPreSetDiscoveryFilter(const base::Closure& callback,
+                               const ErrorCallback& error_callback);
+  void OnPreSetDiscoveryFilterError(const base::Closure& callback,
+                                    const ErrorCallback& error_callback);
+  void OnSetDiscoveryFilter(const base::Closure& callback,
+                            const ErrorCallback& error_callback);
+  void OnSetDiscoveryFilterError(const base::Closure& callback,
+                                 const ErrorCallback& error_callback,
+                                 const std::string& error_name,
+                                 const std::string& error_message);
+
   // Called by dbus:: on completion of the D-Bus method to register a profile.
   void OnRegisterProfile(const device::BluetoothUUID& uuid,
                          scoped_ptr<BluetoothAdapterProfileChromeOS> profile);
@@ -312,7 +323,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // remain.
   void RemoveProfile(const device::BluetoothUUID& uuid);
 
-  // Processes the queued discovery requests. For each DiscoveryCallbackPair in
+  // Processes the queued discovery requests. For each DiscoveryParamTuple in
   // the queue, this method will try to add a new discovery session. This method
   // is called whenever a pending D-Bus call to start or stop discovery has
   // ended (with either success or failure).
@@ -355,6 +366,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterChromeOS
   // Queue of delegates waiting for a profile to register.
   std::map<device::BluetoothUUID, std::vector<RegisterProfileCompletionPair>*>
       profile_queues_;
+
+  scoped_ptr<device::BluetoothDiscoveryFilter> current_filter_;
 
   // Note: This should remain the last member so it'll be destroyed and
   // invalidate its weak pointers before any other members are destroyed.

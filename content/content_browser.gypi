@@ -1120,6 +1120,8 @@
       'browser/renderer_host/input/motion_event_web.h',
       'browser/renderer_host/input/mouse_wheel_rails_filter_mac.cc',
       'browser/renderer_host/input/mouse_wheel_rails_filter_mac.h',
+      'browser/renderer_host/input/render_widget_host_latency_tracker.cc',
+      'browser/renderer_host/input/render_widget_host_latency_tracker.h',
       'browser/renderer_host/input/stylus_text_selector.cc',
       'browser/renderer_host/input/stylus_text_selector.h',
       'browser/renderer_host/input/synthetic_gesture.cc',
@@ -1230,8 +1232,6 @@
       'browser/renderer_host/render_widget_host_delegate.h',
       'browser/renderer_host/render_widget_host_impl.cc',
       'browser/renderer_host/render_widget_host_impl.h',
-      'browser/renderer_host/render_widget_host_latency_tracker.cc',
-      'browser/renderer_host/render_widget_host_latency_tracker.h',
       'browser/renderer_host/render_widget_host_view_android.cc',
       'browser/renderer_host/render_widget_host_view_android.h',
       'browser/renderer_host/render_widget_host_view_aura.cc',
@@ -1729,6 +1729,7 @@
         'browser/devtools/devtools.gyp:devtools_protocol_handler',
         '../cc/cc.gyp:cc',
         '../cc/cc.gyp:cc_surfaces',
+        '../components/scheduler/scheduler.gyp:scheduler_common',
         '../device/bluetooth/bluetooth.gyp:device_bluetooth',
         '../net/net.gyp:http_server',
         '../storage/storage_browser.gyp:storage',
@@ -1813,12 +1814,6 @@
         "browser/media/capture/aura_window_capture_machine.h",
         'browser/media/capture/desktop_capture_device_aura.cc',
         'browser/media/capture/desktop_capture_device_aura.h',
-      ],
-    }],
-    ['enable_webrtc==1 and (OS=="linux" or OS=="mac")', {
-      'sources': [
-        'browser/renderer_host/media/video_capture_texture_wrapper.cc',
-        'browser/renderer_host/media/video_capture_texture_wrapper.h',
       ],
     }],
     ['OS=="win"', {

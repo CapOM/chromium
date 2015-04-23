@@ -103,6 +103,7 @@
       ],
     },
     {
+      # GN version: //net
       'target_name': 'net',
       'dependencies': [
         '../base/base.gyp:base_i18n',
@@ -120,6 +121,7 @@
       'includes': [ 'net_common.gypi' ],
     },
     {
+      # GN version: //net:net_unittests
       'target_name': 'net_unittests',
       'type': '<(gtest_target_type)',
       'dependencies': [
@@ -178,6 +180,9 @@
         }],
         [ 'use_nss_certs != 1', {
           'sources!': [
+            'cert/nss_cert_database_unittest.cc',
+            'cert/nss_cert_database_chromeos_unittest.cc',
+            'cert/nss_profile_filter_chromeos_unittest.cc',
             'ssl/client_cert_store_chromeos_unittest.cc',
             'ssl/client_cert_store_nss_unittest.cc',
           ],
@@ -187,7 +192,8 @@
           'dependencies': [
             '../third_party/boringssl/boringssl.gyp:boringssl',
           ],
-        }, {  # use_openssl == 0
+        }],
+        [ 'use_nss_certs == 1 or OS == "ios" or use_openssl == 0', {
           'conditions': [
             [ 'desktop_linux == 1 or chromeos == 1', {
               'dependencies': [
@@ -198,9 +204,6 @@
                 '../third_party/nss/nss.gyp:nspr',
                 '../third_party/nss/nss.gyp:nss',
                 'third_party/nss/ssl.gyp:libssl',
-              ],
-              'sources!': [
-                'cert/nss_cert_database_unittest.cc',
               ],
             }],
           ],
@@ -239,9 +242,6 @@
             # TODO(bulach): Add equivalent tests when the underlying
             #               functionality is ported to OpenSSL.
             'sources!': [
-              'cert/nss_cert_database_chromeos_unittest.cc',
-              'cert/nss_cert_database_unittest.cc',
-              'cert/nss_profile_filter_chromeos_unittest.cc',
               'cert/x509_util_nss_unittest.cc',
               'quic/test_tools/crypto_test_utils_nss.cc',
             ],
@@ -741,7 +741,7 @@
       # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
       'msvs_disabled_warnings': [4267, ],
     },
-    {
+    { # GN version: //net:balsa
       'target_name': 'balsa',
       'type': 'static_library',
       'dependencies': [

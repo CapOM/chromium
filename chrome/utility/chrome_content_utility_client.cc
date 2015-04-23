@@ -207,9 +207,13 @@ void ChromeContentUtilityClient::PreSandboxStartup() {
 // static
 SkBitmap ChromeContentUtilityClient::DecodeImage(
     const std::vector<unsigned char>& encoded_data, bool shrink_to_fit) {
-  SkBitmap decoded_image = content::DecodeImage(&encoded_data[0],
-                                                gfx::Size(),
-                                                encoded_data.size());
+  SkBitmap decoded_image;
+  if (encoded_data.empty())
+    return decoded_image;
+
+  decoded_image = content::DecodeImage(&encoded_data[0],
+                                       gfx::Size(),
+                                       encoded_data.size());
 
   int64_t struct_size = sizeof(ChromeUtilityHostMsg_DecodeImage_Succeeded);
   int64_t image_size = decoded_image.computeSize64();
@@ -298,10 +302,9 @@ void ChromeContentUtilityClient::OnDetectSeccompSupport() {
   Send(new ChromeUtilityHostMsg_DetectSeccompSupport_ResultPrctl(
       supports_prctl));
 
-  bool supports_syscall = sandbox::SandboxBPF::SupportsSeccompSandbox(
-      sandbox::SandboxBPF::SeccompLevel::MULTI_THREADED);
-  Send(new ChromeUtilityHostMsg_DetectSeccompSupport_ResultSyscall(
-      supports_syscall));
+  // Probing for the seccomp syscall can provoke kernel panics in certain LGE
+  // devices. For now, this data will not be collected. In the future, this
+  // should detect SeccompLevel::MULTI_THREADED. http://crbug.com/478478
 
   ReleaseProcessIfNeeded();
 }

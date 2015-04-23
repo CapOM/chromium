@@ -60,15 +60,15 @@ public class KitKatCaptioningBridge implements SystemCaptioningBridge {
      */
     public KitKatCaptioningBridge(ContentViewCore contenViewCore) {
         mCaptioningChangeDelegate = new CaptioningChangeDelegate(contenViewCore);
-        mCaptioningManager = (CaptioningManager) contenViewCore.getContext().getSystemService(
-                Context.CAPTIONING_SERVICE);
-        mCaptioningManager.addCaptioningChangeListener(mCaptioningChangeListener);
-        syncToDelegate();
+        mCaptioningManager = (CaptioningManager) contenViewCore.getContext()
+                                     .getApplicationContext()
+                                     .getSystemService(Context.CAPTIONING_SERVICE);
     }
 
     /**
      * Force-sync the current closed caption settings to the delegate
      */
+    @Override
     public void syncToDelegate() {
         mCaptioningChangeDelegate.onEnabledChanged(mCaptioningManager.isEnabled());
         mCaptioningChangeDelegate.onFontScaleChanged(mCaptioningManager.getFontScale());
@@ -78,10 +78,19 @@ public class KitKatCaptioningBridge implements SystemCaptioningBridge {
     }
 
     /**
-     * De-register this bridge from the system captioning manager. This bridge
-     * should not be used again after this is called.
+     * Register this bridge for event changes with the system CaptioningManager.
      */
-    public void destroy() {
+    @Override
+    public void registerBridge() {
+        mCaptioningManager.addCaptioningChangeListener(mCaptioningChangeListener);
+        syncToDelegate();
+    }
+
+    /**
+     * De-register this bridge from the system captioning manager.
+     */
+    @Override
+    public void unregisterBridge() {
         mCaptioningManager.removeCaptioningChangeListener(mCaptioningChangeListener);
     }
 

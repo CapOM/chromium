@@ -92,17 +92,17 @@ class MEDIA_EXPORT WASAPIAudioInputStream
 
   // The dtor is typically called by the AudioManager only and it is usually
   // triggered by calling AudioInputStream::Close().
-  virtual ~WASAPIAudioInputStream();
+  ~WASAPIAudioInputStream() override;
 
   // Implementation of AudioInputStream.
-  virtual bool Open() override;
-  virtual void Start(AudioInputCallback* callback) override;
-  virtual void Stop() override;
-  virtual void Close() override;
-  virtual double GetMaxVolume() override;
-  virtual void SetVolume(double volume) override;
-  virtual double GetVolume() override;
-  virtual bool IsMuted() override;
+  bool Open() override;
+  void Start(AudioInputCallback* callback) override;
+  void Stop() override;
+  void Close() override;
+  double GetMaxVolume() override;
+  void SetVolume(double volume) override;
+  double GetVolume() override;
+  bool IsMuted() override;
 
   bool started() const { return started_; }
 
@@ -111,7 +111,7 @@ class MEDIA_EXPORT WASAPIAudioInputStream
 
  private:
   // DelegateSimpleThread::Delegate implementation.
-  virtual void Run() override;
+  void Run() override;
 
   // Issues the OnError() callback to the |sink_|.
   void HandleError(HRESULT err);
@@ -130,6 +130,13 @@ class MEDIA_EXPORT WASAPIAudioInputStream
   static HRESULT GetMixFormat(const std::string& device_id,
                               WAVEFORMATEX** device_format,
                               int* effects);
+
+  // Handles sharing of COM pointers between the audio and capture threads.  The
+  // marshal method must be called on the audio manager thread, while unmarshal
+  // must be called on |capture_thread_|.
+  bool MarshalComPointers();
+  void UnmarshalComPointers(
+      base::win::ScopedComPtr<IAudioCaptureClient>* audio_capture_client);
 
   // Our creator, the audio manager needs to be notified when we close.
   AudioManagerWin* manager_;
@@ -179,8 +186,17 @@ class MEDIA_EXPORT WASAPIAudioInputStream
   // Pointer to the object that will receive the recorded audio samples.
   AudioInputCallback* sink_;
 
-  // Windows Multimedia Device (MMDevice) API interfaces.
+  // ------------------------------------------------------
+  // Warning: COM pointers must be marshaled from the audio thread to be used
+  // on any other thread. Do not use any of these interfaces on a thread other
+  // than the audio thread.  See MarshalComPointers() and UnmarshalComPointers()
+  // for marshaling pointers to the capture thread.
 
+  // Stream into which the COM pointers below are marshaled so that they can
+  // be used on another thread.
+  base::win::ScopedComPtr<IStream> com_stream_;
+
+  // Windows Multimedia Device (MMDevice) API interfaces.
   // An IMMDevice interface which represents an audio endpoint device.
   base::win::ScopedComPtr<IMMDevice> endpoint_device_;
 
@@ -198,15 +214,16 @@ class MEDIA_EXPORT WASAPIAudioInputStream
   // details.
   base::win::ScopedComPtr<IAudioClient> audio_render_client_for_loopback_;
 
-  // The IAudioCaptureClient interface enables a client to read input data
-  // from a capture endpoint buffer.
-  base::win::ScopedComPtr<IAudioCaptureClient> audio_capture_client_;
-
   // The ISimpleAudioVolume interface enables a client to control the
   // master volume level of an audio session.
   // The volume-level is a value in the range 0.0 to 1.0.
   // This interface does only work with shared-mode streams.
   base::win::ScopedComPtr<ISimpleAudioVolume> simple_audio_volume_;
+
+  // The IAudioCaptureClient interface enables a client to read input data
+  // from a capture endpoint buffer.
+  base::win::ScopedComPtr<IAudioCaptureClient> audio_capture_client_;
+  // ------------------------------------------------------
 
   // The audio engine will signal this event each time a buffer has been
   // recorded.

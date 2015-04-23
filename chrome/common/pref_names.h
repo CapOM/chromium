@@ -145,6 +145,7 @@ extern const char kSafeBrowsingExtendedReportingEnabled[];
 extern const char kSafeBrowsingProceedAnywayDisabled[];
 extern const char kSafeBrowsingIncidentsSent[];
 extern const char kSafeBrowsingExtendedReportingOptInAllowed[];
+extern const char kSSLErrorOverrideAllowed[];
 extern const char kIncognitoModeAvailability[];
 extern const char kSearchSuggestEnabled[];
 #if defined(OS_ANDROID)
@@ -677,6 +678,7 @@ extern const char kConsumerManagementStage[];
 extern const char kNewOobe[];
 extern const char kConsumerManagementEnrollmentStage[];
 extern const char kWebviewSigninDisabled[];
+extern const char kNewLoginUIPopup[];
 #endif  // defined(OS_CHROMEOS)
 
 extern const char kClearPluginLSODataEnabled[];

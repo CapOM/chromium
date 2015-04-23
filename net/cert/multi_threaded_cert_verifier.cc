@@ -82,7 +82,7 @@ const unsigned kMaxCacheEntries = 256;
 const unsigned kTTLSecs = 1800;  // 30 minutes.
 
 base::Value* CertVerifyResultCallback(const CertVerifyResult& verify_result,
-                                      NetLog::LogLevel log_level) {
+                                      NetLogCaptureMode capture_mode) {
   base::DictionaryValue* results = new base::DictionaryValue();
   results->SetBoolean("has_md5", verify_result.has_md5);
   results->SetBoolean("has_md2", verify_result.has_md2);
@@ -96,7 +96,7 @@ base::Value* CertVerifyResultCallback(const CertVerifyResult& verify_result,
   results->SetInteger("cert_status", verify_result.cert_status);
   results->Set("verified_cert",
                NetLogX509CertificateCallback(verify_result.verified_cert.get(),
-                                             log_level));
+                                             capture_mode));
 
   base::ListValue* hashes = new base::ListValue();
   for (std::vector<HashValue>::const_iterator it =
@@ -568,9 +568,8 @@ bool MultiThreadedCertVerifier::RequestParams::operator<(
   if (hostname != other.hostname)
     return hostname < other.hostname;
   return std::lexicographical_compare(
-      hash_values.begin(), hash_values.end(),
-      other.hash_values.begin(), other.hash_values.end(),
-      net::SHA1HashValueLessThan());
+      hash_values.begin(), hash_values.end(), other.hash_values.begin(),
+      other.hash_values.end(), SHA1HashValueLessThan());
 }
 
 // HandleResult is called by CertVerifierWorker on the origin message loop.

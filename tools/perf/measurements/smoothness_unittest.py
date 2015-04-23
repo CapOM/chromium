@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 import sys
 
-from telemetry.core import exceptions
 from telemetry.core import wpr_modes
 from telemetry import decorators
 from telemetry.page import page
@@ -27,16 +26,6 @@ class FakePlatform(object):
 class FakeBrowser(object):
   def __init__(self):
     self.platform = FakePlatform()
-
-
-class AnimatedPage(page.Page):
-  def __init__(self, page_set):
-    super(AnimatedPage, self).__init__(
-      url='file://animated_page.html',
-      page_set=page_set, base_dir=page_set.base_dir)
-
-  def RunPageInteractions(self, action_runner):
-    action_runner.Wait(.2)
 
 
 class FakeTab(object):
@@ -146,20 +135,6 @@ class SmoothnessUnitTest(page_test_test_case.PageTestTestCase):
     frame_lengths = results.FindAllPageSpecificValuesNamed('frame_lengths')
     self.assertEquals(1, len(frame_lengths))
     self.assertGreater(frame_lengths[0].GetRepresentativeNumber, 0)
-
-  @decorators.Disabled('mac', 'chromeos')  # http://crbug.com/403903
-  def testSmoothnessForPageWithNoGesture(self):
-    ps = self.CreateEmptyPageSet()
-    ps.AddUserStory(AnimatedPage(ps))
-
-    measurement = smoothness.Smoothness()
-    results = self.RunMeasurement(measurement, ps, options=self._options)
-    self.assertEquals(0, len(results.failures))
-
-    percentage_smooth = results.FindAllPageSpecificValuesNamed(
-        'percentage_smooth')
-    self.assertEquals(len(percentage_smooth), 1)
-    self.assertGreaterEqual(percentage_smooth[0].GetRepresentativeNumber(), 0)
 
   def testCleanUpTrace(self):
     self.TestTracingCleanedUp(smoothness.Smoothness, self._options)

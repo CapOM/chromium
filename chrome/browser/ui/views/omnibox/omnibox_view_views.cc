@@ -416,10 +416,8 @@ bool OmniboxViewViews::HandleEarlyTabActions(const ui::KeyEvent& event) {
   if (!views::FocusManager::IsTabTraversalKeyEvent(event))
     return false;
 
-  if (model()->is_keyword_hint() && !event.IsShiftDown()) {
-    model()->AcceptKeyword(ENTERED_KEYWORD_MODE_VIA_TAB);
-    return true;
-  }
+  if (model()->is_keyword_hint() && !event.IsShiftDown())
+    return model()->AcceptKeyword(ENTERED_KEYWORD_MODE_VIA_TAB);
 
   if (!model()->popup_model()->IsOpen())
     return false;
@@ -427,7 +425,7 @@ bool OmniboxViewViews::HandleEarlyTabActions(const ui::KeyEvent& event) {
   if (event.IsShiftDown() &&
       (model()->popup_model()->selected_line_state() ==
           OmniboxPopupModel::KEYWORD))
-    model()->ClearKeyword(text());
+    model()->ClearKeyword();
   else
     model()->OnUpOrDownKeyPressed(event.IsShiftDown() ? -1 : 1);
 
@@ -468,7 +466,8 @@ void OmniboxViewViews::UpdatePopup() {
 
   // Prevent inline autocomplete when the caret isn't at the end of the text.
   const gfx::Range sel = GetSelectedRange();
-  model()->StartAutocomplete(!sel.is_empty(), sel.GetMax() < text().length());
+  model()->StartAutocomplete(!sel.is_empty(), sel.GetMax() < text().length(),
+                             false);
 }
 
 void OmniboxViewViews::ApplyCaretVisibility() {
@@ -929,7 +928,7 @@ bool OmniboxViewViews::HandleKeyEvent(views::Textfield* textfield,
     if (model()->is_keyword_hint() || model()->keyword().empty() ||
         HasSelection() || GetCursorPosition() != 0)
       return false;
-    model()->ClearKeyword(text());
+    model()->ClearKeyword();
     return true;
   }
 

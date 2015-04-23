@@ -135,14 +135,7 @@ class WebTestDelegate {
   virtual void SetDatabaseQuota(int quota) = 0;
 
   // Controls Web Notifications.
-  virtual void GrantWebNotificationPermission(const GURL& origin,
-                                              bool permission_granted) = 0;
-  virtual void ClearWebNotificationPermissions() = 0;
   virtual void SimulateWebNotificationClick(const std::string& title) = 0;
-
-  // Controls the Push API.
-  virtual void SetPushMessagingPermission(const GURL& origin, bool allowed) = 0;
-  virtual void ClearPushMessagingPermissions() = 0;
 
   // Controls the device scale factor of the main WebView for hidpi tests.
   virtual void SetDeviceScaleFactor(float factor) = 0;
@@ -201,6 +194,16 @@ class WebTestDelegate {
   // Returns a text dump the back/forward history for the WebView associated
   // with the given WebTestProxyBase.
   virtual std::string DumpHistoryForWindow(WebTestProxyBase* proxy) = 0;
+
+  // Sends a message to the LayoutTestPermissionManager in order for it to
+  // update its database.
+  virtual void SetPermission(const std::string& permission_name,
+                             const std::string& permission_value,
+                             const GURL& origin,
+                             const GURL& embedding_origin) = 0;
+
+  // Clear all the permissions set via SetPermission().
+  virtual void ResetPermissions() = 0;
 };
 
 }  // namespace content

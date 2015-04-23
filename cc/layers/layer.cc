@@ -360,6 +360,7 @@ void Layer::SetBounds(const gfx::Size& size) {
           clip_tree_index())) {
     if (clip_node->owner_id == id()) {
       clip_node->data.clip.set_size(size);
+      layer_tree_host_->property_trees()->clip_tree.set_needs_update(true);
     }
   }
 
@@ -614,6 +615,7 @@ void Layer::SetPosition(const gfx::PointF& position) {
       transform_node->data.update_post_local_transform(position,
                                                        transform_origin());
       transform_node->data.needs_local_transform_update = true;
+      layer_tree_host_->property_trees()->transform_tree.set_needs_update(true);
       SetNeedsCommitNoRebuild();
       return;
     }
@@ -663,6 +665,8 @@ void Layer::SetTransform(const gfx::Transform& transform) {
             Are2dAxisAligned(transform_, transform, &invertible);
         transform_node->data.local = transform;
         transform_node->data.needs_local_transform_update = true;
+        layer_tree_host_->property_trees()->transform_tree.set_needs_update(
+            true);
         if (preserves_2d_axis_alignment)
           SetNeedsCommitNoRebuild();
         else
@@ -693,9 +697,11 @@ void Layer::SetTransformOrigin(const gfx::Point3F& transform_origin) {
           layer_tree_host_->property_trees()->transform_tree.Node(
               transform_tree_index())) {
     if (transform_node->owner_id == id()) {
+      transform_node->data.update_pre_local_transform(transform_origin);
       transform_node->data.update_post_local_transform(position(),
                                                        transform_origin);
       transform_node->data.needs_local_transform_update = true;
+      layer_tree_host_->property_trees()->transform_tree.set_needs_update(true);
       SetNeedsCommitNoRebuild();
       return;
     }
@@ -789,6 +795,7 @@ void Layer::SetScrollOffset(const gfx::ScrollOffset& scroll_offset) {
       transform_node->data.scroll_offset =
           gfx::ScrollOffsetToVector2dF(CurrentScrollOffset());
       transform_node->data.needs_local_transform_update = true;
+      layer_tree_host_->property_trees()->transform_tree.set_needs_update(true);
       SetNeedsCommitNoRebuild();
       return;
     }
@@ -828,6 +835,7 @@ void Layer::SetScrollOffsetFromImplSide(
       transform_node->data.scroll_offset =
           gfx::ScrollOffsetToVector2dF(CurrentScrollOffset());
       transform_node->data.needs_local_transform_update = true;
+      layer_tree_host_->property_trees()->transform_tree.set_needs_update(true);
       needs_rebuild = false;
     }
   }
@@ -1319,6 +1327,8 @@ void Layer::OnTransformAnimated(const gfx::Transform& transform) {
         node->data.local = transform;
         node->data.needs_local_transform_update = true;
         node->data.is_animated = true;
+        layer_tree_host_->property_trees()->transform_tree.set_needs_update(
+            true);
       }
     }
   }

@@ -383,12 +383,24 @@ bool AutofillManager::OnFormSubmitted(const FormData& form) {
   if (!IsValidFormData(form))
     return false;
 
-  // Let Autocomplete know as well.
-  autocomplete_history_manager_->OnFormSubmitted(form);
-
+  // We will always give Autocomplete a chance to save the data.
   scoped_ptr<FormStructure> submitted_form = ValidateSubmittedForm(form);
-  if (!submitted_form)
+  if (!submitted_form) {
+    autocomplete_history_manager_->OnFormSubmitted(form);
     return false;
+  }
+
+  // However, if Autofill has recognized a field as CVC, that shouldn't be
+  // saved.
+  FormData form_for_autocomplete = submitted_form->ToFormData();
+  form_for_autocomplete.user_submitted = form.user_submitted;
+  for (size_t i = 0; i < submitted_form->field_count(); ++i) {
+    if (submitted_form->field(i)->Type().GetStorableType() ==
+        CREDIT_CARD_VERIFICATION_CODE) {
+      form_for_autocomplete.fields[i].should_autocomplete = false;
+    }
+  }
+  autocomplete_history_manager_->OnFormSubmitted(form_for_autocomplete);
 
   address_form_event_logger_->OnFormSubmitted();
   credit_card_form_event_logger_->OnFormSubmitted();
@@ -396,6 +408,8 @@ bool AutofillManager::OnFormSubmitted(const FormData& form) {
   // Update Personal Data with the form's submitted data.
   if (submitted_form->IsAutofillable())
     ImportFormData(*submitted_form);
+
+  recently_unmasked_cards_.clear();
 
   return true;
 }
@@ -765,7 +779,8 @@ void AutofillManager::OnSetDataList(const std::vector<base::string16>& values,
 void AutofillManager::OnLoadedServerPredictions(
     const std::string& response_xml) {
   // Parse and store the server predictions.
-  FormStructure::ParseQueryResponse(response_xml, form_structures_.get());
+  FormStructure::ParseQueryResponse(response_xml, form_structures_.get(),
+                                    client_->GetRapporService());
 
   // Forward form structures to the password generation manager to detect
   // account creation forms.
@@ -799,6 +814,7 @@ void AutofillManager::OnDidGetRealPan(AutofillClient::GetRealPanResult result,
   if (!real_pan.empty()) {
     DCHECK_EQ(AutofillClient::SUCCESS, result);
     credit_card_form_event_logger_->OnDidFillSuggestion(unmasking_card_);
+    recently_unmasked_cards_.push_back(unmasking_card_);
     unmasking_card_.set_record_type(CreditCard::FULL_SERVER_CARD);
     unmasking_card_.SetNumber(base::UTF8ToUTF16(real_pan));
     if (unmask_response_.should_store_pan)
@@ -823,6 +839,17 @@ void AutofillManager::ImportFormData(const FormStructure& submitted_form) {
   scoped_ptr<CreditCard> imported_credit_card;
   if (!personal_data_->ImportFormData(submitted_form, &imported_credit_card))
     return;
+
+  // Don't offer to save any cards that were recently unmasked.
+  if (recently_unmasked_cards_.end() !=
+      std::find_if(recently_unmasked_cards_.begin(),
+                   recently_unmasked_cards_.end(),
+                   [&imported_credit_card](const CreditCard& unmasked) -> bool {
+                     return unmasked.TypeAndLastFourDigits() ==
+                            imported_credit_card->TypeAndLastFourDigits();
+                   })) {
+    return;
+  }
 
   // If credit card information was submitted, we need to confirm whether to
   // save it.

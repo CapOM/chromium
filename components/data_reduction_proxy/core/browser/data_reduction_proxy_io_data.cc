@@ -6,6 +6,7 @@
 
 #include "base/bind.h"
 #include "base/command_line.h"
+#include "base/macros.h"
 #include "base/memory/weak_ptr.h"
 #include "base/prefs/pref_member.h"
 #include "base/single_thread_task_runner.h"
@@ -21,12 +22,70 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_network_delegate.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_service.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_settings.h"
-#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_store.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_creator.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_storage_delegate.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
 #include "net/log/net_log.h"
+#include "net/url_request/http_user_agent_settings.h"
+#include "net/url_request/static_http_user_agent_settings.h"
+#include "net/url_request/url_request_context.h"
+#include "net/url_request/url_request_context_builder.h"
+#include "net/url_request/url_request_context_getter.h"
 
 namespace data_reduction_proxy {
+
+// A |net::URLRequestContextGetter| which uses only vanilla HTTP/HTTPS for
+// performing requests. This is used by the secure proxy check to prevent the
+// use of SPDY and QUIC which may be used by the primary request contexts.
+class BasicHTTPURLRequestContextGetter : public net::URLRequestContextGetter {
+ public:
+  BasicHTTPURLRequestContextGetter(
+      const std::string& user_agent,
+      const scoped_refptr<base::SingleThreadTaskRunner>& network_task_runner);
+
+  // Overridden from net::URLRequestContextGetter:
+  net::URLRequestContext* GetURLRequestContext() override;
+  scoped_refptr<base::SingleThreadTaskRunner> GetNetworkTaskRunner()
+      const override;
+
+ private:
+  ~BasicHTTPURLRequestContextGetter() override;
+
+  scoped_refptr<base::SingleThreadTaskRunner> network_task_runner_;
+  scoped_ptr<net::HttpUserAgentSettings> user_agent_settings_;
+  scoped_ptr<net::URLRequestContext> url_request_context_;
+
+  DISALLOW_COPY_AND_ASSIGN(BasicHTTPURLRequestContextGetter);
+};
+
+BasicHTTPURLRequestContextGetter::BasicHTTPURLRequestContextGetter(
+    const std::string& user_agent,
+    const scoped_refptr<base::SingleThreadTaskRunner>& network_task_runner)
+    : network_task_runner_(network_task_runner),
+      user_agent_settings_(
+          new net::StaticHttpUserAgentSettings(std::string(), user_agent)) {
+}
+
+net::URLRequestContext*
+BasicHTTPURLRequestContextGetter::GetURLRequestContext() {
+  if (!url_request_context_) {
+    net::URLRequestContextBuilder builder;
+    builder.set_proxy_service(net::ProxyService::CreateDirect());
+    builder.SetSpdyAndQuicEnabled(false, false);
+    url_request_context_.reset(builder.Build());
+  }
+
+  return url_request_context_.get();
+}
+
+scoped_refptr<base::SingleThreadTaskRunner>
+BasicHTTPURLRequestContextGetter::GetNetworkTaskRunner() const {
+  return network_task_runner_;
+}
+
+BasicHTTPURLRequestContextGetter::~BasicHTTPURLRequestContextGetter() {
+}
 
 DataReductionProxyIOData::DataReductionProxyIOData(
     const Client& client,
@@ -34,13 +93,16 @@ DataReductionProxyIOData::DataReductionProxyIOData(
     net::NetLog* net_log,
     scoped_refptr<base::SingleThreadTaskRunner> io_task_runner,
     scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner,
-    bool enable_quic)
+    bool enable_quic,
+    const std::string& user_agent)
     : client_(client),
       net_log_(net_log),
       io_task_runner_(io_task_runner),
       ui_task_runner_(ui_task_runner),
       shutdown_on_ui_(false),
       url_request_context_getter_(nullptr),
+      basic_url_request_context_getter_(
+          new BasicHTTPURLRequestContextGetter(user_agent, io_task_runner)),
       weak_factory_(this) {
   DCHECK(net_log);
   DCHECK(io_task_runner_);
@@ -48,9 +110,9 @@ DataReductionProxyIOData::DataReductionProxyIOData(
   scoped_ptr<DataReductionProxyParams> params(
       new DataReductionProxyParams(param_flags));
   params->EnableQuic(enable_quic);
-  event_store_.reset(new DataReductionProxyEventStore(ui_task_runner));
+  event_creator_.reset(new DataReductionProxyEventCreator(this));
   configurator_.reset(
-      new DataReductionProxyConfigurator(net_log, event_store_.get()));
+      new DataReductionProxyConfigurator(net_log, event_creator_.get()));
   bool use_config_client = DataReductionProxyParams::IsConfigClientEnabled();
   DataReductionProxyMutableConfigValues* raw_mutable_config = nullptr;
   if (use_config_client) {
@@ -59,11 +121,11 @@ DataReductionProxyIOData::DataReductionProxyIOData(
     raw_mutable_config = mutable_config.get();
     config_.reset(new DataReductionProxyConfig(
         io_task_runner_, net_log, mutable_config.Pass(), configurator_.get(),
-        event_store_.get()));
+        event_creator_.get()));
   } else {
-    config_.reset(
-        new DataReductionProxyConfig(io_task_runner_, net_log, params.Pass(),
-                                     configurator_.get(), event_store_.get()));
+    config_.reset(new DataReductionProxyConfig(
+        io_task_runner_, net_log, params.Pass(), configurator_.get(),
+        event_creator_.get()));
   }
 
   // It is safe to use base::Unretained here, since it gets executed
@@ -124,9 +186,9 @@ void DataReductionProxyIOData::SetDataReductionProxyService(
 
 void DataReductionProxyIOData::InitializeOnIOThread() {
   DCHECK(io_task_runner_->BelongsToCurrentThread());
-  config_->InitializeOnIOThread(url_request_context_getter_);
+  config_->InitializeOnIOThread(basic_url_request_context_getter_.get());
   if (config_client_.get())
-    config_client_->RetrieveConfig();
+    config_client_->InitializeOnIOThread(url_request_context_getter_);
   ui_task_runner_->PostTask(
       FROM_HERE,
       base::Bind(&DataReductionProxyService::SetIOData,
@@ -140,11 +202,17 @@ bool DataReductionProxyIOData::IsEnabled() const {
              switches::kEnableDataReductionProxy);
 }
 
+void DataReductionProxyIOData::RetrieveConfig() {
+  DCHECK(io_task_runner_->BelongsToCurrentThread());
+  if (config_client_)
+    config_client_->RetrieveConfig();
+}
+
 scoped_ptr<net::URLRequestInterceptor>
 DataReductionProxyIOData::CreateInterceptor() {
   DCHECK(io_task_runner_->BelongsToCurrentThread());
   return make_scoped_ptr(new DataReductionProxyInterceptor(
-      config_.get(), bypass_stats_.get(), event_store_.get()));
+      config_.get(), bypass_stats_.get(), event_creator_.get()));
 }
 
 scoped_ptr<DataReductionProxyNetworkDelegate>
@@ -179,6 +247,34 @@ void DataReductionProxyIOData::UpdateContentLengths(
       base::Bind(&DataReductionProxyService::UpdateContentLengths,
                  service_, received_content_length, original_content_length,
                  data_reduction_proxy_enabled, request_type));
+}
+
+void DataReductionProxyIOData::AddEnabledEvent(scoped_ptr<base::Value> entry,
+                                               bool enabled) {
+  DCHECK(io_task_runner_->BelongsToCurrentThread());
+  ui_task_runner_->PostTask(
+      FROM_HERE, base::Bind(&DataReductionProxyService::AddEnabledEvent,
+                            service_, base::Passed(&entry), enabled));
+}
+
+void DataReductionProxyIOData::AddEventAndSecureProxyCheckState(
+    scoped_ptr<base::Value> entry,
+    SecureProxyCheckState state) {
+  DCHECK(io_task_runner_->BelongsToCurrentThread());
+  ui_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&DataReductionProxyService::AddEventAndSecureProxyCheckState,
+                 service_, base::Passed(&entry), state));
+}
+
+void DataReductionProxyIOData::AddAndSetLastBypassEvent(
+    scoped_ptr<base::Value> entry,
+    int64 expiration_ticks) {
+  DCHECK(io_task_runner_->BelongsToCurrentThread());
+  ui_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&DataReductionProxyService::AddAndSetLastBypassEvent, service_,
+                 base::Passed(&entry), expiration_ticks));
 }
 
 void DataReductionProxyIOData::SetUnreachable(bool unreachable) {

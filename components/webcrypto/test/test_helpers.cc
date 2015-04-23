@@ -124,7 +124,7 @@ bool SupportsRsaOaep() {
 
 bool SupportsRsaPrivateKeyImport() {
 // TODO(eroman): Exclude version test for OS_CHROMEOS
-#if defined(USE_NSS_CERTS)
+#if !defined(USE_OPENSSL) && defined(USE_NSS_CERTS)
   crypto::EnsureNSSInit();
   if (!NSS_VersionCheck("3.16.2")) {
     LOG(WARNING) << "RSA key import is not supported by this version of NSS. "
@@ -142,10 +142,10 @@ blink::WebCryptoAlgorithm CreateRsaHashedKeyGenAlgorithm(
     const std::vector<uint8_t>& public_exponent) {
   DCHECK(blink::WebCryptoAlgorithm::isHash(hash_id));
   return blink::WebCryptoAlgorithm::adoptParamsAndCreate(
-      algorithm_id,
-      new blink::WebCryptoRsaHashedKeyGenParams(
-          CreateAlgorithm(hash_id), modulus_length,
-          vector_as_array(&public_exponent), public_exponent.size()));
+      algorithm_id, new blink::WebCryptoRsaHashedKeyGenParams(
+                        CreateAlgorithm(hash_id), modulus_length,
+                        vector_as_array(&public_exponent),
+                        static_cast<unsigned int>(public_exponent.size())));
 }
 
 std::vector<uint8_t> Corrupted(const std::vector<uint8_t>& input) {

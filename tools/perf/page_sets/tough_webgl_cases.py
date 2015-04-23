@@ -4,7 +4,6 @@
 
 from telemetry.page import page as page_module
 from telemetry.page import page_set as page_set_module
-from telemetry.page import shared_page_state
 
 from page_sets import webgl_supported_shared_state
 
@@ -27,7 +26,8 @@ class ToughWebglCasesPage(page_module.Page):
     action_runner.Wait(2)
 
   def RunPageInteractions(self, action_runner):
-    action_runner.Wait(5)
+    with action_runner.CreateInteraction('WebGLAnimation'):
+      action_runner.Wait(5)
 
 
 class ToughWebglCasesPageSet(page_set_module.PageSet):

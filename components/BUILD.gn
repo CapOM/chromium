@@ -36,6 +36,7 @@ group("all_components") {
     "//components/data_reduction_proxy/core/browser",
     "//components/data_reduction_proxy/core/common",
     "//components/device_event_log",
+    "//components/devtools_discovery",
     "//components/devtools_http_handler",
     "//components/dom_distiller/core",
     "//components/domain_reliability",
@@ -224,6 +225,7 @@ group("all_components") {
     deps += [
       "//components/app_modal",
       "//components/browsing_data",
+      "//components/scheduler",
     ]
   }
 
@@ -306,6 +308,10 @@ test("components_unittests") {
   if (is_ios) {
     deps -= [ "//components/devtools_http_handler:unit_tests" ]
   }
+
+  if (!is_ios) {
+    deps += [ "//components/scheduler:unit_tests" ]
+  }
 }
 
 repack("components_tests_pak") {
@@ -326,6 +332,17 @@ repack("components_tests_pak") {
     "//ui/resources",
     "//ui/strings",
   ]
+}
+
+if (is_android) {
+  import("//build/config/android/rules.gni")
+
+  generate_jni("components_browsertests_jni_headers") {
+    jni_package = "components_browsertests/shell"
+    sources = [
+      "test/android/browsertests_apk/src/org/chromium/components_browsertests_apk/ComponentsBrowserTestsActivity.java",
+    ]
+  }
 }
 
 test("components_browsertests") {
@@ -363,7 +380,18 @@ test("components_browsertests") {
   data_deps = [ ":components_tests_pak" ]
 
   if (is_android) {
+    sources += [
+      "test/android/browsertests_apk/components_browser_tests_android.cc",
+      "test/android/browsertests_apk/components_browser_tests_android.h",
+      "test/android/browsertests_apk/components_browser_tests_jni_onload.cc",
+    ]
     sources -= [ "autofill/content/browser/risk/fingerprint_browsertest.cc" ]
+    deps += [
+      ":components_browsertests_jni_headers",
+      "//testing/android/native_test:native_test_util",
+    ]
+
+    use_launcher = false
   }
 
   if (is_linux) {
@@ -379,6 +407,7 @@ test("components_browsertests") {
 
 test("components_perftests") {
   sources = [
+    "scheduler/child/task_queue_manager_perftest.cc",
     "visitedlink/test/visitedlink_perftest.cc",
   ]
 
@@ -389,6 +418,7 @@ test("components_perftests") {
     "//base",
     "//base/test:test_support_perf",
     "//testing/gtest",
+    "//testing/perf",
     "//content/test:test_support",
     "//components/visitedlink/browser",
   ]

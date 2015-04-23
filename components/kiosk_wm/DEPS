@@ -1,0 +1,9 @@
+include_rules = [
+  "+components/view_manager",
+  "+components/window_manager",
+  "+mojo/application",
+  "+mojo/common",
+  "+third_party/mojo/src/mojo/public",
+  "+third_party/mojo_services",
+  "+ui",
+]

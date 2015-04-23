@@ -11,6 +11,7 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_io_data.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_service_observer.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_settings.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_store.h"
 
 namespace data_reduction_proxy {
 
@@ -26,6 +27,7 @@ DataReductionProxyService::DataReductionProxyService(
       weak_factory_(this) {
   DCHECK(settings);
   compression_stats_ = compression_stats.Pass();
+  event_store_.reset(new DataReductionProxyEventStore());
 }
 
 DataReductionProxyService::~DataReductionProxyService() {
@@ -68,6 +70,26 @@ void DataReductionProxyService::UpdateContentLengths(
   }
 }
 
+void DataReductionProxyService::AddEnabledEvent(scoped_ptr<base::Value> entry,
+                                                bool enabled) {
+  DCHECK(CalledOnValidThread());
+  event_store_->AddEnabledEvent(entry.Pass(), enabled);
+}
+
+void DataReductionProxyService::AddEventAndSecureProxyCheckState(
+    scoped_ptr<base::Value> entry,
+    SecureProxyCheckState state) {
+  DCHECK(CalledOnValidThread());
+  event_store_->AddEventAndSecureProxyCheckState(entry.Pass(), state);
+}
+
+void DataReductionProxyService::AddAndSetLastBypassEvent(
+    scoped_ptr<base::Value> entry,
+    int64 expiration_ticks) {
+  DCHECK(CalledOnValidThread());
+  event_store_->AddAndSetLastBypassEvent(entry.Pass(), expiration_ticks);
+}
+
 void DataReductionProxyService::SetUnreachable(bool unreachable) {
   DCHECK(CalledOnValidThread());
   settings_->SetUnreachable(unreachable);
@@ -81,6 +103,13 @@ void DataReductionProxyService::SetProxyPrefs(bool enabled,
       FROM_HERE,
       base::Bind(&DataReductionProxyIOData::SetProxyPrefs,
                  io_data_, enabled, alternative_enabled, at_startup));
+}
+
+void DataReductionProxyService::RetrieveConfig() {
+  DCHECK(CalledOnValidThread());
+  io_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&DataReductionProxyIOData::RetrieveConfig, io_data_));
 }
 
 void DataReductionProxyService::AddObserver(

@@ -12,7 +12,8 @@
 namespace cc {
 
 template <typename T>
-PropertyTree<T>::PropertyTree() {
+PropertyTree<T>::PropertyTree()
+    : needs_update_(false) {
   nodes_.push_back(T());
   back()->id = 0;
   back()->parent_id = -1;
@@ -60,6 +61,13 @@ TransformNodeData::TransformNodeData()
 }
 
 TransformNodeData::~TransformNodeData() {
+}
+
+void TransformNodeData::update_pre_local_transform(
+    const gfx::Point3F& transform_origin) {
+  pre_local.MakeIdentity();
+  pre_local.Translate3d(-transform_origin.x(), -transform_origin.y(),
+                        -transform_origin.z());
 }
 
 void TransformNodeData::update_post_local_transform(

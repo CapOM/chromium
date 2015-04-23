@@ -21,15 +21,15 @@ TestDataReductionProxyConfig::TestDataReductionProxyConfig(
     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
     net::NetLog* net_log,
     DataReductionProxyConfigurator* configurator,
-    DataReductionProxyEventStore* event_store)
+    DataReductionProxyEventCreator* event_creator)
     : TestDataReductionProxyConfig(
-          make_scoped_ptr(
-              new TestDataReductionProxyParams(params_flags,
-                                               params_definitions)).Pass(),
+          make_scoped_ptr(new TestDataReductionProxyParams(params_flags,
+                                                           params_definitions))
+              .Pass(),
           task_runner,
           net_log,
           configurator,
-          event_store) {
+          event_creator) {
 }
 
 TestDataReductionProxyConfig::TestDataReductionProxyConfig(
@@ -37,12 +37,12 @@ TestDataReductionProxyConfig::TestDataReductionProxyConfig(
     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
     net::NetLog* net_log,
     DataReductionProxyConfigurator* configurator,
-    DataReductionProxyEventStore* event_store)
+    DataReductionProxyEventCreator* event_creator)
     : DataReductionProxyConfig(task_runner,
                                net_log,
                                config_values.Pass(),
                                configurator,
-                               event_store) {
+                               event_creator) {
   network_interfaces_.reset(new net::NetworkInterfaceList());
 }
 
@@ -92,12 +92,12 @@ MockDataReductionProxyConfig::MockDataReductionProxyConfig(
     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
     net::NetLog* net_log,
     DataReductionProxyConfigurator* configurator,
-    DataReductionProxyEventStore* event_store)
+    DataReductionProxyEventCreator* event_creator)
     : TestDataReductionProxyConfig(config_values.Pass(),
                                    task_runner,
                                    net_log,
                                    configurator,
-                                   event_store) {
+                                   event_creator) {
 }
 
 MockDataReductionProxyConfig::~MockDataReductionProxyConfig() {
@@ -110,11 +110,6 @@ void MockDataReductionProxyConfig::UpdateConfigurator(bool enabled,
   EXPECT_CALL(*this, LogProxyState(enabled, restricted, at_startup)).Times(1);
   DataReductionProxyConfig::UpdateConfigurator(enabled, alternative_enabled,
                                                restricted, at_startup);
-}
-
-void MockDataReductionProxyConfig::HandleSecureProxyCheckResponse(
-    const std::string& response, const net::URLRequestStatus& status) {
-  DataReductionProxyConfig::HandleSecureProxyCheckResponse(response, status);
 }
 
 }  // namespace data_reduction_proxy

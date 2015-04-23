@@ -184,16 +184,21 @@ void DrmNativeDisplayDelegate::Configure(const DisplaySnapshot& output,
 void DrmNativeDisplayDelegate::CreateFrameBuffer(const gfx::Size& size) {
 }
 
-bool DrmNativeDisplayDelegate::GetHDCPState(const DisplaySnapshot& output,
-                                            HDCPState* state) {
-  NOTIMPLEMENTED();
-  return false;
+void DrmNativeDisplayDelegate::GetHDCPState(
+    const DisplaySnapshot& output,
+    const GetHDCPStateCallback& callback) {
+  get_hdcp_state_callback_map_[output.display_id()] = callback;
+  if (!proxy_->Send(new OzoneGpuMsg_GetHDCPState(output.display_id())))
+    OnHDCPStateReceived(output.display_id(), false, HDCP_STATE_UNDESIRED);
 }
 
-bool DrmNativeDisplayDelegate::SetHDCPState(const DisplaySnapshot& output,
-                                            HDCPState state) {
-  NOTIMPLEMENTED();
-  return false;
+void DrmNativeDisplayDelegate::SetHDCPState(
+    const DisplaySnapshot& output,
+    HDCPState state,
+    const SetHDCPStateCallback& callback) {
+  set_hdcp_state_callback_map_[output.display_id()] = callback;
+  if (!proxy_->Send(new OzoneGpuMsg_SetHDCPState(output.display_id(), state)))
+    OnHDCPStateUpdated(output.display_id(), false);
 }
 
 std::vector<ColorCalibrationProfile>
@@ -301,6 +306,8 @@ bool DrmNativeDisplayDelegate::OnMessageReceived(const IPC::Message& message) {
   IPC_BEGIN_MESSAGE_MAP(DrmNativeDisplayDelegate, message)
   IPC_MESSAGE_HANDLER(OzoneHostMsg_UpdateNativeDisplays, OnUpdateNativeDisplays)
   IPC_MESSAGE_HANDLER(OzoneHostMsg_DisplayConfigured, OnDisplayConfigured)
+  IPC_MESSAGE_HANDLER(OzoneHostMsg_HDCPStateReceived, OnHDCPStateReceived)
+  IPC_MESSAGE_HANDLER(OzoneHostMsg_HDCPStateUpdated, OnHDCPStateUpdated)
   IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
 
@@ -331,6 +338,27 @@ void DrmNativeDisplayDelegate::OnDisplayConfigured(int64_t display_id,
     base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE, base::Bind(it->second, status));
     configure_callback_map_.erase(it);
+  }
+}
+
+void DrmNativeDisplayDelegate::OnHDCPStateReceived(int64_t display_id,
+                                                   bool status,
+                                                   HDCPState state) {
+  auto it = get_hdcp_state_callback_map_.find(display_id);
+  if (it != get_hdcp_state_callback_map_.end()) {
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(it->second, status, state));
+    get_hdcp_state_callback_map_.erase(it);
+  }
+}
+
+void DrmNativeDisplayDelegate::OnHDCPStateUpdated(int64_t display_id,
+                                                  bool status) {
+  auto it = set_hdcp_state_callback_map_.find(display_id);
+  if (it != set_hdcp_state_callback_map_.end()) {
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(it->second, status));
+    set_hdcp_state_callback_map_.erase(it);
   }
 }
 

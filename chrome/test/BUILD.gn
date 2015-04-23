@@ -380,6 +380,10 @@ if (!is_android) {
         "//third_party/wtl",
         "//ui/resources",
       ]
+
+      configs -= [ "//build/config/win:default_incremental_linking" ]
+      configs +=
+          [ "//build/config/win:default_large_module_incremental_linking" ]
     }
 
     if (is_mac) {
@@ -716,7 +720,6 @@ if (!is_android) {
           # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_background_keepalive",  # TODO(GYP)
           # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_media_galleries",  # TODO(GYP)
           # "../ppapi/tests/extensions/extensions.gyp:ppapi_tests_extensions_packaged_app",  # TODO(GYP)
-          # "../ppapi/ppapi_tests_mojo.gyp:ppapi_tests_mojo",  # TODO(GYP)
         ]
         if (is_chromeos) {
           sources += [ "//third_party/liblouis/nacl_wrapper/liblouis_wrapper_browsertest.cc" ]
@@ -737,6 +740,9 @@ if (!is_android) {
         deps += [
           #'chrome.gyp:chrome_nacl_win64',  TODO(GYP)
         ]
+        configs -= [ "//build/config/win:default_incremental_linking" ]
+        configs +=
+            [ "//build/config/win:default_large_module_incremental_linking" ]
       }
       if (is_linux) {
         deps += [
@@ -1070,6 +1076,10 @@ if (!is_android) {
         "//third_party/wtl",
         "//ui/resources",
       ]
+
+      configs -= [ "//build/config/win:default_incremental_linking" ]
+      configs +=
+          [ "//build/config/win:default_large_module_incremental_linking" ]
     } else {
       sources -= [ "../app/chrome_version.rc.version" ]
     }
@@ -1135,6 +1145,9 @@ if (!is_android) {
         "//third_party/wtl",
         "//ui/resources",
       ]
+      configs -= [ "//build/config/win:default_incremental_linking" ]
+      configs +=
+          [ "//build/config/win:default_large_module_incremental_linking" ]
     } else {
       sources -= [ "../app/chrome_version.rc.version" ]
     }
@@ -1604,6 +1617,10 @@ if (!is_android) {
         "//third_party/wtl",
       ]
 
+      configs -= [ "//build/config/win:default_incremental_linking" ]
+      configs +=
+          [ "//build/config/win:default_large_module_incremental_linking" ]
+
       libs = [
         "comsupp.lib",
         "oleacc.lib",
@@ -1718,7 +1735,11 @@ if (!is_android) {
         "//testing/perf",
       ]
 
-      if (!is_win) {
+      if (is_win) {
+        configs -= [ "//build/config/win:default_incremental_linking" ]
+        configs +=
+            [ "//build/config/win:default_large_module_incremental_linking" ]
+      } else {
         sources -= [
           "../app/chrome_command_ids.h",
 

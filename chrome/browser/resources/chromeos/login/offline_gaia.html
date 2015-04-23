@@ -33,8 +33,8 @@
 <polymer-element name="offline-gaia" vertical layout attributes="enterpriseInfo">
   <template>
     <link rel="stylesheet" href="offline_gaia.css">
-    <gaia-core-icon-button id="backButton" icon="arrow-back" on-tap="{{onBack}}"
-        tabindex="0">
+    <gaia-core-icon-button id="backButton" icon="arrow-back"
+        on-tap="{{onBack}}">
     </gaia-core-icon-button>
     <core-animated-pages id="animatedPages" transitions="slide-from-right"
         on-core-animated-pages-transition-end="{{onTransitionEnd}}" flex>
@@ -46,11 +46,15 @@
               {{enterpriseInfo}}
             </p>
           </div>
-          <gaia-input-form class="footer" id="emailInput" inputType="email"
-              i18n-values="errorMsg:offlineLoginInvalidEmail;
-                           inputLabel:offlineLoginEmail;
-                           buttonText:offlineLoginNextBtn">
-          </gaia-input-form>
+          <div class="footer" flex vertical layout justified>
+            <gaia-input-form id="emailInput" inputType="email"
+                i18n-values="errorMsg:offlineLoginInvalidEmail;
+                             inputLabel:offlineLoginEmail;
+                             buttonText:offlineLoginNextBtn">
+            </gaia-input-form>
+            <img self-center src="chrome://theme/IDR_LOGO_GOOGLE_COLOR_90"
+                alt="">
+          </div>
         </gaia-card>
       </section>
       <section flex>
@@ -72,7 +76,6 @@
                 backdrop on-keydown="{{onKeyDownOnDialog}}">
               <p i18n-content="offlineLoginForgotPasswordDlg"></p>
               <gaia-paper-button id="dialogCloseBtn" affirmative autofocus
-                  tabindex="0"
                   i18n-content="offlineLoginCloseBtn">
               </gaia-paper-button>
             </paper-action-dialog>

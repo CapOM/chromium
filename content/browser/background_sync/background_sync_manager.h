@@ -56,7 +56,7 @@ class CONTENT_EXPORT BackgroundSyncManager
     static const RegistrationId kInitialId;
     BackgroundSyncRegistration() {}
 
-    bool Equals(const BackgroundSyncRegistration& other) {
+    bool Equals(const BackgroundSyncRegistration& other) const {
       return this->tag == other.tag && this->periodicity == other.periodicity &&
              this->min_period == other.min_period &&
              network_state == other.network_state &&
@@ -157,12 +157,11 @@ class CONTENT_EXPORT BackgroundSyncManager
         std::map<RegistrationKey, BackgroundSyncRegistration>;
 
     BackgroundSyncRegistrations();
-    explicit BackgroundSyncRegistrations(
-        BackgroundSyncRegistration::RegistrationId next_id);
     ~BackgroundSyncRegistrations();
 
     RegistrationMap registration_map;
     BackgroundSyncRegistration::RegistrationId next_id;
+    GURL origin;
   };
 
   using PermissionStatusCallback = base::Callback<void(bool)>;
@@ -183,13 +182,12 @@ class CONTENT_EXPORT BackgroundSyncManager
 
   // Returns the existing registration in |existing_registration| if it is not
   // null.
-  bool LookupRegistration(int64 sw_registration_id,
-                          const RegistrationKey& registration_key,
-                          BackgroundSyncRegistration* existing_registration);
+  BackgroundSyncRegistration* LookupRegistration(
+      int64 sw_registration_id,
+      const RegistrationKey& registration_key);
 
   // Store all registrations for a given |sw_registration_id|.
-  void StoreRegistrations(const GURL& origin,
-                          int64 sw_registration_id,
+  void StoreRegistrations(int64 sw_registration_id,
                           const ServiceWorkerStorage::StatusCallback& callback);
 
   // Removes the registration if it is in the map.
@@ -198,6 +196,7 @@ class CONTENT_EXPORT BackgroundSyncManager
 
   void AddRegistrationToMap(
       int64 sw_registration_id,
+      const GURL& origin,
       const BackgroundSyncRegistration& sync_registration);
 
   void InitImpl(const base::Closure& callback);

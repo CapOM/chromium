@@ -12,6 +12,7 @@
 #include "content/public/renderer/render_view.h"
 #include "extensions/browser/guest_view/mime_handler_view/mime_handler_view_constants.h"
 #include "extensions/common/extension_messages.h"
+#include "extensions/common/guest_view/extensions_guest_view_messages.h"
 #include "extensions/common/guest_view/guest_view_constants.h"
 #include "extensions/common/guest_view/guest_view_messages.h"
 #include "gin/arguments.h"
@@ -164,11 +165,12 @@ void MimeHandlerViewContainer::DidReceiveData(const char* data,
 bool MimeHandlerViewContainer::OnMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(MimeHandlerViewContainer, message)
-  IPC_MESSAGE_HANDLER(GuestViewMsg_CreateMimeHandlerViewGuestACK,
+  IPC_MESSAGE_HANDLER(ExtensionsGuestViewMsg_CreateMimeHandlerViewGuestACK,
                       OnCreateMimeHandlerViewGuestACK)
+  IPC_MESSAGE_HANDLER(
+      ExtensionsGuestViewMsg_MimeHandlerViewGuestOnLoadCompleted,
+      OnMimeHandlerViewGuestOnLoadCompleted)
   IPC_MESSAGE_HANDLER(GuestViewMsg_GuestAttached, OnGuestAttached)
-  IPC_MESSAGE_HANDLER(GuestViewMsg_MimeHandlerViewGuestOnLoadCompleted,
-                      OnMimeHandlerViewGuestOnLoadCompleted)
   IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -177,7 +179,7 @@ bool MimeHandlerViewContainer::OnMessageReceived(const IPC::Message& message) {
 void MimeHandlerViewContainer::DidResizeElement(const gfx::Size& old_size,
                                                 const gfx::Size& new_size) {
   element_size_ = new_size;
-  render_frame()->Send(new GuestViewHostMsg_ResizeGuest(
+  render_frame()->Send(new ExtensionsGuestViewHostMsg_ResizeGuest(
       render_frame()->GetRoutingID(), element_instance_id(), new_size));
 }
 
@@ -233,11 +235,7 @@ void MimeHandlerViewContainer::PostMessage(v8::Isolate* isolate,
   if (!window_object.Get(std::string(kPostMessageName), &post_message))
     return;
 
-#ifdef WEB_FRAME_USES_V8_LOCAL
-  v8::Local<v8::Value> args[] = {
-#else
   v8::Handle<v8::Value> args[] = {
-#endif
     message,
     // Post the message to any domain inside the browser plugin. The embedder
     // should already know what is embedded.
@@ -315,9 +313,10 @@ void MimeHandlerViewContainer::CreateMimeHandlerViewGuest() {
   if (!render_frame())
     return;
 
-  render_frame()->Send(new GuestViewHostMsg_CreateMimeHandlerViewGuest(
-      render_frame()->GetRoutingID(), view_id_, element_instance_id(),
-      element_size_));
+  render_frame()->Send(
+      new ExtensionsGuestViewHostMsg_CreateMimeHandlerViewGuest(
+          render_frame()->GetRoutingID(), view_id_, element_instance_id(),
+          element_size_));
 }
 
 }  // namespace extensions

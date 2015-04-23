@@ -4,7 +4,8 @@
 
 source_set("trace_event") {
   sources = [
-    "memory_allocator_attributes.h",
+    "memory_allocator_attributes_type_info.cc",
+    "memory_allocator_attributes_type_info.h",
     "memory_allocator_dump.cc",
     "memory_allocator_dump.h",
     "memory_dump_manager.cc",
@@ -12,6 +13,8 @@ source_set("trace_event") {
     "memory_dump_provider.cc",
     "memory_dump_provider.h",
     "memory_dump_request_args.h",
+    "memory_dump_session_state.cc",
+    "memory_dump_session_state.h",
     "process_memory_dump.cc",
     "process_memory_dump.h",
     "process_memory_maps.cc",
@@ -81,6 +84,7 @@ source_set("trace_event") {
 source_set("trace_event_unittests") {
   testonly = true
   sources = [
+    "memory_allocator_attributes_type_info_unittest.cc",
     "memory_allocator_dump_unittest.cc",
     "memory_dump_manager_unittest.cc",
     "process_memory_maps_dump_provider_unittest.cc",

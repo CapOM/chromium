@@ -323,29 +323,44 @@ cr.define('login', function() {
           (this.signinUIState_ == SIGNIN_UI_STATE.SAML_PASSWORD_CONFIRM);
       var isEnrollingConsumerManagement = (this.signinUIState_ ==
           SIGNIN_UI_STATE.CONSUMER_MANAGEMENT_ENROLLMENT);
+      var isPasswordChangedUI =
+          (this.signinUIState_ == SIGNIN_UI_STATE.PASSWORD_CHANGED);
       var isMultiProfilesUI =
           (Oobe.getInstance().displayType == DISPLAY_TYPE.USER_ADDING);
       var isLockScreen =
           (Oobe.getInstance().displayType == DISPLAY_TYPE.LOCK);
+      var isNewGaiaScreenWithBackButton =
+           gaiaIsActive &&
+           this.isNewGaiaFlow_ &&
+           !($('back-button-item').hidden);
+      var supervisedUserCreationDialogIsActiveAndNotIntro =
+          supervisedUserCreationDialogIsActive &&
+          $('supervised-user-creation').currentPage_ != 'intro';
 
       $('add-user-button').hidden =
-          !accountPickerIsActive || isMultiProfilesUI || isLockScreen;
-      $('more-settings-header-bar-item').hidden = !this.isNewGaiaFlow_ ||
+          (!this.isNewGaiaFlow_ && !accountPickerIsActive) ||
+          (this.isNewGaiaFlow_ && gaiaIsActive) ||
+          isMultiProfilesUI ||
+          isLockScreen ||
+          supervisedUserCreationDialogIsActiveAndNotIntro;
+      $('more-settings-header-bar-item').hidden =
           !this.showCreateSupervised_ ||
-          !accountPickerIsActive;
+          isNewGaiaScreenWithBackButton ||
+          supervisedUserCreationDialogIsActive;
       $('cancel-add-user-button').hidden =
-          (gaiaIsActive && this.isNewGaiaFlow_) ||
+          ((gaiaIsActive || isPasswordChangedUI) && this.isNewGaiaFlow_) ||
           accountPickerIsActive ||
           !this.allowCancel_ ||
           wrongHWIDWarningIsActive ||
           isMultiProfilesUI;
       $('guest-user-header-bar-item').hidden =
           (gaiaIsActive && !this.isNewGaiaFlow_) ||
-          supervisedUserCreationDialogIsActive ||
+          supervisedUserCreationDialogIsActiveAndNotIntro ||
           !this.showGuest_ ||
           wrongHWIDWarningIsActive ||
           isSamlPasswordConfirm ||
-          isMultiProfilesUI;
+          isMultiProfilesUI ||
+          isNewGaiaScreenWithBackButton;
       $('restart-header-bar-item').hidden = !this.showReboot_;
       $('shutdown-header-bar-item').hidden = !this.showShutdown_;
       $('sign-out-user-item').hidden = !isLockScreen;

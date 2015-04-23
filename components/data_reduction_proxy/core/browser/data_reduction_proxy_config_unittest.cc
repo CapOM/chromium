@@ -10,9 +10,10 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_configurator_test_utils.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_service.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_test_utils.h"
-#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_store.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_creator.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params_test_utils.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
+#include "net/http/http_status_code.h"
 #include "net/log/test_net_log.h"
 #include "net/proxy/proxy_server.h"
 #include "net/url_request/test_url_fetcher_factory.h"
@@ -109,11 +110,12 @@ class DataReductionProxyConfigTest : public testing::Test {
   class TestResponder {
    public:
     void ExecuteCallback(FetcherResponseCallback callback) {
-      callback.Run(response, status);
+      callback.Run(response, status, http_response_code);
     }
 
     std::string response;
     net::URLRequestStatus status;
+    int http_response_code;
   };
 
   void CheckSecureProxyCheckOnIPChange(
@@ -131,6 +133,7 @@ class DataReductionProxyConfigTest : public testing::Test {
     responder.response = response;
     responder.status =
         net::URLRequestStatus(net::URLRequestStatus::SUCCESS, net::OK);
+    responder.http_response_code = net::HTTP_OK;
     EXPECT_CALL(*config(), SecureProxyCheck(_, _))
         .Times(1)
         .WillRepeatedly(testing::WithArgs<1>(
@@ -160,7 +163,7 @@ class DataReductionProxyConfigTest : public testing::Test {
     params->EnableQuic(false);
     return make_scoped_ptr(new DataReductionProxyConfig(
         test_context_->task_runner(), test_context_->net_log(), params.Pass(),
-        test_context_->configurator(), test_context_->event_store()));
+        test_context_->configurator(), test_context_->event_creator()));
   }
 
   MockDataReductionProxyConfig* config() {

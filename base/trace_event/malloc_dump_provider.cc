@@ -14,7 +14,6 @@ namespace trace_event {
 namespace {
 
 const char kDumperFriendlyName[] = "Malloc";
-const char kDumperName[] = "malloc";
 
 }  // namespace
 
@@ -34,10 +33,10 @@ MallocDumpProvider::~MallocDumpProvider() {
 // the current process.
 bool MallocDumpProvider::DumpInto(ProcessMemoryDump* pmd) {
   struct mallinfo info = mallinfo();
-  DCHECK(info.uordblks > 0);
   DCHECK_GE(info.arena + info.hblkhd, info.uordblks);
 
-  MemoryAllocatorDump* dump = pmd->CreateAllocatorDump(kDumperName);
+  MemoryAllocatorDump* dump =
+      pmd->CreateAllocatorDump("malloc", MemoryAllocatorDump::kRootHeap);
   if (!dump)
     return false;
 

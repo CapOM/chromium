@@ -20,10 +20,11 @@ namespace net {
 
 namespace {
 
-base::Value* NetLogSpdyStreamErrorCallback(SpdyStreamId stream_id,
-                                           int status,
-                                           const std::string* description,
-                                           NetLog::LogLevel /* log_level */) {
+base::Value* NetLogSpdyStreamErrorCallback(
+    SpdyStreamId stream_id,
+    int status,
+    const std::string* description,
+    NetLogCaptureMode /* capture_mode */) {
   base::DictionaryValue* dict = new base::DictionaryValue();
   dict->SetInteger("stream_id", static_cast<int>(stream_id));
   dict->SetInteger("status", status);
@@ -35,7 +36,7 @@ base::Value* NetLogSpdyStreamWindowUpdateCallback(
     SpdyStreamId stream_id,
     int32 delta,
     int32 window_size,
-    NetLog::LogLevel /* log_level */) {
+    NetLogCaptureMode /* capture_mode */) {
   base::DictionaryValue* dict = new base::DictionaryValue();
   dict->SetInteger("stream_id", stream_id);
   dict->SetInteger("delta", delta);
@@ -509,7 +510,11 @@ void SpdyStream::OnDataReceived(scoped_ptr<SpdyBuffer> buffer) {
   size_t length = buffer->GetRemainingSize();
   DCHECK_LE(length, session_->GetDataFrameMaximumPayload());
   if (session_->flow_control_state() >= SpdySession::FLOW_CONTROL_STREAM) {
+    base::WeakPtr<SpdyStream> weak_this = GetWeakPtr();
+    // May close the stream.
     DecreaseRecvWindowSize(static_cast<int32>(length));
+    if (!weak_this)
+      return;
     buffer->AddConsumeCallback(
         base::Bind(&SpdyStream::OnReadBufferConsumed, GetWeakPtr()));
   }
@@ -528,7 +533,11 @@ void SpdyStream::OnPaddingConsumed(size_t len) {
     // Increase window size because padding bytes are consumed (by discarding).
     // Net result: |unacked_recv_window_bytes_| increases by |len|,
     // |recv_window_size_| does not change.
+    base::WeakPtr<SpdyStream> weak_this = GetWeakPtr();
+    // May close the stream.
     DecreaseRecvWindowSize(static_cast<int32>(len));
+    if (!weak_this)
+      return;
     IncreaseRecvWindowSize(static_cast<int32>(len));
   }
 }

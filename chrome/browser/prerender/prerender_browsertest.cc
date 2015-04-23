@@ -434,8 +434,7 @@ class TestPrerenderContents : public PrerenderContents {
       const content::Referrer& referrer,
       Origin origin,
       FinalStatus expected_final_status)
-      : PrerenderContents(prerender_manager, profile, url,
-                          referrer, origin, PrerenderManager::kNoExperiment),
+      : PrerenderContents(prerender_manager, profile, url, referrer, origin),
         expected_final_status_(expected_final_status),
         new_render_view_host_(NULL),
         was_hidden_(false),
@@ -666,8 +665,7 @@ class TestPrerenderContentsFactory : public PrerenderContents::Factory {
       Profile* profile,
       const GURL& url,
       const content::Referrer& referrer,
-      Origin origin,
-      uint8 experiment_id) override {
+      Origin origin) override {
     ExpectedContents expected;
     if (!expected_contents_queue_.empty()) {
       expected = expected_contents_queue_.front();
@@ -3349,43 +3347,6 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, MatchCompleteDummy) {
       "Prerender.websame_PerceivedPLTMatchedComplete", 1);
 }
 
-class PrerenderBrowserTestWithNaCl : public PrerenderBrowserTest {
- public:
-  PrerenderBrowserTestWithNaCl() {}
-  ~PrerenderBrowserTestWithNaCl() override {}
-
-  void SetUpCommandLine(base::CommandLine* command_line) override {
-    PrerenderBrowserTest::SetUpCommandLine(command_line);
-    command_line->AppendSwitch(switches::kEnableNaCl);
-  }
-};
-
-// Check that NaCl plugins work when enabled, with prerendering.
-IN_PROC_BROWSER_TEST_F(PrerenderBrowserTestWithNaCl,
-                       PrerenderNaClPluginEnabled) {
-#if defined(OS_WIN) && defined(USE_ASH)
-  // Disable this test in Metro+Ash for now (http://crbug.com/262796).
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kAshBrowserTests))
-    return;
-#endif
-
-  PrerenderTestURL("files/prerender/prerender_plugin_nacl_enabled.html",
-                   FINAL_STATUS_USED,
-                   1);
-  NavigateToDestURL();
-
-  // To avoid any chance of a race, we have to let the script send its response
-  // asynchronously.
-  WebContents* web_contents =
-      browser()->tab_strip_model()->GetActiveWebContents();
-  bool display_test_result = false;
-  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(web_contents,
-                                                   "DidDisplayReallyPass()",
-                                                   &display_test_result));
-  ASSERT_TRUE(display_test_result);
-}
-
 // Checks that the referrer policy is used when prerendering.
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderReferrerPolicy) {
   set_loader_path("files/prerender/prerender_loader_with_referrer_policy.html");
@@ -4057,5 +4018,45 @@ IN_PROC_BROWSER_TEST_F(PrerenderOmniboxBrowserTest,
   EXPECT_TRUE(
       GetAutocompleteActionPredictor()->IsPrerenderAbandonedForTesting());
 }
+
+// Can't run tests with NaCl plugins if built with DISABLE_NACL.
+#if !defined(DISABLE_NACL)
+class PrerenderBrowserTestWithNaCl : public PrerenderBrowserTest {
+ public:
+  PrerenderBrowserTestWithNaCl() {}
+  ~PrerenderBrowserTestWithNaCl() override {}
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    PrerenderBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitch(switches::kEnableNaCl);
+  }
+};
+
+// Check that NaCl plugins work when enabled, with prerendering.
+IN_PROC_BROWSER_TEST_F(PrerenderBrowserTestWithNaCl,
+                       PrerenderNaClPluginEnabled) {
+#if defined(OS_WIN) && defined(USE_ASH)
+  // Disable this test in Metro+Ash for now (http://crbug.com/262796).
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kAshBrowserTests))
+    return;
+#endif
+
+  PrerenderTestURL("files/prerender/prerender_plugin_nacl_enabled.html",
+                   FINAL_STATUS_USED,
+                   1);
+  NavigateToDestURL();
+
+  // To avoid any chance of a race, we have to let the script send its response
+  // asynchronously.
+  WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  bool display_test_result = false;
+  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(web_contents,
+                                                   "DidDisplayReallyPass()",
+                                                   &display_test_result));
+  ASSERT_TRUE(display_test_result);
+}
+#endif  // !defined(DISABLE_NACL)
 
 }  // namespace prerender

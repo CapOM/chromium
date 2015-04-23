@@ -22,8 +22,10 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_settings_test_utils.h"
 #include "net/base/backoff_entry.h"
 #include "net/log/test_net_log.h"
+#include "net/url_request/url_request_context_getter.h"
 #include "testing/gmock/include/gmock/gmock.h"
 
+class GURL;
 class TestingPrefServiceSimple;
 
 namespace base {
@@ -34,14 +36,13 @@ namespace net {
 class MockClientSocketFactory;
 class NetLog;
 class URLRequestContext;
-class URLRequestContextGetter;
 class URLRequestContextStorage;
 }
 
 namespace data_reduction_proxy {
 
 class DataReductionProxyConfigurator;
-class DataReductionProxyEventStore;
+class DataReductionProxyEventCreator;
 class DataReductionProxyMutableConfigValues;
 class DataReductionProxyRequestOptions;
 class DataReductionProxySettings;
@@ -49,6 +50,7 @@ class DataReductionProxyCompressionStats;
 class MockDataReductionProxyConfig;
 class TestDataReductionProxyConfig;
 class TestDataReductionProxyConfigurator;
+class TestDataReductionProxyEventStorageDelegate;
 class TestDataReductionProxyParams;
 
 // Test version of |DataReductionProxyRequestOptions|.
@@ -67,13 +69,16 @@ class TestDataReductionProxyRequestOptions
   // Time after the unix epoch that Now() reports.
   void set_offset(const base::TimeDelta& now_offset);
 
+  // Visible for testing.
+  const std::string& GetSecureSession() const override;
+
  private:
   base::TimeDelta now_offset_;
 };
 
 // Mock version of |DataReductionProxyRequestOptions|.
 class MockDataReductionProxyRequestOptions
-    : public DataReductionProxyRequestOptions {
+    : public TestDataReductionProxyRequestOptions {
  public:
   MockDataReductionProxyRequestOptions(Client client,
                                        const std::string& version,
@@ -103,6 +108,10 @@ class TestDataReductionProxyConfigServiceClient
   void SetCustomReleaseTime(const base::TimeTicks& release_time);
 
   base::TimeDelta GetDelay() const;
+
+  int GetBackoffErrorCount();
+
+  void SetConfigServiceURL(const GURL& service_url);
 
  protected:
   // Overrides of DataReductionProxyConfigServiceClient
@@ -155,7 +164,7 @@ class TestDataReductionProxyIOData : public DataReductionProxyIOData {
   TestDataReductionProxyIOData(
       scoped_refptr<base::SingleThreadTaskRunner> task_runner,
       scoped_ptr<DataReductionProxyConfig> config,
-      scoped_ptr<DataReductionProxyEventStore> event_store,
+      scoped_ptr<DataReductionProxyEventCreator> event_creator,
       scoped_ptr<DataReductionProxyRequestOptions> request_options,
       scoped_ptr<DataReductionProxyConfigurator> configurator,
       scoped_ptr<DataReductionProxyConfigServiceClient> config_client);
@@ -167,6 +176,11 @@ class TestDataReductionProxyIOData : public DataReductionProxyIOData {
 
   DataReductionProxyConfigServiceClient* config_client() const {
     return config_client_.get();
+  }
+
+  void SetSimpleURLRequestContextGetter(
+      const scoped_refptr<net::URLRequestContextGetter> context_getter) {
+    basic_url_request_context_getter_ = context_getter;
   }
 
   base::WeakPtr<DataReductionProxyIOData> GetWeakPtr() {
@@ -330,8 +344,8 @@ class DataReductionProxyTestContext {
     return request_context_getter_.get();
   }
 
-  DataReductionProxyEventStore* event_store() const {
-    return io_data_->event_store();
+  DataReductionProxyEventCreator* event_creator() const {
+    return io_data_->event_creator();
   }
 
   DataReductionProxyConfigurator* configurator() const {
@@ -380,6 +394,7 @@ class DataReductionProxyTestContext {
       net::MockClientSocketFactory* mock_socket_factory,
       scoped_ptr<TestDataReductionProxyIOData> io_data,
       scoped_ptr<DataReductionProxySettings> settings,
+      scoped_ptr<TestDataReductionProxyEventStorageDelegate> storage_delegate,
       TestDataReductionProxyParams* params,
       unsigned int test_context_flags);
 
@@ -402,6 +417,7 @@ class DataReductionProxyTestContext {
 
   scoped_ptr<TestDataReductionProxyIOData> io_data_;
   scoped_ptr<DataReductionProxySettings> settings_;
+  scoped_ptr<TestDataReductionProxyEventStorageDelegate> storage_delegate_;
 
   TestDataReductionProxyParams* params_;
 

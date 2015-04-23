@@ -36,12 +36,6 @@
 #include "ui/wm/public/activation_change_observer.h"
 #include "ui/wm/public/activation_client.h"
 
-#if defined(USE_X11)
-#include <X11/Xlib.h>
-#include "ui/gfx/x/x11_types.h"
-#undef RootWindow
-#endif
-
 namespace ash {
 namespace {
 
@@ -352,31 +346,10 @@ class TestEventHandler : public ui::EventHandler {
   DISALLOW_COPY_AND_ASSIGN(TestEventHandler);
 };
 
-gfx::Display::Rotation GetStoredRotation(int64 id) {
-  return Shell::GetInstance()->display_manager()->GetDisplayInfo(id).rotation();
-}
-
 float GetStoredUIScale(int64 id) {
   return Shell::GetInstance()->display_manager()->GetDisplayInfo(id).
       GetEffectiveUIScale();
 }
-
-#if defined(USE_X11)
-void GetPrimaryAndSeconary(aura::Window** primary,
-                           aura::Window** secondary) {
-  *primary = Shell::GetPrimaryRootWindow();
-  aura::Window::Windows root_windows = Shell::GetAllRootWindows();
-  *secondary = root_windows[0] == *primary ? root_windows[1] : root_windows[0];
-}
-
-std::string GetXWindowName(aura::WindowTreeHost* host) {
-  char* name = NULL;
-  XFetchName(gfx::GetXDisplay(), host->GetAcceleratedWidget(), &name);
-  std::string ret(name);
-  XFree(name);
-  return ret;
-}
-#endif
 
 class TestMouseWatcherListener : public views::MouseWatcherListener {
  public:
@@ -557,7 +530,7 @@ DisplayInfo CreateDisplayInfo(int64 id,
                               gfx::Display::Rotation rotation) {
   DisplayInfo info(id, "", false);
   info.SetBounds(gfx::Rect(0, y, 500, 500));
-  info.set_rotation(rotation);
+  info.SetRotation(rotation, gfx::Display::ROTATION_SOURCE_ACTIVE);
   return info;
 }
 
@@ -686,12 +659,14 @@ TEST_F(DisplayControllerTest, BoundsUpdated) {
   // Rotation
   observer.GetRotationChangedCountAndReset();  // we only want to reset.
   int64 primary_id = GetPrimaryDisplay().id();
-  display_manager->SetDisplayRotation(primary_id, gfx::Display::ROTATE_90);
+  display_manager->SetDisplayRotation(primary_id, gfx::Display::ROTATE_90,
+                                      gfx::Display::ROTATION_SOURCE_ACTIVE);
   EXPECT_EQ(1, observer.GetRotationChangedCountAndReset());
   EXPECT_EQ(1, observer.CountAndReset());
   EXPECT_EQ(0, observer.GetFocusChangedCountAndReset());
   EXPECT_EQ(0, observer.GetActivationChangedCountAndReset());
-  display_manager->SetDisplayRotation(primary_id, gfx::Display::ROTATE_90);
+  display_manager->SetDisplayRotation(primary_id, gfx::Display::ROTATE_90,
+                                      gfx::Display::ROTATION_SOURCE_ACTIVE);
   EXPECT_EQ(0, observer.GetRotationChangedCountAndReset());
   EXPECT_EQ(0, observer.CountAndReset());
   EXPECT_EQ(0, observer.GetFocusChangedCountAndReset());
@@ -1046,20 +1021,20 @@ TEST_F(DisplayControllerTest, Rotate) {
             ScreenUtil::GetSecondaryDisplay().bounds().ToString());
   generator1.MoveMouseToInHost(50, 40);
   EXPECT_EQ("50,40", event_handler.GetLocationAndReset());
-  EXPECT_EQ(gfx::Display::ROTATE_0, GetStoredRotation(display1.id()));
-  EXPECT_EQ(gfx::Display::ROTATE_0, GetStoredRotation(display2_id));
+  EXPECT_EQ(gfx::Display::ROTATE_0, GetActiveDisplayRotation(display1.id()));
+  EXPECT_EQ(gfx::Display::ROTATE_0, GetActiveDisplayRotation(display2_id));
   EXPECT_EQ(0, observer.GetRotationChangedCountAndReset());
 
-  display_manager->SetDisplayRotation(display1.id(),
-                                      gfx::Display::ROTATE_90);
+  display_manager->SetDisplayRotation(display1.id(), gfx::Display::ROTATE_90,
+                                      gfx::Display::ROTATION_SOURCE_ACTIVE);
   EXPECT_EQ("200x120", root_windows[0]->bounds().size().ToString());
   EXPECT_EQ("150x200", root_windows[1]->bounds().size().ToString());
   EXPECT_EQ("200,0 150x200",
             ScreenUtil::GetSecondaryDisplay().bounds().ToString());
   generator1.MoveMouseToInHost(50, 40);
   EXPECT_EQ("40,69", event_handler.GetLocationAndReset());
-  EXPECT_EQ(gfx::Display::ROTATE_90, GetStoredRotation(display1.id()));
-  EXPECT_EQ(gfx::Display::ROTATE_0, GetStoredRotation(display2_id));
+  EXPECT_EQ(gfx::Display::ROTATE_90, GetActiveDisplayRotation(display1.id()));
+  EXPECT_EQ(gfx::Display::ROTATE_0, GetActiveDisplayRotation(display2_id));
   EXPECT_EQ(1, observer.GetRotationChangedCountAndReset());
 
   DisplayLayout display_layout(DisplayLayout::BOTTOM, 50);
@@ -1067,30 +1042,30 @@ TEST_F(DisplayControllerTest, Rotate) {
   EXPECT_EQ("50,120 150x200",
             ScreenUtil::GetSecondaryDisplay().bounds().ToString());
 
-  display_manager->SetDisplayRotation(display2_id,
-                                      gfx::Display::ROTATE_270);
+  display_manager->SetDisplayRotation(display2_id, gfx::Display::ROTATE_270,
+                                      gfx::Display::ROTATION_SOURCE_ACTIVE);
   EXPECT_EQ("200x120", root_windows[0]->bounds().size().ToString());
   EXPECT_EQ("200x150", root_windows[1]->bounds().size().ToString());
   EXPECT_EQ("50,120 200x150",
             ScreenUtil::GetSecondaryDisplay().bounds().ToString());
-  EXPECT_EQ(gfx::Display::ROTATE_90, GetStoredRotation(display1.id()));
-  EXPECT_EQ(gfx::Display::ROTATE_270, GetStoredRotation(display2_id));
+  EXPECT_EQ(gfx::Display::ROTATE_90, GetActiveDisplayRotation(display1.id()));
+  EXPECT_EQ(gfx::Display::ROTATE_270, GetActiveDisplayRotation(display2_id));
   EXPECT_EQ(1, observer.GetRotationChangedCountAndReset());
 
 #if !defined(OS_WIN)
   ui::test::EventGenerator generator2(root_windows[1]);
   generator2.MoveMouseToInHost(50, 40);
   EXPECT_EQ("179,25", event_handler.GetLocationAndReset());
-  display_manager->SetDisplayRotation(display1.id(),
-                                      gfx::Display::ROTATE_180);
+  display_manager->SetDisplayRotation(display1.id(), gfx::Display::ROTATE_180,
+                                      gfx::Display::ROTATION_SOURCE_ACTIVE);
 
   EXPECT_EQ("120x200", root_windows[0]->bounds().size().ToString());
   EXPECT_EQ("200x150", root_windows[1]->bounds().size().ToString());
   // Dislay must share at least 100, so the x's offset becomes 20.
   EXPECT_EQ("20,200 200x150",
             ScreenUtil::GetSecondaryDisplay().bounds().ToString());
-  EXPECT_EQ(gfx::Display::ROTATE_180, GetStoredRotation(display1.id()));
-  EXPECT_EQ(gfx::Display::ROTATE_270, GetStoredRotation(display2_id));
+  EXPECT_EQ(gfx::Display::ROTATE_180, GetActiveDisplayRotation(display1.id()));
+  EXPECT_EQ(gfx::Display::ROTATE_270, GetActiveDisplayRotation(display2_id));
   EXPECT_EQ(1, observer.GetRotationChangedCountAndReset());
 
   generator1.MoveMouseToInHost(50, 40);
@@ -1306,32 +1281,6 @@ TEST_F(DisplayControllerTest, ReplaceSwappedPrimary) {
 
   EXPECT_EQ(20, Shell::GetScreen()->GetPrimaryDisplay().id());
 }
-
-#if defined(USE_X11)
-TEST_F(DisplayControllerTest, XWidowNameForRootWindow) {
-  EXPECT_EQ("aura_root_0", GetXWindowName(
-      Shell::GetPrimaryRootWindow()->GetHost()));
-
-  // Multiple display.
-  UpdateDisplay("200x200,300x300");
-  aura::Window* primary, *secondary;
-  GetPrimaryAndSeconary(&primary, &secondary);
-  EXPECT_EQ("aura_root_0", GetXWindowName(primary->GetHost()));
-  EXPECT_EQ("aura_root_x", GetXWindowName(secondary->GetHost()));
-
-  // Swap primary.
-  primary = secondary = NULL;
-  Shell::GetInstance()->display_controller()->SwapPrimaryDisplay();
-  GetPrimaryAndSeconary(&primary, &secondary);
-  EXPECT_EQ("aura_root_0", GetXWindowName(primary->GetHost()));
-  EXPECT_EQ("aura_root_x", GetXWindowName(secondary->GetHost()));
-
-  // Switching back to single display.
-  UpdateDisplay("300x400");
-  EXPECT_EQ("aura_root_0", GetXWindowName(
-      Shell::GetPrimaryRootWindow()->GetHost()));
-}
-#endif
 
 TEST_F(DisplayControllerTest, UpdateMouseLocationAfterDisplayChange) {
   if (!SupportsMultipleDisplays())

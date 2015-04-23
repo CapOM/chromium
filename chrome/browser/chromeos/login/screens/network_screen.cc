@@ -224,6 +224,10 @@ std::string NetworkScreen::GetTimezone() const {
   return timezone_;
 }
 
+void NetworkScreen::CreateNetworkFromOnc(const std::string& onc_spec) {
+  network_state_helper_->CreateNetworkFromOnc(onc_spec);
+}
+
 void NetworkScreen::AddObserver(Observer* observer) {
   if (observer)
     observers_.AddObserver(observer);
@@ -370,7 +374,7 @@ void NetworkScreen::OnLanguageListResolved(
     scoped_ptr<base::ListValue> new_language_list,
     std::string new_language_list_locale,
     std::string new_selected_language) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
 
   language_list_.reset(new_language_list.release());
   language_list_locale_ = new_language_list_locale;

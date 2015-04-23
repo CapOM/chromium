@@ -560,7 +560,8 @@ void OmniboxEditModel::Revert() {
 
 void OmniboxEditModel::StartAutocomplete(
     bool has_selected_text,
-    bool prevent_inline_autocomplete) {
+    bool prevent_inline_autocomplete,
+    bool entering_keyword_mode) {
   // TODO(vadimt): Remove ScopedTracker below once crbug.com/440919 is fixed.
   tracked_objects::ScopedTracker tracking_profile(
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
@@ -570,12 +571,17 @@ void OmniboxEditModel::StartAutocomplete(
     // Cursor position is equivalent to the current selection's end.
     size_t start;
     view_->GetSelectionBounds(&start, &cursor_position);
-    // Adjust cursor position taking into account possible keyword in the user
-    // text.  We rely on DisplayTextFromUserText() method which is consistent
-    // with keyword extraction done in KeywordProvider/SearchProvider.
-    const size_t cursor_offset =
-        user_text_.length() - DisplayTextFromUserText(user_text_).length();
-    cursor_position += cursor_offset;
+    // If we're in keyword mode, we're not displaying the full |user_text_|, so
+    // the cursor position we got from the view has to be adjusted later by the
+    // length of the undisplayed text.  If we're just entering keyword mode,
+    // though, we have to avoid making this adjustment, because we haven't
+    // actually hidden any text yet, but the caller has already cleared
+    // |is_keyword_hint_|, so DisplayTextFromUserText() will believe we are
+    // already in keyword mode, and will thus mis-adjust the cursor position.
+    if (!entering_keyword_mode) {
+      cursor_position +=
+          user_text_.length() - DisplayTextFromUserText(user_text_).length();
+    }
   } else {
     // There are some cases where StartAutocomplete() may be called
     // with non-empty |inline_autocomplete_text_|.  In such cases, we cannot
@@ -894,16 +900,40 @@ bool OmniboxEditModel::AcceptKeyword(EnteredKeywordModeMethod entered_method) {
   if (popup_model() && popup_model()->IsOpen())
     popup_model()->SetSelectedLineState(OmniboxPopupModel::KEYWORD);
   else
-    StartAutocomplete(false, true);
+    StartAutocomplete(false, true, true);
 
-  // Ensure the current selection is saved before showing keyword mode
-  // so that moving to another line and then reverting the text will restore
-  // the current state properly.
-  bool save_original_selection = !has_temporary_text_;
-  has_temporary_text_ = true;
-  view_->OnTemporaryTextMaybeChanged(
-      DisplayTextFromUserText(CurrentMatch(NULL).fill_into_edit),
-      save_original_selection, true);
+  // When entering keyword mode via tab, the new text to show is whatever the
+  // newly-selected match in the dropdown is.  When entering via space, however,
+  // we should make sure to use the actual |user_text_| as the basis for the new
+  // text.  This ensures that if the user types "<keyword><space>" and the
+  // default match would have inline autocompleted a further string (e.g.
+  // because there's a past multi-word search beginning with this keyword), the
+  // inline autocompletion doesn't get filled in as the keyword search query
+  // text.
+  //
+  // We also treat tabbing into keyword mode like tabbing through the popup in
+  // that we set |has_temporary_text_|, whereas pressing space is treated like
+  // a new keystroke that changes the current match instead of overlaying it
+  // with a temporary one.  This is important because rerunning autocomplete
+  // after the user pressed space, which will have happened just before reaching
+  // here, may have generated a new match, which the user won't actually see and
+  // which we don't want to switch back to when existing keyword mode; see
+  // comments in ClearKeyword().
+  if (entered_method == ENTERED_KEYWORD_MODE_VIA_TAB) {
+    // Ensure the current selection is saved before showing keyword mode
+    // so that moving to another line and then reverting the text will restore
+    // the current state properly.
+    bool save_original_selection = !has_temporary_text_;
+    has_temporary_text_ = true;
+    const AutocompleteMatch& match = CurrentMatch(NULL);
+    original_url_ = match.destination_url;
+    view_->OnTemporaryTextMaybeChanged(
+        DisplayTextFromUserText(match.fill_into_edit),
+        save_original_selection, true);
+  } else {
+    view_->OnTemporaryTextMaybeChanged(DisplayTextFromUserText(user_text_),
+                                       false, true);
+  }
 
   view_->UpdatePlaceholderText();
 
@@ -922,29 +952,41 @@ void OmniboxEditModel::AcceptTemporaryTextAsUserText() {
     delegate_->OnInputStateChanged();
 }
 
-void OmniboxEditModel::ClearKeyword(const base::string16& visible_text) {
+void OmniboxEditModel::ClearKeyword() {
   autocomplete_controller()->Stop(false);
   omnibox_controller_->ClearPopupKeywordMode();
 
-  const base::string16 window_text(keyword_ + visible_text);
+  const base::string16 window_text(keyword_ + view_->GetText());
 
-  // Only reset the result if the edit text has changed since the
-  // keyword was accepted, or if the popup is closed.
-  if (just_deleted_text_ || !visible_text.empty() ||
-      !(popup_model() && popup_model()->IsOpen())) {
+  // If we've tabbed into keyword mode and haven't done anything else,
+  // |has_temporary_text_| will be true, and we should just revert into keyword
+  // hint mode; otherwise we do a more complete state update/revert via
+  // OnBefore/AfterPossibleChange().
+  //
+  // If we were to do the "complete state revert" all the time, then in cases
+  // where our associated keyword match is in the middle of the popup instead of
+  // on the first line, tabbing into it and then hitting shift-tab would reset
+  // the entire popup contents, and we'd wind up with the first line selected.
+  //
+  // If we were instead to "just switch back to keyword hint mode" all the time,
+  // we could wind up with strange state in some cases.  For example, if a user
+  // has a keyword named "x", an inline-autocompletable history site "xyz.com",
+  // and a lower-ranked inline-autocompletable search "x y", then typing "x"
+  // will inline autocomplete to "xyz.com", hitting space will toggle into
+  // keyword mode, but then hitting backspace might wind up with the default
+  // match as the "x y" search, due to the particulars of how we re-run
+  // autocomplete for "x " before toggling into keyword mode to begin with.
+  if (has_temporary_text_) {
+    is_keyword_hint_ = true;
+    view_->SetWindowTextAndCaretPos(window_text.c_str(), keyword_.length(),
+        false, true);
+  } else {
     view_->OnBeforePossibleChange();
     view_->SetWindowTextAndCaretPos(window_text.c_str(), keyword_.length(),
         false, false);
     keyword_.clear();
     is_keyword_hint_ = false;
     view_->OnAfterPossibleChange();
-    just_deleted_text_ = true;  // OnAfterPossibleChange() fails to clear this
-                                // since the edit contents have actually grown
-                                // longer.
-  } else {
-    is_keyword_hint_ = true;
-    view_->SetWindowTextAndCaretPos(window_text.c_str(), keyword_.length(),
-        false, true);
   }
 
   view_->UpdatePlaceholderText();
@@ -1375,7 +1417,11 @@ void OmniboxEditModel::GetInfoForCurrentText(AutocompleteMatch* match,
       // have gotten here.
       CHECK(!result().empty());
       CHECK(popup_model()->selected_line() < result().size());
-      *match = result().match_at(popup_model()->selected_line());
+      const AutocompleteMatch& selected_match =
+          result().match_at(popup_model()->selected_line());
+      *match =
+          (popup_model()->selected_line_state() == OmniboxPopupModel::KEYWORD) ?
+              *selected_match.associated_keyword : selected_match;
     }
     if (alternate_nav_url &&
         (!popup_model() || popup_model()->manually_selected_match().empty()))
@@ -1402,8 +1448,7 @@ void OmniboxEditModel::RevertTemporaryText(bool revert_popup) {
 bool OmniboxEditModel::MaybeAcceptKeywordBySpace(
     const base::string16& new_text) {
   size_t keyword_length = new_text.length() - 1;
-  return (paste_state_ == NONE) && is_keyword_hint_ && !keyword_.empty() &&
-      inline_autocomplete_text_.empty() &&
+  return (paste_state_ == NONE) && is_keyword_hint_ &&
       (keyword_.length() == keyword_length) &&
       IsSpaceCharForAcceptingKeyword(new_text[keyword_length]) &&
       !new_text.compare(0, keyword_length, keyword_, 0, keyword_length) &&

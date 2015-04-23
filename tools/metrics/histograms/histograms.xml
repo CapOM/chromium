@@ -8577,8 +8577,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="ExtensionInstallSigner.InvalidCount">
+  <owner>asargent@chromium.org</owner>
+  <summary>
+    This is a count of the number of ids that we asked to be signed which the
+    server response indicated were not in the webstore.
+  </summary>
+</histogram>
+
 <histogram name="ExtensionInstallSigner.RequestCount">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     A count of the number of server requests since Chrome started running,
     recorded each time we do a request. NOTE: when interpreting these values,
@@ -8588,7 +8596,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="ExtensionInstallSigner.ResultWasValid">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Whether the server result received by the extensions install signer was
     valid or invalid.
@@ -8597,7 +8605,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="ExtensionInstallSigner.SecondsSinceLastRequest"
     units="seconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     This records the number of seconds since the last time we've done a request
     to the server (only during this run of the browser).
@@ -8605,7 +8613,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="ExtensionInstallSigner.UptimeAtTimeOfRequest" units="seconds">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>asargent@chromium.org</owner>
   <summary>
     Records how many seconds the browser has been running at the time a request
     to the server is made to get a new install signature.
@@ -9666,6 +9674,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Extensions.LoadContentPack">
   <owner>asargent@chromium.org</owner>
+  <obsolete>
+    Deprecated as of 4/2015. Replaced by ManagedUsers.Whitelist.Count.
+  </obsolete>
   <summary>
     The number of content-pack extensions loaded at browser startup.
   </summary>
@@ -11394,6 +11405,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="GPU.ANGLE.D3D11CreateDeviceMS" units="milliseconds">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    The time that elapses for the initial call to D3D11CreateDevice on D3D11
+    ANGLE. A pure system call, with no ANGLE or Chromium code, called once every
+    GPU process startup.
+  </summary>
+</histogram>
+
 <histogram name="GPU.ANGLE.D3D11InitializeResult" enum="D3D11InitializeResult">
   <owner>jmadill@chromium.org</owner>
   <summary>
@@ -12559,6 +12579,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="InstallSigner.InvalidCount">
+  <obsolete>
+    Deprecated 4/2015. It appears the code at some point changed to use the
+    histogram name 'ExtensionInstallSigner.InvalidCount' and we forgot to update
+    this histogram name.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     This is a count of the number of ids that we asked to be signed which the
@@ -13087,6 +13112,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="interstitial.ssl.good_cert_seen" enum="SSLGoodCertSeenEvent">
+  <owner>jww@chromium.org</owner>
+  <summary>
+    Emitted when a good certificate is seen, specifying whether the user already
+    gave an exception for a bad certificate for the same host.
+  </summary>
+</histogram>
+
 <histogram name="interstitial.ssl.severity_score.authority_invalid" units="%">
   <obsolete>
     Deprecated Jan 2015 (M42).
@@ -13191,6 +13224,57 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Records whether or not an invalid Android Intent was fired to launch Chrome.
     (http://crbug.com/445136)
+  </summary>
+</histogram>
+
+<histogram name="Layout.MicroSecondsPerComplexText" units="microseconds">
+  <owner>benjhayden@chromium.org</owner>
+  <summary>
+    For layouts that considered at least 100 nodes, at least half of which were
+    complex text fragments, the average number of microseconds spent laying out
+    each node.
+  </summary>
+</histogram>
+
+<histogram name="Layout.MicroSecondsPerFloat" units="microseconds">
+  <owner>benjhayden@chromium.org</owner>
+  <summary>
+    For layouts that considered at least 100 nodes, at least half of which were
+    floats, the average number of microseconds spent laying out each node.
+  </summary>
+</histogram>
+
+<histogram name="Layout.MicroSecondsPerNode" units="microseconds">
+  <owner>benjhayden@chromium.org</owner>
+  <summary>
+    For layouts that considered at least 100 nodes, the average number of
+    microseconds spent laying out each node.
+  </summary>
+</histogram>
+
+<histogram name="Layout.MicroSecondsPerPositioned" units="microseconds">
+  <owner>benjhayden@chromium.org</owner>
+  <summary>
+    For layouts that considered at least 100 nodes, at least half of which were
+    fixed or absolute positioned, the average number of microseconds spent
+    laying out each node.
+  </summary>
+</histogram>
+
+<histogram name="Layout.MicroSecondsPerSimpleText" units="microseconds">
+  <owner>benjhayden@chromium.org</owner>
+  <summary>
+    For layouts that considered at least 100 nodes, at least half of which were
+    simple text fragments, the average number of microseconds spent laying out
+    each node.
+  </summary>
+</histogram>
+
+<histogram name="Layout.MicroSecondsPerTD" units="microseconds">
+  <owner>benjhayden@chromium.org</owner>
+  <summary>
+    For layouts that considered at least 100 nodes, at least half of which were
+    table cells, the average number of microseconds spent laying out each node.
   </summary>
 </histogram>
 
@@ -13637,6 +13721,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Time from first display of the login prompt until the user completes signing
     in.
   </summary>
+</histogram>
+
+<histogram name="Login.StateKeyGenerationStatus"
+    enum="LoginStateKeyGenerationStatus">
+  <owner>mnissler@chromium.org</owner>
+  <summary>Result of a state key generation operation.</summary>
 </histogram>
 
 <histogram name="Login.SuccessReason" enum="LoginSuccessReason">
@@ -25447,6 +25537,81 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Stats documenting how we handle every form containing a password, bucketed
     by the actions taken.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationBackend.FetchSize" units="facets">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    The number of facets for which affiliation information was requested in a
+    network fetch. Recorded for each network fetch.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationBackend.FirstFetchDelay"
+    units="milliseconds">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    The time elapsed between creation of the AffiliationBackend and the first
+    time it needed to issue a network fetch.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationBackend.SubsequentFetchDelay"
+    units="milliseconds">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    The elapsed time between subsequent network fetches. Recorded whenever the
+    AffiliationBackend initiated a network fetch, regardless of success or
+    failure.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationDummyData.RequestResultCount"
+    units="results">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    The number of facets affiliated with a dummy Web facet, according to the
+    affiliation information retrieved from the cache. Recorded for each dummy
+    Web facet, once shortly after start-up, and then periodically every hour;
+    but only if getting affiliations succeeded for the Web facet.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationDummyData.RequestSuccess"
+    enum="BooleanSuccess">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    Whether or not affiliations of a dummy Web facet could be successfully
+    retrieved from the cache. Recorded for each dummy Web facet, once shortly
+    after start-up, and then periodically every hour.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationFetcher.FetchErrorCode"
+    enum="NetErrorCodes">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    The network error code, as reported by the underlying URLFetcher. Recorded
+    only for each network fetch that failed due to network/server errors.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationFetcher.FetchHttpResponseCode"
+    enum="HttpResponseCode">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    The HTTP response code, as reported by the underlying URLFetcher. Recorded
+    only for each network fetch that failed due to network/server errors.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.AffiliationFetcher.FetchResult"
+    enum="AffiliationFetchResult">
+  <owner>engedy@chromium.org</owner>
+  <summary>
+    Whether the network fetch succeeded, failed due to network/server errors, or
+    contained malformed data. Recorded for each network fetch.
   </summary>
 </histogram>
 
@@ -39689,17 +39854,35 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during app association.</summary>
 </histogram>
 
+<histogram name="Sync.AppsConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of app configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.AppSettingsAssociationTime" units="milliseconds">
   <owner>zea@chromium.org</owner>
   <summary>Time taken during app settings association.</summary>
 </histogram>
 
+<histogram name="Sync.AppSettingsConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of app settings configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.AppSettingsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by AppSettingsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of app settings association failures.</summary>
 </histogram>
 
 <histogram name="Sync.AppsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by AppsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of app association failures.</summary>
 </histogram>
@@ -39796,6 +39979,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during autofill association.</summary>
 </histogram>
 
+<histogram name="Sync.AutofillConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of autofill configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.AutofillProfileAssociationTime" units="milliseconds">
   <owner>zea@chromium.org</owner>
   <summary>
@@ -39821,7 +40009,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during autofill profile association.</summary>
 </histogram>
 
+<histogram name="Sync.AutofillProfilesConfigureFailure"
+    enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of autofill profile configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.AutofillProfilesStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by AutofillProfilesConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Enumeration of types of autofill profile association failures.
@@ -39852,6 +40051,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Sync.AutofillStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by AutofillConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of autofill association failures.</summary>
 </histogram>
@@ -39935,7 +40137,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during bookmark association.</summary>
 </histogram>
 
+<histogram name="Sync.BookmarksConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of bookmark configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.BookmarksStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by BookmarksConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of bookmark association failures.</summary>
 </histogram>
@@ -40142,7 +40352,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during dictionary association.</summary>
 </histogram>
 
+<histogram name="Sync.DictionaryConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of dictionary configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.DictionaryStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by DictionaryConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of dictionary association failures.</summary>
 </histogram>
@@ -40223,12 +40441,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during extension association.</summary>
 </histogram>
 
+<histogram name="Sync.ExtensionsConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of extension configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.ExtensionSettingsAssociationTime" units="milliseconds">
   <owner>zea@chromium.org</owner>
   <summary>Time taken during extension settings association.</summary>
 </histogram>
 
+<histogram name="Sync.ExtensionSettingsConfigureFailure"
+    enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of extension settings configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.ExtensionSettingsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by ExtensionSettingsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Enumeration of types of extension settings association failures.
@@ -40236,6 +40470,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Sync.ExtensionsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by ExtensionsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of extension association failures.</summary>
 </histogram>
@@ -40266,7 +40503,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during favicon images association.</summary>
 </histogram>
 
+<histogram name="Sync.FaviconImagesConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of favicon images configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.FaviconImagesStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by FaviconImagesConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Enumeration of types of favicon images association failures.
@@ -40286,7 +40533,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during favicon tracking association.</summary>
 </histogram>
 
+<histogram name="Sync.FaviconTrackingConfigureFailure"
+    enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of favicon tracking configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.FaviconTrackingStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by FaviconTrackingConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Enumeration of types of favicon tracking association failures.
@@ -40512,7 +40770,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during password association.</summary>
 </histogram>
 
+<histogram name="Sync.PasswordsConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of password configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.PasswordsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by PasswordsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of password association failures.</summary>
 </histogram>
@@ -40552,7 +40818,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during preference association.</summary>
 </histogram>
 
+<histogram name="Sync.PreferencesConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of preference configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.PreferencesStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by PreferencesConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of preference association failures.</summary>
 </histogram>
@@ -40623,7 +40897,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during search engine association.</summary>
 </histogram>
 
+<histogram name="Sync.SearchEnginesConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of search engine configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.SearchEnginesStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by SearchEnginesConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of search engine association failures.</summary>
 </histogram>
@@ -40677,7 +40961,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during session association.</summary>
 </histogram>
 
+<histogram name="Sync.SessionsConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of session configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.SessionsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by SessionsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of session association failures.</summary>
 </histogram>
@@ -40761,7 +41053,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during synced notifications association.</summary>
 </histogram>
 
+<histogram name="Sync.SyncedNotificationsConfigureFailure"
+    enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of synced notifications configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.SyncedNotificationsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by SyncedNotificationsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Enumeration of types of synced notifications association failures.
@@ -40824,7 +41127,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during theme association.</summary>
 </histogram>
 
+<histogram name="Sync.ThemesConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of theme configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.ThemesStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by ThemesConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of theme association failures.</summary>
 </histogram>
@@ -40882,7 +41193,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during typed url association.</summary>
 </histogram>
 
+<histogram name="Sync.TypedUrlsConfigureFailure" enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of types of typed url configuration failures.</summary>
+</histogram>
+
 <histogram name="Sync.TypedUrlsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by TypedUrlsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of typed url association failures.</summary>
 </histogram>
@@ -40936,7 +41255,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time taken during WiFi credentials association.</summary>
 </histogram>
 
+<histogram name="Sync.WifiCredentialsConfigureFailure"
+    enum="SyncConfigureResult">
+  <owner>zea@chromium.org</owner>
+  <summary>
+    Enumeration of types of WiFi credentials configuration failures.
+  </summary>
+</histogram>
+
 <histogram name="Sync.WifiCredentialsStartFailure" enum="SyncStartResult">
+  <obsolete>
+    Replaced by WifiCredentialsConfigureFailure. See crbug.com/478226.
+  </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>
     Enumeration of types of WiFi credentials association failures.
@@ -44140,6 +44470,49 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="WebCore.IndexedDB.Schema.Index.KeyPathType"
+    enum="IDBKeyPathType">
+  <owner>jsbell@chromium.org</owner>
+  <summary>
+    Records the 'keyPath' type (none, string, or array) during IDBObjectStore's
+    createIndex operation. See http://www.w3.org/TR/IndexedDB/
+  </summary>
+</histogram>
+
+<histogram name="WebCore.IndexedDB.Schema.Index.MultiEntry" enum="Boolean">
+  <owner>jsbell@chromium.org</owner>
+  <summary>
+    Records the 'multiEntry' flag value during IDBObjectStore's createIndex
+    operation. See http://www.w3.org/TR/IndexedDB/
+  </summary>
+</histogram>
+
+<histogram name="WebCore.IndexedDB.Schema.Index.Unique" enum="Boolean">
+  <owner>jsbell@chromium.org</owner>
+  <summary>
+    Records the 'unique' flag value during IDBObjectStore's createIndex
+    operation. See http://www.w3.org/TR/IndexedDB/
+  </summary>
+</histogram>
+
+<histogram name="WebCore.IndexedDB.Schema.ObjectStore.AutoIncrement"
+    enum="Boolean">
+  <owner>jsbell@chromium.org</owner>
+  <summary>
+    Records the 'autoIncrement' flag value during IDBDatabase's
+    createObjectStore operation. See http://www.w3.org/TR/IndexedDB/
+  </summary>
+</histogram>
+
+<histogram name="WebCore.IndexedDB.Schema.ObjectStore.KeyPathType"
+    enum="IDBKeyPathType">
+  <owner>jsbell@chromium.org</owner>
+  <summary>
+    Records the 'keyPath' type (none, string, or array) during IDBDatabase's
+    createObjectStore operation. See http://www.w3.org/TR/IndexedDB/
+  </summary>
+</histogram>
+
 <histogram name="WebCore.PreloadDelayMs" units="milliseconds">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
@@ -45723,6 +46096,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="0" label="Unspecified"/>
   <int value="1" label="IPv4"/>
   <int value="2" label="IPv6"/>
+</enum>
+
+<enum name="AffiliationFetchResult" type="int">
+  <int value="0" label="Success"/>
+  <int value="1" label="Network/server error"/>
+  <int value="2" label="Malformed response"/>
 </enum>
 
 <enum name="AlternateProtocolUsage" type="int">
@@ -48260,6 +48639,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="295718620" label="cespy.dll"/>
   <int value="313484566" label="vntsrv.dll"/>
   <int value="447643466" label="libinject.dll"/>
+  <int value="604217493" label="explorerex.dll"/>
   <int value="685821492" label="smdmf.dll"/>
   <int value="750761702" label="systemk.dll"/>
   <int value="777975221" label="activedetect32.dll"/>
@@ -49073,8 +49453,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="16" label="Install attributes timeout">
     Lockbox initialization took too long to complete.
   </int>
-  <int value="17" label="Re-enrollment: lock domain mismatch">
-    Lockbox error at re-enrollment: domain does not match install attributes.
+  <int value="17" label="Lockbox domain mismatch on re-enrollment">
+    Lockbox error on re-enrollment: domain does not match install attributes.
   </int>
   <int value="18" label="Registration/fetch: missing licenses">
     Registration / policy fetch failed: DM server reports licenses expired or
@@ -49176,6 +49556,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </int>
   <int value="49" label="Lockbox inconsistent read back">
     Lockbox read back is inconsistent.
+  </int>
+  <int value="50" label="Device attributes update failed">
+    Failed to update device attributes.
+  </int>
+  <int value="51" label="Lockbox device mode mismatch on re-enrollment">
+    Lockbox error on re-enrollment: mode does not match install attributes.
   </int>
 </enum>
 
@@ -49570,6 +49956,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="298" label="Maximize the first browser window on first run"/>
   <int value="299"
       label="Allow users to opt in to Safe Browsing extended reporting"/>
+  <int value="300" label="Allow proceeding from the SSL warning page"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -50883,6 +51270,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1007" label="DEVELOPERPRIVATE_SHOWOPTIONS"/>
   <int value="1008" label="DEVELOPERPRIVATE_SHOWPATH"/>
   <int value="1009" label="FILEMANAGERPRIVATE_ADDPROVIDEDFILESYSTEM"/>
+  <int value="1010" label="FILEMANAGERPRIVATE_CONFIGUREPROVIDEDFILESYSTEM"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -51972,6 +52360,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="V8HTMLTextAreaElement_Autocapitalize_AttributeSetter"/>
   <int value="758" label="SVGHrefBaseVal"/>
   <int value="759" label="SVGHrefAnimVal"/>
+  <int value="760" label="AutocapitalizeAttribute"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -53149,6 +53538,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="InternalsPage">
     A forced close was requested from the indexeddb-internals page.
   </int>
+</enum>
+
+<enum name="IDBKeyPathType" type="int">
+  <int value="0" label="None">No key path.</int>
+  <int value="1" label="String">Key path is a string.</int>
+  <int value="2" label="Array">Key path is an array of strings.</int>
 </enum>
 
 <enum name="IDBLevelDBBackingStoreInternalErrorType" type="int">
@@ -54782,6 +55177,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-820041355" label="enable-transition-compositing"/>
   <int value="-814097014" label="disable-session-crashed-bubble"/>
   <int value="-813474479" label="site-per-process"/>
+  <int value="-802348444" label="disable-site-engagement-service"/>
   <int value="-795600188" label="disable-async-dns"/>
   <int value="-780798969" label="disable-single-click-autofill"/>
   <int value="-770319039" label="enable-touch-editing"/>
@@ -54805,6 +55201,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-562274241" label="enable-extension-action-redesign"/>
   <int value="-560551550" label="use-memory-pressure-chromeos"/>
   <int value="-536289234" label="ssl-interstitial-v2-colorful"/>
+  <int value="-519960638" label="enable-site-engagement-service"/>
   <int value="-516845951" label="enable-embedded-extension-options"/>
   <int value="-512971943" label="disable-one-copy"/>
   <int value="-510488450" label="disable-pnacl"/>
@@ -54907,6 +55304,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="625273056" label="disable-boot-animation"/>
   <int value="630947363" label="touch-events"/>
   <int value="643725031" label="disable-touch-feedback"/>
+  <int value="683410401"
+      label="enable-proximity-auth-bluetooth-low-energy-discovery"/>
   <int value="689489984" label="disable-zero-suggest"/>
   <int value="709850261" label="disable-touch-editing"/>
   <int value="711424932" label="enable-cloud-print-xps"/>
@@ -55010,6 +55409,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1505194447" label="disable-transition-compositing"/>
   <int value="1510476448" label="disable-prefixed-encrypted-media"/>
   <int value="1515196403" label="fast-user-switching"/>
+  <int value="1560188739" label="reader-mode-heuristics"/>
   <int value="1589341623" label="disable-easy-unlock"/>
   <int value="1612974229" label="allow-insecure-localhost"/>
   <int value="1622131033" label="ozone-test-single-overlay-support"/>
@@ -55138,6 +55538,24 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="41" label="UNUSED">Unused</int>
   <int value="42" label="NO_KEY_NO_POLICY">Un-owned</int>
   <int value="43" label="RESERVED">Reserved</int>
+</enum>
+
+<enum name="LoginStateKeyGenerationStatus" type="int">
+  <summary>The result of a state key generation operation.</summary>
+  <int value="0" label="GENERATION_METHOD_IDENTIFIER_HASH">
+    Successfully generated state keys from machine identifiers.
+  </int>
+  <int value="1" label="GENERATION_METHOD_HMAC_DEVICE_SECRET">
+    Successfully generated state keys from stable device secret.
+  </int>
+  <int value="2" label="MISSING_IDENTIFIERS">
+    Failed due to missing machine IDs.
+  </int>
+  <int value="3" label="BAD_DEVICE_SECRET">
+    Failed due to invalid device secret input.
+  </int>
+  <int value="4" label="HMAC_INIT_FAILURE">HMAC initialization failed.</int>
+  <int value="5" label="HMAC_SIGN_FAILURE">HMAC computation failed.</int>
 </enum>
 
 <enum name="LoginSuccessReason" type="int">
@@ -62169,6 +62587,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="9" label="UNKNOWN"/>
 </enum>
 
+<enum name="SSLGoodCertSeenEvent" type="int">
+  <int value="0" label="NO_PREVIOUS_EXCEPTION"/>
+  <int value="1" label="HAD_PREVIOUS_EXCEPTION"/>
+</enum>
+
 <enum name="SSLIsExpiredAndDecision" type="int">
   <int value="0" label="EXPIRED_AND_PROCEED"/>
   <int value="1" label="EXPIRED_AND_DO_NOT_PROCEED"/>
@@ -62193,6 +62616,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="102" label="ALPN, SPDY 3.1"/>
   <int value="103" label="ALPN, HTTP/2 draft-14"/>
   <int value="104" label="ALPN, HTTP/2 draft-15"/>
+  <int value="107" label="ALPN, HTTP/2"/>
   <int value="200" label="ALPN, QUIC/1 + SPDY/3"/>
   <int value="501" label="NPN, HTTP/1.1"/>
   <int value="600" label="NPN, SPDY 2.0"/>
@@ -62200,6 +62624,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="602" label="NPN, SPDY 3.1"/>
   <int value="603" label="NPN, HTTP/2 draft-14"/>
   <int value="604" label="NPN, HTTP/2 draft-15"/>
+  <int value="607" label="NPN, HTTP/2"/>
   <int value="700" label="NPN, QUIC/1 + SPDY/3"/>
   <int value="1001" label="NPN, fallback to HTTP/1.1"/>
   <int value="1100" label="NPN, fallback to SPDY 2.0"/>
@@ -62207,6 +62632,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1102" label="NPN, fallback to SPDY 3.1"/>
   <int value="1103" label="NPN, fallback to HTTP/2 draft-14"/>
   <int value="1104" label="NPN, fallback to HTTP/2 draft-15"/>
+  <int value="1107" label="NPN, fallback to HTTP/2"/>
   <int value="1200" label="NPN, fallback to QUIC/1 + SPDY/3"/>
 </enum>
 
@@ -62549,6 +62975,20 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Expected restored types but found none"/>
   <int value="2" label="Did not expect restored types and found none"/>
   <int value="3" label="Did not expect restored types but found some"/>
+</enum>
+
+<enum name="SyncConfigureResult" type="int">
+  <summary>
+    Sync data type configure results. The codes are listed in
+    data_type_controller.h with more details.
+  </summary>
+  <int value="0" label="OK"/>
+  <int value="1" label="OK_FIRST_RUN"/>
+  <int value="2" label="ASSOCIATION_FAILED"/>
+  <int value="3" label="ABORTED"/>
+  <int value="4" label="UNRECOVERABLE_ERROR"/>
+  <int value="5" label="NEEDS_CRYPTO"/>
+  <int value="6" label="RUNTIME_ERROR"/>
 </enum>
 
 <enum name="SyncCryptographerPendingKeysState" type="int">
@@ -63897,6 +64337,17 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="CaptivePortal.Session.DiscrepancyWithShill"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="AffiliationDummyData" separator=".">
+  <suffix name="OnStartup"
+      label="with the dummy data being requested shortly after start-up"/>
+  <suffix name="Periodic"
+      label="with the dummy data being requested periodically later"/>
+  <affected-histogram
+      name="PasswordManager.AffiliationDummyData.RequestResultCount"/>
+  <affected-histogram
+      name="PasswordManager.AffiliationDummyData.RequestSuccess"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="AlternateProtocol">
   <suffix name="AlternateProtocol_spdy"
       label="with alternate protocol available but http is used"/>
@@ -64354,7 +64805,47 @@ To add a new entry, add it with any value and run test to compute valid value.
 <histogram_suffixes name="DataReductionProxy_TamperingTotal" separator="_">
   <suffix name="Total" label="total number of tamperings detected"/>
   <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTP"/>
+  <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTP_CSS"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_0_10KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_100_500KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_10_100KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_500KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_GIF"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_JPG"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_PNG"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTP_Image_WEBP"/>
+  <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTP_JS"/>
   <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTPS"/>
+  <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTPS_CSS"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_0_10KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_100_500KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_10_100KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_500KB"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_GIF"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_JPG"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_PNG"/>
+  <affected-histogram
+      name="DataReductionProxy.HeaderTamperDetectionHTTPS_Image_WEBP"/>
+  <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTPS_JS"/>
   <affected-histogram name="DataReductionProxy.HeaderTamperDetectionPassHTTP"/>
   <affected-histogram name="DataReductionProxy.HeaderTamperDetectionPassHTTPS"/>
   <affected-histogram name="DataReductionProxy.HeaderTamperedHTTP_ChromeProxy"/>
@@ -64389,6 +64880,22 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="DataReductionProxy.HeaderTamperedHTTPS_Via"/>
   <affected-histogram
       name="DataReductionProxy.HeaderTamperedHTTPS_Via_Missing"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="DataReductionProxy_TotalCounts" separator="_">
+  <suffix name="JS" label="JavaScript count"/>
+  <suffix name="CSS" label="CSS count"/>
+  <suffix name="Image" label="image count"/>
+  <suffix name="Image_GIF" label="GIF image count"/>
+  <suffix name="Image_JPG" label="JPG image count"/>
+  <suffix name="Image_PNG" label="PNG image count"/>
+  <suffix name="Image_WEBP" label="WEBP image count"/>
+  <suffix name="Image_0_10KB" label="image counts of 0-10KB"/>
+  <suffix name="Image_10_100KB" label="image counts of 10-100KB"/>
+  <suffix name="Image_100_500KB" label="image counts of 100-500KB"/>
+  <suffix name="Image_500KB" label="image counts of more than 500KB"/>
+  <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTP"/>
+  <affected-histogram name="DataReductionProxy.HeaderTamperDetectionHTTPS"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="DataReductionProxyBypassedBytes" separator=".">
@@ -67027,15 +67534,51 @@ To add a new entry, add it with any value and run test to compute valid value.
 
 <histogram_suffixes name="PrerenderSource" ordering="prefix">
   <suffix name="" label="All prerenders."/>
-  <suffix name="exp1" label="Likelihood threshold experiment 1."/>
-  <suffix name="exp2" label="Likelihood threshold experiment 2."/>
-  <suffix name="exp3" label="Likelihood threshold experiment 3."/>
-  <suffix name="exp4" label="Likelihood threshold experiment 4."/>
-  <suffix name="exp5" label="Likelihood threshold experiment 5."/>
-  <suffix name="exp6" label="Likelihood threshold experiment 6."/>
-  <suffix name="exp7" label="Likelihood threshold experiment 7."/>
-  <suffix name="exp8" label="Likelihood threshold experiment 8."/>
-  <suffix name="exp9" label="Likelihood threshold experiment 9."/>
+  <suffix name="exp1" label="Likelihood threshold experiment 1.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp2" label="Likelihood threshold experiment 2.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp3" label="Likelihood threshold experiment 3.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp4" label="Likelihood threshold experiment 4.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp5" label="Likelihood threshold experiment 5.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp6" label="Likelihood threshold experiment 6.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp7" label="Likelihood threshold experiment 7.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp8" label="Likelihood threshold experiment 8.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
+  <suffix name="exp9" label="Likelihood threshold experiment 9.">
+    <obsolete>
+      Deprecated April 2015
+    </obsolete>
+  </suffix>
   <suffix name="gws" label="GWS triggered prerender."/>
   <suffix name="externalrequest" label="Externally triggered prerender."/>
   <suffix name="Instant" label="Instant search prerender."/>

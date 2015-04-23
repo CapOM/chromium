@@ -480,6 +480,14 @@ base::FilePath CreateTemporaryWaveFile() {
   return wav_filename;
 }
 
+void DeleteFileUnlessTestFailed(const base::FilePath& path, bool recursive) {
+  if (::testing::Test::HasFailure())
+    printf("Test failed; keeping recording(s) at\n\t%" PRFilePath ".\n",
+           path.value().c_str());
+  else
+    EXPECT_TRUE(base::DeleteFile(path, recursive));
+}
+
 std::vector<base::FilePath> ListWavFilesInDir(const base::FilePath& dir) {
   base::FileEnumerator files(dir, false, base::FileEnumerator::FILES,
                              FILE_PATH_LITERAL("*.wav"));
@@ -503,7 +511,7 @@ void SplitFileOnSilenceIntoDir(const base::FilePath& to_split,
 
   ASSERT_TRUE(SplitFileOnSilence(
       trimmed_audio, workdir.Append(FILE_PATH_LITERAL("output.wav"))));
-  ASSERT_TRUE(base::DeleteFile(trimmed_audio, false));
+  DeleteFileUnlessTestFailed(trimmed_audio, false);
 }
 
 // Computes the difference between the actual and reference segment. A positive
@@ -575,16 +583,18 @@ void ComputeAndPrintPesqResults(const base::FilePath& reference_file,
 
   std::string raw_mos;
   std::string mos_lqo;
-  ASSERT_TRUE(RunPesq(trimmed_reference, trimmed_recording, 16000,
-                      &raw_mos, &mos_lqo));
+  bool succeeded = RunPesq(trimmed_reference, trimmed_recording, 16000,
+                           &raw_mos, &mos_lqo);
+  EXPECT_TRUE(succeeded) << "Failed to run PESQ.";
+  if (succeeded) {
+    perf_test::PrintResult(
+        "audio_pesq", perf_modifier, "raw_mos", raw_mos, "score", true);
+    perf_test::PrintResult(
+        "audio_pesq", perf_modifier, "mos_lqo", mos_lqo, "score", true);
+  }
 
-  perf_test::PrintResult(
-      "audio_pesq", perf_modifier, "raw_mos", raw_mos, "score", true);
-  perf_test::PrintResult(
-      "audio_pesq", perf_modifier, "mos_lqo", mos_lqo, "score", true);
-
-  EXPECT_TRUE(base::DeleteFile(trimmed_reference, false));
-  EXPECT_TRUE(base::DeleteFile(trimmed_recording, false));
+  DeleteFileUnlessTestFailed(trimmed_reference, false);
+  DeleteFileUnlessTestFailed(trimmed_recording, false);
 }
 
 }  // namespace
@@ -592,11 +602,11 @@ void ComputeAndPrintPesqResults(const base::FilePath& reference_file,
 // Sets up a two-way WebRTC call and records its output to |recording|, using
 // getUserMedia.
 //
-// |reference_file| should have at least two seconds of silence in the
+// |reference_file| should have at least five seconds of silence in the
 // beginning: otherwise all the reference audio will not be picked up by the
 // recording. Note that the reference file will start playing as soon as the
 // audio device is up following the getUserMedia call in the left tab. The time
-// it takes to negotiate a call isn't deterministic, but two seconds should be
+// it takes to negotiate a call isn't deterministic, but five seconds should be
 // plenty of time. Similarly, the recording time should be enough to catch the
 // whole reference file. If you then silence-trim the reference file and actual
 // file, you should end up with two time-synchronized files.
@@ -648,10 +658,10 @@ IN_PROC_BROWSER_TEST_F(MAYBE_WebRtcAudioQualityBrowserTest,
 
   ASSERT_NO_FATAL_FAILURE(SetupAndRecordAudioCall(
       reference_file, recording, kAudioOnlyCallConstraints,
-      base::TimeDelta::FromSeconds(25)));
-  ComputeAndPrintPesqResults(reference_file, recording, "_getusermedia");
+      base::TimeDelta::FromSeconds(30)));
 
-  EXPECT_TRUE(base::DeleteFile(recording, false));
+  ComputeAndPrintPesqResults(reference_file, recording, "_getusermedia");
+  DeleteFileUnlessTestFailed(recording, false);
 }
 
 IN_PROC_BROWSER_TEST_F(MAYBE_WebRtcAudioQualityBrowserTest,
@@ -742,10 +752,8 @@ void MAYBE_WebRtcAudioQualityBrowserTest::TestAutoGainControl(
 
   ASSERT_NO_FATAL_FAILURE(SetupAndRecordAudioCall(
       reference_file, recording, constraints,
-      base::TimeDelta::FromSeconds(25)));
+      base::TimeDelta::FromSeconds(30)));
 
-  // Call Take() on the scoped temp dirs if you want to look at the files after
-  // the test exits (the default is to delete the files).
   base::ScopedTempDir split_ref_files;
   ASSERT_TRUE(split_ref_files.CreateUniqueTempDir());
   ASSERT_NO_FATAL_FAILURE(
@@ -757,13 +765,17 @@ void MAYBE_WebRtcAudioQualityBrowserTest::TestAutoGainControl(
   ASSERT_TRUE(split_actual_files.CreateUniqueTempDir());
   ASSERT_NO_FATAL_FAILURE(
       SplitFileOnSilenceIntoDir(recording, split_actual_files.path()));
+
+  // Keep the recording and split files if the analysis fails.
+  base::FilePath actual_files_dir = split_actual_files.Take();
   std::vector<base::FilePath> actual_segments =
-      ListWavFilesInDir(split_actual_files.path());
+      ListWavFilesInDir(actual_files_dir);
 
-  AnalyzeSegmentsAndPrintResult(ref_segments, actual_segments, reference_file,
-                                perf_modifier);
+  AnalyzeSegmentsAndPrintResult(
+      ref_segments, actual_segments, reference_file, perf_modifier);
 
-  EXPECT_TRUE(base::DeleteFile(recording, false));
+  DeleteFileUnlessTestFailed(recording, false);
+  DeleteFileUnlessTestFailed(actual_files_dir, true);
 }
 
 // The AGC should apply non-zero gain here.

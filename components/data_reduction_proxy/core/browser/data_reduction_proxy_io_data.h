@@ -5,6 +5,8 @@
 #ifndef COMPONENTS_DATA_REDUCTION_PROXY_CORE_BROWSER_DATA_REDUCTION_PROXY_IO_DATA_H_
 #define COMPONENTS_DATA_REDUCTION_PROXY_CORE_BROWSER_DATA_REDUCTION_PROXY_IO_DATA_H_
 
+#include "base/gtest_prod_util.h"
+#include "base/macros.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/prefs/pref_member.h"
@@ -13,6 +15,11 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_metrics.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_network_delegate.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_request_options.h"
+#include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_storage_delegate.h"
+
+namespace base {
+class Value;
+}
 
 namespace net {
 class NetLog;
@@ -26,12 +33,12 @@ class DataReductionProxyBypassStats;
 class DataReductionProxyConfig;
 class DataReductionProxyConfigServiceClient;
 class DataReductionProxyConfigurator;
-class DataReductionProxyEventStore;
+class DataReductionProxyEventCreator;
 class DataReductionProxyService;
 
 // Contains and initializes all Data Reduction Proxy objects that operate on
 // the IO thread.
-class DataReductionProxyIOData {
+class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
  public:
   // Constructs a DataReductionProxyIOData object. |param_flags| is used to
   // set information about the DNS names used by the proxy, and allowable
@@ -42,7 +49,8 @@ class DataReductionProxyIOData {
       net::NetLog* net_log,
       scoped_refptr<base::SingleThreadTaskRunner> io_task_runner,
       scoped_refptr<base::SingleThreadTaskRunner> ui_task_runner,
-      bool enable_quic);
+      bool enable_quic,
+      const std::string& user_agent);
 
   virtual ~DataReductionProxyIOData();
 
@@ -56,6 +64,8 @@ class DataReductionProxyIOData {
   // Sets the Data Reduction Proxy service after it has been created.
   void SetDataReductionProxyService(
       base::WeakPtr<DataReductionProxyService> data_reduction_proxy_service);
+
+  void RetrieveConfig();
 
   // Creates an interceptor suitable for following the Data Reduction Proxy
   // bypass protocol.
@@ -83,6 +93,14 @@ class DataReductionProxyIOData {
                             bool data_reduction_proxy_enabled,
                             DataReductionProxyRequestType request_type);
 
+  // Overrides of DataReductionProxyEventStorageDelegate. Bridges to the UI
+  // thread objects.
+  void AddEnabledEvent(scoped_ptr<base::Value> entry, bool enabled) override;
+  void AddEventAndSecureProxyCheckState(scoped_ptr<base::Value> entry,
+                                        SecureProxyCheckState state) override;
+  void AddAndSetLastBypassEvent(scoped_ptr<base::Value> entry,
+                                int64 expiration_ticks) override;
+
   // Returns true if the Data Reduction Proxy is enabled and false otherwise.
   bool IsEnabled() const;
 
@@ -95,12 +113,16 @@ class DataReductionProxyIOData {
     return config_.get();
   }
 
-  DataReductionProxyEventStore* event_store() const {
-    return event_store_.get();
+  DataReductionProxyEventCreator* event_creator() const {
+    return event_creator_.get();
   }
 
   DataReductionProxyRequestOptions* request_options() const {
     return request_options_.get();
+  }
+
+  DataReductionProxyConfigServiceClient* config_client() const {
+    return config_client_.get();
   }
 
   net::ProxyDelegate* proxy_delegate() const {
@@ -131,6 +153,7 @@ class DataReductionProxyIOData {
 
  private:
   friend class TestDataReductionProxyIOData;
+  FRIEND_TEST_ALL_PREFIXES(DataReductionProxyIODataTest, TestConstruction);
 
   // Used for testing.
   DataReductionProxyIOData();
@@ -153,8 +176,8 @@ class DataReductionProxyIOData {
   // interstitials.
   mutable scoped_ptr<DataReductionProxyDebugUIService> debug_ui_service_;
 
-  // Tracker of Data Reduction Proxy-related events, e.g., for logging.
-  scoped_ptr<DataReductionProxyEventStore> event_store_;
+  // Creates Data Reduction Proxy-related events for logging.
+  scoped_ptr<DataReductionProxyEventCreator> event_creator_;
 
   // Setter of the Data Reduction Proxy-specific proxy configuration.
   scoped_ptr<DataReductionProxyConfigurator> configurator_;
@@ -191,6 +214,10 @@ class DataReductionProxyIOData {
 
   // The net::URLRequestContextGetter used for making URL requests.
   net::URLRequestContextGetter* url_request_context_getter_;
+
+  // A net::URLRequestContextGetter used for making secure proxy checks. It
+  // does not use alternate protocols.
+  scoped_refptr<net::URLRequestContextGetter> basic_url_request_context_getter_;
 
   base::WeakPtrFactory<DataReductionProxyIOData> weak_factory_;
 

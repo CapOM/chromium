@@ -44,7 +44,7 @@ class SpdyStreamRequest;
 
 // Default upload data used by both, mock objects and framer when creating
 // data frames.
-const char kDefaultURL[] = "http://www.google.com";
+const char kDefaultURL[] = "http://www.example.org";
 const char kUploadData[] = "hello!";
 const int kUploadDataSize = arraysize(kUploadData)-1;
 
@@ -233,7 +233,7 @@ class SpdyURLRequestContext : public URLRequestContext {
 
  private:
   MockClientSocketFactory socket_factory_;
-  net::URLRequestContextStorage storage_;
+  URLRequestContextStorage storage_;
 };
 
 // Equivalent to pool->GetIfExists(spdy_session_key, BoundNetLog()) != NULL.

@@ -58,6 +58,7 @@
 #include "chrome/browser/metrics/metrics_reporting_state.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
+#include "chrome/browser/ui/webui/chromeos/login/oobe_ui.h"
 #include "chrome/browser/ui/webui/chromeos/login/signin_screen_handler.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/pref_names.h"
@@ -285,18 +286,19 @@ void WizardController::Init(const std::string& first_screen_name) {
 }
 
 ErrorScreen* WizardController::GetErrorScreen() {
-  return static_cast<ErrorScreen*>(GetScreen(kErrorScreenName));
+  return oobe_display_->GetErrorScreen();
+}
+
+BaseScreen* WizardController::GetScreen(const std::string& screen_name) {
+  if (screen_name == kErrorScreenName)
+    return GetErrorScreen();
+  return ScreenManager::GetScreen(screen_name);
 }
 
 BaseScreen* WizardController::CreateScreen(const std::string& screen_name) {
   if (screen_name == kNetworkScreenName) {
     scoped_ptr<NetworkScreen> screen(
         new NetworkScreen(this, this, oobe_display_->GetNetworkView()));
-    screen->Initialize(nullptr /* context */);
-    return screen.release();
-  } else if (screen_name == kErrorScreenName) {
-    scoped_ptr<ErrorScreen> screen(
-        new ErrorScreen(this, oobe_display_->GetNetworkErrorView()));
     screen->Initialize(nullptr /* context */);
     return screen.release();
   } else if (screen_name == kUpdateScreenName) {
@@ -1051,11 +1053,12 @@ void WizardController::SetHostConfiguration() {
   }
 }
 
-void WizardController::ConfigureHost(bool accepted_eula,
-                                     const std::string& lang,
-                                     const std::string& timezone,
-                                     bool send_reports,
-                                     const std::string& keyboard_layout) {
+void WizardController::ConfigureHostRequested(
+    bool accepted_eula,
+    const std::string& lang,
+    const std::string& timezone,
+    bool send_reports,
+    const std::string& keyboard_layout) {
   VLOG(1) << "ConfigureHost locale=" << lang << ", timezone=" << timezone
           << ", keyboard_layout=" << keyboard_layout;
   if (accepted_eula)  // Always true.
@@ -1066,6 +1069,11 @@ void WizardController::ConfigureHost(bool accepted_eula,
   network_screen->SetApplicationLocale(lang);
   network_screen->SetTimezone(timezone);
   network_screen->SetInputMethod(keyboard_layout);
+}
+
+void WizardController::AddNetworkRequested(const std::string& onc_spec) {
+  NetworkScreen* network_screen = NetworkScreen::Get(this);
+  network_screen->CreateNetworkFromOnc(onc_spec);
 }
 
 void WizardController::OnEnableDebuggingScreenRequested() {

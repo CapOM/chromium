@@ -1541,7 +1541,7 @@ Press any key to continue exploring.
   <message name="IDS_LOGIN_PASSWORD_CHANGED_MORE_INFO" desc="Additional information on the password changed dialog">
     Because <ph name="IDS_SHORT_PRODUCT_OS_NAME">$1<ex>Chrome OS</ex></ph> securely encrypts all your local data, you must enter the old password now to unlock that data.
   </message>
-  <message name="IDS_LOGIN_PASSWORD_CHANGED_OLD_PASSWORD_HINT" desc="Old password field hint on the password changed dialog">
+  <message name="IDS_LOGIN_PASSWORD_CHANGED_OLD_PASSWORD_HINT" desc="Old password field hint on the password changed dialog.">
     Enter old password
   </message>
   <message name="IDS_LOGIN_PASSWORD_CHANGED_INCORRECT_OLD_PASSWORD" desc="Error that is shown when incorrect old password was supplied for user cryptohome migration.">
@@ -1556,7 +1556,7 @@ Press any key to continue exploring.
   <message name="IDS_LOGIN_PASSWORD_CHANGED_PROCEED_ANYWAY" desc="Button to proceed without providing old password on the password changed dialog">
     If you cannot remember your password, you may proceed but local data will be lost. Only synced settings and data will be retrieved.
   </message>
-  <message name="IDS_LOGIN_PASSWORD_CHANGED_PROCEED_ANYWAY_BUTTON" desc="Button to proceed without providing old password on the password changed dialog">
+  <message name="IDS_LOGIN_PASSWORD_CHANGED_PROCEED_ANYWAY_BUTTON" desc="Button to proceed without providing old password on the password changed dialog.">
     Proceed anyway
   </message>
   <message name="IDS_LOGIN_PASSWORD_CHANGED_RESET" desc="Reset option of the password changed dialog">
@@ -1565,6 +1565,18 @@ Press any key to continue exploring.
   <message name="IDS_LOGIN_PASSWORD_CHANGED_MIGRATE" desc="Migrate option of the password changed dialog">
     Migrate all Chrome OS data to the new password
 (requires previous password)
+  </message>
+  <message name="IDS_LOGIN_NEWGAIA_PASSWORD_CHANGED_TITLE" desc="Title for the password changed dialog box">
+    To unlock and restore your local data, please enter your old <ph name="DEVICE_TYPE">$1<ex>Chromebook</ex></ph> password.
+  </message>
+  <message name="IDS_LOGIN_NEWGAIA_PASSWORD_CHANGED_FORGOT_PASSWORD" desc="Text of the link that lets user skip old password input on the password changed dialog in the newgaia flow">
+    Forgot your old password?
+  </message>
+  <message name="IDS_LOGIN_NEWGAIA_PASSWORD_CHANGED_PROCEED_ANYWAY" desc="Button to proceed without providing old password on the password changed dialog in the newgaia flow">
+    You may proceed, but only your synced data and settings will be restored. All local data will be lost.
+  </message>
+  <message name="IDS_LOGIN_NEWGAIA_PASSWORD_CHANGED_TRY_AGAIN" desc="Label for the retry button on the proceed anyway step in the newgaia password changed flow">
+    Try again
   </message>
   <message name="IDS_LOGIN_PREVIOUS_PASSWORD" desc="Password field text on the password changed dialog">
     Previous password
@@ -1962,7 +1974,7 @@ Press any key to continue exploring.
     Connected
   </message>
   <message name="IDS_CHROMEOS_NETWORK_STATE_CONNECTING" desc="Displayed state for a network when connecting">
-    Not Connected
+    Connecting
   </message>
 
   <message name="IDS_OPTIONS_SETTINGS_NETWORK_DISABLED" desc="Message displayed when a type of network connection is disabled">
@@ -4808,9 +4820,6 @@ Battery full
   <message name="IDS_STATUSBAR_LAYOUT_USA_DVORAK" desc="In the language menu button, this shows the input mode [US Dvorak keyboard].">
     US Dvorak
   </message>
-  <message name="IDS_STATUSBAR_LAYOUT_USA_DVP" desc="In the language menu button, this shows the input mode [US Programmer Dvorak keyboard].">
-    US Programmer Dvorak
-  </message>
   <message name="IDS_STATUSBAR_LAYOUT_USA_COLEMAK" desc="In the language menu button, this shows the input mode [US Colemak keyboard].">
     US Colemak
   </message>
@@ -5096,9 +5105,6 @@ Battery full
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_US_DVORAK" desc="The input method name shows in system tray menu, this shows [US Dvorak keyboard].">
     US Dvorak keyboard
-  </message>
-  <message name="IDS_IME_NAME_KEYBOARD_US_DVP" desc="The input method name shows in system tray menu, this shows [US Programmer Dvorak keyboard].">
-    US Programmer Dvorak keyboard
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_US_EXTENDED" desc="The input method name shows in system tray menu, this shows [US Extended keyboard].">
     US Extended keyboard
@@ -5956,6 +5962,9 @@ All users must sign out to continue.
   </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_STATUS_LOCK_WRONG_USER" desc="Error message to show when the user used to re-enroll the device does not belong to the domain that the device was originally enrolled into.">
     This user account does not belong to the domain that the device is enrolled to.  If you want to enroll to a different domain you need to go through device recovery first.
+  </message>
+  <message name="IDS_ENTERPRISE_ENROLLMENT_STATUS_LOCK_WRONG_MODE" desc="Error message to show upon attempting to re-enroll a device that is locked to a different operational mode.">
+    This device is locked in a mode that prevents enterprise enrollment.  If you want to enroll the device you need to go through device recovery first.
   </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_STATUS_STORE_ERROR" desc="Error message shown on the enrollment screen when the installation of the policy on the device fails.">
     Failed to install policy settings on the device: <ph name="VALIDATION_ERROR">$1<ex>Policy parsing failed</ex></ph>.

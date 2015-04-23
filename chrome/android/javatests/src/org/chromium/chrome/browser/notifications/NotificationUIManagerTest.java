@@ -4,6 +4,8 @@
 
 package org.chromium.chrome.browser.notifications;
 
+import static org.chromium.base.test.util.ScalableTimeout.scaleTimeout;
+
 import android.app.Notification;
 import android.graphics.Bitmap;
 import android.os.Build;
@@ -38,6 +40,12 @@ import java.util.concurrent.TimeoutException;
 public class NotificationUIManagerTest extends ChromeShellTestBase {
     private static final String NOTIFICATION_TEST_PAGE =
             TestHttpServerClient.getUrl("chrome/test/data/notifications/android_test.html");
+
+    /** The maximum time to wait for a criteria to become valid. */
+    private static final long MAX_TIME_TO_POLL_MS = scaleTimeout(6000);
+
+    /** The polling interval to wait between checking for a satisfied criteria. */
+    private static final long POLLING_INTERVAL_MS = 50;
 
     private MockNotificationManagerProxy mMockNotificationManager;
 
@@ -117,7 +125,7 @@ public class NotificationUIManagerTest extends ChromeShellTestBase {
             public boolean isSatisfied() {
                 return mMockNotificationManager.getMutationCountAndDecrement() > 0;
             }
-        });
+        }, MAX_TIME_TO_POLL_MS, POLLING_INTERVAL_MS);
     }
 
     @Override
@@ -153,6 +161,12 @@ public class NotificationUIManagerTest extends ChromeShellTestBase {
         assertEquals("MyNotification", notification.extras.getString(Notification.EXTRA_TITLE));
         assertEquals("Hello", notification.extras.getString(Notification.EXTRA_TEXT));
         assertEquals(getOrigin(), notification.extras.getString(Notification.EXTRA_SUB_TEXT));
+
+        // Verify that the ticker text contains the notification's title and body.
+        String tickerText = notification.tickerText.toString();
+
+        assertTrue(tickerText.contains("MyNotification"));
+        assertTrue(tickerText.contains("Hello"));
 
         // Validate the appearance style of the notification. The EXTRA_TEMPLATE was inroduced
         // in Android Lollipop, we cannot verify this in earlier versions.

@@ -13,6 +13,7 @@
 #include "base/basictypes.h"
 #include "base/command_line.h"
 #include "base/debug/leak_annotations.h"
+#include "base/debug/profiler.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/message_loop/message_loop.h"
@@ -25,6 +26,7 @@
 #include "base/synchronization/condition_variable.h"
 #include "base/synchronization/lock.h"
 #include "base/threading/thread_local.h"
+#include "base/trace_event/memory_dump_manager.h"
 #include "base/tracked_objects.h"
 #include "components/tracing/child_trace_message_filter.h"
 #include "content/child/bluetooth/bluetooth_message_filter.h"
@@ -138,6 +140,7 @@ class SuicideOnChannelErrorFilter : public IPC::MessageFilter {
     //
     // So, we install a filter on the sender so that we can process this event
     // here and kill the process.
+    base::debug::StopProfiling();
 #if defined(ADDRESS_SANITIZER) || defined(LEAK_SANITIZER) || \
     defined(MEMORY_SANITIZER) || defined(THREAD_SANITIZER) || \
     defined(UNDEFINED_SANITIZER)
@@ -418,6 +421,8 @@ void ChildThreadImpl::Init(const Options& options) {
       message_loop_->message_loop_proxy(), ::HeapProfilerWithPseudoStackStart,
       ::HeapProfilerStop, ::GetHeapProfile));
 #endif
+
+  base::trace_event::MemoryDumpManager::GetInstance()->Initialize();
 
   shared_bitmap_manager_.reset(
       new ChildSharedBitmapManager(thread_safe_sender()));

@@ -328,7 +328,8 @@ void CardUnmaskPromptViews::AnimationProgressed(
     const gfx::Animation* animation) {
   uint8_t alpha = static_cast<uint8_t>(animation->CurrentValueBetween(0, 255));
   progress_overlay_->SetAlpha(alpha);
-  storage_row_->SetAlpha(255 - alpha);
+  if (storage_row_)
+    storage_row_->SetAlpha(255 - alpha);
 }
 
 void CardUnmaskPromptViews::InitIfNecessary() {
@@ -433,7 +434,7 @@ void CardUnmaskPromptViews::InitIfNecessary() {
   progress_overlay_->SetVisible(false);
   AddChildView(progress_overlay_);
 
-  progress_throbber_ = new views::CheckmarkThrobber();
+  progress_throbber_ = new views::MaterialThrobber();
   progress_overlay_->AddChildView(progress_throbber_);
 
   progress_label_ = new views::Label(l10n_util::GetStringUTF16(
