@@ -5,6 +5,8 @@
 #include "device/bluetooth/bluetooth_adapter_android.h"
 
 #include "base/sequenced_task_runner.h"
+#include "base/single_thread_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 
 namespace device {
 
@@ -36,14 +38,17 @@ void BluetoothAdapterAndroid::SetName(const std::string& name,
 
 bool BluetoothAdapterAndroid::IsInitialized() const {
   NOTIMPLEMENTED();
+  return false;
 }
 
 bool BluetoothAdapterAndroid::IsPresent() const {
   NOTIMPLEMENTED();
+  return false;
 }
 
 bool BluetoothAdapterAndroid::IsPowered() const {
   NOTIMPLEMENTED();
+  return false;
 }
 
 void BluetoothAdapterAndroid::SetPowered(bool powered,
@@ -54,6 +59,7 @@ void BluetoothAdapterAndroid::SetPowered(bool powered,
 
 bool BluetoothAdapterAndroid::IsDiscoverable() const {
   NOTIMPLEMENTED();
+  return false;
 }
 
 void BluetoothAdapterAndroid::SetDiscoverable(
@@ -65,25 +71,7 @@ void BluetoothAdapterAndroid::SetDiscoverable(
 
 bool BluetoothAdapterAndroid::IsDiscovering() const {
   NOTIMPLEMENTED();
-}
-
-void BluetoothAdapterAndroid::DeleteOnCorrectThread() const {
-  if (ui_task_runner_->RunsTasksOnCurrentThread() ||
-      !ui_task_runner_->DeleteSoon(FROM_HERE, this))
-    delete this;
-}
-
-void BluetoothAdapterAndroid::StartDiscoverySessionWithFilter(
-    scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
-    const DiscoverySessionCallback& callback,
-    const ErrorCallback& error_callback) {
-  error_callback.Run();
-}
-
-void BluetoothAdapterAndroid::StartDiscoverySession(
-    const DiscoverySessionCallback& callback,
-    const ErrorCallback& error_callback) {
-  error_callback.Run();
+  return false;
 }
 
 void BluetoothAdapterAndroid::CreateRfcommService(
@@ -91,7 +79,8 @@ void BluetoothAdapterAndroid::CreateRfcommService(
     const ServiceOptions& options,
     const CreateServiceCallback& callback,
     const CreateServiceErrorCallback& error_callback) {
-  error_callback.Run();
+  NOTIMPLEMENTED();
+  error_callback.Run("Not Implemented");
 }
 
 void BluetoothAdapterAndroid::CreateL2capService(
@@ -99,16 +88,18 @@ void BluetoothAdapterAndroid::CreateL2capService(
     const ServiceOptions& options,
     const CreateServiceCallback& callback,
     const CreateServiceErrorCallback& error_callback) {
-  error_callback.Run();
+  NOTIMPLEMENTED();
+  error_callback.Run("Not Implemented");
 }
 
 void BluetoothAdapterAndroid::RegisterAudioSink(
     const BluetoothAudioSink::Options& options,
     const AcquiredCallback& callback,
     const BluetoothAudioSink::ErrorCallback& error_callback) {
+  error_callback.Run(BluetoothAudioSink::ERROR_UNSUPPORTED_PLATFORM);
 }
 
-BluetoothAdapterAndroid::BluetoothAdapterAndroid() {
+BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
   ui_task_runner_ = base::ThreadTaskRunnerHandle::Get();
 }
 
@@ -116,19 +107,19 @@ BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
 }
 
 void BluetoothAdapterAndroid::AddDiscoverySession(
-    device::BluetoothDiscoveryFilter* discovery_filter,
+    BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
 }
 
 void BluetoothAdapterAndroid::RemoveDiscoverySession(
-    device::BluetoothDiscoveryFilter* discovery_filter,
+    BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
 }
 
 void BluetoothAdapterAndroid::SetDiscoveryFilter(
-    scoped_ptr<device::BluetoothDiscoveryFilter> discovery_filter,
+    scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
 }
