@@ -6,7 +6,6 @@
 
 #include <vector>
 
-#include "base/base_switches.h"
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/files/file_path.h"
@@ -238,9 +237,6 @@ bool Context::Init() {
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
 
-  if (command_line.HasSwitch(switches::kWaitForDebugger))
-    base::debug::WaitForDebugger(60, true);
-
   EnsureEmbedderIsInitialized();
   task_runners_.reset(
       new TaskRunners(base::MessageLoop::current()->message_loop_proxy()));
@@ -289,12 +285,12 @@ void Context::Shutdown() {
   base::MessageLoop::current()->Run();
 }
 
-GURL Context::ResolveURL(const GURL& url) {
-  return url_resolver_.ResolveMojoURL(url);
-}
-
 GURL Context::ResolveMappings(const GURL& url) {
   return url_resolver_.ApplyMappings(url);
+}
+
+GURL Context::ResolveMojoURL(const GURL& url) {
+  return url_resolver_.ResolveMojoURL(url);
 }
 
 void Context::OnShutdownComplete() {

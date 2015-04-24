@@ -821,6 +821,20 @@ _NAMED_TYPE_INFO = {
       'GL_FOG_HINT',
     ],
   },
+  'IndexedGLState': {
+    'type': 'GLenum',
+    'valid': [
+      'GL_TRANSFORM_FEEDBACK_BUFFER_BINDING',
+      'GL_TRANSFORM_FEEDBACK_BUFFER_SIZE',
+      'GL_TRANSFORM_FEEDBACK_BUFFER_START',
+      'GL_UNIFORM_BUFFER_BINDING',
+      'GL_UNIFORM_BUFFER_SIZE',
+      'GL_UNIFORM_BUFFER_START',
+    ],
+    'invalid': [
+      'GL_FOG_HINT',
+    ],
+  },
   'GetTexParamTarget': {
     'type': 'GLenum',
     'valid': [
@@ -2461,6 +2475,18 @@ _FUNCTION_INFO = {
     'result': ['SizedResult<GLint>'],
     'decoder_func': 'DoGetIntegerv',
     'client_test': False,
+  },
+  'GetInteger64i_v': {
+    'type': 'GETn',
+    'result': ['SizedResult<GLint64>'],
+    'client_test': False,
+    'unsafe': True
+  },
+  'GetIntegeri_v': {
+    'type': 'GETn',
+    'result': ['SizedResult<GLint>'],
+    'client_test': False,
+    'unsafe': True
   },
   'GetInternalformativ': {
     'type': 'GETn',
@@ -4499,7 +4525,7 @@ class StateSetHandler(TypeHandler):
         # Make this behavior consistent within Chromium, and avoid leaking GL
         # errors by generating the error in the command buffer instead of
         # letting the GL driver generate it.
-        code.append("base::IsNaN(%s)" % args[ndx].name)
+        code.append("std::isnan(%s)" % args[ndx].name)
       if len(code):
         file.Write("  if (%s) {\n" % " ||\n      ".join(code))
         file.Write(

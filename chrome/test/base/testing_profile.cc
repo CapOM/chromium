@@ -287,13 +287,9 @@ KeyedService* BuildWebDataService(content::BrowserContext* context) {
 }
 
 scoped_refptr<RefcountedKeyedService> BuildTopSites(
-    content::BrowserContext* profile) {
-  history::TopSitesImpl* top_sites = new history::TopSitesImpl(
-      static_cast<Profile*>(profile), history::PrepopulatedPageList());
-  top_sites->Init(
-      profile->GetPath().Append(chrome::kTopSitesFilename),
-      BrowserThread::GetMessageLoopProxyForThread(BrowserThread::DB));
-  return make_scoped_refptr(top_sites);
+    content::BrowserContext* context) {
+  return TopSitesFactory::BuildTopSites(context,
+                                        history::PrepopulatedPageList());
 }
 
 }  // namespace
@@ -959,7 +955,7 @@ HostContentSettingsMap* TestingProfile::GetHostContentSettingsMap() {
 
 content::BrowserPluginGuestManager* TestingProfile::GetGuestManager() {
 #if defined(ENABLE_EXTENSIONS)
-  return extensions::GuestViewManager::FromBrowserContextIfAvailable(this);
+  return extensions::GuestViewManager::FromBrowserContext(this);
 #else
   return NULL;
 #endif

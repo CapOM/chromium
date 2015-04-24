@@ -30860,6 +30860,31 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Profile.ValidateMenuItemInvalidIndex.IsGuest" enum="Boolean">
+  <owner>anthonyvd@chromium.org</owner>
+  <summary>
+    Whether the active profile is a guest profile when -validateMenuItem in the
+    ProfileMenuController gets an invalid value for the current profile's index.
+  </summary>
+</histogram>
+
+<histogram name="Profile.ValidateMenuItemInvalidIndex.ProfileCount">
+  <owner>anthonyvd@chromium.org</owner>
+  <summary>
+    The count of profiles in the avatar menu when -validateMenuItem in the
+    ProfileMenuController gets an invalid value for the current profile's index.
+  </summary>
+</histogram>
+
+<histogram name="Profile.ValidateMenuItemInvalidIndex.Selector"
+    enum="ValidateMenuItemSelectorType">
+  <owner>anthonyvd@chromium.org</owner>
+  <summary>
+    The selector associated with the menu item when -validateMenuItem in the
+    ProfileMenuController gets an invalid value for the current profile's index.
+  </summary>
+</histogram>
+
 <histogram name="Profile.VisitedLinksSize" units="MB">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Size of the visited links database.</summary>
@@ -31365,6 +31390,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Renderer.LayoutMs" units="milliseconds">
+  <obsolete>
+    Deprecated as of 3/2015.
+  </obsolete>
   <owner>benjhayden@chromium.org</owner>
   <summary>
     Duration of the FrameView::performLayout trace event, which occurs at most
@@ -31373,6 +31401,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Renderer.LineLayoutMs" units="milliseconds">
+  <obsolete>
+    Deprecated as of 3/2015.
+  </obsolete>
   <owner>benjhayden@chromium.org</owner>
   <summary>
     Amount of time spent doing line layout during FrameView::performLayout.
@@ -48658,6 +48689,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1763208296" label="safetynut.dll"/>
   <int value="1996673448" label="scdetour.dll"/>
   <int value="2060768492" label="libwinhook.dll"/>
+  <int value="2074150225" label="minisp32.dll"/>
   <int value="2117903235" label="cplushook.dll"/>
   <int value="2132270559" label="libsvn_tsvn32.dll"/>
 </enum>
@@ -51271,6 +51303,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1008" label="DEVELOPERPRIVATE_SHOWPATH"/>
   <int value="1009" label="FILEMANAGERPRIVATE_ADDPROVIDEDFILESYSTEM"/>
   <int value="1010" label="FILEMANAGERPRIVATE_CONFIGUREPROVIDEDFILESYSTEM"/>
+  <int value="1011" label="SEARCHENGINESPRIVATE_GETDEFAULTSEARCHENGINES"/>
+  <int value="1012" label="SEARCHENGINESPRIVATE_SETSELECTEDSEARCHENGINE"/>
+  <int value="1013" label="AUTOFILLPRIVATE_SAVEADDRESS"/>
+  <int value="1014" label="AUTOFILLPRIVATE_GETADDRESSCOMPONENTS"/>
+  <int value="1015" label="AUTOFILLPRIVATE_SAVECREDITCARD"/>
+  <int value="1016" label="AUTOFILLPRIVATE_REMOVEENTRY"/>
+  <int value="1017" label="AUTOFILLPRIVATE_VALIDATEPHONENUMBERS"/>
+  <int value="1018" label="AUTOFILLPRIVATE_MASKCREDITCARD"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -63713,6 +63753,17 @@ To add a new entry, add it with any value and run test to compute valid value.
   </int>
   <int value="5" label="FLAGS_MISMATCH">Reject due to flags hash mismatch</int>
   <int value="6" label="CHECKSUM_MISMATCH">Reject due to checksum mismatch</int>
+</enum>
+
+<enum name="ValidateMenuItemSelectorType" type="int">
+  <int value="0"
+      label="The menu items' associated action is an unknown selector."/>
+  <int value="1" label="The menu item's associated action is -newProfile."/>
+  <int value="2" label="The menu item's associated action is -editProfile."/>
+  <int value="3"
+      label="The menu item's associated action is -switchToProfileFromMenu."/>
+  <int value="4"
+      label="The menu item's associated action is -switchToProfileFromDock."/>
 </enum>
 
 <enum name="ValidationFailures" type="int">

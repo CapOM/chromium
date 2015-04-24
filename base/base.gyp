@@ -803,14 +803,6 @@
                 '../third_party/icu/icu.gyp:icudata',
               ],
             }],
-            ['incremental_chrome_dll', {
-              'defines': [
-                # Used only to workaround a linker bug, do not use this
-                # otherwise, and don't make it broader scope. See
-                # http://crbug.com/251251.
-                'INCREMENTAL_LINKING',
-              ],
-            }],
           ],
         }, {  # OS != "win"
           'dependencies': [
@@ -1507,6 +1499,23 @@
             'java_in_dir': '../base/test/android/javatests',
           },
           'includes': [ '../build/java.gypi' ],
+        },
+        {
+          # GN: //base:base_junit_tests
+          'target_name': 'base_junit_tests',
+          'type': 'none',
+          'dependencies': [
+            'base_java',
+            'base_java_test_support',
+            '../testing/android/junit/junit_test.gyp:junit_test_support',
+          ],
+          'variables': {
+             'main_class': 'org.chromium.testing.local.JunitTestMain',
+             'src_paths': [
+               '../base/android/junit/',
+             ],
+           },
+          'includes': [ '../build/host_jar.gypi' ],
         },
         {
           # GN: //base:base_javatests

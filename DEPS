@@ -34,7 +34,7 @@ vars = {
   'llvm_url': 'http://src.chromium.org/llvm-project',
   'llvm_git': 'https://llvm.googlesource.com',
   'webkit_trunk': 'http://src.chromium.org/blink/trunk',
-  'webkit_revision': 'eb0e71eb0e3dba21ec975910c7ffa5da5e283a77', # from svn revision 194323
+  'webkit_revision': '66827988e54f925c0f361bc29f92d201173ef2ee', # from svn revision 194386
   'chromium_git': 'https://chromium.googlesource.com',
   'chromiumos_git': 'https://chromium.googlesource.com/chromiumos',
   'pdfium_git': 'https://pdfium.googlesource.com',
@@ -42,12 +42,12 @@ vars = {
   'boringssl_git': 'https://boringssl.googlesource.com',
   'libvpx_revision': 'c600ca703b712ac0d2db719970a1fce6de70fcb4',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '3d9005c0286f2dff8f3db030c4c1ad19371deebd',
+  'skia_revision': '9d9725c892743cf8fc66ea6cdd5ce21fe2df6d14',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   'v8_branch': 'trunk',
-  'v8_revision': 'e2ee9248e7c7b2a5a2f919f593290478b5905bb7',
+  'v8_revision': 'd8992d971052667fc5d1d89c2c909850ce0966a3',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -62,7 +62,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  'buildtools_revision': '3b302fef93f7cc58d9b8168466905237484b2772',
+  'buildtools_revision': '15308f469a704c45d15567fa69cd94ce07ad0e1b',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
@@ -210,7 +210,7 @@ deps = {
    Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '104f872faf2cd809cdada885a1e39be85e5b3316',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'c37efc9de4cff7da03ff3fa842bbfe35c5a540b4',
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + 'd8bca77284d02b80de15a5420c727a3e1385c542', # commit position 9081
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -234,7 +234,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '51fb6e464e6aab5711afedc6fb9c3d23f4b92057',
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '324d9727cd5cc1f2e3434e82cc9f9d83a486abab', # commit position 9084
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -243,7 +243,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/open-source-parsers/jsoncpp.git' + '@' + 'f572e8e42e22cfcf5ab0aea26574f408943edfa4', # from svn 248
 
   'src/third_party/libyuv':
-    Var('chromium_git') + '/external/libyuv.git' + '@' + '32ad6e0e12fec058efdf85a5a4b32ed657f27c36', # from svn revision 1368
+    Var('chromium_git') + '/external/libyuv.git' + '@' + '01db3d1d1ddd3f2907a46a41f24add5143b518d5', # from svn revision 1374
 
   'src/third_party/smhasher/src':
     Var('chromium_git') + '/external/smhasher.git' + '@' + 'e87738e57558e0ec472b2fc3a643b838e5b6e88f',
@@ -410,7 +410,7 @@ deps_os = {
 
     # For Linux and Chromium OS.
     'src/third_party/cros_system_api':
-     Var('chromium_git') + '/chromiumos/platform/system_api.git' + '@' + 'beb554763c188ae8f0518de6d55661248c907218',
+     Var('chromium_git') + '/chromiumos/platform/system_api.git' + '@' + '42cdfaada2ae9183f6479531e24d739cc778c4a8',
 
     # Note that this is different from Android's freetype repo.
     'src/third_party/freetype2/src':

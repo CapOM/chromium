@@ -184,11 +184,15 @@ void PushMessagingServiceImpl::ShutdownHandler() {
 void PushMessagingServiceImpl::OnMessage(
     const std::string& app_id,
     const gcm::GCMClient::IncomingMessage& message) {
+  base::Closure message_handled_closure =
+      message_callback_for_testing_.is_null() ? base::Bind(&base::DoNothing)
+                                              : message_callback_for_testing_;
   PushMessagingApplicationId application_id =
       PushMessagingApplicationId::Get(profile_, app_id);
   // Drop message and unregister if app id was unknown (maybe recently deleted).
   if (!application_id.IsValid()) {
     DeliverMessageCallback(app_id, GURL::EmptyGURL(), -1, message,
+                           message_handled_closure,
                            content::PUSH_DELIVERY_STATUS_UNKNOWN_APP_ID);
     return;
   }
@@ -196,7 +200,7 @@ void PushMessagingServiceImpl::OnMessage(
   if (!HasPermission(application_id.origin())) {
     DeliverMessageCallback(app_id, application_id.origin(),
                            application_id.service_worker_registration_id(),
-                           message,
+                           message, message_handled_closure,
                            content::PUSH_DELIVERY_STATUS_PERMISSION_DENIED);
     return;
   }
@@ -238,7 +242,8 @@ void PushMessagingServiceImpl::OnMessage(
       base::Bind(&PushMessagingServiceImpl::DeliverMessageCallback,
                  weak_factory_.GetWeakPtr(),
                  application_id.app_id_guid(), application_id.origin(),
-                 application_id.service_worker_registration_id(), message));
+                 application_id.service_worker_registration_id(), message,
+                 message_handled_closure));
 }
 
 void PushMessagingServiceImpl::DeliverMessageCallback(
@@ -246,6 +251,7 @@ void PushMessagingServiceImpl::DeliverMessageCallback(
     const GURL& requesting_origin,
     int64 service_worker_registration_id,
     const gcm::GCMClient::IncomingMessage& message,
+    const base::Closure& message_handled_closure,
     content::PushDeliveryStatus status) {
   // TODO(mvanouwerkerk): Show a warning in the developer console of the
   // Service Worker corresponding to app_id (and/or on an internals page).
@@ -256,22 +262,27 @@ void PushMessagingServiceImpl::DeliverMessageCallback(
     // deliberately failing in order to avoid having to show notifications).
     case content::PUSH_DELIVERY_STATUS_SUCCESS:
     case content::PUSH_DELIVERY_STATUS_EVENT_WAITUNTIL_REJECTED:
-      RequireUserVisibleUX(requesting_origin, service_worker_registration_id);
+      RequireUserVisibleUX(requesting_origin, service_worker_registration_id,
+                           message_handled_closure);
       break;
     case content::PUSH_DELIVERY_STATUS_INVALID_MESSAGE:
     case content::PUSH_DELIVERY_STATUS_SERVICE_WORKER_ERROR:
+      message_handled_closure.Run();
       break;
     case content::PUSH_DELIVERY_STATUS_UNKNOWN_APP_ID:
     case content::PUSH_DELIVERY_STATUS_PERMISSION_DENIED:
     case content::PUSH_DELIVERY_STATUS_NO_SERVICE_WORKER:
-      Unregister(app_id_guid, message.sender_id, UnregisterCallback());
+      Unregister(app_id_guid, message.sender_id,
+                 base::Bind(&UnregisterCallbackToClosure,
+                 message_handled_closure));
       break;
   }
   RecordDeliveryStatus(status);
 }
 
 void PushMessagingServiceImpl::RequireUserVisibleUX(
-    const GURL& requesting_origin, int64 service_worker_registration_id) {
+    const GURL& requesting_origin, int64 service_worker_registration_id,
+    const base::Closure& message_handled_closure) {
 #if defined(ENABLE_NOTIFICATIONS)
   // TODO(johnme): Relax this heuristic slightly.
   PlatformNotificationServiceImpl* notification_service =
@@ -342,11 +353,15 @@ void PushMessagingServiceImpl::RequireUserVisibleUX(
         base::Bind(&PushMessagingServiceImpl::DidGetNotificationsShown,
                    weak_factory_.GetWeakPtr(),
                    requesting_origin, service_worker_registration_id,
-                   notification_shown, notification_needed));
+                   notification_shown, notification_needed,
+                   message_handled_closure));
   } else {
     RecordUserVisibleStatus(
         content::PUSH_USER_VISIBLE_STATUS_NOT_REQUIRED_AND_NOT_SHOWN);
+    message_handled_closure.Run();
   }
+#else
+  message_handled_closure.Run();
 #endif  // defined(ENABLE_NOTIFICATIONS)
 }
 
@@ -356,6 +371,7 @@ static void IgnoreResult(bool unused) {
 void PushMessagingServiceImpl::DidGetNotificationsShown(
     const GURL& requesting_origin, int64 service_worker_registration_id,
     bool notification_shown, bool notification_needed,
+    const base::Closure& message_handled_closure,
     const std::string& data, bool success, bool not_found) {
   content::ServiceWorkerContext* service_worker_context =
       content::BrowserContext::GetStoragePartitionForSite(
@@ -367,6 +383,7 @@ void PushMessagingServiceImpl::DidGetNotificationsShown(
   // needed but not shown. We manipulate it in bitset form.
   std::bitset<MISSED_NOTIFICATIONS_LENGTH> missed_notifications(data);
 
+  DCHECK(notification_shown || notification_needed);  // Caller must ensure this
   bool needed_but_not_shown = notification_needed && !notification_shown;
 
   // New entries go at the end, and old ones are shifted off the beginning once
@@ -385,45 +402,52 @@ void PushMessagingServiceImpl::DidGetNotificationsShown(
         notification_needed
         ? content::PUSH_USER_VISIBLE_STATUS_REQUIRED_AND_SHOWN
         : content::PUSH_USER_VISIBLE_STATUS_NOT_REQUIRED_BUT_SHOWN);
+    message_handled_closure.Run();
     return;
   }
-  if (needed_but_not_shown) {
-    if (missed_notifications.count() <= 1) {  // apply grace
-      RecordUserVisibleStatus(
-        content::PUSH_USER_VISIBLE_STATUS_REQUIRED_BUT_NOT_SHOWN_USED_GRACE);
-      return;
-    }
+  DCHECK(needed_but_not_shown);
+  if (missed_notifications.count() <= 1) {  // Apply grace.
     RecordUserVisibleStatus(
-        content::
-            PUSH_USER_VISIBLE_STATUS_REQUIRED_BUT_NOT_SHOWN_GRACE_EXCEEDED);
-    rappor::SampleDomainAndRegistryFromGURL(
-        g_browser_process->rappor_service(),
-        "PushMessaging.GenericNotificationShown.Origin",
-        requesting_origin);
-    // The site failed to show a notification when one was needed, and they have
-    // already failed once in the previous 10 push messages, so we will show a
-    // generic notification. See https://crbug.com/437277.
-    // TODO(johnme): The generic notification should probably automatically
-    // close itself when the next push message arrives?
-    content::PlatformNotificationData notification_data;
-    // TODO(johnme): Switch to FormatOriginForDisplay from crbug.com/402698
-    notification_data.title = base::UTF8ToUTF16(requesting_origin.host());
-    notification_data.direction =
-        content::PlatformNotificationData::NotificationDirectionLeftToRight;
-    notification_data.body =
-        l10n_util::GetStringUTF16(IDS_PUSH_MESSAGING_GENERIC_NOTIFICATION_BODY);
-    notification_data.tag = kPushMessagingForcedNotificationTag;
-    notification_data.icon = GURL();  // TODO(johnme): Better icon?
-    notification_data.silent = true;
-    PlatformNotificationServiceImpl* notification_service =
-        PlatformNotificationServiceImpl::GetInstance();
-    notification_service->DisplayPersistentNotification(
-        profile_,
-        service_worker_registration_id,
-        requesting_origin,
-        SkBitmap() /* icon */,
-        notification_data);
+      content::PUSH_USER_VISIBLE_STATUS_REQUIRED_BUT_NOT_SHOWN_USED_GRACE);
+    message_handled_closure.Run();
+    return;
   }
+  RecordUserVisibleStatus(
+      content::
+          PUSH_USER_VISIBLE_STATUS_REQUIRED_BUT_NOT_SHOWN_GRACE_EXCEEDED);
+  rappor::SampleDomainAndRegistryFromGURL(
+      g_browser_process->rappor_service(),
+      "PushMessaging.GenericNotificationShown.Origin",
+      requesting_origin);
+  // The site failed to show a notification when one was needed, and they have
+  // already failed once in the previous 10 push messages, so we will show a
+  // generic notification. See https://crbug.com/437277.
+  // TODO(johnme): The generic notification should probably automatically
+  // close itself when the next push message arrives?
+  content::PlatformNotificationData notification_data;
+  // TODO(johnme): Switch to FormatOriginForDisplay from crbug.com/402698
+  notification_data.title = base::UTF8ToUTF16(requesting_origin.host());
+  notification_data.direction =
+      content::PlatformNotificationData::NotificationDirectionLeftToRight;
+  notification_data.body =
+      l10n_util::GetStringUTF16(IDS_PUSH_MESSAGING_GENERIC_NOTIFICATION_BODY);
+  notification_data.tag = kPushMessagingForcedNotificationTag;
+  notification_data.icon = GURL();  // TODO(johnme): Better icon?
+  notification_data.silent = true;
+  PlatformNotificationServiceImpl* notification_service =
+      PlatformNotificationServiceImpl::GetInstance();
+  notification_service->DisplayPersistentNotification(
+      profile_,
+      service_worker_registration_id,
+      requesting_origin,
+      SkBitmap() /* icon */,
+      notification_data);
+  message_handled_closure.Run();
+}
+
+void PushMessagingServiceImpl::SetMessageCallbackForTesting(
+      const base::Closure& callback) {
+  message_callback_for_testing_ = callback;
 }
 
 // Other gcm::GCMAppHandler methods -------------------------------------------

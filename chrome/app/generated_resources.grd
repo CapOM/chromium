@@ -270,7 +270,9 @@ are declared in build/common.gypi.
       </if>
 
       <!-- Media Router specific strings -->
-      <part file="media_router_strings.grdp" />
+      <if expr="enable_media_router">
+        <part file="media_router_strings.grdp" />
+      </if>
 
       <!-- TODO add all of your "string table" messages here.  Remember to
       change nontranslateable parts of the messages into placeholders (using the
@@ -4597,6 +4599,12 @@ Even if you have downloaded files from this website before, the website might ha
       </if>
       <message name="IDS_EXTENSION_PROMPT_WARNING_SETTINGS_PRIVATE" desc="Permission string for access to settings.">
         Read and change user and device settings
+      </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_SEARCH_ENGINES_PRIVATE" desc="Permission string for access to search engines.">
+        Read and change default and custom search engines
+      </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_AUTOFILL_PRIVATE" desc="Permission string for access to autofill settings.">
+        Read and change autofill settings
       </message>
 
       <!-- Extension/App error messages -->

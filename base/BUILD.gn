@@ -233,7 +233,6 @@ component("base") {
     "files/scoped_file.h",
     "files/scoped_temp_dir.cc",
     "files/scoped_temp_dir.h",
-    "float_util.h",
     "format_macros.h",
     "gtest_prod_util.h",
     "guid.cc",
@@ -1462,6 +1461,15 @@ if (is_android) {
       ":base_java",
     ]
     DEPRECATED_java_in_dir = "test/android/javatests/src"
+  }
+
+  # GYP: //base.gyp:base_junit_tests
+  junit_binary("base_junit_tests") {
+    java_files = [ "android/junit/src/org/chromium/base/LogTest.java" ]
+    deps = [
+      ":base_java",
+      ":base_java_test_support",
+    ]
   }
 
   # GYP: //base.gyp:base_java_application_state

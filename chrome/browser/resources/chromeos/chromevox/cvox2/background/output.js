@@ -156,7 +156,7 @@ Output.STATE_INFO_ = {
 Output.RULES = {
   navigate: {
     'default': {
-      speak: '$name $value $role',
+      speak: '$name $value $description $role',
       braille: ''
     },
     alert: {
@@ -207,7 +207,7 @@ Output.RULES = {
           '@describe_radio_unselected($name))'
     },
     slider: {
-      speak: '@describe_slider($value, $name)'
+      speak: '@describe_slider($value, $name) $help'
     },
     staticText: {
       speak: '$value $name'
@@ -303,13 +303,26 @@ Output.EventType = {
 Output.prototype = {
   /**
    * Gets the output buffer for speech.
+   * @param {string=} opt_separator Used to join components of the output.
    * @return {!cvox.Spannable}
    */
-  toSpannable: function() {
+  toSpannable: function(opt_separator) {
+    opt_separator = opt_separator || '';
     return this.buffer_.reduce(function(prev, cur) {
+      if (prev === null)
+        return cur;
+      prev.append(opt_separator);
       prev.append(cur);
       return prev;
-    }, new cvox.Spannable());
+    }, null);
+  },
+
+  /**
+   * Gets the output buffer for speech with separator '|'.
+   * @return {!cvox.Spannable}
+   */
+  toSpannableForTest: function() {
+    return this.toSpannable('|');
   },
 
   /**
@@ -536,11 +549,11 @@ Output.prototype = {
           this.append_(buff, text, options);
         } else if (token == 'indexInParent') {
           options.annotation.push(token);
-          this.append_(buff, node.indexInParent + 1);
+          this.append_(buff, String(node.indexInParent + 1));
         } else if (token == 'parentChildCount') {
           options.annotation.push(token);
           if (node.parent)
-          this.append_(buff, node.parent.children.length);
+          this.append_(buff, String(node.parent.children.length));
         } else if (token == 'state') {
           options.annotation.push(token);
           Object.getOwnPropertyNames(node.state).forEach(function(s) {

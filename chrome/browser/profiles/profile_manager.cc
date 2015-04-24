@@ -15,6 +15,7 @@
 #include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_service.h"
 #include "base/prefs/scoped_user_pref_update.h"
+#include "base/profiler/scoped_profile.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -38,6 +39,7 @@
 #include "chrome/browser/profiles/startup_task_runner_service_factory.h"
 #include "chrome/browser/signin/account_reconcilor_factory.h"
 #include "chrome/browser/signin/account_tracker_service_factory.h"
+#include "chrome/browser/signin/gaia_cookie_manager_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
@@ -55,6 +57,7 @@
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/signin/core/browser/account_tracker_service.h"
+#include "components/signin/core/browser/gaia_cookie_manager_service.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
 #include "content/public/browser/browser_thread.h"
@@ -713,7 +716,7 @@ void ProfileManager::ScheduleProfileForDeletion(
                                   base::Unretained(this),
                                   profile_dir,
                                   last_non_supervised_profile_path,
-                                  CreateCallback()),
+                                  callback),
                        base::string16(),
                        base::string16(),
                        std::string());
@@ -990,6 +993,8 @@ void ProfileManager::OnProfileCreated(Profile* profile,
 
 void ProfileManager::DoFinalInit(Profile* profile, bool go_off_the_record) {
   TRACE_EVENT0("browser", "ProfileManager::DoFinalInit");
+  TRACK_SCOPED_REGION("Startup", "ProfileManager::DoFinalInit");
+
   DoFinalInitForServices(profile, go_off_the_record);
   AddProfileToCache(profile);
   DoFinalInitLogging(profile);
@@ -1004,6 +1009,8 @@ void ProfileManager::DoFinalInit(Profile* profile, bool go_off_the_record) {
 void ProfileManager::DoFinalInitForServices(Profile* profile,
                                             bool go_off_the_record) {
   TRACE_EVENT0("browser", "ProfileManager::DoFinalInitForServices");
+  TRACK_SCOPED_REGION("Startup", "ProfileManager::DoFinalInitForServices");
+
 #if defined(ENABLE_EXTENSIONS)
   ProfileInfoCache& cache = GetProfileInfoCache();
   extensions::ExtensionSystem::Get(profile)->InitForRegularProfile(
@@ -1048,6 +1055,7 @@ void ProfileManager::DoFinalInitForServices(Profile* profile,
   DataReductionProxyChromeSettingsFactory::GetForBrowserContext(profile)->
       MaybeActivateDataReductionProxy(true);
 
+  GaiaCookieManagerServiceFactory::GetForProfile(profile)->Init();
   AccountTrackerServiceFactory::GetForProfile(profile)->EnableNetworkFetches();
   AccountReconcilorFactory::GetForProfile(profile);
 }
@@ -1070,6 +1078,7 @@ void ProfileManager::DoFinalInitLogging(Profile* profile) {
 Profile* ProfileManager::CreateProfileHelper(const base::FilePath& path) {
   TRACE_EVENT0("browser", "ProfileManager::CreateProfileHelper");
   SCOPED_UMA_HISTOGRAM_TIMER("Profile.CreateProfileHelperTime");
+  TRACK_SCOPED_REGION("Startup", "ProfileManager::CreateProfileHelper");
 
   return Profile::CreateProfile(path, NULL, Profile::CREATE_MODE_SYNCHRONOUS);
 }
@@ -1120,6 +1129,8 @@ Profile* ProfileManager::GetActiveUserOrOffTheRecordProfileFromPath(
 
 bool ProfileManager::AddProfile(Profile* profile) {
   TRACE_EVENT0("browser", "ProfileManager::AddProfile");
+  TRACK_SCOPED_REGION("Startup", "ProfileManager::AddProfile");
+
   DCHECK(profile);
 
   // Make sure that we're not loading a profile with the same ID as a profile
@@ -1140,6 +1151,8 @@ bool ProfileManager::AddProfile(Profile* profile) {
 Profile* ProfileManager::CreateAndInitializeProfile(
     const base::FilePath& profile_dir) {
   TRACE_EVENT0("browser", "ProfileManager::CreateAndInitializeProfile");
+  TRACK_SCOPED_REGION(
+      "Startup", "ProfileManager::CreateAndInitializeProfile");
   SCOPED_UMA_HISTOGRAM_LONG_TIMER("Profile.CreateAndInitializeProfile");
 
   // CHECK that we are not trying to load the same profile twice, to prevent

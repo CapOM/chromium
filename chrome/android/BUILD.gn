@@ -451,6 +451,7 @@ android_library("chrome_shell_test_java") {
 # GYP: //chrome/chrome_tests.gypi:chrome_shell_test_apk
 android_apk("chrome_shell_test_apk") {
   testonly = true
+  apk_under_test = ":chrome_shell_apk"
   deps = [
     ":chrome_javatests",
     ":chrome_shell_test_java",
@@ -463,12 +464,17 @@ android_apk("chrome_shell_test_apk") {
 
 # GYP: //chrome/chrome_tests.gypi:chrome_junit_tests
 junit_binary("chrome_junit_tests") {
-  java_files =
-      [ "junit/src/org/chromium/chrome/browser/omaha/ResponseParserTest.java" ]
+  java_files = [
+    "junit/src/org/chromium/chrome/browser/omaha/ResponseParserTest.java",
+    "junit/src/org/chromium/chrome/browser/media/remote/MediaUrlResolverTest.java",
+    "junit/src/org/chromium/chrome/browser/media/remote/RemoteVideoInfoTest.java",
+    "junit/src/org/chromium/chrome/browser/media/remote/TransportControlTest.java",
+  ]
   deps = [
     ":chrome_java",
     "//base:base_java",
     "//base:base_java_test_support",
+    "//third_party/junit:hamcrest",
   ]
 }
 
@@ -477,6 +483,7 @@ if (false) {
   # TODO(GYP): We need sync/sync_tests.gypi:test_support_sync_proto_java to be ported.
   # crbug.com/475612
   android_apk("chrome_sync_shell_test_apk") {
+    apk_under_test = ":chrome_sync_shell_apk"
     testonly = true
     deps = [
       ":chrome_java",
