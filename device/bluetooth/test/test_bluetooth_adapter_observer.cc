@@ -30,7 +30,9 @@ void TestBluetoothAdapterObserver::ResetCounters() {
   device_removed_count_ = 0;
 }
 
-void TestBluetoothAdapterObserver::AdapterPresentChanged(BluetoothAdapter* adapter, bool present) {
+void TestBluetoothAdapterObserver::AdapterPresentChanged(
+    BluetoothAdapter* adapter,
+    bool present) {
   EXPECT_EQ(adapter_.get(), adapter);
 
   ++present_changed_count_;

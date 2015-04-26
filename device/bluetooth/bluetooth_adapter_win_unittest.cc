@@ -48,8 +48,8 @@ class BluetoothAdapterWinTest : public testing::Test {
       : ui_task_runner_(new base::TestSimpleTaskRunner()),
         bluetooth_task_runner_(new base::TestSimpleTaskRunner()),
         adapter_(new BluetoothAdapterWin(
-          base::Bind(&BluetoothAdapterWinTest::RunInitCallback,
-                     base::Unretained(this)))),
+            base::Bind(&BluetoothAdapterWinTest::RunInitCallback,
+                       base::Unretained(this)))),
         adapter_win_(static_cast<BluetoothAdapterWin*>(adapter_.get())),
         adapter_observer_(adapter_),
         init_callback_called_(false) {
