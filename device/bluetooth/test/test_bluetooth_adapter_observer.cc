@@ -2,33 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "device/bluetooth/bluetooth_adapter.h"
+#include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
+
+#include "base/message_loop/message_loop.h"
+#include "testing/gtest/include/gtest/gtest.h"
 
 namespace device {
 
-TestBluetoothAdapterObserver::TestObserver(
+TestBluetoothAdapterObserver::TestBluetoothAdapterObserver(
     scoped_refptr<BluetoothAdapter> adapter)
-    : last_present_(false),
-      last_powered_(false),
-      last_discovering_(false),
-      last_device_(NULL),
-      adapter_(adapter) {
+    : adapter_(adapter) {
   ResetCounters();
   adapter_->AddObserver(this);
 }
 
-TestBluetoothAdapterObserver::~TestObserver() {
+TestBluetoothAdapterObserver::~TestBluetoothAdapterObserver() {
   adapter_->RemoveObserver(this);
 }
 
 void TestBluetoothAdapterObserver::ResetCounters() {
-  int present_changed_count_;
-  int powered_changed_count_;
-  int discoverable_changed_count_;
-  int discovering_changed_count_;
-  int device_added_count_;
-  int device_changed_count_;
-  int device_removed_count_;
+  present_changed_count_ = 0;
+  powered_changed_count_ = 0;
+  discoverable_changed_count_ = 0;
+  discovering_changed_count_ = 0;
+  device_added_count_ = 0;
+  device_changed_count_ = 0;
+  device_removed_count_ = 0;
 }
 
 void TestBluetoothAdapterObserver::TestBluetoothAdapterObserver::

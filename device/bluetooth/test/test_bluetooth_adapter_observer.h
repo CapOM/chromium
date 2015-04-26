@@ -12,26 +12,21 @@ namespace device {
 // Measures observed notifications from BluetoothAdapter::Observer.
 class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
  public:
-  TestObserver(scoped_refptr<BluetoothAdapter> adapter);
-  ~TestObserver() override;
+  TestBluetoothAdapterObserver(scoped_refptr<BluetoothAdapter> adapter);
+  ~TestBluetoothAdapterObserver() override;
 
   void ResetCounters();
 
   // BluetoothAdapter::Observer
   void AdapterPresentChanged(BluetoothAdapter* adapter, bool present) override;
-
   void AdapterPoweredChanged(BluetoothAdapter* adapter, bool powered) override;
-
   void AdapterDiscoverableChanged(BluetoothAdapter* adapter,
                                   bool discoverable) override;
   void AdapterDiscoveringChanged(BluetoothAdapter* adapter,
                                  bool discovering) override;
-
   void DeviceAdded(BluetoothAdapter* adapter, BluetoothDevice* device) override;
-
   void DeviceChanged(BluetoothAdapter* adapter,
                      BluetoothDevice* device) override;
-
   void DeviceRemoved(BluetoothAdapter* adapter,
                      BluetoothDevice* device) override;
 
@@ -39,13 +34,13 @@ class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
   int powered_changed_count_;
   int discoverable_changed_count_;
   int discovering_changed_count_;
-  bool last_present_;
-  bool last_powered_;
-  bool last_discovering_;
+  bool last_present_ = false;
+  bool last_powered_ = false;
+  bool last_discovering_ = false;
   int device_added_count_;
   int device_changed_count_;
   int device_removed_count_;
-  BluetoothDevice* last_device_;
+  BluetoothDevice* last_device_ = NULL;
   std::string last_device_address_;
 
  private:
