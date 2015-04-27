@@ -617,8 +617,7 @@ TEST_F(BluetoothGattChromeOSTest, GattCharacteristicValue) {
   base::MessageLoop::current()->Run();
 
   // Issue write request to non-writable characteristics.
-  observer.last_gatt_characteristic_id().clear();
-  observer.last_gatt_characteristic_uuid() = BluetoothUUID();
+  observer.ResetCounters();
 
   std::vector<uint8> write_value;
   write_value.push_back(0x01);

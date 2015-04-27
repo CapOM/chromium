@@ -41,6 +41,14 @@ void TestBluetoothAdapterObserver::ResetCounters() {
   gatt_descriptor_added_count_ = 0;
   gatt_descriptor_removed_count_ = 0;
   gatt_descriptor_value_changed_count_ = 0;
+  last_gatt_service_id_.clear();
+  last_gatt_service_uuid_ = BluetoothUUID();
+  last_gatt_characteristic_id_.clear();
+  last_gatt_characteristic_uuid_ = BluetoothUUID();
+  last_changed_characteristic_value_.clear();
+  last_gatt_descriptor_id_.clear();
+  last_gatt_descriptor_uuid_ = BluetoothUUID();
+  last_changed_descriptor_value_.clear();
 }
 
 void TestBluetoothAdapterObserver::AdapterPresentChanged(
