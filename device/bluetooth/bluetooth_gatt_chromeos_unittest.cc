@@ -23,6 +23,7 @@
 #include "device/bluetooth/bluetooth_gatt_notify_session.h"
 #include "device/bluetooth/bluetooth_gatt_service.h"
 #include "device/bluetooth/bluetooth_uuid.h"
+#include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 using device::BluetoothAdapter;
@@ -33,6 +34,7 @@ using device::BluetoothGattDescriptor;
 using device::BluetoothGattService;
 using device::BluetoothGattNotifySession;
 using device::BluetoothUUID;
+using device::TestBluetoothAdapterObserver;
 
 namespace chromeos {
 
@@ -56,213 +58,6 @@ bool ValuesEqual(const std::vector<uint8>& value0,
       return false;
   return true;
 }
-
-class TestObserver : public BluetoothAdapter::Observer {
- public:
-  TestObserver(scoped_refptr<BluetoothAdapter> adapter)
-      : gatt_service_added_count_(0),
-        gatt_service_removed_count_(0),
-        gatt_service_changed_count_(0),
-        gatt_discovery_complete_count_(0),
-        gatt_characteristic_added_count_(0),
-        gatt_characteristic_removed_count_(0),
-        gatt_characteristic_value_changed_count_(0),
-        gatt_descriptor_added_count_(0),
-        gatt_descriptor_removed_count_(0),
-        gatt_descriptor_value_changed_count_(0),
-        adapter_(adapter) {
-    adapter_->AddObserver(this);
-  }
-
-  ~TestObserver() override { adapter_->RemoveObserver(this); }
-
-  // BluetoothAdapter::Observer overrides.
-  void GattServiceAdded(BluetoothAdapter* adapter,
-                        BluetoothDevice* device,
-                        BluetoothGattService* service) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-    ASSERT_EQ(service->GetDevice(), device);
-
-    ++gatt_service_added_count_;
-    last_gatt_service_id_ = service->GetIdentifier();
-    last_gatt_service_uuid_ = service->GetUUID();
-
-    EXPECT_FALSE(service->IsLocal());
-    EXPECT_TRUE(service->IsPrimary());
-
-    EXPECT_EQ(device->GetGattService(last_gatt_service_id_), service);
-
-    QuitMessageLoop();
-  }
-
-  void GattServiceRemoved(BluetoothAdapter* adapter,
-                          BluetoothDevice* device,
-                          BluetoothGattService* service) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-    ASSERT_EQ(service->GetDevice(), device);
-
-    ++gatt_service_removed_count_;
-    last_gatt_service_id_ = service->GetIdentifier();
-    last_gatt_service_uuid_ = service->GetUUID();
-
-    EXPECT_FALSE(service->IsLocal());
-    EXPECT_TRUE(service->IsPrimary());
-
-    // The device should return NULL for this service.
-    EXPECT_FALSE(device->GetGattService(last_gatt_service_id_));
-
-    QuitMessageLoop();
-  }
-
-  void GattDiscoveryCompleteForService(BluetoothAdapter* adapter,
-                                       BluetoothGattService* service) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-    ++gatt_discovery_complete_count_;
-
-    QuitMessageLoop();
-  }
-
-  void GattServiceChanged(BluetoothAdapter* adapter,
-                          BluetoothGattService* service) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-    ++gatt_service_changed_count_;
-
-    QuitMessageLoop();
-  }
-
-  void GattCharacteristicAdded(
-      BluetoothAdapter* adapter,
-      BluetoothGattCharacteristic* characteristic) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-
-    ++gatt_characteristic_added_count_;
-    last_gatt_characteristic_id_ = characteristic->GetIdentifier();
-    last_gatt_characteristic_uuid_ = characteristic->GetUUID();
-
-    ASSERT_TRUE(characteristic->GetService());
-    EXPECT_EQ(characteristic->GetService()->GetCharacteristic(
-                  last_gatt_characteristic_id_),
-              characteristic);
-
-    QuitMessageLoop();
-  }
-
-  void GattCharacteristicRemoved(
-      BluetoothAdapter* adapter,
-      BluetoothGattCharacteristic* characteristic) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-
-    ++gatt_characteristic_removed_count_;
-    last_gatt_characteristic_id_ = characteristic->GetIdentifier();
-    last_gatt_characteristic_uuid_ = characteristic->GetUUID();
-
-    // The service should return NULL for this characteristic.
-    ASSERT_TRUE(characteristic->GetService());
-    EXPECT_FALSE(characteristic->GetService()->GetCharacteristic(
-        last_gatt_characteristic_id_));
-
-    QuitMessageLoop();
-  }
-
-  void GattCharacteristicValueChanged(
-      BluetoothAdapter* adapter,
-      BluetoothGattCharacteristic* characteristic,
-      const std::vector<uint8>& value) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-
-    ++gatt_characteristic_value_changed_count_;
-    last_gatt_characteristic_id_ = characteristic->GetIdentifier();
-    last_gatt_characteristic_uuid_ = characteristic->GetUUID();
-    last_changed_characteristic_value_ = value;
-
-    ASSERT_TRUE(characteristic->GetService());
-    EXPECT_EQ(characteristic->GetService()->GetCharacteristic(
-                  last_gatt_characteristic_id_),
-              characteristic);
-
-    QuitMessageLoop();
-  }
-
-  void GattDescriptorAdded(BluetoothAdapter* adapter,
-                           BluetoothGattDescriptor* descriptor) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-
-    ++gatt_descriptor_added_count_;
-    last_gatt_descriptor_id_ = descriptor->GetIdentifier();
-    last_gatt_descriptor_uuid_ = descriptor->GetUUID();
-
-    ASSERT_TRUE(descriptor->GetCharacteristic());
-    EXPECT_EQ(descriptor->GetCharacteristic()->GetDescriptor(
-                  last_gatt_descriptor_id_),
-              descriptor);
-
-    QuitMessageLoop();
-  }
-
-  void GattDescriptorRemoved(BluetoothAdapter* adapter,
-                             BluetoothGattDescriptor* descriptor) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-
-    ++gatt_descriptor_removed_count_;
-    last_gatt_descriptor_id_ = descriptor->GetIdentifier();
-    last_gatt_descriptor_uuid_ = descriptor->GetUUID();
-
-    // The characteristic should return NULL for this descriptor..
-    ASSERT_TRUE(descriptor->GetCharacteristic());
-    EXPECT_FALSE(descriptor->GetCharacteristic()->GetDescriptor(
-        last_gatt_descriptor_id_));
-
-    QuitMessageLoop();
-  }
-
-  void GattDescriptorValueChanged(BluetoothAdapter* adapter,
-                                  BluetoothGattDescriptor* descriptor,
-                                  const std::vector<uint8>& value) override {
-    ASSERT_EQ(adapter_.get(), adapter);
-
-    ++gatt_descriptor_value_changed_count_;
-    last_gatt_descriptor_id_ = descriptor->GetIdentifier();
-    last_gatt_descriptor_uuid_ = descriptor->GetUUID();
-    last_changed_descriptor_value_ = value;
-
-    ASSERT_TRUE(descriptor->GetCharacteristic());
-    EXPECT_EQ(descriptor->GetCharacteristic()->GetDescriptor(
-                  last_gatt_descriptor_id_),
-              descriptor);
-
-    QuitMessageLoop();
-  }
-
-  int gatt_service_added_count_;
-  int gatt_service_removed_count_;
-  int gatt_service_changed_count_;
-  int gatt_discovery_complete_count_;
-  int gatt_characteristic_added_count_;
-  int gatt_characteristic_removed_count_;
-  int gatt_characteristic_value_changed_count_;
-  int gatt_descriptor_added_count_;
-  int gatt_descriptor_removed_count_;
-  int gatt_descriptor_value_changed_count_;
-  std::string last_gatt_service_id_;
-  BluetoothUUID last_gatt_service_uuid_;
-  std::string last_gatt_characteristic_id_;
-  BluetoothUUID last_gatt_characteristic_uuid_;
-  std::vector<uint8> last_changed_characteristic_value_;
-  std::string last_gatt_descriptor_id_;
-  BluetoothUUID last_gatt_descriptor_uuid_;
-  std::vector<uint8> last_changed_descriptor_value_;
-
- private:
-  // Some tests use a message loop since background processing is simulated;
-  // break out of those loops.
-  void QuitMessageLoop() {
-    if (base::MessageLoop::current() &&
-        base::MessageLoop::current()->is_running())
-      base::MessageLoop::current()->Quit();
-  }
-
-  scoped_refptr<BluetoothAdapter> adapter_;
-};
 
 }  // namespace
 
@@ -480,7 +275,7 @@ TEST_F(BluetoothGattChromeOSTest, GattServiceAddedAndRemoved) {
       FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   EXPECT_EQ(0, observer.gatt_service_added_count_);
   EXPECT_EQ(0, observer.gatt_service_removed_count_);
@@ -571,7 +366,7 @@ TEST_F(BluetoothGattChromeOSTest, GattCharacteristicAddedAndRemoved) {
       FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.
@@ -639,7 +434,7 @@ TEST_F(BluetoothGattChromeOSTest, GattDescriptorAddedAndRemoved) {
       FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.
@@ -805,7 +600,7 @@ TEST_F(BluetoothGattChromeOSTest, GattCharacteristicValue) {
       FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.
@@ -1021,7 +816,7 @@ TEST_F(BluetoothGattChromeOSTest, GattCharacteristicProperties) {
       FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.
@@ -1063,7 +858,7 @@ TEST_F(BluetoothGattChromeOSTest, GattDescriptorValue) {
       FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.
@@ -1186,7 +981,7 @@ TEST_F(BluetoothGattChromeOSTest, NotifySessions) {
       adapter_->GetDevice(FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.
@@ -1335,7 +1130,7 @@ TEST_F(BluetoothGattChromeOSTest, NotifySessionsMadeInactive) {
       adapter_->GetDevice(FakeBluetoothDeviceClient::kLowEnergyAddress);
   ASSERT_TRUE(device);
 
-  TestObserver observer(adapter_);
+  TestBluetoothAdapterObserver observer(adapter_);
 
   // Expose the fake Heart Rate service. This will asynchronously expose
   // characteristics.

@@ -29,6 +29,33 @@ class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
                      BluetoothDevice* device) override;
   void DeviceRemoved(BluetoothAdapter* adapter,
                      BluetoothDevice* device) override;
+  void GattServiceAdded(BluetoothAdapter* adapter,
+                        BluetoothDevice* device,
+                        BluetoothGattService* service) override;
+  void GattServiceRemoved(BluetoothAdapter* adapter,
+                          BluetoothDevice* device,
+                          BluetoothGattService* service) override;
+  void GattDiscoveryCompleteForService(BluetoothAdapter* adapter,
+                                       BluetoothGattService* service) override;
+  void GattServiceChanged(BluetoothAdapter* adapter,
+                          BluetoothGattService* service) override;
+  void GattCharacteristicAdded(
+      BluetoothAdapter* adapter,
+      BluetoothGattCharacteristic* characteristic) override;
+  void GattCharacteristicRemoved(
+      BluetoothAdapter* adapter,
+      BluetoothGattCharacteristic* characteristic) override;
+  void GattDescriptorAdded(BluetoothAdapter* adapter,
+                           BluetoothGattDescriptor* descriptor) override;
+  void GattDescriptorRemoved(BluetoothAdapter* adapter,
+                             BluetoothGattDescriptor* descriptor) override;
+  void GattCharacteristicValueChanged(
+      BluetoothAdapter* adapter,
+      BluetoothGattCharacteristic* characteristic,
+      const std::vector<uint8>& value) override;
+  void GattDescriptorValueChanged(BluetoothAdapter* adapter,
+                                  BluetoothGattDescriptor* descriptor,
+                                  const std::vector<uint8>& value) override;
 
   int present_changed_count_;
   int powered_changed_count_;
@@ -42,6 +69,24 @@ class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
   int device_removed_count_;
   BluetoothDevice* last_device_ = NULL;
   std::string last_device_address_;
+  int gatt_service_added_count_;
+  int gatt_service_removed_count_;
+  int gatt_service_changed_count_;
+  int gatt_discovery_complete_count_;
+  int gatt_characteristic_added_count_;
+  int gatt_characteristic_removed_count_;
+  int gatt_characteristic_value_changed_count_;
+  int gatt_descriptor_added_count_;
+  int gatt_descriptor_removed_count_;
+  int gatt_descriptor_value_changed_count_;
+  std::string last_gatt_service_id_;
+  BluetoothUUID last_gatt_service_uuid_;
+  std::string last_gatt_characteristic_id_;
+  BluetoothUUID last_gatt_characteristic_uuid_;
+  std::vector<uint8> last_changed_characteristic_value_;
+  std::string last_gatt_descriptor_id_;
+  BluetoothUUID last_gatt_descriptor_uuid_;
+  std::vector<uint8> last_changed_descriptor_value_;
 
  private:
   // Some tests use a message loop since background processing is simulated;
