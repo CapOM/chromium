@@ -106,15 +106,15 @@ class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
   int powered_changed_count_;
   int discoverable_changed_count_;
   int discovering_changed_count_;
-  bool last_present_ = false;
-  bool last_powered_ = false;
-  bool last_discovering_ = false;
+  bool last_present_;
+  bool last_powered_;
+  bool last_discovering_;
 
   // Device related:
   int device_added_count_;
   int device_changed_count_;
   int device_removed_count_;
-  BluetoothDevice* last_device_ = NULL;
+  BluetoothDevice* last_device_;
   std::string last_device_address_;
 
   // GATT related:
