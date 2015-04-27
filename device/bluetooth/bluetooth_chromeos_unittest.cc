@@ -1756,7 +1756,7 @@ TEST_F(BluetoothChromeOSTest, SetDiscoveryFilterBeforeStartDiscoveryMultiple) {
 
     if (i == 0) {
       EXPECT_EQ(1, observer.discovering_changed_count());
- observer.Reset();
+      observer.Reset();
 
       auto filter = fake_bluetooth_adapter_client_->GetDiscoveryFilter();
       EXPECT_EQ("le", *filter->transport);
