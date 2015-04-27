@@ -15,7 +15,7 @@ namespace device {
 TestBluetoothAdapterObserver::TestBluetoothAdapterObserver(
     scoped_refptr<BluetoothAdapter> adapter)
     : adapter_(adapter) {
-  ResetCounters();
+  Reset();
   adapter_->AddObserver(this);
 }
 
@@ -23,14 +23,19 @@ TestBluetoothAdapterObserver::~TestBluetoothAdapterObserver() {
   adapter_->RemoveObserver(this);
 }
 
-void TestBluetoothAdapterObserver::ResetCounters() {
+void TestBluetoothAdapterObserver::Reset() {
   present_changed_count_ = 0;
   powered_changed_count_ = 0;
   discoverable_changed_count_ = 0;
   discovering_changed_count_ = 0;
+  last_present_ = false;
+  last_powered_ = false;
+  last_discovering_ = false;
   device_added_count_ = 0;
   device_changed_count_ = 0;
   device_removed_count_ = 0;
+  last_device_ = NULL;
+  last_device_address_.clear();
   gatt_service_added_count_ = 0;
   gatt_service_removed_count_ = 0;
   gatt_service_changed_count_ = 0;

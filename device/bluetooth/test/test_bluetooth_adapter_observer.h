@@ -16,7 +16,8 @@ class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
   TestBluetoothAdapterObserver(scoped_refptr<BluetoothAdapter> adapter);
   ~TestBluetoothAdapterObserver() override;
 
-  void ResetCounters();
+  // Reset counters and cached values.
+  void Reset();
 
   // BluetoothAdapter::Observer
   void AdapterPresentChanged(BluetoothAdapter* adapter, bool present) override;

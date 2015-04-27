@@ -617,7 +617,7 @@ TEST_F(BluetoothGattChromeOSTest, GattCharacteristicValue) {
   base::MessageLoop::current()->Run();
 
   // Issue write request to non-writable characteristics.
-  observer.ResetCounters();
+  observer.Reset();
 
   std::vector<uint8> write_value;
   write_value.push_back(0x01);
@@ -1073,7 +1073,7 @@ TEST_F(BluetoothGattChromeOSTest, NotifySessions) {
   EXPECT_FALSE(characteristic->IsNotifying());
 
   success_callback_count_ = 0;
-  observer.ResetCounters();
+  observer.Reset();
 
   // Enable notifications again.
   characteristic->StartNotifySession(
@@ -1215,7 +1215,7 @@ TEST_F(BluetoothGattChromeOSTest, NotifySessionsMadeInactive) {
   // the session count and make a request through the client.
   update_sessions_.clear();
   success_callback_count_ = 0;
-  observer.ResetCounters();
+  observer.Reset();
   characteristic->StartNotifySession(
       base::Bind(&BluetoothGattChromeOSTest::NotifySessionCallback,
                  base::Unretained(this)),

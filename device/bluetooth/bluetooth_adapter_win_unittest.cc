@@ -457,7 +457,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
   devices.push_back(iphone_state);
 
   // Add 3 devices
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(3, observer_.device_added_count());
   EXPECT_EQ(0, observer_.device_removed_count());
@@ -465,7 +465,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
 
   // Change a device name
   android_phone_state->name = "phone2";
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(0, observer_.device_added_count());
   EXPECT_EQ(0, observer_.device_removed_count());
@@ -473,7 +473,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
 
   // Change a device address
   android_phone_state->address = "A1:B2:C3:D4:E5:E6";
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(1, observer_.device_added_count());
   EXPECT_EQ(1, observer_.device_removed_count());
@@ -481,7 +481,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
 
   // Remove a device
   devices.erase(devices.begin());
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(0, observer_.device_added_count());
   EXPECT_EQ(1, observer_.device_removed_count());
@@ -493,7 +493,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
   audio_state->name = kTestAudioSdpName;
   base::HexStringToBytes(kTestAudioSdpBytes, &audio_state->sdp_bytes);
   laptop_state->service_record_states.push_back(audio_state);
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(0, observer_.device_added_count());
   EXPECT_EQ(0, observer_.device_removed_count());
@@ -501,7 +501,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
 
   // Change a service
   audio_state->name = kTestAudioSdpName2;
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(0, observer_.device_added_count());
   EXPECT_EQ(0, observer_.device_removed_count());
@@ -509,7 +509,7 @@ TEST_F(BluetoothAdapterWinTest, DevicesPolled) {
 
   // Remove a service
   laptop_state->service_record_states.clear();
-  observer_.ResetCounters();
+  observer_.Reset();
   adapter_win_->DevicesPolled(devices);
   EXPECT_EQ(0, observer_.device_added_count());
   EXPECT_EQ(0, observer_.device_removed_count());

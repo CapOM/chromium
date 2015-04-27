@@ -446,7 +446,7 @@ TEST_F(BluetoothChromeOSTest, SecondAdapter) {
   EXPECT_FALSE(adapter_->IsPowered());
   EXPECT_FALSE(adapter_->IsDiscovering());
 
-  observer.ResetCounters();
+  observer.Reset();
 
   // Removing the second adapter shouldn't set anything either.
   fake_bluetooth_adapter_client_->SetSecondVisible(false);
@@ -744,7 +744,7 @@ TEST_F(BluetoothChromeOSTest, PoweredAndDiscovering) {
   EXPECT_TRUE(observer.last_discovering());
   EXPECT_TRUE(adapter_->IsDiscovering());
 
-  observer.ResetCounters();
+  observer.Reset();
 
   // Now mark the adapter not present again. Expect the methods to be called
   // again, to reset the properties back to false
@@ -1648,7 +1648,7 @@ TEST_F(BluetoothChromeOSTest, SetDiscoveryFilterAfterStartDiscovery) {
   ASSERT_EQ((size_t)1, discovery_sessions_.size());
   ASSERT_TRUE(discovery_sessions_[0]->IsActive());
   EXPECT_EQ(1, observer.discovering_changed_count());
-  observer.ResetCounters();
+  observer.Reset();
 
   auto nullInstance = scoped_ptr<BluetoothDiscoveryFilter>();
   nullInstance.reset();
@@ -1756,7 +1756,7 @@ TEST_F(BluetoothChromeOSTest, SetDiscoveryFilterBeforeStartDiscoveryMultiple) {
 
     if (i == 0) {
       EXPECT_EQ(1, observer.discovering_changed_count());
- observer.ResetCounters();
+ observer.Reset();
 
       auto filter = fake_bluetooth_adapter_client_->GetDiscoveryFilter();
       EXPECT_EQ("le", *filter->transport);
