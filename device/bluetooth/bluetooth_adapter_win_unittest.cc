@@ -63,8 +63,6 @@ class BluetoothAdapterWinTest : public testing::Test {
     num_stop_discovery_error_callbacks_ = 0;
   }
 
-  void TearDown() override { adapter_win_->RemoveObserver(&observer_); }
-
   void RunInitCallback() {
     init_callback_called_ = true;
   }
