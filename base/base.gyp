@@ -376,24 +376,6 @@
       ],
     },
     {
-      # TODO(pasko): Remove this target when crbug.com/424562 is fixed.
-      # GN: //base:protect_file_posix
-      'target_name': 'protect_file_posix',
-      'conditions': [
-        ['os_posix == 1', {
-          'type': 'static_library',
-          'dependencies': [
-            'base',
-          ],
-          'sources': [
-            'files/protect_file_posix.cc',
-          ],
-        }, {
-          'type': 'none',
-        }],
-      ],
-    },
-    {
       'target_name': 'base_prefs_test_support',
       'type': 'static_library',
       'dependencies': [
@@ -481,6 +463,7 @@
         'containers/hash_tables_unittest.cc',
         'containers/linked_list_unittest.cc',
         'containers/mru_cache_unittest.cc',
+        'containers/scoped_ptr_hash_map_unittest.cc',
         'containers/small_map_unittest.cc',
         'containers/stack_container_unittest.cc',
         'cpu_unittest.cc',
@@ -1494,6 +1477,7 @@
           'type': 'none',
           'dependencies': [
             'base_java',
+            '../testing/android/on_device_instrumentation.gyp:reporter_java',
           ],
           'variables': {
             'java_in_dir': '../base/test/android/javatests',

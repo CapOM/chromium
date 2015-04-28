@@ -432,9 +432,15 @@ bool InitTable(sql::Connection* db) {
   if (!db->Execute("CREATE INDEX domain ON cookies(host_key)"))
     return false;
 
+#if defined(OS_IOS)
+  // iOS 8.1 and older doesn't support partial indices. iOS 8.2 supports
+  // partial indices.
+  if (!db->Execute("CREATE INDEX is_transient ON cookies(persistent)")) {
+#else
   if (!db->Execute(
           "CREATE INDEX is_transient ON cookies(persistent) "
           "where persistent != 1")) {
+#endif
     return false;
   }
 
@@ -701,6 +707,9 @@ bool SQLitePersistentCookieStore::Backend::InitializeDatabase() {
       50);
 
   initialized_ = true;
+
+  if (!restore_old_session_cookies_)
+    DeleteSessionCookiesOnStartup();
   return true;
 }
 
@@ -981,9 +990,16 @@ bool SQLitePersistentCookieStore::Backend::EnsureDatabaseVersion() {
       return false;
     }
 
+#if defined(OS_IOS)
+    // iOS 8.1 and older doesn't support partial indices. iOS 8.2 supports
+    // partial indices.
     if (!db_->Execute(
-            "CREATE INDEX IF NOT EXISTS is_transient ON cookies(persistent) "
-            "where persistent != 1")) {
+        "CREATE INDEX IF NOT EXISTS is_transient ON cookies(persistent)")) {
+#else
+    if (!db_->Execute(
+        "CREATE INDEX IF NOT EXISTS is_transient ON cookies(persistent) "
+        "where persistent != 1")) {
+#endif
       LOG(WARNING)
           << "Unable to create index is_transient in update to version 9.";
       return false;
@@ -1296,7 +1312,7 @@ void SQLitePersistentCookieStore::Backend::SetForceKeepSessionState() {
 
 void SQLitePersistentCookieStore::Backend::DeleteSessionCookiesOnStartup() {
   DCHECK(background_task_runner_->RunsTasksOnCurrentThread());
-  if (!db_->Execute("DELETE FROM cookies WHERE persistent == 0"))
+  if (!db_->Execute("DELETE FROM cookies WHERE persistent != 1"))
     LOG(WARNING) << "Unable to delete session cookies.";
 }
 
@@ -1321,8 +1337,6 @@ void SQLitePersistentCookieStore::Backend::FinishedLoadingCookies(
     bool success) {
   PostClientTask(FROM_HERE, base::Bind(&Backend::CompleteLoadInForeground, this,
                                        loaded_callback, success));
-  if (success && !restore_old_session_cookies_)
-    DeleteSessionCookiesOnStartup();
 }
 
 SQLitePersistentCookieStore::SQLitePersistentCookieStore(

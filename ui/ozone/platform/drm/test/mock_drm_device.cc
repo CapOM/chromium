@@ -236,12 +236,7 @@ bool MockDrmDevice::CloseBufferHandle(uint32_t handle) {
 
 bool MockDrmDevice::CommitProperties(drmModePropertySet* properties,
                                      uint32_t flags,
-                                     bool is_sync,
                                      const PageFlipCallback& callback) {
-  return false;
-}
-
-bool MockDrmDevice::SetCapability(uint64_t capability, uint64_t value) {
   return false;
 }
 

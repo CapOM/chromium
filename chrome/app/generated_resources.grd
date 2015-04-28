@@ -5876,6 +5876,18 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_TOUCH_EDITING_DESCRIPTION" desc="Description of the flag to enable touch based text editing.">
         Touch editing can be initiated by tapping on a textfield or a selected text.
       </message>
+      <message name="IDS_FLAGS_TOUCH_SELECTION_STRATEGY_NAME" desc="Name of the flag that controls touch based text selection strategy.">
+        Touch text selection strategy
+      </message>
+      <message name="IDS_FLAGS_TOUCH_SELECTION_STRATEGY_DESCRIPTION" desc="Description of the flag that controls touch based text selection strategy.">
+        Controls how text selection granularity changes when touch text selection handles are dragged. Non-default behavior is experimental.
+      </message>
+      <message name="IDS_TOUCH_SELECTION_STRATEGY_CHARACTER" desc="Description for the touch text selection strategy which always uses character granularity.">
+        Character
+      </message>
+      <message name="IDS_TOUCH_SELECTION_STRATEGY_DIRECTION" desc="Description for the touch text selection strategy which is based on the direction in which the handle is dragged.">
+        Direction
+      </message>
       <message name="IDS_FLAGS_WALLET_SERVICE_USE_SANDBOX_NAME" desc="Title for the flag to use the Online Wallet sandbox servers (instead of production).">
         Use Wallet sandbox servers
       </message>
@@ -7389,11 +7401,8 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_OMNIBOX_KEYWORD_TEXT" desc="Text shown in the search button at the front of the omnibox when the user has selected a keyword">
         Search <ph name="SITE_NAME">$1<ex>google.com</ex></ph>:
       </message>
-      <message name="IDS_OMNIBOX_EMPTY_HINT_WITH_DEFAULT_SEARCH_PROVIDER" desc="The text displayed in the omnibox when it is empty, which includes the name of the default search provider.">
+      <message name="IDS_SEARCH_BOX_EMPTY_HINT" desc="The text displayed in the fakebox when it is empty, which includes the name of the default search provider.">
         Search <ph name="ENGINE">$1<ex>Google</ex></ph> or type URL
-      </message>
-      <message name="IDS_OMNIBOX_EMPTY_HINT_NO_DEFAULT_SEARCH_PROVIDER" desc="The text displayed in the omnibox when it is empty, if the default search provider cannot be determined.">
-        Type URL
       </message>
       <if expr="is_ios">
         <message name="IDS_OMNIBOX_EMPTY_HINT" desc="The text displayed in the omnibox when it is empty.">
@@ -15122,6 +15131,15 @@ After you create a new supervised user, you can manage their settings at any tim
       <message name="IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_DESCRIPTION" desc="Description of a lab">
         Import cards from my Wallet.
       </message>
+
+      <if expr="is_android">
+        <message name="IDS_FLAGS_AUTOFILL_ACCESSORY_VIEW_NAME" desc="Title for the flag to show Autofill suggestions at top of keyboard">
+          Autofill suggestions as keyboard accessory view
+        </message>
+        <message name="IDS_FLAGS_AUTOFILL_ACCESSORY_VIEW_DESCRIPTION" desc="Description for the flag to show Autofill suggestions at top of keyboard">
+          Shows Autofill suggestions on top of the keyboard rather than in a dropdown.
+        </message>
+      </if>
 
       <!-- Reader mode experiment flags -->
       <if expr="is_android">

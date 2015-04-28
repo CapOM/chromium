@@ -321,7 +321,6 @@ group("gn_all") {
       "//base:base_perftests",
       "//base:base_i18n_perftests",
       "//base:check_example",
-      "//base:protect_file_posix",
       "//base:build_utf8_validator_tables",
       "//cc:cc_perftests",
       "//cc/blink:cc_blink_unittests",
@@ -577,7 +576,6 @@ group("gn_only") {
       "//components/rappor:unit_tests",
       "//components/sessions:unit_tests",
       "//media/blink:media_blink_unittests",
-      "//media/base:base_for_cast_ios",
       "//media/cast:udp_proxy",
       "//native_client/src/trusted/platform_qualify:vcpuid",
       "//native_client/src/trusted/debug_stub:gdb_rsp_unittest",
@@ -605,7 +603,6 @@ group("gn_only") {
       "//third_party/pdfium/third_party:freetype",
       "//third_party/libjingle:peerconnnection_server",
       "//third_party/libjpeg_turbo:simd",
-      "//third_party/libjpeg_turbo:simd_asm",
       "//third_party/libsrtp:replay_driver",
       "//third_party/libsrtp:roc_driver",
       "//third_party/libsrtp:rtpw",
@@ -632,6 +629,9 @@ group("gn_only") {
       "//ui/shell_dialogs:shell_dialogs_unittests",
       "//ui/views/examples:views_examples_exe",
     ]
+    if (target_cpu == "x86" || target_cpu == "x64") {
+      deps += [ "//third_party/libjpeg_turbo:simd_asm" ]
+    }
     if (enable_nacl) {
       deps += [ "//native_client/src/trusted/service_runtime:sel_ldr" ]
     }
@@ -766,6 +766,7 @@ if (is_linux) {
       "//base:base_unittests",  # PASSES 4/20/2015
       "//cc:cc_unittests",  # PASSES 4/17/2015
       "//chrome_elf:chrome_elf_unittests",  # FAILS 4/20/2015
+      "//chrome/app_installer:app_installer_unittests",
       "//chrome/test:browser_tests",
       "//chrome/test:interactive_ui_tests",
       "//chrome/test:sync_integration_tests",  # Note: need to turn off incremental linking for debug.
@@ -816,8 +817,8 @@ if (is_linux) {
       "//ui/gfx:gfx_unittests",  # PASSES (with assertion failure?) 4/20/2015
       "//ui/message_center:message_center_unittests",  # PASSES 4/20/2015
       "//ui/touch_selection:ui_touch_selection_unittests",  # PASSES 4/20/2015
-      "//ui/views:views_unittests",  # Same as WM unittests
-      "//ui/wm:wm_unittests",  # CRASHES, looks like something simple missing.
+      "//ui/views:views_unittests",  # TooltipControllerTest failures
+      "//ui/wm:wm_unittests",  # PASSES 4/21/2015
       "//url:url_unittests",  # PASSES 4/17/2015
 
       # TODO(GYP) installer_util_unittests

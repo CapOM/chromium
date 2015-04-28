@@ -14,8 +14,10 @@
 #include "net/base/net_errors.h"
 #include "net/base/network_delegate_impl.h"
 #include "net/base/test_completion_callback.h"
+#include "net/log/captured_net_log_entry.h"
 #include "net/log/net_log.h"
 #include "net/log/net_log_unittest.h"
+#include "net/log/test_net_log.h"
 #include "net/proxy/dhcp_proxy_script_fetcher.h"
 #include "net/proxy/mock_proxy_resolver.h"
 #include "net/proxy/mock_proxy_script_fetcher.h"
@@ -260,7 +262,7 @@ TEST_F(ProxyServiceTest, Direct) {
   EXPECT_TRUE(info.proxy_resolve_end_time().is_null());
 
   // Check the NetLog was filled correctly.
-  TestNetLog::CapturedEntryList entries;
+  CapturedNetLogEntry::List entries;
   log.GetEntries(&entries);
 
   EXPECT_EQ(3u, entries.size());
@@ -412,7 +414,7 @@ TEST_F(ProxyServiceTest, PAC) {
   EXPECT_LE(info.proxy_resolve_start_time(), info.proxy_resolve_end_time());
 
   // Check the NetLog was filled correctly.
-  TestNetLog::CapturedEntryList entries;
+  CapturedNetLogEntry::List entries;
   log.GetEntries(&entries);
 
   EXPECT_EQ(5u, entries.size());
@@ -730,6 +732,148 @@ TEST_F(ProxyServiceTest, ProxyResolverFails) {
 
   // This time we will have the resolver succeed (perhaps the PAC script has
   // a dependency on the current time).
+  resolver.pending_requests()[0]->results()->UseNamedProxy("foopy_valid:8080");
+  resolver.pending_requests()[0]->CompleteNow(OK);
+
+  EXPECT_EQ(OK, callback2.WaitForResult());
+  EXPECT_FALSE(info.is_direct());
+  EXPECT_EQ("foopy_valid:8080", info.proxy_server().ToURI());
+}
+
+TEST_F(ProxyServiceTest, ProxyResolverTerminatedDuringRequest) {
+  // Test what happens when the ProxyResolver fails with a fatal error while
+  // a GetProxyForURL() call is in progress.
+
+  MockProxyConfigService* config_service =
+      new MockProxyConfigService("http://foopy/proxy.pac");
+
+  MockAsyncProxyResolver resolver;
+
+  ProxyService service(
+      config_service,
+      make_scoped_ptr(new ForwardingProxyResolverFactory(&resolver)), nullptr);
+
+  // Start first resolve request.
+  GURL url("http://www.google.com/");
+  ProxyInfo info;
+  TestCompletionCallback callback1;
+  int rv =
+      service.ResolveProxy(url, net::LOAD_NORMAL, &info, callback1.callback(),
+                           nullptr, nullptr, BoundNetLog());
+  EXPECT_EQ(ERR_IO_PENDING, rv);
+
+  ASSERT_TRUE(resolver.pending_set_pac_script_request());
+  EXPECT_EQ(GURL("http://foopy/proxy.pac"),
+            resolver.pending_set_pac_script_request()->script_data()->url());
+  resolver.pending_set_pac_script_request()->CompleteNow(OK);
+
+  ASSERT_EQ(1u, resolver.pending_requests().size());
+  EXPECT_EQ(url, resolver.pending_requests()[0]->url());
+
+  // Fail the first resolve request in MockAsyncProxyResolver.
+  resolver.pending_requests()[0]->CompleteNow(ERR_PAC_SCRIPT_TERMINATED);
+
+  // Although the proxy resolver failed the request, ProxyService implicitly
+  // falls-back to DIRECT.
+  EXPECT_EQ(OK, callback1.WaitForResult());
+  EXPECT_TRUE(info.is_direct());
+
+  // Failed PAC executions still have proxy resolution times.
+  EXPECT_FALSE(info.proxy_resolve_start_time().is_null());
+  EXPECT_FALSE(info.proxy_resolve_end_time().is_null());
+  EXPECT_LE(info.proxy_resolve_start_time(), info.proxy_resolve_end_time());
+
+  // With no other requests, the ProxyService waits for a new request before
+  // initializing a new ProxyResolver.
+  EXPECT_FALSE(resolver.pending_set_pac_script_request());
+
+  TestCompletionCallback callback2;
+  rv = service.ResolveProxy(url, net::LOAD_NORMAL, &info, callback2.callback(),
+                            nullptr, nullptr, BoundNetLog());
+  EXPECT_EQ(ERR_IO_PENDING, rv);
+
+  ASSERT_TRUE(resolver.pending_set_pac_script_request());
+  EXPECT_EQ(GURL("http://foopy/proxy.pac"),
+            resolver.pending_set_pac_script_request()->script_data()->url());
+  resolver.pending_set_pac_script_request()->CompleteNow(OK);
+
+  ASSERT_EQ(1u, resolver.pending_requests().size());
+  EXPECT_EQ(url, resolver.pending_requests()[0]->url());
+
+  // This time we will have the resolver succeed.
+  resolver.pending_requests()[0]->results()->UseNamedProxy("foopy_valid:8080");
+  resolver.pending_requests()[0]->CompleteNow(OK);
+
+  EXPECT_EQ(OK, callback2.WaitForResult());
+  EXPECT_FALSE(info.is_direct());
+  EXPECT_EQ("foopy_valid:8080", info.proxy_server().ToURI());
+}
+
+TEST_F(ProxyServiceTest,
+       ProxyResolverTerminatedDuringRequestWithConcurrentRequest) {
+  // Test what happens when the ProxyResolver fails with a fatal error while
+  // a GetProxyForURL() call is in progress.
+
+  MockProxyConfigService* config_service =
+      new MockProxyConfigService("http://foopy/proxy.pac");
+
+  MockAsyncProxyResolver resolver;
+
+  ProxyService service(
+      config_service,
+      make_scoped_ptr(new ForwardingProxyResolverFactory(&resolver)), nullptr);
+
+  // Start two resolve requests.
+  GURL url1("http://www.google.com/");
+  GURL url2("https://www.google.com/");
+  ProxyInfo info;
+  TestCompletionCallback callback1;
+  int rv =
+      service.ResolveProxy(url1, net::LOAD_NORMAL, &info, callback1.callback(),
+                           nullptr, nullptr, BoundNetLog());
+  EXPECT_EQ(ERR_IO_PENDING, rv);
+  TestCompletionCallback callback2;
+  rv = service.ResolveProxy(url2, net::LOAD_NORMAL, &info, callback2.callback(),
+                            nullptr, nullptr, BoundNetLog());
+  EXPECT_EQ(ERR_IO_PENDING, rv);
+
+  ASSERT_TRUE(resolver.pending_set_pac_script_request());
+  EXPECT_EQ(GURL("http://foopy/proxy.pac"),
+            resolver.pending_set_pac_script_request()->script_data()->url());
+  resolver.pending_set_pac_script_request()->CompleteNow(OK);
+
+  ASSERT_EQ(2u, resolver.pending_requests().size());
+  EXPECT_EQ(url1, resolver.pending_requests()[0]->url());
+  EXPECT_EQ(url2, resolver.pending_requests()[1]->url());
+
+  // Fail the first resolve request in MockAsyncProxyResolver.
+  resolver.pending_requests()[0]->CompleteNow(ERR_PAC_SCRIPT_TERMINATED);
+
+  // Although the proxy resolver failed the request, ProxyService implicitly
+  // falls-back to DIRECT.
+  EXPECT_EQ(OK, callback1.WaitForResult());
+  EXPECT_TRUE(info.is_direct());
+
+  // Failed PAC executions still have proxy resolution times.
+  EXPECT_FALSE(info.proxy_resolve_start_time().is_null());
+  EXPECT_FALSE(info.proxy_resolve_end_time().is_null());
+  EXPECT_LE(info.proxy_resolve_start_time(), info.proxy_resolve_end_time());
+
+  // The second request is cancelled when the proxy resolver terminates.
+  ASSERT_EQ(1u, resolver.cancelled_requests().size());
+  EXPECT_EQ(url2, resolver.cancelled_requests()[0]->url());
+
+  // Since a second request was in progress, the ProxyService starts
+  // initializating a new ProxyResolver.
+  ASSERT_TRUE(resolver.pending_set_pac_script_request());
+  EXPECT_EQ(GURL("http://foopy/proxy.pac"),
+            resolver.pending_set_pac_script_request()->script_data()->url());
+  resolver.pending_set_pac_script_request()->CompleteNow(OK);
+
+  ASSERT_EQ(1u, resolver.pending_requests().size());
+  EXPECT_EQ(url2, resolver.pending_requests()[0]->url());
+
+  // This request succeeds.
   resolver.pending_requests()[0]->results()->UseNamedProxy("foopy_valid:8080");
   resolver.pending_requests()[0]->CompleteNow(OK);
 
@@ -1919,7 +2063,7 @@ TEST_F(ProxyServiceTest, CancelWhilePACFetching) {
   EXPECT_FALSE(callback1.have_result());  // Cancelled.
   EXPECT_FALSE(callback2.have_result());  // Cancelled.
 
-  TestNetLog::CapturedEntryList entries1;
+  CapturedNetLogEntry::List entries1;
   log1.GetEntries(&entries1);
 
   // Check the NetLog for request 1 (which was cancelled) got filled properly.
@@ -2466,7 +2610,7 @@ TEST_F(ProxyServiceTest, NetworkChangeTriggersPacRefetch) {
   // Check that the expected events were output to the log stream. In particular
   // PROXY_CONFIG_CHANGED should have only been emitted once (for the initial
   // setup), and NOT a second time when the IP address changed.
-  TestNetLog::CapturedEntryList entries;
+  CapturedNetLogEntry::List entries;
   log.GetEntries(&entries);
 
   EXPECT_TRUE(LogContainsEntryWithType(entries, 0,

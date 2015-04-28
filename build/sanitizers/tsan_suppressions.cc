@@ -157,6 +157,9 @@ char kTSanDefaultSuppressions[] =
 "race:PrepareTextureMailbox\n"
 "race:cc::LayerTreeHost::PaintLayerContents\n"
 
+// http://crbug.com/476529
+"deadlock:cc::VideoLayerImpl::WillDraw\n"
+
 // http://crbug.com/328826
 "race:gLCDOrder\n"
 "race:gLCDOrientation\n"
@@ -294,9 +297,6 @@ char kTSanDefaultSuppressions[] =
 
 // https://crbug.com/430533
 "race:TileTaskGraphRunner::Run\n"
-
-// https://crbug.com/437044
-"race:SkEventTracer\n"
 
 // https://crbug.com/448203
 "race:blink::RemoteFrame::detach\n"

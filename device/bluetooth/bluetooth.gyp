@@ -35,6 +35,10 @@
         "bluetooth_adapter_profile_chromeos.h",
         'bluetooth_adapter_win.cc',
         'bluetooth_adapter_win.h',
+        'bluetooth_advertisement.cc',
+        'bluetooth_advertisement.h',
+        'bluetooth_advertisement_chromeos.cc',
+        'bluetooth_advertisement_chromeos.h',
         'bluetooth_audio_sink.cc',
         'bluetooth_audio_sink.h',
         'bluetooth_audio_sink_chromeos.cc',
@@ -152,11 +156,25 @@
             'libraries': [
               '$(SDKROOT)/System/Library/Frameworks/IOBluetooth.framework',
             ],
+            'conditions': [
+              ['mac_sdk == "10.10"', {
+                'xcode_settings': {
+                  # In the OSX 10.10 SDK, CoreBluetooth became a top level
+                  # framework. Previously, it was nested in IOBluetooth. In
+                  # order for Chrome to run on OSes older than OSX 10.10, the
+                  # top level CoreBluetooth framework must be weakly linked.
+                  'OTHER_LDFLAGS': [
+                    '-weak_framework CoreBluetooth',
+                  ],
+                },
+              }],
+            ],
           },
         }],
       ],
     },
     {
+      # GN version: //device/bluetooth/uribeacon
       'target_name': 'uribeacon',
       'type': 'static_library',
       'dependencies': [

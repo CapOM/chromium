@@ -9,6 +9,7 @@
 #include "base/message_loop/message_loop.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_job_coordinator.h"
+#include "content/browser/service_worker/service_worker_metrics.h"
 #include "content/browser/service_worker/service_worker_registration.h"
 #include "content/browser/service_worker/service_worker_storage.h"
 #include "content/browser/service_worker/service_worker_utils.h"
@@ -385,6 +386,8 @@ void ServiceWorkerRegisterJob::InstallAndContinue() {
 
 void ServiceWorkerRegisterJob::OnInstallFinished(
     ServiceWorkerStatusCode status) {
+  ServiceWorkerMetrics::RecordInstallEventStatus(status);
+
   if (status != SERVICE_WORKER_OK) {
     // "8. If installFailed is true, then:..."
     Complete(status);
@@ -450,7 +453,9 @@ void ServiceWorkerRegisterJob::CompleteInternal(
       if (should_uninstall_on_failure_)
         registration()->ClearWhenReady();
       if (new_version()) {
-        if (status != SERVICE_WORKER_ERROR_EXISTS)
+        if (status == SERVICE_WORKER_ERROR_EXISTS)
+          new_version()->SetStartWorkerStatusCode(SERVICE_WORKER_ERROR_EXISTS);
+        else
           new_version()->ReportError(status, status_message);
         registration()->UnsetVersion(new_version());
         new_version()->Doom();

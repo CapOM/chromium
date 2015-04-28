@@ -4,7 +4,6 @@
 
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_test_utils.h"
 
-#include "base/message_loop/message_loop.h"
 #include "base/prefs/testing_pref_service.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_compression_stats.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_config_service_client.h"
@@ -178,7 +177,8 @@ TestDataReductionProxyIOData::TestDataReductionProxyIOData(
     scoped_ptr<DataReductionProxyEventCreator> event_creator,
     scoped_ptr<DataReductionProxyRequestOptions> request_options,
     scoped_ptr<DataReductionProxyConfigurator> configurator,
-    scoped_ptr<DataReductionProxyConfigServiceClient> config_client)
+    scoped_ptr<DataReductionProxyConfigServiceClient> config_client,
+    bool enabled)
     : DataReductionProxyIOData() {
   io_task_runner_ = task_runner;
   ui_task_runner_ = task_runner;
@@ -192,10 +192,10 @@ TestDataReductionProxyIOData::TestDataReductionProxyIOData(
                                 base::Unretained(this))));
   io_task_runner_ = task_runner;
   ui_task_runner_ = task_runner;
+  enabled_ = enabled;
 }
 
 TestDataReductionProxyIOData::~TestDataReductionProxyIOData() {
-  shutdown_on_ui_ = true;
 }
 
 DataReductionProxyTestContext::Builder::Builder()
@@ -293,7 +293,6 @@ scoped_ptr<DataReductionProxyTestContext>
 DataReductionProxyTestContext::Builder::Build() {
   // Check for invalid builder combinations.
   DCHECK(!(use_mock_config_ && use_config_client_));
-  scoped_ptr<base::MessageLoopForIO> loop(new base::MessageLoopForIO());
 
   unsigned int test_context_flags = 0;
   scoped_refptr<base::SingleThreadTaskRunner> task_runner =
@@ -341,17 +340,15 @@ DataReductionProxyTestContext::Builder::Build() {
         DataReductionProxyMutableConfigValues::CreateFromParams(params.get());
     raw_mutable_config = mutable_config.get();
     config.reset(new TestDataReductionProxyConfig(
-        mutable_config.Pass(), task_runner, net_log.get(), configurator.get(),
+        mutable_config.Pass(), net_log.get(), configurator.get(),
         event_creator.get()));
   } else if (use_mock_config_) {
     test_context_flags |= USE_MOCK_CONFIG;
     config.reset(new MockDataReductionProxyConfig(
-        params.Pass(), task_runner, net_log.get(), configurator.get(),
-        event_creator.get()));
+        params.Pass(), net_log.get(), configurator.get(), event_creator.get()));
   } else {
     config.reset(new TestDataReductionProxyConfig(
-        params.Pass(), task_runner, net_log.get(), configurator.get(),
-        event_creator.get()));
+        params.Pass(), net_log.get(), configurator.get(), event_creator.get()));
   }
 
   scoped_ptr<DataReductionProxyRequestOptions> request_options;
@@ -388,13 +385,13 @@ DataReductionProxyTestContext::Builder::Build() {
   scoped_ptr<TestDataReductionProxyIOData> io_data(
       new TestDataReductionProxyIOData(
           task_runner, config.Pass(), event_creator.Pass(),
-          request_options.Pass(), configurator.Pass(), config_client.Pass()));
-  io_data->InitOnUIThread(pref_service.get());
+          request_options.Pass(), configurator.Pass(), config_client.Pass(),
+          true /* enabled */));
   io_data->SetSimpleURLRequestContextGetter(request_context_getter);
 
   scoped_ptr<DataReductionProxyTestContext> test_context(
       new DataReductionProxyTestContext(
-          loop.Pass(), task_runner, pref_service.Pass(), net_log.Pass(),
+          task_runner, pref_service.Pass(), net_log.Pass(),
           request_context_getter, mock_socket_factory_, io_data.Pass(),
           settings.Pass(), storage_delegate.Pass(), raw_params,
           test_context_flags));
@@ -406,7 +403,6 @@ DataReductionProxyTestContext::Builder::Build() {
 }
 
 DataReductionProxyTestContext::DataReductionProxyTestContext(
-    scoped_ptr<base::MessageLoop> loop,
     scoped_refptr<base::SingleThreadTaskRunner> task_runner,
     scoped_ptr<TestingPrefServiceSimple> simple_pref_service,
     scoped_ptr<net::TestNetLog> net_log,
@@ -418,7 +414,6 @@ DataReductionProxyTestContext::DataReductionProxyTestContext(
     TestDataReductionProxyParams* params,
     unsigned int test_context_flags)
     : test_context_flags_(test_context_flags),
-      loop_(loop.Pass()),
       task_runner_(task_runner),
       simple_pref_service_(simple_pref_service.Pass()),
       net_log_(net_log.Pass()),

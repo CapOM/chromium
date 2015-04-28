@@ -380,6 +380,23 @@ static jboolean GetFullscreenAllowed(JNIEnv* env, jobject obj) {
       CONTENT_SETTINGS_TYPE_FULLSCREEN, NULL) == CONTENT_SETTING_ALLOW;
 }
 
+static jboolean GetMetricsReportingEnabled(JNIEnv* env, jobject obj) {
+  PrefService* local_state = g_browser_process->local_state();
+  return local_state->GetBoolean(prefs::kMetricsReportingEnabled);
+}
+
+static void SetMetricsReportingEnabled(JNIEnv* env,
+                                       jobject obj,
+                                       jboolean enabled) {
+  PrefService* local_state = g_browser_process->local_state();
+  local_state->SetBoolean(prefs::kMetricsReportingEnabled, enabled);
+}
+
+static jboolean HasSetMetricsReporting(JNIEnv* env, jobject obj) {
+  PrefService* local_state = g_browser_process->local_state();
+  return local_state->HasPrefPath(prefs::kMetricsReportingEnabled);
+}
+
 namespace {
 
 // Redirects a BrowsingDataRemover completion callback back into Java.
@@ -488,14 +505,19 @@ static void SetAllowLocationEnabled(JNIEnv* env,
       is_enabled ? CONTENT_SETTING_ASK : CONTENT_SETTING_BLOCK);
 }
 
-static void SetCameraMicEnabled(JNIEnv* env, jobject obj, jboolean allow) {
+static void SetCameraEnabled(JNIEnv* env, jobject obj, jboolean allow) {
+  HostContentSettingsMap* host_content_settings_map =
+      GetOriginalProfile()->GetHostContentSettingsMap();
+  host_content_settings_map->SetDefaultContentSetting(
+      CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA,
+      allow ? CONTENT_SETTING_ASK : CONTENT_SETTING_BLOCK);
+}
+
+static void SetMicEnabled(JNIEnv* env, jobject obj, jboolean allow) {
   HostContentSettingsMap* host_content_settings_map =
       GetOriginalProfile()->GetHostContentSettingsMap();
   host_content_settings_map->SetDefaultContentSetting(
       CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC,
-      allow ? CONTENT_SETTING_ASK : CONTENT_SETTING_BLOCK);
-  host_content_settings_map->SetDefaultContentSetting(
-      CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA,
       allow ? CONTENT_SETTING_ASK : CONTENT_SETTING_BLOCK);
 }
 
@@ -598,24 +620,32 @@ static void SetPasswordEchoEnabled(JNIEnv* env,
                                passwordEchoEnabled);
 }
 
-
-static jboolean GetCameraMicEnabled(JNIEnv* env, jobject obj) {
-  return GetBooleanForContentSetting(CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC) &&
-         GetBooleanForContentSetting(CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA);
+static jboolean GetCameraEnabled(JNIEnv* env, jobject obj) {
+  return GetBooleanForContentSetting(CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA);
 }
 
-static jboolean GetCameraMicUserModifiable(JNIEnv* env, jobject obj) {
+static jboolean GetCameraUserModifiable(JNIEnv* env, jobject obj) {
   return IsContentSettingUserModifiable(
-             CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC) &&
-         IsContentSettingUserModifiable(
              CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA);
 }
 
-static jboolean GetCameraMicManagedByCustodian(JNIEnv* env, jobject obj) {
+static jboolean GetCameraManagedByCustodian(JNIEnv* env, jobject obj) {
   return IsContentSettingManagedByCustodian(
-             CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC) &&
-         IsContentSettingManagedByCustodian(
              CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA);
+}
+
+static jboolean GetMicEnabled(JNIEnv* env, jobject obj) {
+  return GetBooleanForContentSetting(CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC);
+}
+
+static jboolean GetMicUserModifiable(JNIEnv* env, jobject obj) {
+  return IsContentSettingUserModifiable(
+             CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC);
+}
+
+static jboolean GetMicManagedByCustodian(JNIEnv* env, jobject obj) {
+  return IsContentSettingManagedByCustodian(
+             CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC);
 }
 
 static jboolean GetAutologinEnabled(JNIEnv* env, jobject obj) {

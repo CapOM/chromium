@@ -33,6 +33,7 @@
 #include "chrome/browser/content_settings/cookie_settings.h"
 #include "chrome/browser/content_settings/tab_specific_content_settings.h"
 #include "chrome/browser/defaults.h"
+#include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #include "chrome/browser/download/download_prefs.h"
 #include "chrome/browser/font_family_cache.h"
 #include "chrome/browser/geolocation/chrome_access_token_store.h"
@@ -173,12 +174,6 @@
 #if defined(OS_ANDROID)
 #include "ui/base/ui_base_paths.h"
 #include "ui/gfx/android/device_display_info.h"
-#endif
-
-#if defined(OS_ANDROID)
-#include "chrome/browser/android/dev_tools_manager_delegate_android.h"
-#else
-#include "chrome/browser/devtools/chrome_devtools_manager_delegate.h"
 #endif
 
 #if defined(TOOLKIT_VIEWS)
@@ -641,17 +636,9 @@ ChromeContentBrowserClient::~ChromeContentBrowserClient() {
 // static
 void ChromeContentBrowserClient::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
-  registry->RegisterBooleanPref(
-      prefs::kDisable3DAPIs,
-      false,
-      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
-  registry->RegisterBooleanPref(
-      prefs::kEnableHyperlinkAuditing,
-      true,
-      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
-  registry->RegisterListPref(
-      prefs::kEnableDeprecatedWebPlatformFeatures,
-      user_prefs::PrefRegistrySyncable::UNSYNCABLE_PREF);
+  registry->RegisterBooleanPref(prefs::kDisable3DAPIs, false);
+  registry->RegisterBooleanPref(prefs::kEnableHyperlinkAuditing, true);
+  registry->RegisterListPref(prefs::kEnableDeprecatedWebPlatformFeatures);
 }
 
 // static
@@ -1353,6 +1340,7 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
     static const char* const kSwitchNames[] = {
       autofill::switches::kDisableFillOnAccountSelect,
       autofill::switches::kDisablePasswordGeneration,
+      autofill::switches::kEnableAccessorySuggestionView,
       autofill::switches::kEnableFillOnAccountSelect,
       autofill::switches::kEnableFillOnAccountSelectNoHighlighting,
       autofill::switches::kEnablePasswordGeneration,
@@ -2375,11 +2363,7 @@ void ChromeContentBrowserClient::RecordURLMetric(const std::string& metric,
 
 content::DevToolsManagerDelegate*
 ChromeContentBrowserClient::GetDevToolsManagerDelegate() {
-#if defined(OS_ANDROID)
-  return new DevToolsManagerDelegateAndroid();
-#else
   return new ChromeDevToolsManagerDelegate();
-#endif
 }
 
 content::TracingDelegate* ChromeContentBrowserClient::GetTracingDelegate() {

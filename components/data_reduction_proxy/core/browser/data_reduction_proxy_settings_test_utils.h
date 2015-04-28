@@ -83,6 +83,7 @@ class DataReductionProxySettingsTestBase : public testing::Test {
     return true;
   }
 
+  base::MessageLoopForIO message_loop_;
   scoped_ptr<DataReductionProxyTestContext> test_context_;
   scoped_ptr<DataReductionProxySettings> settings_;
   base::Time last_update_time_;
@@ -97,11 +98,11 @@ class ConcreteDataReductionProxySettingsTest
     : public DataReductionProxySettingsTestBase {
  public:
   typedef MockDataReductionProxySettings<C> MockSettings;
-  virtual void ResetSettings(bool allowed,
-                             bool fallback_allowed,
-                             bool alt_allowed,
-                             bool promo_allowed,
-                             bool holdback) override {
+  void ResetSettings(bool allowed,
+                     bool fallback_allowed,
+                     bool alt_allowed,
+                     bool promo_allowed,
+                     bool holdback) override {
     return DataReductionProxySettingsTestBase::ResetSettings<C>(
         allowed, fallback_allowed, alt_allowed, promo_allowed, holdback);
   }

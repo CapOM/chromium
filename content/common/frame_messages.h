@@ -270,7 +270,6 @@ IPC_STRUCT_TRAITS_BEGIN(content::RequestNavigationParams)
   IPC_STRUCT_TRAITS_MEMBER(browser_navigation_start)
   IPC_STRUCT_TRAITS_MEMBER(redirects)
   IPC_STRUCT_TRAITS_MEMBER(can_load_local_resources)
-  IPC_STRUCT_TRAITS_MEMBER(frame_to_navigate)
   IPC_STRUCT_TRAITS_MEMBER(request_time)
   IPC_STRUCT_TRAITS_MEMBER(page_state)
   IPC_STRUCT_TRAITS_MEMBER(page_id)
@@ -534,6 +533,10 @@ IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateSandboxFlags, content::SandboxFlags)
 // Update a proxy's window.name property.  Used when the frame's name is
 // changed in another process.
 IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateName, std::string /* name */)
+
+// Update a proxy's replicated origin.  Used when the frame is navigated to a
+// new origin.
+IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateOrigin, url::Origin /* origin */)
 
 // Send to the RenderFrame to set text track style settings.
 // Sent for top-level frames.

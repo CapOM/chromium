@@ -201,6 +201,14 @@ GpuCommandBufferStub::GpuCommandBufferStub(
 
   use_virtualized_gl_context_ |=
       context_group_->feature_info()->workarounds().use_virtualized_gl_contexts;
+
+  bool is_offscreen = surface_id_ == 0;
+  if (is_offscreen && initial_size_.IsEmpty()) {
+    // If we're an offscreen surface with zero width and/or height, set to a
+    // non-zero size so that we have a complete framebuffer for operations like
+    // glClear.
+    initial_size_ = gfx::Size(1, 1);
+  }
 }
 
 GpuCommandBufferStub::~GpuCommandBufferStub() {
@@ -421,9 +429,11 @@ void GpuCommandBufferStub::Destroy() {
   scheduler_.reset();
 
   bool have_context = false;
-  if (decoder_ && command_buffer_ &&
-      command_buffer_->GetLastState().error != gpu::error::kLostContext)
-    have_context = decoder_->MakeCurrent();
+  if (decoder_) {
+    // Try to make the context current regardless of whether it was lost, so we
+    // don't leak resources.
+    have_context = decoder_->GetGLContext()->MakeCurrent(surface_.get());
+  }
   FOR_EACH_OBSERVER(DestructionObserver,
                     destruction_observers_,
                     OnWillDestroyStub());
@@ -671,7 +681,7 @@ void GpuCommandBufferStub::OnParseError() {
   DCHECK(command_buffer_.get());
   gpu::CommandBuffer::State state = command_buffer_->GetLastState();
   IPC::Message* msg = new GpuCommandBufferMsg_Destroyed(
-      route_id_, state.context_lost_reason);
+      route_id_, state.context_lost_reason, state.error);
   msg->set_unblock(true);
   Send(msg);
 
@@ -1089,7 +1099,7 @@ void GpuCommandBufferStub::MarkContextLost() {
 
   command_buffer_->SetContextLostReason(gpu::error::kUnknown);
   if (decoder_)
-    decoder_->LoseContext(GL_UNKNOWN_CONTEXT_RESET_ARB);
+    decoder_->MarkContextLost(gpu::error::kUnknown);
   command_buffer_->SetParseError(gpu::error::kLostContext);
 }
 

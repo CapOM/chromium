@@ -663,6 +663,7 @@ void RenderFrameHostManager::DiscardUnusedFrame(
     // Any currently suspended navigations are no longer needed.
     render_frame_host->CancelSuspendedNavigations();
 
+    CHECK(!GetRenderFrameProxyHost(site_instance));
     RenderFrameProxyHost* proxy =
         new RenderFrameProxyHost(site_instance, frame_tree_node_);
     proxy_hosts_[site_instance->GetId()] = proxy;
@@ -885,6 +886,17 @@ void RenderFrameHostManager::OnDidUpdateName(const std::string& name) {
   for (const auto& pair : proxy_hosts_) {
     pair.second->Send(
         new FrameMsg_DidUpdateName(pair.second->GetRoutingID(), name));
+  }
+}
+
+void RenderFrameHostManager::OnDidUpdateOrigin(const url::Origin& origin) {
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSitePerProcess))
+    return;
+
+  for (const auto& pair : proxy_hosts_) {
+    pair.second->Send(
+        new FrameMsg_DidUpdateOrigin(pair.second->GetRoutingID(), origin));
   }
 }
 

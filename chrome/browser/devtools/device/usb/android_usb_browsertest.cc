@@ -120,11 +120,11 @@ class MockUsbDeviceHandle : public UsbDeviceHandle {
         broken_(false) {
   }
 
-  virtual scoped_refptr<UsbDevice> GetDevice() const override {
+  scoped_refptr<UsbDevice> GetDevice() const override {
     return device_;
   }
 
-  virtual void Close() override { device_ = nullptr; }
+  void Close() override { device_ = nullptr; }
 
   void SetConfiguration(int configuration_value,
                         const ResultCallback& callback) override {
@@ -375,7 +375,7 @@ class MockUsbDeviceHandle : public UsbDeviceHandle {
   scoped_ptr<AdbMessage> current_message_;
   std::vector<char> output_buffer_;
   std::queue<Query> queries_;
-  base::ScopedPtrHashMap<int, MockLocalSocket> local_sockets_;
+  base::ScopedPtrHashMap<int, scoped_ptr<MockLocalSocket>> local_sockets_;
   int last_local_socket_;
   bool broken_;
 };

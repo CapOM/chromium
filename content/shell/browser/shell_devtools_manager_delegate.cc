@@ -17,7 +17,6 @@
 #include "components/devtools_http_handler/devtools_http_handler.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/devtools_frontend_host.h"
-#include "content/public/browser/devtools_target.h"
 #include "content/public/browser/favicon_status.h"
 #include "content/public/browser/navigation_entry.h"
 #include "content/public/browser/render_view_host.h"
@@ -132,6 +131,16 @@ CreateSocketFactory() {
 #endif
 }
 
+scoped_ptr<devtools_discovery::DevToolsTargetDescriptor>
+CreateNewShellTarget(BrowserContext* browser_context, const GURL& url) {
+  Shell* shell = Shell::CreateNewWindow(browser_context,
+                                        url,
+                                        nullptr,
+                                        gfx::Size());
+  return make_scoped_ptr(new devtools_discovery::BasicTargetDescriptor(
+      DevToolsAgentHost::GetOrCreateFor(shell->web_contents())));
+}
+
 // ShellDevToolsDelegate ----------------------------------------------------
 
 class ShellDevToolsDelegate :
@@ -143,6 +152,7 @@ class ShellDevToolsDelegate :
   // devtools_http_handler::DevToolsHttpHandlerDelegate implementation.
   std::string GetDiscoveryPageHTML() override;
   std::string GetFrontendResource(const std::string& path) override;
+  std::string GetPageThumbnailData(const GURL& url) override;
 
  private:
   BrowserContext* browser_context_;
@@ -152,9 +162,15 @@ class ShellDevToolsDelegate :
 
 ShellDevToolsDelegate::ShellDevToolsDelegate(BrowserContext* browser_context)
     : browser_context_(browser_context) {
+  devtools_discovery::DevToolsDiscoveryManager::GetInstance()->
+      SetCreateCallback(base::Bind(&CreateNewShellTarget,
+                                   base::Unretained(browser_context)));
 }
 
 ShellDevToolsDelegate::~ShellDevToolsDelegate() {
+  devtools_discovery::DevToolsDiscoveryManager::GetInstance()->
+      SetCreateCallback(
+          devtools_discovery::DevToolsDiscoveryManager::CreateCallback());
 }
 
 std::string ShellDevToolsDelegate::GetDiscoveryPageHTML() {
@@ -169,6 +185,10 @@ std::string ShellDevToolsDelegate::GetDiscoveryPageHTML() {
 std::string ShellDevToolsDelegate::GetFrontendResource(
     const std::string& path) {
   return content::DevToolsFrontendHost::GetFrontendResource(path).as_string();
+}
+
+std::string ShellDevToolsDelegate::GetPageThumbnailData(const GURL& url) {
+  return std::string();
 }
 
 }  // namespace
@@ -187,7 +207,6 @@ ShellDevToolsManagerDelegate::CreateHttpHandler(
       CreateSocketFactory(),
       frontend_url,
       new ShellDevToolsDelegate(browser_context),
-      new ShellDevToolsManagerDelegate(browser_context),
       base::FilePath(),
       base::FilePath(),
       std::string(),
@@ -206,31 +225,6 @@ base::DictionaryValue* ShellDevToolsManagerDelegate::HandleCommand(
     DevToolsAgentHost* agent_host,
     base::DictionaryValue* command) {
   return NULL;
-}
-
-std::string ShellDevToolsManagerDelegate::GetPageThumbnailData(
-    const GURL& url) {
-  return std::string();
-}
-
-scoped_ptr<DevToolsTarget>
-ShellDevToolsManagerDelegate::CreateNewTarget(const GURL& url) {
-  Shell* shell = Shell::CreateNewWindow(browser_context_,
-                                        url,
-                                        NULL,
-                                        gfx::Size());
-  return scoped_ptr<DevToolsTarget>(
-      new devtools_discovery::BasicTargetDescriptor(
-          DevToolsAgentHost::GetOrCreateFor(shell->web_contents())));
-}
-
-void ShellDevToolsManagerDelegate::EnumerateTargets(TargetCallback callback) {
-  TargetList targets;
-  devtools_discovery::DevToolsDiscoveryManager* discovery_manager =
-      devtools_discovery::DevToolsDiscoveryManager::GetInstance();
-  for (const auto& descriptor : discovery_manager->GetDescriptors())
-    targets.push_back(descriptor);
-  callback.Run(targets);
 }
 
 }  // namespace content

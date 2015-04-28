@@ -8140,6 +8140,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Event.Latency.TouchToFirstScrollUpdateSwap"
     units="microseconds">
   <owner>rbyers@chromium.org</owner>
+  <obsolete>
+    Replaced by Event.Latency.TouchToFirstScrollUpdateSwapBegin.
+    crbug.com/478845
+  </obsolete>
   <summary>
     Time between initial creation of a touch event and the frame swap caused by
     by the generated ScrollUpdate gesture event if that ScrollUpdate is the
@@ -8148,12 +8152,36 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Event.Latency.TouchToFirstScrollUpdateSwapBegin"
+    units="microseconds">
+  <owner>rbyers@chromium.org</owner>
+  <summary>
+    Time between initial creation of a touch event and the start of the frame
+    swap on the GPU service caused by the generated ScrollUpdate gesture event
+    if that ScrollUpdate is the first such event in a given scroll gesture event
+    sequence. If no swap was induced by the event, no recording is made.
+  </summary>
+</histogram>
+
 <histogram name="Event.Latency.TouchToScrollUpdateSwap" units="microseconds">
   <owner>rbyers@chromium.org</owner>
+  <obsolete>
+    Replaced by Event.Latency.TouchToScrollUpdateSwapBegin. crbug.com/478845
+  </obsolete>
   <summary>
     Time between initial creation of a touch event and the frame swap caused by
     by the generated ScrollUpdate gesture event. If no swap was induced by the
     event, no recording is made.
+  </summary>
+</histogram>
+
+<histogram name="Event.Latency.TouchToScrollUpdateSwapBegin"
+    units="microseconds">
+  <owner>rbyers@chromium.org</owner>
+  <summary>
+    Time between initial creation of a touch event and start of the frame swap
+    on the GPU service caused by the generated ScrollUpdate gesture event. If no
+    swap was induced by the event, no recording is made.
   </summary>
 </histogram>
 
@@ -11438,6 +11466,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="GPU.ContextLost" enum="ContextLostReason">
+  <owner>sievers@chromium.org</owner>
+  <summary>
+    The reason a GPU command buffer context of a given type was lost.
+  </summary>
+</histogram>
+
 <histogram name="GPU.CreateBrowserCompositor" units="microseconds">
   <owner>vangelis@chromium.org</owner>
   <summary>
@@ -12047,6 +12082,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="HttpCache.OfflineStatus" enum="OfflineStatus">
+  <obsolete>
+    Deprecated 4/2015.
+  </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>
     Result of a main page HttpCacheTransaction if offline mode had been enabled.
@@ -28627,6 +28665,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="PluginFinder.BuiltInPluginList.ErrorCode"
+    enum="PluginListError">
+  <owner>bauerb@chromium.org</owner>
+  <summary>
+    Error codes when parsing the built-in plugin list. Logged when the
+    PluginFinder singleton is created.
+  </summary>
+</histogram>
+
 <histogram name="Power.BacklightLevelOnAC" units="%">
   <owner>derat@chromium.org</owner>
   <summary>
@@ -34962,6 +35009,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Sdch3.TimeWeightedMemoryUse" units="bytes">
+  <owner>ellyjones@chromium.org</owner>
+  <summary>
+    Measures the time-weighted memory use of SDCH dictionaries, in bytes. The
+    numerator is bytes of dictionary times seconds that dictionary was in
+    memory, and the denominator is seconds that the Chrome process lives.
+  </summary>
+</histogram>
+
 <histogram name="Sdch3.UnflushedBufferSize" units="bytes">
   <owner>rdsmith@chromium.org</owner>
   <summary>
@@ -35053,7 +35109,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="ServiceWorker.ActivateEventExecutionTime" units="millisecond">
   <owner>shimazu@chromium.org</owner>
-  <summary>Execution time of ServiceWorkerGlobalScope.onactivate.</summary>
+  <summary>
+    Execution time of ServiceWorkerGlobalScope.onactivate. Includes the time for
+    waitUntil() promise to settle.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.ActivateEventStatus"
+    enum="ServiceWorkerStatusCode">
+  <owner>falken@chromium.org</owner>
+  <summary>The result of dispatching the activate event to the worker.</summary>
 </histogram>
 
 <histogram name="ServiceWorker.Database.DestroyDatabaseResult"
@@ -35111,12 +35176,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="ServiceWorker.FetchEventExecutionTime" units="millisecond">
   <owner>shimazu@chromium.org</owner>
-  <summary>Execution time of ServiceWorkerGlobalScope.onfetch.</summary>
+  <summary>
+    Execution time of ServiceWorkerGlobalScope.onfetch. Includes the time for
+    the respondWith() promise to settle.
+  </summary>
 </histogram>
 
 <histogram name="ServiceWorker.InstallEventExecutionTime" units="millisecond">
   <owner>shimazu@chromium.org</owner>
-  <summary>Execution time of ServiceWorkerGlobalScope.oninstall.</summary>
+  <summary>
+    Execution time of ServiceWorkerGlobalScope.oninstall. Includes the time for
+    the waitUntil() promise to settle.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.InstallEventStatus"
+    enum="ServiceWorkerStatusCode">
+  <owner>falken@chromium.org</owner>
+  <summary>The result of dispatching the install event to the worker.</summary>
 </histogram>
 
 <histogram name="ServiceWorker.MessageEventExecutionTime" units="millisecond">
@@ -40375,6 +40452,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     are failures due to missing top level sync nodes or model association Note:
     Due to an enumeration reordering, pre-M23 labels are inaccurate (see
     sync/internal_api/public/base/model_type.h).
+  </summary>
+</histogram>
+
+<histogram name="Sync.DeviceIdMismatchDetails" enum="DeviceIdMismatch">
+  <owner>pavely@chromium.org</owner>
+  <summary>
+    When signin_scoped_device_id from pref doesn't match the one in
+    DeviceInfoSpecfics this histogram tells if sync or pref copy was empty. This
+    will indicate how often such mismatch happens and what was the state before.
   </summary>
 </histogram>
 
@@ -48104,6 +48190,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="22" label="App banner setting (Android only)"/>
 </enum>
 
+<enum name="ContextLostReason" type="int">
+  <summary>The reason for losing a GPU context.</summary>
+  <int value="0" label="CONTEXT_INIT_FAILED"/>
+  <int value="1" label="CONTEXT_LOST_GPU_CHANNEL_ERROR"/>
+  <int value="2" label="CONTEXT_PARSE_ERROR_INVALID_SIZE"/>
+  <int value="3" label="CONTEXT_PARSE_ERROR_OUT_OF_BOUNDS"/>
+  <int value="4" label="CONTEXT_PARSE_ERROR_UNKNOWN_COMMAND"/>
+  <int value="5" label="CONTEXT_PARSE_ERROR_INVALID_ARGS"/>
+  <int value="6" label="CONTEXT_PARSE_ERROR_GENERIC_ERROR"/>
+  <int value="7" label="CONTEXT_LOST_GUILTY"/>
+  <int value="8" label="CONTEXT_LOST_INNOCENT"/>
+  <int value="9" label="CONTEXT_LOST_UNKNOWN"/>
+  <int value="10" label="CONTEXT_LOST_OUT_OF_MEMORY"/>
+  <int value="11" label="CONTEXT_LOST_MAKECURRENT_FAILED"/>
+</enum>
+
 <enum name="CookieDeletionCause" type="int">
   <summary>Reason why a cookie was removed from the cookie store</summary>
   <int value="0" label="explicit">
@@ -48530,6 +48632,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="5" label="First window capture call failed."/>
 </enum>
 
+<enum name="DeviceIdMismatch" type="int">
+  <int value="0" label="BOTH_NONEMPTY"/>
+  <int value="1" label="SYNC_EMPTY"/>
+  <int value="2" label="PREF_EMPTY"/>
+</enum>
+
 <enum name="DeviceOrientationSensorTypeAndroid" type="int">
   <int value="0" label="Not Available"/>
   <int value="1" label="ROTATION_VECTOR"/>
@@ -48685,8 +48793,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1270622879" label="hk.dll"/>
   <int value="1409376135" label="windowsapihookdll32.dll"/>
   <int value="1671476533" label="crdli64.dll"/>
+  <int value="1680432366" label="virtualCamera.ax"/>
   <int value="1736709911" label="bitguard.dll"/>
   <int value="1763208296" label="safetynut.dll"/>
+  <int value="1850669228" label="YCWebCameraSource.ax"/>
+  <int value="1979101632" label="bsvc.dll"/>
   <int value="1996673448" label="scdetour.dll"/>
   <int value="2060768492" label="libwinhook.dll"/>
   <int value="2074150225" label="minisp32.dll"/>
@@ -51311,6 +51422,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1016" label="AUTOFILLPRIVATE_REMOVEENTRY"/>
   <int value="1017" label="AUTOFILLPRIVATE_VALIDATEPHONENUMBERS"/>
   <int value="1018" label="AUTOFILLPRIVATE_MASKCREDITCARD"/>
+  <int value="1019" label="INSTANCEID_GETID"/>
+  <int value="1020" label="INSTANCEID_GETCREATIONTIME"/>
+  <int value="1021" label="INSTANCEID_GETTOKEN"/>
+  <int value="1022" label="INSTANCEID_DELETETOKEN"/>
+  <int value="1023" label="INSTANCEID_DELETEID"/>
+  <int value="1024" label="GCDPRIVATE_GETDEVICEINFO"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -55340,10 +55457,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="593707592" label="disable-network-portal-notification"/>
   <int value="598827460" label="enable-roboto-font-ui"/>
   <int value="606288133" label="enable-print-preview-register-promos"/>
+  <int value="609112512" label="touch-selection-strategy"/>
   <int value="610545308" label="enable-potentially-annoying-security-features"/>
   <int value="625273056" label="disable-boot-animation"/>
   <int value="630947363" label="touch-events"/>
   <int value="643725031" label="disable-touch-feedback"/>
+  <int value="650602639" label="enable-autofill-keyboard-accessory-view"/>
   <int value="683410401"
       label="enable-proximity-auth-bluetooth-low-energy-discovery"/>
   <int value="689489984" label="disable-zero-suggest"/>
@@ -57503,6 +57622,9 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="OfflineStatus" type="int">
+  <obsolete>
+    Deprecated 4/2015.
+  </obsolete>
   <int value="0" label="Fresh data load from Cache"/>
   <int value="1" label="Successful network request (validation or fetch)."/>
   <int value="2" label="Failed network request (non-offline error)."/>
@@ -58915,6 +59037,19 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="PLUGIN_NOT_REGISTERED"/>
   <int value="1" label="PLUGIN_AVAILABLE"/>
   <int value="2" label="PLUGIN_DISABLED"/>
+</enum>
+
+<enum name="PluginListError" type="int">
+  <int value="0" label="NoError"/>
+  <int value="1" label="JsonInvalidEscape"/>
+  <int value="2" label="JsonSyntaxError"/>
+  <int value="3" label="JsonUnexpectedToken"/>
+  <int value="4" label="JsonTrailingComma"/>
+  <int value="5" label="JsonTooMuchNesting"/>
+  <int value="6" label="JsonUnexpectedDataAfterRoot"/>
+  <int value="7" label="JsonUnsupportedEncoding"/>
+  <int value="8" label="JsonUnquotedDictionaryKey"/>
+  <int value="9" label="SchemaError"/>
 </enum>
 
 <enum name="PluginLoadResult" type="int">
@@ -61364,6 +61499,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="13" label="SERVICE_WORKER_ERROR_STATE"/>
   <int value="14" label="SERVICE_WORKER_ERROR_TIMEOUT"/>
   <int value="15" label="SERVICE_WORKER_ERROR_SCRIPT_EVALUATE_FAILED"/>
+  <int value="16" label="SERVICE_WORKER_ERROR_DISK_CACHE"/>
 </enum>
 
 <enum name="ServiceWorkerWriteResponseResult" type="int">
@@ -63657,6 +63793,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="44" label="kErrorCodeUnsupportedMajorPayloadVersion"/>
   <int value="45" label="kErrorCodeUnsupportedMinorPayloadVersion"/>
   <int value="46" label="kErrorCodeOmahaRequestXMLHasEntityDecl"/>
+  <int value="47" label="kErrorCodeFilesystemVerifierError"/>
 </enum>
 
 <enum name="UpdateEngineInstallDateProvisioningSource" type="int">
@@ -64735,6 +64872,26 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PLT.BeginToFinish_LinkLoadReload"/>
   <affected-histogram name="PLT.BeginToFinish_NormalLoad"/>
   <affected-histogram name="PLT.LoadType"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="ContextType" separator=".">
+  <suffix name="BrowserCompositor"
+      label="A BrowserCompositor GPU command buffer context"/>
+  <suffix name="BrowserMainThread"
+      label="A BrowserMainThread GPU command buffer context"/>
+  <suffix name="RenderCompositor"
+      label="A RenderCompositor GPU command buffer context"/>
+  <suffix name="RenderMainThread"
+      label="A RenderMainThread GPU command buffer context"/>
+  <suffix name="RenderWorker"
+      label="A RenderWorker GPU command buffer context"/>
+  <suffix name="Unknown" label="A GPU command buffer context of unknown type"/>
+  <suffix name="VideoAccelerator"
+      label="A VideoAccelerator GPU command buffer context"/>
+  <suffix name="VideoCapture"
+      label="A VideoCapture GPU command buffer context"/>
+  <suffix name="WebGL" label="A WebGL GPU command buffer context"/>
+  <affected-histogram name="GPU.ContextLost"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="CreditCardScanSuccess">
@@ -68637,6 +68794,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="ThreadWatcher.ResponsiveThreads"/>
   <affected-histogram name="ThreadWatcher.Unresponsive"/>
   <affected-histogram name="ThreadWatcher.UnresponsiveThreads"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="TotalTimeToGoogle" separator=".">
+  <suffix name="Quic"
+      label="Recorded for Google servers only when QUIC is used."/>
+  <suffix name="NotQuic"
+      label="Recorded for Google servers only when QUIC is not used."/>
+  <affected-histogram name="Net.HttpJob.TotalTime"/>
+  <affected-histogram name="Net.HttpJob.TotalTimeCached"/>
+  <affected-histogram name="Net.HttpJob.TotalTimeNotCached"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="Tps65090Fets" separator=".">

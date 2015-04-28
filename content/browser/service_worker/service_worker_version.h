@@ -286,12 +286,16 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void ReportError(ServiceWorkerStatusCode status,
                    const std::string& status_message);
 
+  // Sets the status code to pass to StartWorker callbacks if start fails.
+  void SetStartWorkerStatusCode(ServiceWorkerStatusCode status);
+
   // Sets this version's status to REDUNDANT and deletes its resources.
   // The version must not have controllees.
   void Doom();
   bool is_redundant() const { return status_ == REDUNDANT; }
 
   bool skip_waiting() const { return skip_waiting_; }
+  void set_skip_waiting(bool skip_waiting) { skip_waiting_ = skip_waiting; }
 
   bool force_bypass_cache_for_scripts() {
     return force_bypass_cache_for_scripts_;
@@ -542,6 +546,12 @@ class CONTENT_EXPORT ServiceWorkerVersion
 
   std::vector<int> pending_skip_waiting_requests_;
   scoped_ptr<net::HttpResponseInfo> main_script_http_info_;
+
+  // The status when StartWorker was invoked. Used for UMA.
+  Status prestart_status_ = NEW;
+  // If not OK, the reason that StartWorker failed. Used for
+  // running |start_callbacks_|.
+  ServiceWorkerStatusCode start_worker_status_ = SERVICE_WORKER_OK;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_;
 

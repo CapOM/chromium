@@ -58,7 +58,6 @@
 #include "ui/android/window_android.h"
 #include "ui/gfx/android/device_display_info.h"
 #include "ui/gfx/frame_time.h"
-#include "webkit/common/gpu/context_provider_in_process.h"
 
 namespace content {
 
@@ -470,7 +469,6 @@ void CompositorImpl::SetVisible(bool visible) {
     CreateLayerTreeHost();
     ui_resource_provider_.SetLayerTreeHost(host_.get());
   }
-  root_window_->OnVisibilityChanged(visible);
 }
 
 void CompositorImpl::setDeviceScaleFactor(float factor) {
@@ -606,7 +604,7 @@ void CompositorImpl::CreateOutputSurface() {
   scoped_refptr<ContextProviderCommandBuffer> context_provider(
       ContextProviderCommandBuffer::Create(
           CreateGpuProcessViewContext(gpu_channel_host, attrs, surface_id_),
-          "BrowserCompositor"));
+          BROWSER_COMPOSITOR_ONSCREEN_CONTEXT));
   DCHECK(context_provider.get());
 
   scoped_ptr<cc::OutputSurface> real_output_surface(

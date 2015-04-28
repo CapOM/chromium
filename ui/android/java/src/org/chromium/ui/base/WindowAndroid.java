@@ -16,6 +16,7 @@ import android.os.Bundle;
 import android.util.Log;
 import android.util.SparseArray;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import org.chromium.base.CalledByNative;
@@ -54,6 +55,8 @@ public class WindowAndroid {
     // We track all animations over content and provide a drawing placeholder for them.
     private HashSet<Animator> mAnimationsOverContent = new HashSet<Animator>();
     private View mAnimationPlaceholderView;
+
+    private ViewGroup mKeyboardAccessoryView;
 
     private final VSyncMonitor.Listener mVSyncListener = new VSyncMonitor.Listener() {
         @Override
@@ -236,24 +239,6 @@ public class WindowAndroid {
     }
 
     /**
-     * For window instances associated with an activity, notifies any listeners
-     * that the activity has been paused.
-     */
-    protected void onActivityPaused() {
-        if (mNativeWindowAndroid == 0) return;
-        nativeOnActivityPaused(mNativeWindowAndroid);
-    }
-
-    /**
-     * For window instances associated with an activity, notifies any listeners
-     * that the activity has been paused.
-     */
-    protected void onActivityResumed() {
-        if (mNativeWindowAndroid == 0) return;
-        nativeOnActivityResumed(mNativeWindowAndroid);
-    }
-
-    /**
      * Responds to the intent result if the intent was created by the native window.
      * @param requestCode Request code of the requested intent.
      * @param resultCode Result code of the requested intent.
@@ -326,6 +311,22 @@ public class WindowAndroid {
     }
 
     /**
+     * Sets the keyboard accessory view.
+     * @param view This view sits at the bottom of the content area and pushes the content up rather
+     *             than overlaying it. Currently used as a container for Autofill suggestions.
+     */
+    public void setKeyboardAccessoryView(ViewGroup view) {
+        mKeyboardAccessoryView = view;
+    }
+
+    /**
+     * {@see setKeyboardAccessoryView(ViewGroup)}.
+     */
+    public ViewGroup getKeyboardAccessoryView() {
+        return mKeyboardAccessoryView;
+    }
+
+    /**
      * Start a post-layout animation on top of web content.
      *
      * By default, Android optimizes what it shows on top of SurfaceViews (saves power).
@@ -369,8 +370,6 @@ public class WindowAndroid {
     private native void nativeOnVSync(long nativeWindowAndroid,
                                       long vsyncTimeMicros,
                                       long vsyncPeriodMicros);
-    private native void nativeOnActivityPaused(long nativeWindowAndroid);
-    private native void nativeOnActivityResumed(long nativeWindowAndroid);
     private native void nativeDestroy(long nativeWindowAndroid);
 
 }

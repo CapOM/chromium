@@ -129,7 +129,7 @@ class GLHelperHolder
   void Initialize();
 
   // WebGraphicsContextLostCallback implementation.
-  virtual void onContextLost() override;
+  void onContextLost() override;
 
   GLHelper* GetGLHelper() { return gl_helper_.get(); }
   bool IsLost() { return !context_.get() || context_->isContextLost(); }
@@ -328,22 +328,6 @@ gfx::RectF GetSelectionRect(const ui::TouchSelectionController& controller) {
 
 }  // anonymous namespace
 
-ReadbackRequest::ReadbackRequest(float scale,
-                                 SkColorType color_type,
-                                 gfx::Rect src_subrect,
-                                 ReadbackRequestCallback& result_callback)
-    : scale_(scale),
-      color_type_(color_type),
-      src_subrect_(src_subrect),
-      result_callback_(result_callback) {
-}
-
-ReadbackRequest::ReadbackRequest() {
-}
-
-ReadbackRequest::~ReadbackRequest() {
-}
-
 RenderWidgetHostViewAndroid::LastFrameInfo::LastFrameInfo(
     uint32 output_id,
     scoped_ptr<cc::CompositorFrame> output_frame)
@@ -387,7 +371,6 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
 RenderWidgetHostViewAndroid::~RenderWidgetHostViewAndroid() {
   SetContentViewCore(NULL);
   DCHECK(ack_callbacks_.empty());
-  DCHECK(readbacks_waiting_for_frame_.empty());
   if (resource_collection_.get())
     resource_collection_->SetClient(NULL);
   DCHECK(!surface_factory_);
@@ -448,32 +431,15 @@ void RenderWidgetHostViewAndroid::SetBounds(const gfx::Rect& rect) {
   SetSize(rect.size());
 }
 
-void RenderWidgetHostViewAndroid::AbortPendingReadbackRequests() {
-  while (!readbacks_waiting_for_frame_.empty()) {
-    ReadbackRequest& readback_request = readbacks_waiting_for_frame_.front();
-    readback_request.GetResultCallback().Run(SkBitmap(), READBACK_FAILED);
-    readbacks_waiting_for_frame_.pop();
-  }
-}
-
 void RenderWidgetHostViewAndroid::GetScaledContentBitmap(
     float scale,
     SkColorType color_type,
     gfx::Rect src_subrect,
     ReadbackRequestCallback& result_callback) {
-  if (!host_ || host_->is_hidden()) {
+  if (!host_ || host_->is_hidden() || !IsSurfaceAvailableForCopy()) {
     result_callback.Run(SkBitmap(), READBACK_NOT_SUPPORTED);
     return;
   }
-  if (!IsSurfaceAvailableForCopy()) {
-    // The view is visible, probably the frame has not yet arrived.
-    // Just add the ReadbackRequest to queue and wait for frame arrival
-    // to get this request processed.
-    readbacks_waiting_for_frame_.push(
-        ReadbackRequest(scale, color_type, src_subrect, result_callback));
-    return;
-  }
-
   gfx::Size bounds = layer_->bounds();
   if (src_subrect.IsEmpty())
     src_subrect = gfx::Rect(bounds);
@@ -583,7 +549,23 @@ void RenderWidgetHostViewAndroid::Show() {
     return;
 
   is_showing_ = true;
-  ShowInternal();
+  if (layer_.get())
+    layer_->SetHideLayerAndSubtree(false);
+
+  if (overscroll_controller_)
+    overscroll_controller_->Enable();
+
+  frame_evictor_->SetVisible(true);
+
+  if (!host_ || !host_->is_hidden())
+    return;
+
+  host_->WasShown(ui::LatencyInfo());
+
+  if (content_view_core_) {
+    StartObservingRootWindow();
+    RequestVSyncUpdate(BEGIN_FRAME);
+  }
 }
 
 void RenderWidgetHostViewAndroid::Hide() {
@@ -591,10 +573,24 @@ void RenderWidgetHostViewAndroid::Hide() {
     return;
 
   is_showing_ = false;
+  if (layer_.get() && locks_on_frame_count_ == 0)
+    layer_->SetHideLayerAndSubtree(true);
 
-  bool hide_frontbuffer = true;
-  bool stop_observing_root_window = true;
-  HideInternal(hide_frontbuffer, stop_observing_root_window);
+  if (overscroll_controller_)
+    overscroll_controller_->Disable();
+
+  frame_evictor_->SetVisible(false);
+
+  RunAckCallbacks(cc::SurfaceDrawStatus::DRAW_SKIPPED);
+
+  if (!host_ || host_->is_hidden())
+    return;
+
+  // Inform the renderer that we are being hidden so it can reduce its resource
+  // utilization.
+  host_->WasHidden();
+
+  StopObservingRootWindow();
 }
 
 bool RenderWidgetHostViewAndroid::IsShowing() {
@@ -1054,9 +1050,6 @@ void RenderWidgetHostViewAndroid::DestroyDelegatedContent() {
     surface_id_ = cc::SurfaceId();
   }
   layer_ = NULL;
-  // This gets called when ever any eviction, loosing resources, swapping
-  // problems are encountered and so we abort any pending readbacks here.
-  AbortPendingReadbackRequests();
 }
 
 void RenderWidgetHostViewAndroid::CheckOutputSurfaceChanged(
@@ -1212,18 +1205,6 @@ void RenderWidgetHostViewAndroid::InternalSwapCompositorFrame(
   // As the metadata update may trigger view invalidation, always call it after
   // any potential compositor scheduling.
   OnFrameMetadataUpdated(frame->metadata);
-  // Check if we have any pending readbacks, see if we have a frame available
-  // and process them here.
-  if (!readbacks_waiting_for_frame_.empty()) {
-    while (!readbacks_waiting_for_frame_.empty()) {
-      ReadbackRequest& readback_request = readbacks_waiting_for_frame_.front();
-      GetScaledContentBitmap(readback_request.GetScale(),
-                             readback_request.GetColorFormat(),
-                             readback_request.GetCaptureRect(),
-                             readback_request.GetResultCallback());
-      readbacks_waiting_for_frame_.pop();
-    }
-  }
 }
 
 void RenderWidgetHostViewAndroid::OnSwapCompositorFrame(
@@ -1430,57 +1411,6 @@ void RenderWidgetHostViewAndroid::AcceleratedSurfaceInitialized(int route_id) {
   accelerated_surface_route_id_ = route_id;
 }
 
-void RenderWidgetHostViewAndroid::ShowInternal() {
-  DCHECK(is_showing_);
-  if (!host_ || !host_->is_hidden())
-    return;
-
-  if (layer_.get())
-    layer_->SetHideLayerAndSubtree(false);
-
-  frame_evictor_->SetVisible(true);
-
-  if (overscroll_controller_)
-    overscroll_controller_->Enable();
-
-  host_->WasShown(ui::LatencyInfo());
-
-  if (content_view_core_) {
-    StartObservingRootWindow();
-    RequestVSyncUpdate(BEGIN_FRAME);
-  }
-}
-
-void RenderWidgetHostViewAndroid::HideInternal(
-    bool hide_frontbuffer,
-    bool stop_observing_root_window) {
-  if (hide_frontbuffer) {
-    if (layer_.get() && locks_on_frame_count_ == 0)
-      layer_->SetHideLayerAndSubtree(true);
-
-    frame_evictor_->SetVisible(false);
-  }
-
-  if (stop_observing_root_window)
-    StopObservingRootWindow();
-
-  if (!host_ || host_->is_hidden())
-    return;
-
-  if (overscroll_controller_)
-    overscroll_controller_->Disable();
-
-  // We don't know if we will ever get a frame if we are hiding the renderer, so
-  // we need to cancel all requests
-  AbortPendingReadbackRequests();
-
-  RunAckCallbacks(cc::SurfaceDrawStatus::DRAW_SKIPPED);
-
-  // Inform the renderer that we are being hidden so it can reduce its resource
-  // utilization.
-  host_->WasHidden();
-}
-
 void RenderWidgetHostViewAndroid::AttachLayers() {
   if (!content_view_core_)
     return;
@@ -1508,12 +1438,6 @@ void RenderWidgetHostViewAndroid::RemoveLayers() {
 void RenderWidgetHostViewAndroid::RequestVSyncUpdate(uint32 requests) {
   bool should_request_vsync = !outstanding_vsync_requests_ && requests;
   outstanding_vsync_requests_ |= requests;
-
-  // If the host has been hidden, defer vsync requests until it is shown
-  // again via |Show()|.
-  if (!host_ || host_->is_hidden())
-    return;
-
   // Note that if we're not currently observing the root window, outstanding
   // vsync requests will be pushed if/when we resume observing in
   // |StartObservingRootWindow()|.
@@ -1523,7 +1447,6 @@ void RenderWidgetHostViewAndroid::RequestVSyncUpdate(uint32 requests) {
 
 void RenderWidgetHostViewAndroid::StartObservingRootWindow() {
   DCHECK(content_view_core_);
-  DCHECK(is_showing_);
   if (observing_root_window_)
     return;
 
@@ -1592,9 +1515,6 @@ void RenderWidgetHostViewAndroid::EvictDelegatedFrame() {
   if (layer_.get())
     DestroyDelegatedContent();
   frame_evictor_->DiscardedFrame();
-  // We are evicting the delegated frame,
-  // so there should be no pending readback requests
-  DCHECK(readbacks_waiting_for_frame_.empty());
 }
 
 bool RenderWidgetHostViewAndroid::HasAcceleratedSurface(
@@ -1840,8 +1760,7 @@ void RenderWidgetHostViewAndroid::SetContentViewCore(
   if (!content_view_core_)
     return;
 
-  if (is_showing_)
-    StartObservingRootWindow();
+  StartObservingRootWindow();
 
   if (resize)
     WasResized();
@@ -1882,17 +1801,6 @@ void RenderWidgetHostViewAndroid::OnCompositingDidCommit() {
   RunAckCallbacks(cc::SurfaceDrawStatus::DRAWN);
 }
 
-void RenderWidgetHostViewAndroid::OnRootWindowVisibilityChanged(bool visible) {
-  DCHECK(is_showing_);
-  if (visible) {
-    ShowInternal();
-  } else {
-    bool hide_frontbuffer = true;
-    bool stop_observing_root_window = false;
-    HideInternal(hide_frontbuffer, stop_observing_root_window);
-  }
-}
-
 void RenderWidgetHostViewAndroid::OnAttachCompositor() {
   DCHECK(content_view_core_);
   if (!overscroll_controller_)
@@ -1909,7 +1817,7 @@ void RenderWidgetHostViewAndroid::OnDetachCompositor() {
 void RenderWidgetHostViewAndroid::OnVSync(base::TimeTicks frame_time,
                                           base::TimeDelta vsync_period) {
   TRACE_EVENT0("cc,benchmark", "RenderWidgetHostViewAndroid::OnVSync");
-  if (!host_ || host_->is_hidden())
+  if (!host_)
     return;
 
   if (outstanding_vsync_requests_ & FLUSH_INPUT) {
@@ -1935,27 +1843,11 @@ void RenderWidgetHostViewAndroid::OnAnimate(base::TimeTicks begin_frame_time) {
     SetNeedsAnimate();
 }
 
-void RenderWidgetHostViewAndroid::OnActivityPaused() {
-  TRACE_EVENT0("browser", "RenderWidgetHostViewAndroid::OnActivityPaused");
-  DCHECK(is_showing_);
-  bool hide_frontbuffer = false;
-  bool stop_observing_root_window = false;
-  HideInternal(hide_frontbuffer, stop_observing_root_window);
-}
-
-void RenderWidgetHostViewAndroid::OnActivityResumed() {
-  TRACE_EVENT0("browser", "RenderWidgetHostViewAndroid::OnActivityResumed");
-  DCHECK(is_showing_);
-  ShowInternal();
-}
-
 void RenderWidgetHostViewAndroid::OnLostResources() {
   ReleaseLocksOnSurface();
   if (layer_.get())
     DestroyDelegatedContent();
   DCHECK(ack_callbacks_.empty());
-  // We should not loose a frame if we have readback requests pending.
-  DCHECK(readbacks_waiting_for_frame_.empty());
 }
 
 // static
