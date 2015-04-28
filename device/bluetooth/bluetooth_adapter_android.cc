@@ -108,7 +108,6 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
 }
 
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
-  ui_task_runner_ = base::ThreadTaskRunnerHandle::Get();
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
