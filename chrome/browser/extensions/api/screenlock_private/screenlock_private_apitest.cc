@@ -10,6 +10,7 @@
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/signin/easy_unlock_service.h"
+#include "chrome/browser/signin/proximity_auth_facade.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/profile_management_switches.h"
@@ -75,9 +76,8 @@ class ScreenlockPrivateApiTest : public ExtensionApiTest,
                const content::NotificationDetails& details) override {
     const std::string& content = *content::Details<std::string>(details).ptr();
     if (content == kAttemptClickAuthMessage) {
-      ScreenlockBridge::Get()->lock_handler()->SetAuthType(
-          kTestUser,
-          ScreenlockBridge::LockHandler::USER_CLICK,
+      GetScreenlockBridgeInstance()->lock_handler()->SetAuthType(
+          kTestUser, proximity_auth::ScreenlockBridge::LockHandler::USER_CLICK,
           base::string16());
       EasyUnlockService::Get(profile())->AttemptAuth(kTestUser);
     }
@@ -95,7 +95,8 @@ class ScreenlockPrivateApiTest : public ExtensionApiTest,
 };
 
 // Time out under MSan. http://crbug.com/478091
-#if defined(MEMORY_SANITIZER)
+// Flaky under LSan on ChromeOS. http://crbug.com/482002
+#if defined(MEMORY_SANITIZER) || defined(LEAK_SANITIZER) && defined(OS_CHROMEOS)
 #define MAYBE_LockUnlock DISABLED_LockUnlock
 #define MAYBE_AuthType DISABLED_AuthType
 #else

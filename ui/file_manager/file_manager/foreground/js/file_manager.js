@@ -261,13 +261,6 @@ function FileManager() {
    * @private
    */
   this.initializeQueue_ = new AsyncUtil.Group();
-
-  /**
-   * Indicates whether cloud import is enabled.  This is initialized in
-   * #initSettings.
-   * @private {boolean}
-   */
-  this.importEnabled_ = true;
 }
 
 FileManager.prototype = /** @struct */ {
@@ -374,17 +367,7 @@ FileManager.prototype = /** @struct */ {
 (function() {
   FileManager.prototype.initSettings_ = function(callback) {
     this.appStateController_ = new AppStateController(this.dialogType);
-    var whenViewOptionsLoaded =
-        this.appStateController_.loadInitialViewOptions();
-    var whenImportFlagLoaded = importer.importEnabled().then(
-        function(enabled) {
-          this.importEnabled_ = enabled;
-        }.bind(this));
-
-    Promise.all([
-      whenViewOptionsLoaded,
-      whenImportFlagLoaded
-    ]).then(callback);
+    this.appStateController_.loadInitialViewOptions().then(callback);
   };
 
   /**
@@ -444,19 +427,21 @@ FileManager.prototype = /** @struct */ {
         this.ui_.emptyFolder,
         this.directoryModel_);
 
-    importer.importEnabled().then(
-        function(enabled) {
-          if (enabled) {
-            this.importController_ = new importer.ImportController(
-                new importer.RuntimeControllerEnvironment(
-                    this,
-                    assert(this.selectionHandler_)),
-                assert(this.mediaScanner_),
-                assert(this.mediaImportHandler_),
-                new importer.RuntimeCommandWidget(),
-                assert(this.tracker_));
-          }
-        }.bind(this));
+    if (this.dialogType === DialogType.FULL_PAGE) {
+      importer.importEnabled().then(
+          function(enabled) {
+            if (enabled) {
+              this.importController_ = new importer.ImportController(
+                  new importer.RuntimeControllerEnvironment(
+                      this,
+                      assert(this.selectionHandler_)),
+                  assert(this.mediaScanner_),
+                  assert(this.mediaImportHandler_),
+                  new importer.RuntimeCommandWidget(),
+                  assert(this.tracker_));
+            }
+          }.bind(this));
+    }
 
     assert(this.fileFilter_);
     assert(this.namingController_);
@@ -598,6 +583,9 @@ FileManager.prototype = /** @struct */ {
     this.initializeQueue_.add(
         this.initFileSystemUI_.bind(this),
         ['initAdditionalUI', 'initSettings'], 'initFileSystemUI');
+    this.initializeQueue_.add(
+        this.initUIFocus_.bind(this),
+        ['initAdditionalUI', 'initFileSystemUI'], 'initUIFocus');
 
     // Run again just in case if all pending closures have completed and the
     // queue has stopped and monitor the completion.
@@ -800,6 +788,17 @@ FileManager.prototype = /** @struct */ {
     this.ui_.listContainer.table.normalizeColumns();
     this.ui_.listContainer.table.redraw();
 
+    callback();
+  };
+
+  /**
+   * One-time initialization of focus. This should run at the last of UI
+   *  initialization.
+   *
+   * @private
+   */
+  FileManager.prototype.initUIFocus_ = function(callback) {
+    this.ui_.initUIFocus();
     callback();
   };
 

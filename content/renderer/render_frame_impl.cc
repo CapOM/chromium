@@ -1091,29 +1091,6 @@ void RenderFrameImpl::OnNavigate(
 
   GetContentClient()->SetActiveURL(common_params.url);
 
-  WebFrame* frame = frame_;
-  if (!request_params.frame_to_navigate.empty()) {
-    // TODO(nasko): Move this lookup to the browser process.
-    frame = render_view_->webview()->findFrameByName(
-        WebString::fromUTF8(request_params.frame_to_navigate));
-    CHECK(frame) << "Invalid frame name passed: "
-                 << request_params.frame_to_navigate;
-  }
-
-  // If this frame isn't in the same process as its parent, it will naively
-  // assume that this is the first navigation in the iframe, but this may not
-  // actually be the case. The PageTransition differentiates between the first
-  // navigation in a subframe and subsequent navigations, so if this is a
-  // subsequent navigation, force the frame's state machine forward.
-  if (ui::PageTransitionCoreTypeIs(common_params.transition,
-                                   ui::PAGE_TRANSITION_MANUAL_SUBFRAME)) {
-    CHECK(frame_->parent());
-    if (frame_->parent()->isWebRemoteFrame()) {
-      CHECK_EQ(frame, frame_);
-      frame_->setCommittedFirstRealLoad();
-    }
-  }
-
   if (is_reload && !render_view_->history_controller()->GetCurrentEntry()) {
     // We cannot reload if we do not have any history state.  This happens, for
     // example, when recovering from a crash.
@@ -1136,9 +1113,9 @@ void RenderFrameImpl::OnNavigate(
                          FrameMsg_Navigate_Type::RELOAD_IGNORING_CACHE);
 
     if (reload_original_url)
-      frame->reloadWithOverrideURL(common_params.url, true);
+      frame_->reloadWithOverrideURL(common_params.url, true);
     else
-      frame->reload(ignore_cache);
+      frame_->reload(ignore_cache);
   } else if (is_history_navigation) {
     // We must know the page ID of the page we are navigating back to.
     DCHECK_NE(request_params.page_id, -1);
@@ -1154,12 +1131,12 @@ void RenderFrameImpl::OnNavigate(
           entry.Pass(), navigation_params.Pass(), cache_policy);
     }
   } else if (!common_params.base_url_for_data_url.is_empty()) {
-    LoadDataURL(common_params, frame);
+    LoadDataURL(common_params, frame_);
   } else {
     // Navigate to the given URL.
     WebURLRequest request = CreateURLRequestForNavigation(
         common_params, scoped_ptr<StreamOverrideParameters>(),
-        frame->isViewSourceModeEnabled());
+        frame_->isViewSourceModeEnabled());
 
     if (!start_params.extra_headers.empty()) {
       for (net::HttpUtil::HeadersIterator i(start_params.extra_headers.begin(),
@@ -1193,9 +1170,9 @@ void RenderFrameImpl::OnNavigate(
     // Record this before starting the load, we need a lower bound of this time
     // to sanitize the navigationStart override set below.
     base::TimeTicks renderer_navigation_start = base::TimeTicks::Now();
-    frame->loadRequest(request);
+    frame_->loadRequest(request);
 
-    UpdateFrameNavigationTiming(frame, request_params.browser_navigation_start,
+    UpdateFrameNavigationTiming(frame_, request_params.browser_navigation_start,
                                 renderer_navigation_start);
   }
 
@@ -2247,8 +2224,13 @@ void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
   CHECK_EQ(it->second, this);
   g_frame_map.Get().erase(it);
 
-  if (is_subframe)
+  if (is_subframe) {
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+            switches::kSitePerProcess) && render_widget_) {
+      render_widget_->UnregisterRenderFrame(this);
+    }
     frame->parent()->removeChild(frame);
+  }
 
   // |frame| is invalid after here.  Be sure to clear frame_ as well, since this
   // object may not be deleted immediately and other methods may try to access
@@ -2568,8 +2550,6 @@ void RenderFrameImpl::didStartProvisionalLoad(blink::WebLocalFrame* frame,
   document_state->set_start_load_time(Time::Now());
 
   bool is_top_most = !frame->parent();
-  NavigationStateImpl* navigation_state =
-      static_cast<NavigationStateImpl*>(document_state->navigation_state());
   if (is_top_most) {
     render_view_->set_navigation_gesture(
         WebUserGestureIndicator::isProcessingUserGesture() ?
@@ -2578,17 +2558,8 @@ void RenderFrameImpl::didStartProvisionalLoad(blink::WebLocalFrame* frame,
     // Subframe navigations that don't add session history items must be
     // marked with AUTO_SUBFRAME. See also didFailProvisionalLoad for how we
     // handle loading of error pages.
-    navigation_state->set_transition_type(ui::PAGE_TRANSITION_AUTO_SUBFRAME);
-  } else if (ui::PageTransitionCoreTypeIs(navigation_state->GetTransitionType(),
-                                          ui::PAGE_TRANSITION_LINK)) {
-    // Subframe navigations that are creating a new history item should be
-    // marked MANUAL_SUBFRAME, unless it has already been marked as a
-    // FORM_SUBMIT. This state will be attached to a main resource request
-    // in the process that began the request. If the request is transferred
-    // to a different process, this state will be used in
-    // RenderFrameImpl::OnNavigate() in the new process (as well as in the
-    // browser process).
-    navigation_state->set_transition_type(ui::PAGE_TRANSITION_MANUAL_SUBFRAME);
+    static_cast<NavigationStateImpl*>(document_state->navigation_state())
+        ->set_transition_type(ui::PAGE_TRANSITION_AUTO_SUBFRAME);
   }
 
   FOR_EACH_OBSERVER(RenderViewObserver, render_view_->observers(),
@@ -3172,9 +3143,16 @@ void RenderFrameImpl::willSendRequest(
     }
   }
 
-  WebDataSource* provisional_data_source = frame->provisionalDataSource();
+  WebFrame* top_frame = frame->top();
+  // TODO(nasko): Hack around asking about top-frame data source. This means
+  // for out-of-process iframes we are treating the current frame as the
+  // top-level frame, which is wrong.
+  if (!top_frame || top_frame->isWebRemoteFrame())
+    top_frame = frame;
+  WebDataSource* provisional_data_source = top_frame->provisionalDataSource();
+  WebDataSource* top_data_source = top_frame->dataSource();
   WebDataSource* data_source =
-      provisional_data_source ? provisional_data_source : frame->dataSource();
+      provisional_data_source ? provisional_data_source : top_data_source;
 
   DocumentState* document_state = DocumentState::FromDataSource(data_source);
   DCHECK(document_state);
@@ -3313,14 +3291,8 @@ void RenderFrameImpl::willSendRequest(
   extra_data->set_stream_override(stream_override.Pass());
   request.setExtraData(extra_data);
 
-  WebFrame* top_frame = frame->top();
-  // TODO(nasko): Hack around asking about top-frame data source. This means
-  // for out-of-process iframes we are treating the current frame as the
-  // top-level frame, which is wrong.
-  if (!top_frame || top_frame->isWebRemoteFrame())
-    top_frame = frame;
   DocumentState* top_document_state =
-      DocumentState::FromDataSource(top_frame->dataSource());
+      DocumentState::FromDataSource(top_data_source);
   if (top_document_state) {
     // TODO(gavinp): separate out prefetching and prerender field trials
     // if the rel=prerender rel type is sticking around.

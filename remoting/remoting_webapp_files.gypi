@@ -71,9 +71,9 @@
       'webapp/base/js/base_inherits_unittest.js',
       'webapp/base/js/ipc_unittest.js',
       'webapp/base/js/protocol_extension_manager_unittest.js',
+      'webapp/base/js/viewport_unittest.js',
       'webapp/crd/js/apps_v2_migration_unittest.js',
       'webapp/crd/js/client_session_unittest.js',
-      'webapp/crd/js/desktop_viewport_unittest.js',
       'webapp/crd/js/client_session_factory_unittest.js',
       'webapp/crd/js/dns_blackhole_checker_unittest.js',
       'webapp/crd/js/error_unittest.js',
@@ -167,7 +167,6 @@
       'webapp/crd/js/connected_view.js',
       'webapp/crd/js/connection_info.js',
       'webapp/crd/js/credentials_provider.js',
-      'webapp/crd/js/desktop_connected_view.js',
       'webapp/crd/js/host_desktop.js',
       'webapp/crd/js/smart_reconnector.js',
       'webapp/crd/js/video_frame_recorder.js',
@@ -216,6 +215,7 @@
     'remoting_webapp_js_host_display_files': [
       'webapp/crd/js/host_list.js',
       'webapp/crd/js/host_list_api.js',
+      'webapp/crd/js/host_list_api_gcd_impl.js',
       'webapp/crd/js/host_list_api_impl.js',
       'webapp/crd/js/host_table_entry.js',
       'webapp/crd/js/local_host_section.js',
@@ -239,21 +239,38 @@
       'webapp/crd/js/xmpp_login_handler.js',
       'webapp/crd/js/xmpp_stream_parser.js',
     ],
-    # UI JavaScript files.
+    # Shared UI JavaScript files.
     'remoting_webapp_js_ui_files': [
+      'webapp/base/js/viewport.js',
       'webapp/base/js/window_shape.js',
+      'webapp/crd/js/connection_stats.js',
+      'webapp/crd/js/feedback.js',
+      'webapp/crd/js/l10n.js',
+      'webapp/crd/js/ui_mode.js',
+    ],
+
+    #
+    # DesktopRemoting-specific JS files.
+    #
+
+    # The CRD-specific JavaScript files required by main.html.
+    'remoting_webapp_crd_js_ui_files': [
       'webapp/crd/js/bump_scroller.js',
       'webapp/crd/js/butter_bar.js',
-      'webapp/crd/js/connection_stats.js',
+      'webapp/crd/js/crd_auth_dialog.js',
+      'webapp/crd/js/crd_event_handlers.js',
+      'webapp/crd/js/crd_experimental.js',
+      'webapp/crd/js/desktop_connected_view.js',
+      'webapp/crd/js/desktop_remoting.js',
+      'webapp/crd/js/desktop_remoting_activity.js',
       'webapp/crd/js/desktop_viewport.js',
-      'webapp/crd/js/feedback.js',
       'webapp/crd/js/fullscreen.js',
       'webapp/crd/js/fullscreen_v1.js',
       'webapp/crd/js/fullscreen_v2.js',
-      'webapp/crd/js/l10n.js',
+      'webapp/crd/js/it2me_activity.js',
+      'webapp/crd/js/me2me_activity.js',
       'webapp/crd/js/menu_button.js',
       'webapp/crd/js/options_menu.js',
-      'webapp/crd/js/ui_mode.js',
       'webapp/crd/js/toolbar.js',
       'webapp/crd/js/window_frame.js',
     ],
@@ -286,17 +303,17 @@
       #'<@(remoting_webapp_browsertest_all_js_files)',
     ],
 
+    # The JS files required by unittest.html.
+    'remoting_webapp_unittest_html_all_js_files': [
+      '<@(remoting_webapp_shared_main_html_js_files)',
+      '<@(remoting_webapp_crd_js_ui_files)',
+    ],
+
     # The CRD-specific JavaScript files required by main.html.
     'remoting_webapp_crd_main_html_all_js_files': [
       '<@(remoting_webapp_shared_main_html_js_files)',
-      'webapp/crd/js/crd_auth_dialog.js',
-      'webapp/crd/js/crd_event_handlers.js',
-      'webapp/crd/js/crd_experimental.js',
+      '<@(remoting_webapp_crd_js_ui_files)',
       'webapp/crd/js/crd_main.js',
-      'webapp/crd/js/desktop_remoting.js',
-      'webapp/crd/js/desktop_remoting_activity.js',
-      'webapp/crd/js/it2me_activity.js',
-      'webapp/crd/js/me2me_activity.js',
     ],
 
     # These template files are used to construct main.html.

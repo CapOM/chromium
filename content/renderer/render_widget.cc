@@ -496,6 +496,7 @@ RenderWidget::RenderWidget(blink::WebPopupType popup_type,
       closing_(false),
       host_closing_(false),
       is_swapped_out_(swapped_out),
+      for_oopif_(false),
       input_method_is_active_(false),
       text_input_type_(ui::TEXT_INPUT_TYPE_NONE),
       text_input_mode_(ui::TEXT_INPUT_MODE_DEFAULT),
@@ -560,6 +561,7 @@ RenderWidget* RenderWidget::CreateForFrame(
   widget->routing_id_ = routing_id;
   widget->surface_id_ = surface_id;
   widget->compositor_deps_ = compositor_deps;
+  widget->for_oopif_ = true;
   // DoInit increments the reference count on |widget|, keeping it alive after
   // this function returns.
   if (widget->DoInit(MSG_ROUTING_NONE, compositor_deps,
@@ -1011,14 +1013,14 @@ scoped_ptr<cc::OutputSurface> RenderWidget::CreateOutputSurface(bool fallback) {
   scoped_refptr<ContextProviderCommandBuffer> worker_context_provider;
   if (!use_software) {
     context_provider = ContextProviderCommandBuffer::Create(
-        CreateGraphicsContext3D(), "RenderCompositor");
+        CreateGraphicsContext3D(), RENDER_COMPOSITOR_CONTEXT);
     if (!context_provider.get()) {
       // Cause the compositor to wait and try again.
       return scoped_ptr<cc::OutputSurface>();
     }
 
     worker_context_provider = ContextProviderCommandBuffer::Create(
-        CreateGraphicsContext3D(), "RenderWorker");
+        CreateGraphicsContext3D(), RENDER_WORKER_CONTEXT);
     if (!worker_context_provider.get()) {
       // Cause the compositor to wait and try again.
       return scoped_ptr<cc::OutputSurface>();

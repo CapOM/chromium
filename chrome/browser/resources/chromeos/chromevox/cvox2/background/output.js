@@ -93,6 +93,9 @@ Output.ROLE_INFO_ = {
   checkBox: {
     msgId: 'input_type_checkbox'
   },
+  date: {
+    msgId: 'input_type_date'
+  },
   dialog: {
     msgId: 'dialog'
   },
@@ -103,18 +106,39 @@ Output.ROLE_INFO_ = {
     msgId: 'tag_link',
     earcon: 'LINK'
   },
+  listBox: {
+    msgId: 'aria_role_listbox',
+    earcon: 'LISTBOX'
+  },
+  listBoxOption: {
+    msgId: 'aria_role_listitem',
+    earcon: 'LIST_ITEM'
+  },
   listItem: {
     msgId: 'ARIA_ROLE_LISTITEM',
     earcon: 'list_item'
   },
+  menu: {
+    msgId: 'aria_role_menu'
+  },
+  menuItem: {
+    msgId: 'aria_role_menuitem'
+  },
   menuListOption: {
     msgId: 'aria_role_menuitem'
+  },
+  menuListPopup: {
+    msgId: 'aria_role_menu'
   },
   popUpButton: {
     msgId: 'tag_button'
   },
   radioButton: {
     msgId: 'input_type_radio'
+  },
+  spinButton: {
+    msgId: 'aria_role_combobox',
+    earcon: 'LISTBOX'
   },
   textBox: {
     msgId: 'input_type_text',
@@ -124,8 +148,17 @@ Output.ROLE_INFO_ = {
     msgId: 'input_type_text',
     earcon: 'EDITABLE_TEXT'
   },
+  time: {
+    msgId: 'tag_time'
+  },
   toolbar: {
     msgId: 'aria_role_toolbar'
+  },
+  tree: {
+    msgId: 'aria_role_tree'
+  },
+  treeItem: {
+    msgId: 'aria_role_treeitem'
   }
 };
 
@@ -133,7 +166,11 @@ Output.ROLE_INFO_ = {
  * Metadata about supported automation states.
  * @const {!Object<string,
  *           {on: {msgId: string, earconId: string},
- *            off: {msgId: string, earconId: string}}>}
+ *            off: {msgId: string, earconId: string},
+ *            omitted: {msgId: string, earconId: string}}>}
+ *     on: info used to describe a state that is set to true.
+ *     off: info used to describe a state that is set to false.
+ *     omitted: info used to describe a state that is undefined.
  * @private
  */
 Output.STATE_INFO_ = {
@@ -145,6 +182,26 @@ Output.STATE_INFO_ = {
     off: {
       earconId: 'CHECK_OFF',
       msgId: 'checkbox_unchecked_state'
+    },
+    omitted: {
+      earconId: 'CHECK_OFF',
+      msgId: 'checkbox_unchecked_state'
+    }
+  },
+  collapsed: {
+    on: {
+      msgId: 'aria_expanded_false'
+    },
+    off: {
+      msgId: 'aria_expanded_true'
+    }
+  },
+  expanded: {
+    on: {
+      msgId: 'aria_expanded_true'
+    },
+    off: {
+      msgId: 'aria_expanded_false'
     }
   }
 };
@@ -156,7 +213,7 @@ Output.STATE_INFO_ = {
 Output.RULES = {
   navigate: {
     'default': {
-      speak: '$name $value $description $role',
+      speak: '$name $value $description $help $role',
       braille: ''
     },
     alert: {
@@ -164,6 +221,10 @@ Output.RULES = {
     },
     checkBox: {
       speak: '$name $role $checked'
+    },
+    date: {
+      enter: '$name $role',
+      leave: '@exited_container($role)'
     },
     dialog: {
       enter: '$name $role'
@@ -181,10 +242,19 @@ Output.RULES = {
       speak: '$name= $visited $role'
     },
     list: {
-      enter: '@aria_role_list @list_with_items($parentChildCount)'
+      enter: '$role @list_with_items($countChildren(listItem))'
+    },
+    listBox: {
+      enter: '$name $role @list_with_items($countChildren(listBoxOption))'
+    },
+    listBoxOption: {
+      speak: '$name $role @describe_index($indexInParent, $parentChildCount)'
     },
     listItem: {
       enter: '$role'
+    },
+    menu: {
+      enter: '$name $role @list_with_items($countChildren(menuItem))'
     },
     menuItem: {
       speak: '$if($haspopup, @describe_menu_item_with_submenu($name), ' +
@@ -215,8 +285,26 @@ Output.RULES = {
     tab: {
       speak: '@describe_tab($name)'
     },
+    textField: {
+      speak: '$name $value $if(' +
+          '$textInputType, @input_type_+$textInputType, @input_type_text) ' +
+          '$earcon(EDITABLE_TEXT)',
+      braille: ''
+    },
+    time: {
+      enter: '$name $role',
+      leave: '@exited_container($role)'
+    },
     toolbar: {
       enter: '$name $role'
+    },
+    tree: {
+      enter: '$name $role @list_with_items($countChildren(treeItem))'
+    },
+    treeItem: {
+        enter: '$role $expanded $collapsed ' +
+            '@describe_index($indexInParent, $parentChildCount) ' +
+            '@describe_depth($hierarchicalLevel)'
     },
     window: {
       enter: '$name',
@@ -604,13 +692,24 @@ Output.prototype = {
           this.append_(buff, msg, options);
         } else if (node.attributes[token] !== undefined) {
           options.annotation.push(token);
-          this.append_(buff, node.attributes[token], options);
+          var value = node.attributes[token];
+          if (typeof value == 'number')
+            value = String(value);
+          this.append_(buff, value, options);
         } else if (Output.STATE_INFO_[token]) {
           options.annotation.push('state');
           var stateInfo = Output.STATE_INFO_[token];
-          var resolvedInfo = node.state[token] ? stateInfo.on : stateInfo.off;
-          options.annotation.push(
-              new Output.EarconAction(resolvedInfo.earconId));
+          var resolvedInfo = {};
+          if (node.state[token] === undefined)
+            resolvedInfo = stateInfo.omitted;
+          else
+            resolvedInfo = node.state[token] ? stateInfo.on : stateInfo.off;
+          if (!resolvedInfo)
+            return;
+          if (resolvedInfo.earconId) {
+            options.annotation.push(
+                new Output.EarconAction(resolvedInfo.earconId));
+          }
           var msgId =
               this.formatOptions_.braille ? resolvedInfo.msgId + '_brl' :
               resolvedInfo.msgId;
@@ -633,6 +732,12 @@ Output.prototype = {
 
             lastBuff.setSpan(
                 new Output.EarconAction(tree.firstChild.value), 0, 0);
+          } else if (token == 'countChildren') {
+            var role = tree.firstChild.value;
+            var count = node.children.filter(function(e) {
+              return e.role == role;
+            }).length;
+            this.append_(buff, String(count));
           }
         }
       } else if (prefix == '@') {
@@ -655,7 +760,7 @@ Output.prototype = {
             return;
           }
           var msgBuff = [];
-          this.format_(node, arg, msgBuff);
+          this.format_(node, curMsg, msgBuff);
           msgArgs = msgArgs.concat(msgBuff);
           curMsg = curMsg.nextSibling;
         }

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//mojo/mojo_application_package.gni")
 import("//testing/test.gni")
 import("//third_party/mojo/src/mojo/public/mojo.gni")
 import("//third_party/mojo/src/mojo/public/mojo_application.gni")
@@ -81,16 +82,12 @@ source_set("lib") {
     "web_mime_registry_impl.h",
     "web_notification_manager_impl.cc",
     "web_notification_manager_impl.h",
-    "web_scheduler_impl.cc",
-    "web_scheduler_impl.h",
     "web_socket_handle_impl.cc",
     "web_socket_handle_impl.h",
     "web_storage_namespace_impl.cc",
     "web_storage_namespace_impl.h",
     "web_theme_engine_impl.cc",
     "web_theme_engine_impl.h",
-    "web_thread_impl.cc",
-    "web_thread_impl.h",
     "web_url_loader_impl.cc",
     "web_url_loader_impl.h",
   ]
@@ -105,9 +102,11 @@ source_set("lib") {
     "//cc/surfaces",
     "//components/clipboard/public/interfaces",
     "//components/gpu/public/interfaces",
+    "//components/scheduler:scheduler",
     "//components/surfaces/public/interfaces",
     "//components/webcrypto",
     "//gin",
+    "//mandoline/services/navigation/public/interfaces",
     "//media",
     "//media/blink",
     "//media/mojo",
@@ -125,7 +124,6 @@ source_set("lib") {
     "//third_party/mojo_services/src/accessibility/public/interfaces",
     "//third_party/mojo_services/src/content_handler/public/interfaces",
     "//ui/mojo/events:interfaces",
-    "//third_party/mojo_services/src/navigation/public/interfaces",
     "//ui/events",
     "//ui/events:gesture_detection",
     "//ui/events/blink",
@@ -201,13 +199,15 @@ if (is_android) {
     ]
   }
 } else {
-  mojo_native_application("html_viewer") {
+  mojo_application_package("html_viewer") {
     sources = [
       "html_viewer.cc",
     ]
     deps = [
       ":lib",
+      "//ui/resources:ui_test_pak",
     ]
+    resources = [ "$root_out_dir/ui_test.pak" ]
     data_deps = [ "//mojo/services/network:network" ]
   }
 }

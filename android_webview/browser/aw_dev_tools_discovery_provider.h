@@ -12,13 +12,17 @@ namespace android_webview {
 class AwDevToolsDiscoveryProvider :
     public devtools_discovery::DevToolsDiscoveryManager::Provider {
  public:
-  AwDevToolsDiscoveryProvider();
+  // Installs provider to devtools_discovery.
+  static void Install();
+
   ~AwDevToolsDiscoveryProvider() override;
 
   // devtools_discovery::DevToolsDiscoveryManager::Provider implementation.
   devtools_discovery::DevToolsTargetDescriptor::List GetDescriptors() override;
 
  private:
+  AwDevToolsDiscoveryProvider();
+
   DISALLOW_COPY_AND_ASSIGN(AwDevToolsDiscoveryProvider);
 };
 

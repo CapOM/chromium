@@ -11,6 +11,7 @@
 #include "base/message_loop/message_loop.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/trace_event/trace_event.h"
 
 namespace ui {
 
@@ -31,7 +32,13 @@ EventReaderLibevdevCros::EventReaderLibevdevCros(int fd,
                                                  InputDeviceType type,
                                                  const EventDeviceInfo& devinfo,
                                                  scoped_ptr<Delegate> delegate)
-    : EventConverterEvdev(fd, path, id, type),
+    : EventConverterEvdev(fd,
+                          path,
+                          id,
+                          type,
+                          devinfo.name(),
+                          devinfo.vendor_id(),
+                          devinfo.product_id()),
       has_keyboard_(devinfo.HasKeyboard()),
       has_mouse_(devinfo.HasMouse()),
       has_touchpad_(devinfo.HasTouchpad()),
@@ -64,6 +71,9 @@ EventReaderLibevdevCros::~EventReaderLibevdevCros() {
 EventReaderLibevdevCros::Delegate::~Delegate() {}
 
 void EventReaderLibevdevCros::OnFileCanReadWithoutBlocking(int fd) {
+  TRACE_EVENT1("evdev", "EventReaderLibevdevCros::OnFileCanReadWithoutBlocking",
+               "fd", fd);
+
   if (EvdevRead(&evdev_)) {
     if (errno == EINTR || errno == EAGAIN)
       return;

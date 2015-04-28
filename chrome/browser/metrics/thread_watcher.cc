@@ -346,7 +346,7 @@ ThreadWatcherList::CrashDataThresholds::CrashDataThresholds()
 // static
 void ThreadWatcherList::StartWatchingAll(
     const base::CommandLine& command_line) {
-  DCHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   uint32 unresponsive_threshold;
   CrashOnHangThreadMap crash_on_hang_threads;
   ParseCommandLine(command_line,
@@ -538,6 +538,13 @@ void ThreadWatcherList::InitializeAndStartWatching(
 
   ThreadWatcherList* thread_watcher_list = new ThreadWatcherList();
   CHECK(thread_watcher_list);
+
+  // Disable ThreadWatcher in Canary channel.
+  chrome::VersionInfo::Channel channel = chrome::VersionInfo::GetChannel();
+  if (channel == chrome::VersionInfo::CHANNEL_CANARY ||
+      channel == chrome::VersionInfo::CHANNEL_UNKNOWN) {
+    return;
+  }
 
   const base::TimeDelta kSleepTime =
       base::TimeDelta::FromSeconds(kSleepSeconds);

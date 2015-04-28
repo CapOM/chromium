@@ -8,6 +8,7 @@
 #include <linux/input.h>
 
 #include "base/message_loop/message_loop.h"
+#include "base/trace_event/trace_event.h"
 #include "ui/events/event.h"
 #include "ui/events/ozone/evdev/device_event_dispatcher_evdev.h"
 
@@ -21,7 +22,13 @@ TabletEventConverterEvdev::TabletEventConverterEvdev(
     CursorDelegateEvdev* cursor,
     const EventDeviceInfo& info,
     DeviceEventDispatcherEvdev* dispatcher)
-    : EventConverterEvdev(fd, path, id, type),
+    : EventConverterEvdev(fd,
+                          path,
+                          id,
+                          type,
+                          info.name(),
+                          info.vendor_id(),
+                          info.product_id()),
       cursor_(cursor),
       dispatcher_(dispatcher),
       stylus_(0),
@@ -38,6 +45,10 @@ TabletEventConverterEvdev::~TabletEventConverterEvdev() {
 }
 
 void TabletEventConverterEvdev::OnFileCanReadWithoutBlocking(int fd) {
+  TRACE_EVENT1("evdev",
+               "TabletEventConverterEvdev::OnFileCanReadWithoutBlocking", "fd",
+               fd);
+
   input_event inputs[4];
   ssize_t read_size = read(fd, inputs, sizeof(inputs));
   if (read_size < 0) {
@@ -145,8 +156,8 @@ void TabletEventConverterEvdev::DispatchMouseButton(const input_event& input) {
   bool down = input.value;
 
   dispatcher_->DispatchMouseButtonEvent(MouseButtonEventParams(
-      id_, cursor_->GetLocation(), button, down, false /* allow_remap */,
-      TimeDeltaFromInputEvent(input)));
+      input_device_.id, cursor_->GetLocation(), button, down,
+      false /* allow_remap */, TimeDeltaFromInputEvent(input)));
 }
 
 void TabletEventConverterEvdev::FlushEvents(const input_event& input) {
@@ -164,8 +175,9 @@ void TabletEventConverterEvdev::FlushEvents(const input_event& input) {
 
   UpdateCursor();
 
-  dispatcher_->DispatchMouseMoveEvent(MouseMoveEventParams(
-      id_, cursor_->GetLocation(), TimeDeltaFromInputEvent(input)));
+  dispatcher_->DispatchMouseMoveEvent(
+      MouseMoveEventParams(input_device_.id, cursor_->GetLocation(),
+                           TimeDeltaFromInputEvent(input)));
 
   abs_value_dirty_ = false;
 }

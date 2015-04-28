@@ -192,14 +192,6 @@ shared_library("chrome_shell") {
   deps = [
     ":chrome_shell_base",
   ]
-
-  # GYP: via base/files/protect_file_posix.gypi
-  # TODO(pasko): Remove this non-trivial linker wrapping as soon as
-  # crbug.com/424562 is fixed.
-  if (!is_component_build) {
-    ldflags = [ "-Wl,--wrap=close" ]
-    deps += [ "//base:protect_file_posix" ]
-  }
 }
 
 # GYP: //chrome/chrome_shell.gypi:libchromesyncshell
@@ -236,6 +228,7 @@ android_library("chrome_shell_java") {
     ":chrome_java",
     "//base:base_java",
     "//content/public/android:content_java",
+    "//components/dom_distiller/android:dom_distiller_content_java",
     "//components/dom_distiller/android:dom_distiller_core_java",
     "//components/service_tab_launcher:service_tab_launcher_java",
     "//components/web_contents_delegate_android:web_contents_delegate_android_java",
@@ -456,7 +449,11 @@ android_apk("chrome_shell_test_apk") {
     ":chrome_javatests",
     ":chrome_shell_test_java",
     "//sync/android:sync_javatests",
+    "//testing/android/broker:broker_java",
     "//ui/android:ui_javatests",
+  ]
+  datadeps = [
+    "//testing/android/driver:driver_apk",
   ]
   apk_name = "ChromeShellTest"
   android_manifest = "shell/javatests/AndroidManifest.xml"
@@ -466,6 +463,7 @@ android_apk("chrome_shell_test_apk") {
 junit_binary("chrome_junit_tests") {
   java_files = [
     "junit/src/org/chromium/chrome/browser/omaha/ResponseParserTest.java",
+    "junit/src/org/chromium/chrome/browser/media/remote/AbstractMediaRouteControllerTest.java",
     "junit/src/org/chromium/chrome/browser/media/remote/MediaUrlResolverTest.java",
     "junit/src/org/chromium/chrome/browser/media/remote/RemoteVideoInfoTest.java",
     "junit/src/org/chromium/chrome/browser/media/remote/TransportControlTest.java",
@@ -475,6 +473,7 @@ junit_binary("chrome_junit_tests") {
     "//base:base_java",
     "//base:base_java_test_support",
     "//third_party/junit:hamcrest",
+    "//third_party/android_tools:android_support_v7_mediarouter_java",
   ]
 }
 

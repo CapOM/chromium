@@ -162,8 +162,8 @@ class DataReductionProxyConfigTest : public testing::Test {
       scoped_ptr<DataReductionProxyParams> params) {
     params->EnableQuic(false);
     return make_scoped_ptr(new DataReductionProxyConfig(
-        test_context_->task_runner(), test_context_->net_log(), params.Pass(),
-        test_context_->configurator(), test_context_->event_creator()));
+        test_context_->net_log(), params.Pass(), test_context_->configurator(),
+        test_context_->event_creator()));
   }
 
   MockDataReductionProxyConfig* config() {
@@ -179,6 +179,7 @@ class DataReductionProxyConfigTest : public testing::Test {
   }
 
  private:
+  base::MessageLoopForIO message_loop_;
   scoped_ptr<DataReductionProxyTestContext> test_context_;
   scoped_ptr<TestDataReductionProxyParams> expected_params_;
 };

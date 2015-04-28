@@ -14,6 +14,7 @@
 #include "chrome/browser/browsing_data/browsing_data_helper.h"
 #include "chrome/browser/browsing_data/browsing_data_remover.h"
 #include "chrome/browser/browsing_data/browsing_data_remover_test_util.h"
+#include "chrome/browser/infobars/infobar_responder.h"
 #include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/notifications/notification_test_util.h"
 #include "chrome/browser/notifications/platform_notification_service_impl.h"
@@ -32,9 +33,6 @@
 #include "components/content_settings/core/common/content_settings.h"
 #include "components/content_settings/core/common/content_settings_types.h"
 #include "components/gcm_driver/gcm_client.h"
-#include "components/infobars/core/confirm_infobar_delegate.h"
-#include "components/infobars/core/infobar.h"
-#include "components/infobars/core/infobar_manager.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test_utils.h"
@@ -46,50 +44,6 @@
 #endif
 
 namespace {
-// Responds to a confirm infobar by accepting or cancelling it. Responds to at
-// most one infobar.
-class InfoBarResponder : public infobars::InfoBarManager::Observer {
- public:
-  InfoBarResponder(Browser* browser, bool accept)
-      : infobar_service_(InfoBarService::FromWebContents(
-            browser->tab_strip_model()->GetActiveWebContents())),
-        accept_(accept),
-        has_observed_(false) {
-    infobar_service_->AddObserver(this);
-  }
-
-  ~InfoBarResponder() override { infobar_service_->RemoveObserver(this); }
-
-  // infobars::InfoBarManager::Observer
-  void OnInfoBarAdded(infobars::InfoBar* infobar) override {
-    if (has_observed_)
-      return;
-    has_observed_ = true;
-    ConfirmInfoBarDelegate* delegate =
-        infobar->delegate()->AsConfirmInfoBarDelegate();
-    DCHECK(delegate);
-
-    // Respond to the infobar asynchronously, like a person.
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(
-            &InfoBarResponder::Respond, base::Unretained(this), delegate));
-  }
-
- private:
-  void Respond(ConfirmInfoBarDelegate* delegate) {
-    if (accept_) {
-      delegate->Accept();
-    } else {
-      delegate->Cancel();
-    }
-  }
-
-  InfoBarService* infobar_service_;
-  bool accept_;
-  bool has_observed_;
-};
-
 // Class to instantiate on the stack that is meant to be used with
 // FakeGCMProfileService. The ::Run() method follows the signature of
 // FakeGCMProfileService::UnregisterCallback.
@@ -226,6 +180,11 @@ class PushMessagingBrowserTest : public InProcessBrowserTest {
 
   virtual Browser* GetBrowser() const { return browser(); }
 
+  InfoBarService* GetInfoBarService() {
+    return InfoBarService::FromWebContents(
+        GetBrowser()->tab_strip_model()->GetActiveWebContents());
+  }
+
  private:
   scoped_ptr<net::SpawnedTestServer> https_server_;
   gcm::FakeGCMProfileService* gcm_service_;
@@ -259,7 +218,7 @@ void PushMessagingBrowserTest::TryToSubscribeSuccessfully(
   EXPECT_TRUE(RunScript("registerServiceWorker()", &script_result));
   EXPECT_EQ("ok - service worker registered", script_result);
 
-  InfoBarResponder accepting_responder(GetBrowser(), true);
+  InfoBarResponder accepting_responder(GetInfoBarService(), true);
   EXPECT_TRUE(RunScript("requestNotificationPermission()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
@@ -302,7 +261,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
-  InfoBarResponder accepting_responder(GetBrowser(), true);
+  InfoBarResponder accepting_responder(GetInfoBarService(), true);
   ASSERT_TRUE(RunScript("subscribePush()", &script_result));
   EXPECT_EQ(std::string(kPushMessagingEndpoint) + " - 1-0", script_result);
 
@@ -318,7 +277,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
-  InfoBarResponder cancelling_responder(GetBrowser(), false);
+  InfoBarResponder cancelling_responder(GetInfoBarService(), false);
   ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
   ASSERT_EQ("permission status - denied", script_result);
 
@@ -333,7 +292,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribeFailureNoManifest) {
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
-  InfoBarResponder accepting_responder(GetBrowser(), true);
+  InfoBarResponder accepting_responder(GetInfoBarService(), true);
   ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
   ASSERT_EQ("permission status - granted", script_result);
 
@@ -602,45 +561,45 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
             notification_manager()->GetNotificationAt(0).tag());
 
   // Verify that the renderer process hasn't crashed.
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 }
 #endif
 
-IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, HasPermissionSaysDefault) {
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysDefault) {
   std::string script_result;
 
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   ASSERT_EQ("permission status - default", script_result);
 }
 
-IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, HasPermissionSaysGranted) {
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysGranted) {
   std::string script_result;
 
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
-  InfoBarResponder accepting_responder(GetBrowser(), true);
+  InfoBarResponder accepting_responder(GetInfoBarService(), true);
   ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   ASSERT_TRUE(RunScript("subscribePush()", &script_result));
   EXPECT_EQ(std::string(kPushMessagingEndpoint) + " - 1-0", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 }
 
-IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, HasPermissionSaysDenied) {
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysDenied) {
   std::string script_result;
 
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
-  InfoBarResponder cancelling_responder(GetBrowser(), false);
+  InfoBarResponder cancelling_responder(GetInfoBarService(), false);
   ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
   EXPECT_EQ("permission status - denied", script_result);
 
@@ -648,7 +607,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, HasPermissionSaysDenied) {
   EXPECT_EQ("AbortError - Registration failed - permission denied",
             script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - denied", script_result);
 }
 
@@ -703,7 +662,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -716,7 +675,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - default", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -732,7 +691,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -750,7 +709,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - default", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -766,7 +725,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -784,7 +743,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - denied", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -800,7 +759,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -813,7 +772,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - default", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -829,7 +788,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -847,7 +806,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - default", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -863,7 +822,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -881,7 +840,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - denied", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -897,7 +856,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -921,7 +880,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   message_loop_runner->Run();
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -941,7 +900,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("true - subscribed", script_result);
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   scoped_refptr<content::MessageLoopRunner> message_loop_runner =
@@ -982,7 +941,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   // The Push service should not unsubcribe |origin| because at no point it was
   // left without permission to use Push.
 
-  ASSERT_TRUE(RunScript("hasPermission()", &script_result));
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
@@ -1018,7 +977,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   // This shouldn't (asynchronously) cause a DCHECK.
   // TODO(johnme): Get this test running on Android, which has a different
-  // codepath due to sender_id being required for unsubscribeing there.
+  // codepath due to sender_id being required for unsubscribing there.
   GetBrowser()->profile()->GetHostContentSettingsMap()->
       ClearSettingsForOneType(CONTENT_SETTINGS_TYPE_PUSH_MESSAGING);
 

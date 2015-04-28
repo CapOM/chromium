@@ -414,7 +414,7 @@ void NavigatorImpl::DidNavigate(
   // origin because it creates a RenderFrameProxy that needs this to initialize
   // its security context. This origin will also be sent to RenderFrameProxies
   // created via ViewMsg_New and FrameMsg_NewFrameProxy.
-  render_frame_host->frame_tree_node()->set_current_origin(params.origin);
+  render_frame_host->frame_tree_node()->SetCurrentOrigin(params.origin);
 
   // When using --site-per-process, we notify the RFHM for all navigations,
   // not just main frame navigations.
@@ -518,7 +518,6 @@ void NavigatorImpl::RequestOpenURL(RenderFrameHostImpl* render_frame_host,
                                    const GURL& url,
                                    SiteInstance* source_site_instance,
                                    const Referrer& referrer,
-                                   ui::PageTransition page_transition,
                                    WindowOpenDisposition disposition,
                                    bool should_replace_current_entry,
                                    bool user_gesture) {
@@ -540,9 +539,9 @@ void NavigatorImpl::RequestOpenURL(RenderFrameHostImpl* render_frame_host,
   // redirects.  http://crbug.com/311721.
   std::vector<GURL> redirect_chain;
   RequestTransferURL(render_frame_host, url, source_site_instance,
-                     redirect_chain, referrer, page_transition, disposition,
-                     GlobalRequestID(), should_replace_current_entry,
-                     user_gesture);
+                     redirect_chain, referrer, ui::PAGE_TRANSITION_LINK,
+                     disposition, GlobalRequestID(),
+                     should_replace_current_entry, user_gesture);
 }
 
 void NavigatorImpl::RequestTransferURL(

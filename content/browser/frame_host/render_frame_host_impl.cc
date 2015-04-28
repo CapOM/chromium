@@ -149,6 +149,7 @@ RenderFrameHostImpl::RenderFrameHostImpl(SiteInstance* site_instance,
       render_frame_proxy_host_(NULL),
       frame_tree_(frame_tree),
       frame_tree_node_(frame_tree_node),
+      render_widget_host_(nullptr),
       routing_id_(routing_id),
       render_frame_created_(false),
       navigations_suspended_(false),
@@ -180,8 +181,8 @@ RenderFrameHostImpl::RenderFrameHostImpl(SiteInstance* site_instance,
       &RenderFrameHostImpl::OnSwappedOut, weak_ptr_factory_.GetWeakPtr())));
 
   if (flags & CREATE_RF_NEEDS_RENDER_WIDGET_HOST) {
-    render_widget_host_.reset(new RenderWidgetHostImpl(
-        rwh_delegate, GetProcess(), MSG_ROUTING_NONE, hidden));
+    render_widget_host_ = new RenderWidgetHostImpl(rwh_delegate, GetProcess(),
+                                                   MSG_ROUTING_NONE, hidden);
     render_widget_host_->set_owned_by_render_frame_host(true);
   }
 }
@@ -213,8 +214,10 @@ RenderFrameHostImpl::~RenderFrameHostImpl() {
     iter.second.Run(false);
   }
 
-  if (render_widget_host_)
-    render_widget_host_->Cleanup();
+  if (render_widget_host_) {
+    // Shutdown causes the RenderWidgetHost to delete itself.
+    render_widget_host_->Shutdown();
+  }
 }
 
 int RenderFrameHostImpl::GetRoutingID() {
@@ -596,7 +599,7 @@ bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
   // lifetime of the current RenderProcessHost for this RenderFrameHost.
   if (render_widget_host_) {
     RenderWidgetHostView* rwhv =
-        new RenderWidgetHostViewChildFrame(render_widget_host_.get());
+        new RenderWidgetHostViewChildFrame(render_widget_host_);
     rwhv->Hide();
   }
 
@@ -871,7 +874,7 @@ void RenderFrameHostImpl::OnDidDropNavigation() {
 
 RenderWidgetHostImpl* RenderFrameHostImpl::GetRenderWidgetHost() {
   if (render_widget_host_)
-    return render_widget_host_.get();
+    return render_widget_host_;
 
   // TODO(kenrb): When RenderViewHost no longer inherits RenderWidgetHost,
   // we can remove this fallback. Currently it is only used for the main
@@ -1601,27 +1604,8 @@ void RenderFrameHostImpl::Navigate(
     const StartNavigationParams& start_params,
     const RequestNavigationParams& request_params) {
   TRACE_EVENT0("navigation", "RenderFrameHostImpl::Navigate");
-  // Browser plugin guests are not allowed to navigate outside web-safe schemes,
-  // so do not grant them the ability to request additional URLs.
-  if (!GetProcess()->IsIsolatedGuest()) {
-    ChildProcessSecurityPolicyImpl::GetInstance()->GrantRequestURL(
-        GetProcess()->GetID(), common_params.url);
-    if (common_params.url.SchemeIs(url::kDataScheme) &&
-        common_params.base_url_for_data_url.SchemeIs(url::kFileScheme)) {
-      // If 'data:' is used, and we have a 'file:' base url, grant access to
-      // local files.
-      ChildProcessSecurityPolicyImpl::GetInstance()->GrantRequestURL(
-          GetProcess()->GetID(), common_params.base_url_for_data_url);
-    }
-  }
 
-  // We may be returning to an existing NavigationEntry that had been granted
-  // file access.  If this is a different process, we will need to grant the
-  // access again.  The files listed in the page state are validated when they
-  // are received from the renderer to prevent abuse.
-  if (request_params.page_state.IsValid()) {
-    render_view_host_->GrantFileAccessFromPageState(request_params.page_state);
-  }
+  UpdatePermissionsForNavigation(common_params, request_params);
 
   // Only send the message if we aren't suspended at the start of a cross-site
   // request.
@@ -1672,14 +1656,8 @@ void RenderFrameHostImpl::OpenURL(const FrameHostMsg_OpenURL_Params& params,
 
   TRACE_EVENT1("navigation", "RenderFrameHostImpl::OpenURL", "url",
                validated_url.possibly_invalid_spec());
-  ui::PageTransition transition = ui::PAGE_TRANSITION_LINK;
-  if (frame_tree_node_->parent()) {
-    transition = params.should_replace_current_entry
-                     ? ui::PAGE_TRANSITION_AUTO_SUBFRAME
-                     : ui::PAGE_TRANSITION_MANUAL_SUBFRAME;
-  }
   frame_tree_node_->navigator()->RequestOpenURL(
-      this, validated_url, source_site_instance, params.referrer, transition,
+      this, validated_url, source_site_instance, params.referrer,
       params.disposition, params.should_replace_current_entry,
       params.user_gesture);
 }
@@ -1783,8 +1761,7 @@ void RenderFrameHostImpl::CommitNavigation(
     const RequestNavigationParams& request_params) {
   DCHECK((response && body.get()) ||
           !NavigationRequest::ShouldMakeNetworkRequest(common_params.url));
-  // TODO(clamy): Check if we have to add security checks for the browser plugin
-  // guests.
+  UpdatePermissionsForNavigation(common_params, request_params);
 
   // Get back to a clean state, in case we start a new navigation without
   // completing a RFH swap or unload handler.
@@ -2070,6 +2047,32 @@ void RenderFrameHostImpl::DidUseGeolocationPermission() {
       GetLastCommittedURL().GetOrigin(),
       frame_tree_node()->frame_tree()->GetMainFrame()
           ->GetLastCommittedURL().GetOrigin());
+}
+
+void RenderFrameHostImpl::UpdatePermissionsForNavigation(
+    const CommonNavigationParams& common_params,
+    const RequestNavigationParams& request_params) {
+  // Browser plugin guests are not allowed to navigate outside web-safe schemes,
+  // so do not grant them the ability to request additional URLs.
+  if (!GetProcess()->IsIsolatedGuest()) {
+    ChildProcessSecurityPolicyImpl::GetInstance()->GrantRequestURL(
+        GetProcess()->GetID(), common_params.url);
+    if (common_params.url.SchemeIs(url::kDataScheme) &&
+        common_params.base_url_for_data_url.SchemeIs(url::kFileScheme)) {
+      // If 'data:' is used, and we have a 'file:' base url, grant access to
+      // local files.
+      ChildProcessSecurityPolicyImpl::GetInstance()->GrantRequestURL(
+          GetProcess()->GetID(), common_params.base_url_for_data_url);
+    }
+  }
+
+  // We may be returning to an existing NavigationEntry that had been granted
+  // file access.  If this is a different process, we will need to grant the
+  // access again.  The files listed in the page state are validated when they
+  // are received from the renderer to prevent abuse.
+  if (request_params.page_state.IsValid()) {
+    render_view_host_->GrantFileAccessFromPageState(request_params.page_state);
+  }
 }
 
 }  // namespace content

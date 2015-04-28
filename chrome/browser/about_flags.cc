@@ -180,6 +180,16 @@ const Experiment::Choice kOverscrollHistoryNavigationChoices[] = {
 };
 #endif
 
+const Experiment::Choice kTouchTextSelectionStrategyChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_TOUCH_SELECTION_STRATEGY_CHARACTER,
+    switches::kTouchTextSelectionStrategy,
+    "character" },
+  { IDS_TOUCH_SELECTION_STRATEGY_DIRECTION,
+    switches::kTouchTextSelectionStrategy,
+    "direction" }
+};
+
 #if !defined(DISABLE_NACL)
 const Experiment::Choice kNaClDebugMaskChoices[] = {
   // Secure shell can be used on ChromeOS for forwarding the TCP port opened by
@@ -1217,6 +1227,13 @@ const Experiment kExperiments[] = {
     kOsCrOS | kOsWin | kOsLinux,
     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableTouchEditing,
                               switches::kDisableTouchEditing)
+  },
+  {
+      "touch-selection-strategy",
+      IDS_FLAGS_TOUCH_SELECTION_STRATEGY_NAME,
+      IDS_FLAGS_TOUCH_SELECTION_STRATEGY_DESCRIPTION,
+      kOsAndroid,   // TODO(mfomitchev): Add CrOS/Win/Linux support soon.
+      MULTI_VALUE_TYPE(kTouchTextSelectionStrategyChoices)
   },
   {
     "enable-stale-while-revalidate",
@@ -2379,6 +2396,15 @@ const Experiment kExperiments[] = {
     kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
     MULTI_VALUE_TYPE(kSupervisedUserSafeSitesChoices)
   },
+#if defined(OS_ANDROID)
+  {
+    "enable-autofill-keyboard-accessory-view",
+    IDS_FLAGS_AUTOFILL_ACCESSORY_VIEW_NAME,
+    IDS_FLAGS_AUTOFILL_ACCESSORY_VIEW_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(autofill::switches::kEnableAccessorySuggestionView)
+  },
+#endif  // defined(OS_ANDROID)
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in
   // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.

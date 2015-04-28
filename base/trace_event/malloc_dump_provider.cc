@@ -11,12 +11,6 @@
 namespace base {
 namespace trace_event {
 
-namespace {
-
-const char kDumperFriendlyName[] = "Malloc";
-
-}  // namespace
-
 // static
 MallocDumpProvider* MallocDumpProvider::GetInstance() {
   return Singleton<MallocDumpProvider,
@@ -31,12 +25,11 @@ MallocDumpProvider::~MallocDumpProvider() {
 
 // Called at trace dump point time. Creates a snapshot the memory counters for
 // the current process.
-bool MallocDumpProvider::DumpInto(ProcessMemoryDump* pmd) {
+bool MallocDumpProvider::OnMemoryDump(ProcessMemoryDump* pmd) {
   struct mallinfo info = mallinfo();
   DCHECK_GE(info.arena + info.hblkhd, info.uordblks);
 
-  MemoryAllocatorDump* dump =
-      pmd->CreateAllocatorDump("malloc", MemoryAllocatorDump::kRootHeap);
+  MemoryAllocatorDump* dump = pmd->CreateAllocatorDump("malloc");
   if (!dump)
     return false;
 
@@ -45,19 +38,14 @@ bool MallocDumpProvider::DumpInto(ProcessMemoryDump* pmd) {
   // |arena| is 0 and the outer pages size is reported by |hblkhd|. In case of
   // dlmalloc the total is given by |arena| + |hblkhd|.
   // For more details see link: http://goo.gl/fMR8lF.
-  dump->set_physical_size_in_bytes(info.arena + info.hblkhd);
-
-  // mallinfo doesn't support any allocated object count.
-  dump->set_allocated_objects_count(0);
+  dump->AddScalar(MemoryAllocatorDump::kNameOuterSize,
+                  MemoryAllocatorDump::kUnitsBytes, info.arena + info.hblkhd);
 
   // Total allocated space is given by |uordblks|.
-  dump->set_allocated_objects_size_in_bytes(info.uordblks);
+  dump->AddScalar(MemoryAllocatorDump::kNameInnerSize,
+                  MemoryAllocatorDump::kUnitsBytes, info.uordblks);
 
   return true;
-}
-
-const char* MallocDumpProvider::GetFriendlyName() const {
-  return kDumperFriendlyName;
 }
 
 }  // namespace trace_event

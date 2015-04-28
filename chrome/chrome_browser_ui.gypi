@@ -17,6 +17,8 @@
       'browser/ui/android/autofill/autofill_dialog_controller_android.h',
       'browser/ui/android/autofill/autofill_dialog_result.cc',
       'browser/ui/android/autofill/autofill_dialog_result.h',
+      'browser/ui/android/autofill/autofill_keyboard_accessory_view.cc',
+      'browser/ui/android/autofill/autofill_keyboard_accessory_view.h',
       'browser/ui/android/autofill/autofill_logger_android.cc',
       'browser/ui/android/autofill/autofill_logger_android.h',
       'browser/ui/android/autofill/autofill_popup_view_android.cc',
@@ -1447,6 +1449,14 @@
     'chrome_browser_ui_media_router_sources': [
       'browser/ui/toolbar/media_router_action.h',
       'browser/ui/toolbar/media_router_action.cc',
+      'browser/ui/webui/media_router/media_cast_mode.cc',
+      'browser/ui/webui/media_router/media_cast_mode.h',
+      'browser/ui/webui/media_router/media_sink_with_cast_modes.cc',
+      'browser/ui/webui/media_router/media_sink_with_cast_modes.h',
+      'browser/ui/webui/media_router/media_router_localized_strings_provider.cc',
+      'browser/ui/webui/media_router/media_router_localized_strings_provider.h',
+      'browser/ui/webui/media_router/media_router_resources_provider.cc',
+      'browser/ui/webui/media_router/media_router_resources_provider.h',
     ],
     'chrome_browser_ui_non_mac_sources': [
       'browser/ui/web_contents_sizer.cc',
@@ -3131,6 +3141,9 @@
           'sources': [ '<@(chrome_browser_ui_google_now_non_android_sources)' ],
         }],
         ['enable_media_router==1', {
+	  'dependencies': [
+	      'browser/media/router/media_router.gyp:media_router',
+	  ],
           'sources': [ '<@(chrome_browser_ui_media_router_sources)' ],
         }],
         ['enable_supervised_users==0', {

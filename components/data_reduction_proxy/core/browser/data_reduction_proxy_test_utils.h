@@ -167,7 +167,8 @@ class TestDataReductionProxyIOData : public DataReductionProxyIOData {
       scoped_ptr<DataReductionProxyEventCreator> event_creator,
       scoped_ptr<DataReductionProxyRequestOptions> request_options,
       scoped_ptr<DataReductionProxyConfigurator> configurator,
-      scoped_ptr<DataReductionProxyConfigServiceClient> config_client);
+      scoped_ptr<DataReductionProxyConfigServiceClient> config_client,
+      bool enabled);
   ~TestDataReductionProxyIOData() override;
 
   DataReductionProxyConfigurator* configurator() const {
@@ -386,7 +387,6 @@ class DataReductionProxyTestContext {
   };
 
   DataReductionProxyTestContext(
-      scoped_ptr<base::MessageLoop> loop,
       scoped_refptr<base::SingleThreadTaskRunner> task_runner,
       scoped_ptr<TestingPrefServiceSimple> simple_pref_service,
       scoped_ptr<net::TestNetLog> net_log,
@@ -404,8 +404,6 @@ class DataReductionProxyTestContext {
       CreateDataReductionProxyServiceInternal();
 
   unsigned int test_context_flags_;
-
-  scoped_ptr<base::MessageLoop> loop_;
 
   scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
   scoped_ptr<TestingPrefServiceSimple> simple_pref_service_;

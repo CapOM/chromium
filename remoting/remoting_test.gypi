@@ -208,6 +208,8 @@
         'host/resizing_host_observer_unittest.cc',
         'host/screen_resolution_unittest.cc',
         'host/server_log_entry_host_unittest.cc',
+        'host/setup/mock_oauth_client.cc',
+        'host/setup/mock_oauth_client.h',
         'host/setup/me2me_native_messaging_host.cc',
         'host/setup/me2me_native_messaging_host.h',
         'host/setup/me2me_native_messaging_host_unittest.cc',
@@ -334,6 +336,7 @@
           'destination': '<(PRODUCT_DIR)/remoting/browser_test_resources',
             'files': [
               '<@(remoting_webapp_browsertest_all_js_files)',
+              '../third_party/sinonjs/src/sinon.js',
             ],
         },
       ], # end of copies
@@ -344,7 +347,7 @@
       'variables': {
         'output_dir': '<(PRODUCT_DIR)/remoting/unittests',
         'webapp_js_files': [
-          '<@(remoting_webapp_shared_main_html_js_files)',
+          '<@(remoting_webapp_unittest_html_all_js_files)',
           '<@(remoting_webapp_wcs_sandbox_html_js_files)',
           '<@(remoting_webapp_background_html_js_files)',
         ]

@@ -134,7 +134,6 @@
 #include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebDateTimeChooserCompletion.h"
 #include "third_party/WebKit/public/web/WebDateTimeChooserParams.h"
-#include "third_party/WebKit/public/web/WebDevToolsAgent.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebElement.h"
 #include "third_party/WebKit/public/web/WebFileChooserParams.h"
@@ -400,12 +399,6 @@ static void ConvertToFaviconSizes(
   sizes->reserve(web_sizes.size());
   for (size_t i = 0; i < web_sizes.size(); ++i)
     sizes->push_back(gfx::Size(web_sizes[i]));
-}
-
-static blink::WebDevToolsAgent* GetWebDevToolsAgent(WebView* webview) {
-  if (!webview || !webview->mainFrame()->isWebLocalFrame())
-    return nullptr;
-  return webview->mainFrame()->toWebLocalFrame()->devToolsAgent();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -762,6 +755,25 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
   if (switches::IsTouchEditingEnabled())
     webview()->settings()->setTouchEditingEnabled(true);
 
+#if defined(OS_ANDROID)
+  WebSettings::SelectionStrategyType selection_strategy_default =
+      WebSettings::SelectionStrategyType::Direction;
+#else
+  WebSettings::SelectionStrategyType selection_strategy_default =
+      WebSettings::SelectionStrategyType::Character;
+#endif
+
+  WebSettings::SelectionStrategyType selection_strategy =
+      selection_strategy_default;
+  const std::string selection_strategy_str =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kTouchTextSelectionStrategy);
+  if (selection_strategy_str == "character")
+    selection_strategy = WebSettings::SelectionStrategyType::Character;
+  else if (selection_strategy_str == "direction")
+    selection_strategy = WebSettings::SelectionStrategyType::Direction;
+  webview()->settings()->setSelectionStrategy(selection_strategy);
+
   if (!params.frame_name.empty())
     webview()->mainFrame()->setName(params.frame_name);
 
@@ -783,12 +795,6 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
 #if defined(OS_MACOSX)
   new TextInputClientObserver(this);
 #endif  // defined(OS_MACOSX)
-
-  // TODO(dgozman): do this not for main frame, but for local frame roots.
-  if (blink::WebDevToolsAgent* devToolsAgent = GetWebDevToolsAgent(webview())) {
-    if (RenderWidgetCompositor* rwc = compositor())
-      devToolsAgent->setLayerTreeId(rwc->GetLayerTreeId());
-  }
 
   // The next group of objects all implement RenderViewObserver, so are deleted
   // along with the RenderView automatically.
@@ -2029,9 +2035,6 @@ void RenderViewImpl::initializeLayerTreeView() {
   RenderWidgetCompositor* rwc = compositor();
   if (!rwc)
     return;
-  // TODO(dgozman): do this not for main frame, but for local frame roots.
-  if (blink::WebDevToolsAgent* devToolsAgent = GetWebDevToolsAgent(webview()))
-    devToolsAgent->setLayerTreeId(rwc->GetLayerTreeId());
 
   bool use_threaded_event_handling = true;
 #if defined(OS_MACOSX) && !defined(OS_IOS)

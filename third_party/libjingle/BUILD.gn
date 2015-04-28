@@ -491,6 +491,7 @@ if (enable_webrtc) {
     public_configs = [ ":jingle_public_configs" ]
 
     deps = [
+      ":libjingle",
       "//third_party/libsrtp",
       "//third_party/webrtc/modules/media_file",
       "//third_party/webrtc/modules/video_capture",
@@ -530,6 +531,8 @@ if (enable_webrtc) {
     configs += [ "//build/config/compiler:no_chromium_code" ]
 
     deps = [
+      # TODO(GYP): crbug.com/481633. Consider depending on :libjingle_webrtc
+      # instead.
       ":libjingle_webrtc_common",
       "//third_party/webrtc",
       "//third_party/webrtc/system_wrappers",

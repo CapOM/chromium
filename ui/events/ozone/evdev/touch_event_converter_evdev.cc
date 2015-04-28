@@ -23,6 +23,7 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/trace_event/trace_event.h"
 #include "ui/events/devices/device_data_manager.h"
 #include "ui/events/devices/device_util_linux.h"
 #include "ui/events/event.h"
@@ -86,8 +87,15 @@ TouchEventConverterEvdev::TouchEventConverterEvdev(
     base::FilePath path,
     int id,
     InputDeviceType type,
+    const EventDeviceInfo& devinfo,
     DeviceEventDispatcherEvdev* dispatcher)
-    : EventConverterEvdev(fd, path, id, type),
+    : EventConverterEvdev(fd,
+                          path,
+                          id,
+                          type,
+                          devinfo.name(),
+                          devinfo.vendor_id(),
+                          devinfo.product_id()),
       dispatcher_(dispatcher),
       syn_dropped_(false),
       has_mt_(false),
@@ -207,6 +215,10 @@ void TouchEventConverterEvdev::OnStopped() {
 }
 
 void TouchEventConverterEvdev::OnFileCanReadWithoutBlocking(int fd) {
+  TRACE_EVENT1("evdev",
+               "TouchEventConverterEvdev::OnFileCanReadWithoutBlocking", "fd",
+               fd);
+
   input_event inputs[kNumTouchEvdevSlots * 6 + 1];
   ssize_t read_size = read(fd, inputs, sizeof(inputs));
   if (read_size < 0) {
@@ -361,7 +373,7 @@ void TouchEventConverterEvdev::ReportEvent(const InProgressTouchEvdev& event,
                                            EventType event_type,
                                            const base::TimeDelta& timestamp) {
   dispatcher_->DispatchTouchEvent(TouchEventParams(
-      id_, event.slot, event_type, gfx::PointF(event.x, event.y),
+      input_device_.id, event.slot, event_type, gfx::PointF(event.x, event.y),
       gfx::Vector2dF(event.radius_x, event.radius_y), event.pressure,
       timestamp));
 }

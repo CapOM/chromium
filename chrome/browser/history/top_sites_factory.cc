@@ -4,16 +4,18 @@
 
 #include "chrome/browser/history/top_sites_factory.h"
 
+#include "base/bind.h"
 #include "base/macros.h"
 #include "base/memory/singleton.h"
 #include "chrome/browser/history/history_service_factory.h"
-#include "chrome/browser/history/top_sites_impl.h"
+#include "chrome/browser/history/history_utils.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/locale_settings.h"
+#include "components/history/core/browser/top_sites_impl.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "grit/theme_resources.h"
@@ -95,7 +97,8 @@ scoped_refptr<history::TopSites> TopSitesFactory::BuildTopSites(
   scoped_refptr<history::TopSitesImpl> top_sites(new history::TopSitesImpl(
       profile->GetPrefs(), HistoryServiceFactory::GetForProfile(
                                profile, ServiceAccessType::EXPLICIT_ACCESS),
-      prefs::kNtpMostVisitedURLsBlacklist, prepopulated_page_list));
+      prefs::kNtpMostVisitedURLsBlacklist, prepopulated_page_list,
+      base::Bind(CanAddURLToHistory)));
   top_sites->Init(context->GetPath().Append(chrome::kTopSitesFilename),
                   content::BrowserThread::GetMessageLoopProxyForThread(
                       content::BrowserThread::DB));

@@ -34,6 +34,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/sys_info.h"
 #include "base/threading/platform_thread.h"
+#include "base/time/default_tick_clock.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "base/values.h"
@@ -133,6 +134,7 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/main_function_params.h"
 #include "grit/platform_locale_settings.h"
+#include "media/audio/audio_manager.h"
 #include "net/base/net_module.h"
 #include "net/cookies/cookie_monster.h"
 #include "net/http/http_network_layer.h"
@@ -144,8 +146,10 @@
 #include "ui/strings/grit/app_locale_settings.h"
 
 #if defined(OS_ANDROID)
+#include "chrome/browser/android/dev_tools_discovery_provider_android.h"
 #include "chrome/browser/metrics/thread_watcher_android.h"
 #else
+#include "chrome/browser/devtools/chrome_devtools_discovery_provider.h"
 #include "chrome/browser/feedback/feedback_profile_observer.h"
 #endif  // defined(OS_ANDROID)
 
@@ -670,8 +674,18 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
   // Now that field trials have been created, initializes metrics recording.
   metrics->InitializeMetricsRecordingState();
 
+  const chrome::VersionInfo::Channel channel =
+      chrome::VersionInfo::GetChannel();
+
+  // TODO(dalecurtis): Remove these checks and enable for all channels once we
+  // track down the root causes of crbug.com/422522 and crbug.com/478932.
+  if (channel == chrome::VersionInfo::CHANNEL_UNKNOWN ||
+      chrome::VersionInfo::CHANNEL_CANARY || chrome::VersionInfo::CHANNEL_DEV) {
+    media::AudioManager::EnableHangMonitor();
+  }
+
   // Enable profiler instrumentation depending on the channel.
-  switch (chrome::VersionInfo::GetChannel()) {
+  switch (channel) {
     case chrome::VersionInfo::CHANNEL_UNKNOWN:
     case chrome::VersionInfo::CHANNEL_CANARY:
       tracked_objects::ScopedTracker::Enable();
@@ -993,8 +1007,8 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
 #endif  // defined(OS_LINUX) || defined(OS_OPENBSD) || defined(OS_MACOSX)
 
   // Initialize tracking synchronizer system.
-  tracking_synchronizer_ =
-      new metrics::TrackingSynchronizer(base::TimeTicks::Now());
+  tracking_synchronizer_ = new metrics::TrackingSynchronizer(
+      make_scoped_ptr(new base::DefaultTickClock()));
 
 #if defined(OS_MACOSX)
   // Get the Keychain API to register for distributed notifications on the main
@@ -1092,6 +1106,13 @@ void ChromeBrowserMainParts::PreProfileInit() {
 
 void ChromeBrowserMainParts::PostProfileInit() {
   TRACE_EVENT0("startup", "ChromeBrowserMainParts::PostProfileInit");
+
+#if defined(OS_ANDROID)
+  DevToolsDiscoveryProviderAndroid::Install();
+#else
+  ChromeDevToolsDiscoveryProvider::Install();
+#endif  // defined(OS_ANDROID)
+
   LaunchDevToolsHandlerIfNeeded(parsed_command_line());
   for (size_t i = 0; i < chrome_extra_parts_.size(); ++i)
     chrome_extra_parts_[i]->PostProfileInit();

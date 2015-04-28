@@ -280,9 +280,10 @@ public class SigninManager {
      */
     public void startSignIn(Activity activity, final Account account, boolean passive,
             final SignInFlowObserver observer) {
-        assert mSignInActivity == null;
-        assert mSignInAccount == null;
-        assert mSignInFlowObserver == null;
+        if (mSignInAccount != null) {
+            Log.w(TAG, "Ignoring sign-in request as another sign-in request is pending.");
+            return;
+        }
 
         if (mFirstRunCheckIsPending) {
             Log.w(TAG, "Ignoring sign-in request until the First Run check completes.");
@@ -395,6 +396,11 @@ public class SigninManager {
     }
 
     private void finishSignIn(AccountIdsAndNames accountIdsAndNames) {
+        if (mSignInAccount == null) {
+            Log.w(TAG, "Sign in request was canceled; aborting finishSignIn().");
+            return;
+        }
+
         // Cache the signed-in account name.
         ChromeSigninController.get(mContext).setSignedInAccountName(mSignInAccount.name);
 
