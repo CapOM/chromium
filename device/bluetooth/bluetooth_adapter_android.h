@@ -16,7 +16,7 @@ namespace device {
 
 // The BluetoothAdapterAndroid class implements BluetoothAdapter for the
 // Android platform.
-class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid
+class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
     : public BluetoothAdapter {
  public:
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
@@ -52,6 +52,10 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid
       const BluetoothAudioSink::Options& options,
       const BluetoothAdapter::AcquiredCallback& callback,
       const BluetoothAudioSink::ErrorCallback& error_callback) override;
+  void RegisterAdvertisement(
+      scoped_ptr<BluetoothAdvertisement::Data> advertisement_data,
+      const CreateAdvertisementCallback& callback,
+      const CreateAdvertisementErrorCallback& error_callback) override;
 
  protected:
   BluetoothAdapterAndroid();

@@ -7,6 +7,7 @@
 #include "base/sequenced_task_runner.h"
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
+#include "device/bluetooth/bluetooth_advertisement.h"
 
 namespace device {
 
@@ -97,6 +98,13 @@ void BluetoothAdapterAndroid::RegisterAudioSink(
     const AcquiredCallback& callback,
     const BluetoothAudioSink::ErrorCallback& error_callback) {
   error_callback.Run(BluetoothAudioSink::ERROR_UNSUPPORTED_PLATFORM);
+}
+
+void BluetoothAdapterAndroid::RegisterAdvertisement(
+    scoped_ptr<BluetoothAdvertisement::Data> advertisement_data,
+    const CreateAdvertisementCallback& callback,
+    const CreateAdvertisementErrorCallback& error_callback) {
+  error_callback.Run(BluetoothAdvertisement::ERROR_UNSUPPORTED_PLATFORM);
 }
 
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
