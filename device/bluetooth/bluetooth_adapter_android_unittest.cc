@@ -19,7 +19,6 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
   EXPECT_TRUE(adapter_.get());
-  EXPECT_FALSE(adapter_.get());
 }
 
 }  // namespace device
