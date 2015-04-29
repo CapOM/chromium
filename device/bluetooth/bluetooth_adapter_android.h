@@ -50,7 +50,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
       const CreateServiceErrorCallback& error_callback) override;
   void RegisterAudioSink(
       const BluetoothAudioSink::Options& options,
-      const BluetoothAdapter::AcquiredCallback& callback,
+      const AcquiredCallback& callback,
       const BluetoothAudioSink::ErrorCallback& error_callback) override;
   void RegisterAdvertisement(
       scoped_ptr<BluetoothAdvertisement::Data> advertisement_data,
