@@ -23,8 +23,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Create a BluetoothAdapterAndroid instance.
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
 
-  // Register methods to bind to Java with JNI.
-  static bool RegisterJNIEnv(JNIEnv* env);
+  // Register associated java class bindings using JNI.
+  static bool RegisterJNI(JNIEnv* env);
 
   // BluetoothAdapter:
   std::string GetAddress() const override;

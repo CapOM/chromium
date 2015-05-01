@@ -129,8 +129,9 @@
           'dependencies': [
             'device_bluetooth_jni_headers',
           ],
-          'sources!': [
-            'bluetooth_manager_impl_default.cc',
+          'sources': [
+            'android/bluetooth_jni_registrar.cc',
+            'android/bluetooth_jni_registrar.h',
           ],
         }],
         ['OS=="win"', {

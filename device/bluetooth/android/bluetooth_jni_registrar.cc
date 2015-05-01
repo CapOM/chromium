@@ -6,14 +6,14 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_registrar.h"
-#include "device/bluetooth/bluetooth_manager_impl_android.h"
+#include "device/bluetooth/bluetooth_adapter_android.h"
 
 namespace device {
 namespace android {
 namespace {
 
 const base::android::RegistrationMethod kRegisteredMethods[] = {
-    {"BluetoothAdapter", device::BluetoothAdapterAndroid::Register},
+    {"BluetoothAdapter", device::BluetoothAdapterAndroid::RegisterJNI},
 };
 
 }  // namespace

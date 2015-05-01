@@ -9,7 +9,7 @@
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
 #include "device/bluetooth/bluetooth_advertisement.h"
-#include "jni/VibrationProvider_jni.h"
+#include "jni/BluetoothAdapter_jni.h"
 
 using base::android::AttachCurrentThread;
 
@@ -28,8 +28,8 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapterAndroid::CreateAdapter() {
 }
 
 // static
-bool BluetoothAdapterAndroid::RegisterJNIEnv(JNIEnv* env) {
-  return RegisterNativesImpl(env);
+bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
+  return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
 }
 
 std::string BluetoothAdapterAndroid::GetAddress() const {
