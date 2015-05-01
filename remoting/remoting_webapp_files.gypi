@@ -2,7 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Keep in sync with remoting/webapp/files.gni.
+# `7MM"""Mq.                       `7MM
+#   MM   `MM.                        MM
+#   MM   ,M9  .gP"Ya   ,6"Yb.   ,M""bMM  `7MMpMMMb.pMMMb.  .gP"Ya
+#   MMmmdM9  ,M'   Yb 8)   MM ,AP    MM    MM    MM    MM ,M'   Yb
+#   MM  YM.  8M""""""  ,pm9MM 8MI    MM    MM    MM    MM 8M""""""
+#   MM   `Mb.YM.    , 8M   MM `Mb    MM    MM    MM    MM YM.    ,
+# .JMML. .JMM.`Mbmmd' `Moo9^Yo.`Wbmd"MML..JMML  JMML  JMML.`Mbmmd'
+#
+# Please keep this file in sync with remoting/webapp/files.gni.
 
 {
   'variables': {
@@ -49,6 +57,10 @@
     'remoting_webapp_browsertest_all_js_files': [
       '<@(remoting_webapp_browsertest_js_files)',
       '<@(remoting_webapp_browsertest_js_mock_files)',
+    ],
+    'remoting_webapp_browsertest_main_html_extra_files': [
+      '<@(remoting_webapp_browsertest_all_js_files)',
+      '../third_party/sinonjs/src/sinon.js',
     ],
 
     #
@@ -298,9 +310,6 @@
       '<@(remoting_webapp_js_logging_files)',
       '<@(remoting_webapp_js_ui_files)',
       '<@(remoting_webapp_js_signaling_files)',
-      # Uncomment this line to include browser test files in the web app
-      # to expedite debugging or local development.
-      #'<@(remoting_webapp_browsertest_all_js_files)',
     ],
 
     # The JS files required by unittest.html.

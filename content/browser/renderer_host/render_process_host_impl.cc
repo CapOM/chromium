@@ -157,6 +157,8 @@
 #include "net/url_request/url_request_context_getter.h"
 #include "ppapi/shared_impl/ppapi_switches.h"
 #include "storage/browser/fileapi/sandbox_file_system_backend.h"
+#include "third_party/icu/source/common/unicode/unistr.h"
+#include "third_party/icu/source/i18n/unicode/timezone.h"
 #include "third_party/skia/include/core/SkBitmap.h"
 #include "ui/base/ui_base_switches.h"
 #include "ui/events/event_switches.h"
@@ -333,8 +335,7 @@ class RendererSandboxedProcessLauncherDelegate
   ~RendererSandboxedProcessLauncherDelegate() override {}
 
 #if defined(OS_WIN)
-  virtual void PreSpawnTarget(sandbox::TargetPolicy* policy,
-                              bool* success) {
+  void PreSpawnTarget(sandbox::TargetPolicy* policy, bool* success) override {
     AddBaseHandleClosePolicy(policy);
 
     if (base::win::GetVersion() == base::win::VERSION_WIN8 ||
@@ -968,8 +969,8 @@ void RenderProcessHostImpl::ResumeResponseDeferredAtStart(
   widget_helper_->ResumeResponseDeferredAtStart(request_id);
 }
 
-void RenderProcessHostImpl::NotifyTimezoneChange() {
-  Send(new ViewMsg_TimezoneChange());
+void RenderProcessHostImpl::NotifyTimezoneChange(const std::string& zone_id) {
+  Send(new ViewMsg_TimezoneChange(zone_id));
 }
 
 ServiceRegistry* RenderProcessHostImpl::GetServiceRegistry() {

@@ -607,7 +607,7 @@ bool ExtractSignonRealmComponents(const std::string& signon_realm,
   if (server)
     *server = realm_as_url.host();
   if (is_secure)
-    *is_secure = realm_as_url.SchemeIsSecure();
+    *is_secure = realm_as_url.SchemeIsCryptographic();
   if (port)
     *port = realm_as_url.has_port() ? atoi(realm_as_url.port().c_str()) : 0;
   if (security_domain) {
@@ -922,7 +922,7 @@ PasswordStoreMac::~PasswordStoreMac() {}
 
 bool PasswordStoreMac::Init(
     const syncer::SyncableService::StartSyncFlare& flare) {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   thread_.reset(new base::Thread("Chrome_PasswordStore_Thread"));
 
   if (!thread_->Start()) {
@@ -944,7 +944,7 @@ void PasswordStoreMac::InitOnBackgroundThread() {
 }
 
 void PasswordStoreMac::Shutdown() {
-  DCHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   password_manager::PasswordStore::Shutdown();
   thread_->Stop();
 }

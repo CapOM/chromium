@@ -105,6 +105,7 @@
 #include "chrome/common/net/net_resource_provider.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/profiling.h"
+#include "chrome/common/variations/variations_util.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/installer/util/google_update_settings.h"
 #include "components/component_updater/component_updater_service.h"
@@ -630,6 +631,13 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
     base::FieldTrial::EnableBenchmarking();
   }
 
+  if (command_line->HasSwitch(switches::kForceFieldTrialParams)) {
+    bool result = chrome_variations::AssociateParamsFromString(
+        command_line->GetSwitchValueASCII(switches::kForceFieldTrialParams));
+    CHECK(result) << "Invalid --" << switches::kForceFieldTrialParams
+                  << " list specified.";
+  }
+
   // Ensure any field trials specified on the command line are initialized.
   if (command_line->HasSwitch(switches::kForceFieldTrials)) {
     std::set<std::string> unforceable_field_trials;
@@ -680,7 +688,8 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
   // TODO(dalecurtis): Remove these checks and enable for all channels once we
   // track down the root causes of crbug.com/422522 and crbug.com/478932.
   if (channel == chrome::VersionInfo::CHANNEL_UNKNOWN ||
-      chrome::VersionInfo::CHANNEL_CANARY || chrome::VersionInfo::CHANNEL_DEV) {
+      channel == chrome::VersionInfo::CHANNEL_CANARY ||
+      channel == chrome::VersionInfo::CHANNEL_DEV) {
     media::AudioManager::EnableHangMonitor();
   }
 

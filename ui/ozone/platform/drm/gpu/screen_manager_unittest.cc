@@ -5,6 +5,7 @@
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/ozone/platform/drm/gpu/crtc_controller.h"
 #include "ui/ozone/platform/drm/gpu/drm_buffer.h"
+#include "ui/ozone/platform/drm/gpu/drm_device_generator.h"
 #include "ui/ozone/platform/drm/gpu/drm_device_manager.h"
 #include "ui/ozone/platform/drm/gpu/drm_window.h"
 #include "ui/ozone/platform/drm/gpu/hardware_display_controller.h"
@@ -41,6 +42,7 @@ class ScreenManagerTest : public testing::Test {
 
   void SetUp() override {
     drm_ = new ui::MockDrmDevice();
+    device_manager_.reset(new ui::DrmDeviceManager(nullptr));
     buffer_generator_.reset(new ui::DrmBufferGenerator());
     screen_manager_.reset(new ui::ScreenManager(buffer_generator_.get()));
   }
@@ -51,6 +53,7 @@ class ScreenManagerTest : public testing::Test {
 
  protected:
   scoped_refptr<ui::MockDrmDevice> drm_;
+  scoped_ptr<ui::DrmDeviceManager> device_manager_;
   scoped_ptr<ui::DrmBufferGenerator> buffer_generator_;
   scoped_ptr<ui::ScreenManager> screen_manager_;
 
@@ -208,12 +211,36 @@ TEST_F(ScreenManagerTest, MonitorGoneInMirrorMode) {
       kDefaultMode);
 
   screen_manager_->RemoveDisplayController(drm_, kSecondaryCrtc);
-  EXPECT_TRUE(screen_manager_->ConfigureDisplayController(
-      drm_, kPrimaryCrtc, kPrimaryConnector, GetPrimaryBounds().origin(),
-      kDefaultMode));
 
-  EXPECT_TRUE(screen_manager_->GetDisplayController(GetPrimaryBounds()));
+  ui::HardwareDisplayController* controller =
+      screen_manager_->GetDisplayController(GetPrimaryBounds());
+  EXPECT_TRUE(controller);
   EXPECT_FALSE(screen_manager_->GetDisplayController(GetSecondaryBounds()));
+
+  EXPECT_TRUE(controller->HasCrtc(drm_, kPrimaryCrtc));
+  EXPECT_FALSE(controller->HasCrtc(drm_, kSecondaryCrtc));
+}
+
+TEST_F(ScreenManagerTest, MonitorDisabledInMirrorMode) {
+  screen_manager_->AddDisplayController(drm_, kPrimaryCrtc, kPrimaryConnector);
+  screen_manager_->ConfigureDisplayController(
+      drm_, kPrimaryCrtc, kPrimaryConnector, GetPrimaryBounds().origin(),
+      kDefaultMode);
+  screen_manager_->AddDisplayController(drm_, kSecondaryCrtc,
+                                        kSecondaryConnector);
+  screen_manager_->ConfigureDisplayController(
+      drm_, kSecondaryCrtc, kSecondaryConnector, GetPrimaryBounds().origin(),
+      kDefaultMode);
+
+  screen_manager_->DisableDisplayController(drm_, kSecondaryCrtc);
+
+  ui::HardwareDisplayController* controller =
+      screen_manager_->GetDisplayController(GetPrimaryBounds());
+  EXPECT_TRUE(controller);
+  EXPECT_FALSE(screen_manager_->GetDisplayController(GetSecondaryBounds()));
+
+  EXPECT_TRUE(controller->HasCrtc(drm_, kPrimaryCrtc));
+  EXPECT_FALSE(controller->HasCrtc(drm_, kSecondaryCrtc));
 }
 
 TEST_F(ScreenManagerTest, DoNotEnterMirrorModeUnlessSameBounds) {
@@ -308,9 +335,8 @@ TEST_F(ScreenManagerTest,
 }
 
 TEST_F(ScreenManagerTest, CheckControllerToWindowMappingWithSameBounds) {
-  ui::DrmDeviceManager device_manager(drm_);
   scoped_ptr<ui::DrmWindow> window(
-      new ui::DrmWindow(1, &device_manager, screen_manager_.get()));
+      new ui::DrmWindow(1, device_manager_.get(), screen_manager_.get()));
   window->Initialize();
   window->OnBoundsChanged(GetPrimaryBounds());
   screen_manager_->AddWindow(1, window.Pass());
@@ -327,9 +353,8 @@ TEST_F(ScreenManagerTest, CheckControllerToWindowMappingWithSameBounds) {
 }
 
 TEST_F(ScreenManagerTest, CheckControllerToWindowMappingWithDifferentBounds) {
-  ui::DrmDeviceManager device_manager(drm_);
   scoped_ptr<ui::DrmWindow> window(
-      new ui::DrmWindow(1, &device_manager, screen_manager_.get()));
+      new ui::DrmWindow(1, device_manager_.get(), screen_manager_.get()));
   window->Initialize();
   gfx::Rect new_bounds = GetPrimaryBounds();
   new_bounds.Inset(0, 0, 1, 1);
@@ -349,11 +374,10 @@ TEST_F(ScreenManagerTest, CheckControllerToWindowMappingWithDifferentBounds) {
 
 TEST_F(ScreenManagerTest,
        CheckControllerToWindowMappingWithOverlappingWindows) {
-  ui::DrmDeviceManager device_manager(drm_);
   const size_t kWindowCount = 2;
   for (size_t i = 1; i < kWindowCount + 1; ++i) {
     scoped_ptr<ui::DrmWindow> window(
-        new ui::DrmWindow(1, &device_manager, screen_manager_.get()));
+        new ui::DrmWindow(i, device_manager_.get(), screen_manager_.get()));
     window->Initialize();
     window->OnBoundsChanged(GetPrimaryBounds());
     screen_manager_->AddWindow(i, window.Pass());
@@ -377,9 +401,8 @@ TEST_F(ScreenManagerTest,
 
 TEST_F(ScreenManagerTest, ShouldDissociateWindowOnControllerRemoval) {
   gfx::AcceleratedWidget window_id = 1;
-  ui::DrmDeviceManager device_manager(drm_);
-  scoped_ptr<ui::DrmWindow> window(
-      new ui::DrmWindow(window_id, &device_manager, screen_manager_.get()));
+  scoped_ptr<ui::DrmWindow> window(new ui::DrmWindow(
+      window_id, device_manager_.get(), screen_manager_.get()));
   window->Initialize();
   window->OnBoundsChanged(GetPrimaryBounds());
   screen_manager_->AddWindow(window_id, window.Pass());
@@ -400,9 +423,8 @@ TEST_F(ScreenManagerTest, ShouldDissociateWindowOnControllerRemoval) {
 }
 
 TEST_F(ScreenManagerTest, EnableControllerWhenWindowHasNoBuffer) {
-  ui::DrmDeviceManager device_manager(drm_);
   scoped_ptr<ui::DrmWindow> window(
-      new ui::DrmWindow(1, &device_manager, screen_manager_.get()));
+      new ui::DrmWindow(1, device_manager_.get(), screen_manager_.get()));
   window->Initialize();
   window->OnBoundsChanged(GetPrimaryBounds());
   screen_manager_->AddWindow(1, window.Pass());

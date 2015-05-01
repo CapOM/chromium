@@ -1475,11 +1475,23 @@ bool ChromeContentBrowserClient::AllowAppCache(
 bool ChromeContentBrowserClient::AllowServiceWorker(
     const GURL& scope,
     const GURL& first_party_url,
-    content::ResourceContext* context) {
+    content::ResourceContext* context,
+    int render_process_id,
+    int render_frame_id) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
+  DCHECK(scope.is_valid());
+  DCHECK(first_party_url.is_valid());
+
   ProfileIOData* io_data = ProfileIOData::FromResourceContext(context);
-  return io_data->GetCookieSettings()->
-      IsSettingCookieAllowed(scope, first_party_url);
+  bool allow = io_data->GetCookieSettings()->IsSettingCookieAllowed(
+      scope, first_party_url);
+
+  // Record access to database for potential display in UI.
+  BrowserThread::PostTask(
+      BrowserThread::UI, FROM_HERE,
+      base::Bind(&TabSpecificContentSettings::ServiceWorkerAccessed,
+                 render_process_id, render_frame_id, scope, !allow));
+  return allow;
 }
 
 bool ChromeContentBrowserClient::AllowGetCookie(
@@ -1987,8 +1999,6 @@ void ChromeContentBrowserClient::OverrideWebkitPrefs(
       prefs->GetBoolean(prefs::kWebKitJavascriptCanOpenWindowsAutomatically);
   web_prefs->dom_paste_enabled =
       prefs->GetBoolean(prefs::kWebKitDomPasteEnabled);
-  web_prefs->shrinks_standalone_images_to_fit =
-      prefs->GetBoolean(prefs::kWebKitShrinksStandaloneImagesToFit);
   web_prefs->tabs_to_links = prefs->GetBoolean(prefs::kWebkitTabsToLinks);
 
   if (!prefs->GetBoolean(prefs::kWebKitJavascriptEnabled))

@@ -404,8 +404,14 @@ IN_PROC_BROWSER_TEST_F(BrowserActionsBarBrowserTest, BrowserActionPopupTest) {
   }
 }
 
+// Waiting for popup termination is flaky on mac; disabling while investigating.
+#if defined(OS_MACOSX)
+#define MAYBE_OverflowedBrowserActionPopupTest DISABLED_OverflowedBrowserActionPopupTest
+#else
+#define MAYBE_OverflowedBrowserActionPopupTest OverflowedBrowserActionPopupTest
+#endif
 IN_PROC_BROWSER_TEST_F(BrowserActionsBarRedesignBrowserTest,
-                       OverflowedBrowserActionPopupTest) {
+                       MAYBE_OverflowedBrowserActionPopupTest) {
   scoped_ptr<BrowserActionTestUtil> overflow_bar =
       browser_actions_bar()->CreateOverflowBar();
 

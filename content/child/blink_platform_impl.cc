@@ -27,6 +27,7 @@
 #include "base/time/time.h"
 #include "blink/public/resources/grit/blink_image_resources.h"
 #include "blink/public/resources/grit/blink_resources.h"
+#include "components/mime_util/mime_util.h"
 #include "components/scheduler/child/webthread_impl_for_worker_scheduler.h"
 #include "content/app/resources/grit/content_resources.h"
 #include "content/app/strings/grit/content_strings.h"
@@ -49,7 +50,6 @@
 #include "content/child/worker_task_runner.h"
 #include "content/public/common/content_client.h"
 #include "net/base/data_url.h"
-#include "net/base/mime_util.h"
 #include "net/base/net_errors.h"
 #include "net/base/net_util.h"
 #include "third_party/WebKit/public/platform/WebConvertableToTraceFormat.h"
@@ -144,9 +144,19 @@ class MemoryUsageCache {
 class ConvertableToTraceFormatWrapper
     : public base::trace_event::ConvertableToTraceFormat {
  public:
+#ifndef WEB_CONVERTABLE_TO_TRACE_FORMAT_IS_MOVED
+  // TODO(hiroshige): Remove #ifndef once the Blink-side CL is landed.
   explicit ConvertableToTraceFormatWrapper(
       const blink::WebConvertableToTraceFormat& convertable)
       : convertable_(convertable) {}
+#else
+  // We move a reference pointer from |convertable| to |convertable_|,
+  // rather than copying, for thread safety. https://crbug.com/478149
+  explicit ConvertableToTraceFormatWrapper(
+      blink::WebConvertableToTraceFormat& convertable) {
+    convertable_.moveFrom(convertable);
+  }
+#endif
   void AppendAsTraceFormat(std::string* out) const override {
     *out += convertable_.asTraceFormat().utf8();
   }
@@ -484,8 +494,8 @@ WebData BlinkPlatformImpl::parseDataURL(const WebURL& url,
                                         WebString& mimetype_out,
                                         WebString& charset_out) {
   std::string mime_type, char_set, data;
-  if (net::DataURL::Parse(url, &mime_type, &char_set, &data)
-      && net::IsSupportedMimeType(mime_type)) {
+  if (net::DataURL::Parse(url, &mime_type, &char_set, &data) &&
+      mime_util::IsSupportedMimeType(mime_type)) {
     mimetype_out = WebString::fromUTF8(mime_type);
     charset_out = WebString::fromUTF8(char_set);
     return data;
@@ -646,7 +656,12 @@ blink::Platform::TraceEventHandle BlinkPlatformImpl::addTraceEvent(
     const char** arg_names,
     const unsigned char* arg_types,
     const unsigned long long* arg_values,
+#ifndef WEB_CONVERTABLE_TO_TRACE_FORMAT_IS_MOVED
+    // TODO(hiroshige): Remove #ifndef once the Blink-side CL is landed.
     const blink::WebConvertableToTraceFormat* convertable_values,
+#else
+    blink::WebConvertableToTraceFormat* convertable_values,
+#endif
     unsigned char flags) {
   scoped_refptr<base::trace_event::ConvertableToTraceFormat>
       convertable_wrappers[2];
@@ -1046,6 +1061,11 @@ double BlinkPlatformImpl::currentTime() {
 
 double BlinkPlatformImpl::monotonicallyIncreasingTime() {
   return base::TimeTicks::Now().ToInternalValue() /
+      static_cast<double>(base::Time::kMicrosecondsPerSecond);
+}
+
+double BlinkPlatformImpl::systemTraceTime() {
+  return base::TimeTicks::NowFromSystemTraceTime().ToInternalValue() /
       static_cast<double>(base::Time::kMicrosecondsPerSecond);
 }
 

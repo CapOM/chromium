@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+'use strict';
+
 cr.define('bmm', function() {
   /**
    * Whether a node contains another node.
@@ -39,8 +41,14 @@ cr.define('bmm', function() {
    * @return {!Promise<!Array<!BookmarkTreeNode>>} .
    */
   function getSubtreePromise(id, foldersOnly) {
-    return new Promise(function(resolve) {
-      chrome.bookmarkManagerPrivate.getSubtree(id, foldersOnly, resolve);
+    return new Promise(function(resolve, reject) {
+      chrome.bookmarkManagerPrivate.getSubtree(id, foldersOnly, function(node) {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+          return;
+        }
+        resolve(node);
+      });
     });
   }
 
@@ -53,8 +61,12 @@ cr.define('bmm', function() {
   function loadSubtree(id) {
     if (!loadingPromises[id]) {
       loadingPromises[id] = getSubtreePromise(id, false).then(function(nodes) {
-        delete loadingPromises[id];
         return nodes && nodes[0];
+      }, function(error) {
+        console.error(error.message);
+      });
+      loadingPromises[id].then(function() {
+        delete loadingPromises[id];
       });
     }
     return loadingPromises[id];

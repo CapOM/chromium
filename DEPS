@@ -34,20 +34,20 @@ vars = {
   'llvm_url': 'http://src.chromium.org/llvm-project',
   'llvm_git': 'https://llvm.googlesource.com',
   'webkit_trunk': 'http://src.chromium.org/blink/trunk',
-  'webkit_revision': 'b9db944dabfa85606c269dca3efa009d0e571885', # from svn revision 194616
+  'webkit_revision': '15f0a99bbe3afc5e3536fc0c3ce509162e8a16cc', # from svn revision 194745
   'chromium_git': 'https://chromium.googlesource.com',
   'chromiumos_git': 'https://chromium.googlesource.com/chromiumos',
   'pdfium_git': 'https://pdfium.googlesource.com',
   'skia_git': 'https://skia.googlesource.com',
   'boringssl_git': 'https://boringssl.googlesource.com',
-  'libvpx_revision': 'c600ca703b712ac0d2db719970a1fce6de70fcb4',
+  'libvpx_revision': '471ce88a3ab02b1cdc99ebdc0ecf0e361b92c3be',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': '38620209ca67535686c6b62a2185254ef119196a',
+  'skia_revision': 'd75c466ef57ef4dbdf96390b2c01121e4de36f23',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling Skia
   # and V8 without interference from each other.
   'v8_branch': 'trunk',
-  'v8_revision': '901c4c6dbe642755d90ccdd6d5bb30b942b72491',
+  'v8_revision': '19ea8c6314a1e78d61cbefd185bbb307fe076504',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling WebRTC
   # and V8 without interference from each other.
@@ -58,11 +58,11 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '2cb7b83595c2a88462b7f9481f920e2960556492',
+  'angle_revision': '2e295e23e8f7c3a6a4dd12e8b9d9f3d51f799081',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
-  'buildtools_revision': '15308f469a704c45d15567fa69cd94ce07ad0e1b',
+  'buildtools_revision': '15f5fc6fdb1795e2b99f66e5bc6c01e9fb62b436',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling PDFium
   # and whatever else without interference from each other.
@@ -132,7 +132,7 @@ deps = {
    Var('chromium_git') + '/crashpad/crashpad.git' + '@' + '1baff4ff92fe1a1ead6b88b5f01633a4f0b6b51c',
 
   'src/third_party/trace-viewer':
-   Var('chromium_git') + '/external/trace-viewer.git' + '@' + 'eea44df50707a9c1667b4fe392e7c3998427b65c',
+   Var('chromium_git') + '/external/trace-viewer.git' + '@' + 'e2b5374c4941c450b168d4c7d9110fb91b2d4c19',
 
   'src/third_party/WebKit':
    Var('chromium_git') + '/chromium/blink.git' + '@' +  Var('webkit_revision'),
@@ -165,7 +165,7 @@ deps = {
     Var('chromium_git') + '/external/grit-i18n.git' + '@' + 'c1b1591a05209c1ad467e845ba8543c22f9072af', # from svn revision 189
 
   'src/tools/gyp':
-    Var('chromium_git') + '/external/gyp.git' + '@' + '2a5511bd901f328db10d0b6415c864a5ff59fc81',
+    Var('chromium_git') + '/external/gyp.git' + '@' + '0bb67471bca068996e15b56738fa4824dfa19de0',
 
   'src/tools/swarming_client':
    Var('chromium_git') + '/external/swarming.client.git' + '@' +  Var('swarming_revision'),
@@ -222,7 +222,7 @@ deps = {
    Var('chromium_git') + '/chromium/deps/yasm/patched-yasm.git' + '@' + '4671120cd8558ce62ee8672ebf3eb6f5216f909b',
 
   'src/third_party/libjpeg_turbo':
-   Var('chromium_git') + '/chromium/deps/libjpeg_turbo.git' + '@' + '9e9058be139a32f2d03eddce97fb15ecca92e6bc',
+   Var('chromium_git') + '/chromium/deps/libjpeg_turbo.git' + '@' + '8ee9bdd068effcf5fe876e401829eadb94569750',
 
   'src/third_party/flac':
    Var('chromium_git') + '/chromium/deps/flac.git' + '@' + '0635a091379d9677f1ddde5f2eec85d0f096f219',
@@ -399,9 +399,6 @@ deps_os = {
     'src/chrome/tools/test/reference_build/chrome_linux':
      Var('chromium_git') + '/chromium/reference_builds/chrome_linux64.git' + '@' + '033d053a528e820e1de3e2db766678d862a86b36',
 
-    'src/third_party/junit/src':
-      Var('chromium_git') + '/external/junit.git' + '@' + '45a44647e7306262162e1346b750c3209019f2e1',
-
     'src/third_party/xdg-utils':
      Var('chromium_git') + '/chromium/deps/xdg-utils.git' + '@' + 'd80274d5869b17b8c9067a1022e4416ee7ed5e0d',
 
@@ -421,11 +418,11 @@ deps_os = {
 
     # Build tools for Chrome OS.
     'src/third_party/chromite':
-     Var('chromium_git') + '/chromiumos/chromite.git' + '@' + 'fdc9440cb96f8de35202abc285ffb896e04292d3',
+     Var('chromium_git') + '/chromiumos/chromite.git' + '@' + '7c430e16a7bb03040576f012b424fab89974fdd4',
 
     # Dependency of chromite.git.
     'src/third_party/pyelftools':
-     Var('chromium_git') + '/chromiumos/third_party/pyelftools.git' + '@' + '19b3e610c86fcadb837d252c794cb5e8008826ae',
+     Var('chromium_git') + '/chromiumos/third_party/pyelftools.git' + '@' + 'bdc1d380acd88d4bfaf47265008091483b0d614e',
 
     'src/third_party/undoview':
      Var('chromium_git') + '/chromium/deps/undoview.git' + '@' + '3ba503e248f3cdbd81b78325a24ece0984637559',
@@ -445,7 +442,7 @@ deps_os = {
      Var('chromium_git') + '/external/android_protobuf.git' + '@' + '94f522f907e3f34f70d9e7816b947e62fddbb267',
 
     'src/third_party/android_tools':
-     Var('chromium_git') + '/android_tools.git' + '@' + '7200281446186c7192cb02f54dc2b38e02d705e5',
+     Var('chromium_git') + '/android_tools.git' + '@' + '0c03d3bfef2606a30c3ccec9f6856e6acb75c2fb',
 
     'src/third_party/apache-mime4j':
      Var('chromium_git') + '/chromium/deps/apache-mime4j.git' + '@' + '28cb1108bff4b6cf0a2e86ff58b3d025934ebe3a',
@@ -473,6 +470,9 @@ deps_os = {
 
     'src/third_party/jsr-305/src':
       Var('chromium_git') + '/external/jsr-305.git' + '@' + '642c508235471f7220af6d5df2d3210e3bfc0919',
+
+    'src/third_party/junit/src':
+      Var('chromium_git') + '/external/junit.git' + '@' + '45a44647e7306262162e1346b750c3209019f2e1',
 
     'src/third_party/mockito/src':
       Var('chromium_git') + '/external/mockito/mockito.git' + '@' + 'ed99a52e94a84bd7c467f2443b475a22fcc6ba8e',
@@ -725,7 +725,7 @@ hooks = [
     'action': ['python',
                'src/build/get_syzygy_binaries.py',
                '--output-dir=src/third_party/kasko',
-               '--revision=584b8e476d6ffdf291d7df9d134bd9747f8a1d32',
+               '--revision=b8adaf37ad3beae939ee2db5ae9c0f8b380d2060',
                '--resource=kasko.zip',
                '--resource=kasko_symbols.zip',
                '--overwrite',

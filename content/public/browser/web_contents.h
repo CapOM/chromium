@@ -220,6 +220,10 @@ class WebContents : public PageNavigator,
   // time and can be nullptr (during setup and teardown).
   virtual RenderWidgetHostView* GetRenderWidgetHostView() const = 0;
 
+  // Causes the current page to be closed, including running its onunload event
+  // handler.
+  virtual void ClosePage() = 0;
+
   // Returns the currently active fullscreen widget. If there is none, returns
   // nullptr.
   virtual RenderWidgetHostView* GetFullscreenRenderWidgetHostView() const = 0;
@@ -627,6 +631,13 @@ class WebContents : public PageNavigator,
 
   // Requests the renderer to exit fullscreen.
   virtual void ExitFullscreen() = 0;
+
+  // Unblocks requests from renderer for a newly created window. This is
+  // used in showCreatedWindow() or sometimes later in cases where
+  // delegate->ShouldResumeRequestsForCreatedWindow() indicated the requests
+  // should not yet be resumed. Then the client is responsible for calling this
+  // as soon as they are ready.
+  virtual void ResumeLoadingCreatedWebContents() = 0;
 
 #if defined(OS_ANDROID)
   CONTENT_EXPORT static WebContents* FromJavaWebContents(

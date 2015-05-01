@@ -102,6 +102,23 @@ class SmoothnessKeyMobileSites(benchmark.Benchmark):
     return 'smoothness.key_mobile_sites_smooth'
 
 
+@benchmark.Disabled('mac', 'win', 'android')
+class SmoothnessKeyMobileSitesWithSlimmingPaint(benchmark.Benchmark):
+  """Measures smoothness on key mobile sites with --enable-slimming-paint.
+
+  http://www.chromium.org/developers/design-documents/rendering-benchmarks
+  """
+  test = smoothness.Smoothness
+  page_set = page_sets.KeyMobileSitesSmoothPageSet
+
+  def CustomizeBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs(['--enable-slimming-paint'])
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.key_mobile_sites_with_slimming_paint_smooth'
+
+
 class SmoothnessToughAnimationCases(benchmark.Benchmark):
   test = smoothness.Smoothness
   page_set = page_sets.ToughAnimationCasesPageSet
@@ -256,10 +273,9 @@ class SmoothnessGpuRasterizationPolymer(benchmark.Benchmark):
     return 'smoothness.gpu_rasterization.polymer'
 
 
-class SmoothnessToughFastScrollingCases(benchmark.Benchmark):
+class SmoothnessToughScrollingCases(benchmark.Benchmark):
   test = smoothness.Smoothness
   page_set = page_sets.ToughScrollingCasesPageSet
-  options = {'story_label_filter': 'fastscrolling'}
 
   @classmethod
   def Name(cls):

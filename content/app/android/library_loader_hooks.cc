@@ -25,6 +25,7 @@
 #include "device/bluetooth/android/bluetooth_jni_registrar.h"
 #include "device/vibration/android/vibration_jni_registrar.h"
 #include "media/base/android/media_jni_registrar.h"
+#include "media/midi/midi_jni_registrar.h"
 #include "net/android/net_jni_registrar.h"
 #include "ui/android/ui_android_jni_registrar.h"
 #include "ui/base/android/ui_base_jni_registrar.h"
@@ -72,6 +73,9 @@ bool EnsureJniRegistered(JNIEnv* env) {
       return false;
 
     if (!media::RegisterJni(env))
+      return false;
+
+    if (!media::midi::RegisterJni(env))
       return false;
 
     if (!ui::RegisterUIAndroidJni(env))

@@ -102,6 +102,7 @@ source_set("lib") {
     "//cc/surfaces",
     "//components/clipboard/public/interfaces",
     "//components/gpu/public/interfaces",
+    "//components/mime_util",
     "//components/scheduler:scheduler",
     "//components/surfaces/public/interfaces",
     "//components/webcrypto",
@@ -212,8 +213,7 @@ if (is_android) {
   }
 }
 
-test("tests") {
-  output_name = "html_viewer_unittests"
+test("html_viewer_unittests") {
   sources = [
     "ax_provider_impl_unittest.cc",
     "discardable_memory_allocator_unittest.cc",

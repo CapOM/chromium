@@ -14,7 +14,6 @@
 #include "mojo/public/cpp/bindings/interface_request.h"
 #include "mojo/public/interfaces/application/application.mojom.h"
 #include "mojo/public/interfaces/application/service_provider.mojom.h"
-#include "mojo/runner/native_application_support.h"
 #include "mojo/services/network/public/interfaces/network_service.mojom.h"
 #include "mojo/shell/application_loader.h"
 #include "mojo/shell/identity.h"
@@ -150,6 +149,7 @@ class ApplicationManager {
                                    ServiceProviderPtr* exposed_services);
 
   bool ConnectToApplicationWithLoader(
+      const GURL& requested_url,
       const GURL& resolved_url,
       const GURL& requestor_url,
       InterfaceRequest<ServiceProvider>* services,
@@ -159,8 +159,7 @@ class ApplicationManager {
       ApplicationLoader* loader);
 
   InterfaceRequest<Application> RegisterShell(
-      // The URL after resolution and redirects, including the querystring.
-      const GURL& resolved_url,
+      const GURL& app_url,
       const GURL& requestor_url,
       InterfaceRequest<ServiceProvider> services,
       ServiceProviderPtr exposed_services,
@@ -175,7 +174,10 @@ class ApplicationManager {
                        InterfaceRequest<ServiceProvider> services,
                        ServiceProviderPtr exposed_services);
 
-  void HandleFetchCallback(const GURL& requestor_url,
+  // Called once |fetcher| has found app. |requested_url| is the url of the
+  // requested application before any mappings/resolution have been applied.
+  void HandleFetchCallback(const GURL& requested_url,
+                           const GURL& requestor_url,
                            InterfaceRequest<ServiceProvider> services,
                            ServiceProviderPtr exposed_services,
                            const base::Closure& on_application_end,

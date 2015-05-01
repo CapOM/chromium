@@ -34,7 +34,7 @@ class UnifiedEventTargeter : public aura::WindowTargeter {
           dst_root_->GetHost()->event_processor()->OnEventFromSource(event));
       return nullptr;
     } else {
-      LOG(ERROR) << "Handling Event:" << event->type();
+      NOTREACHED() << "event type:" << event->type();
       return aura::WindowTargeter::FindTargetForEvent(root, event);
     }
   }
@@ -104,7 +104,6 @@ ui::EventSource* AshWindowTreeHostUnified::GetEventSource() {
 }
 
 gfx::AcceleratedWidget AshWindowTreeHostUnified::GetAcceleratedWidget() {
-  // TODO(oshima): Enable offscreen compositor.
   return gfx::kNullAcceleratedWidget;
 }
 

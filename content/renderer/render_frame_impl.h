@@ -112,6 +112,7 @@ struct NavigationParams;
 struct RequestNavigationParams;
 struct ResourceResponseHead;
 struct StartNavigationParams;
+struct StreamOverrideParameters;
 
 class CONTENT_EXPORT RenderFrameImpl
     : public RenderFrame,
@@ -474,11 +475,11 @@ class CONTENT_EXPORT RenderFrameImpl
                                      const blink::WebURL& target);
   virtual void didAbortLoading(blink::WebLocalFrame* frame);
   virtual void didCreateScriptContext(blink::WebLocalFrame* frame,
-                                      v8::Handle<v8::Context> context,
+                                      v8::Local<v8::Context> context,
                                       int extension_group,
                                       int world_id);
   virtual void willReleaseScriptContext(blink::WebLocalFrame* frame,
-                                        v8::Handle<v8::Context> context,
+                                        v8::Local<v8::Context> context,
                                         int world_id);
   virtual void didFirstVisuallyNonEmptyLayout(blink::WebLocalFrame* frame);
   virtual void didChangeScrollOffset(blink::WebLocalFrame* frame);
@@ -666,6 +667,19 @@ class CONTENT_EXPORT RenderFrameImpl
                const Referrer& referrer,
                blink::WebNavigationPolicy policy);
 
+  // Performs a navigation in the frame. This provides a unified function for
+  // the current code path and the browser-side navigation path (in
+  // development). Currently used by OnNavigate, with all *NavigationParams
+  // provided by the browser. |stream_params| should be null.
+  // PlzNavigate: used by OnCommitNavigation, with |common_params| and
+  // |request_params| received by the browser. |stream_params| should be non
+  // null and created from the information provided by the browser.
+  // |start_params| is not used.
+  void NavigateInternal(const CommonNavigationParams& common_params,
+                        const StartNavigationParams& start_params,
+                        const RequestNavigationParams& request_params,
+                        scoped_ptr<StreamOverrideParameters> stream_params);
+
   // Update current main frame's encoding and send it to browser window.
   // Since we want to let users see the right encoding info from menu
   // before finishing loading, we call the UpdateEncoding in
@@ -702,7 +716,7 @@ class CONTENT_EXPORT RenderFrameImpl
   void HandleJavascriptExecutionResult(const base::string16& javascript,
                                        int id,
                                        bool notify_result,
-                                       v8::Handle<v8::Value> result);
+                                       v8::Local<v8::Value> result);
 
   // Initializes |web_user_media_client_|. If this fails, because it wasn't
   // possible to create a MediaStreamClient (e.g., WebRTC is disabled), then

@@ -2772,6 +2772,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="ChildProcess.InvalidSandboxStateCrash.NoStartupWindow"
+    enum="BooleanPresent">
+  <owner>wfh@chromium.org</owner>
+  <summary>
+    Whether the browser command line had the switch --no-startup-window when a
+    child process crashed due to invalid sandbox state. Recorded when a child
+    process crashes if the exit code from the child process is
+    RESULT_CODE_INVALID_SANDBOX_STATE.
+  </summary>
+</histogram>
+
 <histogram name="ChildProcess.Killed" enum="ProcessType">
   <obsolete>
     Deprecated 3/2013. Renamed to ChildProcess.Killed2.
@@ -6131,8 +6142,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>asanka@chromium.org</owner>
   <summary>
     Content-Disposition header features. The presence of a Content-Disposition
-    header, use of 'name', 'filename' and 'filename*' parameters, and string
-    encoding schemes are counted for each unthrottled download. The total number
+    header, use of 'filename' and 'filename*' parameters, and string encoding
+    schemes are counted for each unthrottled download. The total number
     downloads is Download.Counts[5] (Initiated and Unthrottled).
   </summary>
 </histogram>
@@ -9099,6 +9110,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Part of the suite of Extensions.DidCreateScriptContext_* metrics. Records
     the time taken to install Extension JavaScript bindings per WebUI context
     (chrome://extensions and so forth).
+  </summary>
+</histogram>
+
+<histogram name="Extensions.DidSuppressJavaScriptException"
+    enum="ChromeChannelForHistogram">
+  <owner>kalman@chromium.org</owner>
+  <summary>
+    Records the Chrome channel when JavaScript exceptions are not gracefully
+    dealt with, and suppressed by C++ instead. These are exceptions generated
+    (or simply not caught and gracefully recovered) in our own internal
+    JavaScript, not from JavaScript code written by developers (that which is
+    typically hosted in CRX files). This should be 0 for unstable channels like
+    canary and dev, because we try *not* to suppress errors and instead kill the
+    renderer and generate a crash report. However, at times we need to suppress
+    even those. Note that this histogram is intended to be tracked over time,
+    per channel, to observe crash rates. Comparisons between
+    stable/beta/dev/canary are unlikely to be meaningful.
   </summary>
 </histogram>
 
@@ -35647,6 +35675,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Settings.JsonDataWriteCount" units="count">
+  <owner>raymes@chromium.org</owner>
+  <summary>
+    The number of writes of a JSON file that occur in every 5 minute period of
+    running Chrome. Suffixed with the name of the corresponding JSON file.
+  </summary>
+</histogram>
+
 <histogram name="Settings.MigratedHashesFromLocalState" enum="BooleanMigrated">
   <owner>csharp@chromium.org</owner>
   <owner>gab@chromium.org</owner>
@@ -47623,6 +47659,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Stream was never read at all"/>
 </enum>
 
+<enum name="ChromeChannelForHistogram" type="int">
+  <int value="0" label="UNKNOWN"/>
+  <int value="1" label="CANARY"/>
+  <int value="2" label="DEV"/>
+  <int value="3" label="BETA"/>
+  <int value="4" label="STABLE"/>
+</enum>
+
 <enum name="ChromeDownloadCountType" type="int">
   <int value="0" label="Initiated by Navigation (Obsolete)"/>
   <int value="1" label="Initiated by Context Menu (Obsolete)"/>
@@ -48910,13 +48954,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Valid"/>
   <int value="2" label="Has disposition-type"/>
   <int value="3" label="Has unknown disposition-type"/>
-  <int value="4" label="Has 'name' attribute"/>
+  <int value="4" label="Has 'name' attribute (Obsolete 04/2015)"/>
   <int value="5" label="Has 'filename' attribute"/>
   <int value="6" label="Has 'filename*' attribute"/>
   <int value="7" label="Has non-ASCII strings"/>
   <int value="8" label="Has percent encoded strings"/>
   <int value="9" label="Has RFC 2047 encoded strings"/>
-  <int value="10" label="Has 'name' attribute only"/>
+  <int value="10" label="Has 'name' attribute only (Obsolete 04/2015)"/>
 </enum>
 
 <enum name="DownloadContentType" type="int">
@@ -50100,6 +50144,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="299"
       label="Allow users to opt in to Safe Browsing extended reporting"/>
   <int value="300" label="Allow proceeding from the SSL warning page"/>
+  <int value="301" label="Allow QUIC protocol"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -51414,7 +51459,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1008" label="DEVELOPERPRIVATE_SHOWPATH"/>
   <int value="1009" label="FILEMANAGERPRIVATE_ADDPROVIDEDFILESYSTEM"/>
   <int value="1010" label="FILEMANAGERPRIVATE_CONFIGUREPROVIDEDFILESYSTEM"/>
-  <int value="1011" label="SEARCHENGINESPRIVATE_GETDEFAULTSEARCHENGINES"/>
+  <int value="1011" label="SEARCHENGINESPRIVATE_GETSEARCHENGINES"/>
   <int value="1012" label="SEARCHENGINESPRIVATE_SETSELECTEDSEARCHENGINE"/>
   <int value="1013" label="AUTOFILLPRIVATE_SAVEADDRESS"/>
   <int value="1014" label="AUTOFILLPRIVATE_GETADDRESSCOMPONENTS"/>
@@ -51428,6 +51473,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1022" label="INSTANCEID_DELETETOKEN"/>
   <int value="1023" label="INSTANCEID_DELETEID"/>
   <int value="1024" label="GCDPRIVATE_GETDEVICEINFO"/>
+  <int value="1025" label="SEARCHENGINESPRIVATE_GETHOTWORDSTATE"/>
+  <int value="1026" label="SEARCHENGINESPRIVATE_ADDOTHERSEARCHENGINE"/>
+  <int value="1027" label="SEARCHENGINESPRIVATE_REMOVESEARCHENGINE"/>
+  <int value="1028" label="SEARCHENGINESPRIVATE_UPDATESEARCHENGINE"/>
+  <int value="1029" label="SEARCHENGINESPRIVATE_OPTINTOHOTWORDING"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -55219,6 +55269,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1998927516" label="enable-md-settings"/>
   <int value="-1985025593" label="file-manager-enable-new-gallery"/>
   <int value="-1972383451" label="disable-pinch"/>
+  <int value="-1941852572" label="floating-virtual-keyboard"/>
   <int value="-1940806558" label="enable-syncfs-directory-operation"/>
   <int value="-1938263248" label="enable-extension-info-dialog"/>
   <int value="-1930720286" label="nacl-debug-mask"/>
@@ -67647,6 +67698,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Secure_Preferences" label="Secure Preferences file"/>
   <affected-histogram name="Settings.JsonDataReadSizeKilobytes"/>
   <affected-histogram name="Settings.JsonDataSizeKilobytes"/>
+  <affected-histogram name="Settings.JsonDataWriteCount"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="Prefetch">

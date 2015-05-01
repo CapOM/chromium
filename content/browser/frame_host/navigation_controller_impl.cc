@@ -14,6 +14,7 @@
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
 #include "cc/base/switches.h"
+#include "components/mime_util/mime_util.h"
 #include "content/browser/bad_message.h"
 #include "content/browser/browser_url_handler_impl.h"
 #include "content/browser/dom_storage/dom_storage_context_wrapper.h"
@@ -493,7 +494,8 @@ NavigationEntryImpl* NavigationControllerImpl::GetLastCommittedEntry() const {
 
 bool NavigationControllerImpl::CanViewSource() const {
   const std::string& mime_type = delegate_->GetContentsMimeType();
-  bool is_viewable_mime_type = net::IsSupportedNonImageMimeType(mime_type) &&
+  bool is_viewable_mime_type =
+      mime_util::IsSupportedNonImageMimeType(mime_type) &&
       !net::IsSupportedMediaMimeType(mime_type);
   NavigationEntry* visible_entry = GetVisibleEntry();
   return visible_entry && !visible_entry->IsViewSourceMode() &&
@@ -1323,7 +1325,7 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
           switches::kSitePerProcess)) {
     // This may be a "new auto" case where we add a new FrameNavigationEntry, or
     // it may be a "history auto" case where we update an existing one.
-    int64 frame_tree_node_id = rfh->frame_tree_node()->frame_tree_node_id();
+    int frame_tree_node_id = rfh->frame_tree_node()->frame_tree_node_id();
     NavigationEntryImpl* last_committed = GetLastCommittedEntry();
     last_committed->AddOrUpdateFrameEntry(frame_tree_node_id,
                                           rfh->GetSiteInstance(),

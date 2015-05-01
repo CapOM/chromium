@@ -13,7 +13,7 @@ from telemetry.core import wpr_modes
 from telemetry.internal.actions import page_action
 from telemetry.page import page_test
 from telemetry.results import results_options
-from telemetry.user_story import user_story_filter
+from telemetry.story import story_filter
 from telemetry.util import cloud_storage
 from telemetry.util import exception_formatter
 from telemetry.value import failure
@@ -25,7 +25,7 @@ class ArchiveError(Exception):
 
 
 def AddCommandLineArgs(parser):
-  user_story_filter.UserStoryFilter.AddCommandLineArgs(parser)
+  story_filter.StoryFilter.AddCommandLineArgs(parser)
   results_options.AddResultsOptions(parser)
 
   # Page set options
@@ -54,7 +54,7 @@ def AddCommandLineArgs(parser):
                     help='Ignore @Disabled and @Enabled restrictions.')
 
 def ProcessCommandLineArgs(parser, args):
-  user_story_filter.UserStoryFilter.ProcessCommandLineArgs(parser, args)
+  story_filter.StoryFilter.ProcessCommandLineArgs(parser, args)
   results_options.ProcessCommandLineArgs(parser, args)
 
   # Page set options
@@ -112,27 +112,27 @@ def _RunUserStoryAndProcessErrorIfNeeded(expectations, user_story, results,
           msg='Exception from DidRunUserStory: ')
 
 class UserStoryGroup(object):
-  def __init__(self, shared_user_story_state_class):
-    self._shared_user_story_state_class = shared_user_story_state_class
+  def __init__(self, shared_state_class):
+    self._shared_state_class = shared_state_class
     self._user_stories = []
 
   @property
-  def shared_user_story_state_class(self):
-    return self._shared_user_story_state_class
+  def shared_state_class(self):
+    return self._shared_state_class
 
   @property
   def user_stories(self):
     return self._user_stories
 
   def AddUserStory(self, user_story):
-    assert (user_story.shared_user_story_state_class is
-            self._shared_user_story_state_class)
+    assert (user_story.shared_state_class is
+            self._shared_state_class)
     self._user_stories.append(user_story)
 
 
 def StoriesGroupedByStateClass(user_story_set, allow_multiple_groups):
   """ Returns a list of user story groups which each contains user stories with
-  the same shared_user_story_state_class.
+  the same shared_state_class.
 
   Example:
     Assume A1, A2, A3 are user stories with same shared user story class, and
@@ -148,20 +148,20 @@ def StoriesGroupedByStateClass(user_story_set, allow_multiple_groups):
   """
   user_story_groups = []
   user_story_groups.append(
-      UserStoryGroup(user_story_set[0].shared_user_story_state_class))
+      UserStoryGroup(user_story_set[0].shared_state_class))
   for user_story in user_story_set:
-    if (user_story.shared_user_story_state_class is not
-        user_story_groups[-1].shared_user_story_state_class):
+    if (user_story.shared_state_class is not
+        user_story_groups[-1].shared_state_class):
       if not allow_multiple_groups:
         raise ValueError('This UserStorySet is only allowed to have one '
-                         'SharedUserStoryState but contains the following '
-                         'SharedUserStoryState classes: %s, %s.\n Either '
-                         'remove the extra SharedUserStoryStates or override '
+                         'SharedState but contains the following '
+                         'SharedState classes: %s, %s.\n Either '
+                         'remove the extra SharedStates or override '
                          'allow_mixed_story_states.' % (
-                         user_story_groups[-1].shared_user_story_state_class,
-                         user_story.shared_user_story_state_class))
+                         user_story_groups[-1].shared_state_class,
+                         user_story.shared_state_class))
       user_story_groups.append(
-          UserStoryGroup(user_story.shared_user_story_state_class))
+          UserStoryGroup(user_story.shared_state_class))
     user_story_groups[-1].AddUserStory(user_story)
   return user_story_groups
 
@@ -175,8 +175,8 @@ def Run(test, user_story_set, expectations, finder_options, results,
   can continue running the remaining user stories.
   """
   # Filter page set based on options.
-  user_stories = filter(user_story_filter.UserStoryFilter.IsSelected,
-                        user_story_set)
+  user_stories = filter(story_filter.StoryFilter.IsSelected,
+                              user_story_set)
 
   if (not finder_options.use_live_sites and user_story_set.bucket and
       finder_options.browser_options.wpr_mode != wpr_modes.WPR_RECORD):
@@ -208,7 +208,7 @@ def Run(test, user_story_set, expectations, finder_options, results,
         for user_story in group.user_stories:
           for _ in xrange(finder_options.page_repeat):
             if not state:
-              state = group.shared_user_story_state_class(
+              state = group.shared_state_class(
                   test, finder_options, user_story_set)
             results.WillRunPage(user_story)
             try:

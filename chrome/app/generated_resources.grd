@@ -4885,17 +4885,17 @@ Even if you have downloaded files from this website before, the website might ha
         <message name="IDS_EXTENSIONS_LOAD_ADDITIONAL_FAILURES" desc="The text displayed above additional extension load failures.">
           Other extensions that failed to load:
         </message>
-        <message name="IDS_EXTENSIONS_ERRORS_SHOW_MORE" desc="The text which allows the user to display more errors for a given extension.">
-          Show more...
+        <message name="IDS_EXTENSIONS_ERROR_HEADING" desc="The heading of the list of errors for an extension.">
+          Errors
         </message>
-        <message name="IDS_EXTENSIONS_ERRORS_SHOW_FEWER" desc="The text which allows the user to display fewer errors for a given extension.">
-          Show fewer...
+        <message name="IDS_EXTENSIONS_ERROR_CLEAR_ALL" desc="The text for the button to delete all extension errors.">
+          Clear all
         </message>
-        <message name="IDS_EXTENSIONS_ERROR_VIEW_DETAILS" desc="The link to view the details of an extension error.">
-          View details
+        <message name="IDS_EXTENSIONS_ERROR_NO_ERRORS" desc="The text displayed when an extension has no errors.">
+          Awesome, no errors!
         </message>
-        <message name="IDS_EXTENSIONS_ERROR_VIEW_MANIFEST" desc="The link to view the details of an extension error.">
-          View manifest.json
+        <message name="IDS_EXTENSIONS_ERROR_NO_ERRORS_CODE_MESSAGE" desc="The text displayed in the 'code' section when an extension has no errors.">
+          Nothing to see here, move along.
         </message>
         <message name="IDS_EXTENSIONS_ERROR_CONTEXT" desc="The label for the context of an extension's error.">
           Context:
@@ -5524,6 +5524,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_PLUGINS_BROWSER_PLUGIN" desc="Text that indicates the plugin is a browser plugin.">
           BROWSER PLUGIN
+        </message>
+        <message name="IDS_PLUGINS_NPAPI_BEING_REMOVED_SOON" desc="The text shown when an NPAPI plugin loads to warn the user that NPAPI plugin support is being removed soon.">
+          This site uses a plugin (<ph name="PLUGIN_NAME">$1<ex>Silverlight</ex></ph>) that will soon be unsupported.
+        </message>
+        <message name="IDS_PLUGINS_NPAPI_REMOVED" desc="The text shown when an NPAPI plugin attempts to load to tell the user that NPAPI plugin support has been removed.">
+          This site uses a plugin (<ph name="PLUGIN_NAME">$1<ex>Silverlight</ex></ph>) that is unsupported.
         </message>
       </if>
 
@@ -7105,6 +7111,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Right-click to play <ph name="PLUGIN_NAME">$1<ex>Flash</ex></ph>.
         </message>
       </if>
+      <message name="IDS_PLUGIN_BLOCKED_BY_POLICY" desc="The placeholder text for a plugin blocked by enterprise policy.">
+        <ph name="PLUGIN_NAME">$1<ex>Flash</ex></ph> is not allowed.
+      </message>
       <if expr="chromeos">
         <message name="IDS_NACL_PLUGIN_BLOCKED" desc="The placeholder text for a blocked plugin.">
           This app is not currently supported on this device but the Chrome gnomes are hard at work to make it work soon.
@@ -7571,17 +7580,21 @@ Keep your key file in a safe place. You will need it to create new versions of y
   </ex></ph>Would you like to stop it?
         </message>
       </if>
-      <message name="IDS_BROWSER_HANGMONITOR_RENDERER_TITLE" desc="The title of the 'A renderer has hung' dialog">
-        Page(s) Unresponsive
+      <message name="IDS_BROWSER_HANGMONITOR_RENDERER_TITLE" desc="The title of the 'A renderer has hung' dialog. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
+        {NUM_PAGES, plural,
+        =1 {Page Unresponsive}
+        other {Pages Unresponsive}}
       </message>
-      <message name="IDS_BROWSER_HANGMONITOR_RENDERER" desc="A renderer has hung">
-        The following page(s) have become unresponsive. You can wait for them to become responsive or kill them.
+      <message name="IDS_BROWSER_HANGMONITOR_RENDERER" desc="A renderer has hung. NOTE: If having no explicit # makes the phrasing awkward, feel free to add a # as necessary. [ICU Syntax]">
+        {NUM_PAGES, plural,
+        =1 {The following page has become unresponsive. You can wait for it to become responsive or kill it.}
+        other {The following pages have become unresponsive. You can wait for them to become responsive or kill them.}}
       </message>
       <message name="IDS_BROWSER_HANGMONITOR_RENDERER_WAIT" desc="The label of the 'wait' button">
         Wait
       </message>
       <message name="IDS_BROWSER_HANGMONITOR_RENDERER_END" desc="The label of the 'kill' button">
-        Kill pages
+        Kill
       </message>
       <message name="IDS_BROWSER_HANGMONITOR_PLUGIN_INFOBAR" desc="The text of the infobar notifying the user that a plugin has hung">
         A plugin (<ph name="PLUGIN_NAME">$1<ex>Flash</ex></ph>) isn't responding.
@@ -14442,6 +14455,12 @@ After you create a new supervised user, you can manage their settings at any tim
         </message>
         <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_INPUT_VIEW_FEATURES_DESCRIPTION" desc="Description of about::flags option to enable experimental features for IME input-views">
           Enable experimental features for IME input views.
+        </message>
+        <message name="IDS_FLAGS_FLOATING_VIRTUAL_KEYBOARD_NAME" desc="Name of about::flags option to toggle floating virtual keyboard">
+          Floating virtual keyboard.
+        </message>
+        <message name="IDS_FLAGS_FLOATING_VIRTUAL_KEYBOARD_DESCRIPTION" desc="Description of about::flags option to toggle floating virtual keyboard">
+          Enable/Disable floating virtual keyboard.
         </message>
         <message name="IDS_FLAGS_ENABLE_GESTURE_TYPING_NAME" desc="Name of about::flags option to enable gesture typing for the virtual keyboard">
           Gesture typing for the virtual keyboard.

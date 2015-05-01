@@ -10,6 +10,8 @@
 #include "gpu/gpu_export.h"
 
 #define GPU_DRIVER_BUG_WORKAROUNDS(GPU_OP)                   \
+  GPU_OP(AVOID_EGL_IMAGE_TARGET_TEXTURE_REUSE,               \
+         avoid_egl_image_target_texture_reuse)               \
   GPU_OP(CLEAR_ALPHA_IN_READPIXELS,                          \
          clear_alpha_in_readpixels)                          \
   GPU_OP(CLEAR_UNIFORMS_BEFORE_FIRST_PROGRAM_USE,            \
@@ -124,6 +126,8 @@
          validate_multisample_buffer_allocation)             \
   GPU_OP(WAKE_UP_GPU_BEFORE_DRAWING,                         \
          wake_up_gpu_before_drawing)                         \
+  GPU_OP(DISABLE_GL_RGB_FORMAT,                              \
+         disable_gl_rgb_format)                              \
 
 namespace gpu {
 

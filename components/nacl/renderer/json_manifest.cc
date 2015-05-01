@@ -8,6 +8,7 @@
 
 #include "base/logging.h"
 #include "base/macros.h"
+#include "components/nacl/common/nacl_types.h"
 #include "components/nacl/renderer/nexe_load_manager.h"
 #include "third_party/jsoncpp/source/include/json/reader.h"
 #include "third_party/jsoncpp/source/include/json/value.h"
@@ -443,7 +444,7 @@ bool JsonManifest::GetProgramURL(std::string* full_url,
 }
 
 void JsonManifest::GetPrefetchableFiles(
-    std::vector<std::pair<std::string, std::string> >* out_files) const {
+    std::vector<NaClResourcePrefetchRequest>* out_files) const {
   const Json::Value& files = dictionary_[kFilesKey];
   if (!files.isObject())
     return;
@@ -455,7 +456,7 @@ void JsonManifest::GetPrefetchableFiles(
     // We skip invalid entries in "files".
     if (GetKeyUrl(files, keys[i], &full_url, &unused_pnacl_options)) {
       if (GURL(full_url).SchemeIs("chrome-extension"))
-        out_files->push_back(std::make_pair(keys[i], full_url));
+        out_files->push_back(NaClResourcePrefetchRequest(keys[i], full_url));
     }
   }
 }

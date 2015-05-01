@@ -14,6 +14,7 @@
 #include "base/strings/string_util.h"
 #include "gpu/command_buffer/service/gl_utils.h"
 #include "gpu/command_buffer/service/gpu_switches.h"
+#include "gpu/command_buffer/service/texture_definition.h"
 #include "gpu/config/gpu_switches.h"
 #include "ui/gl/gl_fence.h"
 #include "ui/gl/gl_implementation.h"
@@ -1100,6 +1101,10 @@ void FeatureInfo::InitializeFeatures() {
   }
 #endif
 
+  if (workarounds_.avoid_egl_image_target_texture_reuse) {
+    TextureDefinition::AvoidEGLTargetTextureReuse();
+  }
+
   if (gl_version_info_->IsLowerThanGL(4, 3)) {
     // crbug.com/481184.
     // GL_PRIMITIVE_RESTART_FIXED_INDEX is only available on Desktop GL 4.3+,
@@ -1109,18 +1114,8 @@ void FeatureInfo::InitializeFeatures() {
 }
 
 bool FeatureInfo::IsES3Capable() const {
-  if (gl_version_info_->IsAtLeastGLES(3, 0))
-    return true;
-  // TODO(zmo): For Desktop GL, with anything lower than 4.2, we need to check
-  // the existence of a few extensions to have full WebGL 2 capabilities.
-  if (gl_version_info_->IsAtLeastGL(4, 2))
-    return true;
-#if defined(OS_MACOSX)
-  // TODO(zmo): For experimentation purpose  on MacOSX with core profile,
-  // allow 3.2 or plus for now.
-  if (gl_version_info_->IsAtLeastGL(3, 2))
-    return true;
-#endif
+  if (gl_version_info_)
+    return gl_version_info_->IsES3Capable();
   return false;
 }
 

@@ -175,6 +175,29 @@ class DeviceUtils(object):
     assert hasattr(self, decorators.DEFAULT_TIMEOUT_ATTR)
     assert hasattr(self, decorators.DEFAULT_RETRIES_ATTR)
 
+  def __eq__(self, other):
+    """Checks whether |other| refers to the same device as |self|.
+
+    Args:
+      other: The object to compare to. This can be a basestring, an instance
+        of adb_wrapper.AdbWrapper, or an instance of DeviceUtils.
+    Returns:
+      Whether |other| refers to the same device as |self|.
+    """
+    return self.adb.GetDeviceSerial() == str(other)
+
+  def __lt__(self, other):
+    """Compares two instances of DeviceUtils.
+
+    This merely compares their serial numbers.
+
+    Args:
+      other: The instance of DeviceUtils to compare to.
+    Returns:
+      Whether |self| is less than |other|.
+    """
+    return self.adb.GetDeviceSerial() < other.adb.GetDeviceSerial()
+
   def __str__(self):
     """Returns the device serial."""
     return self.adb.GetDeviceSerial()
@@ -535,7 +558,7 @@ class DeviceUtils(object):
         with device_temp_file.DeviceTempFile(self.adb) as large_output_file:
           cmd = '%s > %s' % (cmd, large_output_file.name)
           logging.info('Large output mode enabled. Will write output to device '
-                       ' and read results from file.')
+                       'and read results from file.')
           handle_large_command(cmd)
           return self.ReadFile(large_output_file.name)
       else:
@@ -853,13 +876,17 @@ class DeviceUtils(object):
     if not real_device_path:
       return [(host_path, device_path)]
 
-    host_checksums = md5sum.CalculateHostMd5Sums([real_host_path])
-    device_paths_to_md5 = (
-        real_device_path if os.path.isfile(real_host_path)
-        else ('%s/%s' % (real_device_path, os.path.relpath(p, real_host_path))
-              for p in host_checksums.iterkeys()))
-    device_checksums = md5sum.CalculateDeviceMd5Sums(
-        device_paths_to_md5, self)
+    try:
+      host_checksums = md5sum.CalculateHostMd5Sums([real_host_path])
+      device_paths_to_md5 = (
+          real_device_path if os.path.isfile(real_host_path)
+          else ('%s/%s' % (real_device_path, os.path.relpath(p, real_host_path))
+                for p in host_checksums.iterkeys()))
+      device_checksums = md5sum.CalculateDeviceMd5Sums(
+          device_paths_to_md5, self)
+    except EnvironmentError as e:
+      logging.warning('Error calculating md5: %s', e)
+      return [(host_path, device_path)]
 
     if os.path.isfile(host_path):
       host_checksum = host_checksums.get(real_host_path)

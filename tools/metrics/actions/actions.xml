@@ -2422,6 +2422,20 @@ should be able to be added at any place in this file.
   </obsolete>
 </action>
 
+<action name="DataSaverPrompt_Clicked">
+  <owner>glevin@chromium.org</owner>
+  <description>
+    Records click on prompt (notification) to install Data Saver extension.
+  </description>
+</action>
+
+<action name="DataSaverPrompt_Shown">
+  <owner>glevin@chromium.org</owner>
+  <description>
+    Records display of prompt (notification) to install Data Saver extension.
+  </description>
+</action>
+
 <action name="Debugger">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
@@ -11062,6 +11076,29 @@ should be able to be added at any place in this file.
   <description>Please enter the description of this user action.</description>
 </action>
 
+<action name="StackedTab_DragActiveTab">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <description>
+    Recorded when the active tab is dragged while the tabstrip is using a
+    stacked layout. The user performs this action in order to view tabs which
+    are not currently visible within the tabstrip. Note this user action is only
+    recorded for platforms which use the Views toolkit.
+  </description>
+</action>
+
+<action name="StackedTab_EnteredStackedLayout">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <description>
+    Recorded when the tabstrip begins using a stacked layout for its tabs. This
+    occurs when the user is interacting with the tabstrip using touch and there
+    is insufficient space to be able to display all tabs at a minimum
+    touch-friendly width. Note this user action is only recorded for platforms
+    which use the Views toolkit.
+  </description>
+</action>
+
 <action name="Star">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
@@ -11369,6 +11406,15 @@ should be able to be added at any place in this file.
 <action name="SuspiciousExtensionBubbleDismissed">
   <owner>finnur@chromium.org</owner>
   <description>Please enter the description of this user action.</description>
+</action>
+
+<action name="SwitchTab_Click">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <description>
+    Recorded when the user switches tabs with a mouse click. This user action is
+    only recorded on platforms which use the Views toolkit.
+  </description>
 </action>
 
 <action name="SyncedNotifications.SendingServiceDisabled">

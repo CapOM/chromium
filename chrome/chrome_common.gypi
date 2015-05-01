@@ -187,6 +187,8 @@
       'common/extensions/manifest_handlers/copresence_manifest.h',
       'common/extensions/manifest_handlers/extension_action_handler.cc',
       'common/extensions/manifest_handlers/extension_action_handler.h',
+      'common/extensions/manifest_handlers/linked_app_icons.cc',
+      'common/extensions/manifest_handlers/linked_app_icons.h',
       'common/extensions/manifest_handlers/minimum_chrome_version_checker.cc',
       'common/extensions/manifest_handlers/minimum_chrome_version_checker.h',
       'common/extensions/manifest_handlers/settings_overrides_handler.cc',
@@ -559,20 +561,8 @@
             'version_py_path': '<(DEPTH)/build/util/version.py',
             'version_path': 'VERSION',
             'template_input_path': 'common/chrome_version_info_values.h.version',
+            'branding_path': 'app/theme/<(branding_path_component)/BRANDING',
           },
-          'conditions': [
-            [ 'branding == "Chrome"', {
-              'variables': {
-                  'branding_path':
-                    'app/theme/google_chrome/BRANDING',
-              },
-            }, { # else branding!="Chrome"
-              'variables': {
-                  'branding_path':
-                    'app/theme/chromium/BRANDING',
-              },
-            }],
-          ],
           'inputs': [
             '<(template_input_path)',
             '<(version_path)',

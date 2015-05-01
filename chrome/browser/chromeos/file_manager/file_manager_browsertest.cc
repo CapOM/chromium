@@ -1160,17 +1160,22 @@ INSTANTIATE_TEST_CASE_P(
     ::testing::Values(TestParameter(NOT_IN_GUEST_MODE,
                                     "tabindexFocusDirectorySelected")));
 
-// http://crbug.com/480491
 INSTANTIATE_TEST_CASE_P(
-    DISABLED_TabindexOpenDialog,
+    TabindexOpenDialog,
     FileManagerBrowserTest,
     ::testing::Values(
         TestParameter(NOT_IN_GUEST_MODE, "tabindexOpenDialogDrive"),
         TestParameter(NOT_IN_GUEST_MODE, "tabindexOpenDialogDownloads"),
         TestParameter(IN_GUEST_MODE, "tabindexOpenDialogDownloads")));
 
-INSTANTIATE_TEST_CASE_P(
-    TabindexSaveFileDialog,
+// Fails on official build. http://crbug.com/482121.
+#if defined(OFFICIAL_BUILD)
+#define MAYBE_TabindexSaveFileDialog DISABLED_TabindexSaveFileDialog
+#else
+#define MAYBE_TabindexSaveFileDialog TabindexSaveFileDialog
+#endif
+WRAPPED_INSTANTIATE_TEST_CASE_P(
+    MAYBE_TabindexSaveFileDialog,
     FileManagerBrowserTest,
     ::testing::Values(
         TestParameter(NOT_IN_GUEST_MODE, "tabindexSaveFileDialogDrive"),

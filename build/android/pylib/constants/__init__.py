@@ -229,7 +229,8 @@ def GetBuildType():
   try:
     return os.environ['BUILDTYPE']
   except KeyError:
-    raise Exception('The BUILDTYPE environment variable has not been set')
+    raise EnvironmentError(
+        'The BUILDTYPE environment variable has not been set')
 
 
 def SetBuildType(build_type):
@@ -240,7 +241,7 @@ def SetBuildDirectory(build_directory):
   os.environ['CHROMIUM_OUT_DIR'] = build_directory
 
 
-def SetOutputDirectort(output_directory):
+def SetOutputDirectory(output_directory):
   os.environ['CHROMIUM_OUTPUT_DIR'] = output_directory
 
 

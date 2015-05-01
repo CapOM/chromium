@@ -18,6 +18,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
+#include "components/mime_util/mime_util.h"
 #include "content/browser/accessibility/accessibility_mode_helper.h"
 #include "content/browser/accessibility/browser_accessibility_state_impl.h"
 #include "content/browser/bad_message.h"
@@ -91,7 +92,6 @@
 #include "content/public/common/url_constants.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/web_preferences.h"
-#include "net/base/mime_util.h"
 #include "net/base/net_util.h"
 #include "net/http/http_cache.h"
 #include "net/http/http_transaction_factory.h"
@@ -673,6 +673,10 @@ int WebContentsImpl::GetRoutingID() const {
 
 int WebContentsImpl::GetFullscreenWidgetRoutingID() const {
   return fullscreen_widget_routing_id_;
+}
+
+void WebContentsImpl::ClosePage() {
+  GetRenderViewHost()->ClosePage();
 }
 
 RenderWidgetHostView* WebContentsImpl::GetRenderWidgetHostView() const {
@@ -1702,6 +1706,9 @@ void WebContentsImpl::ShowCreatedWindow(int route_id,
   WebContentsImpl* contents = GetCreatedWindow(route_id);
   if (contents) {
     WebContentsDelegate* delegate = GetDelegate();
+    if (!delegate || delegate->ShouldResumeRequestsForCreatedWindow())
+      contents->ResumeLoadingCreatedWebContents();
+
     if (delegate) {
       delegate->AddNewContents(
           this, contents, disposition, initial_rect, user_gesture, NULL);
@@ -1788,11 +1795,6 @@ WebContentsImpl* WebContentsImpl::GetCreatedWindow(int route_id) {
   if (!new_contents->GetRenderProcessHost()->HasConnection() ||
       !new_contents->GetRenderViewHost()->GetView())
     return NULL;
-
-  // Resume blocked requests for both the RenderViewHost and RenderFrameHost.
-  // TODO(brettw): It seems bogus to reach into here and initialize the host.
-  new_contents->GetRenderViewHost()->Init();
-  new_contents->GetMainFrame()->Init();
 
   return new_contents;
 }
@@ -2226,7 +2228,7 @@ bool WebContentsImpl::IsSavable() {
          contents_mime_type_ == "application/xhtml+xml" ||
          contents_mime_type_ == "text/plain" ||
          contents_mime_type_ == "text/css" ||
-         net::IsSupportedJavascriptMimeType(contents_mime_type_.c_str());
+         mime_util::IsSupportedJavascriptMimeType(contents_mime_type_);
 }
 
 void WebContentsImpl::OnSavePage() {
@@ -2538,6 +2540,13 @@ void WebContentsImpl::ExitFullscreen() {
   // Clean up related state and initiate the fullscreen exit.
   GetRenderViewHost()->RejectMouseLockOrUnlockIfNecessary();
   ExitFullscreenMode();
+}
+
+void WebContentsImpl::ResumeLoadingCreatedWebContents() {
+  // Resume blocked requests for both the RenderViewHost and RenderFrameHost.
+  // TODO(brettw): It seems bogus to reach into here and initialize the host.
+  GetRenderViewHost()->Init();
+  GetMainFrame()->Init();
 }
 
 bool WebContentsImpl::FocusLocationBarByDefault() {
@@ -3890,6 +3899,7 @@ void WebContentsImpl::DocumentAvailableInMainFrame(
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     DocumentAvailableInMainFrame());
 }
+
 void WebContentsImpl::RouteCloseEvent(RenderViewHost* rvh) {
   // Tell the active RenderViewHost to run unload handlers and close, as long
   // as the request came from a RenderViewHost in the same BrowsingInstance.
@@ -3897,7 +3907,7 @@ void WebContentsImpl::RouteCloseEvent(RenderViewHost* rvh) {
   // It is possible to receive it from one that has just been swapped in,
   // in which case we might as well deliver the message anyway.
   if (rvh->GetSiteInstance()->IsRelatedSiteInstance(GetSiteInstance()))
-    GetRenderViewHost()->ClosePage();
+    ClosePage();
 }
 
 bool WebContentsImpl::ShouldRouteMessageEvent(
