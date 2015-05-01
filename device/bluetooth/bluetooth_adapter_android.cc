@@ -29,6 +29,7 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapterAndroid::CreateAdapter() {
 
 // static
 bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
+  LOG(WARNING) << "BluetoothAdapterAndroid::RegisterJNI";
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
 }
 

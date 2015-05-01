@@ -16,7 +16,7 @@ import org.chromium.base.JNINamespace;
  * device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
-class BluetoothAdapter /*final?*/ {
+class BluetoothAdapter {
     private static final String TAG = "BluetoothAdapter";
 
     private final boolean mHasBluetoothPermission;
