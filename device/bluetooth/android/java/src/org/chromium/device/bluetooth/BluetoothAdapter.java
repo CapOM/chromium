@@ -6,10 +6,10 @@ package org.chromium.device.bluetooth;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.util.Log;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
+import org.chromium.base.Log;
 
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
@@ -17,7 +17,7 @@ import org.chromium.base.JNINamespace;
  */
 @JNINamespace("device")
 final class BluetoothAdapter {
-    private static final String TAG = "BluetoothAdapter";
+    private static final String TAG = Log.makeTag("BluetoothAdapter");
 
     private final boolean mHasBluetoothPermission;
 
