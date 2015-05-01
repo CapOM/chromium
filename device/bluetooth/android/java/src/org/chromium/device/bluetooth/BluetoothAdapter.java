@@ -12,7 +12,7 @@ import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 
 /**
- * Exposes android.bluetooth.BluetoothAdapter as necessary for C++ 
+ * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
  * device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
@@ -32,10 +32,11 @@ class BluetoothAdapter /*final?*/ {
     }
 
     private BluetoothAdapter(Context context) {
-        mHasBluetoothPermission = context.checkCallingOrSelfPermission(
-                android.Manifest.permission.BLUETOOTH)
+        mHasBluetoothPermission =
+                context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH)
                 == PackageManager.PERMISSION_GRANTED;
         if (!mHasBluetoothPermission) {
-            Log.w(TAG, "Failed to use bluetooth API, requires BLUETOOTH permission.");}
+            Log.w(TAG, "Failed to use bluetooth API, requires BLUETOOTH permission.");
+        }
     }
 }

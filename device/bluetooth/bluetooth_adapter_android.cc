@@ -117,12 +117,12 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
 }
 
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
-  j_bluetooth_adapter_.Reset(
-      Java_BluetoothAdapter_create(AttachCurrentThread(),
-                                    base::android::GetApplicationContext()));
-  bool has_permission = Java_BluetoothAdapter_hasBluetoothPermission(AttachCurrentThread(),
-                                               j_bluetooth_adapter_.obj());
-  DLOG(WARNING) << "BluetoothAdapterAndroid::BluetoothAdapterAndroid " << has_permission;
+  j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
+      AttachCurrentThread(), base::android::GetApplicationContext()));
+  bool has_permission = Java_BluetoothAdapter_hasBluetoothPermission(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj());
+  DLOG(WARNING) << "BluetoothAdapterAndroid::BluetoothAdapterAndroid "
+                << has_permission;
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {

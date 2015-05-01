@@ -13,14 +13,14 @@ namespace android {
 namespace {
 
 const base::android::RegistrationMethod kRegisteredMethods[] = {
-    { "BluetoothAdapter", device::BluetoothAdapterAndroid::Register },
+    {"BluetoothAdapter", device::BluetoothAdapterAndroid::Register},
 };
 
 }  // namespace
 
 bool RegisterBluetoothJni(JNIEnv* env) {
-  return RegisterNativeMethods(
-      env, kRegisteredMethods, arraysize(kRegisteredMethods));
+  return RegisterNativeMethods(env, kRegisteredMethods,
+                               arraysize(kRegisteredMethods));
 }
 
 }  // namespace android
