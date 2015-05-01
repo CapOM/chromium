@@ -20,7 +20,11 @@ namespace device {
 class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
     : public BluetoothAdapter {
  public:
+  // Create a BluetoothAdapterAndroid instance.
   static base::WeakPtr<BluetoothAdapter> CreateAdapter();
+
+  // Register methods to bind to Java with JNI.
+  static bool RegisterJNIEnv(JNIEnv* env);
 
   // BluetoothAdapter:
   std::string GetAddress() const override;
@@ -74,6 +78,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
                           const ErrorCallback& error_callback) override;
   void RemovePairingDelegateInternal(
       BluetoothDevice::PairingDelegate* pairing_delegate) override;
+
+  // Java object org.chromium.device.bluetooth.BluetoothAdapter.
+  base::android::ScopedJavaGlobalRef<jobject> j_bluetooth_adapter_;
 
   std::string address_;
   std::string name_;

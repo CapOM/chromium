@@ -123,9 +123,15 @@ component("bluetooth") {
     "//ui/base",
   ]
 
-  if (is_win) {
-    libs = [ "setupapi.lib" ]
-  } else if (is_chromeos) {
+  if (is_android) {
+    deps += [
+      "//device/bluetooth/android",
+      "//device/bluetooth/android:bluetooth_jni_headers",
+    ]
+    allow_circular_includes_from = [ "//device/bluetooth/android" ]
+  }
+
+  if (is_chromeos) {
     deps += [
       "//chromeos",
       "//dbus",
@@ -135,6 +141,10 @@ component("bluetooth") {
   if (is_mac) {
     libs = [ "IOBluetooth.framework" ]
   }
+
+  if (is_win) {
+    libs = [ "setupapi.lib" ]
+  } 
 }
 
 grit("strings") {
