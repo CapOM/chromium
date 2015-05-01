@@ -92,7 +92,7 @@
             'hid/hid.gyp:device_hid',
           ],
           'dependencies': [
-            '../content/content.gyp:content_java',
+            'bluetooth/bluetooth.gyp:device_bluetooth_java',
             '../testing/android/native_test.gyp:native_test_native_code',
           ],
           'sources/': [
