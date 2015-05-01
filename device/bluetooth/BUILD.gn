@@ -144,7 +144,7 @@ component("bluetooth") {
 
   if (is_win) {
     libs = [ "setupapi.lib" ]
-  } 
+  }
 }
 
 grit("strings") {
