@@ -22,7 +22,8 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
 }
 
 // static
-base::WeakPtr<BluetoothAdapter> BluetoothAdapterAndroid::CreateAdapter() {
+base::WeakPtr<BluetoothAdapterAndroid>
+BluetoothAdapterAndroid::CreateAdapter() {
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
@@ -119,10 +120,8 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
   j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
       AttachCurrentThread(), base::android::GetApplicationContext()));
-  bool has_permission = Java_BluetoothAdapter_hasBluetoothPermission(
+  has_bluetooth_permission_ = Java_BluetoothAdapter_hasBluetoothPermission(
       AttachCurrentThread(), j_bluetooth_adapter_.obj());
-  DLOG(WARNING) << "BluetoothAdapterAndroid::BluetoothAdapterAndroid "
-                << has_permission;
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {

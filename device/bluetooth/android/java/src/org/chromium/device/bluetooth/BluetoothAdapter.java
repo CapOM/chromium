@@ -17,7 +17,7 @@ import org.chromium.base.Log;
  */
 @JNINamespace("device")
 final class BluetoothAdapter {
-    private static final String TAG = Log.makeTag("BluetoothAdapter");
+    private static final String TAG = Log.makeTag("Bluetooth");
 
     private final boolean mHasBluetoothPermission;
 
