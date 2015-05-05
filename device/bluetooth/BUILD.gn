@@ -126,7 +126,7 @@ component("bluetooth") {
   if (is_android) {
     deps += [
       "//device/bluetooth/android",
-      "//device/bluetooth/android:bluetooth_jni_headers",
+      "//device/bluetooth/android:bluetooth_jni",
     ]
     allow_circular_includes_from = [ "//device/bluetooth/android" ]
   }

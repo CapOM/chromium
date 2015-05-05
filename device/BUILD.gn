@@ -55,6 +55,12 @@ test("device_unittests") {
     "//url",
   ]
 
+  if (is_android) {
+    deps += [
+      "//device/bluetooth/android",
+    ]
+  }
+
   if (!is_linux_without_dbus && !is_chromeos) {
     sources += [ "battery/battery_status_manager_linux_unittest.cc" ]
   }

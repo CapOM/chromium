@@ -20,7 +20,7 @@ source_set("android") {
   ]
 }
 
-generate_jni("bluetooth_jni_headers") {
+generate_jni("bluetooth_jni") {
   sources = [
     "java/src/org/chromium/device/bluetooth/BluetoothAdapter.java",
   ]
