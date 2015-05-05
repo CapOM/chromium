@@ -8,7 +8,6 @@
     '../crypto/crypto.gyp:crypto',
     '../device/battery/battery.gyp:device_battery',
     '../device/battery/battery.gyp:device_battery_mojo_bindings',
-    '../device/bluetooth/bluetooth.gyp:device_bluetooth',
     '../device/vibration/vibration.gyp:device_vibration',
     '../device/vibration/vibration.gyp:device_vibration_mojo_bindings',
     '../google_apis/google_apis.gyp:google_apis',
