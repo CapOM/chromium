@@ -20,6 +20,7 @@ final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
     private final boolean mHasBluetoothPermission;
+    private android.bluetooth.BluetoothAdapter mAdapter;
 
     @CalledByNative
     private static BluetoothAdapter create(Context context) {
@@ -31,12 +32,27 @@ final class BluetoothAdapter {
         return mHasBluetoothPermission;
     }
 
+    @CalledByNative
+    private String getName() {
+        if (mAdapter != null) {
+            return mAdapter.getName();
+        } else {
+            return "";
+        }
+    }
+
     private BluetoothAdapter(Context context) {
         mHasBluetoothPermission =
                 context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH)
                 == PackageManager.PERMISSION_GRANTED;
         if (!mHasBluetoothPermission) {
-            Log.w(TAG, "Can not use bluetooth API, requires BLUETOOTH permission.");
+            Log.w(TAG, "Can not use Bluetooth API, requires BLUETOOTH permission.");
+            return;
+        }
+
+        mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+        if (mAdapter == null) {
+            Log.w(TAG, "No adapter found.");
         }
     }
 }

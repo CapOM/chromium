@@ -18,7 +18,8 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 };
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
-  EXPECT_FALSE(adapter_->has_bluetooth_permission());
+  EXPECT_TRUE(adapter_->has_bluetooth_permission());
+  EXPECT_GT(adapter_->GetName().length(), 0u);
 }
 
 }  // namespace device

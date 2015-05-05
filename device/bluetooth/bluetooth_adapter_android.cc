@@ -5,6 +5,7 @@
 #include "device/bluetooth/bluetooth_adapter_android.h"
 
 #include "base/android/jni_android.h"
+#include "base/android/jni_string.h"
 #include "base/sequenced_task_runner.h"
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
@@ -38,7 +39,8 @@ std::string BluetoothAdapterAndroid::GetAddress() const {
 }
 
 std::string BluetoothAdapterAndroid::GetName() const {
-  return name_;
+  return base::android::ConvertJavaStringToUTF8(Java_BluetoothAdapter_getName(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj()));
 }
 
 void BluetoothAdapterAndroid::SetName(const std::string& name,
