@@ -56,9 +56,7 @@ test("device_unittests") {
   ]
 
   if (is_android) {
-    deps += [
-      "//device/bluetooth/android",
-    ]
+    deps += [ "//device/bluetooth/android" ]
   }
 
   if (!is_linux_without_dbus && !is_chromeos) {
