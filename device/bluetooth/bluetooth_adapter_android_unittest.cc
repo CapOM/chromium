@@ -25,12 +25,14 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
   InitWithPermission();
+  ASSERT_TRUE(adapter_.get());
   EXPECT_TRUE(adapter_->HasBluetoothPermission());
   EXPECT_GT(adapter_->GetName().length(), 0u);
 }
 
 TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
   InitWithoutPermission();
+  ASSERT_TRUE(adapter_.get());
   EXPECT_FALSE(adapter_->HasBluetoothPermission());
   EXPECT_EQ(adapter_->GetName().length(), 0u);
 }

@@ -30,7 +30,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
 
-  // True if this app has android permissions necessary for bluetooth.
+  // True if this app has android permissions necessary for Bluetooth.
   bool HasBluetoothPermission() const;
 
   // BluetoothAdapter:
@@ -89,7 +89,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Java object org.chromium.device.bluetooth.BluetoothAdapter.
   base::android::ScopedJavaGlobalRef<jobject> j_bluetooth_adapter_;
 
-  bool has_bluetooth_permission_ = false;
   std::string address_;
   std::string name_;
 
