@@ -244,7 +244,7 @@ static_library("mocks") {
 if (is_android) {
   generate_jni("bluetooth_jni") {
     sources = [
-      "java/src/org/chromium/device/bluetooth/BluetoothAdapter.java",
+      "android/java/src/org/chromium/device/bluetooth/BluetoothAdapter.java",
     ]
     jni_package = "bluetooth"
   }
