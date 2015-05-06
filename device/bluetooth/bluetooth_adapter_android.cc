@@ -33,6 +33,11 @@ bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
 }
 
+bool BluetoothAdapterAndroid::HasBluetoothPermission() const {
+  return Java_BluetoothAdapter_hasBluetoothPermission(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj());
+}
+
 std::string BluetoothAdapterAndroid::GetAddress() const {
   return address_;
 }
@@ -120,8 +125,6 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
   j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
       AttachCurrentThread(), base::android::GetApplicationContext()));
-  has_bluetooth_permission_ = Java_BluetoothAdapter_hasBluetoothPermission(
-      AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
