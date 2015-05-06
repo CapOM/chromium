@@ -10,16 +10,29 @@ namespace device {
 
 class BluetoothAdapterAndroidTest : public testing::Test {
  protected:
-  BluetoothAdapterAndroidTest() {
+  void InitWithPermission() {
     adapter_ = BluetoothAdapterAndroid::CreateAdapter().get();
+  }
+
+  void InitWithoutPermission() {
+    adapter_ =
+        BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting()
+            .get();
   }
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_;
 };
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
-  EXPECT_TRUE(adapter_->has_bluetooth_permission());
+  InitWithPermission();
+  EXPECT_TRUE(adapter_->HasBluetoothPermission());
   EXPECT_GT(adapter_->GetName().length(), 0u);
+}
+
+TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
+  InitWithoutPermission();
+  EXPECT_FALSE(adapter_->HasBluetoothPermission());
+  EXPECT_EQ(adapter_->GetName().length(), 0u);
 }
 
 }  // namespace device

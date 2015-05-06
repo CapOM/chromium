@@ -28,6 +28,11 @@ final class BluetoothAdapter {
     }
 
     @CalledByNative
+    private static BluetoothAdapter createWithoutPermissionForTesting(Context context) {
+        return new BluetoothAdapter();
+    }
+
+    @CalledByNative
     private boolean hasBluetoothPermission() {
         return mHasBluetoothPermission;
     }
@@ -54,5 +59,11 @@ final class BluetoothAdapter {
         if (mAdapter == null) {
             Log.w(TAG, "No adapter found.");
         }
+    }
+
+    /* Creates a BluetoothAdapter for testing, with no permission. */
+    private BluetoothAdapter() {
+        Log.i(TAG, "Testing BluetoothAdapter created.");
+        mHasBluetoothPermission = false;
     }
 }

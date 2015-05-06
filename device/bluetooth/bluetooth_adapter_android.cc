@@ -26,12 +26,28 @@ base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
 base::WeakPtr<BluetoothAdapterAndroid>
 BluetoothAdapterAndroid::CreateAdapter() {
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
+  adapter->j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
+      AttachCurrentThread(), base::android::GetApplicationContext()));
+  return adapter->weak_ptr_factory_.GetWeakPtr();
+}
+
+base::WeakPtr<BluetoothAdapterAndroid>
+BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting() {
+  BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
+  adapter->j_bluetooth_adapter_.Reset(
+      Java_BluetoothAdapter_createWithoutPermissionForTesting(
+          AttachCurrentThread(), base::android::GetApplicationContext()));
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
 // static
 bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
+}
+
+bool BluetoothAdapterAndroid::HasBluetoothPermission() const {
+  return Java_BluetoothAdapter_hasBluetoothPermission(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
 std::string BluetoothAdapterAndroid::GetAddress() const {
@@ -120,10 +136,6 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
 }
 
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
-  j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
-      AttachCurrentThread(), base::android::GetApplicationContext()));
-  has_bluetooth_permission_ = Java_BluetoothAdapter_hasBluetoothPermission(
-      AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {

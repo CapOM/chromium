@@ -23,11 +23,15 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Create a BluetoothAdapterAndroid instance.
   static base::WeakPtr<BluetoothAdapterAndroid> CreateAdapter();
 
+  // Create a BluetoothAdapterAndroid instance without Bluetooth permission.
+  static base::WeakPtr<BluetoothAdapterAndroid>
+  CreateAdapterWithoutPermissionForTesting();
+
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
 
   // True if this app has android permissions necessary for bluetooth.
-  bool has_bluetooth_permission() { return has_bluetooth_permission_; }
+  bool HasBluetoothPermission() const;
 
   // BluetoothAdapter:
   std::string GetAddress() const override;
