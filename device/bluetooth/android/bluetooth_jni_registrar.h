@@ -14,6 +14,8 @@ namespace android {
 
 // Registers C++ methods in device/bluetooth classes with JNI.
 // See https://www.chromium.org/developers/design-documents/android-jni
+//
+// Must be called before classes in the Bluetooth module are used.
 DEVICE_BLUETOOTH_EXPORT bool RegisterBluetoothJni(JNIEnv* env);
 
 }  // namespace android
