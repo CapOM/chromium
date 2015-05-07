@@ -5,7 +5,9 @@
 package org.chromium.device.bluetooth;
 
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
+import android.Manifest;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
@@ -29,15 +31,21 @@ final class BluetoothAdapter {
 
     @CalledByNative
     private static BluetoothAdapter createWithoutPermissionForTesting(Context context) {
-        return new BluetoothAdapter();
+        Context contextWithoutPermission = new ContextWrapper(context) {
+            @Override
+            public int checkCallingOrSelfPermission(String permission) {
+                return PackageManager.PERMISSION_DENIED;
+            }
+        };
+        return new BluetoothAdapter(contextWithoutPermission);
     }
 
     // Constructs a BluetoothAdapter.
     private BluetoothAdapter(Context context) {
         mHasBluetoothPermission =
-                context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH)
+                context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
                         == PackageManager.PERMISSION_GRANTED
-                && context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH_ADMIN)
+                && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
                         == PackageManager.PERMISSION_GRANTED;
         if (!mHasBluetoothPermission) {
             Log.w(TAG,
@@ -46,15 +54,7 @@ final class BluetoothAdapter {
         }
 
         mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-        if (mAdapter == null) {
-            Log.w(TAG, "No adapter found.");
-        }
-    }
-
-    // Constructs a BluetoothAdapter for testing, with no permission.
-    private BluetoothAdapter() {
-        Log.i(TAG, "Testing BluetoothAdapter created.");
-        mHasBluetoothPermission = false;
+        if (mAdapter == null) Log.i(TAG, "No adapter found.");
     }
 
     @CalledByNative
