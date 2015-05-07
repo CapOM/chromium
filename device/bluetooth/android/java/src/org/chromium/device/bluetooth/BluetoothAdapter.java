@@ -32,20 +32,7 @@ final class BluetoothAdapter {
         return new BluetoothAdapter();
     }
 
-    @CalledByNative
-    private boolean hasBluetoothPermission() {
-        return mHasBluetoothPermission;
-    }
-
-    @CalledByNative
-    private String getName() {
-        if (mAdapter != null) {
-            return mAdapter.getName();
-        } else {
-            return "";
-        }
-    }
-
+    // Constructs a BluetoothAdapter.
     private BluetoothAdapter(Context context) {
         mHasBluetoothPermission =
                 context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH)
@@ -61,9 +48,27 @@ final class BluetoothAdapter {
         }
     }
 
-    /* Creates a BluetoothAdapter for testing, with no permission. */
+    // Constructs a BluetoothAdapter for testing, with no permission.
     private BluetoothAdapter() {
         Log.i(TAG, "Testing BluetoothAdapter created.");
         mHasBluetoothPermission = false;
     }
+
+    @CalledByNative
+    private boolean hasBluetoothPermission() {
+        return mHasBluetoothPermission;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterAndroid.h interface:
+
+    @CalledByNative
+    private String getName() {
+        if (mAdapter != null) {
+            return mAdapter.getName();
+        } else {
+            return "";
+        }
+    }
+
 }
