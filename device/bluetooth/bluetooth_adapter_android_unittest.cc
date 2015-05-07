@@ -27,6 +27,10 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
   InitWithPermission();
   ASSERT_TRUE(adapter_.get());
   EXPECT_TRUE(adapter_->HasBluetoothPermission());
+  if (!adapter_->IsPresent()) {
+    LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
+    return;
+  }
   EXPECT_GT(adapter_->GetAddress().length(), 0u);
   EXPECT_GT(adapter_->GetName().length(), 0u);
   EXPECT_TRUE(adapter_->IsPresent());
