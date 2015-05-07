@@ -89,8 +89,8 @@ void BluetoothAdapterAndroid::SetPowered(bool powered,
 }
 
 bool BluetoothAdapterAndroid::IsDiscoverable() const {
-  NOTIMPLEMENTED();
-  return false;
+  return Java_BluetoothAdapter_isDiscoverable(AttachCurrentThread(),
+                                              j_bluetooth_adapter_.obj());
 }
 
 void BluetoothAdapterAndroid::SetDiscoverable(
@@ -101,8 +101,8 @@ void BluetoothAdapterAndroid::SetDiscoverable(
 }
 
 bool BluetoothAdapterAndroid::IsDiscovering() const {
-  NOTIMPLEMENTED();
-  return false;
+  return Java_BluetoothAdapter_isDiscovering(AttachCurrentThread(),
+                                             j_bluetooth_adapter_.obj());
 }
 
 void BluetoothAdapterAndroid::CreateRfcommService(

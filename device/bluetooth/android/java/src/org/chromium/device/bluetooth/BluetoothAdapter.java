@@ -89,4 +89,16 @@ final class BluetoothAdapter {
     private boolean isPowered() {
         return isPresent() && mAdapter.isEnabled();
     }
+
+    @CalledByNative
+    private boolean isDiscoverable() {
+        return isPresent()
+                && mAdapter.getScanMode()
+                == android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE;
+    }
+
+    @CalledByNative
+    private boolean isDiscovering() {
+        return isPresent() && mAdapter.isDiscovering();
+    }
 }
