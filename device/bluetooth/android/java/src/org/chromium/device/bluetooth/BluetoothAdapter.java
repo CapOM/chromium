@@ -41,7 +41,7 @@ final class BluetoothAdapter {
                         == PackageManager.PERMISSION_GRANTED;
         if (!mHasBluetoothPermission) {
             Log.w(TAG,
-                    "Can not use Bluetooth API, requires BLUETOOTH and BLUETOOTH_ADMIN permission.");
+                    "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions required.");
             return;
         }
 
