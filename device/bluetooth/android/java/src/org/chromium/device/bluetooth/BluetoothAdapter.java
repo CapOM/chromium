@@ -36,9 +36,12 @@ final class BluetoothAdapter {
     private BluetoothAdapter(Context context) {
         mHasBluetoothPermission =
                 context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH)
-                == PackageManager.PERMISSION_GRANTED;
+                        == PackageManager.PERMISSION_GRANTED
+                && context.checkCallingOrSelfPermission(android.Manifest.permission.BLUETOOTH_ADMIN)
+                        == PackageManager.PERMISSION_GRANTED;
         if (!mHasBluetoothPermission) {
-            Log.w(TAG, "Can not use Bluetooth API, requires BLUETOOTH permission.");
+            Log.w(TAG,
+                    "Can not use Bluetooth API, requires BLUETOOTH and BLUETOOTH_ADMIN permission.");
             return;
         }
 
