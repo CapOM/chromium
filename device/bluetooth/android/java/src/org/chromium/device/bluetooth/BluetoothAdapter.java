@@ -4,10 +4,10 @@
 
 package org.chromium.device.bluetooth;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
-import android.Manifest;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
