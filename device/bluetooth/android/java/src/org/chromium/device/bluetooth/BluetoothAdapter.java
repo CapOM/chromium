@@ -64,7 +64,7 @@ final class BluetoothAdapter {
 
     @CalledByNative
     private String getAddress() {
-        if (mAdapter != null) {
+        if (isPresent()) {
             return mAdapter.getAddress();
         } else {
             return "";
@@ -73,10 +73,15 @@ final class BluetoothAdapter {
 
     @CalledByNative
     private String getName() {
-        if (mAdapter != null) {
+        if (isPresent()) {
             return mAdapter.getName();
         } else {
             return "";
         }
+    }
+
+    @CalledByNative
+    private boolean isPresent() {
+        return mAdapter != null;
     }
 }

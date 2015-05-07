@@ -29,6 +29,7 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
   EXPECT_TRUE(adapter_->HasBluetoothPermission());
   EXPECT_GT(adapter_->GetAddress().length(), 0u);
   EXPECT_GT(adapter_->GetName().length(), 0u);
+  EXPECT_TRUE(adapter_->IsPresent());
 }
 
 TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
@@ -37,6 +38,7 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
   EXPECT_FALSE(adapter_->HasBluetoothPermission());
   EXPECT_EQ(adapter_->GetAddress().length(), 0u);
   EXPECT_EQ(adapter_->GetName().length(), 0u);
+  EXPECT_FALSE(adapter_->IsPresent());
 }
 
 }  // namespace device
