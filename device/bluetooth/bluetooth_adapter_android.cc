@@ -13,6 +13,7 @@
 #include "jni/BluetoothAdapter_jni.h"
 
 using base::android::AttachCurrentThread;
+using base::android::ConvertJavaStringToUTF8;
 
 namespace device {
 
@@ -51,11 +52,12 @@ bool BluetoothAdapterAndroid::HasBluetoothPermission() const {
 }
 
 std::string BluetoothAdapterAndroid::GetAddress() const {
-  return address_;
+  return ConvertJavaStringToUTF8(Java_BluetoothAdapter_getAddress(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj()));
 }
 
 std::string BluetoothAdapterAndroid::GetName() const {
-  return base::android::ConvertJavaStringToUTF8(Java_BluetoothAdapter_getName(
+  return ConvertJavaStringToUTF8(Java_BluetoothAdapter_getName(
       AttachCurrentThread(), j_bluetooth_adapter_.obj()));
 }
 

@@ -63,6 +63,15 @@ final class BluetoothAdapter {
     // BluetoothAdapterAndroid.h interface:
 
     @CalledByNative
+    private String getAddress() {
+        if (mAdapter != null) {
+            return mAdapter.getAddress();
+        } else {
+            return "";
+        }
+    }
+
+    @CalledByNative
     private String getName() {
         if (mAdapter != null) {
             return mAdapter.getName();
