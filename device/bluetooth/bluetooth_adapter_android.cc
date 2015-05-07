@@ -78,8 +78,8 @@ bool BluetoothAdapterAndroid::IsPresent() const {
 }
 
 bool BluetoothAdapterAndroid::IsPowered() const {
-  NOTIMPLEMENTED();
-  return false;
+  return Java_BluetoothAdapter_isPowered(AttachCurrentThread(),
+                                         j_bluetooth_adapter_.obj());
 }
 
 void BluetoothAdapterAndroid::SetPowered(bool powered,

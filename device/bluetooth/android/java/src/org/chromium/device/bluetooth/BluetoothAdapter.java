@@ -84,4 +84,9 @@ final class BluetoothAdapter {
     private boolean isPresent() {
         return mAdapter != null;
     }
+
+    @CalledByNative
+    private boolean isPowered() {
+        return isPresent() && mAdapter.isEnabled();
+    }
 }
