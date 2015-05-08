@@ -68,8 +68,7 @@ void BluetoothAdapterAndroid::SetName(const std::string& name,
 }
 
 bool BluetoothAdapterAndroid::IsInitialized() const {
-  NOTIMPLEMENTED();
-  return false;
+  return true;
 }
 
 bool BluetoothAdapterAndroid::IsPresent() const {
