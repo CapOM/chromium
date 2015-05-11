@@ -34,7 +34,9 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
   EXPECT_GT(adapter_->GetAddress().length(), 0u);
   EXPECT_GT(adapter_->GetName().length(), 0u);
   EXPECT_TRUE(adapter_->IsPresent());
-  EXPECT_TRUE(adapter_->IsPowered());
+  // Don't know on test machines if adapter will be powered or not, but
+  // the call should be safe to make and consistent.
+  EXPECT_EQ(adapter_->IsPowered(), adapter_->IsPowered());
   EXPECT_FALSE(adapter_->IsDiscoverable());
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
