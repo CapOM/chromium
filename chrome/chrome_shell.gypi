@@ -78,10 +78,7 @@
       'variables': {
         'jinja_inputs': ['android/shell/java/AndroidManifest.xml.jinja2'],
         'jinja_output': '<(SHARED_INTERMEDIATE_DIR)/chrome_shell_manifest/AndroidManifest.xml',
-        'jinja_variables': [ '<@(android_manifest_template_vars)' ],
-        'android_manifest_template_vars': [
-          'android_channel=<(android_channel)',
-        ],
+        'jinja_variables': [ 'android_channel=<(android_channel)' ],
       },
       'includes': [ '../build/android/jinja_template.gypi' ],
     },
