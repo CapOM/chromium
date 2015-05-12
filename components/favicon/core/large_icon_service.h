@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Chromium Authors. All rights reserved.
+// Copyright 2015 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -13,8 +13,8 @@
 
 class GURL;
 
-namespace favicon_base {
-struct FaviconRawBitmapResult;
+namespace base {
+class TaskRunner;
 }
 
 namespace favicon {
@@ -29,32 +29,36 @@ class LargeIconService : public KeyedService {
 
   ~LargeIconService() override;
 
-  // Requests the best large icon for the page at |page_url| given the requested
-  // |desired_size_in_pixel|. If no good large icon can be found, returns the
-  // fallback style to use, for which the background is set to the dominant
-  // color of a smaller icon when one is available. This function returns the
-  // style of the fallback icon rather than the rendered version so that clients
-  // can render the icon themselves.
+  // Requests the best large icon for the page at |page_url|.
+  // Case 1. An icon exists whose size is >= |min_source_size_in_pixel|:
+  // - If |desired_size_in_pixel| == 0: returns icon as is.
+  // - Else: returns the icon resized to |desired_size_in_pixel|.
+  // Case 2. An icon exists whose size is < |min_source_size_in_pixel|:
+  // - Extracts dominant color of smaller image, returns a fallback icon style
+  //   that has a matching background.
+  // Case 3. No icon exists.
+  // - Returns the default fallback icon style.
+  // For cases 2 and 3, this function returns the style of the fallback icon
+  // instead of rendering an icon so clients can render the icon themselves.
   base::CancelableTaskTracker::TaskId GetLargeIconOrFallbackStyle(
     const GURL& page_url,
+    int min_source_size_in_pixel,
     int desired_size_in_pixel,
     const favicon_base::LargeIconCallback& callback,
     base::CancelableTaskTracker* tracker);
 
+  // Returns TaskRunner used to execute background task.
+  virtual scoped_refptr<base::TaskRunner> GetBackgroundTaskRunner();
+
  private:
-  // Intermediate callback for GetLargeIconOrFallbackStyle(). Ensures the large
-  // icon is at least the desired size, if not compute the icon fallback style
-  // and use it to invoke |callback|.
-  void RunLargeIconCallback(
-      const favicon_base::LargeIconCallback& callback,
-      int desired_size_in_pixel,
-      const favicon_base::FaviconRawBitmapResult& bitmap_result);
+  // For testing.
+  friend class TestLargeIconService;
 
   FaviconService* favicon_service_;
 
-  // A pre-populated list of the types of icon files to consider when looking
-  // for large icons. This is an optimization over populating an icon type
-  // vector on each request.
+  // A pre-populated list of icon types to consider when looking for large
+  // icons. This is an optimization over populating an icon type vector on each
+  // request.
   std::vector<int> large_icon_types_;
 
   DISALLOW_COPY_AND_ASSIGN(LargeIconService);

@@ -172,8 +172,8 @@ const gfx::FontList* ShelfMenuModelAdapter::GetLabelFontList(
   if (command_id != kCommandIdOfMenuName)
     return MenuModelAdapter::GetLabelFontList(command_id);
 
-  ui::ResourceBundle& rb = ui::ResourceBundle::GetSharedInstance();
-  return &rb.GetFontList(ui::ResourceBundle::BoldFont);
+  ui::ResourceBundle* rb = &ui::ResourceBundle::GetSharedInstance();
+  return &rb->GetFontList(ui::ResourceBundle::BoldFont);
 }
 
 bool ShelfMenuModelAdapter::IsCommandEnabled(int id) const {
@@ -1432,7 +1432,10 @@ void ShelfView::GetAccessibleState(ui::AXViewState* state) {
 }
 
 void ShelfView::OnGestureEvent(ui::GestureEvent* event) {
-  if (gesture_handler_.ProcessGestureEvent(*event))
+  aura::Window* target_window = static_cast<views::View*>(event->target())
+                                    ->GetWidget()
+                                    ->GetNativeWindow();
+  if (gesture_handler_.ProcessGestureEvent(*event, target_window))
     event->StopPropagation();
 }
 

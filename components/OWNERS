@@ -32,6 +32,8 @@ per-file cdm.gypi=xhwang@chromium.org
 per-file cloud_devices*=gene@chromium.org
 per-file cloud_devices*=vitalybuka@chromium.org
 
+per-file chrome_apps.gypi=tbarzic@chromium.org
+
 per-file constrained_window*=gbillock@chromium.org
 per-file constrained_window*=msw@chromium.org
 
@@ -88,6 +90,9 @@ per-file enhanced_bookmarks*=sky@chromium.org
 
 per-file error_page*=mmenke@chromium.org
 per-file error_page*=ttuttle@chromium.org
+
+per-file external_video_surface.gypi=boliu@chromium.org
+per-file external_video_surface.gypi=qinmin@chromium.org
 
 per-file favicon*=pkotwicz@chromium.org
 per-file favicon*=sky@chromium.org
@@ -164,6 +169,9 @@ per-file onc.gypi=stevenjb@chromium.org
 
 per-file open_from_clipboard.gypi=jif@chromium.org
 per-file open_from_clipboard_strings.grdp=jif@chromium.org
+
+per-file ownership.gypi=alemate@chromium.org
+per-file ownership.gypi=dpolukhin@chromium.org
 
 per-file packed_ct_ev_whitelist.gypi=eranm@chromium.org
 per-file packed_ct_ev_whitelist.gypi=rsleevi@chromium.org

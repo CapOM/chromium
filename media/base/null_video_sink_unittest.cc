@@ -5,7 +5,6 @@
 #include "base/bind.h"
 #include "base/callback_helpers.h"
 #include "base/message_loop/message_loop.h"
-#include "base/run_loop.h"
 #include "base/test/simple_test_tick_clock.h"
 #include "media/base/null_video_sink.h"
 #include "media/base/test_helpers.h"
@@ -49,8 +48,10 @@ class NullVideoSinkTest : public testing::Test,
   }
 
   // VideoRendererSink::RenderCallback implementation.
-  MOCK_METHOD2(Render,
-               scoped_refptr<VideoFrame>(base::TimeTicks, base::TimeTicks));
+  MOCK_METHOD3(Render,
+               scoped_refptr<VideoFrame>(base::TimeTicks,
+                                         base::TimeTicks,
+                                         bool));
   MOCK_METHOD0(OnFrameDropped, void());
 
   MOCK_METHOD1(FrameReceived, void(const scoped_refptr<VideoFrame>&));
@@ -77,7 +78,7 @@ TEST_F(NullVideoSinkTest, BasicFunctionality) {
     sink->Start(this);
     const base::TimeTicks current_time = tick_clock_.NowTicks();
     const base::TimeTicks current_interval_end = current_time + kInterval;
-    EXPECT_CALL(*this, Render(current_time, current_interval_end))
+    EXPECT_CALL(*this, Render(current_time, current_interval_end, false))
         .WillOnce(Return(test_frame));
     WaitableMessageLoopEvent event;
     EXPECT_CALL(*this, FrameReceived(test_frame))
@@ -85,12 +86,16 @@ TEST_F(NullVideoSinkTest, BasicFunctionality) {
     event.RunAndWait();
   }
 
+  // Verify that toggling background rendering mode issues the right bit to
+  // each Render() call.
+  sink->set_background_render(true);
+
   // A second call returning the same frame should not result in a new call to
   // FrameReceived().
   {
     SCOPED_TRACE("Waiting for second render call.");
     WaitableMessageLoopEvent event;
-    EXPECT_CALL(*this, Render(_, _))
+    EXPECT_CALL(*this, Render(_, _, true))
         .WillOnce(Return(test_frame))
         .WillOnce(Return(nullptr));
     EXPECT_CALL(*this, FrameReceived(test_frame)).Times(0);
@@ -123,25 +128,22 @@ TEST_F(NullVideoSinkTest, ClocklessFunctionality) {
   const base::TimeTicks now = base::TimeTicks::Now();
   const base::TimeTicks current_time = tick_clock_.NowTicks();
 
-  // Use a RunLoop instead of WaitableMessageLoopEvent() since it will only quit
-  // the loop when it's idle, instead of quitting immediately which is required
-  // when clockless playback is enabled (otherwise the loop is never idle).
-  base::RunLoop run_loop;
+  SCOPED_TRACE("Waiting for multiple render callbacks");
+  WaitableMessageLoopEvent event;
   for (int i = 0; i < kTestRuns; ++i) {
     if (i < kTestRuns - 1) {
       EXPECT_CALL(*this, Render(current_time + i * interval,
-                                current_time + (i + 1) * interval))
+                                current_time + (i + 1) * interval, false))
           .WillOnce(Return(test_frame));
     } else {
       EXPECT_CALL(*this, Render(current_time + i * interval,
-                                current_time + (i + 1) * interval))
-          .WillOnce(DoAll(RunClosure(run_loop.QuitClosure()), Return(nullptr)));
+                                current_time + (i + 1) * interval, false))
+          .WillOnce(DoAll(RunClosure(event.GetClosure()), Return(nullptr)));
     }
   }
-
-  run_loop.Run();
+  event.RunAndWait();
   ASSERT_LT(base::TimeTicks::Now() - now, kTestRuns * interval);
   sink->Stop();
 }
 
-}
+}  // namespace media

@@ -93,6 +93,13 @@ function FileManager() {
   this.folderShortcutsModel_ = null;
 
   /**
+   * Model for providers (providing extensions).
+   * @type {ProvidersModel}
+   * @private
+   */
+  this.providersModel_ = null;
+
+  /**
    * Handler for command events.
    * @type {CommandHandler}
    */
@@ -170,6 +177,13 @@ function FileManager() {
    * @private
    */
   this.spinnerController_ = null;
+
+  /**
+   * Sort menu controller.
+   * @type {SortMenuController}
+   * @private
+   */
+  this.sortMenuController_ = null;
 
   /**
    * Gear menu controller.
@@ -282,6 +296,12 @@ FileManager.prototype = /** @struct */ {
    */
   get folderShortcutsModel() {
     return this.folderShortcutsModel_;
+  },
+  /**
+   * @return {ProvidersModel}
+   */
+  get providersModel() {
+    return this.providersModel_;
   },
   /**
    * @return {DirectoryTree}
@@ -412,6 +432,9 @@ FileManager.prototype = /** @struct */ {
         this.spinnerController_,
         this.commandHandler,
         this.selectionHandler_);
+    this.sortMenuController_ = new SortMenuController(
+        this.ui_.sortButton,
+        assert(this.directoryModel_.getFileList()));
     this.gearMenuController_ = new GearMenuController(
         this.ui_.gearButton,
         this.ui_.gearMenu,
@@ -710,10 +733,14 @@ FileManager.prototype = /** @struct */ {
     this.metadataModel_ = MetadataModel.create(this.volumeManager_);
     this.thumbnailModel_ = new ThumbnailModel(this.metadataModel_);
 
+    // Create the providers model.
+    this.providersModel_ = new ProvidersModel(this.volumeManager_);
+
     // Create the root view of FileManager.
     assert(this.dialogDom_);
     assert(this.launchParams_);
-    this.ui_ = new FileManagerUI(this.dialogDom_, this.launchParams_);
+    this.ui_ = new FileManagerUI(
+        this.providersModel_, this.dialogDom_, this.launchParams_);
 
     // Show the window as soon as the UI pre-initialization is done.
     if (this.dialogType == DialogType.FULL_PAGE && !util.runningInBrowser()) {
@@ -967,10 +994,12 @@ FileManager.prototype = /** @struct */ {
                            assert(this.metadataModel_),
                            fakeEntriesVisible);
     directoryTree.dataModel = new NavigationListModel(
-        this.volumeManager_,
-        this.folderShortcutsModel_,
-        new NavigationModelCommandItem(
-          util.queryDecoratedElement('#add-new-services', cr.ui.Command)));
+        assert(this.volumeManager_),
+        assert(this.folderShortcutsModel_),
+        new NavigationModelMenuItem(
+            str('ADD_NEW_SERVICES_BUTTON_LABEL'),
+            '#add-new-services-menu',
+            'add-new-services'));
 
     this.ui_.initDirectoryTree(directoryTree);
   };

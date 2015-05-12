@@ -14,7 +14,6 @@
 #include "content/public/browser/plugin_service.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents.h"
-#include "ipc/ipc_message_attachment_set.h"
 #include "ipc/ipc_platform_file.h"
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_getter.h"
@@ -25,16 +24,10 @@ namespace nacl {
 
 namespace {
 
-// The maximum number of resource file handles NaClProcessMsg_Start message
-// can have. Currently IPC::MessageAttachmentSet::kMaxDescriptorsPerMessage
-// is 128 and NaCl sends 5 handles for other purposes, hence 123.
-const size_t kMaxPreOpenResourceFiles = 123;
-
-#if defined(OS_POSIX)
-static_assert(kMaxPreOpenResourceFiles ==
-              IPC::MessageAttachmentSet::kMaxDescriptorsPerMessage - 5,
-              "kMaxPreOpenResourceFiles is not up to date");
-#endif
+// The maximum number of resource file handles the browser process accepts. Use
+// 200 because ARC's nmf has ~128 resource files as of May 2015. This prevents
+// untrusted code filling the FD/handle table.
+const size_t kMaxPreOpenResourceFiles = 200;
 
 ppapi::PpapiPermissions GetNaClPermissions(
     uint32 permission_bits,
@@ -170,6 +163,9 @@ void NaClHostMessageFilter::LaunchNaClContinuation(
   nacl::NaClLaunchParams safe_launch_params(launch_params);
   safe_launch_params.resource_prefetch_request_list.clear();
 
+  // TODO(yusukes): Fix NaClProcessHost::~NaClProcessHost() and remove the
+  // ifdef.
+#if !defined(OS_WIN)
   const std::vector<NaClResourcePrefetchRequest>& original_request_list =
       launch_params.resource_prefetch_request_list;
   content::SiteInstance* site_instance = rvh->GetSiteInstance();
@@ -186,6 +182,7 @@ void NaClHostMessageFilter::LaunchNaClContinuation(
     safe_launch_params.resource_prefetch_request_list.push_back(
         original_request_list[i]);
   }
+#endif
 
   // Process a list of resource file URLs in
   // |launch_params.resource_files_to_prefetch|.
@@ -205,7 +202,7 @@ void NaClHostMessageFilter::BatchOpenResourceFiles(
   std::vector<NaClResourcePrefetchResult> prefetched_resource_files;
   const std::vector<NaClResourcePrefetchRequest>& request_list =
       launch_params.resource_prefetch_request_list;
-  for (size_t i = 0; request_list.size(); ++i) {
+  for (size_t i = 0; i < request_list.size(); ++i) {
     GURL gurl(request_list[i].resource_url);
     base::FilePath file_path_metadata;
     if (!nacl::NaClBrowser::GetDelegate()->MapUrlToLocalFilePath(

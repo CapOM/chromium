@@ -165,7 +165,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   void InitAsFullscreen(RenderWidgetHostView* reference_host_view) override;
   void MovePluginWindows(const std::vector<WebPluginGeometry>& moves) override;
   void Focus() override;
-  void Blur() override;
   void UpdateCursor(const WebCursor& cursor) override;
   void SetIsLoading(bool is_loading) override;
   void TextInputTypeChanged(ui::TextInputType type,
@@ -186,10 +185,11 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
   gfx::Size GetRequestedRendererSize() const override;
   void SelectionBoundsChanged(
       const ViewHostMsg_SelectionBounds_Params& params) override;
-  void CopyFromCompositingSurface(const gfx::Rect& src_subrect,
-                                  const gfx::Size& dst_size,
-                                  ReadbackRequestCallback& callback,
-                                  const SkColorType color_type) override;
+  void CopyFromCompositingSurface(
+      const gfx::Rect& src_subrect,
+      const gfx::Size& dst_size,
+      ReadbackRequestCallback& callback,
+      const SkColorType preferred_color_type) override;
   void CopyFromCompositingSurfaceToVideoFrame(
       const gfx::Rect& src_subrect,
       const scoped_refptr<media::VideoFrame>& target,
@@ -358,7 +358,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAura
 
   // Exposed for tests.
   aura::Window* window() { return window_; }
-  SkColorType PreferredReadbackFormat() override;
+
   DelegatedFrameHost* GetDelegatedFrameHost() const {
     return delegated_frame_host_.get();
   }

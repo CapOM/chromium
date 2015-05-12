@@ -47,12 +47,11 @@ class PictureLayerTilingPerfTest : public testing::Test {
   void SetUp() override {
     LayerTreeSettings defaults;
     picture_layer_tiling_client_.SetTileSize(gfx::Size(256, 256));
-    picture_layer_tiling_client_.set_tree(PENDING_TREE);
     scoped_refptr<FakePicturePileImpl> pile =
         FakePicturePileImpl::CreateFilledPileWithDefaultTileSize(
             gfx::Size(256 * 50, 256 * 50));
     picture_layer_tiling_ = PictureLayerTiling::Create(
-        1, pile, &picture_layer_tiling_client_,
+        PENDING_TREE, 1.f, pile, &picture_layer_tiling_client_,
         defaults.max_tiles_for_interest_area,
         defaults.skewport_target_time_in_seconds,
         defaults.skewport_extrapolation_limit_in_content_pixels);
@@ -99,23 +98,22 @@ class PictureLayerTilingPerfTest : public testing::Test {
     gfx::Rect viewport_rect(viewport_size);
     int xoffsets[] = {10, 0, -10, 0};
     int yoffsets[] = {0, 10, 0, -10};
-    int offsetIndex = 0;
-    int offsetCount = 0;
-    const int maxOffsetCount = 1000;
+    int offset_index = 0;
+    int offset_count = 0;
+    const int max_offset_count = 1000;
 
     timer_.Reset();
     do {
       picture_layer_tiling_->ComputeTilePriorityRects(
           viewport_rect, 1.f, timer_.NumLaps() + 1, Occlusion());
 
-      viewport_rect = gfx::Rect(viewport_rect.x() + xoffsets[offsetIndex],
-                                viewport_rect.y() + yoffsets[offsetIndex],
-                                viewport_rect.width(),
-                                viewport_rect.height());
+      viewport_rect = gfx::Rect(viewport_rect.x() + xoffsets[offset_index],
+                                viewport_rect.y() + yoffsets[offset_index],
+                                viewport_rect.width(), viewport_rect.height());
 
-      if (++offsetCount > maxOffsetCount) {
-        offsetCount = 0;
-        offsetIndex = (offsetIndex + 1) % 4;
+      if (++offset_count > max_offset_count) {
+        offset_count = 0;
+        offset_index = (offset_index + 1) % 4;
       }
       timer_.NextLap();
     } while (!timer_.HasTimeLimitExpired());

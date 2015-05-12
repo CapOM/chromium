@@ -34,7 +34,7 @@ class TestDelegate : public SettingsPrivateDelegate {
 
   scoped_ptr<base::Value> GetPref(const std::string& name) override {
     if (name.compare(kTestPrefName) != 0)
-      return make_scoped_ptr(base::Value::CreateNullValue());
+      return base::Value::CreateNullValue();
 
     return CreateTestPrefObject()->ToValue();
   }
@@ -87,7 +87,9 @@ class SettingsPrivateApiTest : public ExtensionApiTest {
 
  protected:
   bool RunSettingsSubtest(const std::string& subtest) {
-    return RunExtensionSubtest("settings_private", "main.html?" + subtest);
+    return RunExtensionSubtest("settings_private",
+                               "main.html?" + subtest,
+                               kFlagLoadAsComponent);
   }
 
   // Static pointer to the TestDelegate so that it can be accessed in

@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Аккумулятор заряжен</translation>
 <translation id="6895424601869865703">Добавить аккаунт для пользователя <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Экранная клавиатура отключена</translation>
-<translation id="1057289296854808272">Поворот включен (нажмите, чтобы изменить)</translation>
+<translation id="5548285847212963613">Подключиться к этой сети можно с помощью расширения &quot;<ph name="EXTENSION_NAME"/>&quot;.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Кнопка переполнения</translation>
 <translation id="7904094684485781019">Администратор этого аккаунта запретил множественный вход</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Строка состояния</translation>
 <translation id="2248649616066688669">Если Chromebook подключен к внешнему монитору, можно закрыть его и продолжать работу.</translation>
 <translation id="2946640296642327832">Включить Bluetooth</translation>
+<translation id="5537725057119320332">Cast</translation>
 <translation id="6459472438155181876">Расширение экрана на <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Сотовый</translation>
 <translation id="6596816719288285829">IP-адрес</translation>
@@ -39,7 +40,6 @@
 Для переключения нажмите Shift + Alt.</translation>
 <translation id="6043994281159824495">Выйти</translation>
 <translation id="2127372758936585790">Маломощное зарядное устройство</translation>
-<translation id="4625920103690741805">Поворот заблокирован (нажмите, чтобы изменить)</translation>
 <translation id="3799026279081545374">Возможно, ваше зарядное устройство требует замены. Для получения подробной информации позвоните по телефону: в США – 866-628-1371, в Великобритании – 0800-026-0613, в Ирландии – 1-800-832-664, в Канаде – 866-628-1372, в Австралии – 1-800-067-460.</translation>
 <translation id="3891340733213178823">Чтобы выйти, дважды нажмите Ctrl+Shift+Q.</translation>
 <translation id="5871632337994001636">Управление устройствами...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">Автоматически скрывать панель запуска</translation>
 <translation id="7573962313813535744">Закрепленный режим</translation>
 <translation id="2792498699870441125">Alt + Search</translation>
-<translation id="8660803626959853127">Синхронизация файлов (<ph name="COUNT"/>)</translation>
 <translation id="5958529069007801266">Контролируемый профиль</translation>
 <translation id="3709443003275901162">более 9</translation>
 <translation id="639644700271529076">CAPS LOCK отключен</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">Подробнее...</translation>
 <translation id="7168224885072002358">Возврат к предыдущему разрешению через <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Камера и микрофон используются.</translation>
+<translation id="6550675742724504774">Параметры</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Вернуться к языку: &quot;<ph name="FROM_LOCALE"/>&quot; (потребуется перезагрузка)</translation>
 <translation id="8103386449138765447">SMS: <ph name="MESSAGE_COUNT"/></translation>

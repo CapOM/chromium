@@ -116,8 +116,8 @@ class SessionManagerClientImpl : public SessionManagerClient {
   }
 
   void RestartJob(int pid, const std::string& command_line) override {
-    dbus::ScopedFileDescriptor local_auth_fd(new dbus::FileDescriptor());
-    dbus::ScopedFileDescriptor remote_auth_fd(new dbus::FileDescriptor());
+    dbus::ScopedFileDescriptor local_auth_fd(new dbus::FileDescriptor);
+    dbus::ScopedFileDescriptor remote_auth_fd(new dbus::FileDescriptor);
 
     // The session_manager provides a new method to replace RestartJob, called
     // RestartJobWithAuth, that is able to be used correctly within a PID
@@ -129,10 +129,21 @@ class SessionManagerClientImpl : public SessionManagerClient {
     // takes care of them from there.
     // NB: PostTaskAndReply ensures that the second callback (which owns the
     //     ScopedFileDescriptor objects) outlives the first, so passing the
-    //     bare pointers to CreateValidCredConduit is safe.
+    //     bare pointers to CreateValidCredConduit is safe...
+    //     -- BUT --
+    //     you have to grab pointers to the contents of {local,remote}_auth_fd
+    //     _before_ they're acted on by base::Passed() below. Passing ownership
+    //     of the ScopedFileDescriptor objects to the callback actually nulls
+    //     out the storage inside the local instances. Since there are
+    //     no guarantees about the order of evaluation of arguments in a
+    //     function call, merely having them appear earlier among the args
+    //     to PostTaskAndReply() is not enough. Relying on this crashed on
+    //     some platforms.
+    base::Closure create_credentials_conduit_closure = base::Bind(
+        &CreateValidCredConduit, local_auth_fd.get(), remote_auth_fd.get());
+
     base::WorkerPool::PostTaskAndReply(
-        FROM_HERE, base::Bind(&CreateValidCredConduit, local_auth_fd.get(),
-                              remote_auth_fd.get()),
+        FROM_HERE, create_credentials_conduit_closure,
         base::Bind(&SessionManagerClientImpl::CallRestartJobWithValidFd,
                    weak_ptr_factory_.GetWeakPtr(), base::Passed(&local_auth_fd),
                    base::Passed(&remote_auth_fd), command_line),

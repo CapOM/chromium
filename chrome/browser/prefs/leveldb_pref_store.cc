@@ -12,6 +12,7 @@
 #include "base/metrics/sparse_histogram.h"
 #include "base/sequenced_task_runner.h"
 #include "base/task_runner_util.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
 #include "base/values.h"
@@ -190,11 +191,12 @@ LevelDBPrefStore::LevelDBPrefStore(
     base::SequencedTaskRunner* sequenced_task_runner)
     : path_(filename),
       sequenced_task_runner_(sequenced_task_runner),
-      original_task_runner_(base::MessageLoopProxy::current()),
+      original_task_runner_(base::ThreadTaskRunnerHandle::Get()),
       read_only_(false),
       initialized_(false),
       read_error_(PREF_READ_ERROR_NONE),
-      weak_ptr_factory_(this) {}
+      weak_ptr_factory_(this) {
+}
 
 LevelDBPrefStore::~LevelDBPrefStore() {
   CommitPendingWrite();
@@ -265,12 +267,15 @@ void LevelDBPrefStore::ScheduleWrite() {
   }
 }
 
-void LevelDBPrefStore::SetValue(const std::string& key, base::Value* value) {
+void LevelDBPrefStore::SetValue(const std::string& key,
+                                base::Value* value,
+                                uint32 flags) {
   SetValueInternal(key, value, true /*notify*/);
 }
 
 void LevelDBPrefStore::SetValueSilently(const std::string& key,
-                                        base::Value* value) {
+                                        base::Value* value,
+                                        uint32 flags) {
   SetValueInternal(key, value, false /*notify*/);
 }
 
@@ -299,7 +304,7 @@ void LevelDBPrefStore::SetValueInternal(const std::string& key,
   }
 }
 
-void LevelDBPrefStore::RemoveValue(const std::string& key) {
+void LevelDBPrefStore::RemoveValue(const std::string& key, uint32 flags) {
   DCHECK(initialized_);
   if (prefs_.RemoveValue(key)) {
     MarkForDeletion(key);
@@ -372,7 +377,8 @@ void LevelDBPrefStore::MarkForInsertion(const std::string& key,
   ScheduleWrite();
 }
 
-void LevelDBPrefStore::ReportValueChanged(const std::string& key) {
+void LevelDBPrefStore::ReportValueChanged(const std::string& key,
+                                          uint32 flags) {
   base::Value* new_value = NULL;
   bool contains_value = prefs_.GetValue(key, &new_value);
   DCHECK(contains_value);

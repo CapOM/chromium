@@ -79,7 +79,6 @@
         '|content/browser/renderer_host/delegated' \
         '|content/browser/renderer_host/software' \
         '|content/common/gpu/client/' \
-        '|webkit/common/gpu/'
     },
     'auto_bisect': {
       'filepath': 'tools/run-bisect-perf-regression.py'\
@@ -185,7 +184,6 @@
     },
     'cc': {
       'filepath': 'cc/|'\
-                  'webkit/renderer/compositor_bindings/|'\
                   'content/common/cc_messages'
     },
     'chrome_elf': {
@@ -439,6 +437,9 @@
     'linux_seccomp_bpf': {
       'filepath': 'content/common/sandbox.*linux.cc',
     },
+    'mandoline': {
+      'filepath': 'mandoline',
+    },
     'md_settings': {
       'filepath': 'ui/webui/resources/cr_element'\
                   '|chrome/browser/resources/md_settings/'\
@@ -583,7 +584,7 @@
     },
     'plugin': {
       'filepath': 'chrome/browser/plugin|chrome/plugin/|'\
-        'chrome/common/plugin|webkit/glue/webplugin|webkit/glue/plugins/',
+        'chrome/common/plugin',
     },
     'polymer': {
       'filepath': 'third_party/polymer/|'\
@@ -656,7 +657,6 @@
                    '|chrome/renderer/spellchecker/'\
                    '|third_party/hunspell/'\
                    '|third_party/hunspell_dictionaries/'\
-                   '|webkit/tools/test_shell/mock_spellcheck'
     },
     'streams': {
       'filepath': 'content/browser/streams/',
@@ -788,9 +788,6 @@
                   'chrome/test/data/chromeos/virtual_keyboard/'\
                   'chrome/common/extensions/api/virtual_keyboard',
     },
-    'webkit': {
-      'filepath': 'webkit/',
-    },
     'webrtc_media': {
       'filepath': 'chrome/browser/media/|'\
                   'content/browser/renderer_host/media/|'\
@@ -812,7 +809,7 @@
     },
     'worker': {
       'filepath': 'chrome/browser/worker_host/|chrome/worker/|'\
-        'chrome/common/worker_messages|webkit/glue/webworker',
+        'chrome/common/worker_messages',
     },
     'x11': {
       'filepath': 'content/browser/renderer_host/backing_store_x\.' \
@@ -840,7 +837,7 @@
     'accessibility': ['aboxhall+watch@chromium.org',
                       'dmazzoni+watch@chromium.org',
                       'dtseng+watch@chromium.org',
-                      'je_julie.kim@samsung.com',
+                      'je_julie.kim@chromium.org',
                       'nektar+watch@chromium.org',
                       'plundblad+watch@chromium.org',
                       'yuzo+watch@chromium.org'],
@@ -983,6 +980,7 @@
     'linux_sandboxing': ['jln+watch@chromium.org'],
     'linux_seccomp_bpf': ['jln+watch@chromium.org'],
     'supervised_users': ['pam+watch@chromium.org'],
+    'mandoline': ['yzshen+watch@chromium.org'],
     'md_settings': ['jhawkins+watch-md-settings@chromium.org',
                     'jlklein+watch-md-settings@chromium.org',
                     'khorimoto+watch-md-settings@chromium.org',
@@ -1101,7 +1099,6 @@
     'views_core': ['tdanderson+views@chromium.org'],
     'virtual_keyboard': ['dfaden+virtualkb@google.com',
                          'groby+virtualkb@chromium.org'],
-    'webkit': ['darin-cc@chromium.org'],
     'webrtc_media': ['wjia+watch@chromium.org',
                      'mcasas+watch@chromium.org',
                      'posciak+watch@chromium.org'],

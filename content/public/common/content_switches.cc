@@ -29,13 +29,6 @@ const char kAllowNoSandboxJob[]             = "allow-no-sandbox-job";
 // Allows debugging of sandboxed processes (see zygote_main_linux.cc).
 const char kAllowSandboxDebugging[]         = "allow-sandbox-debugging";
 
-// The same as kAuditHandles except all handles are enumerated.
-const char kAuditAllHandles[]               = "enable-handle-auditing-all";
-
-// Enumerates and prints a child process' most dangerous handles when it
-// is terminated.
-const char kAuditHandles[]                  = "enable-handle-auditing";
-
 // Choose which logging channels in blink platform to activate.  See
 // Logging.cpp in blink's Source/platform for a list of available channels.
 const char kBlinkPlatformLogChannels[]      = "blink-platform-log-channels";
@@ -97,6 +90,9 @@ const char kDisablePreferCompositingToLCDText[] =
 
 // Disables HTML5 DB support.
 const char kDisableDatabases[]              = "disable-databases";
+
+// Disables Delay Agnostic AEC in WebRTC.
+const char kDisableDelayAgnosticAec[]       = "disable-delay-agnostic-aec";
 
 // Disables delegated renderer.
 const char kDisableDelegatedRenderer[]      = "disable-delegated-renderer";
@@ -383,6 +379,10 @@ const char kEnableOverlayFullscreenVideo[]  = "enable-overlay-fullscreen-video";
 // Enables compositor-accelerated touch-screen pinch gestures.
 const char kEnablePinch[]                   = "enable-pinch";
 
+// Enables testing features of the Plugin Placeholder. For internal use only.
+const char kEnablePluginPlaceholderTesting[] =
+    "enable-plugin-placeholder-testing";
+
 // Make the values returned to window.performance.memory more granular and more
 // up to date in shared worker. Without this flag, the memory information is
 // still available, but it is bucketized and updated less frequently. This flag
@@ -628,6 +628,9 @@ const char kNoReferrers[]                   = "no-referrers";
 
 // Disables the sandbox for all process types that are normally sandboxed.
 const char kNoSandbox[]                     = "no-sandbox";
+
+// Disables appcontainer/lowbox for renderer on Win8+ platforms.
+const char kDisableAppContainer[]           = "disable-appcontainer";
 
 // Number of worker threads used to rasterize content.
 const char kNumRasterThreads[]              = "num-raster-threads";
@@ -941,6 +944,10 @@ const char kRemoteDebuggingSocketName[]     = "remote-debugging-socket-name";
 const char kRendererWaitForJavaDebugger[] = "renderer-wait-for-java-debugger";
 #endif
 
+// Enable the aggressive flushing of DOM Storage to minimize data loss.
+const char kEnableAggressiveDOMStorageFlushing[] =
+    "enable-aggressive-domstorage-flushing";
+
 // Disable web audio API.
 const char kDisableWebAudio[]               = "disable-webaudio";
 
@@ -983,9 +990,14 @@ const char kEnableWin32kRendererLockDown[] =
     "enable-win32k-renderer-lockdown";
 
 // DirectWrite FontCache is shared by browser to renderers using shared memory.
-// This switch allows specifying suffix to shared memory section name to avoid
-// clashes between different instances of Chrome.
-const char kFontCacheSharedMemSuffix[] = "font-cache-shared-mem-suffix";
+// This switch allows us to pass the shared memory handle to the renderer.
+const char kFontCacheSharedHandle[] = "font-cache-shared-handle";
+
+// Sets the free memory thresholds below which the system is considered to be
+// under moderate and critical memory pressure. Used in the browser process,
+// and ignored if invalid. Specified as a pair of comma separated integers.
+// See base/win/memory_pressure_monitor.cc for defaults.
+const char kMemoryPressureThresholdsMb[] = "memory-pressure-thresholds-mb";
 
 // Enables the exporting of the tracing events to ETW. This is only supported on
 // Windows Vista and later.

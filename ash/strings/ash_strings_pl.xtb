@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Bateria naładowana</translation>
 <translation id="6895424601869865703">Dodaj konto dla: <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Klawiatura ekranowa wyłączona</translation>
-<translation id="1057289296854808272">Obracanie włączone (kliknij tutaj, by to zmienić)</translation>
+<translation id="5548285847212963613">Rozszerzenie „<ph name="EXTENSION_NAME"/>” może ułatwić połączenie z tą siecią.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> i <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Przycisk akcji</translation>
 <translation id="7904094684485781019">Administrator tego konta zablokował możliwość wielokrotnego logowania.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Zasobnik stanu</translation>
 <translation id="2248649616066688669">Z Chromebooka możesz nadal korzystać po podłączeniu do zewnętrznego wyświetlacza, nawet z zamkniętą pokrywą.</translation>
 <translation id="2946640296642327832">Włącz Bluetooth</translation>
+<translation id="5537725057119320332">Cast</translation>
 <translation id="6459472438155181876">Rozszerzanie ekranu na <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Komórka</translation>
 <translation id="6596816719288285829">Adres IP</translation>
@@ -39,7 +40,6 @@
 Naciśnij Shift + Alt, by ją przełączyć.</translation>
 <translation id="6043994281159824495">Wyloguj się teraz</translation>
 <translation id="2127372758936585790">Ładowarka o małej mocy</translation>
-<translation id="4625920103690741805">Obracanie zablokowane (kliknij tutaj, by to zmienić)</translation>
 <translation id="3799026279081545374">Możesz mieć niewłaściwą ładowarkę. Jeśli mieszkasz w Stanach Zjednoczonych, aby uzyskać pomoc i zamówić ładowarkę zastępczą, zadzwoń pod numer 866-628-1371. W Wielkiej Brytanii – pod numer 0800-026-0613. W Irlandii – pod numer 1-800-832-664. W Kanadzie – pod numer 866-628-1372. W Australii – pod numer 1-800-067-460.</translation>
 <translation id="3891340733213178823">Naciśnij dwukrotnie Ctrl+Shift+Q, by się wylogować.</translation>
 <translation id="5871632337994001636">Zarządzaj urządzeniami...</translation>
@@ -167,7 +167,6 @@ Naciśnij Shift + Alt, by ją przełączyć.</translation>
 <translation id="112308213915226829">Autoukrywanie półki</translation>
 <translation id="7573962313813535744">Tryb dokowania</translation>
 <translation id="2792498699870441125">Alt+Szukaj</translation>
-<translation id="8660803626959853127">Synchronizacja: <ph name="COUNT"/> pliki(ów)</translation>
 <translation id="5958529069007801266">Użytkownik nadzorowany</translation>
 <translation id="3709443003275901162">Ponad 9</translation>
 <translation id="639644700271529076">CAPS LOCK jest wyłączony</translation>
@@ -187,6 +186,7 @@ Naciśnij Szukaj lub Shift, by anulować.</translation>
 <translation id="6165508094623778733">Więcej informacji</translation>
 <translation id="7168224885072002358">Powrót do wcześniejszej rozdzielczości za <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Aparat i mikrofon są używane.</translation>
+<translation id="6550675742724504774">Opcje</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Zmień z powrotem na „<ph name="FROM_LOCALE"/>” (wymaga ponownego uruchomienia)</translation>
 <translation id="8103386449138765447">SMS-y: <ph name="MESSAGE_COUNT"/></translation>

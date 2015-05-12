@@ -19,21 +19,13 @@ namespace cc {
 
 class CC_EXPORT FloatClipDisplayItem : public DisplayItem {
  public:
+  FloatClipDisplayItem();
   ~FloatClipDisplayItem() override;
 
-  static scoped_ptr<FloatClipDisplayItem> Create(gfx::RectF clip_rect) {
-    return make_scoped_ptr(new FloatClipDisplayItem(clip_rect));
-  }
+  void SetNew(const gfx::RectF& clip_rect);
 
   void Raster(SkCanvas* canvas, SkDrawPictureCallback* callback) const override;
-
-  bool IsSuitableForGpuRasterization() const override;
-  int ApproximateOpCount() const override;
-  size_t PictureMemoryUsage() const override;
   void AsValueInto(base::trace_event::TracedValue* array) const override;
-
- protected:
-  explicit FloatClipDisplayItem(gfx::RectF clip_rect);
 
  private:
   gfx::RectF clip_rect_;
@@ -41,6 +33,7 @@ class CC_EXPORT FloatClipDisplayItem : public DisplayItem {
 
 class CC_EXPORT EndFloatClipDisplayItem : public DisplayItem {
  public:
+  EndFloatClipDisplayItem();
   ~EndFloatClipDisplayItem() override;
 
   static scoped_ptr<EndFloatClipDisplayItem> Create() {
@@ -48,14 +41,7 @@ class CC_EXPORT EndFloatClipDisplayItem : public DisplayItem {
   }
 
   void Raster(SkCanvas* canvas, SkDrawPictureCallback* callback) const override;
-
-  bool IsSuitableForGpuRasterization() const override;
-  int ApproximateOpCount() const override;
-  size_t PictureMemoryUsage() const override;
   void AsValueInto(base::trace_event::TracedValue* array) const override;
-
- protected:
-  EndFloatClipDisplayItem();
 };
 
 }  // namespace cc

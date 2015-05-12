@@ -309,17 +309,6 @@ bool IsStaleWhileRevalidateEnabled(const base::CommandLine& command_line) {
   return group_name == "Enabled";
 }
 
-bool IsCertificateTransparencyRequiredForEV(
-    const base::CommandLine& command_line) {
-  const std::string group_name =
-      base::FieldTrialList::FindFullName("CTRequiredForEVTrial");
-  if (command_line.HasSwitch(
-        switches::kDisableCertificateTransparencyRequirementForEV))
-    return false;
-
-  return group_name == "RequirementEnforced";
-}
-
 // Parse kUseSpdy command line flag options, which may contain the following:
 //
 //   "off"                      : Disables SPDY support entirely.
@@ -733,17 +722,19 @@ void IOThread::InitAsync() {
     for (std::vector<std::string>::iterator it = logs.begin(); it != logs.end();
          ++it) {
       const std::string& curr_log = *it;
-      size_t delim_pos = curr_log.find(":");
-      CHECK(delim_pos != std::string::npos)
-          << "CT log description not provided (switch format"
-             " is 'description:base64_key')";
-      std::string log_description(curr_log.substr(0, delim_pos));
+      std::vector<std::string> log_metadata;
+      base::SplitString(curr_log, ':', &log_metadata);
+      CHECK_GE(log_metadata.size(), 3u)
+          << "CT log metadata missing: Switch format is "
+          << "'description:base64_key:url_without_schema'.";
+      std::string log_description(log_metadata[0]);
+      std::string log_url(std::string("https://") + log_metadata[2]);
       std::string ct_public_key_data;
-      CHECK(base::Base64Decode(curr_log.substr(delim_pos + 1),
-                               &ct_public_key_data))
+      CHECK(base::Base64Decode(log_metadata[1], &ct_public_key_data))
           << "Unable to decode CT public key.";
       scoped_ptr<net::CTLogVerifier> external_log_verifier(
-          net::CTLogVerifier::Create(ct_public_key_data, log_description));
+          net::CTLogVerifier::Create(ct_public_key_data, log_description,
+                                     log_url));
       CHECK(external_log_verifier) << "Unable to parse CT public key.";
       VLOG(1) << "Adding log with description " << log_description;
       ct_verifier->AddLog(external_log_verifier.Pass());
@@ -755,9 +746,7 @@ void IOThread::InitAsync() {
   tracked_objects::ScopedTracker tracking_profile10(
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "466432 IOThread::InitAsync::CertPolicyEnforcer"));
-  net::CertPolicyEnforcer* policy_enforcer = NULL;
-  policy_enforcer = new net::CertPolicyEnforcer(
-      IsCertificateTransparencyRequiredForEV(command_line));
+  net::CertPolicyEnforcer* policy_enforcer = new net::CertPolicyEnforcer;
   globals_->cert_policy_enforcer.reset(policy_enforcer);
 
   globals_->ssl_config_service = GetSSLConfigService();
@@ -1036,18 +1025,6 @@ void IOThread::ConfigureSpdyGlobals(
     globals->next_protos.push_back(net::kProtoQUIC1SPDY3);
   }
 
-  if (command_line.HasSwitch(switches::kEnableSpdy4)) {
-    globals->next_protos.push_back(net::kProtoSPDY31);
-    globals->next_protos.push_back(net::kProtoSPDY4_14);
-    globals->next_protos.push_back(net::kProtoSPDY4);
-    globals->use_alternate_protocols.set(true);
-    return;
-  }
-  if (command_line.HasSwitch(switches::kEnableNpnHttpOnly)) {
-    globals->use_alternate_protocols.set(false);
-    return;
-  }
-
   // No SPDY command-line flags have been specified. Examine trial groups.
   if (spdy_trial_group.starts_with(kSpdyFieldTrialHoldbackGroupNamePrefix)) {
     net::HttpStreamFactory::set_spdy_enabled(false);
@@ -1193,6 +1170,7 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
       &params->alternative_service_probability_threshold);
 
   globals.enable_quic.CopyToIfSet(&params->enable_quic);
+  globals.disable_insecure_quic.CopyToIfSet(&params->disable_insecure_quic);
   globals.enable_quic_for_proxies.CopyToIfSet(&params->enable_quic_for_proxies);
   globals.quic_always_require_handshake_confirmation.CopyToIfSet(
       &params->quic_always_require_handshake_confirmation);
@@ -1329,6 +1307,8 @@ void IOThread::ConfigureQuicGlobals(
       command_line, quic_trial_group, quic_allowed_by_policy);
   globals->enable_quic_for_proxies.set(enable_quic_for_proxies);
   if (enable_quic) {
+    globals->disable_insecure_quic.set(
+        ShouldDisableInsecureQuic(quic_trial_params));
     globals->quic_always_require_handshake_confirmation.set(
         ShouldQuicAlwaysRequireHandshakeConfirmation(quic_trial_params));
     globals->quic_disable_connection_pooling.set(
@@ -1438,6 +1418,14 @@ bool IOThread::ShouldEnableQuicForDataReductionProxy() {
 
   return data_reduction_proxy::DataReductionProxyParams::
       IsIncludedInQuicFieldTrial();
+}
+
+// static
+bool IOThread::ShouldDisableInsecureQuic(
+    const VariationParameters& quic_trial_params) {
+  return LowerCaseEqualsASCII(
+      GetVariationParam(quic_trial_params, "disable_insecure_quic"),
+      "true");
 }
 
 bool IOThread::ShouldEnableQuicPortSelection(

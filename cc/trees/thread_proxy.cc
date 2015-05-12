@@ -1087,8 +1087,7 @@ DrawResult ThreadProxy::DrawSwapInternal(bool forced_draw) {
   }
 
   if (draw_frame) {
-    impl().layer_tree_host_impl->DrawLayers(
-        &frame, impl().scheduler->LastBeginImplFrameTime());
+    impl().layer_tree_host_impl->DrawLayers(&frame);
     result = DRAW_SUCCESS;
   } else {
     DCHECK_NE(DRAW_SUCCESS, result);
@@ -1163,8 +1162,8 @@ base::TimeDelta ThreadProxy::CommitToActivateDurationEstimate() {
   return impl().timing_history.CommitToActivateDurationEstimate();
 }
 
-void ThreadProxy::DidBeginImplFrameDeadline() {
-  impl().layer_tree_host_impl->ResetCurrentBeginFrameArgsForNextFrame();
+void ThreadProxy::DidFinishImplFrame() {
+  impl().layer_tree_host_impl->DidFinishImplFrame();
 }
 
 void ThreadProxy::SendBeginFramesToChildren(const BeginFrameArgs& args) {

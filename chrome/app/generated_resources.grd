@@ -3606,7 +3606,7 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
 
       <!-- Basic Auth Dialog -->
-      <message name="IDS_LOGIN_DIALOG_TITLE" desc="String to be displayed in the title bar of the login prompt dialog">
+      <message name="IDS_LOGIN_DIALOG_TITLE" desc="String to be displayed in the title bar of the login prompt dialog" formatter_data="android_java">
         Authentication Required
       </message>
       <message name="IDS_LOGIN_DIALOG_DESCRIPTION" desc="String to be displayed in the login prompt dialog to explain what the user needs to do">
@@ -3615,13 +3615,13 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_LOGIN_DIALOG_DESCRIPTION_NO_REALM" desc="String to be displayed in the login prompt dialog to explain what the user needs to do">
         The server <ph name="DOMAIN">$1<ex>google.com</ex></ph> requires a username and password.
       </message>
-      <message name="IDS_LOGIN_DIALOG_USERNAME_FIELD" desc="The label of the username field in the login prompt dialog">
+      <message name="IDS_LOGIN_DIALOG_USERNAME_FIELD" desc="The label of the username field in the login prompt dialog" formatter_data="android_java">
         User Name:
       </message>
-      <message name="IDS_LOGIN_DIALOG_PASSWORD_FIELD" desc="The label of the password field in the login prompt dialog">
+      <message name="IDS_LOGIN_DIALOG_PASSWORD_FIELD" desc="The label of the password field in the login prompt dialog" formatter_data="android_java">
         Password:
       </message>
-      <message name="IDS_LOGIN_DIALOG_OK_BUTTON_LABEL" desc="The label of the 'Log In' button on the login prompt dialog">
+      <message name="IDS_LOGIN_DIALOG_OK_BUTTON_LABEL" desc="The label of the 'Log In' button on the login prompt dialog" formatter_data="android_java">
         Log In
       </message>
       <!-- User Image Selection Dialog -->
@@ -4606,6 +4606,9 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_EXTENSION_PROMPT_WARNING_AUTOFILL_PRIVATE" desc="Permission string for access to autofill settings.">
         Read and change autofill settings
       </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_PASSWORDS_PRIVATE" desc="Permission string for access to passwords settings.">
+        Read and change saved password settings
+      </message>
 
       <!-- Extension/App error messages -->
       <message name="IDS_EXTENSION_CANT_GET_ABSOLUTE_PATH" desc="Warning displayed in pack dialog when the absolute path to the extension directory can not be found.">
@@ -4986,6 +4989,12 @@ Even if you have downloaded files from this website before, the website might ha
           <message name="IDS_EXTENSIONS_HIDE_BUTTON" desc="The text for the Hide context menu item (sentence case).">
             Hide button
           </message>
+          <message name="IDS_EXTENSIONS_KEEP_BUTTON_IN_TOOLBAR" desc="The text for the menu item to keep a button pinned in the toolbar (sentence case).">
+            Keep in toolbar
+          </message>
+          <message name="IDS_EXTENSIONS_SHOW_BUTTON_IN_TOOLBAR" desc="The text for the menu item to move a button to the toolbar (sentence case).">
+            Show in toolbar
+          </message>
           <message name="IDS_MANAGE_EXTENSION" desc="The 'Manage extensions' text in the context menu for when right-clicking on extension icons (sentence case).">
             Manage extensions
           </message>
@@ -5005,6 +5014,12 @@ Even if you have downloaded files from this website before, the website might ha
           </message>
           <message name="IDS_EXTENSIONS_HIDE_BUTTON" desc="The text for the Hide context menu item (title case).">
             Hide Button
+          </message>
+          <message name="IDS_EXTENSIONS_KEEP_BUTTON_IN_TOOLBAR" desc="The text for the menu item to keep a button pinned in the toolbar (title case).">
+            Keep in Toolbar
+          </message>
+          <message name="IDS_EXTENSIONS_SHOW_BUTTON_IN_TOOLBAR" desc="The text for the menu item to move a button to the toolbar (title case).">
+            Show in Toolbar
           </message>
           <message name="IDS_MANAGE_EXTENSION" desc="The 'Manage Extensions' text in the context menu for when right-clicking on extension icons (title case).">
             Manage Extensions
@@ -5407,6 +5422,9 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_COMPONENTS_SVC_STATUS_DNL" desc="Service Status">
         Downloading
+      </message>
+      <message name="IDS_COMPONENTS_SVC_STATUS_DOWNLOADED" desc="Service Status">
+        Downloaded
       </message>
       <message name="IDS_COMPONENTS_SVC_STATUS_UPDT_DIFF" desc="Service Status">
         Updating diff
@@ -5992,12 +6010,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_QUIC_DESCRIPTION" desc="Description for the flag to enable QUIC.">
         Enable experimental QUIC protocol support.
       </message>
-      <message name="IDS_FLAGS_ENABLE_SPDY4_NAME" desc="Title for the flag to enable SPDY/4">
-        Enable SPDY/4
-      </message>
-      <message name="IDS_FLAGS_ENABLE_SPDY4_DESCRIPTION" desc="Description for the flag to enable SPDY/4.">
-        Enable SPDY/4, which is the HTTP/2 standard. Currently experimental.
-      </message>
       <message name="IDS_FLAGS_DISABLE_MEDIA_SOURCE_NAME" desc="Title for the flag to disable the Media Source API.">
         Disable Media Source API.
       </message>
@@ -6280,6 +6292,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         <message name="IDS_FLAGS_ALLOW_TOUCHPAD_THREE_FINGER_CLICK_DESCRIPTION" desc="Description for the flag to enable touchpad three finger click as middle button.">
           Enables touchpad three-finger-click as middle button.
         </message>
+        <message name="IDS_FLAGS_ASH_ENABLE_UNIFIED_DESKTOP_NAME" desc="Name for the flag to enable unified desktop mode.">
+          Enable unified desktop mode.
+        </message>
+        <message name="IDS_FLAGS_ASH_ENABLE_UNIFIED_DESKTOP_DESCRIPTION" desc="Description for the flag to enable unified desktop mode.">
+          Enable unified desktop mode which allows a window to span multiple displays.
+        </message>
         <message name="IDS_FLAGS_DISABLE_BOOT_ANIMATION" desc="Name for the flag to disable wallpaper boot animation (except for OOBE).">
           Disable boot animation.
         </message>
@@ -6347,8 +6365,14 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_PASSWORD_MANAGER_LINK_DESCRIPTION" desc="Description of the flag to enable showing a link to account central on password settings page">
         Show a link in the password manager settings page to manage your synced passwords online.
       </message>
-      <message name="IDS_PASSWORD_MANAGER_SAVE_PASSWORD_SMART_LOCK_PROMPT" desc="Message to save a password to Smart Lock.">
-          Save password for this site with Google Smart Lock?
+      <message name="IDS_SAVE_PASSWORD" desc="The title of the save password bubble when a password can be saved.">
+        Do you want <ph name="PASSWORD_MANAGER_BRAND">$1<ex>Google Chrome</ex></ph> to save your password for this site?
+      </message>
+      <message name="IDS_PASSWORD_MANAGER_SMART_LOCK" desc="The brand name of the password manager for the title of the save password bubble when a user is signed in.">
+        Google Smart Lock
+      </message>
+      <message name="IDS_PASSWORD_MANAGER_SMART_LOCK_ARTICLE" desc="URL of help center page explaining what the 'Google Smart Lock' is.">
+        https://support.google.com/chromebook/answer/6070209?hl=[GRITLANGCODE]
       </message>
       <message name="IDS_PASSWORD_MANAGER_SAVE_PASSWORD_SMART_LOCK_NO_THANKS_BUTTON" desc="Text for the button the user clicks to dismiss save password bubble.">
         No thanks
@@ -6427,11 +6451,17 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Enable AVFoundation use for video capture and video device monitoring on OS X >= 10.7. QTKit will be used otherwise.
         </message>
       </if>
+      <message name="IDS_FLAGS_DISABLE_DELAY_AGNOSTIC_AEC_NAME" desc="Name of the flag to disable DA-AEC in WebRTC.">
+        Disable Delay Agnostic AEC in WebRTC.
+      </message>
+      <message name="IDS_FLAGS_DISABLE_DELAY_AGNOSTIC_AEC_DESCRIPTION" desc="Description for the flag to disable DA-AEC in WebRTC.">
+        Disable Delay Agnostic AEC in WebRTC. Use if reported system delays are very trusted, or if others experience echo from your machine.
+      </message>
       <message name="IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_NAME" desc="Name of the flag to enable DA-AEC in WebRTC.">
         Enable Delay Agnostic AEC in WebRTC.
       </message>
       <message name="IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_DESCRIPTION" desc="Description for the flag to enable DA-AEC in WebRTC.">
-        Enable Delay Agnostic AEC in WebRTC. Use if reported system delays are untrusted. Specifically applies to Mac OS X and CrOS, but also if audio is routed through a different device like TV.
+        Enable Delay Agnostic AEC in WebRTC. Use if reported system delays are untrusted. Specifically applies to Mac OS X and CrOS, but also if audio is routed through a different device like TV. enable-delay-agnostic-aec overrides disable-delay-agnostic-aec.
       </message>
       <message name="IDS_FLAGS_V8_PAC_MOJO_OUT_OF_PROCESS_NAME" desc="Name of the flag to enable out-of-process V8 proxy resolver.">
         Enable Out-of-process V8 Proxy Resolver.
@@ -6879,6 +6909,19 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_SUPERVISED_USER_SAFESITES_ONLINE_CHECK_ONLY" desc="Description for the choice to enable only the online check in the supervised user SafeSites filtering feature.">
         Online check only
+      </message>
+      <message name="IDS_FLAGS_DISABLE_NEW_VIDEO_RENDERER_NAME" desc="Title for the flag to disable the new video rendering path for video elements.">
+        Disables the new video rendering path for video elements.
+      </message>
+      <message name="IDS_FLAGS_DISABLE_NEW_VIDEO_RENDERER_DESCRIPTION" desc="Description for the flag to disable the new video rendering path for video elements.">
+        Disables the new compositor driven video rendering path for video elements.
+      </message>
+      <message name="IDS_FLAGS_SCROLL_TOP_LEFT_INTEROP_NAME" desc="Title for the flag to enable scrollTop interoperability">
+        Document scrolling element interoperability.
+      </message>
+      <message name="IDS_FLAGS_SCROLL_TOP_LEFT_INTEROP_DESCRIPTION" desc="Description for the flag to enable scrollTop interoperability.">
+        Control whether document.body.scrollTop/scrollLeft in JavaScript reflects the standard interoperable behavior (enabled) or legacy WebKit behavior (disabled).
+        When enabled, document.scrollingElement is document.documentElement, when disabled it's document.body (for strict-mode pages).
       </message>
 
       <!-- Crashes -->
@@ -9713,16 +9756,16 @@ I don't think this site should be blocked!
       </message>
 
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_NO_CT" desc="The text of the identity section when the page is secure and no Certificate Transparency information is present.">
-        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph> but does not have public audit records.
+        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph>. No Certificate Transparency information was supplied by the server.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_CT_VERIFIED" desc="The text of the identity section when the page is secure and a Signed Certificate Timestamp from a known Certificate Transparency log is present and valid.">
-        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph> and is publicly auditable.
+        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph>. Valid Certificate Transparency information was supplied by the server.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_CT_UNVERIFIED" desc="The text of the identity section when the page is secure and contains a Signed Certificate Timestamp from an unknown Certificate Transparency log.">
-        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph>, it claims to have public audit records, but the records cannot be verified.
+        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph>. Certificate Transparency information was supplied by the server, but one or more of the Certificate Transparency logs were not recognized.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_CT_INVALID" desc="The text of the identity section when the page is secure, but it contains a Signed Certificate Timestamp from a known Certificate Transparency log that failed to verify.">
-        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph>, but its public audit records failed verification.
+        The identity of this website has been verified by <ph name="ISSUER">$1<ex>VeriSign</ex></ph>. Certificate Transparency information was supplied by the server, but it was invalid.
       </message>
 
       <message name="IDS_PAGEINFO_ADDRESS" desc="Locality as reported in the EV identity text.">
@@ -9734,16 +9777,16 @@ I don't think this site should be blocked!
       </message>
 
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_EV_NO_CT" desc="The text of the identity section when the page is secured with an EV cert and no Certificate Transparency information is present.">
-        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph> but does not have public audit records.
+        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph>. No Certificate Transparency information was supplied by the server.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_EV_CT_VERIFIED" desc="The text of the identity section when the page is secured with an EV cert and a Signed Certificate Timestamp from a known Certificate Transparency log is present and valid.">
-        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph> and is publicly auditable.
+        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph>. Valid Certificate Transparency information was supplied by the server.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_EV_CT_UNVERIFIED" desc="The text of the identity section when the page is secured with an EV cert and contains a Signed Certificate Timestamp from an unknown Certificate Transparency log.">
-        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph>, it claims to have public audit records, but the records cannot be verified.
+        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph>. Certificate Transparency information was supplied by the server, but one or more of the Certificate Transparency logs were not recognized.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_SECURE_IDENTITY_EV_CT_INVALID" desc="The text of the identity section when the page is secured with an EV cert, but it contains a Signed Certificate Timestamp from a known Certificate Transparency log that failed to verify.">
-        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph>, but its public audit records failed verification.
+        The identity of <ph name="ORGANIZATION">$1<ex>Google</ex></ph> at <ph name="LOCALITY">$2<ex>Mountain View, CA US</ex></ph> has been verified by <ph name="ISSUER">$3<ex>VeriSign</ex></ph>. Certificate Transparency information was supplied by the server, but it was invalid.
       </message>
 
       <message name="IDS_PAGE_INFO_SECURITY_TAB_UNKNOWN_PARTY" desc="The default name used when we did not find a principal name.">
@@ -9764,19 +9807,19 @@ I don't think this site should be blocked!
       </message>
 
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTED_CONNECTION_TEXT" desc="The text of the connection section when the connection is encrypted.">
-        Your connection to <ph name="DOMAIN">$1<ex>www.google.com</ex></ph> is encrypted with modern cryptography.
+        Your connection to <ph name="DOMAIN">$1<ex>www.google.com</ex></ph> is encrypted using a modern cipher suite.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_WEAK_ENCRYPTION_CONNECTION_TEXT" desc="The text of the connection section when the connection uses weak encryption.">
-        Your connection to <ph name="DOMAIN">$1<ex>www.google.com</ex></ph> is encrypted with obsolete cryptography.
+        Your connection to <ph name="DOMAIN">$1<ex>www.google.com</ex></ph> is encrypted using an obsolete cipher suite.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_NOT_ENCRYPTED_CONNECTION_TEXT" desc="The text of the connection section when the connection is not encrypted.">
         Your connection to <ph name="DOMAIN">$1<ex>www.google.com</ex></ph> is not encrypted.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTED_INSECURE_CONTENT_WARNING" desc="Some extra text of the connection section when the connection is encrypted and the page contains insecure content which has been displayed (e.g. images, CSS).">
-        However, this page includes other resources which are not secure. These resources can be viewed by others while in transit, and can be modified by an attacker to change the look of the page.
+        Further, this page includes other resources which are not secure. These resources can be viewed by others while in transit, and can be modified by an attacker to change the look of the page.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTED_INSECURE_CONTENT_ERROR" desc="Some extra text of the connection section when the connection is encrypted and the page contains insecure content which has been run (e.g. script).">
-        However, this page includes other resources which are not secure. These resources can be viewed by others while in transit, and can be modified by an attacker to change the behavior of the page.
+        Further, this page includes other resources which are not secure. These resources can be viewed by others while in transit, and can be modified by an attacker to change the behavior of the page.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTED_SENTENCE_LINK" desc="Linking 2 sentences in 1 paragraph.">
         <ph name="SENTENCE1">$1<ex>Your connection is encrypted.</ex></ph> <ph name="SENTENCE2">$2<ex>However, this page includes resources from other pages whose identity cannot be verified.</ex></ph>
@@ -9785,7 +9828,7 @@ I don't think this site should be blocked!
         The connection uses <ph name="SSL_VERSION">$1<ex>TLS 1.0</ex></ph>.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTION_DETAILS" desc="This message gives details of the cryptographic primitives used to protect the HTTPS connection.">
-        The connection is encrypted using <ph name="CIPHER">$1<ex>AES_128</ex></ph>, with <ph name="MAC">$2<ex>SHA1</ex></ph> for message authentication and <ph name="KX">$3<ex>RSA</ex></ph> as the key exchange mechanism.
+        The connection is encrypted using <ph name="CIPHER">$1<ex>AES_128</ex></ph>, with <ph name="MAC">$2<ex>HMAC-SHA1</ex></ph> for message authentication and <ph name="KX">$3<ex>RSA</ex></ph> as the key exchange mechanism.
       </message>
       <message name="IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTION_DETAILS_AEAD" desc="This message gives details of the cryptographic primitives used to protect the HTTPS connection. It should be translated in a similar manner as IDS_PAGE_INFO_SECURITY_TAB_ENCRYPTION_DETAILS">
         The connection is encrypted and authenticated using <ph name="CIPHER">$1<ex>AES_128_GCM</ex></ph> and uses <ph name="KX">$2<ex>RSA</ex></ph> as the key exchange mechanism.
@@ -10158,19 +10201,17 @@ I don't think this site should be blocked!
       </message>
 
       <!-- Killed Tab Strings -->
-      <!-- TODO(gspencer): These are temporary values until real
-           values are supplied by UI team. See http://crosbug.com/10711 -->
       <message name="IDS_KILLED_TAB_TITLE" desc="The title of the killed tab page that is shown when a tab is killed by the OS. This is intended to be a humorous exclamation of dismay.">
         He's dead, Jim!
       </message>
       <message name="IDS_KILLED_TAB_MESSAGE" desc="The message displayed on the killed tab page.">
-        Either Chrome ran out of memory or the process for the webpage was terminated for some other reason.  To continue, reload or go to another page.
+        The webpage was terminated unexpectedly. To continue, reload or go to another page.
       </message>
       <message name="IDS_KILLED_TAB_FEEDBACK_LINK" desc="The text for the feedback link on the killed tab page.">
         Send feedback to help improve Chrome
       </message>
       <message name="IDS_KILLED_TAB_FEEDBACK_MESSAGE" desc="The text to auto-populate the feedback page with.">
-Chrome ran out of memory.
+Dead Jim feedback.
 '''
       </message>
 
@@ -12442,8 +12483,8 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_MULTI_DOWNLOAD_WARNING_ALLOW" desc="Text on the allow button in the IDS_MULTI_DOWNLOAD_WARNING dialog">
         Allow
       </message>
-      <message name="IDS_MULTI_DOWNLOAD_WARNING_DENY" desc="Text on the deny button in the IDS_MULTI_DOWNLOAD_WARNING dialog">
-        Deny
+      <message name="IDS_MULTI_DOWNLOAD_WARNING_BLOCK" desc="Text on the block button in the IDS_MULTI_DOWNLOAD_WARNING dialog">
+        Block
       </message>
 
       <message name="IDS_RECENT_TABS_MENU" desc="The title of the Recent Tabs menu in the wrench menu.">
@@ -12983,7 +13024,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
           <ph name="site">$1<ex>mail.google.com</ex></ph> wants to send you notifications.
         </message>
         <message name="IDS_NOTIFICATION_PERMISSIONS_FRAGMENT" desc="Permission sentence fragment to show following the prompt 'This site wants to:' in a permissions request">
-          Send notifications
+          Show notifications
         </message>
         <message name="IDS_NOTIFICATION_PERMISSION_YES" desc="The label of the 'allow' button on the notification permission infobar.">
           Allow
@@ -13488,7 +13529,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
         Allow
       </message>
       <message name="IDS_MIDI_SYSEX_DENY_BUTTON" desc="A button in MIDI access infobar for denying full access to MIDI devices for a given domain.">
-        Deny
+        Block
       </message>
       <message name="IDS_MIDI_SYSEX_ALLOWED_TOOLTIP" desc="Location bar icon tooltip text when a page is allowed to use MIDI system exclusive messages.">
         This page has full control of MIDI devices.
@@ -13543,7 +13584,7 @@ Some features may be unavailable.  Please check that the profile exists and you 
         This page may need to be reloaded before the new settings take effect.
       </message>
 
-      <!-- Proteced media identifier permission infobar -->
+      <!-- Protected media identifier permission infobar -->
       <if expr="is_android or chromeos">
         <message name="IDS_PROTECTED_MEDIA_IDENTIFIER_PERMISSION_FRAGMENT" desc="Permission fragment shown in the permissions bubble when a web page requests access to the computer's protected media identifier.">
           Know your unique device identifier
@@ -13556,9 +13597,6 @@ Some features may be unavailable.  Please check that the profile exists and you 
         </message>
         <message name="IDS_PROTECTED_MEDIA_IDENTIFIER_DENY_BUTTON" desc="A button in the protected media identifier infobar for denying access to a protected media identifier for a given origin.">
           Deny
-        </message>
-        <message name="IDS_PROTECTED_MEDIA_IDENTIFIER_SETTINGS_LINK" desc="Link on in the protected media identifier infobar to open up its settings page.">
-          Settings
         </message>
       </if>
 
@@ -13937,8 +13975,8 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_MEDIA_CAPTURE_ALLOW" desc="Label for a button that grants access to a web page, so they can use a camera and/or a microphone.">
         Allow
       </message>
-      <message name="IDS_MEDIA_CAPTURE_DENY" desc="Label for a button that denies access to a web page, so they can use a camera and/or a microphone.">
-        Deny
+      <message name="IDS_MEDIA_CAPTURE_BLOCK" desc="Label for a button that blocks access to a web page, so they can't use a camera and/or a microphone.">
+        Block
       </message>
 
       <!-- Quota messages -->
@@ -14462,36 +14500,23 @@ After you create a new supervised user, you can manage their settings at any tim
         <message name="IDS_FLAGS_FLOATING_VIRTUAL_KEYBOARD_DESCRIPTION" desc="Description of about::flags option to toggle floating virtual keyboard">
           Enable/Disable floating virtual keyboard.
         </message>
-        <message name="IDS_FLAGS_ENABLE_GESTURE_TYPING_NAME" desc="Name of about::flags option to enable gesture typing for the virtual keyboard">
+        <message name="IDS_FLAGS_GESTURE_TYPING_NAME" desc="Name of about::flags option to toggle gesture typing for the virtual keyboard">
           Gesture typing for the virtual keyboard.
         </message>
-        <message name="IDS_FLAGS_ENABLE_GESTURE_TYPING_DESCRIPTION" desc="Description of about::flags option to enable gesture typing for the virtual keyboard">
-          Enable gesture typing for the virtual keyboard.
+        <message name="IDS_FLAGS_GESTURE_TYPING_DESCRIPTION" desc="Description of about::flags option to toggle gesture typing for the virtual keyboard">
+          Enable/Disable gesture typing for the virtual keyboard.
         </message>
-        <message name="IDS_FLAGS_ENABLE_GESTURE_SELECTION_NAME" desc="Name of about::flags option to enable gesture selection for the virtual keyboard">
-          Gesture selection for the virtual keyboard.
+        <message name="IDS_FLAGS_GESTURE_EDITING_NAME" desc="Name of about::flags option to toggle gesture editing for the virtual keyboard">
+          Gesture editing for the virtual keyboard.
         </message>
-        <message name="IDS_FLAGS_ENABLE_GESTURE_SELECTION_DESCRIPTION" desc="Description of about::flags option to enable gesture selection for the virtual keyboard">
-          Enable gesture selection for the virtual keyboard.
-        </message>
-        <message name="IDS_FLAGS_ENABLE_GESTURE_DELETION_NAME" desc="Name of about::flags option to enable gesture deletion for the virtual keyboard">
-          Gesture deletion for the virtual keyboard.
-        </message>
-        <message name="IDS_FLAGS_ENABLE_GESTURE_DELETION_DESCRIPTION" desc="Description of about::flags option to enable gesture deletion for the virtual keyboard">
-          Enable gesture deletion for the virtual keyboard.
+        <message name="IDS_FLAGS_GESTURE_EDITING_DESCRIPTION" desc="Description of about::flags option to toggle gesture editing in the settings page for the virtual keyboard">
+          Enable/Disable gesture editing option in the settings page for the virtual keyboard.
         </message>
         <message name="IDS_FLAGS_DISABLE_CAPTIVE_PORTAL_BYPASS_PROXY_NAME" desc="Name of about::flags option to disable bypass proxy for captive portal authorization on Chrome OS.">
           Disable bypass proxy for Captive Portal Authorization
         </message>
         <message name="IDS_FLAGS_DISABLE_CAPTIVE_PORTAL_BYPASS_PROXY_DESCRIPTION" desc="Description of about::flags option to disable bypass proxy for captive portal authorization on Chrome OS.">
           If proxy is configured, it usually prevents from authorization on different captive portals. This flag disables opening captive portal authorization dialog in a separate window, which ignores proxy settings.
-        </message>
-
-        <message name="IDS_FLAGS_DISABLE_ROBOTO_FONT_UI_NAME" desc="Name of about::flags option to disable Roboto fonts in the Chrome OS UI.">
-          Disable the experiment to use Roboto fonts in the UI.
-        </message>
-        <message name="IDS_FLAGS_DISABLE_ROBOTO_FONT_UI_DESCRIPTION" desc="Description of about::flags option to disable Roboto fonts in the Chrome OS UI.">
-          Disable Roboto fonts in the UI.
         </message>
       </if>
 

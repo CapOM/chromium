@@ -42,6 +42,7 @@
         'public/chromecast_export.h',
         'public/graphics_properties_shlib.h',
         'public/graphics_types.h',
+        'public/media/decoder_config.h',
         'public/osd_plane.h',
         'public/osd_plane_shlib.h',
         'public/osd_surface.h',
@@ -102,6 +103,16 @@
         'net/connectivity_checker.h',
         'net/net_switches.cc',
         'net/net_switches.h',
+        'net/net_util_cast.cc',
+        'net/net_util_cast.h',
+      ],
+      'conditions': [
+        ['OS!="android"', {
+          'sources': [
+            'net/network_change_notifier_factory_cast.cc',
+            'net/network_change_notifier_factory_cast.h',
+          ],
+        }],
       ],
     },
     {
@@ -424,6 +435,7 @@
             '../breakpad/breakpad.gyp:breakpad_client',
             '../components/components.gyp:breakpad_host',
             '../components/components.gyp:crash_component',
+            '../components/components.gyp:external_video_surface',
             '../content/content.gyp:content',
             '../skia/skia.gyp:skia',
             '../ui/gfx/gfx.gyp:gfx',
@@ -443,8 +455,6 @@
             'browser/android/cast_window_android.h',
             'browser/android/cast_window_manager.cc',
             'browser/android/cast_window_manager.h',
-            'browser/android/external_video_surface_container_impl.cc',
-            'browser/android/external_video_surface_container_impl.h',
             'crash/android/cast_crash_reporter_client_android.cc',
             'crash/android/cast_crash_reporter_client_android.h',
             'crash/android/crash_handler.cc',
@@ -523,7 +533,6 @@
             'browser/android/apk/src/org/chromium/chromecast/shell/CastCrashHandler.java',
             'browser/android/apk/src/org/chromium/chromecast/shell/CastWindowAndroid.java',
             'browser/android/apk/src/org/chromium/chromecast/shell/CastWindowManager.java',
-            'browser/android/apk/src/org/chromium/chromecast/shell/ExternalVideoSurfaceContainer.java',
           ],
           'direct_dependent_settings': {
             'include_dirs': [
@@ -590,7 +599,7 @@
             'media/media.gyp:cast_media',
           ],
           'conditions': [
-            ['chromecast_branding!="Chrome"', {
+            ['ozone_platform_egltest==1', {
               'dependencies': [
                 '../ui/ozone/ozone.gyp:eglplatform_shim_x11',
               ],

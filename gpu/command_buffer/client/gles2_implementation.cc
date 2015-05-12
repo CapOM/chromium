@@ -1968,6 +1968,51 @@ void GLES2Implementation::CompressedTexImage3D(
   CheckGLError();
 }
 
+void GLES2Implementation::CompressedTexSubImage3D(
+    GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset,
+    GLsizei width, GLsizei height, GLsizei depth, GLenum format,
+    GLsizei image_size, const void* data) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glCompressedTexSubImage3D("
+      << GLES2Util::GetStringTextureTarget(target) << ", "
+      << level << ", "
+      << xoffset << ", " << yoffset << ", " << zoffset << ", "
+      << width << ", " << height << ", " << depth << ", "
+      << GLES2Util::GetStringCompressedTextureFormat(format) << ", "
+      << image_size << ", "
+      << static_cast<const void*>(data) << ")");
+  if (width < 0 || height < 0 || depth < 0 || level < 0) {
+    SetGLError(GL_INVALID_VALUE, "glCompressedTexSubImage3D", "dimension < 0");
+    return;
+  }
+  // If there's a pixel unpack buffer bound use it when issuing
+  // CompressedTexSubImage3D.
+  if (bound_pixel_unpack_transfer_buffer_id_) {
+    GLuint offset = ToGLuint(data);
+    BufferTracker::Buffer* buffer = GetBoundPixelUnpackTransferBufferIfValid(
+        bound_pixel_unpack_transfer_buffer_id_,
+        "glCompressedTexSubImage3D", offset, image_size);
+    if (buffer && buffer->shm_id() != -1) {
+      helper_->CompressedTexSubImage3D(
+          target, level, xoffset, yoffset, zoffset,
+          width, height, depth, format, image_size,
+          buffer->shm_id(), buffer->shm_offset() + offset);
+      buffer->set_last_usage_token(helper_->InsertToken());
+      CheckGLError();
+    }
+    return;
+  }
+  SetBucketContents(kResultBucketId, data, image_size);
+  helper_->CompressedTexSubImage3DBucket(
+      target, level, xoffset, yoffset, zoffset, width, height, depth, format,
+      kResultBucketId);
+  // Free the bucket. This is not required but it does free up the memory.
+  // and we don't have to wait for the result so from the client's perspective
+  // it's cheap.
+  helper_->SetBucketSize(kResultBucketId, 0);
+  CheckGLError();
+}
+
 namespace {
 
 void CopyRectToBuffer(
@@ -3130,7 +3175,32 @@ void GLES2Implementation::GetUniformiv(
   helper_->GetUniformiv(
       program, location, GetResultShmId(), GetResultShmOffset());
   WaitForCmd();
-  GetResultAs<cmds::GetUniformfv::Result*>()->CopyResult(params);
+  GetResultAs<cmds::GetUniformiv::Result*>()->CopyResult(params);
+  GPU_CLIENT_LOG_CODE_BLOCK({
+    for (int32 i = 0; i < result->GetNumResults(); ++i) {
+      GPU_CLIENT_LOG("  " << i << ": " << result->GetData()[i]);
+    }
+  });
+  CheckGLError();
+}
+
+void GLES2Implementation::GetUniformuiv(
+    GLuint program, GLint location, GLuint* params) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glGetUniformuiv("
+      << program << ", " << location << ", "
+      << static_cast<const void*>(params) << ")");
+  TRACE_EVENT0("gpu", "GLES2::GetUniformuiv");
+  typedef cmds::GetUniformuiv::Result Result;
+  Result* result = GetResultAs<Result*>();
+  if (!result) {
+    return;
+  }
+  result->SetNumResults(0);
+  helper_->GetUniformuiv(
+      program, location, GetResultShmId(), GetResultShmOffset());
+  WaitForCmd();
+  GetResultAs<cmds::GetUniformuiv::Result*>()->CopyResult(params);
   GPU_CLIENT_LOG_CODE_BLOCK({
     for (int32 i = 0; i < result->GetNumResults(); ++i) {
       GPU_CLIENT_LOG("  " << i << ": " << result->GetData()[i]);

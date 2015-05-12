@@ -570,10 +570,10 @@ class TestRunner : public WebTestRunner,
   void AddWebPageOverlay();
   void RemoveWebPageOverlay();
 
-  void DisplayAsync();
-  void DisplayAsyncThen(v8::Local<v8::Function> callback);
+  void LayoutAndPaintAsync();
+  void LayoutAndPaintAsyncThen(v8::Local<v8::Function> callback);
 
-  // Similar to DisplayAsyncThen(), but pass parameters of the captured
+  // Similar to LayoutAndPaintAsyncThen(), but pass parameters of the captured
   // snapshot (width, height, snapshot) to the callback. The snapshot is in
   // uint8 RGBA format.
   void CapturePixelsAsyncThen(v8::Local<v8::Function> callback);
@@ -724,7 +724,7 @@ class TestRunner : public WebTestRunner,
 
   // If true, the test_shell will output the MIME type for each resource that
   // was loaded.
-  bool dump_resource_reqponse_mime_types_;
+  bool dump_resource_response_mime_types_;
 
   // If true, the test_shell will dump all changes to window.status.
   bool dump_window_status_changes_;

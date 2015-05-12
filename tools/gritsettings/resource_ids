@@ -30,7 +30,7 @@
     "structures": [2200],
   },
   "chrome/common/common_resources.grd": {
-    "includes": [2500],
+    "includes": [3000],
   },
   "chrome/renderer/resources/renderer_resources.grd": {
     "includes": [3500],
@@ -217,6 +217,9 @@
   },
   "ui/file_manager/file_manager_resources.grd": {
     "includes": [28100],
+  },
+  "components/chrome_apps/chrome_apps_resources.grd": {
+    "includes": [28250],
   },
   "ui/login/login_resources.grd": {
     "includes": [28300],

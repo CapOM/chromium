@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/config/allocator.gni")
+import("//build/config/chrome_build.gni")
 import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
@@ -23,7 +24,7 @@ declare_args() {
   # TODO(maruel): This decision should be revisited because having an
   # official deterministic build has high value too but MSVC toolset can't
   # generate anything deterministic with WPO enabled AFAIK.
-  dont_embed_build_metadata = is_official_build
+  dont_embed_build_metadata = !is_official_build
 
   # Set to true to enable dcheck in Release builds.
   dcheck_always_on = false
@@ -40,11 +41,8 @@ declare_args() {
 #
 # For now we define these globally to match the current GYP build.
 config("feature_flags") {
-  # TODO(brettw) most of these need to be parameterized.
-  defines = [
-    "CHROMIUM_BUILD",
-    "V8_DEPRECATION_WARNINGS",  # Don't use deprecated V8 APIs anywhere.
-  ]
+  # TODO(brettw) this probably needs to be parameterized.
+  defines = [ "V8_DEPRECATION_WARNINGS" ]  # Don't use deprecated V8 APIs anywhere.
 
   if (cld_version > 0) {
     defines += [ "CLD_VERSION=$cld_version" ]
@@ -238,6 +236,14 @@ config("feature_flags") {
     defines += [ "MOBILE_SAFE_BROWSING" ]
     defines += [ "SAFE_BROWSING_SERVICE" ]
   }
+  if (is_official_build) {
+    defines += [ "OFFICIAL_BUILD" ]
+  }
+  if (is_chrome_branded) {
+    defines += [ "GOOGLE_CHROME_BUILD" ]
+  } else {
+    defines += [ "CHROMIUM_BUILD" ]
+  }
 }
 
 # Debug/release ----------------------------------------------------------------
@@ -270,6 +276,18 @@ config("debug") {
 
 config("release") {
   defines = [ "NDEBUG" ]
+
+  # Sanitizers.
+  # TODO(GYP) The GYP build has "release_valgrind_build == 0" for this
+  # condition. When Valgrind is set up, we need to do the same here.
+  if (!is_tsan) {
+    defines += [ "NVALGRIND" ]
+    if (!is_nacl) {
+      # NaCl always enables dynamic annotations. Currently this value is set to
+      # 1 for all .nexes.
+      defines += [ "DYNAMIC_ANNOTATIONS_ENABLED=0" ]
+    }
+  }
 }
 
 # Default libraries ------------------------------------------------------------

@@ -669,11 +669,11 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
   // Ensure we start with a valid next_page_id_ from the browser.
   DCHECK_GE(next_page_id_, 0);
 
-  main_render_frame_.reset(RenderFrameImpl::Create(
-      this, params.main_frame_routing_id));
+  main_render_frame_ = RenderFrameImpl::Create(
+      this, params.main_frame_routing_id);
   // The main frame WebLocalFrame object is closed by
   // RenderFrameImpl::frameDetached().
-  WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame_.get());
+  WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame_);
   main_render_frame_->SetWebFrame(web_frame);
 
   compositor_deps_ = compositor_deps;
@@ -734,7 +734,7 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
   if (params.proxy_routing_id != MSG_ROUTING_NONE) {
     CHECK(params.swapped_out);
     proxy = RenderFrameProxy::CreateProxyToReplaceFrame(
-        main_render_frame_.get(), params.proxy_routing_id);
+        main_render_frame_, params.proxy_routing_id);
     main_render_frame_->set_render_frame_proxy(proxy);
   }
 
@@ -1036,6 +1036,8 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setDeviceSupportsTouch(prefs.device_supports_touch);
   settings->setDeviceSupportsMouse(prefs.device_supports_mouse);
   settings->setEnableTouchAdjustment(prefs.touch_adjustment_enabled);
+  settings->setMultiTargetTapNotificationEnabled(
+      switches::IsLinkDisambiguationPopupEnabled());
 
   settings->setDeferredImageDecodingEnabled(
       prefs.deferred_image_decoding_enabled);
@@ -1358,6 +1360,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
                         OnGetRenderedText)
     IPC_MESSAGE_HANDLER(ViewMsg_PluginImeCompositionCompleted,
                         OnPluginImeCompositionCompleted)
+    IPC_MESSAGE_HANDLER(ViewMsg_Close, OnClose)
     IPC_MESSAGE_HANDLER(ViewMsg_SetInLiveResize, OnSetInLiveResize)
     IPC_MESSAGE_HANDLER(ViewMsg_SetWindowVisibility, OnSetWindowVisibility)
     IPC_MESSAGE_HANDLER(ViewMsg_WindowFrameChanged, OnWindowFrameChanged)
@@ -2167,7 +2170,7 @@ bool RenderViewImpl::Send(IPC::Message* message) {
 }
 
 RenderFrameImpl* RenderViewImpl::GetMainRenderFrame() {
-  return main_render_frame_.get();
+  return main_render_frame_;
 }
 
 int RenderViewImpl::GetRoutingID() const {
@@ -2852,6 +2855,12 @@ void RenderViewImpl::OnClosePage() {
   Send(new ViewHostMsg_ClosePage_ACK(routing_id_));
 }
 
+void RenderViewImpl::OnClose() {
+  if (closing_)
+    RenderThread::Get()->Send(new ViewHostMsg_Close_ACK(routing_id_));
+  RenderWidget::OnClose();
+}
+
 void RenderViewImpl::OnThemeChanged() {
 #if defined(USE_AURA)
   // Aura doesn't care if we switch themes.
@@ -2928,6 +2937,9 @@ void RenderViewImpl::DidFlushPaint() {
   // of loading and we don't want to save stats.
   if (!main_frame->provisionalDataSource()) {
     WebDataSource* ds = main_frame->dataSource();
+    if (!ds)
+      return;
+
     DocumentState* document_state = DocumentState::FromDataSource(ds);
 
     // TODO(jar): The following code should all be inside a method, probably in
@@ -3020,12 +3032,6 @@ void RenderViewImpl::OnPluginImeCompositionCompleted(const base::string16& text,
   }
 }
 #endif  // OS_MACOSX
-
-void RenderViewImpl::OnClose() {
-  if (closing_)
-    RenderThread::Get()->Send(new ViewHostMsg_Close_ACK(routing_id_));
-  RenderWidget::OnClose();
-}
 
 void RenderViewImpl::Close() {
   // We need to grab a pointer to the doomed WebView before we destroy it.
@@ -3486,7 +3492,7 @@ blink::WebPageVisibilityState RenderViewImpl::visibilityState() const {
   blink::WebPageVisibilityState override_state = current_state;
   // TODO(jam): move this method to WebFrameClient.
   if (GetContentClient()->renderer()->
-          ShouldOverridePageVisibilityState(main_render_frame_.get(),
+          ShouldOverridePageVisibilityState(main_render_frame_,
                                             &override_state))
     return override_state;
   return current_state;
@@ -3586,8 +3592,7 @@ bool RenderViewImpl::didTapMultipleTargets(
     const WebSize& inner_viewport_offset,
     const WebRect& touch_rect,
     const WebVector<WebRect>& target_rects) {
-  if (!switches::IsLinkDisambiguationPopupEnabled())
-    return false;
+  DCHECK(switches::IsLinkDisambiguationPopupEnabled());
 
   // Never show a disambiguation popup when accessibility is enabled,
   // as this interferes with "touch exploration".

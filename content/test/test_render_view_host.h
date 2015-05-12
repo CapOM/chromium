@@ -40,10 +40,12 @@ class SiteInstance;
 class TestRenderFrameHost;
 class TestWebContents;
 
-// Utility function to initialize ViewHostMsg_NavigateParams_Params
-// with given |page_id|, |url| and |transition_type|.
+// Utility function to initialize FrameHostMsg_DidCommitProvisionalLoad_Params
+// with given parameters.
 void InitNavigateParams(FrameHostMsg_DidCommitProvisionalLoad_Params* params,
                         int page_id,
+                        int nav_entry_id,
+                        bool did_create_new_entry,
                         const GURL& url,
                         ui::PageTransition transition_type);
 
@@ -94,7 +96,6 @@ class TestRenderWidgetHostView : public RenderWidgetHostViewBase {
   void MovePluginWindows(const std::vector<WebPluginGeometry>& moves) override {
   }
   void Focus() override {}
-  void Blur() override {}
   void SetIsLoading(bool is_loading) override {}
   void UpdateCursor(const WebCursor& cursor) override {}
   void TextInputTypeChanged(ui::TextInputType type,
@@ -111,10 +112,11 @@ class TestRenderWidgetHostView : public RenderWidgetHostViewBase {
   void SetTooltipText(const base::string16& tooltip_text) override {}
   void SelectionBoundsChanged(
       const ViewHostMsg_SelectionBounds_Params& params) override {}
-  void CopyFromCompositingSurface(const gfx::Rect& src_subrect,
-                                  const gfx::Size& dst_size,
-                                  ReadbackRequestCallback& callback,
-                                  const SkColorType color_type) override;
+  void CopyFromCompositingSurface(
+      const gfx::Rect& src_subrect,
+      const gfx::Size& dst_size,
+      ReadbackRequestCallback& callback,
+      const SkColorType preferred_color_type) override;
   void CopyFromCompositingSurfaceToVideoFrame(
       const gfx::Rect& src_subrect,
       const scoped_refptr<media::VideoFrame>& target,

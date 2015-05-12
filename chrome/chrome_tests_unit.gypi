@@ -110,13 +110,6 @@
       'browser/history/android/sqlite_cursor_unittest.cc',
       'browser/history/android/urls_sql_handler_unittest.cc',
       'browser/history/android/visit_sql_handler_unittest.cc',
-      'browser/history/expire_history_backend_unittest.cc',
-      'browser/history/history_backend_unittest.cc',
-      'browser/history/history_database_unittest.cc',
-      'browser/history/history_querying_unittest.cc',
-      'browser/history/thumbnail_database_unittest.cc',
-      'browser/history/top_sites_impl_unittest.cc',
-      'browser/history/typed_url_syncable_service_unittest.cc',
       'browser/history/web_history_service_unittest.cc',
       'browser/image_holder_unittest.cc',
       'browser/install_verification/win/imported_module_verification_unittest.cc',
@@ -212,6 +205,8 @@
       'browser/profiles/profile_info_cache_unittest.h',
       'browser/profiles/profile_manager_unittest.cc',
       'browser/profiles/profile_shortcut_manager_unittest_win.cc',
+      'browser/push_messaging/push_messaging_app_identifier_unittest.cc',
+      'browser/push_messaging/push_messaging_permission_context_unittest.cc',
       'browser/renderer_context_menu/render_view_context_menu_test_util.cc',
       'browser/renderer_context_menu/render_view_context_menu_test_util.h',
       'browser/renderer_host/chrome_render_widget_host_view_mac_history_swiper_unit_test.mm',
@@ -247,10 +242,10 @@
       'browser/shell_integration_win_unittest.cc',
       'browser/signin/account_reconcilor_unittest.cc',
       'browser/signin/account_service_flag_fetcher_unittest.cc',
+      'browser/signin/chrome_signin_client_unittest.cc',
       'browser/signin/local_auth_unittest.cc',
       'browser/signin/signin_global_error_unittest.cc',
       'browser/signin/signin_manager_unittest.cc',
-      'browser/signin/signin_names_io_thread_unittest.cc',
       'browser/signin/signin_tracker_unittest.cc',
       'browser/signin/test_signin_client_builder.cc',
       'browser/ssl/ssl_error_classification_unittest.cc',
@@ -560,6 +555,7 @@
       'common/partial_circular_buffer_unittest.cc',
       'common/pref_names_util_unittest.cc',
       'common/search_urls_unittest.cc',
+      'common/secure_origin_whitelist_unittest.cc',
       'common/switch_utils_unittest.cc',
       'common/variations/experiment_labels_unittest.cc',
       'common/variations/variations_util_unittest.cc',
@@ -862,7 +858,6 @@
       'common/extensions/api/extension_action/browser_action_manifest_unittest.cc',
       'common/extensions/api/extension_action/page_action_manifest_unittest.cc',
       'common/extensions/api/extension_api_unittest.cc',
-      'common/extensions/api/file_browser_handlers/file_browser_handler_manifest_unittest.cc',
       'common/extensions/api/storage/storage_schema_manifest_handler_unittest.cc',
       'common/extensions/chrome_extensions_client_unittest.cc',
       'common/extensions/command_unittest.cc',
@@ -1283,6 +1278,7 @@
       'browser/chromeos/policy/heartbeat_scheduler_unittest.cc',
       'browser/chromeos/policy/network_configuration_updater_unittest.cc',
       'browser/chromeos/policy/recommendation_restorer_unittest.cc',
+      'browser/chromeos/policy/remote_commands/device_command_screenshot_job_unittest.cc',
       'browser/chromeos/policy/server_backed_state_keys_broker_unittest.cc',
       'browser/chromeos/policy/status_uploader_unittest.cc',
       'browser/chromeos/policy/upload_job_unittest.cc',
@@ -1329,6 +1325,8 @@
       'browser/ui/webui/chromeos/login/l10n_util_unittest.cc',
       'browser/ui/webui/chromeos/login/signin_userlist_unittest.cc',
       'browser/ui/webui/options/chromeos/cros_language_options_handler_unittest.cc',
+      'common/extensions/api/file_browser_handlers/file_browser_handler_manifest_unittest.cc',
+      'common/extensions/api/file_system_provider/file_system_provider_handler_unittest.cc',
     ],
     'chrome_unit_tests_desktop_linux_sources': [
       'browser/password_manager/native_backend_kwallet_x_unittest.cc',
@@ -1521,7 +1519,6 @@
       'browser/ui/toolbar/wrench_menu_model_unittest.cc',
       'browser/ui/website_settings/permission_menu_model_unittest.cc',
       'browser/ui/webui/help/version_updater_chromeos_unittest.cc',
-      'browser/ui/webui/media_router/media_cast_mode_unittest.cc',
       'browser/ui/webui/ntp/ntp_user_data_logger_unittest.cc',
       'browser/ui/webui/ntp/suggestions_combiner_unittest.cc',
       'browser/ui/webui/options/autofill_options_handler_unittest.cc',
@@ -1573,6 +1570,10 @@
       'browser/ui/app_list/test/fake_profile_store.h',
       'browser/ui/app_list/test/fast_show_pickler_unittest.cc',
     ],
+    # ChromeOS only sources of app_list.
+    'chrome_unit_tests_app_list_chromeos_sources': [
+      'browser/ui/app_list/search/launcher_search/extension_badged_icon_image_unittest.cc',
+    ],
   },
   'targets': [
     {
@@ -1595,6 +1596,7 @@
         '../components/components.gyp:bookmarks_test_support',
         '../components/components.gyp:gcm_driver_test_support',
         '../components/components.gyp:history_core_test_support',
+        '../components/components.gyp:instance_id_test_support',
         '../components/components.gyp:invalidation',
         '../components/components.gyp:invalidation_test_support',
         '../components/components.gyp:metrics_test_support',
@@ -1717,8 +1719,6 @@
         'browser/ui/login/login_prompt_test_utils.h',
         'browser/ui/passwords/manage_passwords_ui_controller_mock.cc',
         'browser/ui/passwords/manage_passwords_ui_controller_mock.h',
-        'browser/ui/pdf/pdf_browsertest_base.cc',
-        'browser/ui/pdf/pdf_browsertest_base.h',
         'browser/ui/test/test_confirm_bubble_model.cc',
         'browser/ui/test/test_confirm_bubble_model.h',
         'browser/ui/toolbar/test_toolbar_action_view_controller.cc',
@@ -1746,6 +1746,8 @@
         'test/base/chrome_test_suite.h',
         'test/base/chrome_unit_test_suite.cc',
         'test/base/chrome_unit_test_suite.h',
+        'test/base/dialog_test_browser_window.cc',
+        'test/base/dialog_test_browser_window.h',
         'test/base/find_in_page_observer.cc',
         'test/base/find_in_page_observer.h',
         'test/base/history_index_restore_observer.cc',
@@ -2180,7 +2182,7 @@
           'sources': [ '<@(chrome_unit_tests_spellchecker_sources)' ],
           'conditions': [
             ['OS!="mac" and OS!="ios"', {
-              'dependencies': [ '../third_party/hunspell/hunspell.gyp:hunspell' ],
+              'dependencies': [ '../third_party/hunspell_new/hunspell.gyp:hunspell' ],
             }],
           ],
         }],
@@ -2449,7 +2451,7 @@
         }],
         ['OS!="mac" and OS!="ios"', {
           'dependencies': [
-            '../third_party/hunspell/hunspell.gyp:hunspell',
+            '../third_party/hunspell_new/hunspell.gyp:hunspell',
             'chrome_resources.gyp:packed_extra_resources',
             'chrome_resources.gyp:packed_resources',
             'tools/convert_dict/convert_dict.gyp:convert_dict_lib',
@@ -2513,7 +2515,7 @@
             # but that causes errors in other targets when
             # resulting .res files get referenced multiple times.
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
-            '<(SHARED_INTERMEDIATE_DIR)/installer_util_strings/installer_util_strings.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/chrome/installer/util/installer_util_strings.rc',
             '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_unscaled_resources.rc',
           ],
           'link_settings': {
@@ -2609,6 +2611,9 @@
           'dependencies': [
             '../ui/app_list/app_list.gyp:app_list_test_support',
           ],
+        }],
+        ['enable_app_list==1 and chromeos==1', {
+          'sources': [ '<@(chrome_unit_tests_app_list_chromeos_sources)' ],
         }],
         ['enable_plugin_installation==0', {
           'sources!': [

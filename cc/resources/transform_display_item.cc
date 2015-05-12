@@ -10,11 +10,19 @@
 
 namespace cc {
 
-TransformDisplayItem::TransformDisplayItem(const gfx::Transform& transform)
-    : transform_(transform) {
+TransformDisplayItem::TransformDisplayItem()
+    : transform_(gfx::Transform::kSkipInitialization) {
 }
 
 TransformDisplayItem::~TransformDisplayItem() {
+}
+
+void TransformDisplayItem::SetNew(const gfx::Transform& transform) {
+  transform_ = transform;
+
+  size_t memory_usage = sizeof(gfx::Transform);
+  DisplayItem::SetNew(true /* suitable_for_gpu_raster */, 1 /* op_count */,
+                      memory_usage);
 }
 
 void TransformDisplayItem::Raster(SkCanvas* canvas,
@@ -24,18 +32,6 @@ void TransformDisplayItem::Raster(SkCanvas* canvas,
     canvas->concat(transform_.matrix());
 }
 
-bool TransformDisplayItem::IsSuitableForGpuRasterization() const {
-  return true;
-}
-
-int TransformDisplayItem::ApproximateOpCount() const {
-  return 1;
-}
-
-size_t TransformDisplayItem::PictureMemoryUsage() const {
-  return sizeof(gfx::Transform);
-}
-
 void TransformDisplayItem::AsValueInto(
     base::trace_event::TracedValue* array) const {
   array->AppendString(base::StringPrintf("TransformDisplayItem transform: [%s]",
@@ -43,6 +39,8 @@ void TransformDisplayItem::AsValueInto(
 }
 
 EndTransformDisplayItem::EndTransformDisplayItem() {
+  DisplayItem::SetNew(true /* suitable_for_gpu_raster */, 0 /* op_count */,
+                      0 /* memory_usage */);
 }
 
 EndTransformDisplayItem::~EndTransformDisplayItem() {
@@ -51,18 +49,6 @@ EndTransformDisplayItem::~EndTransformDisplayItem() {
 void EndTransformDisplayItem::Raster(SkCanvas* canvas,
                                      SkDrawPictureCallback* callback) const {
   canvas->restore();
-}
-
-bool EndTransformDisplayItem::IsSuitableForGpuRasterization() const {
-  return true;
-}
-
-int EndTransformDisplayItem::ApproximateOpCount() const {
-  return 0;
-}
-
-size_t EndTransformDisplayItem::PictureMemoryUsage() const {
-  return 0;
 }
 
 void EndTransformDisplayItem::AsValueInto(

@@ -4,27 +4,21 @@
 
 import("//third_party/mojo/src/mojo/public/mojo.gni")
 
-if (is_android) {
-  import("//build/config/android/config.gni")
-  import("//build/config/android/rules.gni")
-}
-
-executable("mandoline") {
-  sources = []
-
+group("app") {
   deps = [
-    "//base",
-    "//build/config/sanitizers:deps",
-    "//mojo/common",
-    "//mojo/environment:chromium",
-    "//mojo/runner:lib",
+    "//mandoline/ui",
   ]
 
-  if (!is_android) {
-    sources += [
-      "desktop/launcher_process.cc",
-      "desktop/launcher_process.h",
-      "desktop/main.cc",
-    ]
+  if (is_android) {
+    deps += [ "//mandoline/app/android" ]
+  } else {
+    deps += [ "//mandoline/app/desktop" ]
   }
+
+  data_deps = [
+    "//components/html_viewer",
+    "//mandoline/ui/browser",
+    "//mandoline/services/core_services",
+    "//mojo/runner:mojo_runner",
+  ]
 }

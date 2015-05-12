@@ -476,6 +476,26 @@ const Experiment::Choice kFloatingVirtualKeyboardChoices[] = {
     keyboard::switches::kFloatingVirtualKeyboard,
     keyboard::switches::kFloatingVirtualKeyboardEnabled},
 };
+
+const Experiment::Choice kGestureTypingChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
+    keyboard::switches::kGestureTyping,
+    keyboard::switches::kGestureTypingDisabled},
+  { IDS_GENERIC_EXPERIMENT_CHOICE_ENABLED,
+    keyboard::switches::kGestureTyping,
+    keyboard::switches::kGestureTypingEnabled},
+};
+
+const Experiment::Choice kGestureEditingChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
+    keyboard::switches::kGestureEditing,
+    keyboard::switches::kGestureEditingDisabled},
+  { IDS_GENERIC_EXPERIMENT_CHOICE_ENABLED,
+    keyboard::switches::kGestureEditing,
+    keyboard::switches::kGestureEditingEnabled},
+};
 #endif
 
 const Experiment::Choice kSupervisedUserSafeSitesChoices[] = {
@@ -779,13 +799,6 @@ const Experiment kExperiments[] = {
                               switches::kDisableQuic)
   },
   {
-    "enable-spdy4",
-    IDS_FLAGS_ENABLE_SPDY4_NAME,
-    IDS_FLAGS_ENABLE_SPDY4_DESCRIPTION,
-    kOsAll,
-    SINGLE_VALUE_TYPE(switches::kEnableSpdy4)
-  },
-  {
     "disable-media-source",
     IDS_FLAGS_DISABLE_MEDIA_SOURCE_NAME,
     IDS_FLAGS_DISABLE_MEDIA_SOURCE_DESCRIPTION,
@@ -960,6 +973,13 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ALLOW_TOUCHPAD_THREE_FINGER_CLICK_DESCRIPTION,
     kOsCrOS,
     SINGLE_VALUE_TYPE(chromeos::switches::kEnableTouchpadThreeFingerClick)
+  },
+  {
+    "ash-enable-unified-desktop",
+    IDS_FLAGS_ASH_ENABLE_UNIFIED_DESKTOP_NAME,
+    IDS_FLAGS_ASH_ENABLE_UNIFIED_DESKTOP_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(ash::switches::kAshEnableUnifiedDesktop)
   },
   {
     "disable-easy-unlock",
@@ -1411,7 +1431,7 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_DISABLE_NEW_MD_INPUT_VIEW_NAME,
     IDS_FLAGS_DISABLE_NEW_MD_INPUT_VIEW_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kDisableNewMDInputView)
+    SINGLE_VALUE_TYPE(keyboard::switches::kDisableNewMDInputView)
   },
   {
     "enable-physical-keyboard-autocorrect",
@@ -1427,7 +1447,7 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_DISABLE_VOICE_INPUT_NAME,
     IDS_FLAGS_DISABLE_VOICE_INPUT_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kDisableVoiceInput)
+    SINGLE_VALUE_TYPE(keyboard::switches::kDisableVoiceInput)
   },
   {
     "enable-experimental-input-view-features",
@@ -1444,25 +1464,18 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kFloatingVirtualKeyboardChoices)
   },
   {
-    "enable-gesture-typing",
-    IDS_FLAGS_ENABLE_GESTURE_TYPING_NAME,
-    IDS_FLAGS_ENABLE_GESTURE_TYPING_DESCRIPTION,
+    "gesture-typing",
+    IDS_FLAGS_GESTURE_TYPING_NAME,
+    IDS_FLAGS_GESTURE_TYPING_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(keyboard::switches::kEnableGestureTyping)
+    MULTI_VALUE_TYPE(kGestureTypingChoices)
   },
   {
-    "enable-gesture-deletion",
-    IDS_FLAGS_ENABLE_GESTURE_DELETION_NAME,
-    IDS_FLAGS_ENABLE_GESTURE_DELETION_DESCRIPTION,
+    "gesture-editing",
+    IDS_FLAGS_GESTURE_EDITING_NAME,
+    IDS_FLAGS_GESTURE_EDITING_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(keyboard::switches::kEnableGestureDeletion)
-  },
-  {
-    "enable-gesture-selection",
-    IDS_FLAGS_ENABLE_GESTURE_SELECTION_NAME,
-    IDS_FLAGS_ENABLE_GESTURE_SELECTION_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(keyboard::switches::kEnableGestureSelection)
+    MULTI_VALUE_TYPE(kGestureEditingChoices)
   },
   {
     "disable-smart-virtual-keyboard",
@@ -1854,14 +1867,6 @@ const Experiment kExperiments[] = {
                               switches::kDisableSessionCrashedBubble)
   },
   {
-    "enable-out-of-process-pdf",
-    IDS_FLAGS_OUT_OF_PROCESS_PDF_NAME,
-    IDS_FLAGS_OUT_OF_PROCESS_PDF_DESCRIPTION,
-    kOsDesktop,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableOutOfProcessPdf,
-                              switches::kDisableOutOfProcessPdf)
-  },
-  {
     "enable-pdf-material-ui",
     IDS_FLAGS_PDF_MATERIAL_UI_NAME,
     IDS_FLAGS_PDF_MATERIAL_UI_DESCRIPTION,
@@ -2193,13 +2198,6 @@ const Experiment kExperiments[] = {
     kOsCrOS,
     SINGLE_VALUE_TYPE(chromeos::switches::kDisableCaptivePortalBypassProxy)
   },
-  {
-    "disable-roboto-font-ui",
-    IDS_FLAGS_DISABLE_ROBOTO_FONT_UI_NAME,
-    IDS_FLAGS_DISABLE_ROBOTO_FONT_UI_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(switches::kDisableRobotoFontUI)
-  },
 #endif  // defined(OS_CHROMEOS)
 #if defined(OS_ANDROID)
   {
@@ -2240,6 +2238,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnablePotentiallyAnnoyingSecurityFeatures)
   },
 #endif
+  {
+    "disable-delay-agnostic-aec",
+    IDS_FLAGS_DISABLE_DELAY_AGNOSTIC_AEC_NAME,
+    IDS_FLAGS_DISABLE_DELAY_AGNOSTIC_AEC_DESCRIPTION,
+    kOsDesktop,
+    SINGLE_VALUE_TYPE(switches::kDisableDelayAgnosticAec)
+  },
   {
     "enable-delay-agnostic-aec",
     IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_NAME,
@@ -2390,11 +2395,11 @@ const Experiment kExperiments[] = {
 #endif  // defined(ENABLE_APP_LIST)
 #if defined(OS_CHROMEOS)
   {
-    "enable-mtp-write-support",
-    IDS_FLAG_ENABLE_MTP_WRITE_SUPPORT_NAME,
-    IDS_FLAG_ENABLE_MTP_WRITE_SUPPORT_DESCRIPTION,
+    "disable-mtp-write-support",
+    IDS_FLAG_DISABLE_MTP_WRITE_SUPPORT_NAME,
+    IDS_FLAG_DISABLE_MTP_WRITE_SUPPORT_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kEnableMtpWriteSupport)
+    SINGLE_VALUE_TYPE(chromeos::switches::kDisableMtpWriteSupport)
   },
 #endif  // defined(OS_CHROMEOS)
 #if defined(OS_CHROMEOS)
@@ -2422,6 +2427,24 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(autofill::switches::kEnableAccessorySuggestionView)
   },
 #endif  // defined(OS_ANDROID)
+  {
+    "disable-new-video-renderer",
+    IDS_FLAGS_DISABLE_NEW_VIDEO_RENDERER_NAME,
+    IDS_FLAGS_DISABLE_NEW_VIDEO_RENDERER_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kDisableNewVideoRenderer)
+  },
+  // Temporary flag to ease the transition to standard-compliant scrollTop
+  // behavior.  Will be removed shortly after http://crbug.com/157855 ships.
+  {
+    "scroll-top-left-interop",
+    IDS_FLAGS_SCROLL_TOP_LEFT_INTEROP_NAME,
+    IDS_FLAGS_SCROLL_TOP_LEFT_INTEROP_DESCRIPTION,
+    kOsAll,
+    ENABLE_DISABLE_VALUE_TYPE_AND_VALUE(
+        switches::kEnableBlinkFeatures, "ScrollTopLeftInterop",
+        switches::kDisableBlinkFeatures, "ScrollTopLeftInterop")
+  }
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in
   // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.

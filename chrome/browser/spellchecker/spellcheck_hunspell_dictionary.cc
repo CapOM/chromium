@@ -19,7 +19,7 @@
 #include "net/base/load_flags.h"
 #include "net/url_request/url_fetcher.h"
 #include "net/url_request/url_request_context_getter.h"
-#include "third_party/hunspell/google/bdict.h"
+#include "third_party/hunspell_new/google/bdict.h"
 #include "url/gurl.h"
 
 using content::BrowserThread;
@@ -230,7 +230,7 @@ void SpellcheckHunspellDictionary::DownloadDictionary(GURL url) {
   download_status_ = DOWNLOAD_IN_PROGRESS;
   FOR_EACH_OBSERVER(Observer, observers_, OnHunspellDictionaryDownloadBegin());
 
-  fetcher_.reset(net::URLFetcher::Create(url, net::URLFetcher::GET, this));
+  fetcher_ = net::URLFetcher::Create(url, net::URLFetcher::GET, this);
   fetcher_->SetRequestContext(request_context_getter_);
   fetcher_->SetLoadFlags(
       net::LOAD_DO_NOT_SEND_COOKIES | net::LOAD_DO_NOT_SAVE_COOKIES);

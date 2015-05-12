@@ -115,8 +115,14 @@ RenderViewTest::RendererBlinkPlatformImplNoSandbox::
     ~RendererBlinkPlatformImplNoSandbox() {
 }
 
-blink::Platform* RenderViewTest::RendererBlinkPlatformImplNoSandbox::Get() {
+blink::Platform*
+    RenderViewTest::RendererBlinkPlatformImplNoSandbox::Get() const {
   return blink_platform_impl_.get();
+}
+
+scheduler::RendererScheduler*
+    RenderViewTest::RendererBlinkPlatformImplNoSandbox::Scheduler() const {
+  return renderer_scheduler_.get();
 }
 
 RenderViewTest::RenderViewTest()
@@ -249,7 +255,6 @@ void RenderViewTest::SetUp() {
   // This needs to pass the mock render thread to the view.
   RenderViewImpl* view =
       RenderViewImpl::Create(view_params, compositor_deps_.get(), false);
-  view->AddRef();
   view_ = view;
 }
 
@@ -280,6 +285,7 @@ void RenderViewTest::TearDown() {
   autorelease_pool_.reset(NULL);
 #endif
 
+  blink_platform_impl_.Scheduler()->Shutdown();
   blink::shutdown();
 
   platform_->PlatformUninitialize();
@@ -534,6 +540,7 @@ void RenderViewTest::GoToOffset(int offset, const PageState& state) {
   RequestNavigationParams request_params;
   request_params.page_state = state;
   request_params.page_id = impl->page_id_ + offset;
+  request_params.nav_entry_id = pending_offset + 1;
   request_params.pending_history_list_offset = pending_offset;
   request_params.current_history_list_offset = impl->history_list_offset_;
   request_params.current_history_list_length = history_list_length;

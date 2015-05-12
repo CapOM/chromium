@@ -699,6 +699,8 @@ void PepperPluginInstanceImpl::Delete() {
     fullscreen_container_ = NULL;
   }
 
+  throttler_.reset();
+
   // Force-unbind any Graphics. In the case of Graphics2D, if the plugin
   // leaks the graphics 2D, it may actually get cleaned up after our
   // destruction, so we need its pointers to be up-to-date.
@@ -2031,7 +2033,10 @@ void PepperPluginInstanceImpl::UpdateLayer(bool device_changed) {
     else if (fullscreen_container_)
       fullscreen_container_->SetLayer(NULL);
     web_layer_.reset();
-    texture_layer_ = NULL;
+    if (texture_layer_) {
+      texture_layer_->ClearClient();
+      texture_layer_ = NULL;
+    }
     compositor_layer_ = NULL;
   }
 
@@ -3135,9 +3140,6 @@ bool PepperPluginInstanceImpl::FlashSetFullscreen(bool fullscreen,
 }
 
 bool PepperPluginInstanceImpl::IsRectTopmost(const gfx::Rect& rect) {
-  if (is_deleted_)
-    return false;
-
   if (flash_fullscreen_)
     return true;
 

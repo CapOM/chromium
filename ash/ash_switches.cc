@@ -27,10 +27,6 @@ const char kAshCopyHostBackgroundAtBoot[] = "ash-copy-host-background-at-boot";
 // Enable keyboard shortcuts useful for debugging.
 const char kAshDebugShortcuts[] = "ash-debug-shortcuts";
 
-// Disables LockLayoutManager used for LockScreenContainer, return back to
-// WorkspaceLayoutManager.
-const char kAshDisableLockLayoutManager[] = "ash-disable-lock-layout-manager";
-
 // Disables the window backdrops normally used in maximize mode (TouchView).
 const char kAshDisableMaximizeModeWindowBackdrop[] =
     "ash-disable-maximize-mode-window-backdrop";
@@ -54,6 +50,9 @@ const char kAshEnableFullscreenAppList[] = "ash-enable-fullscreen-app-list";
 // Enables key bindings to scroll magnified screen.
 const char kAshEnableMagnifierKeyScroller[] =
     "ash-enable-magnifier-key-scroller";
+
+// Enables unified desktop mode.
+const char kAshEnableUnifiedDesktop[] = "ash-enable-unified-desktop";
 
 #endif
 
@@ -131,9 +130,7 @@ bool ConstrainPointerToRoot() {
              kAshConstrainPointerToRoot);
 }
 
-// Enables unified desktop mode.
 bool UnifiedDesktopEnabled() {
-  const char kAshEnableUnifiedDesktop[] = "ash-enable-unified-desktop";
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       kAshEnableUnifiedDesktop);
 }

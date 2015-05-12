@@ -19,7 +19,7 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
 {
   "name": "gpu driver bug list",
   // Please update the version number whenever you change this file.
-  "version": "7.25",
+  "version": "8.01",
   "entries": [
     {
       "id": 1,
@@ -258,6 +258,9 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
       "gl_vendor": "Qualcomm.*",
       "features": [
         "disable_depth_texture"
+      ],
+      "disabled_extensions": [
+        "GL_OES_depth_texture"
       ]
     },
     {
@@ -1228,6 +1231,9 @@ LONG_STRING_CONST(
       "gl_renderer": "PowerVR SGX 544",
       "features": [
         "disable_ext_occlusion_query"
+      ],
+      "disabled_extensions": [
+        "EXT_occlusion_query_boolean"
       ]
     },
     {
@@ -1262,6 +1268,46 @@ LONG_STRING_CONST(
       "gl_renderer": ".*Mali-400.*",
       "features": [
         "disable_gl_rgb_format"
+      ]
+    },
+    {
+      "id": 109,
+      "description": "MakeCurrent is slow on Linux",
+      "os": {
+        "type": "linux"
+      },
+      "features": [
+        "use_virtualized_gl_contexts"
+      ]
+    },
+    {
+      "id": 110,
+      "description": "EGL Sync server causes crashes on Adreno 3xx drivers",
+      "cr_bugs": [482298],
+      "os": {
+        "type": "android"
+      },
+      "gl_vendor": "Qualcomm.*",
+      "gl_renderer": "Adreno \\(TM\\) 3.*",
+      "driver_version": {
+        "op": "<",
+        "value": "95"
+      },
+      "features": [
+        "disable_egl_khr_wait_sync"
+      ]
+    },
+    {
+      "id": 111,
+      "description": "Discard Framebuffer breaks WebGL on Mali-400 Linux",
+      "cr_bugs": [485814],
+      "os": {
+        "type": "linux"
+      },
+      "gl_vendor": "ARM.*",
+      "gl_renderer": ".*Mali-400.*",
+      "features": [
+        "disable_discard_framebuffer"
       ]
     }
   ]

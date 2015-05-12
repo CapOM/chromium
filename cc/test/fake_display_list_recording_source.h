@@ -16,15 +16,17 @@ namespace cc {
 // display list.
 class FakeDisplayListRecordingSource : public DisplayListRecordingSource {
  public:
-  explicit FakeDisplayListRecordingSource(const gfx::Size& grid_cell_size)
-      : DisplayListRecordingSource(grid_cell_size) {}
+  FakeDisplayListRecordingSource(const gfx::Size& grid_cell_size,
+                                 bool use_cached_picture)
+      : DisplayListRecordingSource(grid_cell_size, use_cached_picture) {}
   ~FakeDisplayListRecordingSource() override {}
 
   static scoped_ptr<FakeDisplayListRecordingSource> CreateRecordingSource(
       const gfx::Rect& recorded_viewport) {
     scoped_ptr<FakeDisplayListRecordingSource> recording_source(
         new FakeDisplayListRecordingSource(
-            ImplSidePaintingSettings().default_tile_grid_size));
+            ImplSidePaintingSettings().default_tile_grid_size,
+            ImplSidePaintingSettings().use_cached_picture_in_display_list));
     recording_source->SetRecordedViewport(recorded_viewport);
     return recording_source;
   }
@@ -45,6 +47,7 @@ class FakeDisplayListRecordingSource : public DisplayListRecordingSource {
         DisplayItemList::Create(recorded_viewport_, use_cached_picture);
     client_.PaintContentsToDisplayList(display_list_.get(), recorded_viewport_,
                                        painting_control);
+    display_list_->ProcessAppendedItems();
     display_list_->CreateAndCacheSkPicture();
     if (gather_pixel_refs_)
       display_list_->GatherPixelRefs(grid_cell_size_);

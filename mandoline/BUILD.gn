@@ -2,14 +2,36 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("mandoline_all") {
+group("all") {
   # Meta-target, don't link into production code.
   testonly = true
+
   deps = [
-    "//mojo:mojo",
+    ":tests",
   ]
 
-  if (!is_android && !is_component_build) {
-    deps += [ "//mandoline/app:mandoline" ]
+  if (!is_component_build) {
+    deps += [ "//mandoline/app" ]
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    "//mojo:tests",
+  ]
+
+  # TODO(GYP): Make this work.
+  if (!is_component_build && !is_mac) {
+    deps += [
+      "//components/clipboard:apptests",
+      "//components/html_viewer:apptests",
+      "//components/html_viewer:tests",
+      "//components/resource_provider:apptests",
+      "//components/resource_provider:tests",
+      "//components/view_manager:apptests",
+      "//components/view_manager:tests",
+      "//components/window_manager:apptests",
+    ]
   }
 }

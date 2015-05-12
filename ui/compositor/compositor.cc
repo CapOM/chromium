@@ -128,6 +128,7 @@ Compositor::Compositor(gfx::AcceleratedWidget widget,
 
   settings.impl_side_painting = IsUIImplSidePaintingEnabled();
   settings.use_display_lists = IsUISlimmingPaintEnabled();
+  settings.use_cached_picture_in_display_list = false;
   settings.use_zero_copy = IsUIZeroCopyEnabled();
   settings.use_one_copy = IsUIOneCopyEnabled();
   settings.use_image_texture_target = context_factory_->GetImageTextureTarget();
@@ -139,10 +140,16 @@ Compositor::Compositor(gfx::AcceleratedWidget widget,
       command_line->HasSwitch(switches::kUIEnableCompositorAnimationTimelines);
 
   base::TimeTicks before_create = base::TimeTicks::Now();
-  host_ = cc::LayerTreeHost::CreateSingleThreaded(
-      this, this, context_factory_->GetSharedBitmapManager(),
-      context_factory_->GetGpuMemoryBufferManager(),
-      context_factory_->GetTaskGraphRunner(), settings, task_runner_, nullptr);
+
+  cc::LayerTreeHost::InitParams params;
+  params.client = this;
+  params.shared_bitmap_manager = context_factory_->GetSharedBitmapManager();
+  params.gpu_memory_buffer_manager =
+      context_factory_->GetGpuMemoryBufferManager();
+  params.task_graph_runner = context_factory_->GetTaskGraphRunner();
+  params.settings = &settings;
+  params.main_task_runner = task_runner_;
+  host_ = cc::LayerTreeHost::CreateSingleThreaded(this, &params);
   UMA_HISTOGRAM_TIMES("GPU.CreateBrowserCompositor",
                       base::TimeTicks::Now() - before_create);
   host_->SetRootLayer(root_web_layer_);

@@ -277,6 +277,20 @@ bool IsFractionalScaleFactor(float scale_factor) {
   return (scale_factor - static_cast<int>(scale_factor)) > 0;
 }
 
+// Reset unchanged touch point to StateStationary for touchmove and
+// touchcancel.
+void MarkUnchangedTouchPointsAsStationary(
+    blink::WebTouchEvent* event,
+    int changed_touch_id) {
+  if (event->type == blink::WebInputEvent::TouchMove ||
+      event->type == blink::WebInputEvent::TouchCancel) {
+    for (size_t i = 0; i < event->touchesLength; ++i) {
+      if (event->touches[i].id != changed_touch_id)
+        event->touches[i].state = blink::WebTouchPoint::StateStationary;
+    }
+  }
+}
+
 }  // namespace
 
 // We need to watch for mouse events outside a Web Popup or its parent
@@ -866,10 +880,6 @@ void RenderWidgetHostViewAura::Focus() {
     window_->Focus();
 }
 
-void RenderWidgetHostViewAura::Blur() {
-  window_->Blur();
-}
-
 bool RenderWidgetHostViewAura::HasFocus() const {
   return window_->HasFocus();
 }
@@ -1064,9 +1074,9 @@ void RenderWidgetHostViewAura::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
     ReadbackRequestCallback& callback,
-    const SkColorType color_type) {
+    const SkColorType preferred_color_type) {
   delegated_frame_host_->CopyFromCompositingSurface(
-      src_subrect, dst_size, callback, color_type);
+      src_subrect, dst_size, callback, preferred_color_type);
 }
 
 void RenderWidgetHostViewAura::CopyFromCompositingSurfaceToVideoFrame(
@@ -1282,10 +1292,14 @@ void RenderWidgetHostViewAura::ProcessAckedTouchEvent(
       break;
   }
 
-  // Only send acks for changed touches.
+  // Only send acks for one changed touch point.
+  bool sent_ack = false;
   for (size_t i = 0; i < touch.event.touchesLength; ++i) {
-    if (touch.event.touches[i].state == required_state)
+    if (touch.event.touches[i].state == required_state) {
+      DCHECK(!sent_ack);
       host->dispatcher()->ProcessedTouchEvent(window_, result);
+      sent_ack = true;
+    }
   }
 }
 
@@ -2184,6 +2198,10 @@ void RenderWidgetHostViewAura::OnTouchEvent(ui::TouchEvent* event) {
   // processed by the gesture recognizer before events currently awaiting
   // dispatch in the touch queue.
   event->DisableSynchronousHandling();
+
+  // Set unchanged touch point to StateStationary for touchmove and
+  // touchcancel to make sure only send one ack per WebTouchEvent.
+  MarkUnchangedTouchPointsAsStationary(&touch_event, event->touch_id());
   host_->ForwardTouchEventWithLatencyInfo(touch_event, *event->latency());
 }
 
@@ -2532,9 +2550,6 @@ void RenderWidgetHostViewAura::OnShowContextMenu() {
 }
 
 void RenderWidgetHostViewAura::InternalSetBounds(const gfx::Rect& rect) {
-  if (HasDisplayPropertyChanged(window_))
-    host_->InvalidateScreenInfo();
-
   SnapToPhysicalPixelBoundary();
   // Don't recursively call SetBounds if this bounds update is the result of
   // a Window::SetBoundsInternal call.
@@ -2683,10 +2698,6 @@ void RenderWidgetHostViewAura::ForwardKeyboardEvent(
 #endif
 
   host_->ForwardKeyboardEvent(event);
-}
-
-SkColorType RenderWidgetHostViewAura::PreferredReadbackFormat() {
-  return kN32_SkColorType;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

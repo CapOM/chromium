@@ -6,7 +6,7 @@
 
 #include "base/base64.h"
 #include "base/bind.h"
-#include "base/message_loop/message_loop.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "chrome/common/extensions/api/networking_private/networking_private_crypto.h"
 #include "chrome/common/extensions/chrome_utility_extensions_messages.h"
@@ -27,8 +27,6 @@ class CredentialsGetterHostClient : public UtilityProcessHostClient {
  public:
   explicit CredentialsGetterHostClient(const std::string& public_key);
 
-  ~CredentialsGetterHostClient() override;
-
   // UtilityProcessHostClient
   bool OnMessageReceived(const IPC::Message& message) override;
   void OnProcessCrashed(int exit_code) override;
@@ -43,6 +41,8 @@ class CredentialsGetterHostClient : public UtilityProcessHostClient {
       const NetworkingPrivateCredentialsGetter::CredentialsCallback& callback);
 
  private:
+  ~CredentialsGetterHostClient() override;
+
   // Public key used to encrypt results
   std::vector<uint8> public_key_;
 
@@ -56,8 +56,6 @@ CredentialsGetterHostClient::CredentialsGetterHostClient(
     const std::string& public_key)
     : public_key_(public_key.begin(), public_key.end()) {
 }
-
-CredentialsGetterHostClient::~CredentialsGetterHostClient() {}
 
 bool CredentialsGetterHostClient::OnMessageReceived(
     const IPC::Message& message) {
@@ -102,11 +100,14 @@ void CredentialsGetterHostClient::StartProcessOnIOThread(
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   callback_ = callback;
   UtilityProcessHost* host =
-      UtilityProcessHost::Create(this, base::MessageLoopProxy::current());
+      UtilityProcessHost::Create(this, base::ThreadTaskRunnerHandle::Get());
   host->SetName(l10n_util::GetStringUTF16(
       IDS_UTILITY_PROCESS_WIFI_CREDENTIALS_GETTER_NAME));
   host->ElevatePrivileges();
   host->Send(new ChromeUtilityHostMsg_GetWiFiCredentials(network_guid));
+}
+
+CredentialsGetterHostClient::~CredentialsGetterHostClient() {
 }
 
 }  // namespace

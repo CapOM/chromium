@@ -4,7 +4,6 @@
 
 #include "chrome/browser/push_messaging/push_messaging_service_impl.h"
 
-#include <bitset>
 #include <vector>
 
 #include "base/barrier_closure.h"
@@ -14,13 +13,9 @@
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
 #include "base/prefs/pref_service.h"
-#include "base/strings/string_util.h"
-#include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/notifications/notification_ui_manager.h"
-#include "chrome/browser/notifications/platform_notification_service_impl.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/push_messaging/push_messaging_application_id.h"
+#include "chrome/browser/push_messaging/push_messaging_app_identifier.h"
 #include "chrome/browser/push_messaging/push_messaging_constants.h"
 #include "chrome/browser/push_messaging/push_messaging_permission_context.h"
 #include "chrome/browser/push_messaging/push_messaging_permission_context_factory.h"
@@ -29,37 +24,19 @@
 #include "chrome/browser/services/gcm/gcm_profile_service_factory.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
-#include "chrome/grit/generated_resources.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/content_settings/core/common/permission_request_id.h"
 #include "components/gcm_driver/gcm_driver.h"
 #include "components/pref_registry/pref_registry_syncable.h"
 #include "components/rappor/rappor_utils.h"
 #include "content/public/browser/browser_context.h"
-#include "content/public/browser/browser_thread.h"
-#include "content/public/browser/notification_database_data.h"
-#include "content/public/browser/platform_notification_context.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/service_worker_context.h"
 #include "content/public/browser/storage_partition.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_switches.h"
-#include "content/public/common/platform_notification_data.h"
 #include "content/public/common/push_messaging_status.h"
-#include "third_party/skia/include/core/SkBitmap.h"
-#include "ui/base/l10n/l10n_util.h"
-
-#if defined(OS_ANDROID)
-#include "chrome/browser/ui/android/tab_model/tab_model.h"
-#include "chrome/browser/ui/android/tab_model/tab_model_list.h"
-#else
-#include "chrome/browser/ui/browser.h"
-#include "chrome/browser/ui/browser_iterator.h"
-#include "chrome/browser/ui/tabs/tab_strip_model.h"
-#endif
-
-using content::BrowserThread;
 
 namespace {
 const int kMaxRegistrations = 1000000;
@@ -70,12 +47,6 @@ void RecordDeliveryStatus(content::PushDeliveryStatus status) {
                             content::PUSH_DELIVERY_STATUS_LAST + 1);
 }
 
-void RecordUserVisibleStatus(content::PushUserVisibleStatus status) {
-  UMA_HISTOGRAM_ENUMERATION("PushMessaging.UserVisibleStatus",
-                            status,
-                            content::PUSH_USER_VISIBLE_STATUS_LAST + 1);
-}
-
 blink::WebPushPermissionStatus ToPushPermission(ContentSetting setting) {
   switch (setting) {
     case CONTENT_SETTING_ALLOW:
@@ -83,7 +54,7 @@ blink::WebPushPermissionStatus ToPushPermission(ContentSetting setting) {
     case CONTENT_SETTING_BLOCK:
       return blink::WebPushPermissionStatusDenied;
     case CONTENT_SETTING_ASK:
-      return blink::WebPushPermissionStatusDefault;
+      return blink::WebPushPermissionStatusPrompt;
     default:
       NOTREACHED();
       return blink::WebPushPermissionStatusDenied;
@@ -101,7 +72,7 @@ void UnregisterCallbackToClosure(
 void PushMessagingServiceImpl::RegisterProfilePrefs(
     user_prefs::PrefRegistrySyncable* registry) {
   registry->RegisterIntegerPref(prefs::kPushMessagingRegistrationCount, 0);
-  PushMessagingApplicationId::RegisterProfilePrefs(registry);
+  PushMessagingAppIdentifier::RegisterProfilePrefs(registry);
 }
 
 // static
@@ -129,6 +100,9 @@ PushMessagingServiceImpl::PushMessagingServiceImpl(Profile* profile)
     : profile_(profile),
       push_registration_count_(0),
       pending_push_registration_count_(0),
+#if defined(ENABLE_NOTIFICATIONS)
+      notification_manager_(profile),
+#endif
       weak_factory_(this) {
   DCHECK(profile);
   profile_->GetHostContentSettingsMap()->AddObserver(this);
@@ -142,7 +116,7 @@ void PushMessagingServiceImpl::IncreasePushRegistrationCount(int add,
                                                              bool is_pending) {
   DCHECK(add > 0);
   if (push_registration_count_ + pending_push_registration_count_ == 0) {
-    GetGCMDriver()->AddAppHandler(kPushMessagingApplicationIdPrefix, this);
+    GetGCMDriver()->AddAppHandler(kPushMessagingAppIdentifierPrefix, this);
   }
   if (is_pending) {
     pending_push_registration_count_ += add;
@@ -166,12 +140,12 @@ void PushMessagingServiceImpl::DecreasePushRegistrationCount(int subtract,
                                      push_registration_count_);
   }
   if (push_registration_count_ + pending_push_registration_count_ == 0) {
-    GetGCMDriver()->RemoveAppHandler(kPushMessagingApplicationIdPrefix);
+    GetGCMDriver()->RemoveAppHandler(kPushMessagingAppIdentifierPrefix);
   }
 }
 
 bool PushMessagingServiceImpl::CanHandle(const std::string& app_id) const {
-  return PushMessagingApplicationId::Get(profile_, app_id).IsValid();
+  return !PushMessagingAppIdentifier::Get(profile_, app_id).is_null();
 }
 
 void PushMessagingServiceImpl::ShutdownHandler() {
@@ -188,19 +162,19 @@ void PushMessagingServiceImpl::OnMessage(
   base::Closure message_handled_closure =
       message_callback_for_testing_.is_null() ? base::Bind(&base::DoNothing)
                                               : message_callback_for_testing_;
-  PushMessagingApplicationId application_id =
-      PushMessagingApplicationId::Get(profile_, app_id);
-  // Drop message and unregister if app id was unknown (maybe recently deleted).
-  if (!application_id.IsValid()) {
+  PushMessagingAppIdentifier app_identifier =
+      PushMessagingAppIdentifier::Get(profile_, app_id);
+  // Drop message and unregister if app_id was unknown (maybe recently deleted).
+  if (app_identifier.is_null()) {
     DeliverMessageCallback(app_id, GURL::EmptyGURL(), -1, message,
                            message_handled_closure,
                            content::PUSH_DELIVERY_STATUS_UNKNOWN_APP_ID);
     return;
   }
   // Drop message and unregister if |origin| has lost push permission.
-  if (!HasPermission(application_id.origin())) {
-    DeliverMessageCallback(app_id, application_id.origin(),
-                           application_id.service_worker_registration_id(),
+  if (!HasPermission(app_identifier.origin())) {
+    DeliverMessageCallback(app_id, app_identifier.origin(),
+                           app_identifier.service_worker_registration_id(),
                            message, message_handled_closure,
                            content::PUSH_DELIVERY_STATUS_PERMISSION_DENIED);
     return;
@@ -209,7 +183,7 @@ void PushMessagingServiceImpl::OnMessage(
   rappor::SampleDomainAndRegistryFromGURL(
       g_browser_process->rappor_service(),
       "PushMessaging.MessageReceived.Origin",
-      application_id.origin());
+      app_identifier.origin());
 
   // The Push API only exposes a single string of data in the push event fired
   // on the Service Worker. When developers send messages using GCM to the Push
@@ -237,18 +211,18 @@ void PushMessagingServiceImpl::OnMessage(
 
   content::BrowserContext::DeliverPushMessage(
       profile_,
-      application_id.origin(),
-      application_id.service_worker_registration_id(),
+      app_identifier.origin(),
+      app_identifier.service_worker_registration_id(),
       data,
       base::Bind(&PushMessagingServiceImpl::DeliverMessageCallback,
                  weak_factory_.GetWeakPtr(),
-                 application_id.app_id_guid(), application_id.origin(),
-                 application_id.service_worker_registration_id(), message,
+                 app_identifier.app_id(), app_identifier.origin(),
+                 app_identifier.service_worker_registration_id(), message,
                  message_handled_closure));
 }
 
 void PushMessagingServiceImpl::DeliverMessageCallback(
-    const std::string& app_id_guid,
+    const std::string& app_id,
     const GURL& requesting_origin,
     int64 service_worker_registration_id,
     const gcm::GCMClient::IncomingMessage& message,
@@ -258,13 +232,19 @@ void PushMessagingServiceImpl::DeliverMessageCallback(
   // Service Worker corresponding to app_id (and/or on an internals page).
   // TODO(mvanouwerkerk): Is there a way to recover from failure?
   switch (status) {
-    // Call RequireUserVisibleUX if the message was delivered to the Service
-    // Worker JS, even if the website's event handler failed (to prevent sites
-    // deliberately failing in order to avoid having to show notifications).
+    // Call EnforceUserVisibleOnlyRequirements if the message was delivered to
+    // the Service Worker JavaScript, even if the website's event handler failed
+    // (to prevent sites deliberately failing in order to avoid having to show
+    // notifications).
     case content::PUSH_DELIVERY_STATUS_SUCCESS:
     case content::PUSH_DELIVERY_STATUS_EVENT_WAITUNTIL_REJECTED:
-      RequireUserVisibleUX(requesting_origin, service_worker_registration_id,
-                           message_handled_closure);
+#if defined(ENABLE_NOTIFICATIONS)
+      notification_manager_.EnforceUserVisibleOnlyRequirements(
+          requesting_origin, service_worker_registration_id,
+          message_handled_closure);
+#else
+      message_handled_closure.Run();
+#endif
       break;
     case content::PUSH_DELIVERY_STATUS_INVALID_MESSAGE:
     case content::PUSH_DELIVERY_STATUS_SERVICE_WORKER_ERROR:
@@ -273,261 +253,12 @@ void PushMessagingServiceImpl::DeliverMessageCallback(
     case content::PUSH_DELIVERY_STATUS_UNKNOWN_APP_ID:
     case content::PUSH_DELIVERY_STATUS_PERMISSION_DENIED:
     case content::PUSH_DELIVERY_STATUS_NO_SERVICE_WORKER:
-      Unregister(app_id_guid, message.sender_id,
+      Unregister(app_id, message.sender_id,
                  base::Bind(&UnregisterCallbackToClosure,
                  message_handled_closure));
       break;
   }
   RecordDeliveryStatus(status);
-}
-
-void PushMessagingServiceImpl::RequireUserVisibleUX(
-    const GURL& requesting_origin, int64_t service_worker_registration_id,
-    const base::Closure& message_handled_closure) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-#if defined(ENABLE_NOTIFICATIONS)
-  // TODO(johnme): Relax this heuristic slightly.
-  scoped_refptr<content::PlatformNotificationContext> notification_context =
-      content::BrowserContext::GetStoragePartitionForSite(
-          profile_, requesting_origin)->GetPlatformNotificationContext();
-  BrowserThread::PostTask(
-      BrowserThread::IO, FROM_HERE,
-      base::Bind(
-          &content::PlatformNotificationContext
-                  ::ReadAllNotificationDataForServiceWorkerRegistration,
-          notification_context,
-          requesting_origin, service_worker_registration_id,
-          base::Bind(
-              &PushMessagingServiceImpl::DidGetNotificationsFromDatabaseIOProxy,
-              weak_factory_.GetWeakPtr(),
-              requesting_origin, service_worker_registration_id,
-              message_handled_closure)));
-#else
-  message_handled_closure.Run();
-#endif  // defined(ENABLE_NOTIFICATIONS)
-}
-
-// static
-void PushMessagingServiceImpl::DidGetNotificationsFromDatabaseIOProxy(
-    const base::WeakPtr<PushMessagingServiceImpl>& ui_weak_ptr,
-    const GURL& requesting_origin,
-    int64_t service_worker_registration_id,
-    const base::Closure& message_handled_closure,
-    bool success,
-    const std::vector<content::NotificationDatabaseData>& data) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE,
-      base::Bind(&PushMessagingServiceImpl::DidGetNotificationsFromDatabase,
-                 ui_weak_ptr,
-                 requesting_origin, service_worker_registration_id,
-                 message_handled_closure,
-                 success, data));
-}
-
-void PushMessagingServiceImpl::DidGetNotificationsFromDatabase(
-    const GURL& requesting_origin, int64_t service_worker_registration_id,
-    const base::Closure& message_handled_closure,
-    bool success, const std::vector<content::NotificationDatabaseData>& data) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  // TODO(johnme): Hiding an existing notification should also count as a useful
-  // user-visible action done in response to a push message - but make sure that
-  // sending two messages in rapid succession which show then hide a
-  // notification doesn't count.
-  int notification_count = success ? data.size() : 0;
-  bool notification_shown = notification_count > 0;
-
-  bool notification_needed = true;
-  // Sites with a currently visible tab don't need to show notifications.
-#if defined(OS_ANDROID)
-  for (auto it = TabModelList::begin(); it != TabModelList::end(); ++it) {
-    Profile* profile = (*it)->GetProfile();
-    content::WebContents* active_web_contents =
-        (*it)->GetActiveWebContents();
-#else
-  for (chrome::BrowserIterator it; !it.done(); it.Next()) {
-    Profile* profile = it->profile();
-    content::WebContents* active_web_contents =
-        it->tab_strip_model()->GetActiveWebContents();
-#endif
-    if (!active_web_contents || !active_web_contents->GetMainFrame())
-      continue;
-
-    // Don't leak information from other profiles.
-    if (profile != profile_)
-      continue;
-
-    // Ignore minimized windows etc.
-    switch (active_web_contents->GetMainFrame()->GetVisibilityState()) {
-     case blink::WebPageVisibilityStateHidden:
-     case blink::WebPageVisibilityStatePrerender:
-      continue;
-     case blink::WebPageVisibilityStateVisible:
-      break;
-    }
-
-    // Use the visible URL since that's the one the user is aware of (and it
-    // doesn't matter whether the page loaded successfully).
-    const GURL& active_url = active_web_contents->GetVisibleURL();
-    if (requesting_origin == active_url.GetOrigin()) {
-      notification_needed = false;
-      break;
-    }
-#if defined(OS_ANDROID)
-  }
-#else
-  }
-#endif
-
-  // Don't track push messages that didn't show a notification but were exempt
-  // from needing to do so.
-  if (notification_shown || notification_needed) {
-    content::ServiceWorkerContext* service_worker_context =
-        content::BrowserContext::GetStoragePartitionForSite(
-            profile_, requesting_origin)->GetServiceWorkerContext();
-
-    GetNotificationsShownByLastFewPushes(
-        service_worker_context, service_worker_registration_id,
-        base::Bind(&PushMessagingServiceImpl::DidGetNotificationsShownAndNeeded,
-                   weak_factory_.GetWeakPtr(),
-                   requesting_origin, service_worker_registration_id,
-                   notification_shown, notification_needed,
-                   message_handled_closure));
-  } else {
-    RecordUserVisibleStatus(
-        content::PUSH_USER_VISIBLE_STATUS_NOT_REQUIRED_AND_NOT_SHOWN);
-    message_handled_closure.Run();
-  }
-}
-
-static void IgnoreResult(bool unused) {
-}
-
-void PushMessagingServiceImpl::DidGetNotificationsShownAndNeeded(
-    const GURL& requesting_origin, int64_t service_worker_registration_id,
-    bool notification_shown, bool notification_needed,
-    const base::Closure& message_handled_closure,
-    const std::string& data, bool success, bool not_found) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  content::ServiceWorkerContext* service_worker_context =
-      content::BrowserContext::GetStoragePartitionForSite(
-          profile_, requesting_origin)->GetServiceWorkerContext();
-
-  // We remember whether the last (up to) 10 pushes showed notifications.
-  const size_t MISSED_NOTIFICATIONS_LENGTH = 10;
-  // data is a string like "0001000", where '0' means shown, and '1' means
-  // needed but not shown. We manipulate it in bitset form.
-  std::bitset<MISSED_NOTIFICATIONS_LENGTH> missed_notifications(data);
-
-  DCHECK(notification_shown || notification_needed);  // Caller must ensure this
-  bool needed_but_not_shown = notification_needed && !notification_shown;
-
-  // New entries go at the end, and old ones are shifted off the beginning once
-  // the history length is exceeded.
-  missed_notifications <<= 1;
-  missed_notifications[0] = needed_but_not_shown;
-  std::string updated_data(missed_notifications.
-      to_string<char, std::string::traits_type, std::string::allocator_type>());
-  SetNotificationsShownByLastFewPushes(
-      service_worker_context, service_worker_registration_id,
-      requesting_origin, updated_data,
-      base::Bind(&IgnoreResult));  // This is a heuristic; ignore failure.
-
-  if (notification_shown) {
-    RecordUserVisibleStatus(
-        notification_needed
-        ? content::PUSH_USER_VISIBLE_STATUS_REQUIRED_AND_SHOWN
-        : content::PUSH_USER_VISIBLE_STATUS_NOT_REQUIRED_BUT_SHOWN);
-    message_handled_closure.Run();
-    return;
-  }
-  DCHECK(needed_but_not_shown);
-  if (missed_notifications.count() <= 1) {  // Apply grace.
-    RecordUserVisibleStatus(
-      content::PUSH_USER_VISIBLE_STATUS_REQUIRED_BUT_NOT_SHOWN_USED_GRACE);
-    message_handled_closure.Run();
-    return;
-  }
-  RecordUserVisibleStatus(
-      content::
-          PUSH_USER_VISIBLE_STATUS_REQUIRED_BUT_NOT_SHOWN_GRACE_EXCEEDED);
-  rappor::SampleDomainAndRegistryFromGURL(
-      g_browser_process->rappor_service(),
-      "PushMessaging.GenericNotificationShown.Origin",
-      requesting_origin);
-  // The site failed to show a notification when one was needed, and they have
-  // already failed once in the previous 10 push messages, so we will show a
-  // generic notification. See https://crbug.com/437277.
-  // TODO(johnme): The generic notification should probably automatically
-  // close itself when the next push message arrives?
-  content::PlatformNotificationData notification_data;
-  // TODO(johnme): Switch to FormatOriginForDisplay from crbug.com/402698
-  notification_data.title = base::UTF8ToUTF16(requesting_origin.host());
-  notification_data.direction =
-      content::PlatformNotificationData::NotificationDirectionLeftToRight;
-  notification_data.body =
-      l10n_util::GetStringUTF16(IDS_PUSH_MESSAGING_GENERIC_NOTIFICATION_BODY);
-  notification_data.tag = kPushMessagingForcedNotificationTag;
-  notification_data.icon = GURL();
-  notification_data.silent = true;
-
-  content::NotificationDatabaseData database_data;
-  database_data.origin = requesting_origin;
-  database_data.service_worker_registration_id =
-      service_worker_registration_id;
-  database_data.notification_data = notification_data;
-
-  scoped_refptr<content::PlatformNotificationContext> notification_context =
-    content::BrowserContext::GetStoragePartitionForSite(
-        profile_, requesting_origin)->GetPlatformNotificationContext();
-  BrowserThread::PostTask(
-      BrowserThread::IO, FROM_HERE,
-      base::Bind(
-          &content::PlatformNotificationContext::WriteNotificationData,
-          notification_context,
-          requesting_origin, database_data,
-          base::Bind(&PushMessagingServiceImpl::DidWriteNotificationDataIOProxy,
-                     weak_factory_.GetWeakPtr(),
-                     requesting_origin, notification_data,
-                     message_handled_closure)));
-}
-
-// static
-void PushMessagingServiceImpl::DidWriteNotificationDataIOProxy(
-    const base::WeakPtr<PushMessagingServiceImpl>& ui_weak_ptr,
-    const GURL& requesting_origin,
-    const content::PlatformNotificationData& notification_data,
-    const base::Closure& message_handled_closure,
-    bool success,
-    int64_t persistent_notification_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::IO);
-  BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE,
-      base::Bind(&PushMessagingServiceImpl::DidWriteNotificationData,
-                 ui_weak_ptr,
-                 requesting_origin, notification_data, message_handled_closure,
-                 success, persistent_notification_id));
-}
-
-void PushMessagingServiceImpl::DidWriteNotificationData(
-    const GURL& requesting_origin,
-    const content::PlatformNotificationData& notification_data,
-    const base::Closure& message_handled_closure,
-    bool success,
-    int64_t persistent_notification_id) {
-  DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  if (!success) {
-    DLOG(ERROR) << "Writing forced notification to database should not fail";
-    message_handled_closure.Run();
-    return;
-  }
-  PlatformNotificationServiceImpl::GetInstance()->DisplayPersistentNotification(
-      profile_,
-      persistent_notification_id,
-      requesting_origin,
-      SkBitmap() /* icon */,
-      notification_data);
-  message_handled_closure.Run();
 }
 
 void PushMessagingServiceImpl::SetMessageCallbackForTesting(
@@ -570,10 +301,9 @@ void PushMessagingServiceImpl::RegisterFromDocument(
     int render_frame_id,
     bool user_visible,
     const content::PushMessagingService::RegisterCallback& callback) {
-  PushMessagingApplicationId application_id =
-      PushMessagingApplicationId::Generate(requesting_origin,
+  PushMessagingAppIdentifier app_identifier =
+      PushMessagingAppIdentifier::Generate(requesting_origin,
                                            service_worker_registration_id);
-  DCHECK(application_id.IsValid());
 
   if (push_registration_count_ + pending_push_registration_count_
       >= kMaxRegistrations) {
@@ -618,7 +348,7 @@ void PushMessagingServiceImpl::RegisterFromDocument(
   permission_context->RequestPermission(
       web_contents, id, requesting_origin, true /* user_gesture */,
       base::Bind(&PushMessagingServiceImpl::DidRequestPermission,
-                 weak_factory_.GetWeakPtr(), application_id, sender_id,
+                 weak_factory_.GetWeakPtr(), app_identifier, sender_id,
                  callback));
 }
 
@@ -628,10 +358,9 @@ void PushMessagingServiceImpl::RegisterFromWorker(
     const std::string& sender_id,
     bool user_visible,
     const content::PushMessagingService::RegisterCallback& register_callback) {
-  PushMessagingApplicationId application_id =
-      PushMessagingApplicationId::Generate(requesting_origin,
+  PushMessagingAppIdentifier app_identifier =
+      PushMessagingAppIdentifier::Generate(requesting_origin,
                                            service_worker_registration_id);
-  DCHECK(application_id.IsValid());
 
   if (profile_->GetPrefs()->GetInteger(
           prefs::kPushMessagingRegistrationCount) >= kMaxRegistrations) {
@@ -657,10 +386,10 @@ void PushMessagingServiceImpl::RegisterFromWorker(
   IncreasePushRegistrationCount(1, true /* is_pending */);
   std::vector<std::string> sender_ids(1, sender_id);
   GetGCMDriver()->Register(
-      application_id.app_id_guid(), sender_ids,
+      app_identifier.app_id(), sender_ids,
       base::Bind(&PushMessagingServiceImpl::DidRegister,
                  weak_factory_.GetWeakPtr(),
-                 application_id, register_callback));
+                 app_identifier, register_callback));
 }
 
 blink::WebPushPermissionStatus PushMessagingServiceImpl::GetPermissionStatus(
@@ -683,7 +412,7 @@ void PushMessagingServiceImpl::RegisterEnd(
 }
 
 void PushMessagingServiceImpl::DidRegister(
-    const PushMessagingApplicationId& application_id,
+    const PushMessagingAppIdentifier& app_identifier,
     const content::PushMessagingService::RegisterCallback& callback,
     const std::string& registration_id,
     gcm::GCMClient::Result result) {
@@ -692,7 +421,7 @@ void PushMessagingServiceImpl::DidRegister(
   switch (result) {
     case gcm::GCMClient::SUCCESS:
       status = content::PUSH_REGISTRATION_STATUS_SUCCESS_FROM_PUSH_SERVICE;
-      application_id.PersistToDisk(profile_);
+      app_identifier.PersistToPrefs(profile_);
       IncreasePushRegistrationCount(1, false /* is_pending */);
       break;
     case gcm::GCMClient::INVALID_PARAMETER:
@@ -712,7 +441,7 @@ void PushMessagingServiceImpl::DidRegister(
 }
 
 void PushMessagingServiceImpl::DidRequestPermission(
-    const PushMessagingApplicationId& application_id,
+    const PushMessagingAppIdentifier& app_identifier,
     const std::string& sender_id,
     const content::PushMessagingService::RegisterCallback& register_callback,
     ContentSetting content_setting) {
@@ -726,11 +455,11 @@ void PushMessagingServiceImpl::DidRequestPermission(
   IncreasePushRegistrationCount(1, true /* is_pending */);
   std::vector<std::string> sender_ids(1, sender_id);
   GetGCMDriver()->Register(
-      application_id.app_id_guid(),
+      app_identifier.app_id(),
       sender_ids,
       base::Bind(&PushMessagingServiceImpl::DidRegister,
                  weak_factory_.GetWeakPtr(),
-                 application_id, register_callback));
+                 app_identifier, register_callback));
 }
 
 // Unregister methods ----------------------------------------------------------
@@ -740,9 +469,9 @@ void PushMessagingServiceImpl::Unregister(
     int64 service_worker_registration_id,
     const std::string& sender_id,
     const content::PushMessagingService::UnregisterCallback& callback) {
-  PushMessagingApplicationId application_id = PushMessagingApplicationId::Get(
+  PushMessagingAppIdentifier app_identifier = PushMessagingAppIdentifier::Get(
       profile_, requesting_origin, service_worker_registration_id);
-  if (!application_id.IsValid()) {
+  if (app_identifier.is_null()) {
     if (!callback.is_null()) {
       callback.Run(
           content::PUSH_UNREGISTRATION_STATUS_SUCCESS_WAS_NOT_REGISTERED);
@@ -750,22 +479,22 @@ void PushMessagingServiceImpl::Unregister(
     return;
   }
 
-  Unregister(application_id.app_id_guid(), sender_id, callback);
+  Unregister(app_identifier.app_id(), sender_id, callback);
 }
 
 void PushMessagingServiceImpl::Unregister(
-    const std::string& app_id_guid,
+    const std::string& app_id,
     const std::string& sender_id,
     const content::PushMessagingService::UnregisterCallback& callback) {
-  // Delete the mapping for this app id, to guarantee that no messages get
+  // Delete the mapping for this app_id, to guarantee that no messages get
   // delivered in future (even if unregistration fails).
   // TODO(johnme): Instead of deleting these app ids, store them elsewhere, and
   // retry unregistration if it fails due to network errors (crbug.com/465399).
-  PushMessagingApplicationId application_id =
-      PushMessagingApplicationId::Get(profile_, app_id_guid);
-  bool was_registered = application_id.IsValid();
+  PushMessagingAppIdentifier app_identifier =
+      PushMessagingAppIdentifier::Get(profile_, app_id);
+  bool was_registered = !app_identifier.is_null();
   if (was_registered)
-    application_id.DeleteFromDisk(profile_);
+    app_identifier.DeleteFromPrefs(profile_);
 
   const auto& unregister_callback =
       base::Bind(&PushMessagingServiceImpl::DidUnregister,
@@ -777,10 +506,10 @@ void PushMessagingServiceImpl::Unregister(
   if (sender_id.empty())
     unregister_callback.Run(gcm::GCMClient::INVALID_PARAMETER);
   else
-    GetGCMDriver()->UnregisterWithSenderId(app_id_guid, sender_id,
+    GetGCMDriver()->UnregisterWithSenderId(app_id, sender_id,
                                            unregister_callback);
 #else
-  GetGCMDriver()->Unregister(app_id_guid, unregister_callback);
+  GetGCMDriver()->Unregister(app_id, unregister_callback);
 #endif
 }
 
@@ -830,57 +559,61 @@ void PushMessagingServiceImpl::OnContentSettingChanged(
     return;
   }
 
-  std::vector<PushMessagingApplicationId> all_app_ids =
-      PushMessagingApplicationId::GetAll(profile_);
+  std::vector<PushMessagingAppIdentifier> all_app_identifiers =
+      PushMessagingAppIdentifier::GetAll(profile_);
 
   base::Closure barrier_closure = base::BarrierClosure(
-      all_app_ids.size(),
+      all_app_identifiers.size(),
       content_setting_changed_callback_for_testing_.is_null()
           ? base::Bind(&base::DoNothing)
           : content_setting_changed_callback_for_testing_);
 
-  for (const auto& id : all_app_ids) {
+  for (const PushMessagingAppIdentifier& app_identifier : all_app_identifiers) {
     // If |primary_pattern| is not valid, we should always check for a
     // permission change because it can happen for example when the entire
     // Push or Notifications permissions are cleared.
     // Otherwise, the permission should be checked if the pattern matches the
     // origin.
-    if (primary_pattern.IsValid() && !primary_pattern.Matches(id.origin())) {
+    if (primary_pattern.IsValid() &&
+        !primary_pattern.Matches(app_identifier.origin())) {
       barrier_closure.Run();
       continue;
     }
 
-    if (HasPermission(id.origin())) {
+    if (HasPermission(app_identifier.origin())) {
       barrier_closure.Run();
       continue;
     }
 
     GetSenderId(
-        profile_, id.origin(), id.service_worker_registration_id(),
+        profile_, app_identifier.origin(),
+        app_identifier.service_worker_registration_id(),
         base::Bind(
             &PushMessagingServiceImpl::UnregisterBecausePermissionRevoked,
-            weak_factory_.GetWeakPtr(), id, barrier_closure));
+            weak_factory_.GetWeakPtr(), app_identifier, barrier_closure));
   }
 }
 
 void PushMessagingServiceImpl::UnregisterBecausePermissionRevoked(
-    const PushMessagingApplicationId& id, const base::Closure& closure,
-    const std::string& sender_id, bool success, bool not_found) {
+    const PushMessagingAppIdentifier& app_identifier,
+    const base::Closure& closure, const std::string& sender_id,
+    bool success, bool not_found) {
   base::Closure barrier_closure = base::BarrierClosure(2, closure);
 
-  // Unregister the PushMessagingApplicationId with the push service.
+  // Unregister the PushMessagingAppIdentifier with the push service.
   // It's possible for GetSenderId to have failed and sender_id to be empty, if
   // cookies (and the SW database) for an origin got cleared before permissions
   // are cleared for the origin. In that case Unregister will just delete the
-  // application ID to block future messages.
+  // app identifier to block future messages.
   // TODO(johnme): Auto-unregister before SW DB is cleared
   // (https://crbug.com/402458).
-  Unregister(id.app_id_guid(), sender_id,
+  Unregister(app_identifier.app_id(), sender_id,
              base::Bind(&UnregisterCallbackToClosure, barrier_closure));
 
   // Clear the associated service worker push registration id.
-  ClearPushRegistrationID(profile_, id.origin(),
-                          id.service_worker_registration_id(), barrier_closure);
+  ClearPushRegistrationID(profile_, app_identifier.origin(),
+                          app_identifier.service_worker_registration_id(),
+                          barrier_closure);
 }
 
 void PushMessagingServiceImpl::SetContentSettingChangedCallbackForTesting(
@@ -891,7 +624,7 @@ void PushMessagingServiceImpl::SetContentSettingChangedCallbackForTesting(
 // KeyedService methods -------------------------------------------------------
 
 void PushMessagingServiceImpl::Shutdown() {
-  GetGCMDriver()->RemoveAppHandler(kPushMessagingApplicationIdPrefix);
+  GetGCMDriver()->RemoveAppHandler(kPushMessagingAppIdentifierPrefix);
 }
 
 // Helper methods --------------------------------------------------------------

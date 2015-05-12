@@ -446,7 +446,7 @@
     ]
   }],
   "fileSystem.requestFileSystem": [{
-    "channel": "dev",
+    "channel": "stable",
     "extension_types": ["platform_app"],
     "platforms": ["chromeos"]
   }],
@@ -538,7 +538,7 @@
     "location": "component"
   }],
   "launcherSearchProvider": {
-    "channel": "dev",
+    "channel": "stable",
     "extension_types": ["extension", "platform_app"],
     "platform": ["chromeos"],
     "whitelist": [
@@ -755,6 +755,11 @@
     "channel": "stable",
     "extension_types": ["extension", "legacy_packaged_app"]
   },
+  "passwordsPrivate": {
+    "channel": "trunk",
+    "extension_types": ["extension", "platform_app"],
+    "location": "component"
+  },
   "pointerLock": {
     "channel": "stable",
     "extension_types": ["platform_app"]
@@ -890,8 +895,7 @@
   "settingsPrivate": {
     "channel": "trunk",
     "extension_types": ["extension", "platform_app"],
-    "platforms": ["chromeos", "mac", "win", "linux"],
-    "whitelist": []
+    "location": "component"
   },
   "signedInDevices": {
     "channel": "dev",
@@ -985,6 +989,18 @@
       "ADFA45434ABA2F1A4647E673F53FF37F8F6047A3"
     ]
   },
+  "webrtcDesktopCapturePrivate": {
+    "channel": "stable",
+    "extension_types": ["extension"],
+    "whitelist": [
+      // Hangouts test extension
+      "80B9DC58E5210749F052F5B4DB239C50CF72AEB6",
+      // Hangout Services component extension.
+      "DF84F03F9B960409CCDE0D895B9650EBE81C0A8E",
+      // Extension used for API test.
+      "ADFA45434ABA2F1A4647E673F53FF37F8F6047A3"
+    ]
+  },
   "webrtcLoggingPrivate": {
     "channel": "stable",
     "extension_types": ["extension"],
@@ -1001,6 +1017,16 @@
     "whitelist": [
       "B44D08FD98F1523ED5837D78D0A606EA9D6206E5",  // Web Store
       "2653F6F6C39BC6EEBD36A09AFB92A19782FF7EB4"   // Enterprise Web Store
+    ]
+  },
+  "webstoreWidgetPrivate": {
+    "channel": "stable",
+    "extension_types": ["platform_app"],
+    "platforms": ["chromeos"],
+    "whitelist": [
+      "A948368FC53BE437A55FEB414106E207925482F5",  // Files app
+      "8C726564C6DBE7380BAB388DE6CC7EC93EB44B06",  // Video player
+      "5065C83E84321221675D20FBE4DC43C655CC8C6F"   // Files app tests
     ]
   }
 }

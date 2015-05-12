@@ -295,14 +295,14 @@ BrowserGpuChannelHostFactory::~BrowserGpuChannelHostFactory() {
   for (size_t n = 0; n < established_callbacks_.size(); n++)
     established_callbacks_[n].Run();
   shutdown_event_->Signal();
+  if (gpu_channel_) {
+    gpu_channel_->DestroyChannel();
+    gpu_channel_ = NULL;
+  }
 }
 
 bool BrowserGpuChannelHostFactory::IsMainThread() {
   return BrowserThread::CurrentlyOn(BrowserThread::UI);
-}
-
-base::MessageLoop* BrowserGpuChannelHostFactory::GetMainLoop() {
-  return BrowserThread::UnsafeGetMessageLoopForThread(BrowserThread::UI);
 }
 
 scoped_refptr<base::MessageLoopProxy>
@@ -396,6 +396,7 @@ void BrowserGpuChannelHostFactory::EstablishGpuChannel(
   if (gpu_channel_.get() && gpu_channel_->IsLost()) {
     DCHECK(!pending_request_.get());
     // Recreate the channel if it has been lost.
+    gpu_channel_->DestroyChannel();
     gpu_channel_ = NULL;
   }
 

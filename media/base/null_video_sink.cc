@@ -22,7 +22,8 @@ NullVideoSink::NullVideoSink(
       task_runner_(task_runner),
       started_(false),
       callback_(nullptr),
-      tick_clock_(&default_tick_clock_) {
+      tick_clock_(&default_tick_clock_),
+      background_render_(false) {
 }
 
 NullVideoSink::~NullVideoSink() {
@@ -53,14 +54,12 @@ void NullVideoSink::CallRender() {
   DCHECK(started_);
 
   const base::TimeTicks end_of_interval = current_render_time_ + interval_;
-  if (current_render_time_ > pause_end_time_) {
-    scoped_refptr<VideoFrame> new_frame =
-        callback_->Render(current_render_time_, end_of_interval);
-    const bool is_new_frame = new_frame != last_frame_;
-    last_frame_ = new_frame;
-    if (is_new_frame)
-      new_frame_cb_.Run(new_frame);
-  }
+  scoped_refptr<VideoFrame> new_frame = callback_->Render(
+      current_render_time_, end_of_interval, background_render_);
+  const bool is_new_frame = new_frame != last_frame_;
+  last_frame_ = new_frame;
+  if (is_new_frame)
+    new_frame_cb_.Run(new_frame);
 
   current_render_time_ += interval_;
 
@@ -69,21 +68,20 @@ void NullVideoSink::CallRender() {
     return;
   }
 
-  // Recompute now to compensate for the cost of Render().
   const base::TimeTicks now = tick_clock_->NowTicks();
-  base::TimeDelta delay = current_render_time_ - now;
-
-  // If we're behind, find the next nearest on time interval.
-  if (delay < base::TimeDelta())
-    delay += interval_ * (-delay / interval_ + 1);
-  current_render_time_ = now + delay;
-
-  // The tick clock is frozen in this case, so clamp delay to the interval time.
-  // We still want the interval passed to Render() to grow, but we also don't
-  // want the delay used here to increase slowly over time.
-  if (last_now_ == now && delay > interval_)
+  base::TimeDelta delay;
+  if (last_now_ == now) {
+    // The tick clock is frozen in this case, so don't advance deadline.
     delay = interval_;
-  last_now_ = now;
+    current_render_time_ = now;
+  } else {
+    // If we're behind, find the next nearest on time interval.
+    delay = current_render_time_ - now;
+    if (delay < base::TimeDelta())
+      delay += interval_ * (-delay / interval_ + 1);
+    current_render_time_ = now + delay;
+    last_now_ = now;
+  }
 
   task_runner_->PostDelayedTask(FROM_HERE, cancelable_worker_.callback(),
                                 delay);
@@ -92,10 +90,6 @@ void NullVideoSink::CallRender() {
 void NullVideoSink::PaintFrameUsingOldRenderingPath(
     const scoped_refptr<VideoFrame>& frame) {
   new_frame_cb_.Run(frame);
-}
-
-void NullVideoSink::PauseRenderCallbacks(base::TimeTicks pause_until) {
-  pause_end_time_ = pause_until;
 }
 
 }  // namespace media

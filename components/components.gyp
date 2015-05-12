@@ -30,6 +30,7 @@
     'favicon_base.gypi',
     'gcm_driver.gypi',
     'google.gypi',
+    'guest_view.gypi',
     'handoff.gypi',
     'history.gypi',
     'infobars.gypi',
@@ -80,6 +81,7 @@
   'conditions': [
     ['OS == "android"', {
       'includes': [
+        'external_video_surface.gypi',
         'service_tab_launcher.gypi',
       ],
     }],
@@ -150,6 +152,13 @@
     ['enable_plugins==1', {
       'includes': [
         'pdf.gypi',
+      ],
+    }],
+    # TODO(tbarzic): Remove chromeos condition when there are non-chromeos apps
+    # in components/apps.
+    ['enable_extensions == 1 and chromeos == 1', {
+      'includes': [
+        'chrome_apps.gypi',
       ],
     }],
   ],

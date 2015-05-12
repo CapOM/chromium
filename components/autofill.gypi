@@ -162,6 +162,8 @@
         'autofill/core/browser/form_structure.h',
         'autofill/core/browser/name_field.cc',
         'autofill/core/browser/name_field.h',
+        'autofill/core/browser/options_util.cc',
+        'autofill/core/browser/options_util.h',
         'autofill/core/browser/password_generator.cc',
         'autofill/core/browser/password_generator.h',
         'autofill/core/browser/personal_data_manager.cc',
@@ -204,13 +206,6 @@
         'autofill/core/browser/webdata/autofill_webdata_service.cc',
         'autofill/core/browser/webdata/autofill_webdata_service.h',
         'autofill/core/browser/webdata/autofill_webdata_service_observer.h',
-      ],
-      'conditions': [
-        ['desktop_linux != 1', {
-          # Controls whether Wallet cards can be saved to the local instance of
-          # chrome.
-          'defines': [ 'ENABLE_SAVE_WALLET_CARDS_LOCALLY' ],
-        }],
       ],
 
       # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.

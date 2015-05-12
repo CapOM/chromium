@@ -179,6 +179,10 @@ div.splitter {
   padding: 0 3px;
 }
 
+#directory-tree .tree-row > .button {
+  display: flex;
+}
+
 #directory-tree .tree-row > .expand-icon {
   flex: none;
   height: 36px;
@@ -189,13 +193,13 @@ div.splitter {
   width: 36px;
 }
 
-#directory-tree .tree-row > .item-icon {
+#directory-tree .tree-row .item-icon {
   flex: none;
   height: 16px;
   width: 16px;
 }
 
-#directory-tree .tree-row > .label {
+#directory-tree .tree-row .label {
   display: block;
   flex: auto;
   margin: 0 6px;
@@ -398,6 +402,16 @@ body.check-select #view-button.thumbnail {
   display: none;
 }
 
+#sort-button {
+  background-image: -webkit-image-set(
+      url(../images/files/ui/sorting_white.png) 1x,
+      url(../images/files/ui/2x/sorting_white.png) 2x);
+}
+
+body.check-select #sort-button {
+  display: none;
+}
+
 #gear-button {
   background-image: -webkit-image-set(
       url(../images/files/ui/menu_white.png) 1x,
@@ -409,7 +423,12 @@ body.check-select #gear-button {
 }
 
 #cloud-import-details-button {
-  -webkit-margin-start: -15px;
+  -webkit-margin-start: -11px;
+  width: 24px;
+}
+
+#cloud-import-details-button core-icon {
+  margin: 8px 4px;
 }
 
 #cloud-import-details {
@@ -892,7 +911,7 @@ html[dir='rtl'] .breadcrumbs .separator {
 }
 
 .spinner {
-  background: url(../images/common/spinner.svg) center/100% no-repeat;
+  background: url(chrome://resources/images/throbber.svg) center/100% no-repeat;
   height: 16px;
   left: 50%;
   margin-left: -8px;
@@ -1815,7 +1834,8 @@ list.autocomplete-suggestions > [lead] {
   margin-top: 8px;
 }
 
-#gear-menu > cr-menu-item:not(.menuitem-button) {
+#gear-menu > cr-menu-item:not(.menuitem-button),
+#sort-menu > cr-menu-item {
   -webkit-margin-end: 50px;
 }
 

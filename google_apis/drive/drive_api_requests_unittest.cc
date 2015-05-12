@@ -58,6 +58,55 @@ void AppendContent(std::string* out,
   out->append(*content);
 }
 
+class TestBatchableRequest : public BatchableRequestBase {
+ public:
+  TestBatchableRequest(RequestSender* sender,
+                       const GURL url,
+                       const std::string& content_type,
+                       const std::string& content_data,
+                       const base::Closure& callback)
+      : BatchableRequestBase(sender),
+        url_(url),
+        content_type_(content_type),
+        content_data_(content_data),
+        callback_(callback) {}
+  GURL GetURL() const override { return url_; }
+  void RunCallbackOnPrematureFailure(DriveApiErrorCode code) override {
+    callback_.Run();
+  }
+  void ProcessURLFetchResults(DriveApiErrorCode code,
+                              const std::string& body) override {
+    callback_.Run();
+  }
+  net::URLFetcher::RequestType GetRequestType() const override {
+    return net::URLFetcher::PUT;
+  }
+  bool GetContentData(std::string* upload_content_type,
+                      std::string* upload_content) override {
+    upload_content_type->assign(content_type_);
+    upload_content->assign(content_data_);
+    return true;
+  }
+  void OnURLFetchUploadProgress(const net::URLFetcher* source,
+                                int64 current,
+                                int64 total) override {
+    progress_values_.push_back(current);
+  }
+  const std::vector<int64>& progress_values() const { return progress_values_; }
+
+ private:
+  GURL url_;
+  std::string content_type_;
+  std::string content_data_;
+  base::Closure callback_;
+  std::vector<int64> progress_values_;
+};
+
+void EmptyPreapreCallback(DriveApiErrorCode) {
+}
+void EmptyClosure() {
+}
+
 }  // namespace
 
 class DriveApiRequestsTest : public testing::Test {
@@ -459,8 +508,8 @@ TEST_F(DriveApiRequestsTest, DriveApiDataRequest_Fields) {
         test_util::CreateQuitCallback(
             &run_loop,
             test_util::CreateCopyResultCallback(&error, &about_resource)));
-    request->set_fields(
-        "kind,quotaBytesTotal,quotaBytesUsed,largestChangeId,rootFolderId");
+    request->set_fields("kind,quotaBytesTotal,quotaBytesUsedAggregate,"
+                        "largestChangeId,rootFolderId");
     request_sender_->StartRequestWithRetry(request);
     run_loop.Run();
   }
@@ -468,7 +517,7 @@ TEST_F(DriveApiRequestsTest, DriveApiDataRequest_Fields) {
   EXPECT_EQ(HTTP_SUCCESS, error);
   EXPECT_EQ(net::test_server::METHOD_GET, http_request_.method);
   EXPECT_EQ("/drive/v2/about?"
-            "fields=kind%2CquotaBytesTotal%2CquotaBytesUsed%2C"
+            "fields=kind%2CquotaBytesTotal%2CquotaBytesUsedAggregate%2C"
             "largestChangeId%2CrootFolderId",
             http_request_.relative_url);
 
@@ -478,7 +527,8 @@ TEST_F(DriveApiRequestsTest, DriveApiDataRequest_Fields) {
   ASSERT_TRUE(about_resource.get());
   EXPECT_EQ(expected->largest_change_id(), about_resource->largest_change_id());
   EXPECT_EQ(expected->quota_bytes_total(), about_resource->quota_bytes_total());
-  EXPECT_EQ(expected->quota_bytes_used(), about_resource->quota_bytes_used());
+  EXPECT_EQ(expected->quota_bytes_used_aggregate(),
+            about_resource->quota_bytes_used_aggregate());
   EXPECT_EQ(expected->root_folder_id(), about_resource->root_folder_id());
 }
 
@@ -629,7 +679,8 @@ TEST_F(DriveApiRequestsTest, AboutGetRequest_ValidJson) {
   ASSERT_TRUE(about_resource.get());
   EXPECT_EQ(expected->largest_change_id(), about_resource->largest_change_id());
   EXPECT_EQ(expected->quota_bytes_total(), about_resource->quota_bytes_total());
-  EXPECT_EQ(expected->quota_bytes_used(), about_resource->quota_bytes_used());
+  EXPECT_EQ(expected->quota_bytes_used_aggregate(),
+            about_resource->quota_bytes_used_aggregate());
   EXPECT_EQ(expected->root_folder_id(), about_resource->root_folder_id());
 }
 
@@ -2018,6 +2069,109 @@ TEST_F(DriveApiRequestsTest, EmptyBatchUploadRequest) {
   scoped_ptr<drive::BatchUploadRequest> request(new drive::BatchUploadRequest(
       request_sender_.get(), *url_generator_));
   EXPECT_DEATH(request->Commit(), "");
+}
+
+TEST_F(DriveApiRequestsTest, BatchUploadRequestWithBodyIncludingZero) {
+  // Create batch request.
+  drive::BatchUploadRequest* const request =
+      new drive::BatchUploadRequest(request_sender_.get(), *url_generator_);
+  request->SetBoundaryForTesting("OUTERBOUNDARY");
+  request_sender_->StartRequestWithRetry(request);
+
+  // Create child request.
+  {
+    base::RunLoop loop;
+    TestBatchableRequest* child_request = new TestBatchableRequest(
+        request_sender_.get(), GURL("http://example.com/test"),
+        "application/binary", std::string("Apple\0Orange\0", 13),
+        loop.QuitClosure());
+    request->AddRequest(child_request);
+    request->Commit();
+    loop.Run();
+  }
+
+  EXPECT_EQ(net::test_server::METHOD_PUT, http_request_.method);
+  EXPECT_EQ("batch", http_request_.headers["X-Goog-Upload-Protocol"]);
+  EXPECT_EQ("multipart/mixed; boundary=OUTERBOUNDARY",
+            http_request_.headers["Content-Type"]);
+  EXPECT_EQ(
+      "--OUTERBOUNDARY\n"
+      "Content-Type: application/http\n"
+      "\n"
+      "PUT /test HTTP/1.1\n"
+      "Host: 127.0.0.1\n"
+      "X-Goog-Upload-Protocol: multipart\n"
+      "Content-Type: application/binary\n"
+      "\n" +
+          std::string("Apple\0Orange\0", 13) +
+          "\n"
+          "--OUTERBOUNDARY--",
+      http_request_.content);
+}
+
+TEST_F(DriveApiRequestsTest, BatchUploadRequestProgress) {
+  // Create batch request.
+  drive::BatchUploadRequest* const request =
+      new drive::BatchUploadRequest(request_sender_.get(), *url_generator_);
+  TestBatchableRequest* requests[] = {
+      new TestBatchableRequest(request_sender_.get(),
+                               GURL("http://example.com/test"),
+                               "application/binary", std::string(100, 'a'),
+                               base::Bind(&EmptyClosure)),
+      new TestBatchableRequest(request_sender_.get(),
+                               GURL("http://example.com/test"),
+                               "application/binary", std::string(50, 'b'),
+                               base::Bind(&EmptyClosure)),
+      new TestBatchableRequest(request_sender_.get(),
+                               GURL("http://example.com/test"),
+                               "application/binary", std::string(0, 'c'),
+                               base::Bind(&EmptyClosure))};
+  const size_t kExpectedUploadDataPosition[] = {208, 517, 776};
+  const size_t kExpectedUploadDataSize = 851;
+  request->AddRequest(requests[0]);
+  request->AddRequest(requests[1]);
+  request->AddRequest(requests[2]);
+  request->Commit();
+  request->Prepare(base::Bind(&EmptyPreapreCallback));
+
+  request->OnURLFetchUploadProgress(nullptr, 0, kExpectedUploadDataSize);
+  request->OnURLFetchUploadProgress(nullptr, 150, kExpectedUploadDataSize);
+  EXPECT_EQ(0u, requests[0]->progress_values().size());
+  EXPECT_EQ(0u, requests[1]->progress_values().size());
+  EXPECT_EQ(0u, requests[2]->progress_values().size());
+  request->OnURLFetchUploadProgress(nullptr, kExpectedUploadDataPosition[0],
+                                    kExpectedUploadDataSize);
+  EXPECT_EQ(1u, requests[0]->progress_values().size());
+  EXPECT_EQ(0u, requests[1]->progress_values().size());
+  EXPECT_EQ(0u, requests[2]->progress_values().size());
+  request->OnURLFetchUploadProgress(
+      nullptr, kExpectedUploadDataPosition[0] + 50, kExpectedUploadDataSize);
+  EXPECT_EQ(2u, requests[0]->progress_values().size());
+  EXPECT_EQ(0u, requests[1]->progress_values().size());
+  EXPECT_EQ(0u, requests[2]->progress_values().size());
+  request->OnURLFetchUploadProgress(
+      nullptr, kExpectedUploadDataPosition[1] + 20, kExpectedUploadDataSize);
+  EXPECT_EQ(3u, requests[0]->progress_values().size());
+  EXPECT_EQ(1u, requests[1]->progress_values().size());
+  EXPECT_EQ(0u, requests[2]->progress_values().size());
+  request->OnURLFetchUploadProgress(nullptr, kExpectedUploadDataPosition[2],
+                                    kExpectedUploadDataSize);
+  EXPECT_EQ(3u, requests[0]->progress_values().size());
+  EXPECT_EQ(2u, requests[1]->progress_values().size());
+  EXPECT_EQ(1u, requests[2]->progress_values().size());
+  request->OnURLFetchUploadProgress(nullptr, kExpectedUploadDataSize,
+                                    kExpectedUploadDataSize);
+  ASSERT_EQ(3u, requests[0]->progress_values().size());
+  EXPECT_EQ(0, requests[0]->progress_values()[0]);
+  EXPECT_EQ(50, requests[0]->progress_values()[1]);
+  EXPECT_EQ(100, requests[0]->progress_values()[2]);
+  ASSERT_EQ(2u, requests[1]->progress_values().size());
+  EXPECT_EQ(20, requests[1]->progress_values()[0]);
+  EXPECT_EQ(50, requests[1]->progress_values()[1]);
+  ASSERT_EQ(1u, requests[2]->progress_values().size());
+  EXPECT_EQ(0, requests[2]->progress_values()[0]);
+
+  request->Cancel();
 }
 
 TEST(ParseMultipartResponseTest, Empty) {

@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">பேட்டரி நிரம்பியது</translation>
 <translation id="6895424601869865703"><ph name="GIVEN_NAME"/> க்காகக் கணக்கைச் சேர்</translation>
 <translation id="1270290102613614947">ஆன்ஸ்க்ரீன் விசைப்பலகை முடக்கப்பட்டது</translation>
-<translation id="1057289296854808272">சுழற்றல் இயக்கத்தில் (மாற்ற, இங்கு தட்டவும்)</translation>
+<translation id="5548285847212963613">இந்த நெட்வொர்க்குடன் இணைய, &quot;<ph name="EXTENSION_NAME"/>&quot; நீட்டிப்பு உதவும்.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> மற்றும் <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">மிகைப்படுத்தி பொத்தான்</translation>
 <translation id="7904094684485781019">இந்தக் கணக்கிற்கான நிர்வாகி பல உள்நுழைவுகளை அனுமதிக்கவில்லை.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">நிலைத் தட்டு</translation>
 <translation id="2248649616066688669">வெளிப்புற காட்சியுடன் இணைக்கப்பட்டிருக்கும்போது, மூடியை மூடி வைத்தும் உங்கள் Chromebook ஐத் தொடர்ந்து பயன்படுத்தலாம்.</translation>
 <translation id="2946640296642327832">புளூடூத்தை இயக்கு</translation>
+<translation id="5537725057119320332">அனுப்பு</translation>
 <translation id="6459472438155181876"><ph name="DISPLAY_NAME"/> க்கு திரை விரிவாக்கப்படுகிறது</translation>
 <translation id="8206859287963243715">செல்லுலர்</translation>
 <translation id="6596816719288285829">IP முகவரி</translation>
@@ -39,7 +40,6 @@
 மாற்ற Shift + Alt ஐ அழுத்தவும்.</translation>
 <translation id="6043994281159824495">இப்போது வெளியேறு</translation>
 <translation id="2127372758936585790">குறைந்த சக்திகொண்ட சார்ஜர்</translation>
-<translation id="4625920103690741805">சுழற்றுவது பூட்டப்பட்டது (மாற்ற, இங்கு தட்டவும்)</translation>
 <translation id="3799026279081545374">உங்களிடம் நல்ல நிலையில் இல்லாத சார்ஜர் இருக்கலாம். நீங்கள் US இல் வசிக்கிறீர்கள் எனில், உதவி மற்றும் மாற்று சார்ஜரைப் பெறுவதற்கு 866-628-1371 ஐ அழைக்கவும். நீங்கள் UK இல் வசிக்கிறீர்கள் எனில், 0800-026-0613 ஐ அழைக்கவும். நீங்கள் அயர்லாந்தில் வசிக்கிறீர்கள் எனில், 1-800-832-664 ஐ அழைக்கவும். நீங்கள் கனடாவில் வசிக்கிறீர்கள் எனில், 866-628-1372 ஐ அழைக்கவும். நீங்கள் ஆஸ்திரேலியாவில் வசிக்கிறீர்கள் எனில், 1-800-067-460 ஐ அழைக்கவும்.</translation>
 <translation id="3891340733213178823">வெளியேற Ctrl+Shift+Q ஐ இருமுறை அழுத்தவும்.</translation>
 <translation id="5871632337994001636">சாதனங்களை நிர்வகி...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">அடுக்கைத் தானாக மறை</translation>
 <translation id="7573962313813535744">டாக் செய்யப்பட்ட பயன்முறை</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127"><ph name="COUNT"/> கோப்பு(களை) ஒத்திசைக்கிறது</translation>
 <translation id="5958529069007801266">கண்காணிக்கப்படும் பயனர்</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">CAPS LOCK முடக்கப்பட்டுள்ளது</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">மேலும் அறிக</translation>
 <translation id="7168224885072002358"><ph name="TIMEOUT_SECONDS"/> வினாடிகளில் பழைய தெளிவுதிறனுக்கு மாற்றியமைக்கப்படும்</translation>
 <translation id="743058460480092004">கேமராவும் மைக்ரோஃபோனும் பயன்பாட்டில் உள்ளன.</translation>
+<translation id="6550675742724504774">விருப்பத்தேர்வுகள்</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">&quot;<ph name="FROM_LOCALE"/>&quot; க்கு மீண்டும் மாற்று (மறுதொடக்கம் தேவை)</translation>
 <translation id="8103386449138765447">SMS செய்திகள்: <ph name="MESSAGE_COUNT"/></translation>

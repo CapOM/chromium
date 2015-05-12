@@ -204,7 +204,7 @@ PATH_SPECIFIC_WHITELISTED_LICENSES = {
     'third_party/freetype2': [ # http://crbug.com/177319
         'UNKNOWN',
     ],
-    'third_party/hunspell': [  # http://crbug.com/98134
+    'third_party/hunspell_new': [  # http://crbug.com/98134
         'UNKNOWN',
     ],
     'third_party/iccjpeg': [  # http://crbug.com/98137
@@ -361,9 +361,6 @@ PATH_SPECIFIC_WHITELISTED_LICENSES = {
         'UNKNOWN',
     ],
 
-    'third_party/swig/Lib/linkruntime.c': [  # http://crbug.com/98585
-        'UNKNOWN',
-    ],
     'third_party/talloc': [
         'GPL (v3 or later)',
         'UNKNOWN',  # http://crbug.com/98588

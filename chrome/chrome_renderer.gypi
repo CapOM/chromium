@@ -5,6 +5,8 @@
 {
   'variables': {
     'chrome_renderer_sources': [
+      'renderer/banners/app_banner_client.cc',
+      'renderer/banners/app_banner_client.h',
       'renderer/benchmarking_extension.cc',
       'renderer/benchmarking_extension.h',
       'renderer/chrome_content_renderer_client.cc',
@@ -21,7 +23,7 @@
       'renderer/external_extension.cc',
       'renderer/external_extension.h',
       'renderer/instant_restricted_id_cache.h',
-      'renderer/isolated_world_ids.h',
+      'renderer/chrome_isolated_world_ids.h',
       'renderer/loadtimes_extension_bindings.cc',
       'renderer/loadtimes_extension_bindings.h',
       'renderer/media/chrome_key_systems.cc',
@@ -341,7 +343,7 @@
             '<@(chrome_renderer_spellchecker_sources)',
           ],
           'dependencies': [
-            '../third_party/hunspell/hunspell.gyp:hunspell',
+            '../third_party/hunspell_new/hunspell.gyp:hunspell',
           ],
         }],
         ['OS=="mac"', {

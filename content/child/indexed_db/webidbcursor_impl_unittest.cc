@@ -12,7 +12,7 @@
 #include "ipc/ipc_sync_message_filter.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/WebKit/public/platform/WebData.h"
-#include "third_party/WebKit/public/platform/WebIDBCallbacks.h"
+#include "third_party/WebKit/public/platform/modules/indexeddb/WebIDBCallbacks.h"
 
 using blink::WebBlobInfo;
 using blink::WebData;
@@ -128,6 +128,7 @@ class WebIDBCursorImplTest : public testing::Test {
   }
 
  protected:
+  base::MessageLoop message_loop_;
   WebIDBKey null_key_;
   scoped_refptr<ThreadSafeSender> thread_safe_sender_;
   scoped_ptr<MockDispatcher> dispatcher_;

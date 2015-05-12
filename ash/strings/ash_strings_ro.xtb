@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Baterie încărcată</translation>
 <translation id="6895424601869865703">Adăugați un cont pentru <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Tastatură pe ecran dezactivată</translation>
-<translation id="1057289296854808272">Rotire activată (atingeți aici pentru a schimba)</translation>
+<translation id="5548285847212963613">Extensia „<ph name="EXTENSION_NAME"/>” te poate ajuta să te conectezi la această rețea.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/>:<ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Butonul Overflow</translation>
 <translation id="7904094684485781019">Administratorul acestui cont a dezactivat conectarea multiplă.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Bara de stare</translation>
 <translation id="2248649616066688669">Puteți folosi în continuare Chromebookul când este conectat la un afișaj extern, chiar și cu ecranul închis.</translation>
 <translation id="2946640296642327832">Activați Bluetooth</translation>
+<translation id="5537725057119320332">Proiectează</translation>
 <translation id="6459472438155181876">Se extinde ecranul pe <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Celular</translation>
 <translation id="6596816719288285829">Adresă IP</translation>
@@ -39,7 +40,6 @@
         Apăsați pe Shift + Alt pentru a comuta.</translation>
 <translation id="6043994281159824495">Deconectați-vă acum</translation>
 <translation id="2127372758936585790">Încărcător de putere joasă</translation>
-<translation id="4625920103690741805">Rotire blocată (atingeți aici pentru a schimba)</translation>
 <translation id="3799026279081545374">Este posibil să aveți un încărcător defect. Dacă locuiți în S.U.A., sunați la 866-628-1371 pentru a primi asistență și un încărcător de schimb. Dacă locuiți în Regatul Unit, sunați la 0800-026-0613. Dacă locuiți în Irlanda, sunați la 1-800-832-664. Dacă locuiți în Canada, sunați la 866-628-1372. Dacă locuiți în Australia, sunați la 1-800-067-460.</translation>
 <translation id="3891340733213178823">Apăsați de două ori Ctrl+Shift+Q pentru a vă deconecta.</translation>
 <translation id="5871632337994001636">Gestionați dispozitivele...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">Ascundeți automat raftul</translation>
 <translation id="7573962313813535744">Modul andocat</translation>
 <translation id="2792498699870441125">Alt+Căutare</translation>
-<translation id="8660803626959853127">Se sincronizează <ph name="COUNT"/> (de) fișiere</translation>
 <translation id="5958529069007801266">Utilizator monitorizat</translation>
 <translation id="3709443003275901162">Peste 9</translation>
 <translation id="639644700271529076">Tasta CAPS LOCK este dezactivată</translation>
@@ -187,6 +186,7 @@ Apăsați Căutare sau Shift pentru a anula.</translation>
 <translation id="6165508094623778733">Află mai multe</translation>
 <translation id="7168224885072002358">Se revine la rezoluția anterioară în <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Camera foto și microfonul sunt în uz.</translation>
+<translation id="6550675742724504774">Opțiuni</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Modifică înapoi la „<ph name="FROM_LOCALE"/>” (este necesară repornirea)</translation>
 <translation id="8103386449138765447">Mesaje SMS: <ph name="MESSAGE_COUNT"/></translation>

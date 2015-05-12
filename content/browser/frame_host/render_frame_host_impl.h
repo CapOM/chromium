@@ -135,7 +135,12 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void ExecuteJavaScript(const base::string16& javascript) override;
   void ExecuteJavaScript(const base::string16& javascript,
                          const JavaScriptResultCallback& callback) override;
-  void ExecuteJavaScriptForTests(const base::string16& javascript) override;
+  void ExecuteJavaScriptWithUserGestureForTests(
+      const base::string16& javascript) override;
+  void ExecuteJavaScriptInIsolatedWorld(
+      const base::string16& javascript,
+      const JavaScriptResultCallback& callback,
+      int world_id) override;
   void ActivateFindInPageResultForAccessibility(int request_id) override;
   RenderViewHost* GetRenderViewHost() override;
   ServiceRegistry* GetServiceRegistry() override;
@@ -179,7 +184,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // Creates a RenderFrame in the renderer process.  Only called for
   // cross-process subframe navigations in --site-per-process.
-  bool CreateRenderFrame(int parent_routing_id, int proxy_routing_id);
+  bool CreateRenderFrame(int parent_routing_id,
+                         int previous_sibling_routing_id,
+                         int proxy_routing_id);
 
   // Returns whether the RenderFrame in the renderer process has been created
   // and still has a connection.  This is valid for all frames.

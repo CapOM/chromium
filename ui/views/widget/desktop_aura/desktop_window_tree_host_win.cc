@@ -57,7 +57,7 @@ gfx::Size GetExpandedWindowSize(DWORD window_style, gfx::Size size) {
   return expanded;
 }
 
-void InsetBottomRight(gfx::Rect* rect, gfx::Vector2d vector) {
+void InsetBottomRight(gfx::Rect* rect, const gfx::Vector2d& vector) {
   rect->Inset(0, 0, vector.x(), vector.y());
 }
 
@@ -898,15 +898,10 @@ void DesktopWindowTreeHostWin::HandleInputLanguageChange(
       input_method()->OnInputLocaleChanged();
 }
 
-bool DesktopWindowTreeHostWin::HandlePaintAccelerated(
+void DesktopWindowTreeHostWin::HandlePaintAccelerated(
     const gfx::Rect& invalid_rect) {
-  return native_widget_delegate_->OnNativeWidgetPaintAccelerated(invalid_rect);
-}
-
-void DesktopWindowTreeHostWin::HandlePaint(gfx::Canvas* canvas) {
-  // It appears possible to get WM_PAINT after WM_DESTROY.
   if (compositor())
-    compositor()->ScheduleRedrawRect(gfx::Rect());
+    compositor()->ScheduleRedrawRect(invalid_rect);
 }
 
 bool DesktopWindowTreeHostWin::HandleTooltipNotify(int w_param,

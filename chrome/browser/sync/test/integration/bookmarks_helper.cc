@@ -27,6 +27,7 @@
 #include "chrome/browser/sync/glue/bookmark_change_processor.h"
 #include "chrome/browser/sync/test/integration/multi_client_status_change_checker.h"
 #include "chrome/browser/sync/test/integration/profile_sync_service_harness.h"
+#include "chrome/browser/sync/test/integration/single_client_status_change_checker.h"
 #include "chrome/browser/sync/test/integration/sync_datatype_helper.h"
 #include "chrome/browser/sync/test/integration/sync_test.h"
 #include "chrome/common/chrome_paths.h"
@@ -631,9 +632,9 @@ void Remove(int profile, const BookmarkNode* parent, int index) {
     const BookmarkNode* v_parent = NULL;
     FindNodeInVerifier(model, parent, &v_parent);
     ASSERT_TRUE(NodesMatch(parent->GetChild(index), v_parent->GetChild(index)));
-    GetVerifierBookmarkModel()->Remove(v_parent, index);
+    GetVerifierBookmarkModel()->Remove(v_parent->GetChild(index));
   }
-  model->Remove(parent, index);
+  model->Remove(parent->GetChild(index));
 }
 
 void RemoveAll(int profile) {
@@ -642,7 +643,7 @@ void RemoveAll(int profile) {
     for (int i = 0; i < root_node->child_count(); ++i) {
       const BookmarkNode* permanent_node = root_node->GetChild(i);
       for (int j = permanent_node->child_count() - 1; j >= 0; --j) {
-        GetVerifierBookmarkModel()->Remove(permanent_node, j);
+        GetVerifierBookmarkModel()->Remove(permanent_node->GetChild(j));
       }
     }
   }
@@ -755,6 +756,51 @@ bool AwaitAllModelsMatch() {
   return !checker.TimedOut();
 }
 
+namespace {
+
+class CountBookmarksWithTitlesMatchingChecker
+    : public SingleClientStatusChangeChecker {
+ public:
+  CountBookmarksWithTitlesMatchingChecker(ProfileSyncService* service,
+                                          int profile_index,
+                                          const std::string& title,
+                                          int expected_count)
+      : SingleClientStatusChangeChecker(service),
+        profile_index_(profile_index),
+        title_(title),
+        expected_count_(expected_count) {
+    DCHECK_GE(0, expected_count) << "expected_count must be non-negative.";
+  }
+
+  bool IsExitConditionSatisfied() override {
+    int actual_count = CountBookmarksWithTitlesMatching(profile_index_, title_);
+    return expected_count_ == actual_count;
+  }
+
+  std::string GetDebugMessage() const override {
+    return "Waiting for bookmark count to match";
+  }
+
+ private:
+  const int profile_index_;
+  const std::string title_;
+  const int expected_count_;
+};
+
+}  // namespace
+
+bool AwaitCountBookmarksWithTitlesMatching(int profile,
+                                           const std::string& title,
+                                           int expected_count) {
+  ProfileSyncService* service =
+      sync_datatype_helper::test()->GetSyncService(profile);
+  CountBookmarksWithTitlesMatchingChecker checker(service,
+                                                  profile,
+                                                  title,
+                                                  expected_count);
+  checker.Wait();
+  return !checker.TimedOut();
+}
 
 bool ContainsDuplicateBookmarks(int profile) {
   ui::TreeNodeIterator<const BookmarkNode> iterator(

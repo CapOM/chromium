@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Puno na ang baterya</translation>
 <translation id="6895424601869865703">Magdagdag ng account para kay <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Naka-disable ang on-screen na keyboard</translation>
-<translation id="1057289296854808272">Naka-on ang Pag-rotate (Mag-tap dito upang baguhin)</translation>
+<translation id="5548285847212963613">Maaaring makatulong na makakonekta sa network na ito ang extension na &quot;<ph name="EXTENSION_NAME"/>.&quot;</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> at <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Button na Overflow</translation>
 <translation id="7904094684485781019">Hindi pinayagan ng administrator para sa account na ito ang multiple na pag-sign in.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Tray ng katayuan</translation>
 <translation id="2248649616066688669">Maaari mong patuloy na gamitin ang iyong Chromebook habang nakakonekta ito sa isang external na display, kahit na nakasara ang lid.</translation>
 <translation id="2946640296642327832">Paganahin ang Bluetooth</translation>
+<translation id="5537725057119320332">I-cast</translation>
 <translation id="6459472438155181876">Pinapalawak ang screen sa <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Cellular</translation>
 <translation id="6596816719288285829">IP Address</translation>
@@ -39,7 +40,6 @@
 Pindutin ang Shift + Alt upang magpalit.</translation>
 <translation id="6043994281159824495">Mag-sign out ngayon</translation>
 <translation id="2127372758936585790">Low-power charger</translation>
-<translation id="4625920103690741805">Naka-lock ang Pag-rotate (Mag-tap dito upang baguhin)</translation>
 <translation id="3799026279081545374">Maaaring mayroon kang hindi magandang charger. Kung nakatira ka sa US, mangyaring tumawag sa 866-628-1371 upang makatanggap ng tulong at ng kapalit. Kung nakatira ka sa UK, mangyaring tumawag sa 0800-026-0613. Kung nakatira ka sa Ireland, mangyaring tumawag sa 1-800-832-664. Kung nakatira ka sa Canada, mangyaring tumawag sa 866-628-1372. Kung nakatira ka sa Australia, mangyaring tumawag sa 1-800-067-460.</translation>
 <translation id="3891340733213178823">Pindutin ang Ctrl+Shift+Q nang dalawang beses upang mag-sign out.</translation>
 <translation id="5871632337994001636">Pamahalaan ang mga device...</translation>
@@ -167,7 +167,6 @@ Pindutin ang Shift + Alt upang magpalit.</translation>
 <translation id="112308213915226829">Awtomatikong itago ang shelf</translation>
 <translation id="7573962313813535744">Mode na naka-dock</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127">Nagsi-sync ng <ph name="COUNT"/> (na) file</translation>
 <translation id="5958529069007801266">Pinangangasiwaang user</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">Naka-off ang CAPS LOCK</translation>
@@ -187,6 +186,7 @@ Pindutin ang Search o Shift upang kanselahin.</translation>
 <translation id="6165508094623778733">Matuto nang higit pa</translation>
 <translation id="7168224885072002358">Magre-revert sa lumang resolution sa loob ng <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Ginagamit ang camera at mikropono.</translation>
+<translation id="6550675742724504774">Mga Pagpipilian</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Palitan pabalik sa &quot;<ph name="FROM_LOCALE"/>&quot; (kailangang i-restart)</translation>
 <translation id="8103386449138765447">Mga mensaheng SMS: <ph name="MESSAGE_COUNT"/></translation>

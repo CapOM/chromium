@@ -26,6 +26,7 @@
     'gn_release_trybot': ['gn', 'release_trybot'],
     'gn_release_trybot_x86': ['gn', 'release_trybot', 'x86'],
     'gn_debug_bot': ['gn', 'debug_bot'],
+    'gn_debug_bot_x86': ['gn', 'debug_bot', 'x86'],
     'gn_debug_static_bot': ['gn', 'debug_static_bot'],
     'gn_debug_static_bot_x86': ['gn', 'debug_static_bot', 'x86'],
     'gyp_release_bot': ['gyp', 'release_bot'],
@@ -73,7 +74,7 @@
     },
 
     'debug': {
-      'gn_args': 'is_debug=true', 
+      'gn_args': 'is_debug=true',
       'gyp_config': 'Debug',
     },
 
@@ -96,7 +97,7 @@
     },
 
     'gyp': {'type': 'gyp'},
-    
+
     'minimal_symbols': {
       'gn_args': 'symbol_level=1',
       'gyp_defines': 'fastbuild=1',
@@ -114,7 +115,7 @@
     'release_trybot': {
       'mixins': ['release_bot', 'dcheck_always_on']
     },
-    
+
     'shared': {
       'gn_args': 'is_component_build=true',
       'gyp_defines': 'component=shared_library',
@@ -143,8 +144,10 @@
     },
     'chromium.linux': {
       'Android GN': 'android_gn_release_bot',
+      'Android GN (dbg)': 'android_gn_debug_bot',
       'Linux Builder': 'gyp_release_bot',
       'Linux GN': 'gn_release_bot',
+      'Linux GN Clobber': 'gn_release_bot',
       'Linux GN (dbg)': 'gn_debug_bot',
       'Linux Tests': 'gyp_release_bot',
     },
@@ -154,15 +157,25 @@
     },
     'chromium.win': {
       'Win x64 GN': 'gn_release_bot',
-      'Win x64 GN (dbg)': 'gn_debug_static_bot',
+      'Win x64 GN (dbg)': 'gn_debug_bot',
       'Win8 GN': 'gn_release_bot_x86',
-      'Win8 GN (dbg)': 'gn_debug_static_bot_x86',
+      'Win8 GN (dbg)': 'gn_debug_bot_x86',
     },
     'chromium.webkit': {
       'Android GN': 'android_gn_release_bot',
       'Android GN (dbg)': 'android_gn_debug_bot',
       'Linux GN': 'gn_release_bot',
       'Linux GN (dbg)': 'gn_debug_bot'
+    },
+    'chromium.webrtc.fyi': {
+      'Android GN': 'android_gn_release_bot',
+      'Android GN (dbg)': 'android_gn_debug_bot',
+      'Linux GN': 'gn_release_bot',
+      'Linux GN (dbg)': 'gn_debug_bot',
+      'Mac GN': 'gn_release_bot',
+      'Mac GN (dbg)': 'gn_debug_static_bot',
+      'Win GN': 'gn_release_bot_x86',
+      'Win GN (dbg)': 'gn_debug_static_bot_x86',
     },
     'client.v8': {
       'V8 Linux GN': 'gn_release_bot',
@@ -179,10 +192,11 @@
       'android_chromium_gn_compile_rel': 'android_gn_release_trybot',
       'linux_chromium_gn_chromeos_rel': 'chromeos_gn_release_trybot',
       'linux_chromium_gn_chromeos_dbg': 'chromeos_gn_debug_bot',
-      'linux_chromium_gn_dbg': 'gn_debug_bot', 
-      'linux_chromium_gn_rel': 'gn_release_trybot', 
-      'linux_chromium_gn_upload_x64': 'gn_release_bot',
-      'linux_chromium_gn_upload_x86': 'gn_release_bot_x86',
+      'linux_chromium_gn_dbg': 'gn_debug_bot',
+      'linux_chromium_gn_rel': 'gn_release_trybot',
+      'linux_chromium_gn_upload': 'gn_release_bot',
+      'linux_chromium_gn_upload_x64': 'gn_release_bot', # TODO(dpranke): Remove me.
+      'linux_chromium_gn_upload_x86': 'gn_release_bot_x86', # TODO(dpranke): Remove me.
     },
     'tryserver.chromium.mac': {
       'mac_chromium_gn_dbg': 'gn_debug_static_bot',

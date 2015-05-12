@@ -9,15 +9,12 @@
 #include "chrome/browser/extensions/extension_action_manager.h"
 #include "chrome/browser/extensions/extension_message_bubble.h"
 #include "chrome/browser/extensions/extension_service.h"
-#include "chrome/browser/extensions/extension_toolbar_model.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/ui/browser.h"
-#include "chrome/common/chrome_version_info.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_system.h"
-#include "extensions/common/feature_switch.h"
 #include "grit/components_strings.h"
 #include "ui/base/l10n/l10n_util.h"
 
@@ -43,7 +40,6 @@ class DevModeBubbleDelegate
       const std::string& extension_id,
       ExtensionMessageBubbleController::BubbleAction user_action) override;
   void PerformAction(const ExtensionIdList& list) override;
-  void OnClose() override;
   base::string16 GetTitle() const override;
   base::string16 GetMessageBody(bool anchored_to_browser_action) const override;
   base::string16 GetOverflowText(
@@ -77,7 +73,8 @@ bool DevModeBubbleDelegate::ShouldIncludeExtension(
   const Extension* extension = service_->GetExtensionById(extension_id, false);
   if (!extension)
     return false;
-  return DevModeBubbleController::IsDevModeExtension(extension);
+  return (extension->location() == Manifest::UNPACKED ||
+          extension->location() == Manifest::COMMAND_LINE);
 }
 
 void DevModeBubbleDelegate::AcknowledgeExtension(
@@ -88,12 +85,6 @@ void DevModeBubbleDelegate::AcknowledgeExtension(
 void DevModeBubbleDelegate::PerformAction(const ExtensionIdList& list) {
   for (size_t i = 0; i < list.size(); ++i)
     service_->DisableExtension(list[i], Extension::DISABLE_USER_ACTION);
-}
-
-void DevModeBubbleDelegate::OnClose() {
-  ExtensionToolbarModel* toolbar_model = ExtensionToolbarModel::Get(profile());
-  if (toolbar_model)
-    toolbar_model->StopHighlighting();
 }
 
 base::string16 DevModeBubbleDelegate::GetTitle() const {
@@ -152,17 +143,6 @@ void DevModeBubbleDelegate::LogAction(
 // static
 void DevModeBubbleController::ClearProfileListForTesting() {
   g_shown_for_profiles.Get().clear();
-}
-
-// static
-bool DevModeBubbleController::IsDevModeExtension(
-    const Extension* extension) {
-  if (!FeatureSwitch::force_dev_mode_highlighting()->IsEnabled()) {
-    if (chrome::VersionInfo::GetChannel() < chrome::VersionInfo::CHANNEL_BETA)
-      return false;
-  }
-  return extension->location() == Manifest::UNPACKED ||
-         extension->location() == Manifest::COMMAND_LINE;
 }
 
 DevModeBubbleController::DevModeBubbleController(Profile* profile)

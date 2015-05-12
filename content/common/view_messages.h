@@ -42,6 +42,7 @@
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
 #include "third_party/WebKit/public/platform/WebFloatRect.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
+#include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
 #include "third_party/WebKit/public/web/WebDeviceEmulationParams.h"
 #include "third_party/WebKit/public/web/WebFindOptions.h"
 #include "third_party/WebKit/public/web/WebMediaPlayerAction.h"
@@ -82,6 +83,10 @@ IPC_ENUM_TRAITS_MAX_VALUE(blink::WebPluginAction::Type,
                           blink::WebPluginAction::Type::TypeLast)
 IPC_ENUM_TRAITS_MAX_VALUE(blink::WebPopupType,
                           blink::WebPopupType::WebPopupTypeLast)
+// TODO(dcheng): Update WebScreenOrientationType to have a "Last" enum member.
+IPC_ENUM_TRAITS_MIN_MAX_VALUE(blink::WebScreenOrientationType,
+                              blink::WebScreenOrientationUndefined,
+                              blink::WebScreenOrientationLandscapeSecondary)
 IPC_ENUM_TRAITS_MAX_VALUE(blink::WebTextDirection,
                           blink::WebTextDirection::WebTextDirectionLast)
 IPC_ENUM_TRAITS_MAX_VALUE(blink::WebDisplayMode,
@@ -1159,30 +1164,6 @@ IPC_MESSAGE_ROUTED2(ViewHostMsg_FocusedNodeChanged,
                     gfx::Rect /* node_bounds */)
 
 IPC_MESSAGE_ROUTED1(ViewHostMsg_SetCursor, content::WebCursor)
-
-// Used to set a cookie. The cookie is set asynchronously, but will be
-// available to a subsequent ViewHostMsg_GetCookies request.
-IPC_MESSAGE_CONTROL4(ViewHostMsg_SetCookie,
-                     int /* render_frame_id */,
-                     GURL /* url */,
-                     GURL /* first_party_for_cookies */,
-                     std::string /* cookie */)
-
-// Used to get cookies for the given URL. This may block waiting for a
-// previous SetCookie message to be processed.
-IPC_SYNC_MESSAGE_CONTROL3_1(ViewHostMsg_GetCookies,
-                            int /* render_frame_id */,
-                            GURL /* url */,
-                            GURL /* first_party_for_cookies */,
-                            std::string /* cookies */)
-
-// Used to check if cookies are enabled for the given URL. This may block
-// waiting for a previous SetCookie message to be processed.
-IPC_SYNC_MESSAGE_CONTROL3_1(ViewHostMsg_CookiesEnabled,
-                            int /* render_frame_id */,
-                            GURL /* url */,
-                            GURL /* first_party_for_cookies */,
-                            bool /* cookies_enabled */)
 
 // Used to get the list of plugins
 IPC_SYNC_MESSAGE_CONTROL1_1(ViewHostMsg_GetPlugins,

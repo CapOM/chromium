@@ -29,15 +29,6 @@ class CC_EXPORT PictureLayerImpl
     : public LayerImpl,
       NON_EXPORTED_BASE(public PictureLayerTilingClient) {
  public:
-  struct CC_EXPORT Pair {
-    Pair();
-    Pair(PictureLayerImpl* active_layer, PictureLayerImpl* pending_layer);
-    ~Pair();
-
-    PictureLayerImpl* active;
-    PictureLayerImpl* pending;
-  };
-
   static scoped_ptr<PictureLayerImpl> Create(
       LayerTreeImpl* tree_impl,
       int id,
@@ -64,16 +55,13 @@ class CC_EXPORT PictureLayerImpl
   Region GetInvalidationRegion() override;
 
   // PictureLayerTilingClient overrides.
-  scoped_refptr<Tile> CreateTile(float contents_scale,
-                                 const gfx::Rect& content_rect) override;
+  ScopedTilePtr CreateTile(float contents_scale,
+                           const gfx::Rect& content_rect) override;
   gfx::Size CalculateTileSize(const gfx::Size& content_bounds) const override;
   const Region* GetPendingInvalidation() override;
   const PictureLayerTiling* GetPendingOrActiveTwinTiling(
       const PictureLayerTiling* tiling) const override;
-  PictureLayerTiling* GetRecycledTwinTiling(
-      const PictureLayerTiling* tiling) override;
   TilePriority::PriorityBin GetMaxTilePriorityBin() const override;
-  WhichTree GetTree() const override;
   bool RequiresHighResToDraw() const override;
   gfx::Rect GetEnclosingRectInTargetSpace() const override;
 
@@ -86,6 +74,7 @@ class CC_EXPORT PictureLayerImpl
   bool UpdateTiles(bool resourceless_software_draw);
   void UpdateCanUseLCDTextAfterCommit();
   bool RasterSourceUsesLCDText() const;
+  WhichTree GetTree() const;
 
   // Mask-related functions.
   void GetContentsResourceId(ResourceProvider::ResourceId* resource_id,

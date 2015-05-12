@@ -101,8 +101,6 @@ class TrackedObjectsTest : public testing::Test {
 
     EXPECT_EQ(death_thread, process_data_phase.tasks[0].death_thread_name);
 
-    EXPECT_EQ(0u, process_data_phase.descendants.size());
-
     EXPECT_EQ(base::GetCurrentProcId(), process_data.process_id);
   }
 
@@ -121,11 +119,7 @@ class TrackedObjectsTest : public testing::Test {
 unsigned int TrackedObjectsTest::test_time_;
 
 TEST_F(TrackedObjectsTest, TaskStopwatchNoStartStop) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   // Check that creating and destroying a stopwatch without starting it doesn't
   // crash.
@@ -134,11 +128,7 @@ TEST_F(TrackedObjectsTest, TaskStopwatchNoStartStop) {
 
 TEST_F(TrackedObjectsTest, MinimalStartupShutdown) {
   // Minimal test doesn't even create any tasks.
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   EXPECT_FALSE(ThreadData::first());  // No activity even on this thread.
   ThreadData* data = ThreadData::Get();
@@ -148,18 +138,15 @@ TEST_F(TrackedObjectsTest, MinimalStartupShutdown) {
   EXPECT_EQ(data, ThreadData::Get());
   ThreadData::BirthMap birth_map;
   ThreadData::DeathsSnapshot deaths;
-  ThreadData::ParentChildSet parent_child_set;
-  data->SnapshotMaps(0, &birth_map, &deaths, &parent_child_set);
+  data->SnapshotMaps(0, &birth_map, &deaths);
   EXPECT_EQ(0u, birth_map.size());
   EXPECT_EQ(0u, deaths.size());
-  EXPECT_EQ(0u, parent_child_set.size());
 
   // Clean up with no leaking.
   Reset();
 
   // Do it again, just to be sure we reset state completely.
-  EXPECT_TRUE(ThreadData::InitializeAndSetTrackingStatus(
-      ThreadData::PROFILING_CHILDREN_ACTIVE));
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
   EXPECT_FALSE(ThreadData::first());  // No activity even on this thread.
   data = ThreadData::Get();
   EXPECT_TRUE(ThreadData::first());  // Now class was constructed.
@@ -168,24 +155,18 @@ TEST_F(TrackedObjectsTest, MinimalStartupShutdown) {
   EXPECT_EQ(data, ThreadData::Get());
   birth_map.clear();
   deaths.clear();
-  parent_child_set.clear();
-  data->SnapshotMaps(0, &birth_map, &deaths, &parent_child_set);
+  data->SnapshotMaps(0, &birth_map, &deaths);
   EXPECT_EQ(0u, birth_map.size());
   EXPECT_EQ(0u, deaths.size());
-  EXPECT_EQ(0u, parent_child_set.size());
 }
 
 TEST_F(TrackedObjectsTest, TinyStartupShutdown) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   // Instigate tracking on a single tracked object, on our thread.
   const char kFunction[] = "TinyStartupShutdown";
   Location location(kFunction, kFile, kLineNumber, NULL);
-  Births* first_birth = ThreadData::TallyABirthIfActive(location);
+  ThreadData::TallyABirthIfActive(location);
 
   ThreadData* data = ThreadData::first();
   ASSERT_TRUE(data);
@@ -193,17 +174,14 @@ TEST_F(TrackedObjectsTest, TinyStartupShutdown) {
   EXPECT_EQ(data, ThreadData::Get());
   ThreadData::BirthMap birth_map;
   ThreadData::DeathsSnapshot deaths;
-  ThreadData::ParentChildSet parent_child_set;
-  data->SnapshotMaps(0, &birth_map, &deaths, &parent_child_set);
+  data->SnapshotMaps(0, &birth_map, &deaths);
   EXPECT_EQ(1u, birth_map.size());                         // 1 birth location.
   EXPECT_EQ(1, birth_map.begin()->second->birth_count());  // 1 birth.
   EXPECT_EQ(0u, deaths.size());                            // No deaths.
-  EXPECT_EQ(0u, parent_child_set.size());                  // No children.
 
 
   // Now instigate another birth, while we are timing the run of the first
   // execution.
-  ThreadData::PrepareForStartOfRun(first_birth);
   // Create a child (using the same birth location).
   // TrackingInfo will call TallyABirth() during construction.
   const int32 start_time = 1;
@@ -222,19 +200,11 @@ TEST_F(TrackedObjectsTest, TinyStartupShutdown) {
 
   birth_map.clear();
   deaths.clear();
-  parent_child_set.clear();
-  data->SnapshotMaps(0, &birth_map, &deaths, &parent_child_set);
+  data->SnapshotMaps(0, &birth_map, &deaths);
   EXPECT_EQ(1u, birth_map.size());                         // 1 birth location.
   EXPECT_EQ(2, birth_map.begin()->second->birth_count());  // 2 births.
   EXPECT_EQ(1u, deaths.size());                            // 1 location.
   EXPECT_EQ(1, deaths.begin()->second.death_data.count);   // 1 death.
-  if (ThreadData::TrackingParentChildStatus()) {
-    EXPECT_EQ(1u, parent_child_set.size());                  // 1 child.
-    EXPECT_EQ(parent_child_set.begin()->first,
-              parent_child_set.begin()->second);
-  } else {
-    EXPECT_EQ(0u, parent_child_set.size());                  // no stats.
-  }
 
   // The births were at the same location as the one known death.
   EXPECT_EQ(birth_map.begin()->second, deaths.begin()->first);
@@ -264,36 +234,10 @@ TEST_F(TrackedObjectsTest, TinyStartupShutdown) {
   EXPECT_EQ(0, process_data_phase.tasks[0].death_data.queue_duration_max);
   EXPECT_EQ(0, process_data_phase.tasks[0].death_data.queue_duration_sample);
   EXPECT_EQ(kWorkerThreadName, process_data_phase.tasks[0].death_thread_name);
-
-  if (ThreadData::TrackingParentChildStatus()) {
-    ASSERT_EQ(1u, process_data_phase.descendants.size());
-    EXPECT_EQ(kFile,
-              process_data_phase.descendants[0].parent.location.file_name);
-    EXPECT_EQ(kFunction,
-              process_data_phase.descendants[0].parent.location.function_name);
-    EXPECT_EQ(kLineNumber,
-              process_data_phase.descendants[0].parent.location.line_number);
-    EXPECT_EQ(kWorkerThreadName,
-              process_data_phase.descendants[0].parent.thread_name);
-    EXPECT_EQ(kFile,
-              process_data_phase.descendants[0].child.location.file_name);
-    EXPECT_EQ(kFunction,
-              process_data_phase.descendants[0].child.location.function_name);
-    EXPECT_EQ(kLineNumber,
-              process_data_phase.descendants[0].child.location.line_number);
-    EXPECT_EQ(kWorkerThreadName,
-              process_data_phase.descendants[0].child.thread_name);
-  } else {
-    EXPECT_EQ(0u, process_data_phase.descendants.size());
-  }
 }
 
 TEST_F(TrackedObjectsTest, DeathDataTestRecordDeath) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   scoped_ptr<DeathData> data(new DeathData());
   ASSERT_NE(data, reinterpret_cast<DeathData*>(NULL));
@@ -332,11 +276,7 @@ TEST_F(TrackedObjectsTest, DeathDataTestRecordDeath) {
 }
 
 TEST_F(TrackedObjectsTest, DeathDataTest2Phases) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   scoped_ptr<DeathData> data(new DeathData());
   ASSERT_NE(data, reinterpret_cast<DeathData*>(NULL));
@@ -401,11 +341,7 @@ TEST_F(TrackedObjectsTest, DeathDataTest2Phases) {
 }
 
 TEST_F(TrackedObjectsTest, Delta) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   DeathDataSnapshot snapshot;
   snapshot.count = 10;
@@ -437,10 +373,7 @@ TEST_F(TrackedObjectsTest, Delta) {
 
 TEST_F(TrackedObjectsTest, DeactivatedBirthOnlyToSnapshotWorkerThread) {
   // Start in the deactivated state.
-  if (!ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED);
 
   const char kFunction[] = "DeactivatedBirthOnlyToSnapshotWorkerThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -462,10 +395,7 @@ TEST_F(TrackedObjectsTest, DeactivatedBirthOnlyToSnapshotWorkerThread) {
 
 TEST_F(TrackedObjectsTest, DeactivatedBirthOnlyToSnapshotMainThread) {
   // Start in the deactivated state.
-  if (!ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED);
 
   const char kFunction[] = "DeactivatedBirthOnlyToSnapshotMainThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -486,11 +416,7 @@ TEST_F(TrackedObjectsTest, DeactivatedBirthOnlyToSnapshotMainThread) {
 }
 
 TEST_F(TrackedObjectsTest, BirthOnlyToSnapshotWorkerThread) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "BirthOnlyToSnapshotWorkerThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -503,11 +429,7 @@ TEST_F(TrackedObjectsTest, BirthOnlyToSnapshotWorkerThread) {
 }
 
 TEST_F(TrackedObjectsTest, BirthOnlyToSnapshotMainThread) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "BirthOnlyToSnapshotMainThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -520,11 +442,7 @@ TEST_F(TrackedObjectsTest, BirthOnlyToSnapshotMainThread) {
 }
 
 TEST_F(TrackedObjectsTest, LifeCycleToSnapshotMainThread) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "LifeCycleToSnapshotMainThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -553,11 +471,7 @@ TEST_F(TrackedObjectsTest, LifeCycleToSnapshotMainThread) {
 }
 
 TEST_F(TrackedObjectsTest, TwoPhases) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "TwoPhases";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -628,8 +542,6 @@ TEST_F(TrackedObjectsTest, TwoPhases) {
 
   EXPECT_EQ(kMainThreadName, process_data_phase0.tasks[0].death_thread_name);
 
-  EXPECT_EQ(0u, process_data_phase0.descendants.size());
-
   auto it1 = process_data.phased_snapshots.find(1);
   ASSERT_TRUE(it1 != process_data.phased_snapshots.end());
   const ProcessDataPhaseSnapshot& process_data_phase1 = it1->second;
@@ -654,17 +566,11 @@ TEST_F(TrackedObjectsTest, TwoPhases) {
 
   EXPECT_EQ(kMainThreadName, process_data_phase1.tasks[0].death_thread_name);
 
-  EXPECT_EQ(0u, process_data_phase1.descendants.size());
-
   EXPECT_EQ(base::GetCurrentProcId(), process_data.process_id);
 }
 
 TEST_F(TrackedObjectsTest, ThreePhases) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "ThreePhases";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -753,8 +659,6 @@ TEST_F(TrackedObjectsTest, ThreePhases) {
 
   EXPECT_EQ(kMainThreadName, process_data_phase0.tasks[0].death_thread_name);
 
-  EXPECT_EQ(0u, process_data_phase0.descendants.size());
-
   auto it1 = process_data.phased_snapshots.find(1);
   ASSERT_TRUE(it1 != process_data.phased_snapshots.end());
   const ProcessDataPhaseSnapshot& process_data_phase1 = it1->second;
@@ -778,8 +682,6 @@ TEST_F(TrackedObjectsTest, ThreePhases) {
   EXPECT_EQ(5, process_data_phase1.tasks[0].death_data.queue_duration_sample);
 
   EXPECT_EQ(kMainThreadName, process_data_phase1.tasks[0].death_thread_name);
-
-  EXPECT_EQ(0u, process_data_phase1.descendants.size());
 
   auto it2 = process_data.phased_snapshots.find(2);
   ASSERT_TRUE(it2 != process_data.phased_snapshots.end());
@@ -805,17 +707,11 @@ TEST_F(TrackedObjectsTest, ThreePhases) {
 
   EXPECT_EQ(kMainThreadName, process_data_phase2.tasks[0].death_thread_name);
 
-  EXPECT_EQ(0u, process_data_phase2.descendants.size());
-
   EXPECT_EQ(base::GetCurrentProcId(), process_data.process_id);
 }
 
 TEST_F(TrackedObjectsTest, TwoPhasesSecondEmpty) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "TwoPhasesSecondEmpty";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -874,17 +770,11 @@ TEST_F(TrackedObjectsTest, TwoPhasesSecondEmpty) {
 
   ASSERT_EQ(0u, process_data_phase1.tasks.size());
 
-  EXPECT_EQ(0u, process_data_phase0.descendants.size());
-
   EXPECT_EQ(base::GetCurrentProcId(), process_data.process_id);
 }
 
 TEST_F(TrackedObjectsTest, TwoPhasesFirstEmpty) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   ThreadData::OnProfilingPhaseCompleted(0);
 
@@ -945,11 +835,7 @@ TEST_F(TrackedObjectsTest, TwoPhasesFirstEmpty) {
 // our tallied births are matched by tallied deaths (except for when the
 // task is still running, or is queued).
 TEST_F(TrackedObjectsTest, LifeCycleMidDeactivatedToSnapshotMainThread) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "LifeCycleMidDeactivatedToSnapshotMainThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -962,8 +848,7 @@ TEST_F(TrackedObjectsTest, LifeCycleMidDeactivatedToSnapshotMainThread) {
   pending_task.time_posted = kTimePosted;  // Overwrite implied Now().
 
   // Turn off tracking now that we have births.
-  EXPECT_TRUE(
-      ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED));
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED);
 
   const unsigned int kStartOfRun = 5;
   const unsigned int kEndOfRun = 7;
@@ -985,10 +870,7 @@ TEST_F(TrackedObjectsTest, LifeCycleMidDeactivatedToSnapshotMainThread) {
 // the birth nor the death will be recorded.
 TEST_F(TrackedObjectsTest, LifeCyclePreDeactivatedToSnapshotMainThread) {
   // Start in the deactivated state.
-  if (!ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::DEACTIVATED);
 
   const char kFunction[] = "LifeCyclePreDeactivatedToSnapshotMainThread";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -1025,11 +907,7 @@ TEST_F(TrackedObjectsTest, LifeCyclePreDeactivatedToSnapshotMainThread) {
 }
 
 TEST_F(TrackedObjectsTest, TwoLives) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "TwoLives";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -1069,11 +947,7 @@ TEST_F(TrackedObjectsTest, TwoLives) {
 }
 
 TEST_F(TrackedObjectsTest, DifferentLives) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   // Use a well named thread.
   ThreadData::InitializeThreadContext(kMainThreadName);
@@ -1141,16 +1015,11 @@ TEST_F(TrackedObjectsTest, DifferentLives) {
   EXPECT_EQ(0, process_data_phase.tasks[1].death_data.queue_duration_max);
   EXPECT_EQ(0, process_data_phase.tasks[1].death_data.queue_duration_sample);
   EXPECT_EQ(kStillAlive, process_data_phase.tasks[1].death_thread_name);
-  EXPECT_EQ(0u, process_data_phase.descendants.size());
   EXPECT_EQ(base::GetCurrentProcId(), process_data.process_id);
 }
 
 TEST_F(TrackedObjectsTest, TaskWithNestedExclusion) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "TaskWithNestedExclusion";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -1184,11 +1053,7 @@ TEST_F(TrackedObjectsTest, TaskWithNestedExclusion) {
 }
 
 TEST_F(TrackedObjectsTest, TaskWith2NestedExclusions) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "TaskWith2NestedExclusions";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -1228,11 +1093,7 @@ TEST_F(TrackedObjectsTest, TaskWith2NestedExclusions) {
 }
 
 TEST_F(TrackedObjectsTest, TaskWithNestedExclusionWithNestedTask) {
-  if (!ThreadData::InitializeAndSetTrackingStatus(
-          ThreadData::PROFILING_CHILDREN_ACTIVE)) {
-    // Don't run the test if task tracking is not compiled in.
-    return;
-  }
+  ThreadData::InitializeAndSetTrackingStatus(ThreadData::PROFILING_ACTIVE);
 
   const char kFunction[] = "TaskWithNestedExclusionWithNestedTask";
   Location location(kFunction, kFile, kLineNumber, NULL);
@@ -1319,7 +1180,6 @@ TEST_F(TrackedObjectsTest, TaskWithNestedExclusionWithNestedTask) {
   EXPECT_EQ(1, process_data_phase.tasks[t1].death_data.queue_duration_max);
   EXPECT_EQ(1, process_data_phase.tasks[t1].death_data.queue_duration_sample);
   EXPECT_EQ(kMainThreadName, process_data_phase.tasks[t1].death_thread_name);
-  EXPECT_EQ(0u, process_data_phase.descendants.size());
   EXPECT_EQ(base::GetCurrentProcId(), process_data.process_id);
 }
 

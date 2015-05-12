@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">బ్యాటరీ  నిండింది</translation>
 <translation id="6895424601869865703"><ph name="GIVEN_NAME"/> కోసం ఖాతాని జోడించు</translation>
 <translation id="1270290102613614947">స్క్రీన్‌పై కనిపించే కీబోర్డ్ నిలిపివేయబడింది</translation>
-<translation id="1057289296854808272">తిప్పడం ఆన్‌లో ఉంది (మార్చడానికి ఇక్కడ నొక్కండి)</translation>
+<translation id="5548285847212963613">&quot;<ph name="EXTENSION_NAME"/>&quot; పొడిగింపు ఈ నెట్‌వర్క్‌కు కనెక్ట్ చేయడంలో సహాయపడగలదు.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> మరియు <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">అతివ్యాప్తి బటన్</translation>
 <translation id="7904094684485781019">ఈ ఖాతా నిర్వాహకులు బహుళ సైన్-ఇన్‌కు అనుమతించలేదు.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">స్థితి ట్రే</translation>
 <translation id="2248649616066688669">మీ Chromebook బాహ్య డిస్‌ప్లేకి కనెక్ట్ చేయబడినప్పుడు మూత మూసివేసి ఉన్నప్పటికీ కూడా మీరు దాన్ని ఉపయోగించడం కొనసాగించవచ్చు.</translation>
 <translation id="2946640296642327832">Bluetoothని ప్రారంభించు</translation>
+<translation id="5537725057119320332">Cast</translation>
 <translation id="6459472438155181876"><ph name="DISPLAY_NAME"/>కు స్క్రీన్‌ను విస్తరిస్తోంది</translation>
 <translation id="8206859287963243715">సెల్యులార్</translation>
 <translation id="6596816719288285829">IP చిరునామా</translation>
@@ -39,7 +40,6 @@
 మారడానికి Shift + Altను నొక్కండి.</translation>
 <translation id="6043994281159824495">ఇప్పుడే సైన్ అవుట్ చేయి</translation>
 <translation id="2127372758936585790">తక్కువ-పవర్ గల ఛార్జర్</translation>
-<translation id="4625920103690741805">తిప్పడం లాక్ చేయబడింది (మార్చడానికి ఇక్కడ నొక్కండి)</translation>
 <translation id="3799026279081545374">మీరు పని చేయని ఛార్జర్‌ను కలిగి ఉండవచ్చు. మీరు USలో నివసిస్తుంటే, దయచేసి సహాయం పొందడానికి మరియు భర్తీ అభ్యర్థించడానికి 866-628-1371కి కాల్ చేయండి. మీరు UKలో నివసిస్తుంటే, దయచేసి 0800-026-0613కి కాల్ చేయండి. మీరు ఐర్లాండ్‌లో నివసిస్తుంటే, దయచేసి 1-800-832-664కి కాల్ చేయండి. మీరు కెనడాలో నివసిస్తుంటే, దయచేసి 866-628-1372కి కాల్ చేయండి. మీరు ఆస్ట్రేలియాలో నివసిస్తుంటే, దయచేసి 1-800-067-460కి కాల్ చేయండి.</translation>
 <translation id="3891340733213178823">సైన్ అవుట్ చేయడానికి Ctrl+Shift+Qని రెండుసార్లు నొక్కండి.</translation>
 <translation id="5871632337994001636">పరికరాలను నిర్వహించండి...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">అరను స్వయంచాలకంగా దాచు</translation>
 <translation id="7573962313813535744">డాక్ చేయబడిన మోడ్</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127"><ph name="COUNT"/> ఫైల్(ల)ను సమకాలీకరిస్తోంది</translation>
 <translation id="5958529069007801266">పర్యవేక్షించబడే వినియోగదారు</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">CAPS LOCK ఆపివేయబడింది</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">మరింత తెలుసుకోండి</translation>
 <translation id="7168224885072002358"><ph name="TIMEOUT_SECONDS"/>లో తిరిగి పాత రిజల్యూషన్‌కి మార్చబడుతోంది</translation>
 <translation id="743058460480092004">కెమెరా మరియు మైక్రోఫోన్ ఉపయోగంలో ఉన్నాయి.</translation>
+<translation id="6550675742724504774">ఎంపికలు</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">&quot;<ph name="FROM_LOCALE"/>&quot;కు వెనుకకి మార్చండి (పునఃప్రారంభం అవసరం)</translation>
 <translation id="8103386449138765447">SMS సందేశాలు: <ph name="MESSAGE_COUNT"/></translation>

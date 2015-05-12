@@ -10,6 +10,7 @@
 #include <errno.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
+#include <openssl/mem.h>
 #include <openssl/ssl.h>
 #include <string.h>
 
@@ -30,7 +31,6 @@
 #include "net/cert/cert_verifier.h"
 #include "net/cert/ct_ev_whitelist.h"
 #include "net/cert/ct_verifier.h"
-#include "net/cert/single_request_cert_verifier.h"
 #include "net/cert/x509_certificate_net_log_param.h"
 #include "net/cert/x509_util_openssl.h"
 #include "net/http/transport_security_state.h"
@@ -357,7 +357,6 @@ SSLClientSocketOpenSSL::SSLClientSocketOpenSSL(
       server_cert_chain_(new PeerCertificateChain(NULL)),
       completed_connect_(false),
       was_ever_used_(false),
-      client_auth_cert_needed_(false),
       cert_verifier_(context.cert_verifier),
       cert_transparency_verifier_(context.cert_transparency_verifier),
       channel_id_service_(context.channel_id_service),
@@ -405,6 +404,9 @@ int SSLClientSocketOpenSSL::ExportKeyingMaterial(
     const base::StringPiece& label,
     bool has_context, const base::StringPiece& context,
     unsigned char* out, unsigned int outlen) {
+  if (!IsConnected())
+    return ERR_SOCKET_NOT_CONNECTED;
+
   crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
 
   int rv = SSL_export_keying_material(
@@ -469,7 +471,7 @@ void SSLClientSocketOpenSSL::Disconnect() {
   }
 
   // Shut down anything that may call us back.
-  verifier_.reset();
+  cert_verifier_request_.reset();
   transport_->socket()->Disconnect();
 
   // Null all callbacks, delete all buffers.
@@ -498,7 +500,6 @@ void SSLClientSocketOpenSSL::Disconnect() {
 
   cert_authorities_.clear();
   cert_key_types_.clear();
-  client_auth_cert_needed_ = false;
 
   start_cert_verification_time_ = base::TimeTicks();
 
@@ -842,6 +843,10 @@ int SSLClientSocketOpenSSL::Init() {
                                ssl_config_.fastradio_padding_enabled &&
                                    ssl_config_.fastradio_padding_eligible);
 
+  // By default, renegotiations are rejected. After the initial handshake
+  // completes, some application protocols may re-enable it.
+  SSL_set_reject_peer_renegotiations(ssl_, 1);
+
   return OK;
 }
 
@@ -948,20 +953,23 @@ int SSLClientSocketOpenSSL::DoHandshake() {
     SSL_get0_signed_cert_timestamp_list(ssl_, &sct_list, &sct_list_len);
     set_signed_cert_timestamps_received(sct_list_len != 0);
 
+    if (IsRenegotiationAllowed())
+      SSL_set_reject_peer_renegotiations(ssl_, 0);
+
     // Verify the certificate.
     UpdateServerCert();
     GotoState(STATE_VERIFY_CERT);
   } else {
-    if (client_auth_cert_needed_)
-      return ERR_SSL_CLIENT_AUTH_CERT_NEEDED;
-
     int ssl_error = SSL_get_error(ssl_, rv);
-
     if (ssl_error == SSL_ERROR_WANT_CHANNEL_ID_LOOKUP) {
       // The server supports channel ID. Stop to look one up before returning to
       // the handshake.
       GotoState(STATE_CHANNEL_ID_LOOKUP);
       return OK;
+    }
+    if (ssl_error == SSL_ERROR_WANT_X509_LOOKUP &&
+        !ssl_config_.send_client_cert) {
+      return ERR_SSL_CLIENT_AUTH_CERT_NEEDED;
     }
 
     OpenSSLErrorInfo error_info;
@@ -1086,19 +1094,18 @@ int SSLClientSocketOpenSSL::DoVerifyCert(int result) {
     flags |= CertVerifier::VERIFY_CERT_IO_ENABLED;
   if (ssl_config_.rev_checking_required_local_anchors)
     flags |= CertVerifier::VERIFY_REV_CHECKING_REQUIRED_LOCAL_ANCHORS;
-  verifier_.reset(new SingleRequestCertVerifier(cert_verifier_));
-  return verifier_->Verify(
+  return cert_verifier_->Verify(
       server_cert_.get(), host_and_port_.host(), ocsp_response, flags,
       // TODO(davidben): Route the CRLSet through SSLConfig so
       // SSLClientSocket doesn't depend on SSLConfigService.
       SSLConfigService::GetCRLSet().get(), &server_cert_verify_result_,
       base::Bind(&SSLClientSocketOpenSSL::OnHandshakeIOComplete,
                  base::Unretained(this)),
-      net_log_);
+      &cert_verifier_request_, net_log_);
 }
 
 int SSLClientSocketOpenSSL::DoVerifyCertComplete(int result) {
-  verifier_.reset();
+  cert_verifier_request_.reset();
 
   if (!start_cert_verification_time_.is_null()) {
     base::TimeDelta verify_time =
@@ -1381,9 +1388,7 @@ int SSLClientSocketOpenSSL::DoPayloadRead() {
   // Although only the final SSL_read call may have failed, the failure needs to
   // processed immediately, while the information still available in OpenSSL's
   // error queue.
-  if (client_auth_cert_needed_) {
-    pending_read_error_ = ERR_SSL_CLIENT_AUTH_CERT_NEEDED;
-  } else if (ssl_ret <= 0) {
+  if (ssl_ret <= 0) {
     // A zero return from SSL_read may mean any of:
     // - The underlying BIO_read returned 0.
     // - The peer sent a close_notify.
@@ -1395,6 +1400,9 @@ int SSLClientSocketOpenSSL::DoPayloadRead() {
     pending_read_ssl_error_ = SSL_get_error(ssl_, ssl_ret);
     if (pending_read_ssl_error_ == SSL_ERROR_ZERO_RETURN) {
       pending_read_error_ = 0;
+    } else if (pending_read_ssl_error_ == SSL_ERROR_WANT_X509_LOOKUP &&
+               !ssl_config_.send_client_cert) {
+      pending_read_error_ = ERR_SSL_CLIENT_AUTH_CERT_NEEDED;
     } else {
       pending_read_error_ = MapOpenSSLErrorWithDetails(
           pending_read_ssl_error_, err_tracer, &pending_read_error_info_);
@@ -1606,7 +1614,6 @@ int SSLClientSocketOpenSSL::ClientCertRequestCallback(SSL* ssl) {
   if (!ssl_config_.send_client_cert) {
     // First pass: we know that a client certificate is needed, but we do not
     // have one at hand.
-    client_auth_cert_needed_ = true;
     STACK_OF(X509_NAME) *authorities = SSL_get_client_CA_list(ssl);
     for (size_t i = 0; i < sk_X509_NAME_num(authorities); i++) {
       X509_NAME *ca_name = (X509_NAME *)sk_X509_NAME_value(authorities, i);
@@ -1626,7 +1633,8 @@ int SSLClientSocketOpenSSL::ClientCertRequestCallback(SSL* ssl) {
           static_cast<SSLClientCertType>(client_cert_types[i]));
     }
 
-    return -1;  // Suspends handshake.
+    // Suspends handshake. SSL_get_error will return SSL_ERROR_WANT_X509_LOOKUP.
+    return -1;
   }
 
   // Second pass: a client certificate should have been selected.
@@ -1883,6 +1891,18 @@ std::string SSLClientSocketOpenSSL::GetSessionCacheKey() const {
     result.append("deprecated");
 
   return result;
+}
+
+bool SSLClientSocketOpenSSL::IsRenegotiationAllowed() const {
+  if (npn_status_ == kNextProtoUnsupported)
+    return ssl_config_.renego_allowed_default;
+
+  NextProto next_proto = NextProtoFromString(npn_proto_);
+  for (NextProto allowed : ssl_config_.renego_allowed_for_protos) {
+    if (next_proto == allowed)
+      return true;
+  }
+  return false;
 }
 
 scoped_refptr<X509Certificate>

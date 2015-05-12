@@ -6,7 +6,6 @@
 #define MEDIA_AUDIO_NULL_VIDEO_SINK_H_
 
 #include "base/cancelable_callback.h"
-#include "base/md5.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/time/default_tick_clock.h"
 #include "base/time/tick_clock.h"
@@ -18,7 +17,7 @@ class SingleThreadTaskRunner;
 
 namespace media {
 
-class MEDIA_EXPORT NullVideoSink : NON_EXPORTED_BASE(public VideoRendererSink) {
+class NullVideoSink : public VideoRendererSink {
  public:
   using NewFrameCB = base::Callback<void(const scoped_refptr<VideoFrame>&)>;
 
@@ -38,9 +37,6 @@ class MEDIA_EXPORT NullVideoSink : NON_EXPORTED_BASE(public VideoRendererSink) {
   void PaintFrameUsingOldRenderingPath(
       const scoped_refptr<VideoFrame>& frame) override;
 
-  // Allows tests to simulate suspension of Render() callbacks.
-  void PauseRenderCallbacks(base::TimeTicks pause_until);
-
   void set_tick_clock_for_testing(base::TickClock* tick_clock) {
     tick_clock_ = tick_clock;
   }
@@ -48,6 +44,12 @@ class MEDIA_EXPORT NullVideoSink : NON_EXPORTED_BASE(public VideoRendererSink) {
   // Sets |stop_cb_|, which will be fired when Stop() is called.
   void set_stop_cb(const base::Closure& stop_cb) {
     stop_cb_ = stop_cb;
+  }
+
+  bool is_started() const { return started_; }
+
+  void set_background_render(bool is_background_rendering) {
+    background_render_ = is_background_rendering;
   }
 
  private:
@@ -72,9 +74,6 @@ class MEDIA_EXPORT NullVideoSink : NON_EXPORTED_BASE(public VideoRendererSink) {
   // to maintain stable periodicity of callbacks.
   base::TimeTicks current_render_time_;
 
-  // Used to suspend Render() callbacks to |callback_| for some time.
-  base::TimeTicks pause_end_time_;
-
   // Allow for an injectable tick clock for testing.
   base::DefaultTickClock default_tick_clock_;
   base::TimeTicks last_now_;
@@ -84,6 +83,9 @@ class MEDIA_EXPORT NullVideoSink : NON_EXPORTED_BASE(public VideoRendererSink) {
 
   // If set, called when Stop() is called.
   base::Closure stop_cb_;
+
+  // Value passed to RenderCallback::Render().
+  bool background_render_;
 
   DISALLOW_COPY_AND_ASSIGN(NullVideoSink);
 };

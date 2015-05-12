@@ -1192,6 +1192,54 @@ CommandHandler.COMMANDS_['zoom-reset'] = /** @type {Command} */ ({
 });
 
 /**
+ * Sort the file list by name (in ascending order).
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['sort-by-name'] = /** @type {Command} */ ({
+  execute: function(event, fileManager) {
+    if (fileManager.directoryModel.getFileList())
+      fileManager.directoryModel.getFileList().sort('name', 'asc');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+});
+
+/**
+ * Sort the file list by size (in descending order).
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['sort-by-size'] = /** @type {Command} */ ({
+  execute: function(event, fileManager) {
+    if (fileManager.directoryModel.getFileList())
+      fileManager.directoryModel.getFileList().sort('size', 'desc');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+});
+
+/**
+ * Sort the file list by type (in ascending order).
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['sort-by-type'] = /** @type {Command} */ ({
+  execute: function(event, fileManager) {
+    if (fileManager.directoryModel.getFileList())
+      fileManager.directoryModel.getFileList().sort('type', 'asc');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+});
+
+/**
+ * Sort the file list by date-modified (in descending order).
+ * @type {Command}
+ */
+CommandHandler.COMMANDS_['sort-by-date'] = /** @type {Command} */ ({
+  execute: function(event, fileManager) {
+    if (fileManager.directoryModel.getFileList())
+      fileManager.directoryModel.getFileList().sort('modificationTime', 'desc');
+  },
+  canExecute: CommandUtil.canExecuteAlways
+});
+
+/**
  * Open inspector for foreground page.
  * @type {Command}
  */
@@ -1255,27 +1303,18 @@ CommandHandler.COMMANDS_['inspect-background'] = /** @type {Command} */ ({
  * Shows a suggest dialog with new services to be added to the left nav.
  * @type {Command}
  */
-CommandHandler.COMMANDS_['add-new-services'] = /** @type {Command} */ ({
+CommandHandler.COMMANDS_['install-new-extension'] = /** @type {Command} */ ({
   /**
    * @param {!Event} event Command event.
    * @param {!FileManager} fileManager FileManager to use.
-   * @suppress {checkTypes}
    */
   execute: function(event, fileManager) {
     fileManager.ui.suggestAppsDialog.showProviders(
         function(result, itemId) {
           // If a new provider is installed, then launch it so the configuration
           // dialog is shown (if it's available).
-          if (result === SuggestAppsDialog.Result.SUCCESS) {
-            // TODO(mtomasz): Pass extension_id to addProvidedFileSystem.
-            chrome.fileManagerPrivate.addProvidedFileSystem(function() {
-              if (chrome.runtime.lastError) {
-                // TODO(mtomasz): Handle the error and let users uninstall the
-                // extension easily.
-                console.error(chrome.runtime.lastError.message);
-              }
-            });
-          }
+          if (result === SuggestAppsDialog.Result.SUCCESS)
+            fileManager.providersModel.requestMount(assert(itemId));
         });
   },
   canExecute: CommandUtil.canExecuteAlways

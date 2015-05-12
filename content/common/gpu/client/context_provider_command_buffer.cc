@@ -10,9 +10,9 @@
 #include "base/callback_helpers.h"
 #include "base/strings/stringprintf.h"
 #include "cc/output/managed_memory_policy.h"
+#include "content/common/gpu/client/grcontext_for_webgraphicscontext3d.h"
 #include "gpu/command_buffer/client/gles2_implementation.h"
 #include "third_party/skia/include/gpu/GrContext.h"
-#include "webkit/common/gpu/grcontext_for_webgraphicscontext3d.h"
 
 namespace content {
 
@@ -134,14 +134,21 @@ class GrContext* ContextProviderCommandBuffer::GrContext() {
   if (gr_context_)
     return gr_context_->get();
 
-  gr_context_.reset(
-      new webkit::gpu::GrContextForWebGraphicsContext3D(context3d_.get()));
+  gr_context_.reset(new GrContextForWebGraphicsContext3D(context3d_.get()));
 
   // If GlContext is already lost, also abandon the new GrContext.
   if (IsContextLost())
     gr_context_->get()->abandonContext();
 
   return gr_context_->get();
+}
+
+void ContextProviderCommandBuffer::InvalidateGrContext(uint32_t state) {
+  if (gr_context_) {
+    DCHECK(lost_context_callback_proxy_);  // Is bound to thread.
+    DCHECK(context_thread_checker_.CalledOnValidThread());
+    gr_context_->get()->resetContext(state);
+  }
 }
 
 void ContextProviderCommandBuffer::SetupLock() {

@@ -94,7 +94,7 @@ public class ExternalNavigationHandlerTest extends InstrumentationTestCase {
                 true,
                 false,
                 null,
-                OverrideUrlLoadingResult.OVERRIDE_WITH_EXTERNAL_INTENT,
+                OverrideUrlLoadingResult.OVERRIDE_WITH_INCOGNITO_MODE,
                 START_INCOGNITO);
     }
 
@@ -181,7 +181,7 @@ public class ExternalNavigationHandlerTest extends InstrumentationTestCase {
 
     @SmallTest
     public void testIgnore() {
-        // About, Content URIs are disabled in Chrome on Android.
+        // Ensure about: URLs are not broadcast for external navigation.
         check("about:test",
                 null, /* referrer */
                 false, /* incognito */
@@ -202,6 +202,8 @@ public class ExternalNavigationHandlerTest extends InstrumentationTestCase {
                 null,
                 OverrideUrlLoadingResult.NO_OVERRIDE,
                 IGNORE);
+
+        // Ensure content: URLs are not broadcast for external navigation.
         check("content:test",
                 null, /* referrer */
                 true, /* incognito */
@@ -213,6 +215,50 @@ public class ExternalNavigationHandlerTest extends InstrumentationTestCase {
                 OverrideUrlLoadingResult.NO_OVERRIDE,
                 IGNORE);
         check("content:test",
+                null, /* referrer */
+                false, /* incognito */
+                PageTransition.LINK,
+                NO_REDIRECT,
+                true,
+                false,
+                null,
+                OverrideUrlLoadingResult.NO_OVERRIDE,
+                IGNORE);
+
+        // Ensure chrome: URLs are not broadcast for external navigation.
+        check("chrome://history",
+                null, /* referrer */
+                true, /* incognito */
+                PageTransition.LINK,
+                NO_REDIRECT,
+                true,
+                false,
+                null,
+                OverrideUrlLoadingResult.NO_OVERRIDE,
+                IGNORE);
+        check("chrome://history",
+                null, /* referrer */
+                false, /* incognito */
+                PageTransition.LINK,
+                NO_REDIRECT,
+                true,
+                false,
+                null,
+                OverrideUrlLoadingResult.NO_OVERRIDE,
+                IGNORE);
+
+        // Ensure chrome-native: URLs are not broadcast for external navigation.
+        check("chrome-native://newtab",
+                null, /* referrer */
+                true, /* incognito */
+                PageTransition.LINK,
+                NO_REDIRECT,
+                true,
+                false,
+                null,
+                OverrideUrlLoadingResult.NO_OVERRIDE,
+                IGNORE);
+        check("chrome-native://newtab",
                 null, /* referrer */
                 false, /* incognito */
                 PageTransition.LINK,
@@ -921,7 +967,8 @@ public class ExternalNavigationHandlerTest extends InstrumentationTestCase {
         }
 
         @Override
-        public void startIncognitoIntent(Intent intent) {
+        public void startIncognitoIntent(Intent intent, String referrerUrl, String fallbackUrl,
+                Tab tab, boolean needsToCloseTab) {
             startIncognitoIntentCalled = true;
         }
 
@@ -1002,6 +1049,7 @@ public class ExternalNavigationHandlerTest extends InstrumentationTestCase {
                 .setApplicationMustBeInForeground(chromeAppInForegroundRequired)
                 .setRedirectHandler(redirectHandler)
                 .setIsBackgroundTabNavigation(isBackgroundTabNavigation)
+                .setIsMainFrame(true)
                 .build();
         OverrideUrlLoadingResult result = mUrlHandler.shouldOverrideUrlLoading(params);
         boolean startActivityCalled = mDelegate.startActivityIntent != null;

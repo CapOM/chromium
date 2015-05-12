@@ -681,29 +681,6 @@ system call NtCreateSection
 *!cc::ResourceProvider::CreateBitmap
 *!cc::ResourceProvider::Create*Resource
 
-UNADDRESSABLE ACCESS
-name=http://crbug.com/445836_a
-...
-content.dll!content::RenderFrameImpl::~RenderFrameImpl
-content.dll!content::RenderFrameImpl::`vector deleting destructor'
-content.dll!content::RenderViewImpl::~RenderViewImpl
-content.dll!content::RenderViewImpl::`vector deleting destructor'
-content.dll!base::internal::BindState<>::`scalar deleting destructor'
-base.dll!scoped_refptr<>::Release
-base.dll!base::internal::CallbackBase::~CallbackBase
-
-INVALID HEAP ARGUMENT
-name=http://crbug.com/445836_b
-drmemorylib.dll!replace_operator_delete
-ipc.dll!IPC::Listener::`vector deleting destructor'
-content.dll!content::RenderFrameImpl::~RenderFrameImpl
-content.dll!content::RenderFrameImpl::`vector deleting destructor'
-content.dll!content::RenderViewImpl::~RenderViewImpl
-content.dll!content::RenderViewImpl::`vector deleting destructor'
-content.dll!base::internal::BindState<>::`scalar deleting destructor'
-base.dll!scoped_refptr<>::Release
-base.dll!base::internal::CallbackBase::~CallbackBase
-
 HANDLE LEAK
 name=http://crbug.com/449989
 system call NtOpenProcess
@@ -774,3 +751,29 @@ name=http://crbug.com/476586b
 *!cc::LayerTreeHost::BeginMainFrame
 *!cc::ThreadProxy::BeginMainFrame
 *!base::internal::InvokeHelper<>::MakeItSo
+
+UNADDRESSABLE ACCESS
+name=http://crbug.com/483305
+blink_web.dll!blink::WebFrameWidgetImpl::suppressInvalidations
+blink_web.dll!blink::WebFrameWidgetImpl::setRootGraphicsLayer
+blink_web.dll!blink::ChromeClientImpl::attachRootGraphicsLayer
+blink_web.dll!blink::DeprecatedPaintLayerCompositor::detachRootLayer
+
+UNADDRESSABLE ACCESS
+name=http://crbug.com/483305b
+blink_web.dll!blink::WebFrameWidgetImpl::setRootGraphicsLayer
+blink_web.dll!blink::ChromeClientImpl::attachRootGraphicsLayer
+blink_web.dll!blink::DeprecatedPaintLayerCompositor::detachRootLayer
+
+UNADDRESSABLE ACCESS
+name=http://crbug.com/484352
+blink_web.dll!blink::WebFrameWidgetImpl::setIsAcceleratedCompositingActive
+blink_web.dll!blink::WebFrameWidgetImpl::willCloseLayerTreeView
+scheduler.dll!scheduler::TaskQueueManager::ProcessTaskFromWorkQueue
+
+UNADDRESSABLE ACCESS
+name=http://crbug.com/484352b
+blink_web.dll!blink::WebFrameWidgetImpl::setIsAcceleratedCompositingActive
+blink_web.dll!blink::WebFrameWidgetImpl::setRootGraphicsLayer
+blink_web.dll!blink::ChromeClientImpl::attachRootGraphicsLayer
+blink_web.dll!blink::DeprecatedPaintLayerCompositor::detachRootLayer

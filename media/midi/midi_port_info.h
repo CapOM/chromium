@@ -9,9 +9,10 @@
 #include <vector>
 
 #include "base/basictypes.h"
-#include "media/base/media_export.h"
+#include "media/midi/midi_export.h"
 
 namespace media {
+namespace midi {
 
 enum MidiPortState {
   MIDI_PORT_DISCONNECTED,
@@ -20,7 +21,7 @@ enum MidiPortState {
   MIDI_PORT_STATE_LAST = MIDI_PORT_OPENED,
 };
 
-struct MEDIA_EXPORT MidiPortInfo final {
+struct MIDI_EXPORT MidiPortInfo final {
   MidiPortInfo();
   MidiPortInfo(const std::string& in_id,
                const std::string& in_manufacturer,
@@ -40,6 +41,7 @@ struct MEDIA_EXPORT MidiPortInfo final {
 
 using MidiPortInfoList = std::vector<MidiPortInfo>;
 
+}  // namespace midi
 }  // namespace media
 
 #endif  // MEDIA_MIDI_MIDI_PORT_INFO_H_

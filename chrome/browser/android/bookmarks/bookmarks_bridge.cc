@@ -548,6 +548,21 @@ void BookmarksBridge::GetBookmarksForFolder(JNIEnv* env,
   }
 }
 
+jint BookmarksBridge::GetBookmarkCountForFolder(JNIEnv* env,
+                                                jobject obj,
+                                                jobject j_folder_id_obj) {
+  DCHECK(IsLoaded());
+  long folder_id = JavaBookmarkIdGetId(env, j_folder_id_obj);
+  int type = JavaBookmarkIdGetType(env, j_folder_id_obj);
+  const BookmarkNode* folder = GetNodeByID(folder_id, type);
+
+  if (!folder || !IsFolderAvailable(folder) || !folder->is_folder()
+      || !IsReachable(folder))
+    return 0;
+
+  return folder->child_count();
+}
+
 void BookmarksBridge::GetCurrentFolderHierarchy(JNIEnv* env,
                                                 jobject obj,
                                                 jobject j_folder_id_obj,
@@ -614,12 +629,10 @@ void BookmarksBridge::DeleteBookmark(JNIEnv* env,
     return;
   }
 
-  if (partner_bookmarks_shim_->IsPartnerBookmark(node)) {
+  if (partner_bookmarks_shim_->IsPartnerBookmark(node))
     partner_bookmarks_shim_->RemoveBookmark(node);
-  } else {
-    const BookmarkNode* parent_node = GetParentNode(node);
-    bookmark_model_->Remove(parent_node, parent_node->GetIndexOf(node));
-  }
+  else
+    bookmark_model_->Remove(node);
 }
 
 void BookmarksBridge::MoveBookmark(JNIEnv* env,
