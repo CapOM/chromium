@@ -42,13 +42,6 @@ final class BluetoothAdapter {
 
     // Constructs a BluetoothAdapter.
     private BluetoothAdapter(Context context) {
-
-
-
-        Log.i(TAG, "BluetoothAdapter.");
-
-
-
         mHasBluetoothPermission =
                 context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
                         == PackageManager.PERMISSION_GRANTED
