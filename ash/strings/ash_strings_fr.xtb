@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Batterie pleine</translation>
 <translation id="6895424601869865703">Ajouter un compte pour <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Clavier à l'écran désactivé</translation>
-<translation id="1057289296854808272">Rotation activée (appuyer ici pour changer)</translation>
+<translation id="5548285847212963613">L'extension &quot;<ph name="EXTENSION_NAME"/>&quot; peut aider à se connecter à ce réseau.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> et <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Bouton de dépassement de capacité</translation>
 <translation id="7904094684485781019">L'administrateur de ce compte a désactivé la connexion multicompte.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Barre d'état</translation>
 <translation id="2248649616066688669">Vous pouvez continuer à utiliser votre Chromebook, même fermé, tant qu'il est connecté à un écran externe.</translation>
 <translation id="2946640296642327832">Activer le Bluetooth</translation>
+<translation id="5537725057119320332">Caster</translation>
 <translation id="6459472438155181876">Extension de l'écran pour <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Mobile</translation>
 <translation id="6596816719288285829">Adresse IP</translation>
@@ -39,7 +40,6 @@
 Appuyez sur Maj + Alt pour en utiliser un autre.</translation>
 <translation id="6043994281159824495">Se déconnecter maintenant</translation>
 <translation id="2127372758936585790">Chargeur de faible puissance</translation>
-<translation id="4625920103690741805">Rotation verrouillée (appuyer ici pour changer)</translation>
 <translation id="3799026279081545374">Votre chargeur est peut-être défaillant. Si vous résidez aux États-Unis, veuillez appeler le 866 628 1371 pour obtenir de l'aide et recevoir un chargeur de substitution. Si vous résidez au Royaume-Uni, veuillez appeler le 0800 026 0613. Si vous résidez en Irlande, veuillez appeler le 1 800 832 664. Si vous résidez au Canada, veuillez appeler le 866 628 1372. Si vous résidez en Australie, veuillez appeler le 1 800 067 460.</translation>
 <translation id="3891340733213178823">Appuyez deux fois sur Ctrl + Maj + Q pour vous déconnecter.</translation>
 <translation id="5871632337994001636">Gérer les appareils…</translation>
@@ -167,7 +167,6 @@ Appuyez sur Maj + Alt pour en utiliser un autre.</translation>
 <translation id="112308213915226829">Masquer automatiquement l'étagère</translation>
 <translation id="7573962313813535744">Mode Dock</translation>
 <translation id="2792498699870441125">Alt + Recherche</translation>
-<translation id="8660803626959853127">Synchronisation de <ph name="COUNT"/> fichier(s) en cours…</translation>
 <translation id="5958529069007801266">Utilisateur supervisé</translation>
 <translation id="3709443003275901162">Plus de 9</translation>
 <translation id="639644700271529076">La touche de verrouillage des majuscules est désactivée.</translation>
@@ -187,6 +186,7 @@ Appuyez sur Search ou Maj pour le désactiver.</translation>
 <translation id="6165508094623778733">En savoir plus</translation>
 <translation id="7168224885072002358">Rétablissement de la résolution précédente dans <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">La caméra et le micro sont en cours d'utilisation.</translation>
+<translation id="6550675742724504774">Options</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Revenir à &quot;<ph name="FROM_LOCALE"/>&quot; (redémarrage requis)</translation>
 <translation id="8103386449138765447">Messages SMS : <ph name="MESSAGE_COUNT"/></translation>

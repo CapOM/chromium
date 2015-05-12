@@ -18,11 +18,13 @@
 #include "base/threading/thread.h"
 #include "base/values.h"
 #include "device/udev_linux/scoped_udev.h"
+#include "media/midi/midi_export.h"
 #include "media/midi/midi_manager.h"
 
 namespace media {
+namespace midi {
 
-class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
+class MIDI_EXPORT MidiManagerAlsa final : public MidiManager {
  public:
   MidiManagerAlsa();
   ~MidiManagerAlsa() override;
@@ -38,6 +40,9 @@ class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
   friend class MidiManagerAlsaTest;
   FRIEND_TEST_ALL_PREFIXES(MidiManagerAlsaTest, ExtractManufacturer);
   FRIEND_TEST_ALL_PREFIXES(MidiManagerAlsaTest, ToMidiPortState);
+
+  class AlsaCard;
+  typedef std::map<int, AlsaCard*> AlsaCardMap;
 
   class MidiPort {
    public:
@@ -208,7 +213,10 @@ class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
                    bool midi);
     void PortExit(int client_id, int port_id);
     snd_seq_client_type_t ClientType(int client_id) const;
-    scoped_ptr<TemporaryMidiPortState> ToMidiPortState();
+    scoped_ptr<TemporaryMidiPortState> ToMidiPortState(
+        const AlsaCardMap& alsa_cards);
+
+    int card_client_count() { return card_client_count_; }
 
    private:
     class Port {
@@ -257,19 +265,62 @@ class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
     ClientMap clients_;
     STLValueDeleter<ClientMap> clients_deleter_;
 
+    // This is the current number of clients we know about that have
+    // cards. When this number matches alsa_card_midi_count_, we know
+    // we are in sync between ALSA and udev. Until then, we cannot generate
+    // MIDIConnectionEvents to web clients.
+    int card_client_count_;
+
     DISALLOW_COPY_AND_ASSIGN(AlsaSeqState);
+  };
+
+  class AlsaCard {
+   public:
+    AlsaCard(udev_device* dev,
+             const std::string& alsa_name,
+             const std::string& alsa_longname,
+             const std::string& alsa_driver,
+             int midi_device_count);
+    ~AlsaCard();
+    const std::string alsa_name() const { return alsa_name_; }
+    const std::string alsa_longname() const { return alsa_longname_; }
+    const std::string manufacturer() const { return manufacturer_; }
+    const std::string alsa_driver() const { return alsa_driver_; }
+    int midi_device_count() const { return midi_device_count_; }
+    // Returns hardware path.
+    const std::string path() const;
+    // Returns the id we can use to try to match hardware across different
+    // paths.
+    const std::string id() const;
+
+   private:
+    FRIEND_TEST_ALL_PREFIXES(MidiManagerAlsaTest, ExtractManufacturer);
+
+    // Extracts the manufacturer using heuristics and a variety of sources.
+    static std::string ExtractManufacturerString(
+        const std::string& udev_id_vendor,
+        const std::string& udev_id_vendor_id,
+        const std::string& udev_id_vendor_from_database,
+        const std::string& alsa_name,
+        const std::string& alsa_longname);
+
+    std::string alsa_name_;
+    std::string alsa_longname_;
+    std::string manufacturer_;
+    std::string alsa_driver_;
+    std::string path_;
+    std::string bus_;
+    std::string serial_;
+    std::string vendor_id_;
+    std::string model_id_;
+    std::string usb_interface_num_;
+    int midi_device_count_;
+
+    DISALLOW_COPY_AND_ASSIGN(AlsaCard);
   };
 
   typedef base::hash_map<int, uint32> SourceMap;
   typedef base::hash_map<uint32, int> OutPortMap;
-
-  // Extracts the manufacturer using heuristics and a variety of sources.
-  static std::string ExtractManufacturerString(
-      const std::string& udev_id_vendor,
-      const std::string& udev_id_vendor_id,
-      const std::string& udev_id_vendor_from_database,
-      const std::string& alsa_name,
-      const std::string& alsa_longname);
 
   // An internal callback that runs on MidiSendThread.
   void SendMidiData(uint32 port_index, const std::vector<uint8>& data);
@@ -281,12 +332,17 @@ class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
   void ProcessPortStartEvent(const snd_seq_addr_t& addr);
   void ProcessClientExitEvent(const snd_seq_addr_t& addr);
   void ProcessPortExitEvent(const snd_seq_addr_t& addr);
+  void ProcessUdevEvent(udev_device* dev);
+  void AddCard(udev_device* dev);
+  void RemoveCard(int number);
 
   // Updates port_state_ and Web MIDI state from alsa_seq_state_.
   void UpdatePortStateAndGenerateEvents();
 
   // Enumerates ports. Call once after subscribing to the announce port.
   void EnumerateAlsaPorts();
+  // Enumerates udev cards. Call once after initializing the udev monitor.
+  bool EnumerateUdevCards();
   // Returns true if successful.
   bool CreateAlsaOutputPort(uint32 port_index, int client_id, int port_id);
   void DeleteAlsaOutputPort(uint32 port_index);
@@ -310,11 +366,22 @@ class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
   // Mapping from ALSA client:port to our index.
   SourceMap source_map_;
 
+  // Mapping from card to devices.
+  AlsaCardMap alsa_cards_;
+  STLValueDeleter<AlsaCardMap> alsa_cards_deleter_;
+
+  // This is the current count of midi devices across all cards we know
+  // about. When this number matches card_client_count_ in AlsaSeqState,
+  // we are safe to generate MIDIConnectionEvents. Otherwise we need to
+  // wait for our information from ALSA and udev to get back in sync.
+  int alsa_card_midi_count_;
+
   // ALSA event -> MIDI coder.
   snd_midi_event_t* decoder_;
 
   // udev, for querying hardware devices.
   device::ScopedUdevPtr udev_;
+  device::ScopedUdevMonitorPtr udev_monitor_;
 
   base::Thread send_thread_;
   base::Thread event_thread_;
@@ -325,6 +392,7 @@ class MEDIA_EXPORT MidiManagerAlsa final : public MidiManager {
   DISALLOW_COPY_AND_ASSIGN(MidiManagerAlsa);
 };
 
+}  // namespace midi
 }  // namespace media
 
 #endif  // MEDIA_MIDI_MIDI_MANAGER_ALSA_H_

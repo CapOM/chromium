@@ -45,7 +45,7 @@ class Media(benchmark.Benchmark):
     return 'media.tough_video_cases'
 
 
-@benchmark.Disabled
+@benchmark.Disabled('android', 'mac', 'xp')
 class MediaNetworkSimulation(benchmark.Benchmark):
   """Obtains media metrics under different network simulations."""
   test = media.Media

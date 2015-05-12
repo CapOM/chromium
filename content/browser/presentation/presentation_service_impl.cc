@@ -10,11 +10,73 @@
 #include "content/browser/presentation/presentation_type_converters.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/navigation_details.h"
+#include "content/public/browser/presentation_session_message.h"
 #include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/content_client.h"
 #include "content/public/common/frame_navigate_params.h"
+#include "content/public/common/presentation_constants.h"
+
+namespace {
+
+// The return value takes ownership of the contents of |input|.
+presentation::SessionMessagePtr ToMojoSessionMessage(
+    content::PresentationSessionMessage* input) {
+  presentation::SessionMessagePtr output(presentation::SessionMessage::New());
+  output->presentation_url.Swap(&input->presentation_url);
+  output->presentation_id.Swap(&input->presentation_id);
+  if (input->is_binary()) {
+    // binary data
+    output->type = presentation::PresentationMessageType::
+        PRESENTATION_MESSAGE_TYPE_ARRAY_BUFFER;
+    output->data.Swap(input->data.get());
+  } else {
+    // string message
+    output->type =
+        presentation::PresentationMessageType::PRESENTATION_MESSAGE_TYPE_TEXT;
+    output->message.Swap(input->message.get());
+  }
+  return output.Pass();
+}
+
+scoped_ptr<content::PresentationSessionMessage> GetPresentationSessionMessage(
+    presentation::SessionMessagePtr input) {
+  DCHECK(!input.is_null());
+  scoped_ptr<content::PresentationSessionMessage> output;
+  if (input->type == presentation::PresentationMessageType::
+                     PRESENTATION_MESSAGE_TYPE_TEXT) {
+    DCHECK(!input->message.is_null());
+    DCHECK(input->data.is_null());
+    // Return null PresentationSessionMessage if size exceeds.
+    if (input->message.size() > content::kMaxPresentationSessionMessageSize)
+      return output.Pass();
+
+    output = content::PresentationSessionMessage::CreateStringMessage(
+        input->presentation_url,
+        input->presentation_id,
+        make_scoped_ptr(new std::string));
+    input->message.Swap(output->message.get());
+
+  } else if (input->type == presentation::PresentationMessageType::
+              PRESENTATION_MESSAGE_TYPE_ARRAY_BUFFER) {
+    DCHECK(!input->data.is_null());
+    DCHECK(input->message.is_null());
+    // Return null PresentationSessionMessage if size exceeds.
+    if (input->data.size() > content::kMaxPresentationSessionMessageSize)
+      return output.Pass();
+
+    output = content::PresentationSessionMessage::CreateBinaryMessage(
+        input->presentation_url,
+        input->presentation_id,
+        make_scoped_ptr(new std::vector<uint8_t>));
+    input->data.Swap(output->data.get());
+  }
+
+  return output.Pass();
+}
+
+} // namespace
 
 namespace content {
 
@@ -76,58 +138,62 @@ void PresentationServiceImpl::OnConnectionError() {
   delete this;
 }
 
-PresentationServiceImpl::ScreenAvailabilityContext*
-PresentationServiceImpl::GetOrCreateAvailabilityContext(
-    const std::string& presentation_url) {
-  auto it = availability_contexts_.find(presentation_url);
-  if (it == availability_contexts_.end()) {
-    linked_ptr<ScreenAvailabilityContext> context(
-        new ScreenAvailabilityContext(presentation_url));
-    if (!delegate_->AddScreenAvailabilityListener(
-        render_process_id_, render_frame_id_, context.get())) {
-      DVLOG(1) << "AddScreenAvailabilityListener failed. Ignoring request.";
-      return nullptr;
-    }
-    it = availability_contexts_.insert(
-        std::make_pair(context->GetPresentationUrl(), context)).first;
-  }
-  return it->second.get();
+void PresentationServiceImpl::SetClient(
+    presentation::PresentationServiceClientPtr client) {
+  DCHECK(!client_.get());
+  // TODO(imcheng): Set ErrorHandler to listen for errors.
+  client_ = client.Pass();
 }
 
-void PresentationServiceImpl::ListenForScreenAvailability(
-    const mojo::String& presentation_url,
-    const ScreenAvailabilityMojoCallback& callback) {
+void PresentationServiceImpl::ListenForScreenAvailability() {
   DVLOG(2) << "ListenForScreenAvailability";
-  if (!delegate_) {
-    callback.Run(presentation_url, false);
-    return;
-  }
-
-  ScreenAvailabilityContext* context =
-      GetOrCreateAvailabilityContext(presentation_url.get());
-  if (!context) {
-    callback.Run(presentation_url, false);
-    return;
-  }
-  context->CallbackReceived(callback);
-}
-
-void PresentationServiceImpl::RemoveScreenAvailabilityListener(
-    const mojo::String& presentation_url) {
-  DVLOG(2) << "RemoveScreenAvailabilityListener";
   if (!delegate_)
     return;
 
-  const std::string& presentation_url_str = presentation_url.get();
-  auto it = availability_contexts_.find(presentation_url_str);
-  if (it == availability_contexts_.end())
+  if (screen_availability_listener_.get() &&
+      screen_availability_listener_->GetPresentationUrl() ==
+          default_presentation_url_) {
+    return;
+  }
+
+  ResetScreenAvailabilityListener(default_presentation_url_);
+}
+
+void PresentationServiceImpl::ResetScreenAvailabilityListener(
+    const std::string& presentation_url) {
+  DCHECK(delegate_);
+  DCHECK(!screen_availability_listener_.get() ||
+         presentation_url != default_presentation_url_);
+
+  // (1) Unregister old listener with delegate
+  StopListeningForScreenAvailability();
+
+  // (2) Replace old listener with new listener
+  screen_availability_listener_.reset(new ScreenAvailabilityListenerImpl(
+      presentation_url, this));
+
+  // (3) Register new listener with delegate
+  if (!delegate_->AddScreenAvailabilityListener(
+      render_process_id_,
+      render_frame_id_,
+      screen_availability_listener_.get())) {
+    DVLOG(1) << "AddScreenAvailabilityListener failed. Ignoring request.";
+    screen_availability_listener_.reset();
+  }
+}
+
+void PresentationServiceImpl::StopListeningForScreenAvailability() {
+  DVLOG(2) << "StopListeningForScreenAvailability";
+  if (!delegate_)
     return;
 
-  delegate_->RemoveScreenAvailabilityListener(
-      render_process_id_, render_frame_id_, it->second.get());
-  // Resolve the context's pending callbacks before removing it.
-  it->second->OnScreenAvailabilityChanged(false);
-  availability_contexts_.erase(it);
+  if (screen_availability_listener_.get()) {
+    delegate_->RemoveScreenAvailabilityListener(
+        render_process_id_,
+        render_frame_id_,
+        screen_availability_listener_.get());
+    screen_availability_listener_.reset();
+  }
 }
 
 void PresentationServiceImpl::ListenForDefaultSessionStart(
@@ -260,19 +326,6 @@ void PresentationServiceImpl::RunAndEraseNewSessionMojoCallback(
   pending_session_cbs_.erase(it);
 }
 
-void PresentationServiceImpl::DoSetDefaultPresentationUrl(
-    const std::string& default_presentation_url,
-    const std::string& default_presentation_id) {
-  DCHECK(delegate_);
-  delegate_->SetDefaultPresentationUrl(
-      render_process_id_,
-      render_frame_id_,
-      default_presentation_url,
-      default_presentation_id);
-  default_presentation_url_ = default_presentation_url;
-  default_presentation_id_ = default_presentation_id;
-}
-
 void PresentationServiceImpl::SetDefaultPresentationURL(
     const mojo::String& default_presentation_url,
     const mojo::String& default_presentation_id) {
@@ -289,28 +342,50 @@ void PresentationServiceImpl::SetDefaultPresentationURL(
     return;
   }
 
-  auto old_it = availability_contexts_.find(old_default_url);
-  // Haven't started listening yet.
-  if (old_it == availability_contexts_.end()) {
-    DoSetDefaultPresentationUrl(new_default_url, default_presentation_id);
+  if (old_default_url != new_default_url) {
+    // If DPU changed, replace screen availability listeners if any.
+    if (screen_availability_listener_.get())
+      ResetScreenAvailabilityListener(new_default_url);
+  }
+
+  delegate_->SetDefaultPresentationUrl(
+      render_process_id_,
+      render_frame_id_,
+      default_presentation_url,
+      default_presentation_id);
+  default_presentation_url_ = default_presentation_url;
+  default_presentation_id_ = default_presentation_id;
+}
+
+
+void PresentationServiceImpl::SendSessionMessage(
+    presentation::SessionMessagePtr session_message,
+    const SendMessageMojoCallback& callback) {
+  DVLOG(2) << "SendSessionMessage";
+  DCHECK(!session_message.is_null());
+  // send_message_callback_ should be null by now, otherwise resetting of
+  // send_message_callback_ with new callback will drop the old callback.
+  if (!delegate_ || send_message_callback_) {
+    callback.Run(false);
     return;
   }
 
-  // Have already started listening. Create a listener for the new URL and
-  // transfer the callbacks from the old listener, if any.
-  // This is done so that a listener added before default URL is changed
-  // will continue to work.
-  ScreenAvailabilityContext* context =
-      GetOrCreateAvailabilityContext(new_default_url);
-  old_it->second->PassPendingCallbacks(context);
-
-  // Remove listener for old default presentation URL.
-  delegate_->RemoveScreenAvailabilityListener(
+  send_message_callback_.reset(new SendMessageMojoCallback(callback));
+  delegate_->SendMessage(
       render_process_id_,
       render_frame_id_,
-      old_it->second.get());
-  availability_contexts_.erase(old_it);
-  DoSetDefaultPresentationUrl(new_default_url, default_presentation_id);
+      GetPresentationSessionMessage(session_message.Pass()),
+      base::Bind(&PresentationServiceImpl::OnSendMessageCallback,
+                 weak_factory_.GetWeakPtr()));
+}
+
+void PresentationServiceImpl::OnSendMessageCallback() {
+  // It is possible that Reset() is invoked before receiving this callback.
+  // So, always check send_message_callback_ for non-null.
+  if (send_message_callback_) {
+    send_message_callback_->Run(true);
+    send_message_callback_.reset();
+  }
 }
 
 void PresentationServiceImpl::CloseSession(
@@ -335,7 +410,37 @@ bool PresentationServiceImpl::FrameMatches(
 
 void PresentationServiceImpl::ListenForSessionMessages(
     const SessionMessagesCallback& callback) {
-  NOTIMPLEMENTED();
+  DVLOG(2) << "ListenForSessionMessages";
+  if (!delegate_) {
+    callback.Run(mojo::Array<presentation::SessionMessagePtr>());
+    return;
+  }
+
+  // Crash early if renderer is misbehaving.
+  CHECK(!on_session_messages_callback_.get());
+
+  on_session_messages_callback_.reset(new SessionMessagesCallback(callback));
+  delegate_->ListenForSessionMessages(
+      render_process_id_, render_frame_id_,
+      base::Bind(&PresentationServiceImpl::OnSessionMessages,
+                 weak_factory_.GetWeakPtr()));
+}
+
+void PresentationServiceImpl::OnSessionMessages(
+    scoped_ptr<ScopedVector<PresentationSessionMessage>> messages) {
+  DCHECK(messages.get() && !messages->empty());
+  if (!on_session_messages_callback_.get()) {
+    // The Reset method of this class was invoked.
+    return;
+  }
+
+  mojo::Array<presentation::SessionMessagePtr> mojoMessages(messages->size());
+  for (size_t i = 0; i < messages->size(); ++i) {
+    mojoMessages[i] = ToMojoSessionMessage((*messages)[i]);
+  }
+
+  on_session_messages_callback_->Run(mojoMessages.Pass());
+  on_session_messages_callback_.reset();
 }
 
 void PresentationServiceImpl::DidNavigateAnyFrame(
@@ -384,10 +489,21 @@ void PresentationServiceImpl::Reset() {
 
   default_presentation_url_.clear();
   default_presentation_id_.clear();
-  availability_contexts_.clear();
+  screen_availability_listener_.reset();
   queued_start_session_requests_.clear();
   FlushNewSessionCallbacks();
   default_session_start_context_.reset();
+  if (on_session_messages_callback_.get()) {
+    on_session_messages_callback_->Run(
+        mojo::Array<presentation::SessionMessagePtr>());
+    on_session_messages_callback_.reset();
+  }
+  if (send_message_callback_) {
+    // Run the callback with false, indicating the renderer to stop sending
+    // the requests and invalidate all pending requests.
+    send_message_callback_->Run(false);
+    send_message_callback_.reset();
+  }
 }
 
 // static
@@ -411,65 +527,28 @@ void PresentationServiceImpl::OnDefaultPresentationStarted(
     default_session_start_context_->set_session(session);
 }
 
-PresentationServiceImpl::ScreenAvailabilityContext::ScreenAvailabilityContext(
-    const std::string& presentation_url)
-    : presentation_url_(presentation_url) {
+PresentationServiceImpl::ScreenAvailabilityListenerImpl
+::ScreenAvailabilityListenerImpl(
+    const std::string& presentation_url,
+    PresentationServiceImpl* service)
+    : presentation_url_(presentation_url),
+      service_(service) {
+  DCHECK(service_);
+  DCHECK(service_->client_.get());
 }
 
-PresentationServiceImpl::ScreenAvailabilityContext::
-~ScreenAvailabilityContext() {
-  // Ensure that pending callbacks are flushed.
-  OnScreenAvailabilityChanged(false);
+PresentationServiceImpl::ScreenAvailabilityListenerImpl::
+~ScreenAvailabilityListenerImpl() {
 }
 
-void PresentationServiceImpl::ScreenAvailabilityContext::CallbackReceived(
-    const ScreenAvailabilityMojoCallback& callback) {
-  // NOTE: This will overwrite previously registered callback if any.
-  if (!available_ptr_) {
-    // No results yet, store callback for later invocation.
-    callbacks_.push_back(new ScreenAvailabilityMojoCallback(callback));
-  } else {
-    // Run callback now, reset result.
-    // There shouldn't be any callbacks stored in this scenario.
-    DCHECK(!HasPendingCallbacks());
-    callback.Run(presentation_url_, *available_ptr_);
-    available_ptr_.reset();
-  }
-}
-
-std::string PresentationServiceImpl::ScreenAvailabilityContext
+std::string PresentationServiceImpl::ScreenAvailabilityListenerImpl
     ::GetPresentationUrl() const {
   return presentation_url_;
 }
 
-void PresentationServiceImpl::ScreenAvailabilityContext
+void PresentationServiceImpl::ScreenAvailabilityListenerImpl
     ::OnScreenAvailabilityChanged(bool available) {
-  if (!HasPendingCallbacks()) {
-    // No callback, stash the result for now.
-    available_ptr_.reset(new bool(available));
-  } else {
-    // Invoke callbacks and erase them.
-    // There shouldn't be any result stored in this scenario.
-    DCHECK(!available_ptr_);
-    ScopedVector<ScreenAvailabilityMojoCallback> callbacks;
-    callbacks.swap(callbacks_);
-    for (const auto& callback : callbacks)
-      callback->Run(presentation_url_, available);
-  }
-}
-
-void PresentationServiceImpl::ScreenAvailabilityContext
-    ::PassPendingCallbacks(
-    PresentationServiceImpl::ScreenAvailabilityContext* other) {
-  std::vector<ScreenAvailabilityMojoCallback*> callbacks;
-  callbacks_.release(&callbacks);
-  std::copy(callbacks.begin(), callbacks.end(),
-            std::back_inserter(other->callbacks_));
-}
-
-bool PresentationServiceImpl::ScreenAvailabilityContext
-    ::HasPendingCallbacks() const {
-  return !callbacks_.empty();
+  service_->client_->OnScreenAvailabilityUpdated(available);
 }
 
 PresentationServiceImpl::StartSessionRequest::StartSessionRequest(

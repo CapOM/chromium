@@ -1221,6 +1221,12 @@ void LayerImpl::DidUpdateScrollOffset(bool is_from_root_delegate) {
     layer_tree_impl()->DidUpdateScrollOffset(id());
   NoteLayerPropertyChangedForSubtree();
   ScrollbarParametersDidChange(false);
+  // Inform the pending twin that a property changed.
+  if (layer_tree_impl()->IsActiveTree()) {
+    LayerImpl* pending_twin = layer_tree_impl()->FindPendingTreeLayerById(id());
+    if (pending_twin)
+      pending_twin->NoteLayerPropertyChangedForSubtree();
+  }
 }
 
 void LayerImpl::SetDoubleSided(bool double_sided) {
@@ -1566,7 +1572,7 @@ void LayerImpl::AsValueInto(base::trace_event::TracedValue* state) const {
       DCHECK(converted_to_dictionary);
       for (base::DictionaryValue::Iterator it(*dictionary_value); !it.IsAtEnd();
            it.Advance()) {
-        state->SetValue(it.key().data(), it.value().DeepCopy());
+        state->SetValue(it.key().data(), it.value().CreateDeepCopy());
       }
     } else {
       NOTREACHED();

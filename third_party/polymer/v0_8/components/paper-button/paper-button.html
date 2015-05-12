@@ -53,7 +53,7 @@ The opacity of the ripple is not customizable via CSS.
 -->
 
 <link rel="import" href="../polymer/polymer.html">
-<link rel="import" href="../paper-card/paper-card.html">
+<link rel="import" href="../paper-material/paper-material.html">
 <link rel="import" href="../paper-ripple/paper-ripple.html">
 
 <link rel="import" href="../paper-behaviors/paper-button-behavior.html">
@@ -93,7 +93,7 @@ The opacity of the ripple is not customizable via CSS.
       display: none;
     }
 
-    paper-card {
+    paper-material {
       border-radius: inherit;
     }
 
@@ -110,51 +110,53 @@ The opacity of the ripple is not customizable via CSS.
 
     <paper-ripple></paper-ripple>
 
-    <paper-card class="content" elevation="[[_elevation]]" animated>
+    <paper-material class="content" elevation="[[_elevation]]" animated>
       <content></content>
-    </paper-card>
+    </paper-material>
 
   </template>
 
-  <script>
+</dom-module>
 
-    Polymer({
+<script>
 
-      behaviors: [
-        Polymer.PaperButtonBehavior
-      ],
+  Polymer({
 
-      properties: {
+    is: 'paper-button',
 
-        /**
-         * If true, the button should be styled with a shadow.
-         *
-         * @attribute raised
-         * @type boolean
-         * @default false
-         */
-        raised: {
-          type: Boolean,
-          reflectToAttribute: true,
-          value: false,
-          observer: '_buttonStateChanged'
-        }
+    behaviors: [
+      Polymer.PaperButtonBehavior
+    ],
 
-      },
+    properties: {
 
-      ready: function() {
-        if (!this.hasAttribute('role')) {
-          this.setAttribute('role', 'button');
-        }
-      },
-
-      _buttonStateChanged: function() {
-        this._calculateElevation();
+      /**
+       * If true, the button should be styled with a shadow.
+       *
+       * @attribute raised
+       * @type boolean
+       * @default false
+       */
+      raised: {
+        type: Boolean,
+        reflectToAttribute: true,
+        value: false,
+        observer: '_buttonStateChanged'
       }
 
-    });
+    },
 
-  </script>
+    ready: function() {
+      if (!this.hasAttribute('role')) {
+        this.setAttribute('role', 'button');
+      }
+    },
 
-</dom-module>
+    _buttonStateChanged: function() {
+      this._calculateElevation();
+    }
+
+  });
+
+</script>
 

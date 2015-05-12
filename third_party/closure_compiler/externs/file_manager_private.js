@@ -19,6 +19,7 @@ var FileTask;
  *   size: (number|undefined),
  *   modificationTime: (number|undefined),
  *   thumbnailUrl: (string|undefined),
+ *   croppedThumbnailUrl: (string|undefined),
  *   externalFileUrl: (string|undefined),
  *   imageWidth: (number|undefined),
  *   imageHeight: (number|undefined),
@@ -204,8 +205,9 @@ var DeviceEvent;
  * @typedef {{
  *   extensionId: string,
  *   name: string,
- *   canConfigure: boolean,
- *   canAdd: boolean
+ *   configurable: boolean,
+ *   multipleMounts: boolean,
+ *   source: string
  * }}
  */
 var ProvidingExtension;

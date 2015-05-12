@@ -243,6 +243,12 @@ void EnrollmentScreen::OnDeviceAttributeUpdatePermission(bool granted) {
   }
 
   if (remora_controller_) {
+    policy::BrowserPolicyConnectorChromeOS* connector =
+        g_browser_process->platform_part()->browser_policy_connector_chromeos();
+    const enterprise_management::PolicyData* policy =
+        connector->GetDeviceCloudPolicyManager()->core()->store()->policy();
+
+    remora_controller_->SetPermanentId(policy->directory_api_id());
     remora_controller_->OnEnrollmentStatusChanged(
         HostPairingController::ENROLLMENT_STATUS_SUCCESS);
   }
@@ -250,6 +256,10 @@ void EnrollmentScreen::OnDeviceAttributeUpdatePermission(bool granted) {
 
 void EnrollmentScreen::OnDeviceAttributeUploadCompleted(bool success) {
   if (success) {
+    // If the device attributes have been successfully uploaded, fetch policy.
+    policy::BrowserPolicyConnectorChromeOS* connector =
+        g_browser_process->platform_part()->browser_policy_connector_chromeos();
+    connector->GetDeviceCloudPolicyManager()->core()->RefreshSoon();
     actor_->ShowEnrollmentStatus(policy::EnrollmentStatus::ForStatus(
         policy::EnrollmentStatus::STATUS_SUCCESS));
   } else {

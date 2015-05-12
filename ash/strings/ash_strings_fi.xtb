@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Akku täynnä</translation>
 <translation id="6895424601869865703">Lisää tili käyttäjälle <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Ruutunäppäimistö poistettiin käytöstä</translation>
-<translation id="1057289296854808272">Kiertäminen käytössä (muuta napauttamalla tätä)</translation>
+<translation id="5548285847212963613">Laajennus <ph name="EXTENSION_NAME"/> voi auttaa muodostamaan yhteyden tähän verkkoon.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Overflow-painike</translation>
 <translation id="7904094684485781019">Tämän tilin järjestelmänvalvoja on estänyt useisiin tileihin kirjautumisen.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Tila-alue</translation>
 <translation id="2248649616066688669">Voit käyttää Chromebookia sen ollessa yhdistettynä ulkoiseen näyttöön, vaikka laitteen kansi olisi kiinni.</translation>
 <translation id="2946640296642327832">Ota Bluetooth käyttöön</translation>
+<translation id="5537725057119320332">Lähetä</translation>
 <translation id="6459472438155181876">Ruutua laajennetaan: <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Matkapuhelin</translation>
 <translation id="6596816719288285829">IP-osoite</translation>
@@ -39,7 +40,6 @@
 Vaihda syöttötapaa painamalla Shift + Alt.</translation>
 <translation id="6043994281159824495">Kirjaudu ulos nyt</translation>
 <translation id="2127372758936585790">Pienitehoinen laturi</translation>
-<translation id="4625920103690741805">Kiertäminen lukittu (muuta napauttamalla tätä)</translation>
 <translation id="3799026279081545374">Laturisi voi olla virheellinen. Jos asut Yhdysvalloissa, saat ohjeita ja voit tilata uuden laturin soittamalla numeroon 866 628 1371. Jos asut Isossa-Britanniassa, soita numeroon 0800 026 0613. Jos asut Irlannissa, soita numeroon 1 800 832 664. Jos asut Kanadassa, soita numeroon 866 628 1372. Jos asut Australiassa, soita numeroon 1 800 067 460.</translation>
 <translation id="3891340733213178823">Kirjaudu ulos painamalla Ctrl+Shift+Q kahdesti.</translation>
 <translation id="5871632337994001636">Hallinnoi laitteita…</translation>
@@ -167,7 +167,6 @@ Vaihda syöttötapaa painamalla Shift + Alt.</translation>
 <translation id="112308213915226829">Piilota hylly automaattisesti</translation>
 <translation id="7573962313813535744">Telakoitu tila</translation>
 <translation id="2792498699870441125">Alt + haku</translation>
-<translation id="8660803626959853127">Synkronoidaan <ph name="COUNT"/> tiedosto(a)</translation>
 <translation id="5958529069007801266">Valvottu käyttäjä</translation>
 <translation id="3709443003275901162">Yli 9</translation>
 <translation id="639644700271529076">CAPS LOCK on pois päältä</translation>
@@ -186,6 +185,7 @@ Vaihda syöttötapaa painamalla Shift + Alt.</translation>
 <translation id="6165508094623778733">Lisätietoja</translation>
 <translation id="7168224885072002358">Palautetaan vanha tarkkuus, aikaa palautukseen <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Kamera ja mikrofoni ovat käytössä.</translation>
+<translation id="6550675742724504774">Asetukset</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Vaihda takaisin kieleksi <ph name="FROM_LOCALE"/> (vaatii uudelleenkäynnistyksen)</translation>
 <translation id="8103386449138765447">Tekstiviestit: <ph name="MESSAGE_COUNT"/></translation>

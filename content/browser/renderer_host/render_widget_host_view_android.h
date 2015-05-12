@@ -77,6 +77,8 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
                               ContentViewCoreImpl* content_view_core);
   ~RenderWidgetHostViewAndroid() override;
 
+  void Blur();
+
   // RenderWidgetHostView implementation.
   bool OnMessageReceived(const IPC::Message& msg) override;
   void InitAsChild(gfx::NativeView parent_view) override;
@@ -92,7 +94,6 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   gfx::NativeViewAccessible GetNativeViewAccessible() override;
   void MovePluginWindows(const std::vector<WebPluginGeometry>& moves) override;
   void Focus() override;
-  void Blur() override;
   bool HasFocus() const override;
   bool IsSurfaceAvailableForCopy() const override;
   void Show() override;
@@ -125,10 +126,11 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   void AcceleratedSurfaceInitialized(int route_id) override;
   bool HasAcceleratedSurface(const gfx::Size& desired_size) override;
   void SetBackgroundColor(SkColor color) override;
-  void CopyFromCompositingSurface(const gfx::Rect& src_subrect,
-                                  const gfx::Size& dst_size,
-                                  ReadbackRequestCallback& callback,
-                                  const SkColorType color_type) override;
+  void CopyFromCompositingSurface(
+      const gfx::Rect& src_subrect,
+      const gfx::Size& dst_size,
+      ReadbackRequestCallback& callback,
+      const SkColorType preferred_color_type) override;
   void CopyFromCompositingSurfaceToVideoFrame(
       const gfx::Rect& src_subrect,
       const scoped_refptr<media::VideoFrame>& target,
@@ -173,11 +175,14 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
 
   // ui::WindowAndroidObserver implementation.
   void OnCompositingDidCommit() override;
+  void OnRootWindowVisibilityChanged(bool visible) override;
   void OnAttachCompositor() override;
   void OnDetachCompositor() override;
   void OnVSync(base::TimeTicks frame_time,
                base::TimeDelta vsync_period) override;
   void OnAnimate(base::TimeTicks begin_frame_time) override;
+  void OnActivityPaused() override;
+  void OnActivityResumed() override;
 
   // DelegatedFrameEvictor implementation
   void EvictDelegatedFrame() override;
@@ -225,7 +230,7 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
   void WasResized();
 
   void GetScaledContentBitmap(float scale,
-                              SkColorType color_type,
+                              SkColorType preferred_color_type,
                               gfx::Rect src_subrect,
                               ReadbackRequestCallback& result_callback);
 
@@ -267,6 +272,8 @@ class CONTENT_EXPORT RenderWidgetHostViewAndroid
       const cc::CompositorFrameMetadata& frame_metadata);
   void ComputeContentsSize(const cc::CompositorFrameMetadata& frame_metadata);
 
+  void ShowInternal();
+  void HideInternal(bool hide_frontbuffer, bool stop_observing_root_window);
   void AttachLayers();
   void RemoveLayers();
 

@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Akumulators pilns</translation>
 <translation id="6895424601869865703">Pievienot lietotāja <ph name="GIVEN_NAME"/> kontu</translation>
 <translation id="1270290102613614947">Ekrāna tastatūra atspējota</translation>
-<translation id="1057289296854808272">Pagriešana ir ieslēgta (pieskarieties šeit, lai mainītu)</translation>
+<translation id="5548285847212963613">Paplašinājums “<ph name="EXTENSION_NAME"/>” var palīdzēt pievienoties šim tīklam.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> un <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Pārpildes poga</translation>
 <translation id="7904094684485781019">Šī konta administrators nav atļāvis vairākkārtēju pierakstīšanos.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Statusa tekne</translation>
 <translation id="2248649616066688669">Varat turpināt izmantot Chromebook datoru, kamēr tas ir pievienots ārējam displejam, pat ja datora displejs ir aizvērts.</translation>
 <translation id="2946640296642327832">Iespējot Bluetooth</translation>
+<translation id="5537725057119320332">Apraidīt</translation>
 <translation id="6459472438155181876">Paplašina ekrānu uz: <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Mobilais tālrunis</translation>
 <translation id="6596816719288285829">IP adrese</translation>
@@ -39,7 +40,6 @@
 Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="6043994281159824495">Izrakstīties tagad</translation>
 <translation id="2127372758936585790">Lādētājs ar mazu strāvas padevi</translation>
-<translation id="4625920103690741805">Pagriešana ir bloķēta (pieskarieties šeit, lai mainītu)</translation>
 <translation id="3799026279081545374">Iespējams, uzlādes ierīce ir bojāta. Ja dzīvojat ASV, lūdzu, zvaniet 866-628-1371, lai saņemtu palīdzību vai pieprasītu ierīces aizstāšanu. Ja dzīvojat Lielbritānijā, lūdzu, zvaniet 0800-026-0613. Ja dzīvojat Īrijā, lūdzu, zvaniet 1-800-832-664. Ja dzīvojat Kanādā, lūdzu, zvaniet 866-628-1372. Ja dzīvojat Austrālijā, lūdzu, zvaniet 1-800-067-460.</translation>
 <translation id="3891340733213178823">Lai izrakstītos, divas reizes nospiediet taustiņu kombināciju Ctrl+Shift+Q.</translation>
 <translation id="5871632337994001636">Pārvaldīt ierīces...</translation>
@@ -167,7 +167,6 @@ Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="112308213915226829">Automātiski slēpt plauktu</translation>
 <translation id="7573962313813535744">Dokošanas režīms</translation>
 <translation id="2792498699870441125">Alt+Meklēt</translation>
-<translation id="8660803626959853127">Notiek <ph name="COUNT"/> faila(-u) sinhronizēšana</translation>
 <translation id="5958529069007801266">Uzraudzīts lietotājs</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">Funkcija CAPS LOCK ir izslēgta.</translation>
@@ -187,6 +186,7 @@ Lai atceltu tā funkcionalitāti, nospiediet Meklēt vai Shift.</translation>
 <translation id="6165508094623778733">Uzziniet vairāk</translation>
 <translation id="7168224885072002358">Iepriekšējā izšķirtspēja tiks atgriezta pēc <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Kamera un mikrofons tiek lietoti.</translation>
+<translation id="6550675742724504774">Opcijas</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Mainīt atpakaļ uz <ph name="FROM_LOCALE"/> (nepieciešama restartēšana)</translation>
 <translation id="8103386449138765447">Īsziņas: <ph name="MESSAGE_COUNT"/></translation>

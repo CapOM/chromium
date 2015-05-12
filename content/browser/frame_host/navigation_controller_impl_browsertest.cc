@@ -1025,10 +1025,292 @@ class StallDelegate : public ResourceDispatcherHostDelegate {
   }
 };
 
+// Loads |start_url|, then loads |stalled_url| which stalls. While the page is
+// stalled, an in-page navigation happens. Make sure that all the navigations
+// are properly classified.
+void DoReplaceStateWhilePending(Shell* shell,
+                                const GURL& start_url,
+                                const GURL& stalled_url,
+                                const std::string& replace_state_filename) {
+  NavigationControllerImpl& controller =
+      static_cast<NavigationControllerImpl&>(
+          shell->web_contents()->GetController());
+
+  FrameTreeNode* root =
+      static_cast<WebContentsImpl*>(shell->web_contents())->
+          GetFrameTree()->root();
+
+  // Start with one page.
+  EXPECT_TRUE(NavigateToURL(shell, start_url));
+
+  // Have the user decide to go to a different page which is very slow.
+  StallDelegate stall_delegate;
+  ResourceDispatcherHost::Get()->SetDelegate(&stall_delegate);
+  controller.LoadURL(
+      stalled_url, Referrer(), ui::PAGE_TRANSITION_LINK, std::string());
+
+  // That should be the pending entry.
+  NavigationEntryImpl* entry = controller.GetPendingEntry();
+  ASSERT_NE(nullptr, entry);
+  EXPECT_EQ(stalled_url, entry->GetURL());
+
+  {
+    // Now the existing page uses history.replaceState().
+    FrameNavigateParamsCapturer capturer(root);
+    capturer.set_wait_for_load(false);
+    std::string script =
+        "history.replaceState({}, '', '" + replace_state_filename + "')";
+    EXPECT_TRUE(content::ExecuteScript(root->current_frame_host(), script));
+    capturer.Wait();
+
+    // The fact that there was a pending entry shouldn't interfere with the
+    // classification.
+    EXPECT_EQ(NAVIGATION_TYPE_IN_PAGE, capturer.details().type);
+  }
+
+  ResourceDispatcherHost::Get()->SetDelegate(nullptr);
+}
+
+}  // namespace
+
+IN_PROC_BROWSER_TEST_F(
+    NavigationControllerBrowserTest,
+    NavigationTypeClassification_On1InPageToXWhile2Pending) {
+  GURL url1(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_1.html"));
+  GURL url2(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_2.html"));
+  DoReplaceStateWhilePending(shell(), url1, url2, "x");
+}
+
+IN_PROC_BROWSER_TEST_F(
+    NavigationControllerBrowserTest,
+    NavigationTypeClassification_On1InPageTo2While2Pending) {
+  GURL url1(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_1.html"));
+  GURL url2(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_2.html"));
+  DoReplaceStateWhilePending(shell(), url1, url2, "simple_page_2.html");
+}
+
+IN_PROC_BROWSER_TEST_F(NavigationControllerBrowserTest,
+                       NavigationTypeClassification_On1InPageToXWhile1Pending) {
+  GURL url(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_1.html"));
+  DoReplaceStateWhilePending(shell(), url, url, "x");
+}
+
+IN_PROC_BROWSER_TEST_F(NavigationControllerBrowserTest,
+                       NavigationTypeClassification_On1InPageTo1While1Pending) {
+  GURL url(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_1.html"));
+  DoReplaceStateWhilePending(shell(), url, url, "simple_page_1.html");
+}
+
+// Ensure the renderer process does not get confused about the current entry
+// due to subframes and replaced entries.  See https://crbug.com/480201.
+IN_PROC_BROWSER_TEST_F(NavigationControllerBrowserTest,
+                       PreventSpoofFromSubframeAndReplace) {
+  // Start at an initial URL.
+  GURL url1(embedded_test_server()->GetURL(
+      "/navigation_controller/simple_page_1.html"));
+  NavigateToURL(shell(), url1);
+
+  // Now go to a page with a real iframe.
+  GURL url2(embedded_test_server()->GetURL(
+      "/navigation_controller/page_with_data_iframe.html"));
+  NavigateToURL(shell(), url2);
+
+  // It is safe to obtain the root frame tree node here, as it doesn't change.
+  FrameTreeNode* root = static_cast<WebContentsImpl*>(shell()->web_contents())
+                            ->GetFrameTree()
+                            ->root();
+  ASSERT_EQ(1U, root->child_count());
+  ASSERT_NE(nullptr, root->child_at(0));
+
+  {
+    // Navigate in the iframe.
+    FrameNavigateParamsCapturer capturer(root->child_at(0));
+    GURL frame_url(embedded_test_server()->GetURL(
+        "/navigation_controller/simple_page_2.html"));
+    NavigateFrameToURL(root->child_at(0), frame_url);
+    capturer.Wait();
+    EXPECT_EQ(NAVIGATION_TYPE_NEW_SUBFRAME, capturer.details().type);
+  }
+
+  {
+    // Go back in the iframe.
+    TestNavigationObserver back_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoBack();
+    back_load_observer.Wait();
+  }
+
+  {
+    // Go forward in the iframe.
+    TestNavigationObserver forward_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoForward();
+    forward_load_observer.Wait();
+  }
+
+  GURL url3(embedded_test_server()->GetURL(
+      "/navigation_controller/page_with_iframe.html"));
+  {
+    // location.replace() to cause an inert commit.
+    TestNavigationObserver replace_load_observer(shell()->web_contents());
+    std::string script = "location.replace('" + url3.spec() + "')";
+    EXPECT_TRUE(content::ExecuteScript(root->current_frame_host(), script));
+    replace_load_observer.Wait();
+  }
+
+  {
+    // Go back to url2.
+    TestNavigationObserver back_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoBack();
+    back_load_observer.Wait();
+
+    // Make sure the URL is correct for both the entry and the main frame, and
+    // that the process hasn't been killed for showing a spoof.
+    EXPECT_TRUE(root->current_frame_host()->IsRenderFrameLive());
+    EXPECT_EQ(url2, shell()->web_contents()->GetLastCommittedURL());
+    EXPECT_EQ(url2, root->current_url());
+  }
+
+  {
+    // Go back to reset main frame entirely.
+    TestNavigationObserver back_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoBack();
+    back_load_observer.Wait();
+    EXPECT_EQ(url1, shell()->web_contents()->GetLastCommittedURL());
+    EXPECT_EQ(url1, root->current_url());
+  }
+
+  {
+    // Go forward.
+    TestNavigationObserver back_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoForward();
+    back_load_observer.Wait();
+    EXPECT_EQ(url2, shell()->web_contents()->GetLastCommittedURL());
+    EXPECT_EQ(url2, root->current_url());
+  }
+
+  {
+    // Go forward to the replaced URL.
+    TestNavigationObserver forward_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoForward();
+    forward_load_observer.Wait();
+
+    // Make sure the URL is correct for both the entry and the main frame, and
+    // that the process hasn't been killed for showing a spoof.
+    EXPECT_TRUE(root->current_frame_host()->IsRenderFrameLive());
+    EXPECT_EQ(url3, shell()->web_contents()->GetLastCommittedURL());
+    EXPECT_EQ(url3, root->current_url());
+  }
+}
+
+// Ensure the renderer process does not get killed if the main frame URL's path
+// changes when going back in a subframe, since this is currently possible after
+// a replaceState in the main frame (thanks to https://crbug.com/373041).
+// See https:///crbug.com/486916.
+IN_PROC_BROWSER_TEST_F(NavigationControllerBrowserTest,
+                       SubframeBackFromReplaceState) {
+  // Start at a page with a real iframe.
+  GURL url1(embedded_test_server()->GetURL(
+      "/navigation_controller/page_with_data_iframe.html"));
+  NavigateToURL(shell(), url1);
+
+  // It is safe to obtain the root frame tree node here, as it doesn't change.
+  FrameTreeNode* root = static_cast<WebContentsImpl*>(shell()->web_contents())
+                            ->GetFrameTree()
+                            ->root();
+  ASSERT_EQ(1U, root->child_count());
+  ASSERT_NE(nullptr, root->child_at(0));
+
+  {
+    // Navigate in the iframe.
+    FrameNavigateParamsCapturer capturer(root->child_at(0));
+    GURL frame_url(embedded_test_server()->GetURL(
+        "/navigation_controller/simple_page_2.html"));
+    NavigateFrameToURL(root->child_at(0), frame_url);
+    capturer.Wait();
+    EXPECT_EQ(NAVIGATION_TYPE_NEW_SUBFRAME, capturer.details().type);
+  }
+
+  {
+    // history.replaceState().
+    FrameNavigateParamsCapturer capturer(root);
+    std::string script =
+        "history.replaceState({}, 'replaced', 'replaced')";
+    EXPECT_TRUE(content::ExecuteScript(root->current_frame_host(), script));
+    capturer.Wait();
+  }
+
+  {
+    // Go back in the iframe.
+    TestNavigationObserver back_load_observer(shell()->web_contents());
+    shell()->web_contents()->GetController().GoBack();
+    back_load_observer.Wait();
+  }
+
+  // For now, we expect the main frame's URL to revert.  This won't happen once
+  // https://crbug.com/373041 is fixed.
+  EXPECT_EQ(url1, shell()->web_contents()->GetLastCommittedURL());
+
+  // Make sure the renderer process has not been killed.
+  EXPECT_TRUE(root->current_frame_host()->IsRenderFrameLive());
+}
+
+namespace {
+
+class FailureWatcher : public WebContentsObserver {
+ public:
+  // Observes failure for the specified |node|.
+  explicit FailureWatcher(FrameTreeNode* node)
+      : WebContentsObserver(
+            node->current_frame_host()->delegate()->GetAsWebContents()),
+        frame_tree_node_id_(node->frame_tree_node_id()),
+        message_loop_runner_(new MessageLoopRunner) {}
+
+  void Wait() {
+    message_loop_runner_->Run();
+  }
+
+ private:
+  void DidFailLoad(RenderFrameHost* render_frame_host,
+                   const GURL& validated_url,
+                   int error_code,
+                   const base::string16& error_description) override {
+    RenderFrameHostImpl* rfh =
+        static_cast<RenderFrameHostImpl*>(render_frame_host);
+    if (rfh->frame_tree_node()->frame_tree_node_id() != frame_tree_node_id_)
+      return;
+
+    message_loop_runner_->Quit();
+  }
+
+  void DidFailProvisionalLoad(
+      RenderFrameHost* render_frame_host,
+      const GURL& validated_url,
+      int error_code,
+      const base::string16& error_description) override {
+    RenderFrameHostImpl* rfh =
+        static_cast<RenderFrameHostImpl*>(render_frame_host);
+    if (rfh->frame_tree_node()->frame_tree_node_id() != frame_tree_node_id_)
+      return;
+
+    message_loop_runner_->Quit();
+  }
+
+  // The id of the FrameTreeNode whose navigations to observe.
+  int frame_tree_node_id_;
+
+  // The MessageLoopRunner used to spin the message loop.
+  scoped_refptr<MessageLoopRunner> message_loop_runner_;
+};
+
 }  // namespace
 
 IN_PROC_BROWSER_TEST_F(NavigationControllerBrowserTest,
-                       NavigationTypeClassification_InPageWhilePending) {
+                       StopCausesFailureDespiteJavaScriptURL) {
   NavigationControllerImpl& controller =
       static_cast<NavigationControllerImpl&>(
           shell()->web_contents()->GetController());
@@ -1054,17 +1336,16 @@ IN_PROC_BROWSER_TEST_F(NavigationControllerBrowserTest,
   ASSERT_NE(nullptr, entry);
   EXPECT_EQ(url2, entry->GetURL());
 
+  // Loading a JavaScript URL shouldn't affect the ability to stop.
   {
-    // Now the existing page uses history.replaceState().
-    FrameNavigateParamsCapturer capturer(root);
-    capturer.set_wait_for_load(false);
-    EXPECT_TRUE(content::ExecuteScript(root->current_frame_host(),
-                                       "history.replaceState({}, '', 'x')"));
-    capturer.Wait();
-
-    // The fact that there was a pending entry shouldn't interfere with the
-    // classification.
-    EXPECT_EQ(NAVIGATION_TYPE_IN_PAGE, capturer.details().type);
+    FailureWatcher watcher(root);
+    GURL js("javascript:(function(){})()");
+    controller.LoadURL(js, Referrer(), ui::PAGE_TRANSITION_LINK, std::string());
+    // This LoadURL ends up purging the pending entry, which is why this is
+    // tricky.
+    EXPECT_EQ(nullptr, controller.GetPendingEntry());
+    shell()->web_contents()->Stop();
+    watcher.Wait();
   }
 
   ResourceDispatcherHost::Get()->SetDelegate(nullptr);

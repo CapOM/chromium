@@ -13,6 +13,7 @@
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/trace_event_argument.h"
 #include "cc/base/math_util.h"
+#include "cc/resources/prioritized_tile.h"
 #include "cc/resources/tile.h"
 #include "cc/resources/tile_priority.h"
 #include "ui/gfx/geometry/point_conversions.h"
@@ -29,6 +30,7 @@ const float kMaxSoonBorderDistanceInScreenPixels = 312.f;
 }  // namespace
 
 scoped_ptr<PictureLayerTiling> PictureLayerTiling::Create(
+    WhichTree tree,
     float contents_scale,
     scoped_refptr<RasterSource> raster_source,
     PictureLayerTilingClient* client,
@@ -36,12 +38,13 @@ scoped_ptr<PictureLayerTiling> PictureLayerTiling::Create(
     float skewport_target_time_in_seconds,
     int skewport_extrapolation_limit_in_content_pixels) {
   return make_scoped_ptr(new PictureLayerTiling(
-      contents_scale, raster_source, client, max_tiles_for_interest_area,
+      tree, contents_scale, raster_source, client, max_tiles_for_interest_area,
       skewport_target_time_in_seconds,
       skewport_extrapolation_limit_in_content_pixels));
 }
 
 PictureLayerTiling::PictureLayerTiling(
+    WhichTree tree,
     float contents_scale,
     scoped_refptr<RasterSource> raster_source,
     PictureLayerTilingClient* client,
@@ -54,6 +57,7 @@ PictureLayerTiling::PictureLayerTiling(
           skewport_extrapolation_limit_in_content_pixels),
       contents_scale_(contents_scale),
       client_(client),
+      tree_(tree),
       raster_source_(raster_source),
       resolution_(NON_IDEAL_RESOLUTION),
       tiling_data_(gfx::Size(), gfx::Size(), kBorderTexels),
@@ -103,10 +107,11 @@ Tile* PictureLayerTiling::CreateTile(int i, int j) {
   if (!raster_source_->CoversRect(tile_rect, contents_scale_))
     return nullptr;
 
-  scoped_refptr<Tile> tile = client_->CreateTile(contents_scale_, tile_rect);
+  ScopedTilePtr tile = client_->CreateTile(contents_scale_, tile_rect);
+  Tile* raw_ptr = tile.get();
   tile->set_tiling_index(i, j);
-  tiles_[key] = tile;
-  return tile.get();
+  tiles_.add(key, tile.Pass());
+  return raw_ptr;
 }
 
 void PictureLayerTiling::CreateMissingTilesInLiveTilesRect() {
@@ -145,16 +150,16 @@ void PictureLayerTiling::TakeTilesAndPropertiesFrom(
     SetLiveTilesRect(pending_twin->live_tiles_rect());
   }
 
-  if (tiles_.size() < pending_twin->tiles_.size()) {
+  if (tiles_.empty()) {
     tiles_.swap(pending_twin->tiles_);
-    tiles_.insert(pending_twin->tiles_.begin(), pending_twin->tiles_.end());
   } else {
-    for (TileMap::value_type& tile_pair : pending_twin->tiles_) {
-      tiles_[tile_pair.first].swap(tile_pair.second);
-      DCHECK(tiles_[tile_pair.first]->raster_source() == raster_source_.get());
+    while (!pending_twin->tiles_.empty()) {
+      TileMapKey key = pending_twin->tiles_.begin()->first;
+      tiles_.set(key, pending_twin->tiles_.take_and_erase(key));
+      DCHECK(tiles_.get(key)->raster_source() == raster_source_.get());
     }
   }
-  pending_twin->tiles_.clear();
+  DCHECK(pending_twin->tiles_.empty());
 
   if (create_missing_tiles)
     CreateMissingTilesInLiveTilesRect();
@@ -246,7 +251,7 @@ void PictureLayerTiling::SetRasterSourceAndResize(
 }
 
 void PictureLayerTiling::Invalidate(const Region& layer_invalidation) {
-  DCHECK_IMPLIES(client_->GetTree() == ACTIVE_TREE,
+  DCHECK_IMPLIES(tree_ == ACTIVE_TREE,
                  !client_->GetPendingOrActiveTwinTiling(this));
   RemoveTilesInRegion(layer_invalidation, true /* recreate tiles */);
 }
@@ -293,7 +298,7 @@ void PictureLayerTiling::RemoveTilesInRegion(const Region& layer_invalidation,
 }
 
 void PictureLayerTiling::SetRasterSourceOnTiles() {
-  if (client_->GetTree() == PENDING_TREE)
+  if (tree_ == PENDING_TREE)
     return;
 
   for (TileMap::value_type& tile_pair : tiles_)
@@ -308,7 +313,7 @@ bool PictureLayerTiling::ShouldCreateTileAt(int i, int j) const {
   // the tile for instance). Pending tree, on the other hand, should only be
   // creating tiles that are different from the current active tree, which is
   // represented by the logic in the rest of the function.
-  if (client_->GetTree() == ACTIVE_TREE)
+  if (tree_ == ACTIVE_TREE)
     return true;
 
   // If the pending tree has no active twin, then it needs to create all tiles.
@@ -675,7 +680,7 @@ void PictureLayerTiling::SetLiveTilesRect(
 void PictureLayerTiling::VerifyLiveTilesRect(bool is_on_recycle_tree) const {
 #if DCHECK_IS_ON()
   for (auto it = tiles_.begin(); it != tiles_.end(); ++it) {
-    if (!it->second.get())
+    if (!it->second)
       continue;
     DCHECK(it->first.first < tiling_data_.num_tiles_x())
         << this << " " << it->first.first << "," << it->first.second
@@ -702,7 +707,7 @@ bool PictureLayerTiling::IsTileOccluded(const Tile* tile) const {
 
   // Otherwise, if this is the pending tree, we're done and the tile is
   // occluded.
-  if (client_->GetTree() == PENDING_TREE)
+  if (tree_ == PENDING_TREE)
     return true;
 
   // On the active tree however, we need to check if this tile will be
@@ -741,7 +746,7 @@ bool PictureLayerTiling::IsTileOccludedOnCurrentTree(const Tile* tile) const {
 }
 
 bool PictureLayerTiling::IsTileRequiredForActivation(const Tile* tile) const {
-  if (client_->GetTree() == PENDING_TREE) {
+  if (tree_ == PENDING_TREE) {
     if (!can_require_tiles_for_activation_)
       return false;
 
@@ -777,7 +782,7 @@ bool PictureLayerTiling::IsTileRequiredForActivation(const Tile* tile) const {
     return true;
   }
 
-  DCHECK(client_->GetTree() == ACTIVE_TREE);
+  DCHECK_EQ(tree_, ACTIVE_TREE);
   const PictureLayerTiling* pending_twin =
       client_->GetPendingOrActiveTwinTiling(this);
   // If we don't have a pending tree, or the pending tree will overwrite the
@@ -791,7 +796,7 @@ bool PictureLayerTiling::IsTileRequiredForActivation(const Tile* tile) const {
 }
 
 bool PictureLayerTiling::IsTileRequiredForDraw(const Tile* tile) const {
-  if (client_->GetTree() == PENDING_TREE)
+  if (tree_ == PENDING_TREE)
     return false;
 
   if (resolution_ != HIGH_RESOLUTION)
@@ -806,11 +811,28 @@ bool PictureLayerTiling::IsTileRequiredForDraw(const Tile* tile) const {
   return true;
 }
 
-void PictureLayerTiling::UpdateTileAndTwinPriority(Tile* tile) const {
-  tile->set_priority(ComputePriorityForTile(tile));
-  tile->set_is_occluded(IsTileOccluded(tile));
+void PictureLayerTiling::UpdateRequiredStatesOnTile(Tile* tile) const {
+  DCHECK(tile);
   tile->set_required_for_activation(IsTileRequiredForActivation(tile));
   tile->set_required_for_draw(IsTileRequiredForDraw(tile));
+}
+
+PrioritizedTile PictureLayerTiling::MakePrioritizedTile(Tile* tile) const {
+  DCHECK(tile);
+  return PrioritizedTile(tile, ComputePriorityForTile(tile),
+                         IsTileOccluded(tile));
+}
+
+std::map<const Tile*, PrioritizedTile>
+PictureLayerTiling::UpdateAndGetAllPrioritizedTilesForTesting() {
+  std::map<const Tile*, PrioritizedTile> result;
+  for (const auto& key_tile_pair : tiles_) {
+    UpdateRequiredStatesOnTile(key_tile_pair.second);
+    PrioritizedTile prioritized_tile =
+        MakePrioritizedTile(key_tile_pair.second);
+    result.insert(std::make_pair(prioritized_tile.tile(), prioritized_tile));
+  }
+  return result;
 }
 
 void PictureLayerTiling::VerifyAllTilesHaveCurrentRasterSource() const {
@@ -858,7 +880,7 @@ TilePriority PictureLayerTiling::ComputePriorityForTile(
 void PictureLayerTiling::GetAllTilesAndPrioritiesForTracing(
     std::map<const Tile*, TilePriority>* tile_map) const {
   for (const auto& tile_pair : tiles_) {
-    const Tile* tile = tile_pair.second.get();
+    const Tile* tile = tile_pair.second;
     const TilePriority& priority = ComputePriorityForTile(tile);
     // Store combined priority.
     (*tile_map)[tile] = priority;
@@ -880,7 +902,7 @@ void PictureLayerTiling::AsValueInto(
 size_t PictureLayerTiling::GPUMemoryUsageInBytes() const {
   size_t amount = 0;
   for (TileMap::const_iterator it = tiles_.begin(); it != tiles_.end(); ++it) {
-    const Tile* tile = it->second.get();
+    const Tile* tile = it->second;
     amount += tile->GPUMemoryUsageInBytes();
   }
   return amount;

@@ -6,20 +6,27 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
+#include "base/command_line.h"
 #include "base/json/string_escape.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/values.h"
+#include "content/public/child/v8_value_converter.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_thread.h"
 #include "gin/handle.h"
 #include "gin/object_template_builder.h"
+#include "third_party/WebKit/public/web/WebDOMMessageEvent.h"
+#include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebElement.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "third_party/WebKit/public/web/WebKit.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebPluginContainer.h"
 #include "third_party/WebKit/public/web/WebScriptSource.h"
+#include "third_party/WebKit/public/web/WebSerializedScriptValue.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "third_party/re2/re2/re2.h"
 
@@ -247,6 +254,17 @@ void LoadablePluginPlaceholder::PluginDestroyed() {
   PluginPlaceholder::PluginDestroyed();
 }
 
+v8::Local<v8::Object> LoadablePluginPlaceholder::GetV8ScriptableObject(
+    v8::Isolate* isolate) const {
+#if defined(ENABLE_PLUGINS)
+  // Pass through JavaScript access to the underlying throttled plugin.
+  if (premade_throttler_ && premade_throttler_->GetWebPlugin()) {
+    return premade_throttler_->GetWebPlugin()->v8ScriptableObject(isolate);
+  }
+#endif
+  return v8::Local<v8::Object>();
+}
+
 void LoadablePluginPlaceholder::WasShown() {
   if (is_blocked_for_background_tab_) {
     is_blocked_for_background_tab_ = false;
@@ -292,20 +310,7 @@ void LoadablePluginPlaceholder::LoadPlugin() {
     ReplacePlugin(premade_throttler_->GetWebPlugin());
     premade_throttler_ = nullptr;
   } else {
-    // TODO(mmenke):  In the case of prerendering, feed into
-    //                ChromeContentRendererClient::CreatePlugin instead, to
-    //                reduce the chance of future regressions.
-    scoped_ptr<PluginInstanceThrottler> throttler;
-#if defined(ENABLE_PLUGINS)
-    // If the plugin has already been marked essential in its placeholder form,
-    // we shouldn't create a new throttler and start the process all over again.
-    if (power_saver_enabled_)
-      throttler = PluginInstanceThrottler::Create();
-#endif
-    WebPlugin* plugin = render_frame()->CreatePlugin(
-        GetFrame(), plugin_info_, GetPluginParams(), throttler.Pass());
-
-    ReplacePlugin(plugin);
+    ReplacePlugin(CreatePlugin());
   }
 }
 
@@ -333,6 +338,32 @@ void LoadablePluginPlaceholder::DidFinishLoadingCallback() {
   // This is necessary to prevent a flicker.
   if (premade_throttler_ && power_saver_enabled_)
     premade_throttler_->SetHiddenForPlaceholder(true /* hidden */);
+
+  // Set an attribute and post an event, so browser tests can wait for the
+  // placeholder to be ready to receive simulated user input.
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnablePluginPlaceholderTesting)) {
+    WebElement element = plugin()->container()->element();
+    element.setAttribute("placeholderLoaded", "true");
+
+    scoped_ptr<content::V8ValueConverter> converter(
+        content::V8ValueConverter::create());
+    base::StringValue value("placeholderLoaded");
+    blink::WebSerializedScriptValue message_data =
+        blink::WebSerializedScriptValue::serialize(converter->ToV8Value(
+            &value, element.document().frame()->mainWorldScriptContext()));
+
+    blink::WebDOMEvent event = element.document().createEvent("MessageEvent");
+    blink::WebDOMMessageEvent msg_event = event.to<blink::WebDOMMessageEvent>();
+    msg_event.initMessageEvent("message",     // type
+                               false,         // canBubble
+                               false,         // cancelable
+                               message_data,  // data
+                               "",            // origin [*]
+                               NULL,          // source [*]
+                               "");           // lastEventId
+    element.dispatchEvent(msg_event);
+  }
 }
 
 void LoadablePluginPlaceholder::SetPluginInfo(
@@ -346,6 +377,10 @@ const content::WebPluginInfo& LoadablePluginPlaceholder::GetPluginInfo() const {
 
 void LoadablePluginPlaceholder::SetIdentifier(const std::string& identifier) {
   identifier_ = identifier;
+}
+
+const std::string& LoadablePluginPlaceholder::GetIdentifier() const {
+  return identifier_;
 }
 
 bool LoadablePluginPlaceholder::LoadingBlocked() const {

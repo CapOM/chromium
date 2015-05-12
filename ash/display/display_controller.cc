@@ -17,11 +17,14 @@
 #include "ash/host/ash_window_tree_host.h"
 #include "ash/host/ash_window_tree_host_init_params.h"
 #include "ash/host/root_window_transformer.h"
+#include "ash/magnifier/magnification_controller.h"
+#include "ash/magnifier/partial_magnification_controller.h"
 #include "ash/root_window_controller.h"
 #include "ash/root_window_settings.h"
 #include "ash/screen_util.h"
 #include "ash/shell.h"
 #include "ash/shell_delegate.h"
+#include "ash/system/tray/system_tray.h"
 #include "ash/wm/coordinate_conversion.h"
 #include "base/command_line.h"
 #include "base/stl_util.h"
@@ -366,9 +369,10 @@ aura::Window* DisplayController::GetRootWindowForDisplayId(int64 id) {
 }
 
 AshWindowTreeHost* DisplayController::GetAshWindowTreeHostForDisplayId(
-    int64 id) {
-  CHECK_EQ(1u, window_tree_hosts_.count(id));
-  return window_tree_hosts_[id];
+    int64 display_id) {
+  CHECK_EQ(1u, window_tree_hosts_.count(display_id))
+      << "display id = " << display_id;
+  return window_tree_hosts_[display_id];
 }
 
 void DisplayController::CloseChildWindows() {
@@ -588,6 +592,10 @@ void DisplayController::UpdateMouseLocationAfterDisplayChange() {
   ::wm::ConvertPointToScreen(dst_root_window, &target_location_in_screen);
   const gfx::Display& target_display =
       display_manager->FindDisplayContainingPoint(target_location_in_screen);
+  // If the original location isn't on any of new display, let ozone move
+  // the cursor.
+  if (!target_display.is_valid())
+    return;
   int64 target_display_id = target_display.id();
 
   // Do not move the cursor if the cursor's location did not change. This avoids
@@ -640,9 +648,30 @@ void DisplayController::OnDisplayAdded(const gfx::Display& display) {
         AddWindowTreeHostForDisplay(display, AshWindowTreeHostInitParams());
     RootWindowController::CreateForSecondaryDisplay(ash_host);
 
+    // Magnifier controllers keep pointers to the current root window.
+    // Update them here to avoid accessing them later.
+    Shell::GetInstance()->magnification_controller()->SwitchTargetRootWindow(
+        ash_host->AsWindowTreeHost()->window(), false);
+    Shell::GetInstance()
+        ->partial_magnification_controller()
+        ->SwitchTargetRootWindow(ash_host->AsWindowTreeHost()->window());
+
     if (primary_tree_host_for_replace_) {
       AshWindowTreeHost* to_delete = primary_tree_host_for_replace_;
       primary_tree_host_for_replace_ = nullptr;
+
+      // Show the shelf if the original WTH had a visible system
+      // tray. It may or may not be visible depending on OOBE state.
+      ash::SystemTray* old_tray =
+          GetRootWindowController(to_delete->AsWindowTreeHost()->window())
+              ->GetSystemTray();
+      ash::SystemTray* new_tray =
+          ash::Shell::GetInstance()->GetPrimarySystemTray();
+      if (old_tray->GetWidget()->IsVisible()) {
+        new_tray->SetVisible(true);
+        new_tray->GetWidget()->Show();
+      }
+
       DeleteHost(to_delete);
 #ifndef NDEBUG
       auto iter = std::find_if(
@@ -767,14 +796,12 @@ void DisplayController::OnHostResized(const aura::WindowTreeHost* host) {
 
 void DisplayController::CreateOrUpdateMirroringDisplay(
     const DisplayInfoList& info_list) {
-  switch (GetDisplayManager()->multi_display_mode()) {
-    case DisplayManager::MIRRORING:
-    case DisplayManager::UNIFIED:
-      mirror_window_controller_->UpdateWindow(info_list);
-      cursor_window_controller_->UpdateContainer();
-      break;
-    case DisplayManager::EXTENDED:
-      NOTREACHED();
+  if (GetDisplayManager()->IsInMirrorMode() ||
+      GetDisplayManager()->IsInUnifiedMode()) {
+    mirror_window_controller_->UpdateWindow(info_list);
+    cursor_window_controller_->UpdateContainer();
+  } else {
+    NOTREACHED();
   }
 }
 

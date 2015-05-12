@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "base/basictypes.h"
-#include "base/containers/hash_tables.h"
+#include "base/containers/scoped_ptr_hash_map.h"
 #include "base/memory/scoped_ptr.h"
 #include "cc/base/cc_export.h"
 #include "cc/base/region.h"
@@ -29,14 +29,15 @@ class TracedValue;
 namespace cc {
 
 class PictureLayerTiling;
+class PrioritizedTile;
 class RasterSource;
 
 class CC_EXPORT PictureLayerTilingClient {
  public:
   // Create a tile at the given content_rect (in the contents scale of the
   // tiling) This might return null if the client cannot create such a tile.
-  virtual scoped_refptr<Tile> CreateTile(float contents_scale,
-                                         const gfx::Rect& content_rect) = 0;
+  virtual ScopedTilePtr CreateTile(float contents_scale,
+                                   const gfx::Rect& content_rect) = 0;
   virtual gfx::Size CalculateTileSize(
     const gfx::Size& content_bounds) const = 0;
   // This invalidation region defines the area (if any, it can by null) that
@@ -44,10 +45,7 @@ class CC_EXPORT PictureLayerTilingClient {
   virtual const Region* GetPendingInvalidation() = 0;
   virtual const PictureLayerTiling* GetPendingOrActiveTwinTiling(
       const PictureLayerTiling* tiling) const = 0;
-  virtual PictureLayerTiling* GetRecycledTwinTiling(
-      const PictureLayerTiling* tiling) = 0;
   virtual TilePriority::PriorityBin GetMaxTilePriorityBin() const = 0;
-  virtual WhichTree GetTree() const = 0;
   virtual bool RequiresHighResToDraw() const = 0;
 
  protected:
@@ -67,6 +65,7 @@ class CC_EXPORT PictureLayerTiling {
 
   // Create a tiling with no tiles. CreateTile() must be called to add some.
   static scoped_ptr<PictureLayerTiling> Create(
+      WhichTree tree,
       float contents_scale,
       scoped_refptr<RasterSource> raster_source,
       PictureLayerTilingClient* client,
@@ -99,7 +98,7 @@ class CC_EXPORT PictureLayerTiling {
 
   Tile* TileAt(int i, int j) const {
     TileMap::const_iterator iter = tiles_.find(TileMapKey(i, j));
-    return iter == tiles_.end() ? nullptr : iter->second.get();
+    return iter == tiles_.end() ? nullptr : iter->second;
   }
 
   bool has_tiles() const { return !tiles_.empty(); }
@@ -112,19 +111,17 @@ class CC_EXPORT PictureLayerTiling {
   std::vector<Tile*> AllTilesForTesting() const {
     std::vector<Tile*> all_tiles;
     for (TileMap::const_iterator it = tiles_.begin(); it != tiles_.end(); ++it)
-      all_tiles.push_back(it->second.get());
-    return all_tiles;
-  }
-  void UpdateAllTilePrioritiesForTesting() {
-    for (TileMap::const_iterator it = tiles_.begin(); it != tiles_.end(); ++it)
-      UpdateTileAndTwinPriority(it->second.get());
-  }
-  std::vector<scoped_refptr<Tile>> AllRefTilesForTesting() const {
-    std::vector<scoped_refptr<Tile>> all_tiles;
-    for (TileMap::const_iterator it = tiles_.begin(); it != tiles_.end(); ++it)
       all_tiles.push_back(it->second);
     return all_tiles;
   }
+
+  void UpdateAllRequiredStateForTesting() {
+    for (const auto& key_tile_pair : tiles_)
+      UpdateRequiredStatesOnTile(key_tile_pair.second);
+  }
+  std::map<const Tile*, PrioritizedTile>
+  UpdateAndGetAllPrioritizedTilesForTesting();
+
   void SetAllTilesOccludedForTesting() {
     gfx::Rect viewport_in_layer_space =
         ScaleToEnclosingRect(current_visible_rect_, 1.0f / contents_scale_);
@@ -213,19 +210,21 @@ class CC_EXPORT PictureLayerTiling {
 
  protected:
   friend class CoverageIterator;
+  friend class PrioritizedTile;
   friend class TilingSetRasterQueueAll;
   friend class TilingSetRasterQueueRequired;
   friend class TilingSetEvictionQueue;
 
-  typedef std::pair<int, int> TileMapKey;
-  typedef base::hash_map<TileMapKey, scoped_refptr<Tile>> TileMap;
+  using TileMapKey = std::pair<int, int>;
+  using TileMap = base::ScopedPtrHashMap<TileMapKey, ScopedTilePtr>;
 
   struct FrameVisibleRect {
     gfx::Rect visible_rect_in_content_space;
     double frame_time_in_seconds = 0.0;
   };
 
-  PictureLayerTiling(float contents_scale,
+  PictureLayerTiling(WhichTree tree,
+                     float contents_scale,
                      scoped_refptr<RasterSource> raster_source,
                      PictureLayerTilingClient* client,
                      size_t max_tiles_for_interest_area,
@@ -275,7 +274,8 @@ class CC_EXPORT PictureLayerTiling {
   bool IsTileOccludedOnCurrentTree(const Tile* tile) const;
   bool ShouldCreateTileAt(int i, int j) const;
   bool IsTileOccluded(const Tile* tile) const;
-  void UpdateTileAndTwinPriority(Tile* tile) const;
+  void UpdateRequiredStatesOnTile(Tile* tile) const;
+  PrioritizedTile MakePrioritizedTile(Tile* tile) const;
   TilePriority ComputePriorityForTile(const Tile* tile) const;
   bool has_visible_rect_tiles() const { return has_visible_rect_tiles_; }
   bool has_skewport_rect_tiles() const { return has_skewport_rect_tiles_; }
@@ -289,9 +289,8 @@ class CC_EXPORT PictureLayerTiling {
   }
   gfx::Rect pending_visible_rect() const {
     const PictureLayerTiling* pending_tiling =
-        client_->GetTree() == ACTIVE_TREE
-            ? client_->GetPendingOrActiveTwinTiling(this)
-            : this;
+        tree_ == ACTIVE_TREE ? client_->GetPendingOrActiveTwinTiling(this)
+                             : this;
     if (pending_tiling)
       return pending_tiling->current_visible_rect();
     return gfx::Rect();
@@ -317,6 +316,7 @@ class CC_EXPORT PictureLayerTiling {
   // Given properties.
   const float contents_scale_;
   PictureLayerTilingClient* const client_;
+  const WhichTree tree_;
   scoped_refptr<RasterSource> raster_source_;
   TileResolution resolution_;
 

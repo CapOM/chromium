@@ -80,6 +80,8 @@ bool IsDelayAgnosticAecEnabled() {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (command_line->HasSwitch(switches::kEnableDelayAgnosticAec))
     return true;
+  if (command_line->HasSwitch(switches::kDisableDelayAgnosticAec))
+    return false;
 
   return (group_name == "Enabled" || group_name == "DefaultEnabled");
 }
@@ -493,10 +495,8 @@ void MediaStreamAudioProcessor::InitializeAudioProcessingModule(
   if (goog_beamforming) {
     ConfigureBeamforming(&config);
   }
-  if (audio_proc_48kHz_support_) {
-    config.Set<webrtc::AudioProcessing48kHzSupport>(
-        new webrtc::AudioProcessing48kHzSupport(true));
-  }
+  config.Set<webrtc::AudioProcessing48kHzSupport>(
+      new webrtc::AudioProcessing48kHzSupport(audio_proc_48kHz_support_));
 
   // Create and configure the webrtc::AudioProcessing.
   audio_processing_.reset(webrtc::AudioProcessing::Create(config));

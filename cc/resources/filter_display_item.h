@@ -18,22 +18,13 @@ namespace cc {
 
 class CC_EXPORT FilterDisplayItem : public DisplayItem {
  public:
+  FilterDisplayItem();
   ~FilterDisplayItem() override;
 
-  static scoped_ptr<FilterDisplayItem> Create(const FilterOperations& filters,
-                                              gfx::RectF bounds) {
-    return make_scoped_ptr(new FilterDisplayItem(filters, bounds));
-  }
+  void SetNew(const FilterOperations& filters, const gfx::RectF& bounds);
 
   void Raster(SkCanvas* canvas, SkDrawPictureCallback* callback) const override;
-
-  bool IsSuitableForGpuRasterization() const override;
-  int ApproximateOpCount() const override;
-  size_t PictureMemoryUsage() const override;
   void AsValueInto(base::trace_event::TracedValue* array) const override;
-
- protected:
-  FilterDisplayItem(const FilterOperations& filters, gfx::RectF bounds);
 
  private:
   FilterOperations filters_;
@@ -42,6 +33,7 @@ class CC_EXPORT FilterDisplayItem : public DisplayItem {
 
 class CC_EXPORT EndFilterDisplayItem : public DisplayItem {
  public:
+  EndFilterDisplayItem();
   ~EndFilterDisplayItem() override;
 
   static scoped_ptr<EndFilterDisplayItem> Create() {
@@ -49,14 +41,7 @@ class CC_EXPORT EndFilterDisplayItem : public DisplayItem {
   }
 
   void Raster(SkCanvas* canvas, SkDrawPictureCallback* callback) const override;
-
-  bool IsSuitableForGpuRasterization() const override;
-  int ApproximateOpCount() const override;
-  size_t PictureMemoryUsage() const override;
   void AsValueInto(base::trace_event::TracedValue* array) const override;
-
- protected:
-  EndFilterDisplayItem();
 };
 
 }  // namespace cc

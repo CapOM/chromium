@@ -15,10 +15,13 @@ class GURL;
 
 namespace media {
 
+// Callback used when CDM is created. |error_message| only used if
+// MediaKeys is null (i.e. CDM can't be created).
+using CdmCreatedCB = base::Callback<void(scoped_ptr<MediaKeys>,
+                                         const std::string& error_message)>;
+
 class MEDIA_EXPORT CdmFactory {
  public:
-  using CdmCreatedCB = base::Callback<void(scoped_ptr<MediaKeys>)>;
-
   CdmFactory();
   virtual ~CdmFactory();
 

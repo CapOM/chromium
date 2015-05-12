@@ -71,16 +71,16 @@ public class ToolbarModel {
         return nativeGetText(mNativeToolbarModelAndroid);
     }
 
-    /** @return The parameter in the url that triggers query extraction. */
-    public String getQueryExtractionParam() {
-        if (mNativeToolbarModelAndroid == 0) return null;
-        return nativeGetQueryExtractionParam(mNativeToolbarModelAndroid);
-    }
-
     /** @return The chip text from the search URL. */
     public String getCorpusChipText() {
         if (mNativeToolbarModelAndroid == 0) return null;
         return nativeGetCorpusChipText(mNativeToolbarModelAndroid);
+    }
+
+    /** @return Whether the URL is replaced by a search query. */
+    public boolean wouldReplaceURL() {
+        if (mNativeToolbarModelAndroid == 0) return false;
+        return nativeWouldReplaceURL(mNativeToolbarModelAndroid);
     }
 
     private static native int nativeGetSecurityLevelForWebContents(WebContents webContents);
@@ -89,6 +89,6 @@ public class ToolbarModel {
     private native long nativeInit(ToolbarModelDelegate delegate);
     private native void nativeDestroy(long nativeToolbarModelAndroid);
     private native String nativeGetText(long nativeToolbarModelAndroid);
-    private native String nativeGetQueryExtractionParam(long nativeToolbarModelAndroid);
     private native String nativeGetCorpusChipText(long nativeToolbarModelAndroid);
+    private native boolean nativeWouldReplaceURL(long nativeToolbarModelAndroid);
 }

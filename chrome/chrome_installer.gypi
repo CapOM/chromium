@@ -76,6 +76,7 @@
           ],
         },
         {
+          # GN version: //chrome/installer/util:installer_util_unittests
           'target_name': 'installer_util_unittests',
           'type': 'executable',
           'dependencies': [
@@ -94,7 +95,9 @@
             '..',
           ],
           'sources': [
+            # List duplicated in GN build.
             '<(SHARED_INTERMEDIATE_DIR)/chrome_version/other_version.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/chrome/installer/util/installer_util_strings.rc',
             'installer/setup/compat_checks_unittest.cc',
             'installer/setup/setup_constants.cc',
             'installer/util/advanced_firewall_manager_win_unittest.cc',
@@ -118,8 +121,6 @@
             'installer/util/installer_state_unittest.cc',
             'installer/util/installer_util_test_common.cc',
             'installer/util/installer_util_test_common.h',
-            'installer/util/installer_util_unittests.rc',
-            'installer/util/installer_util_unittests_resource.h',
             'installer/util/language_selector_unittest.cc',
             'installer/util/legacy_firewall_manager_win_unittest.cc',
             'installer/util/logging_installer_unittest.cc',
@@ -147,8 +148,6 @@
               ],
             },
           },
-          # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-          'msvs_disabled_warnings': [ 4267, ],
         },
         {
           # GN version: //chrome/installer/util:strings
@@ -160,6 +159,7 @@
               'variables': {
                 'create_string_rc_py': 'installer/util/prebuild/create_string_rc.py',
                 'brand_strings': '<(branding_path_component)_strings',
+                'gen_dir': '<(SHARED_INTERMEDIATE_DIR)/chrome/installer/util',
               },
 
               'inputs': [
@@ -167,20 +167,20 @@
                 'app/<(brand_strings).grd',
               ],
               'outputs': [
-                '<(SHARED_INTERMEDIATE_DIR)/installer_util_strings/installer_util_strings.h',
-                '<(SHARED_INTERMEDIATE_DIR)/installer_util_strings/installer_util_strings.rc',
+                '<(gen_dir)/installer_util_strings.h',
+                '<(gen_dir)/installer_util_strings.rc',
               ],
               'action': ['python',
                          '<(create_string_rc_py)',
                          '-i', 'app/<(brand_strings).grd:resources',
                          '-n', 'installer_util_strings',
-                         '-o', '<(SHARED_INTERMEDIATE_DIR)/installer_util_strings',],
+                         '-o', '<(gen_dir)',],
               'message': 'Generating installer_util_strings',
             },
           ],
           'direct_dependent_settings': {
             'include_dirs': [
-              '<(SHARED_INTERMEDIATE_DIR)/installer_util_strings',
+              '<(SHARED_INTERMEDIATE_DIR)',
             ],
           },
         },
@@ -228,7 +228,7 @@
             ],
           },
           'sources': [
-            '<(SHARED_INTERMEDIATE_DIR)/installer_util_strings/installer_util_strings.rc',
+            '<(SHARED_INTERMEDIATE_DIR)/chrome/installer/util/installer_util_strings.rc',
             'installer/mini_installer/chrome.release',
             'installer/setup/app_launcher_installer.cc',
             'installer/setup/app_launcher_installer.h',

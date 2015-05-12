@@ -12,10 +12,10 @@
 #include "base/command_line.h"
 #include "base/debug/leak_tracker.h"
 #include "base/lazy_instance.h"
+#include "base/metrics/field_trial.h"
 #include "base/path_service.h"
 #include "base/prefs/pref_change_registrar.h"
 #include "base/prefs/pref_service.h"
-#include "base/profiler/scoped_tracker.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "base/threading/thread.h"
@@ -39,7 +39,6 @@
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "components/startup_metric_utils/startup_metric_utils.h"
-#include "components/variations/variations_associated_data.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cookie_store_factory.h"
 #include "content/public/browser/notification_service.h"
@@ -398,10 +397,6 @@ void SafeBrowsingService::RegisterAllDelayedAnalysis() {
 
 void SafeBrowsingService::InitURLRequestContextOnIOThread(
     net::URLRequestContextGetter* system_url_request_context_getter) {
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455469 is fixed.
-  tracked_objects::ScopedTracker tracking_profile1(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455469 SafeBrowsingService::InitURLRequestContextOnIOThread 1"));
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   DCHECK(!url_request_context_.get());
 
@@ -413,10 +408,6 @@ void SafeBrowsingService::InitURLRequestContextOnIOThread(
               NULL,
               NULL)));
 
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455469 is fixed.
-  tracked_objects::ScopedTracker tracking_profile2(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455469 SafeBrowsingService::InitURLRequestContextOnIOThread 2"));
   url_request_context_.reset(new net::URLRequestContext);
   // |system_url_request_context_getter| may be NULL during tests.
   if (system_url_request_context_getter) {
@@ -477,10 +468,6 @@ SafeBrowsingProtocolConfig SafeBrowsingService::GetProtocolConfig() const {
 
 void SafeBrowsingService::StartOnIOThread(
     net::URLRequestContextGetter* url_request_context_getter) {
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455469 is fixed.
-  tracked_objects::ScopedTracker tracking_profile1(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455469 SafeBrowsingService::StartOnIOThread 1"));
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   if (enabled_)
     return;
@@ -489,28 +476,15 @@ void SafeBrowsingService::StartOnIOThread(
   SafeBrowsingProtocolConfig config = GetProtocolConfig();
 
 #if defined(SAFE_BROWSING_DB_LOCAL)
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455469 is fixed.
-  tracked_objects::ScopedTracker tracking_profile2(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455469 SafeBrowsingService::StartOnIOThread 2"));
-
   DCHECK(database_manager_.get());
   database_manager_->StartOnIOThread();
 
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455469 is fixed.
-  tracked_objects::ScopedTracker tracking_profile3(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455469 SafeBrowsingService::StartOnIOThread 3"));
   DCHECK(!protocol_manager_);
   protocol_manager_ = SafeBrowsingProtocolManager::Create(
       database_manager_.get(), url_request_context_getter, config);
   protocol_manager_->Initialize();
 #endif
 
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455469 is fixed.
-  tracked_objects::ScopedTracker tracking_profile4(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455469 SafeBrowsingService::StartOnIOThread 4"));
   DCHECK(!ping_manager_);
   ping_manager_ = SafeBrowsingPingManager::Create(
       url_request_context_getter, config);
@@ -608,11 +582,6 @@ void SafeBrowsingService::RefreshState() {
       break;
     }
   }
-
-  // TODO(asvitkine): Experimental code for measuring start up impact of SB.
-  // Remove when experimentation is complete. http://crbug.com/450037
-  if (!variations::GetVariationParamValue("LightSpeed", "DisableSB").empty())
-    enable = false;
 
   if (enable)
     Start();

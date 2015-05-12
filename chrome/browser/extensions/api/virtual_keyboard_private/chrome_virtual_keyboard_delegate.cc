@@ -58,21 +58,19 @@ bool ChromeVirtualKeyboardDelegate::GetKeyboardConfig(
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   results->SetString("layout", keyboard::GetKeyboardLayout());
   results->SetBoolean("a11ymode", keyboard::GetAccessibilityKeyboardEnabled());
-  // TODO(rsadam): Deprecate this, and rely on features.
-  results->SetBoolean("experimental",
-                      keyboard::IsExperimentalInputViewEnabled());
   scoped_ptr<base::ListValue> features(new base::ListValue());
   features->AppendString(GenerateFeatureFlag(
       "floatingvirtualkeyboard", keyboard::IsFloatingVirtualKeyboardEnabled()));
   features->AppendString(
       GenerateFeatureFlag("gesturetyping", keyboard::IsGestureTypingEnabled()));
   features->AppendString(GenerateFeatureFlag(
-      "gestureselection", keyboard::IsGestureSelectionEnabled()));
+      "gestureediting", keyboard::IsGestureEditingEnabled()));
   features->AppendString(GenerateFeatureFlag(
-      "gesturedeletion", keyboard::IsGestureDeletionEnabled()));
+      "materialdesign", keyboard::IsMaterialDesignEnabled()));
+  features->AppendString(
+      GenerateFeatureFlag("voiceinput", keyboard::IsVoiceInputEnabled()));
   features->AppendString(GenerateFeatureFlag("experimental",
       keyboard::IsExperimentalInputViewEnabled()));
-  // TODO(rsadam): Populate features with more inputview features.
   results->Set("features", features.Pass());
   return true;
 }

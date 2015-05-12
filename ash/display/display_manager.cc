@@ -937,7 +937,7 @@ void DisplayManager::SetMirrorMode(bool mirror) {
     return;
   }
 
-  // This is fallback path to emulate mirroroing on desktop.
+  // This is fallback path to emulate mirroroing on desktop and unit test.
   DisplayInfoList display_info_list;
   for (DisplayList::const_iterator iter = active_display_list_.begin();
        (display_info_list.size() < 2 && iter != active_display_list_.end());
@@ -959,6 +959,7 @@ void DisplayManager::SetMirrorMode(bool mirror) {
     Shell::GetInstance()->display_configurator_animation()->
         StartFadeInAnimation();
   }
+  RunPendingTasksForTest();
 #endif
 }
 
@@ -972,11 +973,13 @@ void DisplayManager::AddRemoveDisplay() {
   new_display_info_list.push_back(first_display);
   // Add if there is only one display connected.
   if (num_connected_displays() == 1) {
+    const int kVerticalOffsetPx = 100;
     // Layout the 2nd display below the primary as with the real device.
     gfx::Rect host_bounds = first_display.bounds_in_native();
-    new_display_info_list.push_back(DisplayInfo::CreateFromSpec(
-        base::StringPrintf(
-            "%d+%d-500x400", host_bounds.x(), host_bounds.bottom())));
+    new_display_info_list.push_back(
+        DisplayInfo::CreateFromSpec(base::StringPrintf(
+            "%d+%d-600x%d", host_bounds.x(),
+            host_bounds.bottom() + kVerticalOffsetPx, host_bounds.height())));
   }
   num_connected_displays_ = new_display_info_list.size();
   mirroring_display_id_ = gfx::Display::kInvalidDisplayID;
@@ -1086,7 +1089,6 @@ void DisplayManager::CreateSoftwareMirroringDisplay(
   // the root window so that it matches the external display's
   // resolution. This is necessary in order for scaling to work while
   // mirrored.
-  // int64 mirroring_display_id = gfx::Display::kInvalidDisplayID;
   if (display_info_list->size() == 2) {
     switch (multi_display_mode_) {
       case MIRRORING: {

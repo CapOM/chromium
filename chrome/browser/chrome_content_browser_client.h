@@ -249,10 +249,9 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
   const wchar_t* GetResourceDllName() override;
   void PreSpawnRenderer(sandbox::TargetPolicy* policy, bool* success) override;
 #endif
-  bool CheckMediaAccessPermission(content::BrowserContext* browser_context,
-                                  const GURL& security_origin,
-                                  content::MediaStreamType type) override;
-
+  void OverrideRenderFrameMojoServices(
+      content::ServiceRegistry* registry,
+      content::RenderFrameHost* render_frame_host) override;
   void OpenURL(content::BrowserContext* browser_context,
                const content::OpenURLParams& params,
                const base::Callback<void(content::WebContents*)>& callback)

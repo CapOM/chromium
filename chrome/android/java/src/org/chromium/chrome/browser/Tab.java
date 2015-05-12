@@ -388,6 +388,12 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
         @Override
         public void showRepostFormWarningDialog() {
+            // When the dialog is visible, keeping the refresh animation active
+            // in the background is distracting and unnecessary (and likely to
+            // jank when the dialog is shown).
+            if (mSwipeRefreshHandler != null) {
+                mSwipeRefreshHandler.reset();
+            }
             RepostFormWarningDialog warningDialog = new RepostFormWarningDialog(
                     new Runnable() {
                         @Override
@@ -418,7 +424,8 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         @Override
         public void navigationStateChanged(int flags) {
             if ((flags & InvalidateTypes.TITLE) != 0) {
-                for (TabObserver observer : mObservers) observer.onTitleUpdated(Tab.this);
+                // Update cached title then notify observers.
+                updateTitle();
             }
             if ((flags & InvalidateTypes.URL) != 0) {
                 for (TabObserver observer : mObservers) observer.onUrlUpdated(Tab.this);
@@ -1204,7 +1211,13 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * on both cold and warm starts.
      */
     public void onActivityStart() {
-        show(TabSelectionType.FROM_USER);
+        if (isHidden()) {
+            show(TabSelectionType.FROM_USER);
+        } else {
+            // The visible Tab's renderer process may have died after the activity was paused.
+            // Ensure that it's restored appropriately.
+            loadIfNeeded();
+        }
 
         // When resuming the activity, force an update to the fullscreen state to ensure a
         // subactivity did not change the fullscreen configuration of this ChromeTab's renderer in
@@ -1216,7 +1229,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * Called on the foreground tab when the Activity is stopped.
      */
     public void onActivityStop() {
-        hide();
+        // TODO(jdduke): Remove this method when all downstream callers have been removed.
     }
 
     /**

@@ -232,6 +232,8 @@ void CardUnmaskPromptViews::OnNativeThemeChanged(const ui::NativeTheme* theme) {
   progress_overlay_->set_background(
       views::Background::CreateSolidBackground(bg_color));
   progress_label_->SetBackgroundColor(bg_color);
+  progress_label_->SetEnabledColor(theme->GetSystemColor(
+      ui::NativeTheme::kColorId_ThrobberSpinningColor));
 }
 
 ui::ModalType CardUnmaskPromptViews::GetModalType() const {
@@ -435,13 +437,11 @@ void CardUnmaskPromptViews::InitIfNecessary() {
   progress_overlay_->SetVisible(false);
   AddChildView(progress_overlay_);
 
-  progress_throbber_ = new views::MaterialThrobber();
+  progress_throbber_ = new views::Throbber();
   progress_overlay_->AddChildView(progress_throbber_);
 
   progress_label_ = new views::Label(l10n_util::GetStringUTF16(
       IDS_AUTOFILL_CARD_UNMASK_VERIFICATION_IN_PROGRESS));
-  // Material blue. TODO(estade): find an appropriate place for this color.
-  progress_label_->SetEnabledColor(SkColorSetRGB(0x42, 0x85, 0xF4));
   progress_overlay_->AddChildView(progress_label_);
 }
 

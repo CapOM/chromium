@@ -66,6 +66,7 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
 
   // SchedulerClient implementation
   void WillBeginImplFrame(const BeginFrameArgs& args) override;
+  void DidFinishImplFrame() override;
   void ScheduledActionSendBeginMainFrame() override;
   DrawResult ScheduledActionDrawAndSwapIfPossible() override;
   DrawResult ScheduledActionDrawAndSwapForced() override;
@@ -79,7 +80,6 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   base::TimeDelta DrawDurationEstimate() override;
   base::TimeDelta BeginMainFrameToCommitDurationEstimate() override;
   base::TimeDelta CommitToActivateDurationEstimate() override;
-  void DidBeginImplFrameDeadline() override;
   void SendBeginFramesToChildren(const BeginFrameArgs& args) override;
   void SendBeginMainFrameNotExpectedSoon() override;
 
@@ -129,13 +129,12 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
       scoped_ptr<BeginFrameSource> external_begin_frame_source);
 
  private:
-  void BeginMainFrame();
+  void BeginMainFrame(const BeginFrameArgs& begin_frame_args);
   void BeginMainFrameAbortedOnImplThread(CommitEarlyOutReason reason);
   void DoAnimate();
   void DoBeginMainFrame(const BeginFrameArgs& begin_frame_args);
   void DoCommit();
-  DrawResult DoComposite(base::TimeTicks frame_begin_time,
-                         LayerTreeHostImpl::FrameData* frame);
+  DrawResult DoComposite(LayerTreeHostImpl::FrameData* frame);
   void DoSwap();
   void DidCommitAndDrawFrame();
   void CommitComplete();
@@ -160,6 +159,9 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   scoped_ptr<ResourceUpdateQueue> queue_for_commit_;
   bool next_frame_is_newly_committed_frame_;
 
+#if DCHECK_IS_ON()
+  bool inside_impl_frame_;
+#endif
   bool inside_draw_;
   bool defer_commits_;
   bool animate_requested_;

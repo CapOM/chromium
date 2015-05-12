@@ -32,6 +32,7 @@
 #include "mojo/services/tracing/tracing.mojom.h"
 #include "mojo/shell/application_loader.h"
 #include "mojo/shell/application_manager.h"
+#include "mojo/shell/switches.h"
 #include "mojo/util/filename_util.h"
 #include "url/gurl.h"
 
@@ -293,6 +294,12 @@ GURL Context::ResolveMappings(const GURL& url) {
 
 GURL Context::ResolveMojoURL(const GURL& url) {
   return url_resolver_.ResolveMojoURL(url);
+}
+
+bool Context::CreateFetcher(
+    const GURL& url,
+    const shell::Fetcher::FetchCallback& loader_callback) {
+  return false;
 }
 
 void Context::OnShutdownComplete() {

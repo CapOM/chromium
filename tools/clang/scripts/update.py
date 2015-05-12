@@ -23,9 +23,11 @@ LLVM_WIN_REVISION = 'HEAD'
 
 # ASan on Windows is useful enough to use it even while the clang/win is still
 # in bringup. Use a pinned revision to make it slightly more stable.
-if (re.search(r'\b(asan)=1', os.environ.get('GYP_DEFINES', '')) and
-    not 'LLVM_FORCE_HEAD_REVISION' in os.environ):
-  LLVM_WIN_REVISION = '235968'
+use_head_revision = ('LLVM_FORCE_HEAD_REVISION' in os.environ or
+  not re.search(r'\b(asan)=1', os.environ.get('GYP_DEFINES', '')))
+
+if not use_head_revision:
+  LLVM_WIN_REVISION = '237003'
 
 # Path constants. (All of these should be absolute paths.)
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -63,6 +65,21 @@ def WriteStampFile(s):
     f.write(s)
 
 
+def PrintRevision():
+  """Print the current Clang revision."""
+  # gyp runs update.py --print-revision even when clang isn't used.
+  # It won't use the value, but we must not error.
+  if not os.path.exists(LLVM_DIR):
+    print "0"
+    return
+
+  # TODO(hans): This needs an update when we move to prebuilt Clang binaries.
+  svn_info = subprocess.check_output(['svn', 'info', LLVM_DIR], shell=True)
+  m = re.search(r'Revision: (\d+)', svn_info)
+  assert m
+  print m.group(1)
+
+
 def RmTree(dir):
   """Delete dir."""
   def ChmodAndRetry(func, path, _):
@@ -73,15 +90,6 @@ def RmTree(dir):
     raise
 
   shutil.rmtree(dir, onerror=ChmodAndRetry)
-
-
-def ClobberChromiumBuildFiles():
-  """Clobber Chomium build files."""
-  print 'Clobbering Chromium build files...'
-  out_dir = os.path.join(CHROMIUM_DIR, 'out')
-  if os.path.isdir(out_dir):
-    RmTree(out_dir)
-    print 'Removed Chromium out dir: %s.' % (out_dir)
 
 
 def RunCommand(command, fail_hard=True):
@@ -167,12 +175,10 @@ def AddCMakeToPath():
     if e.errno != os.errno.ENOENT:
       raise
 
-  cmake_locations = ['C:\\Program Files (x86)\\CMake\\bin',
-                     'C:\\Program Files (x86)\\CMake 2.8\\bin']
-  for d in cmake_locations:
-    if os.path.isdir(d):
-      os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + d
-      return
+  cmake_dir = 'C:\\Program Files (x86)\\CMake\\bin'
+  if os.path.isdir(cmake_dir):
+    os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + cmake_dir
+    return
   print 'Failed to find CMake!'
   sys.exit(1)
 
@@ -216,9 +222,6 @@ def UpdateClang(args):
     return 0
 
   AddCMakeToPath()
-  if args.clobber:
-    ClobberChromiumBuildFiles()
-
   # Reset the stamp file in case the build is unsuccessful.
   WriteStampFile('')
 
@@ -233,8 +236,20 @@ def UpdateClang(args):
     os.makedirs(LLVM_BUILD_DIR)
   os.chdir(LLVM_BUILD_DIR)
 
+  # If building at head, define a macro that plugins can use for #ifdefing
+  # out code that builds at head, but not at CLANG_REVISION or vice versa.
+  cflags = cxxflags = ''
+
+  # TODO(thakis): Set this only conditionally if use_head_revision once posix
+  # and win clang are in sync. At the moment, the plugins only build at clang
+  # head on posix, but they build at both head and the pinned win version :-/
+  cflags += ' -DLLVM_FORCE_HEAD_REVISION'
+  cxxflags += ' -DLLVM_FORCE_HEAD_REVISION'
+
   cmake_args = ['-GNinja', '-DCMAKE_BUILD_TYPE=Release',
                 '-DLLVM_ENABLE_ASSERTIONS=ON', SubversionCmakeArg(),
+                '-DCMAKE_C_FLAGS=' + cflags,
+                '-DCMAKE_CXX_FLAGS=' + cxxflags,
                 '-DCHROMIUM_TOOLS_SRC=%s' % os.path.join(
                     CHROMIUM_DIR, 'tools', 'clang'),
                 '-DCHROMIUM_TOOLS=%s' % ';'.join(args.tools)]
@@ -299,9 +314,27 @@ def main():
     # dup()ed sys.stdin is writable, try
     #   fd2 = os.dup(sys.stdin.fileno()); os.write(fd2, 'hi')
     # TODO: Fix gclient instead, http://crbug.com/95350
+    try:
+      stderr = os.fdopen(os.dup(sys.stdin.fileno()))
+    except:
+      stderr = sys.stderr
     return subprocess.call(
-        [os.path.join(os.path.dirname(__file__), 'update.sh')] +  sys.argv[1:],
-        stderr=os.fdopen(os.dup(sys.stdin.fileno())))
+        [os.path.join(os.path.dirname(__file__), 'update.sh')] + sys.argv[1:],
+        stderr=stderr)
+
+  parser = argparse.ArgumentParser(description='Build Clang.')
+  parser.add_argument('--tools', nargs='*',
+                      default=['plugins', 'blink_gc_plugin'])
+  # For now, this flag is only used for the non-Windows flow, but argparser gets
+  # mad if it sees a flag it doesn't recognize.
+  parser.add_argument('--if-needed', action='store_true')
+  parser.add_argument('--print-revision', action='store_true')
+
+  args = parser.parse_args()
+
+  if args.print_revision:
+    PrintRevision()
+    return 0
 
   if not re.search(r'\b(clang|asan)=1', os.environ.get('GYP_DEFINES', '')):
     print 'Skipping Clang update (clang=1 was not set in GYP_DEFINES).'
@@ -311,13 +344,7 @@ def main():
     print 'Skipping Clang update (make_clang_dir= was set in GYP_DEFINES).'
     return 0
 
-  parser = argparse.ArgumentParser(description='Build Clang.')
-  parser.add_argument('--no-clobber', dest='clobber', action='store_false')
-  parser.add_argument('--tools', nargs='*', default=['plugins'])
-  # For now, this flag is only used for the non-Windows flow, but argparser gets
-  # mad if it sees a flag it doesn't recognize.
-  parser.add_argument('--if-needed', action='store_true')
-  return UpdateClang(parser.parse_args())
+  return UpdateClang(args)
 
 
 if __name__ == '__main__':

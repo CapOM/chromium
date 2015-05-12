@@ -5,15 +5,19 @@
 
 Polymer('gaia-paper-button', {
   onKeyDown: function(e) {
-    if (e.keyCode == 13 || e.keyCode == 32)
+    if (!this.disabled && (e.keyCode == 13 || e.keyCode == 32))
       this.fire('tap');
   }
 });
 
-Polymer('gaia-core-icon-button', {
-  onKeyDown: function(e) {
-    if (e.keyCode == 13 || e.keyCode == 32)
-      this.fire('tap');
+Polymer('gaia-icon-button', {
+  ready: function() {
+    this.classList.add('custom-appearance');
+  },
+
+  onMouseDown: function(e) {
+    /* Prevents button focusing after mouse click. */
+    e.preventDefault();
   }
 });
 

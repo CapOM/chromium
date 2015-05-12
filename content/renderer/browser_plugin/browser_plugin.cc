@@ -409,20 +409,7 @@ void BrowserPlugin::paint(WebCanvas* canvas, const WebRect& rect) {
 // static
 bool BrowserPlugin::ShouldForwardToBrowserPlugin(
     const IPC::Message& message) {
-  switch (message.type()) {
-    case BrowserPluginMsg_AdvanceFocus::ID:
-    case BrowserPluginMsg_CompositorFrameSwapped::ID:
-    case BrowserPluginMsg_GuestGone::ID:
-    case BrowserPluginMsg_SetContentsOpaque::ID:
-    case BrowserPluginMsg_SetCursor::ID:
-    case BrowserPluginMsg_SetMouseLock::ID:
-    case BrowserPluginMsg_SetTooltipText::ID:
-    case BrowserPluginMsg_ShouldAcceptTouchEvents::ID:
-      return true;
-    default:
-      break;
-  }
-  return false;
+  return IPC_MESSAGE_CLASS(message) == BrowserPluginMsgStart;
 }
 
 void BrowserPlugin::updateGeometry(const WebRect& window_rect,
@@ -433,13 +420,18 @@ void BrowserPlugin::updateGeometry(const WebRect& window_rect,
   int old_width = view_rect_.width();
   int old_height = view_rect_.height();
   view_rect_ = window_rect;
+
   if (!ready_) {
-    if (delegate_) {
-      delegate_->DidResizeElement(gfx::Size(), view_rect_.size());
+    if (delegate_)
       delegate_->Ready();
-    }
     ready_ = true;
   }
+
+  if (delegate_) {
+    delegate_->DidResizeElement(
+        gfx::Size(old_width, old_height), view_rect_.size());
+  }
+
   if (!attached())
     return;
 
@@ -448,11 +440,6 @@ void BrowserPlugin::updateGeometry(const WebRect& window_rect,
     BrowserPluginManager::Get()->Send(new BrowserPluginHostMsg_UpdateGeometry(
         browser_plugin_instance_id_, view_rect_));
     return;
-  }
-
-  if (delegate_) {
-    delegate_->DidResizeElement(
-        gfx::Size(old_width, old_height), view_rect_.size());
   }
 }
 

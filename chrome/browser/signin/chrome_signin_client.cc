@@ -32,6 +32,7 @@
 #endif
 
 #if defined(OS_CHROMEOS)
+#include "chrome/browser/chromeos/net/delay_network_call.h"
 #include "components/user_manager/user_manager.h"
 #endif
 
@@ -44,10 +45,19 @@ ChromeSigninClient::ChromeSigninClient(
     : profile_(profile),
       signin_error_controller_(signin_error_controller) {
   signin_error_controller_->AddObserver(this);
+#if !defined(OS_CHROMEOS)
+  net::NetworkChangeNotifier::AddNetworkChangeObserver(this);
+#endif
 }
 
 ChromeSigninClient::~ChromeSigninClient() {
   signin_error_controller_->RemoveObserver(this);
+}
+
+void ChromeSigninClient::Shutdown() {
+#if !defined(OS_CHROMEOS)
+  net::NetworkChangeNotifier::RemoveNetworkChangeObserver(this);
+#endif
 }
 
 // static
@@ -127,7 +137,7 @@ void ChromeSigninClient::OnSignedOut() {
     return;
 
   cache.SetLocalAuthCredentialsOfProfileAtIndex(index, std::string());
-  cache.SetUserNameOfProfileAtIndex(index, base::string16());
+  cache.SetAuthInfoOfProfileAtIndex(index, std::string(), base::string16());
   cache.SetProfileSigninRequiredAtIndex(index, false);
 }
 
@@ -185,13 +195,15 @@ ChromeSigninClient::AddCookieChangedCallback(
 }
 
 void ChromeSigninClient::OnSignedIn(const std::string& account_id,
+                                    const std::string& gaia_id,
                                     const std::string& username,
                                     const std::string& password) {
   ProfileManager* profile_manager = g_browser_process->profile_manager();
   ProfileInfoCache& cache = profile_manager->GetProfileInfoCache();
   size_t index = cache.GetIndexOfProfileWithPath(profile_->GetPath());
   if (index != std::string::npos) {
-    cache.SetUserNameOfProfileAtIndex(index, base::UTF8ToUTF16(username));
+    cache.SetAuthInfoOfProfileAtIndex(index, gaia_id,
+                                      base::UTF8ToUTF16(username));
     ProfileMetrics::UpdateReportedProfilesStatistics(profile_manager);
   }
 }
@@ -204,6 +216,11 @@ void ChromeSigninClient::PostSignedIn(const std::string& account_id,
   if (!password.empty() && profiles::IsLockAvailable(profile_))
     LocalAuth::SetLocalAuthCredentials(profile_, password);
 #endif
+}
+
+bool ChromeSigninClient::UpdateAccountInfo(
+    AccountTrackerService::AccountInfo* out_account_info) {
+  return false;
 }
 
 void ChromeSigninClient::OnErrorChanged() {
@@ -219,4 +236,33 @@ void ChromeSigninClient::OnErrorChanged() {
 
   cache.SetProfileIsAuthErrorAtIndex(index,
       signin_error_controller_->HasError());
+}
+
+#if !defined(OS_CHROMEOS)
+void ChromeSigninClient::OnNetworkChanged(
+    net::NetworkChangeNotifier::ConnectionType type) {
+  if (type >= net::NetworkChangeNotifier::ConnectionType::CONNECTION_NONE)
+    return;
+
+  for (const base::Closure& callback : delayed_callbacks_)
+    callback.Run();
+
+  delayed_callbacks_.clear();
+}
+#endif
+
+void ChromeSigninClient::DelayNetworkCall(const base::Closure& callback) {
+#if defined(OS_CHROMEOS)
+  chromeos::DelayNetworkCall(
+      base::TimeDelta::FromMilliseconds(chromeos::kDefaultNetworkRetryDelayMS),
+      callback);
+  return;
+#else
+  // Don't bother if we don't have any kind of network connection.
+  if (net::NetworkChangeNotifier::IsOffline()) {
+    delayed_callbacks_.push_back(callback);
+  } else {
+    callback.Run();
+  }
+#endif
 }

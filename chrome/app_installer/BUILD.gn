@@ -8,7 +8,7 @@ assert(is_win)
 
 executable("app_installer") {
   sources = [
-    "/win/app_installer_main.cc"
+    "win/app_installer_main.cc",
   ]
 
   configs -= [ "//build/config/win:console" ]
@@ -17,6 +17,7 @@ executable("app_installer") {
   deps = [
     ":util",
     "//base",
+    "//mojo/environment:chromium",
   ]
 
   # TODO(GYP) manifest.
@@ -50,6 +51,7 @@ test("app_installer_unittests") {
     ":util",
     "//base",
     "//base/test:run_all_unittests",
+    "//mojo/environment:chromium",
     "//net:test_support",
     "//testing/gtest",
   ]

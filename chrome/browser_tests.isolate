@@ -67,7 +67,9 @@
           '../net/data/',
           '../net/tools/testserver/',
           '../ppapi/tests/test_case.html',
+          '../ppapi/tests/test_case.html.mock-http-headers',
           '../ppapi/tests/test_page.css',
+          '../ppapi/tests/test_page.css.mock-http-headers',
           '../testing/test_env.py',
           '../third_party/accessibility-audit/axs_testing.js',
           '../third_party/pyftpdlib/',
@@ -88,6 +90,7 @@
           '<(PRODUCT_DIR)/test_case.html.mock-http-headers',
           '<(PRODUCT_DIR)/test_data/',
           '<(PRODUCT_DIR)/test_page.css',
+          '<(PRODUCT_DIR)/test_page.css.mock-http-headers',
           '<(PRODUCT_DIR)/test_url_loader_data/',
           'browser/policy/test/asn1der.py',
           'browser/policy/test/policy_testserver.py',
@@ -123,16 +126,14 @@
         ],
       },
     }],
-    [('disable_nacl==0 and (OS=="linux" or OS=="mac" or OS=="win") and '
-         '(target_arch=="x64" or target_arch=="ia32")'), {
+    ['disable_nacl==0 and (OS=="linux" or OS=="mac" or OS=="win") and (target_arch=="x64" or target_arch=="ia32")', {
       'variables': {
         'files': [
           '<(PRODUCT_DIR)/ppapi_nacl_tests_glibc.nmf',
         ],
       },
     }],
-    [('disable_nacl==0 and OS=="linux" and '
-      '(target_arch=="ia32" or target_arch=="x64" or target_arch=="arm")'), {
+    ['disable_nacl==0 and OS=="linux" and (target_arch=="ia32" or target_arch=="x64" or target_arch=="arm")', {
       'variables': {
         'files': [
           '<(PRODUCT_DIR)/ppapi_nacl_tests_pnacl_nonsfi.nmf',
@@ -148,8 +149,7 @@
         ],
       },
     }],
-    ['disable_nacl==0 and (OS=="win" or '
-         '((OS=="linux" or OS=="mac") and target_arch=="x64"))', {
+    ['disable_nacl==0 and (OS=="win" or ((OS=="linux" or OS=="mac") and target_arch=="x64"))', {
       'variables': {
         'files': [
           '<(PRODUCT_DIR)/lib64/',
@@ -159,8 +159,7 @@
         ],
       },
     }],
-    ['disable_nacl==0 and target_arch=="ia32" and'
-         '(OS=="mac" or OS=="linux" or OS=="win")', {
+    ['disable_nacl==0 and target_arch=="ia32" and (OS=="mac" or OS=="linux" or OS=="win")', {
       'variables': {
         'files': [
           '<(PRODUCT_DIR)/lib32/',
@@ -170,8 +169,7 @@
         ],
       },
     }],
-    ['disable_nacl==0 and OS=="linux" and '
-         '(target_arch=="x64" or target_arch=="ia32")', {
+    ['disable_nacl==0 and OS=="linux" and (target_arch=="x64" or target_arch=="ia32")', {
       'variables': {
         'files': [
           '<(PRODUCT_DIR)/ppapi_nacl_tests_pnacl_newlib_x32_nonsfi.nexe',
@@ -247,6 +245,7 @@
       'variables': {
         'files': [
           '../chromeos/test/data/',
+          '../components/chrome_apps/webstore_widget/cws_widget/',
           '../ui/file_manager/file_manager/',
           '../ui/file_manager/gallery/',
           '../ui/file_manager/image_loader/',

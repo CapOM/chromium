@@ -45,6 +45,8 @@ const char kAttributeFieldType[] = "fieldtype";
 const char kAttributeFormSignature[] = "formsignature";
 const char kAttributeName[] = "name";
 const char kAttributeSignature[] = "signature";
+const char kAttributeControlType[] = "type";
+const char kAttributeAutocomplete[] = "autocomplete";
 const char kClientVersion[] = "6.1.1715.1442/en (GGLL)";
 const char kXMLDeclaration[] = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
 const char kXMLElementAutofillQuery[] = "autofillquery";
@@ -100,6 +102,25 @@ std::string EncodeFieldTypes(const ServerFieldTypeSet& available_field_types) {
   return data_presence;
 }
 
+// Helper for |EncodeFormRequest()| and |EncodeFieldForUpload| that returns an
+// XmlElement for the given field in query xml, and also add it to the parent
+// XmlElement.
+buzz::XmlElement* EncodeFieldForQuery(const AutofillField& field,
+                                      buzz::XmlElement* parent) {
+  buzz::XmlElement* field_element = new buzz::XmlElement(
+      buzz::QName(kXMLElementField));
+  field_element->SetAttr(buzz::QName(kAttributeSignature),
+                         field.FieldSignature());
+  if (!field.name.empty()) {
+    field_element->SetAttr(buzz::QName(kAttributeName),
+                           base::UTF16ToUTF8(field.name));
+  }
+  field_element->SetAttr(buzz::QName(kAttributeControlType),
+                         field.form_control_type);
+  parent->AddElement(field_element);
+  return field_element;
+}
+
 // Helper for |EncodeFormRequest()| that creates XmlElements for the given field
 // in upload xml, and also add them to the parent XmlElement.
 void EncodeFieldForUpload(const AutofillField& field,
@@ -112,26 +133,16 @@ void EncodeFieldForUpload(const AutofillField& field,
   // |types| could be empty in unit-tests only.
   for (ServerFieldTypeSet::iterator field_type = types.begin();
        field_type != types.end(); ++field_type) {
-    buzz::XmlElement *field_element = new buzz::XmlElement(
-        buzz::QName(kXMLElementField));
+    // We use the same field elements as the query and add a few more below.
+    buzz::XmlElement* field_element = EncodeFieldForQuery(field, parent);
 
-    field_element->SetAttr(buzz::QName(kAttributeSignature),
-                           field.FieldSignature());
+    if (!field.autocomplete_attribute.empty()) {
+      field_element->SetAttr(buzz::QName(kAttributeAutocomplete),
+                             field.autocomplete_attribute);
+    }
     field_element->SetAttr(buzz::QName(kAttributeAutofillType),
                            base::IntToString(*field_type));
-    parent->AddElement(field_element);
   }
-}
-
-// Helper for |EncodeFormRequest()| that creates XmlElement for the given field
-// in query xml, and also add it to the parent XmlElement.
-void EncodeFieldForQuery(const AutofillField& field,
-                         buzz::XmlElement* parent) {
-  buzz::XmlElement *field_element = new buzz::XmlElement(
-      buzz::QName(kXMLElementField));
-  field_element->SetAttr(buzz::QName(kAttributeSignature),
-                         field.FieldSignature());
-  parent->AddElement(field_element);
 }
 
 // Helper for |EncodeFormRequest()| that creates XmlElements for the given field

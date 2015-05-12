@@ -28,9 +28,12 @@ namespace content {
 
 void InitNavigateParams(FrameHostMsg_DidCommitProvisionalLoad_Params* params,
                         int page_id,
+                        int nav_entry_id,
+                        bool did_create_new_entry,
                         const GURL& url,
                         ui::PageTransition transition) {
   params->page_id = page_id;
+  params->nav_entry_id = nav_entry_id;
   params->url = url;
   params->referrer = Referrer();
   params->transition = transition;
@@ -38,6 +41,7 @@ void InitNavigateParams(FrameHostMsg_DidCommitProvisionalLoad_Params* params,
   params->should_update_history = false;
   params->searchable_form_url = GURL();
   params->searchable_form_encoding = std::string();
+  params->did_create_new_entry = did_create_new_entry;
   params->security_info = std::string();
   params->gesture = NavigationGestureUser;
   params->was_within_same_page = false;
@@ -124,8 +128,8 @@ void TestRenderWidgetHostView::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
     ReadbackRequestCallback& callback,
-    const SkColorType color_type) {
-  callback.Run(SkBitmap(), content::READBACK_NOT_SUPPORTED);
+    const SkColorType preferred_color_type) {
+  callback.Run(SkBitmap(), content::READBACK_FAILED);
 }
 
 void TestRenderWidgetHostView::CopyFromCompositingSurfaceToVideoFrame(

@@ -661,7 +661,8 @@ class DeviceUtilsRunShellCommandTest(DeviceUtilsTest):
         (mock.call.pylib.utils.device_temp_file.DeviceTempFile(self.adb),
             temp_file),
         (self.call.adb.Shell(cmd_redirect)),
-        (self.call.device.ReadFile(temp_file.name), 'something')):
+        (self.call.device.ReadFile(temp_file.name, force_pull=True),
+         'something')):
       self.assertEquals(
           ['something'],
           self.device.RunShellCommand(
@@ -682,7 +683,8 @@ class DeviceUtilsRunShellCommandTest(DeviceUtilsTest):
         (mock.call.pylib.utils.device_temp_file.DeviceTempFile(self.adb),
             temp_file),
         (self.call.adb.Shell(cmd_redirect)),
-        (self.call.device.ReadFile(mock.ANY), 'something')):
+        (self.call.device.ReadFile(mock.ANY, force_pull=True),
+         'something')):
       self.assertEquals(['something'],
                         self.device.RunShellCommand(cmd, check_return=True))
 
@@ -727,24 +729,6 @@ class DeviceUtilsRunPipedShellCommandTest(DeviceUtilsTest):
       with self.assertRaises(device_errors.AdbShellCommandFailedError) as ec:
         self.device._RunPipedShellCommand('ps | grep foo')
       self.assertIs(None, ec.exception.status)
-
-
-class DeviceUtilsGetDevicePieWrapper(DeviceUtilsTest):
-
-  def testGetDevicePieWrapper_jb(self):
-    with self.assertCall(
-        self.call.device.build_version_sdk(),
-        constants.ANDROID_SDK_VERSION_CODES.JELLY_BEAN):
-      self.assertEqual('', self.device.GetDevicePieWrapper())
-
-  def testGetDevicePieWrapper_ics(self):
-    with self.assertCalls(
-        (self.call.device.build_version_sdk(),
-         constants.ANDROID_SDK_VERSION_CODES.ICE_CREAM_SANDWICH),
-        (mock.call.pylib.constants.GetOutDirectory(), '/foo/bar'),
-        (mock.call.os.path.exists(mock.ANY), True),
-        (self.call.adb.Push(mock.ANY, mock.ANY), '')):
-      self.assertNotEqual('', self.device.GetDevicePieWrapper())
 
 
 @mock.patch('time.sleep', mock.Mock())
@@ -1289,6 +1273,15 @@ class DeviceUtilsReadFileTest(DeviceUtilsTest):
           contents,
           self.device.ReadFile('/this/big/file/can.be.read.with.su',
                                as_root=True))
+
+  def testReadFile_forcePull(self):
+    contents = 'a' * 123456
+    with self.assertCall(
+        self.call.device._ReadFileWithPull('/read/this/big/test/file'),
+        contents):
+      self.assertEqual(
+          contents,
+          self.device.ReadFile('/read/this/big/test/file', force_pull=True))
 
 
 class DeviceUtilsWriteFileTest(DeviceUtilsTest):

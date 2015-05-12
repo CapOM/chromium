@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">电池已充满</translation>
 <translation id="6895424601869865703">为<ph name="GIVEN_NAME"/>添加一个帐户</translation>
 <translation id="1270290102613614947">屏幕键盘已停用</translation>
-<translation id="1057289296854808272">旋转功能已启用（点按此处可进行更改）</translation>
+<translation id="5548285847212963613">扩展程序“<ph name="EXTENSION_NAME"/>”可帮助连接到此网络。</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">溢出按钮</translation>
 <translation id="7904094684485781019">此帐户的管理员已停用多帐户登录。</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">状态栏</translation>
 <translation id="2248649616066688669">Chromebook连接到外接显示器时，即使合上盖子，也可继续使用。</translation>
 <translation id="2946640296642327832">启用蓝牙</translation>
+<translation id="5537725057119320332">投射</translation>
 <translation id="6459472438155181876">正在将屏幕扩展到<ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">蜂窝网络设备</translation>
 <translation id="6596816719288285829">IP 地址</translation>
@@ -39,7 +40,6 @@
 按 Shift + Alt 键可切换。</translation>
 <translation id="6043994281159824495">立即退出</translation>
 <translation id="2127372758936585790">低功率充电器</translation>
-<translation id="4625920103690741805">旋转功能已锁定（点按此处可进行更改）</translation>
 <translation id="3799026279081545374">您的充电器可能有问题。如果您居住在美国，请拨打866-628-1371寻求帮助并申请更换充电器。如果您居住在英国，请拨打0800-026-0613。如果您居住在爱尔兰，请拨打1-800-832-664。如果您居住在加拿大，请拨打866-628-1372。如果您居住在澳大利亚，请拨打1-800-067-460。</translation>
 <translation id="3891340733213178823">连按两次Ctrl+Shift+Q即可退出。</translation>
 <translation id="5871632337994001636">管理设备…</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">自动隐藏文件架</translation>
 <translation id="7573962313813535744">停靠模式</translation>
 <translation id="2792498699870441125">Alt + 搜索键</translation>
-<translation id="8660803626959853127">正在同步 <ph name="COUNT"/> 个文件</translation>
 <translation id="5958529069007801266">受监管用户</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">CAPS LOCK 已关闭</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">了解详情</translation>
 <translation id="7168224885072002358"><ph name="TIMEOUT_SECONDS"/>秒后恢复到原分辨率</translation>
 <translation id="743058460480092004">摄像头和麦克风处于使用状态。</translation>
+<translation id="6550675742724504774">选项</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">重新更改为“<ph name="FROM_LOCALE"/>”（需要重启）</translation>
 <translation id="8103386449138765447">短信数：<ph name="MESSAGE_COUNT"/> 条</translation>

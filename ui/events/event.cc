@@ -17,9 +17,9 @@
 #include "base/strings/stringprintf.h"
 #include "ui/events/base_event_utils.h"
 #include "ui/events/event_utils.h"
-#include "ui/events/keycodes/dom3/dom_code.h"
-#include "ui/events/keycodes/dom3/dom_key.h"
-#include "ui/events/keycodes/dom4/keycode_converter.h"
+#include "ui/events/keycodes/dom/dom_code.h"
+#include "ui/events/keycodes/dom/dom_key.h"
+#include "ui/events/keycodes/dom/keycode_converter.h"
 #include "ui/events/keycodes/keyboard_code_conversion.h"
 #include "ui/gfx/geometry/point3_f.h"
 #include "ui/gfx/geometry/point_conversions.h"
@@ -805,8 +805,7 @@ void KeyEvent::ApplyLayout() const {
   // returns 'a' for VKEY_A even if the key is actually bound to 'à' in X11.
   // GetCharacterFromXEvent returns 'à' in that case.
   if (!IsControlDown() && native_event()) {
-    character_ = GetCharacterFromXEvent(native_event());
-    // TODO(kpschoedel): set key_ field for X11.
+    GetMeaningFromXEvent(native_event(), &key_, &character_);
     return;
   }
 #elif defined(USE_OZONE)

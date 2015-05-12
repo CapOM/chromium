@@ -52,7 +52,8 @@ remoting.HostListApiGcdImpl.prototype.register = function(
       then(function(/**remoting.gcd.RegistrationTicket*/ ticket) {
         return {
           authCode: ticket.robotAccountAuthorizationCode,
-          email: ticket.robotAccountEmail
+          email: ticket.robotAccountEmail,
+          gcdId: ticket.deviceId
         };
       }).
       catch(function(error) {
@@ -68,7 +69,7 @@ remoting.HostListApiGcdImpl.prototype.get = function() {
         var hosts = [];
         devices.forEach(function(device) {
           try {
-            hosts.push(remoting.HostListApiGcdImpl.deviceToHost(device));
+            hosts.push(deviceToHost(device));
           } catch (/** @type {*} */ error) {
             console.warn('Invalid device spec:', error);
           }
@@ -105,11 +106,18 @@ remoting.HostListApiGcdImpl.prototype.remove = function(hostId) {
   });
 };
 
+/** @override */
+remoting.HostListApiGcdImpl.prototype.getSupportHost = function(supportId) {
+  console.error('getSupportHost not supported by HostListApiGclImpl');
+  return Promise.reject(remoting.Error.unexpected());
+};
+
 /**
+ * Converts a GCD device description to a Host object.
  * @param {!Object} device
  * @return {!remoting.Host}
  */
-remoting.HostListApiGcdImpl.deviceToHost = function(device) {
+function deviceToHost(device) {
   var statusMap = {
     'online': 'ONLINE',
     'offline': 'OFFLINE'

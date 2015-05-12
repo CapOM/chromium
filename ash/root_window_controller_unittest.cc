@@ -4,6 +4,7 @@
 
 #include "ash/root_window_controller.h"
 
+#include "ash/display/display_manager.h"
 #include "ash/session/session_state_delegate.h"
 #include "ash/shelf/shelf_layout_manager.h"
 #include "ash/shell.h"
@@ -287,6 +288,89 @@ TEST_F(RootWindowControllerTest, MoveWindows_Modal) {
   EXPECT_TRUE(wm::IsActiveWindow(modal->GetNativeView()));
   generator_1st.ClickLeftButton();
   EXPECT_TRUE(wm::IsActiveWindow(modal->GetNativeView()));
+}
+
+// Make sure lock related windows moves.
+TEST_F(RootWindowControllerTest, MoveWindows_LockWindowsInUnified) {
+  if (!SupportsMultipleDisplays())
+    return;
+  DisplayManager* display_manager = Shell::GetInstance()->display_manager();
+  display_manager->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
+  display_manager->SetMultiDisplayMode(DisplayManager::UNIFIED);
+  UpdateDisplay("500x500");
+  const int kLockScreenWindowId = 1000;
+  const int kLockBackgroundWindowId = 1001;
+
+  RootWindowController* controller =
+      Shell::GetInstance()->GetPrimaryRootWindowController();
+
+  aura::Window* lock_container =
+      controller->GetContainer(kShellWindowId_LockScreenContainer);
+  aura::Window* lock_background_container =
+      controller->GetContainer(kShellWindowId_LockScreenBackgroundContainer);
+
+  views::Widget* lock_screen =
+      CreateModalWidgetWithParent(gfx::Rect(10, 10, 100, 100), lock_container);
+  lock_screen->GetNativeWindow()->set_id(kLockScreenWindowId);
+  lock_screen->SetFullscreen(true);
+
+  views::Widget* lock_background = CreateModalWidgetWithParent(
+      gfx::Rect(10, 10, 100, 100), lock_background_container);
+  lock_background->GetNativeWindow()->set_id(kLockBackgroundWindowId);
+
+  ASSERT_EQ(lock_screen->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockScreenWindowId));
+  ASSERT_EQ(lock_background->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockBackgroundWindowId));
+  EXPECT_EQ("0,0 500x500", lock_screen->GetNativeWindow()->bounds().ToString());
+
+  // Switch to unified.
+  UpdateDisplay("500x500,500x500");
+
+  // In unified mode, RWC is created
+  controller = Shell::GetInstance()->GetPrimaryRootWindowController();
+
+  ASSERT_EQ(lock_screen->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockScreenWindowId));
+  ASSERT_EQ(lock_background->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockBackgroundWindowId));
+  EXPECT_EQ("0,0 500x500", lock_screen->GetNativeWindow()->bounds().ToString());
+
+  // Switch to mirror.
+  display_manager->SetMirrorMode(true);
+  EXPECT_TRUE(display_manager->IsInMirrorMode());
+
+  controller = Shell::GetInstance()->GetPrimaryRootWindowController();
+  ASSERT_EQ(lock_screen->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockScreenWindowId));
+  ASSERT_EQ(lock_background->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockBackgroundWindowId));
+  EXPECT_EQ("0,0 500x500", lock_screen->GetNativeWindow()->bounds().ToString());
+
+  // Switch to unified.
+  display_manager->SetMirrorMode(false);
+  EXPECT_TRUE(display_manager->IsInUnifiedMode());
+
+  controller = Shell::GetInstance()->GetPrimaryRootWindowController();
+
+  ASSERT_EQ(lock_screen->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockScreenWindowId));
+  ASSERT_EQ(lock_background->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockBackgroundWindowId));
+  EXPECT_EQ("0,0 500x500", lock_screen->GetNativeWindow()->bounds().ToString());
+
+  // Switch to single display.
+  UpdateDisplay("600x500");
+  EXPECT_FALSE(display_manager->IsInUnifiedMode());
+  EXPECT_FALSE(display_manager->IsInMirrorMode());
+
+  controller = Shell::GetInstance()->GetPrimaryRootWindowController();
+
+  ASSERT_EQ(lock_screen->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockScreenWindowId));
+  ASSERT_EQ(lock_background->GetNativeWindow(),
+            controller->GetRootWindow()->GetChildById(kLockBackgroundWindowId));
+  EXPECT_EQ("0,0 600x500", lock_screen->GetNativeWindow()->bounds().ToString());
 }
 
 TEST_F(RootWindowControllerTest, ModalContainer) {

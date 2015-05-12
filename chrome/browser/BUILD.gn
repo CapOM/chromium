@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/chrome_build.gni")
 import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
@@ -97,7 +98,9 @@ source_set("browser") {
     "//components/favicon/core",
     "//components/favicon_base",
     "//components/gcm_driver",
+    "//components/gcm_driver/instance_id",
     "//components/google/core/browser",
+    "//components/guest_view:guest_view",
     "//components/handoff",
     "//components/history/core/browser",
     "//components/history/core/common",
@@ -253,7 +256,7 @@ source_set("browser") {
       "//components/password_manager/content/browser",
       "//components/plugins/common",
       "//components/precache/content",
-      "//components/sessions:sessions_content",
+      "//components/sessions",
       "//components/storage_monitor",
       "//components/translate/content/browser",
       "//components/url_matcher",
@@ -363,7 +366,7 @@ source_set("browser") {
     sources += rebase_path(gypi_values.chrome_browser_spellchecker_sources,
                            ".",
                            "//chrome")
-    deps += [ "//third_party/hunspell" ]
+    deps += [ "//third_party/hunspell_new" ]
   }
   if (enable_nacl) {
     sources +=

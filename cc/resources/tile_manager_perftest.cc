@@ -221,7 +221,7 @@ class TileManagerPerfTest : public testing::Test {
           priorities[priority_count], RasterTilePriorityQueue::Type::ALL));
       while (count--) {
         ASSERT_FALSE(queue->IsEmpty());
-        ASSERT_TRUE(queue->Top() != NULL);
+        ASSERT_TRUE(queue->Top().tile());
         queue->Pop();
       }
       priority_count = (priority_count + 1) % arraysize(priorities);
@@ -296,7 +296,7 @@ class TileManagerPerfTest : public testing::Test {
           host_impl_.BuildEvictionQueue(priorities[priority_count]));
       while (count--) {
         ASSERT_FALSE(queue->IsEmpty());
-        ASSERT_TRUE(queue->Top() != NULL);
+        ASSERT_TRUE(queue->Top().tile());
         queue->Pop();
       }
       priority_count = (priority_count + 1) % arraysize(priorities);
@@ -390,7 +390,7 @@ class TileManagerPerfTest : public testing::Test {
     do {
       BeginFrameArgs args =
           CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE);
-      host_impl_.UpdateCurrentBeginFrameArgs(args);
+      host_impl_.WillBeginImplFrame(args);
       for (const auto& layer : layers)
         layer->UpdateTiles(resourceless_software_draw);
 
@@ -398,7 +398,7 @@ class TileManagerPerfTest : public testing::Test {
       tile_manager()->PrepareTiles(global_state);
       tile_manager()->UpdateVisibleTiles(global_state);
       timer_.NextLap();
-      host_impl_.ResetCurrentBeginFrameArgsForNextFrame();
+      host_impl_.DidFinishImplFrame();
     } while (!timer_.HasTimeLimitExpired());
 
     perf_test::PrintResult("prepare_tiles", "", test_name,

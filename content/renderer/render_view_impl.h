@@ -457,7 +457,6 @@ class CONTENT_EXPORT RenderViewImpl
 
  protected:
   // RenderWidget overrides:
-  void OnClose() override;
   void Close() override;
   void OnResize(const ViewMsg_Resize_Params& params) override;
   void DidInitiatePaint() override;
@@ -558,6 +557,7 @@ class CONTENT_EXPORT RenderViewImpl
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest,
                            MessageOrderInDidChangeSelection);
   FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, SendCandidateWindowEvents);
+  FRIEND_TEST_ALL_PREFIXES(RenderViewImplTest, RenderFrameClearedAfterClose);
   FRIEND_TEST_ALL_PREFIXES(SuppressErrorPageTest, Suppresses);
   FRIEND_TEST_ALL_PREFIXES(SuppressErrorPageTest, DoesNotSuppress);
 
@@ -606,6 +606,8 @@ class CONTENT_EXPORT RenderViewImpl
   void OnCancelDownload(int32 download_id);
   void OnClearFocusedElement();
   void OnClosePage();
+  void OnClose();
+
   void OnShowContextMenu(ui::MenuSourceType source_type,
                          const gfx::Point& location);
   void OnCopyImageAt(int x, int y);
@@ -907,7 +909,7 @@ class CONTENT_EXPORT RenderViewImpl
 
   // Helper objects ------------------------------------------------------------
 
-  scoped_ptr<RenderFrameImpl> main_render_frame_;
+  RenderFrameImpl* main_render_frame_;
 
   // The next group of objects all implement RenderViewObserver, so are deleted
   // along with the RenderView automatically.  This is why we just store

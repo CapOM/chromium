@@ -52,16 +52,25 @@ SafeBrowsingPingManager::SafeBrowsingPingManager(
   DCHECK(!url_prefix_.empty());
 
   if (request_context_getter) {
+    // Set the upload URL and whether or not to send cookies with
+    // certificate reports sent to Safe Browsing servers.
     bool use_insecure_certificate_upload_url =
         CertificateErrorReporter::IsHttpUploadUrlSupported() &&
         strlen(kExtendedReportingUploadUrlInsecure) > 0;
-    GURL certificate_upload_url(use_insecure_certificate_upload_url
-                                    ? kExtendedReportingUploadUrlInsecure
-                                    : kExtendedReportingUploadUrlSecure);
+
+    CertificateErrorReporter::CookiesPreference cookies_preference;
+    GURL certificate_upload_url;
+    if (use_insecure_certificate_upload_url) {
+      cookies_preference = CertificateErrorReporter::DO_NOT_SEND_COOKIES;
+      certificate_upload_url = GURL(kExtendedReportingUploadUrlInsecure);
+    } else {
+      cookies_preference = CertificateErrorReporter::SEND_COOKIES;
+      certificate_upload_url = GURL(kExtendedReportingUploadUrlSecure);
+    }
 
     certificate_error_reporter_.reset(new CertificateErrorReporter(
         request_context_getter->GetURLRequestContext(), certificate_upload_url,
-        CertificateErrorReporter::SEND_COOKIES));
+        cookies_preference));
   }
 
   version_ = SafeBrowsingProtocolManagerHelper::Version();
@@ -95,10 +104,11 @@ void SafeBrowsingPingManager::ReportSafeBrowsingHit(
   GURL report_url = SafeBrowsingHitUrl(malicious_url, page_url,
                                        referrer_url, is_subresource,
                                        threat_type);
-  net::URLFetcher* report = net::URLFetcher::Create(
-      report_url,
-      post_data.empty() ? net::URLFetcher::GET : net::URLFetcher::POST,
-      this);
+  net::URLFetcher* report =
+      net::URLFetcher::Create(
+          report_url,
+          post_data.empty() ? net::URLFetcher::GET : net::URLFetcher::POST,
+          this).release();
   report->SetLoadFlags(net::LOAD_DISABLE_CACHE);
   report->SetRequestContext(request_context_getter_.get());
   if (!post_data.empty())
@@ -111,8 +121,9 @@ void SafeBrowsingPingManager::ReportSafeBrowsingHit(
 void SafeBrowsingPingManager::ReportMalwareDetails(
     const std::string& report) {
   GURL report_url = MalwareDetailsUrl();
-  net::URLFetcher* fetcher = net::URLFetcher::Create(
-      report_url, net::URLFetcher::POST, this);
+  net::URLFetcher* fetcher =
+      net::URLFetcher::Create(report_url, net::URLFetcher::POST, this)
+          .release();
   fetcher->SetLoadFlags(net::LOAD_DISABLE_CACHE);
   fetcher->SetRequestContext(request_context_getter_.get());
   fetcher->SetUploadData("application/octet-stream", report);

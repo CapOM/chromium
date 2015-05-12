@@ -12,22 +12,22 @@
 #include "cc/resources/tile_priority.h"
 
 namespace cc {
-class Tile;
+class PrioritizedTile;
 
 class CC_EXPORT RasterTilePriorityQueue {
  public:
   enum class Type { ALL, REQUIRED_FOR_ACTIVATION, REQUIRED_FOR_DRAW };
 
-  // TODO(vmpstr): Make this work with PictureLayerTilingSet pairs instead.
   static scoped_ptr<RasterTilePriorityQueue> Create(
-      const std::vector<PictureLayerImpl::Pair>& paired_layers,
+      const std::vector<PictureLayerImpl*>& active_layers,
+      const std::vector<PictureLayerImpl*>& pending_layers,
       TreePriority tree_priority,
       Type type);
 
   virtual ~RasterTilePriorityQueue() {}
 
   virtual bool IsEmpty() const = 0;
-  virtual Tile* Top() = 0;
+  virtual const PrioritizedTile& Top() const = 0;
   virtual void Pop() = 0;
 
  protected:

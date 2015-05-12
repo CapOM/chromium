@@ -36,6 +36,18 @@ class SmoothnessToughFiltersCases(benchmark.Benchmark):
     return 'smoothness.tough_filters_cases'
 
 
+class SmoothnessToughPathRenderingCases(benchmark.Benchmark):
+  """Tests a selection of pages with SVG and 2D Canvas paths.
+
+  Measures frame rate and a variety of other statistics.  """
+  test = smoothness.Smoothness
+  page_set = page_sets.ToughPathRenderingCasesPageSet
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.tough_path_rendering_cases'
+
+
 # crbug.com/388877, crbug.com/396127
 @benchmark.Disabled('mac', 'win', 'android')
 class SmoothnessToughCanvasCases(benchmark.Benchmark):
@@ -120,7 +132,7 @@ class SmoothnessKeyMobileSitesWithSlimmingPaint(benchmark.Benchmark):
 
 
 class SmoothnessToughAnimationCases(benchmark.Benchmark):
-  test = smoothness.Smoothness
+  test = smoothness.SmoothnessWithRestart
   page_set = page_sets.ToughAnimationCasesPageSet
 
   @classmethod
@@ -172,6 +184,38 @@ class SmoothnessGpuRasterizationKeyMobileSites(benchmark.Benchmark):
   @classmethod
   def Name(cls):
     return 'smoothness.gpu_rasterization.key_mobile_sites_smooth'
+
+
+class SmoothnessGpuRasterizationToughPathRenderingCases(benchmark.Benchmark):
+  """Tests a selection of pages with SVG and 2D canvas paths with GPU
+  rasterization.
+  """
+  tag = 'gpu_rasterization'
+  test = smoothness.Smoothness
+  page_set = page_sets.ToughPathRenderingCasesPageSet
+
+  def CustomizeBrowserOptions(self, options):
+    silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.gpu_rasterization.tough_path_rendering_cases'
+
+
+class SmoothnessGpuRasterizationFiltersCases(benchmark.Benchmark):
+  """Tests a selection of pages with SVG and CSS filter effects with GPU
+  rasterization.
+  """
+  tag = 'gpu_rasterization'
+  test = smoothness.Smoothness
+  page_set = page_sets.ToughFiltersCasesPageSet
+
+  def CustomizeBrowserOptions(self, options):
+    silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
+
+  @classmethod
+  def Name(cls):
+    return 'smoothness.gpu_rasterization.tough_filters_cases'
 
 
 @benchmark.Enabled('android')

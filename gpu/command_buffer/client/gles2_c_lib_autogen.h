@@ -167,6 +167,21 @@ void GLES2CompressedTexImage3D(GLenum target,
                                               width, height, depth, border,
                                               imageSize, data);
 }
+void GLES2CompressedTexSubImage3D(GLenum target,
+                                  GLint level,
+                                  GLint xoffset,
+                                  GLint yoffset,
+                                  GLint zoffset,
+                                  GLsizei width,
+                                  GLsizei height,
+                                  GLsizei depth,
+                                  GLenum format,
+                                  GLsizei imageSize,
+                                  const void* data) {
+  gles2::GetGLContext()->CompressedTexSubImage3D(
+      target, level, xoffset, yoffset, zoffset, width, height, depth, format,
+      imageSize, data);
+}
 void GLES2CopyBufferSubData(GLenum readtarget,
                             GLenum writetarget,
                             GLintptr readoffset,
@@ -512,6 +527,9 @@ void GLES2GetUniformfv(GLuint program, GLint location, GLfloat* params) {
 }
 void GLES2GetUniformiv(GLuint program, GLint location, GLint* params) {
   gles2::GetGLContext()->GetUniformiv(program, location, params);
+}
+void GLES2GetUniformuiv(GLuint program, GLint location, GLuint* params) {
+  gles2::GetGLContext()->GetUniformuiv(program, location, params);
 }
 void GLES2GetUniformIndices(GLuint program,
                             GLsizei count,
@@ -1505,6 +1523,10 @@ extern const NameToFunc g_gles2_function_table[] = {
      reinterpret_cast<GLES2FunctionPointer>(glCompressedTexImage3D),
     },
     {
+     "glCompressedTexSubImage3D",
+     reinterpret_cast<GLES2FunctionPointer>(glCompressedTexSubImage3D),
+    },
+    {
      "glCopyBufferSubData",
      reinterpret_cast<GLES2FunctionPointer>(glCopyBufferSubData),
     },
@@ -1808,6 +1830,10 @@ extern const NameToFunc g_gles2_function_table[] = {
     {
      "glGetUniformiv",
      reinterpret_cast<GLES2FunctionPointer>(glGetUniformiv),
+    },
+    {
+     "glGetUniformuiv",
+     reinterpret_cast<GLES2FunctionPointer>(glGetUniformuiv),
     },
     {
      "glGetUniformIndices",

@@ -31,6 +31,8 @@
 #include "chrome/browser/android/foreign_session_helper.h"
 #include "chrome/browser/android/fullscreen/fullscreen_infobar_delegate.h"
 #include "chrome/browser/android/intent_helper.h"
+#include "chrome/browser/android/java_exception_reporter.h"
+#include "chrome/browser/android/large_icon_bridge.h"
 #include "chrome/browser/android/location_settings_impl.h"
 #include "chrome/browser/android/logo_bridge.h"
 #include "chrome/browser/android/metrics/launch_metrics.h"
@@ -211,8 +213,10 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
      invalidation::InvalidationServiceFactoryAndroid::Register},
     {"ShortcutHelper", ShortcutHelper::RegisterShortcutHelper},
     {"IntentHelper", RegisterIntentHelper},
+    {"JavaExceptionReporter", RegisterJavaExceptionReporterJni},
     {"JavascriptAppModalDialog",
      JavascriptAppModalDialogAndroid::RegisterJavascriptAppModalDialog},
+    {"LargeIconBridge", LargeIconBridge::RegisterLargeIconBridge},
     {"LaunchMetrics", metrics::RegisterLaunchMetrics},
     {"LayerTitleCache", chrome::android::RegisterLayerTitleCache},
     {"LocationSettings", LocationSettingsImpl::Register},

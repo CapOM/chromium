@@ -66,7 +66,9 @@ class ImageDecoder : public content::UtilityProcessHostClient {
 
   enum ImageCodec {
     DEFAULT_CODEC = 0,  // Uses WebKit image decoding (via WebImage).
+#if defined(OS_CHROMEOS)
     ROBUST_JPEG_CODEC,  // Restrict decoding to robust jpeg codec.
+#endif  // defined(OS_CHROMEOS)
   };
 
   // Calls StartWithOptions() with ImageCodec::DEFAULT_CODEC and
@@ -117,7 +119,12 @@ class ImageDecoder : public content::UtilityProcessHostClient {
   // |kBatchModeTimeoutSeconds|.
   void StopBatchMode();
 
+  // Fails all outstanding requests.
+  void FailAllRequests();
+
   // Overidden from UtilityProcessHostClient.
+  void OnProcessCrashed(int exit_code) override;
+  void OnProcessLaunchFailed() override;
   bool OnMessageReceived(const IPC::Message& message) override;
 
   // IPC message handlers.

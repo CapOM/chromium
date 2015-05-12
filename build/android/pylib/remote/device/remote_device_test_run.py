@@ -173,7 +173,7 @@ class RemoteDeviceTestRun(test_run.TestRun):
     """Download the test results from remote device service.
 
     Args:
-      results_path: path to download results to.
+      results_path: Path to download appurify results zipfile.
     """
     if results_path:
       logging.info('Downloading results to %s.' % results_path)

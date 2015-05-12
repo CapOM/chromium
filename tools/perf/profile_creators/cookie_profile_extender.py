@@ -3,7 +3,11 @@
 # found in the LICENSE file.
 import multiprocessing
 import os
-import sqlite3
+
+try:
+  import sqlite3  # Not present on ChromeOS DUT.
+except ImportError:
+  pass
 
 import page_sets
 
@@ -24,6 +28,13 @@ class CookieProfileExtender(
     # javascript. There's not much to be done about the former, and having one
     # tab per logical core appears close to optimum for the latter.
     maximum_batch_size = multiprocessing.cpu_count()
+
+    # Web page replay cannot handle too many requests over a duration of 4
+    # minutes (maximum segment lifetime), as it may exhaust the socket pool.
+    # Artificially limit the rate to no more than 5 simultaneous tab loads.
+    if not finder_options.use_live_sites:
+      maximum_batch_size = min(5, maximum_batch_size)
+
     super(CookieProfileExtender, self).__init__(
         finder_options, maximum_batch_size)
 

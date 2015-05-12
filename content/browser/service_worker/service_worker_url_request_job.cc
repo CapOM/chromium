@@ -46,6 +46,7 @@ ServiceWorkerURLRequestJob::ServiceWorkerURLRequestJob(
     const ResourceContext* resource_context,
     FetchRequestMode request_mode,
     FetchCredentialsMode credentials_mode,
+    bool is_main_resource_load,
     RequestContextType request_context_type,
     RequestContextFrameType frame_type,
     scoped_refptr<ResourceRequestBody> body)
@@ -59,6 +60,7 @@ ServiceWorkerURLRequestJob::ServiceWorkerURLRequestJob(
       stream_pending_buffer_size_(0),
       request_mode_(request_mode),
       credentials_mode_(credentials_mode),
+      is_main_resource_load_(is_main_resource_load),
       request_context_type_(request_context_type),
       frame_type_(frame_type),
       fall_back_required_(false),
@@ -486,9 +488,13 @@ void ServiceWorkerURLRequestJob::DidDispatchFetchEvent(
     return;
 
   if (status != SERVICE_WORKER_OK) {
-    // Dispatching event has been failed, returns an error response.
-    // TODO(kinuko): Would be nice to log the error case.
-    DeliverErrorResponse();
+    // TODO(falken): Add UMA and the report error to the version.
+    if (is_main_resource_load_) {
+      response_type_ = FALLBACK_TO_NETWORK;
+      NotifyRestartRequired();
+    } else {
+      DeliverErrorResponse();
+    }
     return;
   }
 
@@ -533,8 +539,14 @@ void ServiceWorkerURLRequestJob::DidDispatchFetchEvent(
   DCHECK(version);
   const net::HttpResponseInfo* main_script_http_info =
       version->GetMainScriptHttpResponseInfo();
-  DCHECK(main_script_http_info);
-  http_response_info_.reset(new net::HttpResponseInfo(*main_script_http_info));
+  if (main_script_http_info) {
+    // In normal case |main_script_http_info| must be set while starting the
+    // ServiceWorker. But when the ServiceWorker registration database was not
+    // written correctly, it may be null.
+    // TODO(horo): Change this line to DCHECK when crbug.com/485900 is fixed.
+    http_response_info_.reset(
+        new net::HttpResponseInfo(*main_script_http_info));
+  }
 
   // Set up a request for reading the stream.
   if (response.stream_url.is_valid()) {

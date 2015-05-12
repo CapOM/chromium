@@ -72,10 +72,6 @@ const char kDisableHIDDetectionOnOOBE[] = "disable-hid-detection-on-oobe";
 // Avoid doing expensive animations upon login.
 const char kDisableLoginAnimations[] = "disable-login-animations";
 
-// Disable login/lock UI (user pods) scrolling into view on JS side when virtual
-// keyboard is shown.
-const char kDisableLoginScrollIntoView[] = "disable-login-scroll-into-view";
-
 // Disable new channel switcher UI.
 const char kDisableNewChannelSwitcherUI[] = "disable-new-channel-switcher-ui";
 
@@ -119,8 +115,8 @@ const char kDisableDeviceDisabling[] = "disable-device-disabling";
 // chrome://settings/languages.
 const char kEnableNewKoreanIme[] = "enable-new-korean-ime";
 
-// If this switch is set, the input view keyboard will disable materia design.
-const char kDisableNewMDInputView[] = "disable-new-md-input-view";
+// Disables mtp write support.
+const char kDisableMtpWriteSupport[] = "disable-mtp-write-support";
 
 // If this switch is set, the options for suggestions as typing on physical
 // keyboard will be enabled.
@@ -132,14 +128,8 @@ const char kEnablePhysicalKeyboardAutocorrect[] =
 const char kDisablePhysicalKeyboardAutocorrect[] =
     "disable-physical-keyboard-autocorrect";
 
-// If this switch is set, the voice input will be disabled.
-const char kDisableVoiceInput[] = "disable-voice-input";
-
 // Enabled sharing assets for installed default apps.
 const char kEnableExtensionAssetsSharing[]  = "enable-extension-assets-sharing";
-
-// Enables mtp write support.
-const char kEnableMtpWriteSupport[] = "enable-mtp-write-support";
 
 // Enables notifications about captive portals in session.
 const char kEnableNetworkPortalNotification[] =
@@ -219,6 +209,10 @@ const char kHostPairingOobe[] = "host-pairing-oobe";
 // turn on multi-profile feature on ChromeOS.
 const char kIgnoreUserProfileMappingForTests[] =
     "ignore-user-profile-mapping-for-tests";
+
+// File to load internal display ICC file from.
+const char kInternalDisplayColorProfileFile[] =
+    "internal-display-color-profile-file";
 
 // Enables Chrome-as-a-login-manager behavior.
 const char kLoginManager[] = "login-manager";

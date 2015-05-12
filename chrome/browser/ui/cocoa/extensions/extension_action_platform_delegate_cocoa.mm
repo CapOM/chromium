@@ -24,6 +24,7 @@
 #include "content/public/browser/notification_source.h"
 #include "extensions/browser/notification_types.h"
 #include "extensions/common/extension.h"
+#include "extensions/common/feature_switch.h"
 
 namespace {
 
@@ -55,20 +56,11 @@ ExtensionActionPlatformDelegateCocoa::ExtensionActionPlatformDelegateCocoa(
 ExtensionActionPlatformDelegateCocoa::~ExtensionActionPlatformDelegateCocoa() {
 }
 
-bool ExtensionActionPlatformDelegateCocoa::IsMenuRunning() const {
-  // TODO(devlin): Also account for context menus.
-  return controller_->is_showing_popup();
-}
-
 void ExtensionActionPlatformDelegateCocoa::RegisterCommand() {
   // Commands are handled elsewhere for Cocoa.
 }
 
 void ExtensionActionPlatformDelegateCocoa::OnDelegateSet() {
-  registrar_.Add(
-      this,
-      extensions::NOTIFICATION_EXTENSION_HOST_VIEW_SHOULD_CLOSE,
-      content::Source<Profile>(controller_->browser()->profile()));
   registrar_.Add(
       this,
       GetNotificationTypeForAction(*controller_->extension_action()),
@@ -106,15 +98,16 @@ NSPoint ExtensionActionPlatformDelegateCocoa::GetPopupPoint() const {
           controller_->browser()->window()->GetNativeWindow()];
   NSPoint popupPoint;
   if (controller_->extension_action()->action_type() ==
-          extensions::ActionInfo::TYPE_PAGE) {
-    popupPoint = [windowController locationBarBridge]->GetPageActionBubblePoint(
-        controller_->extension_action());
-  } else {
-    DCHECK_EQ(extensions::ActionInfo::TYPE_BROWSER,
-              controller_->extension_action()->action_type());
+          extensions::ActionInfo::TYPE_BROWSER ||
+      extensions::FeatureSwitch::extension_action_redesign()->IsEnabled()) {
     BrowserActionsController* actionsController =
         [[windowController toolbarController] browserActionsController];
     popupPoint = [actionsController popupPointForId:controller_->GetId()];
+  } else {
+    DCHECK_EQ(extensions::ActionInfo::TYPE_PAGE,
+              controller_->extension_action()->action_type());
+    popupPoint = [windowController locationBarBridge]->GetPageActionBubblePoint(
+        controller_->extension_action());
   }
   return popupPoint;
 }
@@ -124,16 +117,6 @@ void ExtensionActionPlatformDelegateCocoa::Observe(
     const content::NotificationSource& source,
     const content::NotificationDetails& details) {
   switch (type) {
-    case extensions::NOTIFICATION_EXTENSION_HOST_VIEW_SHOULD_CLOSE: {
-      extensions::ExtensionHost* host =
-          content::Details<extensions::ExtensionHost>(details).ptr();
-      if (host->extension_id() == controller_->GetId()) {
-        ExtensionPopupController* popup = [ExtensionPopupController popup];
-        if (popup && ![popup isClosing] && [popup extensionViewHost] == host)
-          [popup close];
-      }
-      break;
-    }
     case extensions::NOTIFICATION_EXTENSION_COMMAND_BROWSER_ACTION_MAC:
     case extensions::NOTIFICATION_EXTENSION_COMMAND_PAGE_ACTION_MAC: {
       DCHECK_EQ(type,

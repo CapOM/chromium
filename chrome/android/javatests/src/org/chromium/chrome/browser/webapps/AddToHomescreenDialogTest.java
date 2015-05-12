@@ -4,8 +4,8 @@
 
 package org.chromium.chrome.browser.webapps;
 
-import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.support.v7.app.AlertDialog;
 import android.test.suitebuilder.annotation.SmallTest;
 
 import org.chromium.base.ThreadUtils;
@@ -47,7 +47,8 @@ public class AddToHomescreenDialogTest extends ChromeShellTestBase {
 
                 assertTrue(dialog.isShowing());
 
-                assertNotNull(dialog.findViewById(R.id.title));
+                assertNotNull(dialog.findViewById(R.id.spinny));
+                assertNotNull(dialog.findViewById(R.id.icon));
                 assertNotNull(dialog.findViewById(R.id.text));
                 assertNotNull(dialog.getButton(DialogInterface.BUTTON_POSITIVE));
                 assertNotNull(dialog.getButton(DialogInterface.BUTTON_NEGATIVE));

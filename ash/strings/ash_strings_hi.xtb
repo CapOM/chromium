@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">बैटरी पूर्ण</translation>
 <translation id="6895424601869865703"><ph name="GIVEN_NAME"/> के लिए नया खाता जोड़ें</translation>
 <translation id="1270290102613614947">ऑन-स्‍क्रीन कीबोर्ड अक्षम है</translation>
-<translation id="1057289296854808272">घूर्णन चालू (बदलने के लिए यहां टैप करें)</translation>
+<translation id="5548285847212963613">&quot;<ph name="EXTENSION_NAME"/>&quot; एक्‍सटेंशन इस नेटवर्क से कनेक्‍ट करने में सहायता कर सकता है.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> और <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">ओवरफ़्लो बटन</translation>
 <translation id="7904094684485781019">इस खाते के व्यवस्थापक ने एकाधिक प्रवेश को अस्वीकार कर दिया है.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">स्थिति ट्रे</translation>
 <translation id="2248649616066688669">आप अपने Chrome बुक का उपयोग बाहरी डिस्प्ले से कनेक्ट रहते हुए कर सकते हैं, भले ही लिड बंद हो.</translation>
 <translation id="2946640296642327832">ब्लूटूथ सक्षम करें</translation>
+<translation id="5537725057119320332">कास्‍ट करें</translation>
 <translation id="6459472438155181876"><ph name="DISPLAY_NAME"/> पर स्क्रीन विस्तृत कर रहा है</translation>
 <translation id="8206859287963243715">सेलुलर</translation>
 <translation id="6596816719288285829">IP पता</translation>
@@ -39,7 +40,6 @@
 स्विच करने के लिए Shift + Alt दबाएं.</translation>
 <translation id="6043994281159824495">अब प्रस्थान करें</translation>
 <translation id="2127372758936585790">कम-शक्ति वाला चार्जर</translation>
-<translation id="4625920103690741805">घूर्णन लॉक किया गया (बदलने के लिए यहां टैप करें)</translation>
 <translation id="3799026279081545374">आपका चार्जर खराब हो सकता है. यदि आप यूएस में रहते हैं, तो कृपया सहायता प्राप्त करने और रिप्लेसमेंट के लिए 866-628-1371 पर कॉल करें. यदि आप यूके में रहते हैं, तो कृपया 0800-026-0613 पर कॉल करें. यदि आप आयरलैंड में रहते हैं, तो कृपया 1-800-832-664 पर कॉल करें. यदि आप कनाडा में रहते हैं, तो कृपया 866-628-1372 पर कॉल करें. यदि आप ऑस्ट्रेलिया में रहते हैं, तो कृपया 1-800-067-460 पर कॉल करें.</translation>
 <translation id="3891340733213178823">प्रस्थान करने के लिए दो बार Ctrl+Shift+Q दबाएं.</translation>
 <translation id="5871632337994001636">डिवाइस को प्रबंधित करें...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">शेल्फ़ को स्वत: छिपाएं</translation>
 <translation id="7573962313813535744">डॉक मोड</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127"><ph name="COUNT"/> फ़ाइल/फ़ाइलें समन्वयित हो रही है/हो रही हैं</translation>
 <translation id="5958529069007801266">पर्यवेक्षित उपयोगकर्ता</translation>
 <translation id="3709443003275901162">9 से अधिक</translation>
 <translation id="639644700271529076">CAPS LOCK बंद है</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">अधिक जानें</translation>
 <translation id="7168224885072002358"><ph name="TIMEOUT_SECONDS"/> में पुराने रिज़ॉल्यूशन में वापस लौट रहा है</translation>
 <translation id="743058460480092004">कैमरे और माइक्रोफ़ोन का उपयोग हो रहा है.</translation>
+<translation id="6550675742724504774">विकल्प</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">&quot;<ph name="FROM_LOCALE"/>&quot; में पुन: बदलें (फिर से आरंभ करने की आवश्यकता है)</translation>
 <translation id="8103386449138765447">SMS संदेश: <ph name="MESSAGE_COUNT"/></translation>

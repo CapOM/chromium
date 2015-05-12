@@ -45,6 +45,9 @@ SingleThreadProxy::SingleThreadProxy(
       client_(client),
       timing_history_(layer_tree_host->rendering_stats_instrumentation()),
       next_frame_is_newly_committed_frame_(false),
+#if DCHECK_IS_ON()
+      inside_impl_frame_(false),
+#endif
       inside_draw_(false),
       defer_commits_(false),
       animate_requested_(false),
@@ -586,6 +589,9 @@ void SingleThreadProxy::OnDrawForOutputSurface() {
 void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
   TRACE_EVENT0("cc,benchmark", "SingleThreadProxy::CompositeImmediately");
   DCHECK(Proxy::IsMainThread());
+#if DCHECK_IS_ON()
+  DCHECK(!inside_impl_frame_);
+#endif
   base::AutoReset<bool> inside_composite(&inside_synchronous_composite_, true);
 
   if (layer_tree_host_->output_surface_lost()) {
@@ -596,10 +602,21 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
       return;
   }
 
+  BeginFrameArgs begin_frame_args(BeginFrameArgs::Create(
+      BEGINFRAME_FROM_HERE, frame_begin_time, base::TimeTicks(),
+      BeginFrameArgs::DefaultInterval(), BeginFrameArgs::NORMAL));
+
+  // Start the impl frame.
   {
-    BeginFrameArgs begin_frame_args(BeginFrameArgs::Create(
-        BEGINFRAME_FROM_HERE, frame_begin_time, base::TimeTicks(),
-        BeginFrameArgs::DefaultInterval(), BeginFrameArgs::NORMAL));
+    DebugScopedSetImplThread impl(this);
+    WillBeginImplFrame(begin_frame_args);
+  }
+
+  // Run the "main thread" and get it to commit.
+  {
+#if DCHECK_IS_ON()
+    DCHECK(inside_impl_frame_);
+#endif
     DoBeginMainFrame(begin_frame_args);
     DoCommit();
 
@@ -607,8 +624,9 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
         << "Commit should always succeed and transfer promises.";
   }
 
+  // Finish the impl frame.
   {
-    DebugScopedSetImplThread impl(const_cast<SingleThreadProxy*>(this));
+    DebugScopedSetImplThread impl(this);
     if (layer_tree_host_impl_->settings().impl_side_painting) {
       layer_tree_host_impl_->ActivateSyncTree();
       DCHECK(!layer_tree_host_impl_->active_tree()
@@ -620,12 +638,14 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
     DoAnimate();
 
     LayerTreeHostImpl::FrameData frame;
-    DoComposite(frame_begin_time, &frame);
+    DoComposite(&frame);
 
     // DoComposite could abort, but because this is a synchronous composite
     // another draw will never be scheduled, so break remaining promises.
     layer_tree_host_impl_->active_tree()->BreakSwapPromises(
         SwapPromise::SWAP_FAILS);
+
+    DidFinishImplFrame();
   }
 }
 
@@ -660,8 +680,7 @@ void SingleThreadProxy::ScheduleRequestNewOutputSurface() {
   }
 }
 
-DrawResult SingleThreadProxy::DoComposite(base::TimeTicks frame_begin_time,
-                                          LayerTreeHostImpl::FrameData* frame) {
+DrawResult SingleThreadProxy::DoComposite(LayerTreeHostImpl::FrameData* frame) {
   TRACE_EVENT0("cc", "SingleThreadProxy::DoComposite");
   DCHECK(!layer_tree_host_->output_surface_lost());
 
@@ -700,7 +719,7 @@ DrawResult SingleThreadProxy::DoComposite(base::TimeTicks frame_begin_time,
       tracked_objects::ScopedTracker tracking_profile3(
           FROM_HERE_WITH_EXPLICIT_FUNCTION(
               "461509 SingleThreadProxy::DoComposite3"));
-      layer_tree_host_impl_->DrawLayers(frame, frame_begin_time);
+      layer_tree_host_impl_->DrawLayers(frame);
     }
     // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
     // is fixed.
@@ -716,12 +735,6 @@ DrawResult SingleThreadProxy::DoComposite(base::TimeTicks frame_begin_time,
         FROM_HERE_WITH_EXPLICIT_FUNCTION(
             "461509 SingleThreadProxy::DoComposite5"));
     layer_tree_host_impl_->UpdateAnimationState(start_ready_animations);
-    // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
-    // is fixed.
-    tracked_objects::ScopedTracker tracking_profile6(
-        FROM_HERE_WITH_EXPLICIT_FUNCTION(
-            "461509 SingleThreadProxy::DoComposite6"));
-    layer_tree_host_impl_->ResetCurrentBeginFrameArgsForNextFrame();
 
     // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
     // is fixed.
@@ -791,6 +804,11 @@ void SingleThreadProxy::SetAuthoritativeVSyncInterval(
 }
 
 void SingleThreadProxy::WillBeginImplFrame(const BeginFrameArgs& args) {
+#if DCHECK_IS_ON()
+  DCHECK(!inside_impl_frame_)
+      << "WillBeginImplFrame called while already inside an impl frame!";
+  inside_impl_frame_ = true;
+#endif
   layer_tree_host_impl_->WillBeginImplFrame(args);
 }
 
@@ -803,17 +821,23 @@ void SingleThreadProxy::ScheduledActionSendBeginMainFrame() {
   // fall on the next.  Doing it asynchronously instead matches the semantics of
   // ThreadProxy::SetNeedsCommit where SetNeedsCommit will not cause a
   // synchronous commit.
+#if DCHECK_IS_ON()
+  DCHECK(inside_impl_frame_)
+      << "BeginMainFrame should only be sent inside a BeginImplFrame";
+#endif
+  const BeginFrameArgs& begin_frame_args =
+      layer_tree_host_impl_->CurrentBeginFrameArgs();
+
   MainThreadTaskRunner()->PostTask(
-      FROM_HERE,
-      base::Bind(&SingleThreadProxy::BeginMainFrame,
-                 weak_factory_.GetWeakPtr()));
+      FROM_HERE, base::Bind(&SingleThreadProxy::BeginMainFrame,
+                            weak_factory_.GetWeakPtr(), begin_frame_args));
 }
 
 void SingleThreadProxy::SendBeginMainFrameNotExpectedSoon() {
   layer_tree_host_->BeginMainFrameNotExpectedSoon();
 }
 
-void SingleThreadProxy::BeginMainFrame() {
+void SingleThreadProxy::BeginMainFrame(const BeginFrameArgs& begin_frame_args) {
   commit_requested_ = false;
   animate_requested_ = false;
 
@@ -849,8 +873,6 @@ void SingleThreadProxy::BeginMainFrame() {
   // a commit here.
   commit_requested_ = true;
 
-  const BeginFrameArgs& begin_frame_args =
-      layer_tree_host_impl_->CurrentBeginFrameArgs();
   DoBeginMainFrame(begin_frame_args);
 }
 
@@ -902,8 +924,7 @@ void SingleThreadProxy::BeginMainFrameAbortedOnImplThread(
 DrawResult SingleThreadProxy::ScheduledActionDrawAndSwapIfPossible() {
   DebugScopedSetImplThread impl(this);
   LayerTreeHostImpl::FrameData frame;
-  return DoComposite(layer_tree_host_impl_->CurrentBeginFrameArgs().frame_time,
-                     &frame);
+  return DoComposite(&frame);
 }
 
 DrawResult SingleThreadProxy::ScheduledActionDrawAndSwapForced() {
@@ -967,8 +988,13 @@ base::TimeDelta SingleThreadProxy::CommitToActivateDurationEstimate() {
   return timing_history_.CommitToActivateDurationEstimate();
 }
 
-void SingleThreadProxy::DidBeginImplFrameDeadline() {
-  layer_tree_host_impl_->ResetCurrentBeginFrameArgsForNextFrame();
+void SingleThreadProxy::DidFinishImplFrame() {
+  layer_tree_host_impl_->DidFinishImplFrame();
+#if DCHECK_IS_ON()
+  DCHECK(inside_impl_frame_)
+      << "DidFinishImplFrame called while not inside an impl frame!";
+  inside_impl_frame_ = false;
+#endif
 }
 
 void SingleThreadProxy::SendBeginFramesToChildren(const BeginFrameArgs& args) {

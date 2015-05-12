@@ -111,7 +111,8 @@ class ScrollingPage(page_module.Page):
 
 
 class SmoothGestureTest(page_test_test_case.PageTestTestCase):
-  @decorators.Disabled('mac')  # crbug.com/450171.
+  @decorators.Disabled('mac',       # crbug.com/450171
+                       'chromeos')  # crbug.com/483212
   def testSmoothGestureAdjusted(self):
     ps = self.CreateEmptyPageSet()
     ps.AddUserStory(ScrollingPage(
@@ -123,19 +124,16 @@ class SmoothGestureTest(page_test_test_case.PageTestTestCase):
         # pylint: disable=bad-super-call
         super(ScrollingGestureTestMeasurement, self).__init__()
 
-      def WillRunActions(self, _page, tab):
+      def WillNavigateToPage(self, _page, tab):
         options = tracing_options.TracingOptions()
         options.enable_chrome_trace = True
         tab.browser.platform.tracing_controller.Start(
           options, tracing_category_filter.TracingCategoryFilter())
 
-      def DidRunActions(self, _page, tab):
+      def ValidateAndMeasurePage(self, _page, tab, _results):
         models.append(model_module.TimelineModel(
           tab.browser.platform.tracing_controller.Stop()))
         tab_ids.append(tab.id)
-
-      def ValidateAndMeasurePage(self, _page, _tab, _results):
-         pass
 
     self.RunMeasurement(ScrollingGestureTestMeasurement(), ps)
     timeline_model = models[0]

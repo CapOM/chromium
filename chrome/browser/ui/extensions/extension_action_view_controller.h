@@ -61,7 +61,7 @@ class ExtensionActionViewController
   void HidePopup() override;
   gfx::NativeView GetPopupNativeView() override;
   ui::MenuModel* GetContextMenu() override;
-  bool IsMenuRunning() const override;
+  void OnContextMenuClosed() override;
   bool CanDrag() const override;
   bool ExecuteAction(bool by_user) override;
   void UpdateState() override;
@@ -76,14 +76,12 @@ class ExtensionActionViewController
   // Closes the active popup (whether it was this action's popup or not).
   void HideActivePopup();
 
-  // Handles cleanup after a menu closes.
-  void OnMenuClosed();
 
   // Populates |command| with the command associated with |extension|, if one
   // exists. Returns true if |command| was populated.
   bool GetExtensionCommand(extensions::Command* command);
 
-  const extensions::Extension* extension() const { return extension_; }
+  const extensions::Extension* extension() const { return extension_.get(); }
   Browser* browser() { return browser_; }
   ExtensionAction* extension_action() { return extension_action_; }
   const ExtensionAction* extension_action() const { return extension_action_; }
@@ -138,7 +136,7 @@ class ExtensionActionViewController
   void OnPopupClosed();
 
   // The extension associated with the action we're displaying.
-  const extensions::Extension* extension_;
+  scoped_refptr<const extensions::Extension> extension_;
 
   // The corresponding browser.
   Browser* browser_;

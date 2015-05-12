@@ -8,6 +8,26 @@
 
 namespace cc {
 
+namespace {
+
+void AppendTilingSetRequiredQueues(
+    const std::vector<PictureLayerImpl*>& layers,
+    ScopedPtrVector<TilingSetRasterQueueRequired>* queues) {
+  for (auto* layer : layers) {
+    if (!layer->HasValidTilePriorities())
+      continue;
+
+    scoped_ptr<TilingSetRasterQueueRequired> tiling_set_queue(
+        new TilingSetRasterQueueRequired(
+            layer->picture_layer_tiling_set(),
+            RasterTilePriorityQueueRequired::Type::REQUIRED_FOR_ACTIVATION));
+    if (!tiling_set_queue->IsEmpty())
+      queues->push_back(tiling_set_queue.Pass());
+  }
+}
+
+}  // namespace
+
 RasterTilePriorityQueueRequired::RasterTilePriorityQueueRequired() {
 }
 
@@ -15,56 +35,42 @@ RasterTilePriorityQueueRequired::~RasterTilePriorityQueueRequired() {
 }
 
 void RasterTilePriorityQueueRequired::Build(
-    const std::vector<PictureLayerImpl::Pair>& paired_layers,
+    const std::vector<PictureLayerImpl*>& active_layers,
+    const std::vector<PictureLayerImpl*>& pending_layers,
     Type type) {
   DCHECK_NE(static_cast<int>(type), static_cast<int>(Type::ALL));
   if (type == Type::REQUIRED_FOR_DRAW)
-    BuildRequiredForDraw(paired_layers);
+    BuildRequiredForDraw(active_layers);
   else
-    BuildRequiredForActivation(paired_layers);
+    BuildRequiredForActivation(active_layers, pending_layers);
 }
 
 void RasterTilePriorityQueueRequired::BuildRequiredForDraw(
-    const std::vector<PictureLayerImpl::Pair>& paired_layers) {
-  for (const auto& pair : paired_layers) {
-    if (!pair.active)
+    const std::vector<PictureLayerImpl*>& active_layers) {
+  for (const auto& layer : active_layers) {
+    if (!layer->HasValidTilePriorities())
       continue;
+
     scoped_ptr<TilingSetRasterQueueRequired> tiling_set_queue(
-        new TilingSetRasterQueueRequired(
-            pair.active->picture_layer_tiling_set(), Type::REQUIRED_FOR_DRAW));
-    if (tiling_set_queue->IsEmpty())
-      continue;
-    tiling_set_queues_.push_back(tiling_set_queue.Pass());
+        new TilingSetRasterQueueRequired(layer->picture_layer_tiling_set(),
+                                         Type::REQUIRED_FOR_DRAW));
+    if (!tiling_set_queue->IsEmpty())
+      tiling_set_queues_.push_back(tiling_set_queue.Pass());
   }
 }
 
 void RasterTilePriorityQueueRequired::BuildRequiredForActivation(
-    const std::vector<PictureLayerImpl::Pair>& paired_layers) {
-  for (const auto& pair : paired_layers) {
-    if (pair.active) {
-      scoped_ptr<TilingSetRasterQueueRequired> tiling_set_queue(
-          new TilingSetRasterQueueRequired(
-              pair.active->picture_layer_tiling_set(),
-              Type::REQUIRED_FOR_ACTIVATION));
-      if (!tiling_set_queue->IsEmpty())
-        tiling_set_queues_.push_back(tiling_set_queue.Pass());
-    }
-    if (pair.pending) {
-      scoped_ptr<TilingSetRasterQueueRequired> tiling_set_queue(
-          new TilingSetRasterQueueRequired(
-              pair.pending->picture_layer_tiling_set(),
-              Type::REQUIRED_FOR_ACTIVATION));
-      if (!tiling_set_queue->IsEmpty())
-        tiling_set_queues_.push_back(tiling_set_queue.Pass());
-    }
-  }
+    const std::vector<PictureLayerImpl*>& active_layers,
+    const std::vector<PictureLayerImpl*>& pending_layers) {
+  AppendTilingSetRequiredQueues(active_layers, &tiling_set_queues_);
+  AppendTilingSetRequiredQueues(pending_layers, &tiling_set_queues_);
 }
 
 bool RasterTilePriorityQueueRequired::IsEmpty() const {
   return tiling_set_queues_.empty();
 }
 
-Tile* RasterTilePriorityQueueRequired::Top() {
+const PrioritizedTile& RasterTilePriorityQueueRequired::Top() const {
   DCHECK(!IsEmpty());
   return tiling_set_queues_.back()->Top();
 }

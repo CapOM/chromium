@@ -28,9 +28,9 @@ namespace {
 // Callback for TYPE_URL_REQUEST_FILTERS_SET net-internals event.
 base::Value* FiltersSetCallback(Filter* filter,
                                 NetLogCaptureMode /* capture_mode */) {
-  base::DictionaryValue* event_params = new base::DictionaryValue();
+  scoped_ptr<base::DictionaryValue> event_params(new base::DictionaryValue());
   event_params->SetString("filters", filter->OrderedFilterList());
-  return event_params;
+  return event_params.release();
 }
 
 std::string ComputeMethodForRedirect(const std::string& method,
@@ -271,6 +271,10 @@ void URLRequestJob::OnSuspend() {
 }
 
 void URLRequestJob::NotifyURLRequestDestroyed() {
+}
+
+void URLRequestJob::GetConnectionAttempts(ConnectionAttempts* out) const {
+  out->clear();
 }
 
 // static
@@ -698,12 +702,11 @@ bool URLRequestJob::ReadFilteredData(int* bytes_read) {
       }
 
       // If logging all bytes is enabled, log the filtered bytes read.
-      if (rv && request() &&
-          request()->net_log().GetCaptureMode().include_socket_bytes() &&
-          filtered_data_len > 0) {
+      if (rv && request() && filtered_data_len > 0 &&
+          request()->net_log().IsCapturing()) {
         request()->net_log().AddByteTransferEvent(
-            NetLog::TYPE_URL_REQUEST_JOB_FILTERED_BYTES_READ,
-            filtered_data_len, filtered_read_buffer_->data());
+            NetLog::TYPE_URL_REQUEST_JOB_FILTERED_BYTES_READ, filtered_data_len,
+            filtered_read_buffer_->data());
       }
     } else {
       // we are done, or there is no data left.
@@ -790,9 +793,8 @@ void URLRequestJob::FollowRedirect(const RedirectInfo& redirect_info) {
 void URLRequestJob::OnRawReadComplete(int bytes_read) {
   DCHECK(raw_read_buffer_.get());
   // If |filter_| is non-NULL, bytes will be logged after it is applied instead.
-  if (!filter_.get() && request() &&
-      request()->net_log().GetCaptureMode().include_socket_bytes() &&
-      bytes_read > 0) {
+  if (!filter_.get() && request() && bytes_read > 0 &&
+      request()->net_log().IsCapturing()) {
     request()->net_log().AddByteTransferEvent(
         NetLog::TYPE_URL_REQUEST_JOB_BYTES_READ,
         bytes_read, raw_read_buffer_->data());

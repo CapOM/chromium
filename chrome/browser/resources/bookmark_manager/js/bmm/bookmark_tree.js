@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-'use strict';
 
 cr.define('bmm', function() {
+  'use strict';
+
   /**
    * The id of the bookmark root.
    * @type {string}
