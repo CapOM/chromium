@@ -146,18 +146,21 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::RemoveDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::SetDiscoveryFilter(
     scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
+  error_callback.Run();
 }
 
 void BluetoothAdapterAndroid::RemovePairingDelegateInternal(
