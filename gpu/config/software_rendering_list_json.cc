@@ -18,7 +18,7 @@ const char kSoftwareRenderingListJson[] = LONG_STRING_CONST(
 {
   "name": "software rendering list",
   // Please update the version number whenever you change this file.
-  "version": "10.6",
+  "version": "10.8",
   "entries": [
     {
       "id": 1,
@@ -1042,21 +1042,6 @@ LONG_STRING_CONST(
       ]
     },
     {
-      "id": 99,
-      "description": "GPU rasterization is blacklisted on non-Android",
-      "cr_bugs": [362779],
-      "exceptions": [
-        {
-          "os": {
-            "type": "android"
-          }
-        }
-      ],
-      "features": [
-        "gpu_rasterization"
-      ]
-    },
-    {
       "id": 100,
       "description": "GPU rasterization and canvas is blacklisted on Nexus 10",
       "cr_bugs": [407144],
@@ -1118,13 +1103,9 @@ LONG_STRING_CONST(
     {
       "id": 104,
       "description": "GPU raster broken on PowerVR Rogue",
-      "cr_bugs": [436331],
+      "cr_bugs": [436331, 483574],
       "os": {
-        "type": "android",
-        "version": {
-          "op": "<",
-          "value": "5.0"
-        }
+        "type": "android"
       },
       "gl_renderer": "PowerVR Rogue.*",
       "features": [

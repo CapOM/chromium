@@ -41,7 +41,8 @@ class CONTENT_EXPORT FrameTreeNode {
                 RenderViewHostDelegate* render_view_delegate,
                 RenderWidgetHostDelegate* render_widget_delegate,
                 RenderFrameHostManager::Delegate* manager_delegate,
-                const std::string& name);
+                const std::string& name,
+                SandboxFlags sandbox_flags);
 
   ~FrameTreeNode();
 
@@ -122,6 +123,10 @@ class CONTENT_EXPORT FrameTreeNode {
   }
 
   bool IsDescendantOf(FrameTreeNode* other) const;
+
+  // Return the node immediately preceding this node in its parent's
+  // |children_|, or nullptr if there is no such node.
+  FrameTreeNode* PreviousSibling() const;
 
   // Returns true if this node is in a loading state.
   bool IsLoading() const;

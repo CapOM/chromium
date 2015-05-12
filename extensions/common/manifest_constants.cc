@@ -174,6 +174,7 @@ const char kUIOverride[] = "chrome_ui_overrides";
 const char kUpdateURL[] = "update_url";
 const char kUrlHandlers[] = "url_handlers";
 const char kUrlHandlerTitle[] = "title";
+const char kUsbPrinters[] = "usb_printers";
 const char kVersion[] = "version";
 const char kVersionName[] = "version_name";
 const char kWebAccessibleResources[] = "web_accessible_resources";
@@ -183,6 +184,10 @@ const char kWebviewAccessibleResources[] = "accessible_resources";
 const char kWebviewName[] = "name";
 const char kWebviewPartitions[] = "partitions";
 const char kWhitelist[] = "whitelist";
+#if defined(OS_CHROMEOS)
+const char kFileSystemProviderCapabilities[] =
+    "file_system_provider_capabilities";
+#endif
 
 }  // namespace manifest_keys
 
@@ -708,7 +713,14 @@ const char kWebRequestConflictsWithLazyBackground[] =
     "The 'webRequest' API cannot be used with event pages.";
 #if defined(OS_CHROMEOS)
 const char kIllegalPlugins[] =
-    "Extensions cannot install plugins on Chrome OS";
+    "Extensions cannot install plugins on Chrome OS.";
+const char kInvalidFileSystemProviderMissingCapabilities[] =
+    "The 'fileSystemProvider' permission requires the "
+    "'file_system_provider_capabilities' section to be specified in the "
+    "manifest.";
+const char kInvalidFileSystemProviderMissingPermission[] =
+    "The 'file_system_provider_capabilities' section requires the "
+    "'fileSystemProvider' permission to be specified in the manifest.";
 #endif
 
 }  // namespace manifest_errors

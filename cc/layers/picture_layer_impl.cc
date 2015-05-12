@@ -54,17 +54,6 @@ const int kTileRoundUp = 64;
 
 namespace cc {
 
-PictureLayerImpl::Pair::Pair() : active(nullptr), pending(nullptr) {
-}
-
-PictureLayerImpl::Pair::Pair(PictureLayerImpl* active_layer,
-                             PictureLayerImpl* pending_layer)
-    : active(active_layer), pending(pending_layer) {
-}
-
-PictureLayerImpl::Pair::~Pair() {
-}
-
 PictureLayerImpl::PictureLayerImpl(
     LayerTreeImpl* tree_impl,
     int id,
@@ -629,9 +618,8 @@ Region PictureLayerImpl::GetInvalidationRegion() {
   return IntersectRegions(invalidation_, update_rect());
 }
 
-scoped_refptr<Tile> PictureLayerImpl::CreateTile(
-    float contents_scale,
-    const gfx::Rect& content_rect) {
+ScopedTilePtr PictureLayerImpl::CreateTile(float contents_scale,
+                                           const gfx::Rect& content_rect) {
   int flags = 0;
 
   // We don't handle solid color masks, so we shouldn't bother analyzing those.
@@ -661,14 +649,6 @@ const PictureLayerTiling* PictureLayerImpl::GetPendingOrActiveTwinTiling(
   if (!twin_layer)
     return nullptr;
   return twin_layer->tilings_->FindTilingWithScale(tiling->contents_scale());
-}
-
-PictureLayerTiling* PictureLayerImpl::GetRecycledTwinTiling(
-    const PictureLayerTiling* tiling) {
-  PictureLayerImpl* recycled_twin = GetRecycledTwinLayer();
-  if (!recycled_twin || !recycled_twin->tilings_)
-    return nullptr;
-  return recycled_twin->tilings_->FindTilingWithScale(tiling->contents_scale());
 }
 
 TilePriority::PriorityBin PictureLayerImpl::GetMaxTilePriorityBin() const {
@@ -972,12 +952,9 @@ void PictureLayerImpl::RecalculateRasterScales() {
   if (draw_properties().screen_space_transform_is_animating &&
       !ShouldAdjustRasterScaleDuringScaleAnimations()) {
     bool can_raster_at_maximum_scale = false;
-    // TODO(ajuma): If we need to deal with scale-down animations starting right
-    // as a layer gets promoted, then we'd want to have the
-    // |starting_animation_contents_scale| passed in here as a separate draw
-    // property so we could try use that when the max is too large.
-    // See crbug.com/422341.
+    bool should_raster_at_starting_scale = false;
     float maximum_scale = draw_properties().maximum_animation_contents_scale;
+    float starting_scale = draw_properties().starting_animation_contents_scale;
     if (maximum_scale) {
       gfx::Size bounds_at_maximum_scale = gfx::ToCeiledSize(
           gfx::ScaleSize(raster_source_->GetSize(), maximum_scale));
@@ -989,10 +966,23 @@ void PictureLayerImpl::RecalculateRasterScales() {
       if (maximum_area <= viewport_area)
         can_raster_at_maximum_scale = true;
     }
+    if (starting_scale && starting_scale > maximum_scale) {
+      gfx::Size bounds_at_starting_scale = gfx::ToCeiledSize(
+          gfx::ScaleSize(raster_source_->GetSize(), starting_scale));
+      int64 start_area = static_cast<int64>(bounds_at_starting_scale.width()) *
+                         static_cast<int64>(bounds_at_starting_scale.height());
+      gfx::Size viewport = layer_tree_impl()->device_viewport_size();
+      int64 viewport_area = static_cast<int64>(viewport.width()) *
+                            static_cast<int64>(viewport.height());
+      if (start_area <= viewport_area)
+        should_raster_at_starting_scale = true;
+    }
     // Use the computed scales for the raster scale directly, do not try to use
     // the ideal scale here. The current ideal scale may be way too large in the
     // case of an animation with scale, and will be constantly changing.
-    if (can_raster_at_maximum_scale)
+    if (should_raster_at_starting_scale)
+      raster_contents_scale_ = starting_scale;
+    else if (can_raster_at_maximum_scale)
       raster_contents_scale_ = maximum_scale;
     else
       raster_contents_scale_ = 1.f * ideal_page_scale_ * ideal_device_scale_;
@@ -1048,6 +1038,7 @@ void PictureLayerImpl::CleanUpTilingsOnActiveLayer(
   }
 
   PictureLayerTilingSet* twin_set = twin ? twin->tilings_.get() : nullptr;
+  // TODO(vmpstr): See if this step is required without tile sharing.
   PictureLayerImpl* recycled_twin = GetRecycledTwinLayer();
   PictureLayerTilingSet* recycled_twin_set =
       recycled_twin ? recycled_twin->tilings_.get() : nullptr;
@@ -1156,7 +1147,7 @@ scoped_ptr<PictureLayerTilingSet>
 PictureLayerImpl::CreatePictureLayerTilingSet() {
   const LayerTreeSettings& settings = layer_tree_impl()->settings();
   return PictureLayerTilingSet::Create(
-      this, settings.max_tiles_for_interest_area,
+      GetTree(), this, settings.max_tiles_for_interest_area,
       layer_tree_impl()->use_gpu_rasterization()
           ? settings.gpu_rasterization_skewport_target_time_in_seconds
           : settings.skewport_target_time_in_seconds,

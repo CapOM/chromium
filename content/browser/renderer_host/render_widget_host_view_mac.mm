@@ -518,9 +518,13 @@ void RenderWidgetHostViewMac::AcceleratedWidgetSwapCompleted(
     const std::vector<ui::LatencyInfo>& all_latency_info) {
   if (!render_widget_host_)
     return;
+  base::TimeTicks swap_time = base::TimeTicks::Now();
   for (auto latency_info : all_latency_info) {
-    latency_info.AddLatencyNumber(
-        ui::INPUT_EVENT_LATENCY_TERMINATED_FRAME_SWAP_COMPONENT, 0, 0);
+    latency_info.AddLatencyNumberWithTimestamp(
+        ui::INPUT_EVENT_GPU_SWAP_BUFFER_COMPONENT, 0, 0, swap_time, 1);
+    latency_info.AddLatencyNumberWithTimestamp(
+        ui::INPUT_EVENT_LATENCY_TERMINATED_FRAME_SWAP_COMPONENT, 0, 0,
+        swap_time, 1);
     render_widget_host_->FrameSwapped(latency_info);
   }
 }
@@ -549,6 +553,7 @@ RenderWidgetHostViewMac::RenderWidgetHostViewMac(RenderWidgetHost* widget,
       can_compose_inline_(true),
       browser_compositor_state_(BrowserCompositorDestroyed),
       browser_compositor_placeholder_(new BrowserCompositorMacPlaceholder),
+      page_at_minimum_scale_(true),
       is_loading_(false),
       allow_pause_for_resize_or_repaint_(true),
       is_guest_view_hack_(is_guest_view_hack),
@@ -841,7 +846,10 @@ void RenderWidgetHostViewMac::SendVSyncParametersToRenderer() {
     return;
   }
 
-  render_widget_host_->UpdateVSyncParameters(vsync_timebase_, vsync_interval_);
+  if (browser_compositor_) {
+    browser_compositor_->compositor()->vsync_manager()->UpdateVSyncParameters(
+        vsync_timebase_, vsync_interval_);
+  }
 }
 
 void RenderWidgetHostViewMac::SpeakText(const std::string& text) {
@@ -985,11 +993,6 @@ void RenderWidgetHostViewMac::MovePluginWindows(
 
 void RenderWidgetHostViewMac::Focus() {
   [[cocoa_view_ window] makeFirstResponder:cocoa_view_];
-}
-
-void RenderWidgetHostViewMac::Blur() {
-  UnlockMouse();
-  [[cocoa_view_ window] makeFirstResponder:nil];
 }
 
 bool RenderWidgetHostViewMac::HasFocus() const {
@@ -1241,10 +1244,10 @@ void RenderWidgetHostViewMac::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
     ReadbackRequestCallback& callback,
-    const SkColorType color_type) {
+    const SkColorType preferred_color_type) {
   if (delegated_frame_host_) {
     delegated_frame_host_->CopyFromCompositingSurface(
-        src_subrect, dst_size, callback, color_type);
+        src_subrect, dst_size, callback, preferred_color_type);
   }
 }
 
@@ -1468,6 +1471,10 @@ void RenderWidgetHostViewMac::OnSwapCompositorFrame(
   TRACE_EVENT0("browser", "RenderWidgetHostViewMac::OnSwapCompositorFrame");
 
   last_scroll_offset_ = frame->metadata.root_scroll_offset;
+
+  page_at_minimum_scale_ = frame->metadata.page_scale_factor ==
+                           frame->metadata.min_page_scale_factor;
+
   if (frame->delegated_frame_data) {
     float scale_factor = frame->metadata.device_scale_factor;
 
@@ -1710,10 +1717,6 @@ void RenderWidgetHostViewMac::PauseForPendingResizeOrRepaintsAndDraw() {
     browser_compositor_->accelerated_widget_mac()->EndPumpingFrames();
 }
 
-SkColorType RenderWidgetHostViewMac::PreferredReadbackFormat() {
-  return kN32_SkColorType;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // gfx::DisplayObserver, public:
 
@@ -1752,7 +1755,7 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     canBeKeyView_ = YES;
     opaque_ = YES;
     focusedPluginIdentifier_ = -1;
-    lastUsedPinchEventTimestamp_ = 0;
+    pinchHasReachedZoomThreshold_ = false;
 
     // OpenGL support:
     if ([self respondsToSelector:
@@ -2284,7 +2287,13 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   [responderDelegate_ beginGestureWithEvent:event];
   gestureBeginEvent_.reset(
       new WebGestureEvent(WebInputEventFactory::gestureEvent(event, self)));
-  unusedPinchAmount_ = 0;
+
+  // If the page is at the minimum zoom level, require a threshold be reached
+  // before the pinch has an effect.
+  if (renderWidgetHostView_->page_at_minimum_scale_) {
+    pinchHasReachedZoomThreshold_ = false;
+    pinchUnusedAmount_ = 1;
+  }
 }
 
 - (void)endGestureWithEvent:(NSEvent*)event {
@@ -2299,7 +2308,6 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
     endEvent.type = WebInputEvent::GesturePinchEnd;
     renderWidgetHostView_->render_widget_host_->ForwardGestureEvent(endEvent);
     gestureBeginPinchSent_ = NO;
-    lastUsedPinchEventTimestamp_ = [event timestamp];
   }
 }
 
@@ -2412,22 +2420,14 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   if (!gestureBeginEvent_)
     return;
 
+  if (!pinchHasReachedZoomThreshold_) {
+      pinchUnusedAmount_ *= (1 + [event magnification]);
+      if (pinchUnusedAmount_ < 0.667 || pinchUnusedAmount_ > 1.5)
+          pinchHasReachedZoomThreshold_ = true;
+  }
+
   // Send a GesturePinchBegin event if none has been sent yet.
   if (!gestureBeginPinchSent_) {
-    // If less than 1 second has passed since an intentional pinch zoom
-    // was done, don't threshold zooms, because subsequent zooms are likely
-    // intentional.
-    const NSTimeInterval kSecondsUntilZoomThresholdReEnabled = 1;
-    if ([event timestamp] - lastUsedPinchEventTimestamp_ >
-        kSecondsUntilZoomThresholdReEnabled) {
-      // Require that a 40% zoom be hit before actually zooming the page,
-      // to avoid accidental zooms.
-      // http://crbug.com/478981
-      unusedPinchAmount_ += [event magnification];
-      if (unusedPinchAmount_ > -0.4 && unusedPinchAmount_ < 0.4)
-        return;
-    }
-
     WebGestureEvent beginEvent(*gestureBeginEvent_);
     beginEvent.type = WebInputEvent::GesturePinchBegin;
     renderWidgetHostView_->render_widget_host_->ForwardGestureEvent(beginEvent);
@@ -2435,8 +2435,9 @@ void RenderWidgetHostViewMac::OnDisplayMetricsChanged(
   }
 
   // Send a GesturePinchUpdate event.
-  const WebGestureEvent& updateEvent =
+  WebGestureEvent updateEvent =
       WebInputEventFactory::gestureEvent(event, self);
+  updateEvent.data.pinchUpdate.zoomDisabled = !pinchHasReachedZoomThreshold_;
   renderWidgetHostView_->render_widget_host_->ForwardGestureEvent(updateEvent);
 }
 

@@ -179,7 +179,7 @@ class SessionRestoreImpl : public content::NotificationObserver {
     }
 
     // Always create in a new window.
-    FinishedTabCreation(true, true, created_contents);
+    FinishedTabCreation(true, true, &created_contents);
 
     on_session_restored_callbacks_->Notify(
         static_cast<int>(created_contents.size()));
@@ -280,10 +280,9 @@ class SessionRestoreImpl : public content::NotificationObserver {
   // have been loaded.
   //
   // Returns the Browser that was created, if any.
-  Browser* FinishedTabCreation(
-      bool succeeded,
-      bool created_tabbed_browser,
-      const std::vector<RestoredTab>& contents_created) {
+  Browser* FinishedTabCreation(bool succeeded,
+                               bool created_tabbed_browser,
+                               std::vector<RestoredTab>* contents_created) {
     Browser* browser = nullptr;
     if (!created_tabbed_browser && always_create_tabbed_browser_) {
       browser =
@@ -299,9 +298,10 @@ class SessionRestoreImpl : public content::NotificationObserver {
 
     if (succeeded) {
       // Start Loading tabs.
-      bool active_only = SessionRestore::WillLoadActiveTabsOnly();
-      SessionRestoreDelegate::RestoreTabs(contents_created, restore_started_,
-                                          active_only);
+      if (SessionRestore::GetSmartRestoreMode() !=
+          SessionRestore::SMART_RESTORE_MODE_OFF)
+        std::stable_sort(contents_created->begin(), contents_created->end());
+      SessionRestoreDelegate::RestoreTabs(*contents_created, restore_started_);
     }
 
     if (!synchronous_) {
@@ -364,7 +364,7 @@ class SessionRestoreImpl : public content::NotificationObserver {
       content::BrowserContext::GetDefaultStoragePartition(profile_)
           ->GetDOMStorageContext()
           ->StartScavengingUnusedSessionStorage();
-      return FinishedTabCreation(false, false, *created_contents);
+      return FinishedTabCreation(false, false, created_contents);
     }
 
 #if defined(OS_CHROMEOS)
@@ -464,7 +464,7 @@ class SessionRestoreImpl : public content::NotificationObserver {
     // FinishedTabCreation will create a new TabbedBrowser and add the urls to
     // it.
     Browser* finished_browser =
-        FinishedTabCreation(true, has_tabbed_browser, *created_contents);
+        FinishedTabCreation(true, has_tabbed_browser, created_contents);
     if (finished_browser)
       last_browser = finished_browser;
 
@@ -520,9 +520,8 @@ class SessionRestoreImpl : public content::NotificationObserver {
         if (!contents)
           continue;
 
-        RestoredTab restored_tab;
-        restored_tab.contents = contents;
-        restored_tab.is_active = is_selected_tab;
+        RestoredTab restored_tab(contents, is_selected_tab,
+                                 tab.extension_app_id.empty(), tab.pinned);
         created_contents->push_back(restored_tab);
 
         // If this isn't the selected tab, there's nothing else to do.
@@ -545,9 +544,8 @@ class SessionRestoreImpl : public content::NotificationObserver {
         WebContents* contents =
             RestoreTab(tab, tab_index_offset + i, browser, false);
         if (contents) {
-          RestoredTab restored_tab;
-          restored_tab.contents = contents;
-          restored_tab.is_active = false;
+          RestoredTab restored_tab(contents, false,
+                                   tab.extension_app_id.empty(), tab.pinned);
           created_contents->push_back(restored_tab);
         }
       }
@@ -821,12 +819,14 @@ SessionRestore::CallbackSubscription
 }
 
 // static
-bool SessionRestore::WillLoadActiveTabsOnly() {
-  base::FieldTrial* trial =
-      base::FieldTrialList::Find("SessionRestoreBackgroundLoading");
-  if (!trial || trial->group_name() == "Restore")
-    return false;
-  return true;
+SessionRestore::SmartRestoreMode SessionRestore::GetSmartRestoreMode() {
+  std::string prioritize_tabs = variations::GetVariationParamValue(
+      "IntelligentSessionRestore", "PrioritizeTabs");
+  if (prioritize_tabs == "mru")
+    return SMART_RESTORE_MODE_MRU;
+  if (prioritize_tabs == "simple")
+    return SMART_RESTORE_MODE_SIMPLE;
+  return SMART_RESTORE_MODE_OFF;
 }
 
 // static

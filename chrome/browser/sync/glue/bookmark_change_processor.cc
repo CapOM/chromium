@@ -300,7 +300,7 @@ int64 BookmarkChangeProcessor::CreateSyncNode(const BookmarkNode* parent,
 
   // Associate the ID from the sync domain with the bookmark node, so that we
   // can refer back to this item later.
-  associator->Associate(child, sync_child.GetId());
+  associator->Associate(child, sync_child);
 
   return sync_child.GetId();
 }
@@ -607,7 +607,7 @@ void BookmarkChangeProcessor::ApplyChangesFromSyncModel(
     const BookmarkNode* parent = dst->parent();
     int index = parent->GetIndexOf(dst);
     if (index > -1)
-      model->Remove(parent, index);
+      model->Remove(parent->GetChild(index));
   }
 
   // A map to keep track of some reordering work we defer until later.
@@ -639,7 +639,7 @@ void BookmarkChangeProcessor::ApplyChangesFromSyncModel(
     if (synced_bookmarks_id != syncer::kInvalidId &&
         it->id == synced_bookmarks_id) {
       // This is a newly created Synced Bookmarks node. Associate it.
-      model_associator_->Associate(model->mobile_node(), it->id);
+      model_associator_->Associate(model->mobile_node(), synced_bookmarks);
       continue;
     }
 
@@ -689,7 +689,7 @@ void BookmarkChangeProcessor::ApplyChangesFromSyncModel(
                    << src.GetBookmarkSpecifics().url();
         continue;
       }
-      model_associator_->Associate(dst, src.GetId());
+      model_associator_->Associate(dst, src);
     }
 
     to_reposition.insert(std::make_pair(src.GetPositionIndex(), dst));
@@ -709,8 +709,7 @@ void BookmarkChangeProcessor::ApplyChangesFromSyncModel(
   if (foster_parent) {
     // There should be no nodes left under the foster parent.
     DCHECK_EQ(foster_parent->child_count(), 0);
-    model->Remove(foster_parent->parent(),
-                  foster_parent->parent()->GetIndexOf(foster_parent));
+    model->Remove(foster_parent);
     foster_parent = NULL;
   }
 
@@ -775,15 +774,28 @@ const BookmarkNode* BookmarkChangeProcessor::CreateBookmarkNode(
     BookmarkModel* model,
     Profile* profile,
     int index) {
+  return CreateBookmarkNode(base::UTF8ToUTF16(sync_node->GetTitle()),
+                            GURL(sync_node->GetBookmarkSpecifics().url()),
+                            sync_node, parent, model, profile, index);
+}
+
+// static
+// Creates a bookmark node under the given parent node from the given sync
+// node. Returns the newly created node.
+const BookmarkNode* BookmarkChangeProcessor::CreateBookmarkNode(
+    const base::string16& title,
+    const GURL& url,
+    syncer::BaseNode* sync_node,
+    const BookmarkNode* parent,
+    BookmarkModel* model,
+    Profile* profile,
+    int index) {
   DCHECK(parent);
 
   const BookmarkNode* node;
   if (sync_node->GetIsFolder()) {
-    node =
-        model->AddFolderWithMetaInfo(parent,
-                                     index,
-                                     base::UTF8ToUTF16(sync_node->GetTitle()),
-                                     GetBookmarkMetaInfo(sync_node).get());
+    node = model->AddFolderWithMetaInfo(parent, index, title,
+                                        GetBookmarkMetaInfo(sync_node).get());
   } else {
     // 'creation_time_us' was added in m24. Assume a time of 0 means now.
     const sync_pb::BookmarkSpecifics& specifics =
@@ -792,11 +804,7 @@ const BookmarkNode* BookmarkChangeProcessor::CreateBookmarkNode(
     base::Time create_time = (create_time_internal == 0) ?
         base::Time::Now() : base::Time::FromInternalValue(create_time_internal);
     node = model->AddURLWithCreationTimeAndMetaInfo(
-        parent,
-        index,
-        base::UTF8ToUTF16(sync_node->GetTitle()),
-        GURL(specifics.url()),
-        create_time,
+        parent, index, title, url, create_time,
         GetBookmarkMetaInfo(sync_node).get());
     if (node)
       SetBookmarkFavicon(sync_node, node, model, profile);

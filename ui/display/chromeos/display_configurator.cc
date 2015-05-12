@@ -754,6 +754,17 @@ bool DisplayConfigurator::SetColorCalibrationProfile(
   return false;
 }
 
+bool DisplayConfigurator::SetGammaRamp(
+    int64_t display_id,
+    const std::vector<GammaRampRGBEntry>& lut) {
+  for (const DisplaySnapshot* display : cached_displays_) {
+    if (display->display_id() == display_id)
+      return native_display_delegate_->SetGammaRamp(*display, lut);
+  }
+
+  return false;
+}
+
 void DisplayConfigurator::PrepareForExit() {
   configure_display_ = false;
 }
@@ -843,7 +854,8 @@ void DisplayConfigurator::RemoveObserver(Observer* observer) {
   observers_.RemoveObserver(observer);
 }
 
-void DisplayConfigurator::SuspendDisplays() {
+void DisplayConfigurator::SuspendDisplays(
+    const ConfigurationCallback& callback) {
   // If the display is off due to user inactivity and there's only a single
   // internal display connected, switch to the all-on state before
   // suspending.  This shouldn't be very noticeable to the user since the
@@ -851,13 +863,14 @@ void DisplayConfigurator::SuspendDisplays() {
   // into the "on" state, which greatly reduces resume times.
   if (requested_power_state_ == chromeos::DISPLAY_POWER_ALL_OFF) {
     SetDisplayPower(chromeos::DISPLAY_POWER_ALL_ON,
-                    kSetDisplayPowerOnlyIfSingleInternalDisplay,
-                    base::Bind(&DoNothing));
+                    kSetDisplayPowerOnlyIfSingleInternalDisplay, callback);
 
     // We need to make sure that the monitor configuration we just did actually
     // completes before we return, because otherwise the X message could be
     // racing with the HandleSuspendReadiness message.
     native_display_delegate_->SyncWithServer();
+  } else {
+    callback.Run(true);
   }
 
   displays_suspended_ = true;

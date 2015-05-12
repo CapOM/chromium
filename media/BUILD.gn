@@ -142,6 +142,10 @@ component("media") {
     "filters/source_buffer_stream.h",
     "filters/stream_parser_factory.cc",
     "filters/stream_parser_factory.h",
+    "filters/video_cadence_estimator.cc",
+    "filters/video_cadence_estimator.h",
+    "filters/video_renderer_algorithm.cc",
+    "filters/video_renderer_algorithm.h",
     "filters/vp8_bool_decoder.cc",
     "filters/vp8_bool_decoder.h",
     "filters/vp8_parser.cc",
@@ -515,8 +519,10 @@ test("media_unittests") {
     "filters/h264_parser_unittest.cc",
     "filters/jpeg_parser_unittest.cc",
     "filters/source_buffer_stream_unittest.cc",
+    "filters/video_cadence_estimator_unittest.cc",
     "filters/video_decoder_selector_unittest.cc",
     "filters/video_frame_stream_unittest.cc",
+    "filters/video_renderer_algorithm_unittest.cc",
     "filters/vp8_bool_decoder_unittest.cc",
     "filters/vp8_parser_unittest.cc",
     "formats/common/offset_byte_queue_unittest.cc",
@@ -657,6 +663,20 @@ test("media_perftests") {
   if (media_use_ffmpeg) {
     deps += [ "//third_party/ffmpeg" ]  # Direct dependency required to inherit config.
   }
+}
+
+# For running the subset of media_unittests that might require audio hardware
+# separately on GPU bots. media_unittests includes these too.
+test("audio_unittests") {
+  sources = [
+    "base/run_all_unittests.cc",
+  ]
+  deps = [
+    ":test_support",
+    "//base/test:test_support",
+    "//media/audio:unittests",
+    "//ui/gfx:test_support",
+  ]
 }
 
 source_set("test_support") {

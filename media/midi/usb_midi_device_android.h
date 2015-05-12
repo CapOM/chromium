@@ -12,12 +12,13 @@
 #include "base/android/scoped_java_ref.h"
 #include "base/basictypes.h"
 #include "base/callback.h"
-#include "media/base/media_export.h"
 #include "media/midi/usb_midi_device.h"
+#include "media/midi/usb_midi_export.h"
 
 namespace media {
+namespace midi {
 
-class MEDIA_EXPORT UsbMidiDeviceAndroid : public UsbMidiDevice {
+class USB_MIDI_EXPORT UsbMidiDeviceAndroid : public UsbMidiDevice {
  public:
   typedef base::android::ScopedJavaLocalRef<jobject> ObjectRef;
 
@@ -59,6 +60,7 @@ class MEDIA_EXPORT UsbMidiDeviceAndroid : public UsbMidiDevice {
   DISALLOW_IMPLICIT_CONSTRUCTORS(UsbMidiDeviceAndroid);
 };
 
+}  // namespace midi
 }  // namespace media
 
 #endif  // MEDIA_MIDI_USB_MIDI_DEVICE_ANDROID_H_

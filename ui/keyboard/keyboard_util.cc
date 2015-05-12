@@ -20,9 +20,9 @@
 #include "ui/base/ime/text_input_client.h"
 #include "ui/events/event_processor.h"
 #include "ui/events/event_utils.h"
-#include "ui/events/keycodes/dom3/dom_code.h"
-#include "ui/events/keycodes/dom3/dom_key.h"
-#include "ui/events/keycodes/dom4/keycode_converter.h"
+#include "ui/events/keycodes/dom/dom_code.h"
+#include "ui/events/keycodes/dom/dom_key.h"
+#include "ui/events/keycodes/dom/keycode_converter.h"
 #include "ui/events/keycodes/keyboard_code_conversion.h"
 #include "ui/keyboard/keyboard_controller.h"
 #include "ui/keyboard/keyboard_controller_proxy.h"
@@ -164,18 +164,27 @@ bool IsFloatingVirtualKeyboardEnabled() {
 }
 
 bool IsGestureTypingEnabled() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kEnableGestureTyping);
+  std::string keyboard_switch =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kGestureTyping);
+  return keyboard_switch == switches::kGestureTypingEnabled;
 }
 
-bool IsGestureSelectionEnabled() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kEnableGestureSelection);
+bool IsGestureEditingEnabled() {
+  std::string keyboard_switch =
+      base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
+          switches::kGestureEditing);
+  return keyboard_switch == switches::kGestureEditingEnabled;
 }
 
-bool IsGestureDeletionEnabled() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kEnableGestureDeletion);
+bool IsMaterialDesignEnabled() {
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kDisableNewMDInputView);
+}
+
+bool IsVoiceInputEnabled() {
+  return !base::CommandLine::ForCurrentProcess()->HasSwitch(
+      switches::kDisableVoiceInput);
 }
 
 bool InsertText(const base::string16& text) {

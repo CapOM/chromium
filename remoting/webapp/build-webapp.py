@@ -76,7 +76,7 @@ def parseBool(boolStr):
 
   Returns a bool on success; raises ValueError on failure.
   """
-  lower = boolStr.tolower()
+  lower = boolStr.lower()
   if lower in ['0', 'false']: return False
   if lower in ['1', 'true']: return True
   raise ValueError('not a boolean string {!r}'.format(boolStr))
@@ -247,8 +247,6 @@ def buildWebApp(buildtype, version, destination, zip_path,
       if not is_prod_service_environment:
         raise Exception('Invalid service_environment targeted for '
                         + buildtype + ': ' + service_environment)
-      if 'out/Release' not in destination and 'out\Release' not in destination:
-        raise Exception('Prod builds must be placed in the out/Release folder')
       if appid != None:
         raise Exception('Cannot pass in an appid for '
                         + buildtype + ' builds: ' + service_environment)

@@ -6,7 +6,6 @@
 
 #include <algorithm>
 
-#include "cc/base/histograms.h"
 #include "cc/base/region.h"
 #include "cc/layers/content_layer_client.h"
 #include "cc/resources/display_item_list.h"
@@ -23,18 +22,15 @@ const int kPixelDistanceToRecord = 8000;
 // operations.
 const int kOpCountThatIsOkToAnalyze = 10;
 
-DEFINE_SCOPED_UMA_HISTOGRAM_AREA_TIMER(
-    ScopedDisplayListRecordingSourceUpdateTimer,
-    "Compositing.DisplayListRecordingSource.UpdateUs",
-    "Compositing.DisplayListRecordingSource.UpdateInvalidatedAreaPerMs");
-
 }  // namespace
 
 namespace cc {
 
 DisplayListRecordingSource::DisplayListRecordingSource(
-    const gfx::Size& grid_cell_size)
-    : slow_down_raster_scale_factor_for_debug_(0),
+    const gfx::Size& grid_cell_size,
+    bool use_cached_picture)
+    : use_cached_picture_(use_cached_picture),
+      slow_down_raster_scale_factor_for_debug_(0),
       gather_pixel_refs_(false),
       requires_clear_(false),
       is_solid_color_(false),
@@ -55,7 +51,6 @@ bool DisplayListRecordingSource::UpdateAndExpandInvalidation(
     const gfx::Rect& visible_layer_rect,
     int frame_number,
     RecordingMode recording_mode) {
-  ScopedDisplayListRecordingSourceUpdateTimer timer;
   bool updated = false;
 
   if (size_ != layer_size) {
@@ -80,12 +75,6 @@ bool DisplayListRecordingSource::UpdateAndExpandInvalidation(
 
     updated = true;
   }
-
-  // Count the area that is being invalidated.
-  Region recorded_invalidation(*invalidation);
-  recorded_invalidation.Intersect(recorded_viewport_);
-  for (Region::Iterator it(recorded_invalidation); it.has_rect(); it.next())
-    timer.AddArea(it.rect().size().GetArea());
 
   if (!updated && !invalidation->Intersects(recorded_viewport_))
     return false;
@@ -117,13 +106,14 @@ bool DisplayListRecordingSource::UpdateAndExpandInvalidation(
     painting_control = ContentLayerClient::DISPLAY_LIST_CACHING_DISABLED;
   }
   for (int i = 0; i < repeat_count; ++i) {
-    const bool use_cached_picture = true;
     display_list_ =
-        DisplayItemList::Create(recorded_viewport_, use_cached_picture);
+        DisplayItemList::Create(recorded_viewport_, use_cached_picture_);
     painter->PaintContentsToDisplayList(display_list_.get(), recorded_viewport_,
                                         painting_control);
   }
-  display_list_->CreateAndCacheSkPicture();
+  display_list_->ProcessAppendedItems();
+  if (use_cached_picture_)
+    display_list_->CreateAndCacheSkPicture();
 
   is_suitable_for_gpu_rasterization_ =
       display_list_->IsSuitableForGpuRasterization();

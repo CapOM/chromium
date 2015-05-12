@@ -11,7 +11,6 @@
 #include "chrome/browser/ui/exclusive_access/fullscreen_controller.h"
 #include "chrome/browser/ui/passwords/manage_passwords_bubble_model.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
-#include "chrome/browser/ui/passwords/password_bubble_experiment.h"
 #include "chrome/browser/ui/passwords/save_password_refusal_combobox_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
 #include "chrome/browser/ui/views/passwords/credentials_item_view.h"
@@ -166,7 +165,7 @@ void AddTitleRow(views::GridLayout* layout, ManagePasswordsBubbleModel* model) {
   layout->StartRowWithPadding(
       0, SINGLE_VIEW_COLUMN_SET, 0, views::kRelatedControlSmallVerticalSpacing);
   layout->AddView(title_label);
-  layout->AddPaddingRow(0, views::kUnrelatedControlVerticalSpacing);
+  layout->AddPaddingRow(0, views::kRelatedControlVerticalSpacing);
 }
 
 }  // namespace
@@ -353,9 +352,11 @@ void ManagePasswordsBubbleView::AutoSigninView::OnTimer() {
 // A view offering the user the ability to save credentials. Contains a
 // single ManagePasswordItemsView, along with a "Save Passwords" button
 // and a rejection combobox.
-class ManagePasswordsBubbleView::PendingView : public views::View,
-                                               public views::ButtonListener,
-                                               public views::ComboboxListener {
+class ManagePasswordsBubbleView::PendingView
+    : public views::View,
+      public views::ButtonListener,
+      public views::ComboboxListener,
+      public views::StyledLabelListener {
  public:
   explicit PendingView(ManagePasswordsBubbleView* parent);
   ~PendingView() override;
@@ -363,6 +364,10 @@ class ManagePasswordsBubbleView::PendingView : public views::View,
  private:
   // views::ButtonListener:
   void ButtonPressed(views::Button* sender, const ui::Event& event) override;
+
+  // views::StyledLabelListener:
+  void StyledLabelLinkClicked(const gfx::Range& range,
+                              int event_flags) override;
 
   // Handles the event when the user changes an index of a combobox.
   void OnPerformAction(views::Combobox* source) override;
@@ -398,17 +403,27 @@ ManagePasswordsBubbleView::PendingView::PendingView(
   save_button_->SetFontList(ui::ResourceBundle::GetSharedInstance().GetFontList(
       ui::ResourceBundle::SmallFont));
 
-  combobox_model_.reset(new SavePasswordRefusalComboboxModel(
-      password_bubble_experiment::ShouldShowNeverForThisSiteDefault(
-          parent_->model()->GetProfile()->GetPrefs())));
+  combobox_model_.reset(new SavePasswordRefusalComboboxModel);
   refuse_combobox_.reset(new views::Combobox(combobox_model_.get()));
   refuse_combobox_->set_listener(this);
   refuse_combobox_->SetStyle(views::Combobox::STYLE_ACTION);
   // TODO(mkwst): Need a mechanism to pipe a font list down into a combobox.
 
   // Title row.
+  views::StyledLabel* title_label =
+      new views::StyledLabel(parent_->model()->title(), this);
+  title_label->SetBaseFontList(
+      ui::ResourceBundle::GetSharedInstance().GetFontList(
+          ui::ResourceBundle::MediumFont));
+  if (!parent_->model()->title_brand_link_range().is_empty()) {
+    title_label->AddStyleRange(
+        parent_->model()->title_brand_link_range(),
+        views::StyledLabel::RangeStyleInfo::CreateForLink());
+  }
   BuildColumnSet(layout, SINGLE_VIEW_COLUMN_SET);
-  AddTitleRow(layout, parent_->model());
+  layout->StartRow(0, SINGLE_VIEW_COLUMN_SET);
+  layout->AddView(title_label);
+  layout->AddPaddingRow(0, views::kRelatedControlVerticalSpacing);
 
   // Credential row.
   layout->StartRow(0, SINGLE_VIEW_COLUMN_SET);
@@ -438,16 +453,24 @@ void ManagePasswordsBubbleView::PendingView::ButtonPressed(
   parent_->Close();
 }
 
+void ManagePasswordsBubbleView::PendingView::StyledLabelLinkClicked(
+    const gfx::Range& range,
+    int event_flags) {
+  DCHECK_EQ(range, parent_->model()->title_brand_link_range());
+  parent_->model()->OnBrandLinkClicked();
+}
+
 void ManagePasswordsBubbleView::PendingView::OnPerformAction(
     views::Combobox* source) {
   DCHECK_EQ(source, refuse_combobox_);
-  if (source->selected_index() == combobox_model_->index_nope()) {
-    parent_->model()->OnNopeClicked();
-    parent_->Close();
-  } else if (source->selected_index() == combobox_model_->index_never()) {
-    parent_->NotifyNeverForThisSiteClicked();
-  } else {
-    NOTREACHED();
+  switch (refuse_combobox_->selected_index()) {
+    case SavePasswordRefusalComboboxModel::INDEX_NOPE:
+      parent_->model()->OnNopeClicked();
+      parent_->Close();
+      break;
+    case SavePasswordRefusalComboboxModel::INDEX_NEVER_FOR_THIS_SITE:
+      parent_->NotifyNeverForThisSiteClicked();
+      break;
   }
 }
 

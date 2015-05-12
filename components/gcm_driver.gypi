@@ -136,8 +136,8 @@
       ],
     },
     {
-      # GN version: //components/gcm_driver/instance_id:instance_id_driver
-      'target_name': 'instance_id_driver',
+      # GN version: //components/gcm_driver/instance_id
+      'target_name': 'instance_id',
       'type': 'static_library',
       'include_dirs': [
         '..',
@@ -160,6 +160,24 @@
             'gcm_driver/instance_id/instance_id_impl.h',
           ],
         }],
+      ],
+    },
+    {
+      # GN version: //components/gcm_driver/instance_id:test_support
+      'target_name': 'instance_id_test_support',
+      'type': 'static_library',
+      'dependencies': [
+        'gcm_driver_test_support',
+        'instance_id',
+        '../testing/gtest.gyp:gtest',
+      ],
+      'include_dirs': [
+        '..',
+      ],
+      'sources': [
+        # Note: file list duplicated in GN build.
+        'gcm_driver/instance_id/fake_gcm_driver_for_instance_id.cc',
+        'gcm_driver/instance_id/fake_gcm_driver_for_instance_id.h',
       ],
     },
   ],

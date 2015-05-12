@@ -79,6 +79,7 @@ source_set("chromeos") {
     "//device/bluetooth",
     "//device/hid",
     "//media",
+    "//media/mojo/interfaces",
     "//net",
     "//ppapi/proxy:ipc",  # For PpapiMsg_LoadPlugin
 
@@ -91,7 +92,6 @@ source_set("chromeos") {
     "//third_party/adobe/flash:flapper_version_h",
     "//third_party/cacheinvalidation",
     "//third_party/expat",
-    "//third_party/hunspell",
     "//third_party/icu",
     "//third_party/leveldatabase",
     "//third_party/libevent",
@@ -111,7 +111,7 @@ source_set("chromeos") {
     "//ui/display",
     "//ui/events/devices",
     "//ui/events/platform",
-    "//ui/events:dom4_keycode_converter",
+    "//ui/events:dom_keycode_converter",
     "//ui/file_manager",
     "//ui/message_center",
     "//ui/oobe:oobe",

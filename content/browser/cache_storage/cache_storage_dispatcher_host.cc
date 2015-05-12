@@ -24,45 +24,18 @@ namespace {
 const uint32 kFilteredMessageClasses[] = {CacheStorageMsgStart};
 
 blink::WebServiceWorkerCacheError ToWebServiceWorkerCacheError(
-    CacheStorage::CacheStorageError err) {
+    CacheStorageError err) {
   switch (err) {
-    case CacheStorage::CACHE_STORAGE_ERROR_NO_ERROR:
+    case CACHE_STORAGE_OK:
       NOTREACHED();
       return blink::WebServiceWorkerCacheErrorNotImplemented;
-    case CacheStorage::CACHE_STORAGE_ERROR_NOT_IMPLEMENTED:
-      return blink::WebServiceWorkerCacheErrorNotImplemented;
-    case CacheStorage::CACHE_STORAGE_ERROR_NOT_FOUND:
-      return blink::WebServiceWorkerCacheErrorNotFound;
-    case CacheStorage::CACHE_STORAGE_ERROR_EXISTS:
+    case CACHE_STORAGE_ERROR_EXISTS:
       return blink::WebServiceWorkerCacheErrorExists;
-    case CacheStorage::CACHE_STORAGE_ERROR_STORAGE:
-      // TODO(jkarlin): Change this to CACHE_STORAGE_ERROR_STORAGE once that's
-      // added.
+    case CACHE_STORAGE_ERROR_STORAGE:
+      // TODO(nhiroki): Add WebServiceWorkerCacheError equivalent to
+      // CACHE_STORAGE_ERROR_STORAGE.
       return blink::WebServiceWorkerCacheErrorNotFound;
-    case CacheStorage::CACHE_STORAGE_ERROR_CLOSING:
-      // TODO(jkarlin): Update this to CACHE_STORAGE_ERROR_CLOSING once that's
-      // added.
-      return blink::WebServiceWorkerCacheErrorNotFound;
-  }
-  NOTREACHED();
-  return blink::WebServiceWorkerCacheErrorNotImplemented;
-}
-
-// TODO(jkarlin): CacheStorageCache and CacheStorage should share
-// an error enum type.
-blink::WebServiceWorkerCacheError CacheErrorToWebServiceWorkerCacheError(
-    CacheStorageCache::ErrorType err) {
-  switch (err) {
-    case CacheStorageCache::ERROR_TYPE_OK:
-      NOTREACHED();
-      return blink::WebServiceWorkerCacheErrorNotImplemented;
-    case CacheStorageCache::ERROR_TYPE_EXISTS:
-      return blink::WebServiceWorkerCacheErrorExists;
-    case CacheStorageCache::ERROR_TYPE_STORAGE:
-      // TODO(jkarlin): Change this to CACHE_STORAGE_ERROR_STORAGE once that's
-      // added.
-      return blink::WebServiceWorkerCacheErrorNotFound;
-    case CacheStorageCache::ERROR_TYPE_NOT_FOUND:
+    case CACHE_STORAGE_ERROR_NOT_FOUND:
       return blink::WebServiceWorkerCacheErrorNotFound;
   }
   NOTREACHED();
@@ -271,40 +244,10 @@ void CacheStorageDispatcherHost::OnCacheBatch(
         thread_id, request_id, blink::WebServiceWorkerCacheErrorNotFound));
     return;
   }
-
-  const CacheStorageBatchOperation& operation = operations[0];
-
   scoped_refptr<CacheStorageCache> cache = it->second;
-  scoped_ptr<ServiceWorkerFetchRequest> scoped_request(
-      new ServiceWorkerFetchRequest(
-          operation.request.url, operation.request.method,
-          operation.request.headers, operation.request.referrer,
-          operation.request.is_reload));
-
-  if (operation.operation_type == CACHE_STORAGE_CACHE_OPERATION_TYPE_DELETE) {
-    cache->Delete(scoped_request.Pass(),
-                  base::Bind(&CacheStorageDispatcherHost::OnCacheDeleteCallback,
+  cache->BatchOperation(
+      operations, base::Bind(&CacheStorageDispatcherHost::OnCacheBatchCallback,
                              this, thread_id, request_id, cache));
-    return;
-  }
-
-  if (operation.operation_type == CACHE_STORAGE_CACHE_OPERATION_TYPE_PUT) {
-    // We don't support streaming for cache.
-    DCHECK(operation.response.stream_url.is_empty());
-    scoped_ptr<ServiceWorkerResponse> scoped_response(new ServiceWorkerResponse(
-        operation.response.url, operation.response.status_code,
-        operation.response.status_text, operation.response.response_type,
-        operation.response.headers, operation.response.blob_uuid,
-        operation.response.blob_size, operation.response.stream_url));
-    cache->Put(scoped_request.Pass(), scoped_response.Pass(),
-               base::Bind(&CacheStorageDispatcherHost::OnCachePutCallback, this,
-                          thread_id, request_id, cache));
-
-    return;
-  }
-
-  Send(new CacheStorageMsg_CacheBatchError(
-      thread_id, request_id, blink::WebServiceWorkerCacheErrorNotImplemented));
 }
 
 void CacheStorageDispatcherHost::OnCacheClosed(int cache_id) {
@@ -319,8 +262,8 @@ void CacheStorageDispatcherHost::OnCacheStorageHasCallback(
     int thread_id,
     int request_id,
     bool has_cache,
-    CacheStorage::CacheStorageError error) {
-  if (error != CacheStorage::CACHE_STORAGE_ERROR_NO_ERROR) {
+    CacheStorageError error) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheStorageHasError(
         thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
@@ -337,8 +280,8 @@ void CacheStorageDispatcherHost::OnCacheStorageOpenCallback(
     int thread_id,
     int request_id,
     const scoped_refptr<CacheStorageCache>& cache,
-    CacheStorage::CacheStorageError error) {
-  if (error != CacheStorage::CACHE_STORAGE_ERROR_NO_ERROR) {
+    CacheStorageError error) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheStorageOpenError(
         thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
@@ -352,8 +295,8 @@ void CacheStorageDispatcherHost::OnCacheStorageDeleteCallback(
     int thread_id,
     int request_id,
     bool deleted,
-    CacheStorage::CacheStorageError error) {
-  if (!deleted || error != CacheStorage::CACHE_STORAGE_ERROR_NO_ERROR) {
+    CacheStorageError error) {
+  if (!deleted || error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheStorageDeleteError(
         thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
@@ -365,8 +308,8 @@ void CacheStorageDispatcherHost::OnCacheStorageKeysCallback(
     int thread_id,
     int request_id,
     const std::vector<std::string>& strings,
-    CacheStorage::CacheStorageError error) {
-  if (error != CacheStorage::CACHE_STORAGE_ERROR_NO_ERROR) {
+    CacheStorageError error) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheStorageKeysError(
         thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
@@ -383,12 +326,12 @@ void CacheStorageDispatcherHost::OnCacheStorageKeysCallback(
 void CacheStorageDispatcherHost::OnCacheStorageMatchCallback(
     int thread_id,
     int request_id,
-    CacheStorageCache::ErrorType error,
+    CacheStorageError error,
     scoped_ptr<ServiceWorkerResponse> response,
     scoped_ptr<storage::BlobDataHandle> blob_data_handle) {
-  if (error != CacheStorageCache::ERROR_TYPE_OK) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheStorageMatchError(
-        thread_id, request_id, CacheErrorToWebServiceWorkerCacheError(error)));
+        thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
   }
 
@@ -403,12 +346,12 @@ void CacheStorageDispatcherHost::OnCacheMatchCallback(
     int thread_id,
     int request_id,
     const scoped_refptr<CacheStorageCache>& cache,
-    CacheStorageCache::ErrorType error,
+    CacheStorageError error,
     scoped_ptr<ServiceWorkerResponse> response,
     scoped_ptr<storage::BlobDataHandle> blob_data_handle) {
-  if (error != CacheStorageCache::ERROR_TYPE_OK) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheMatchError(
-        thread_id, request_id, CacheErrorToWebServiceWorkerCacheError(error)));
+        thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
   }
 
@@ -422,11 +365,11 @@ void CacheStorageDispatcherHost::OnCacheKeysCallback(
     int thread_id,
     int request_id,
     const scoped_refptr<CacheStorageCache>& cache,
-    CacheStorageCache::ErrorType error,
+    CacheStorageError error,
     scoped_ptr<CacheStorageCache::Requests> requests) {
-  if (error != CacheStorageCache::ERROR_TYPE_OK) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheKeysError(
-        thread_id, request_id, CacheErrorToWebServiceWorkerCacheError(error)));
+        thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
   }
 
@@ -442,40 +385,18 @@ void CacheStorageDispatcherHost::OnCacheKeysCallback(
   Send(new CacheStorageMsg_CacheKeysSuccess(thread_id, request_id, out));
 }
 
-void CacheStorageDispatcherHost::OnCacheDeleteCallback(
+void CacheStorageDispatcherHost::OnCacheBatchCallback(
     int thread_id,
     int request_id,
     const scoped_refptr<CacheStorageCache>& cache,
-    CacheStorageCache::ErrorType error) {
-  if (error != CacheStorageCache::ERROR_TYPE_OK) {
+    CacheStorageError error) {
+  if (error != CACHE_STORAGE_OK) {
     Send(new CacheStorageMsg_CacheBatchError(
-        thread_id, request_id, CacheErrorToWebServiceWorkerCacheError(error)));
+        thread_id, request_id, ToWebServiceWorkerCacheError(error)));
     return;
   }
 
-  Send(new CacheStorageMsg_CacheBatchSuccess(
-      thread_id, request_id, std::vector<ServiceWorkerResponse>()));
-}
-
-void CacheStorageDispatcherHost::OnCachePutCallback(
-    int thread_id,
-    int request_id,
-    const scoped_refptr<CacheStorageCache>& cache,
-    CacheStorageCache::ErrorType error,
-    scoped_ptr<ServiceWorkerResponse> response,
-    scoped_ptr<storage::BlobDataHandle> blob_data_handle) {
-  if (error != CacheStorageCache::ERROR_TYPE_OK) {
-    Send(new CacheStorageMsg_CacheBatchError(
-        thread_id, request_id, CacheErrorToWebServiceWorkerCacheError(error)));
-    return;
-  }
-
-  if (blob_data_handle)
-    StoreBlobDataHandle(blob_data_handle.Pass());
-
-  std::vector<ServiceWorkerResponse> responses;
-  responses.push_back(*response);
-  Send(new CacheStorageMsg_CacheBatchSuccess(thread_id, request_id, responses));
+  Send(new CacheStorageMsg_CacheBatchSuccess(thread_id, request_id));
 }
 
 CacheStorageDispatcherHost::CacheID

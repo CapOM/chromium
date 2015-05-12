@@ -78,7 +78,8 @@ class RemoteDeviceEnvironment(environment.Environment):
     self._remote_device_minimum_os = device_json.get(
         'remote_device_minimum_os', None)
     self._remote_device_os = device_json.get('remote_device_os', None)
-    self._remote_device_timeout = device_json.get('remote_device_timeout', None)
+    self._remote_device_timeout = device_json.get(
+        'remote_device_timeout', None)
     self._results_path = device_json.get('results_path', None)
     self._runner_package = device_json.get('runner_package', None)
     self._runner_type = device_json.get('runner_type', None)

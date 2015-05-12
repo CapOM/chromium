@@ -340,16 +340,20 @@ class RendererSandboxedProcessLauncherDelegate
 
     if (base::win::GetVersion() == base::win::VERSION_WIN8 ||
         base::win::GetVersion() == base::win::VERSION_WIN8_1) {
-      // TODO(shrikant): Check if these constants should be different across
-      // various versions of Chromium code base or could be same.
-      // If there should be different SID per channel then move this code
-      // in chrome rather than content and assign SID based on
-      // VersionInfo::GetChannel().
-      const wchar_t kAppContainerSid[] =
-          L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
-          L"924012148-129201922";
+      const base::CommandLine& command_line =
+          *base::CommandLine::ForCurrentProcess();
+      if (!command_line.HasSwitch(switches::kDisableAppContainer)) {
+        // TODO(shrikant): Check if these constants should be different across
+        // various versions of Chromium code base or could be same.
+        // If there should be different SID per channel then move this code
+        // in chrome rather than content and assign SID based on
+        // VersionInfo::GetChannel().
+        const wchar_t kAppContainerSid[] =
+            L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
+            L"924012148-129201922";
 
-      policy->SetLowBox(kAppContainerSid);
+        policy->SetLowBox(kAppContainerSid);
+      }
     }
 
     GetContentClient()->browser()->PreSpawnRenderer(policy, success);
@@ -929,9 +933,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       message_port_message_filter_.get()));
   if (browser_command_line.HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
-    scoped_refptr<BluetoothDispatcherHost> bluetooth_dispatcher_host(
-        BluetoothDispatcherHost::Create());
-    AddFilter(bluetooth_dispatcher_host.get());
+    AddFilter(new BluetoothDispatcherHost());
   }
 }
 
@@ -1035,19 +1037,6 @@ void RenderProcessHostImpl::RemoveRoute(int32 routing_id) {
   DCHECK(listeners_.Lookup(routing_id) != NULL);
   listeners_.Remove(routing_id);
 
-#if defined(OS_WIN)
-  // Dump the handle table if handle auditing is enabled.
-  const base::CommandLine& browser_command_line =
-      *base::CommandLine::ForCurrentProcess();
-  if (browser_command_line.HasSwitch(switches::kAuditHandles) ||
-      browser_command_line.HasSwitch(switches::kAuditAllHandles)) {
-    DumpHandles();
-
-    // We wait to close the channels until the child process has finished
-    // dumping handles and sends us ChildProcessHostMsg_DumpHandlesDone.
-    return;
-  }
-#endif
   // Keep the one renderer thread around forever in single process mode.
   if (!run_renderer_in_process())
     Cleanup();
@@ -1194,9 +1183,6 @@ void RenderProcessHostImpl::AppendRendererCommandLine(
 #if defined(OS_WIN)
   command_line->AppendSwitchASCII(switches::kDeviceScaleFactor,
                                   base::DoubleToString(gfx::GetDPIScale()));
-  command_line->AppendSwitchASCII(
-      switches::kFontCacheSharedMemSuffix,
-      base::UintToString(base::GetCurrentProcId()));
 #endif
 
   AppendCompositorCommandLineFlags(command_line);
@@ -1210,8 +1196,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
   static const char* const kSwitchNames[] = {
     switches::kAllowLoopbackInPeerConnection,
     switches::kAudioBufferSize,
-    switches::kAuditAllHandles,
-    switches::kAuditHandles,
     switches::kBlinkPlatformLogChannels,
     switches::kBlinkSettings,
     switches::kBlockCrossSiteDocuments,
@@ -1224,6 +1208,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableBreakpad,
     switches::kDisablePreferCompositingToLCDText,
     switches::kDisableDatabases,
+    switches::kDisableDelayAgnosticAec,
     switches::kDisableDirectNPAPIRequests,
     switches::kDisableDisplayList2dCanvas,
     switches::kDisableDistanceFieldText,
@@ -1239,6 +1224,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableLogging,
     switches::kDisableMediaSource,
     switches::kDisableMojoChannel,
+    switches::kDisableNewVideoRenderer,
     switches::kDisableNotifications,
     switches::kDisableOverlayScrollbar,
     switches::kDisablePinch,
@@ -1279,6 +1265,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableOverlayFullscreenVideo,
     switches::kEnableOverlayScrollbar,
     switches::kEnablePinch,
+    switches::kEnablePluginPlaceholderTesting,
     switches::kEnablePreciseMemoryInfo,
     switches::kEnablePreferCompositingToLCDText,
     switches::kEnablePushMessagePayload,
@@ -1304,7 +1291,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kForceDeviceScaleFactor,
     switches::kForceDisplayList2dCanvas,
     switches::kFullMemoryCrashReport,
-    switches::kIgnoreResolutionLimitsForAcceleratedVideoDecode,
     switches::kIPCConnectionTimeout,
     switches::kJavaScriptFlags,
     switches::kLoggingLevel,
@@ -1487,14 +1473,6 @@ bool RenderProcessHostImpl::FastShutdownIfPossible() {
   return true;
 }
 
-void RenderProcessHostImpl::DumpHandles() {
-#if defined(OS_WIN)
-  Send(new ChildProcessMsg_DumpHandles());
-#else
-  NOTIMPLEMENTED();
-#endif
-}
-
 bool RenderProcessHostImpl::Send(IPC::Message* msg) {
   TRACE_EVENT0("renderer_host", "RenderProcessHostImpl::Send");
   if (!channel_) {
@@ -1528,8 +1506,6 @@ bool RenderProcessHostImpl::OnMessageReceived(const IPC::Message& msg) {
     IPC_BEGIN_MESSAGE_MAP(RenderProcessHostImpl, msg)
       IPC_MESSAGE_HANDLER(ChildProcessHostMsg_ShutdownRequest,
                           OnShutdownRequest)
-      IPC_MESSAGE_HANDLER(ChildProcessHostMsg_DumpHandlesDone,
-                          OnDumpHandlesDone)
       IPC_MESSAGE_HANDLER(ViewHostMsg_SuddenTerminationChanged,
                           SuddenTerminationChanged)
       IPC_MESSAGE_HANDLER(ViewHostMsg_UserMetricsRecordAction,
@@ -1834,7 +1810,6 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
     // navigation to the home page. This is often a privileged page
     // (chrome://newtab/) which is exactly what we don't want.
     *url = GURL(url::kAboutBlankURL);
-    RecordAction(base::UserMetricsAction("FilterURLTermiate_Invalid"));
     return;
   }
 
@@ -1842,7 +1817,6 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
     // The renderer treats all URLs in the about: scheme as being about:blank.
     // Canonicalize about: URLs to about:blank.
     *url = GURL(url::kAboutBlankURL);
-    RecordAction(base::UserMetricsAction("FilterURLTermiate_About"));
   }
 
   // Do not allow browser plugin guests to navigate to non-web URLs, since they
@@ -1856,7 +1830,6 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
     // later.
     VLOG(1) << "Blocked URL " << url->spec();
     *url = GURL(url::kAboutBlankURL);
-    RecordAction(base::UserMetricsAction("FilterURLTermiate_Blocked"));
   }
 }
 
@@ -2218,10 +2191,6 @@ void RenderProcessHostImpl::OnShutdownRequest() {
 
 void RenderProcessHostImpl::SuddenTerminationChanged(bool enabled) {
   SetSuddenTerminationAllowed(enabled);
-}
-
-void RenderProcessHostImpl::OnDumpHandlesDone() {
-  Cleanup();
 }
 
 void RenderProcessHostImpl::SetBackgrounded(bool backgrounded) {

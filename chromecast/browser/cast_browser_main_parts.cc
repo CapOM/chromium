@@ -4,6 +4,7 @@
 
 #include "chromecast/browser/cast_browser_main_parts.h"
 
+#include <string>
 #if !defined(OS_ANDROID)
 #include <signal.h>
 #include <sys/prctl.h>
@@ -17,6 +18,7 @@
 #include "base/run_loop.h"
 #include "cc/base/switches.h"
 #include "chromecast/base/cast_paths.h"
+#include "chromecast/base/cast_sys_info_util.h"
 #include "chromecast/base/metrics/cast_metrics_helper.h"
 #include "chromecast/base/metrics/grouped_histogram.h"
 #include "chromecast/browser/cast_browser_context.h"
@@ -31,8 +33,12 @@
 #include "chromecast/common/platform_client_auth.h"
 #include "chromecast/media/base/key_systems_common.h"
 #include "chromecast/net/connectivity_checker.h"
+#include "chromecast/public/cast_sys_info.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/gpu_data_manager.h"
 #include "content/public/common/content_switches.h"
+#include "media/audio/audio_manager.h"
+#include "media/audio/audio_manager_factory.h"
 #include "media/base/browser_cdm_factory.h"
 #include "media/base/media_switches.h"
 
@@ -44,6 +50,7 @@
 #include "net/android/network_change_notifier_factory_android.h"
 #else
 #include "chromecast/browser/media/cast_browser_cdm_factory.h"
+#include "chromecast/net/network_change_notifier_factory_cast.h"
 #endif
 
 #if defined(USE_AURA)
@@ -192,11 +199,13 @@ void AddDefaultCommandLineSwitches(base::CommandLine* command_line) {
 
 CastBrowserMainParts::CastBrowserMainParts(
     const content::MainFunctionParams& parameters,
-    URLRequestContextFactory* url_request_context_factory)
+    URLRequestContextFactory* url_request_context_factory,
+    scoped_ptr<::media::AudioManagerFactory> audio_manager_factory)
     : BrowserMainParts(),
       cast_browser_process_(new CastBrowserProcess()),
       parameters_(parameters),
-      url_request_context_factory_(url_request_context_factory) {
+      url_request_context_factory_(url_request_context_factory),
+      audio_manager_factory_(audio_manager_factory.Pass()) {
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   AddDefaultCommandLineSwitches(command_line);
 }
@@ -212,9 +221,16 @@ void CastBrowserMainParts::PreMainMessageLoopStart() {
   // Net/DNS metrics.
   metrics::PreregisterAllGroupedHistograms();
 
+  // Set the platform's implementation of AudioManagerFactory.
+  if (audio_manager_factory_)
+    ::media::AudioManager::SetFactory(audio_manager_factory_.release());
+
 #if defined(OS_ANDROID)
   net::NetworkChangeNotifier::SetFactory(
       new net::NetworkChangeNotifierFactoryAndroid());
+#else
+  net::NetworkChangeNotifier::SetFactory(
+      new NetworkChangeNotifierFactoryCast());
 #endif  // defined(OS_ANDROID)
 }
 
@@ -257,6 +273,14 @@ int CastBrowserMainParts::PreCreateThreads() {
 }
 
 void CastBrowserMainParts::PreMainMessageLoopRun() {
+  // Set GL strings so GPU config code can make correct feature blacklisting/
+  // whitelisting decisions.
+  // Note: SetGLStrings MUST be called after GpuDataManager::Initialize.
+  scoped_ptr<CastSysInfo> sys_info = CreateSysInfo();
+  content::GpuDataManager::GetInstance()->SetGLStrings(
+      sys_info->GetGlVendor(), sys_info->GetGlRenderer(),
+      sys_info->GetGlVersion());
+
   scoped_refptr<PrefRegistrySimple> pref_registry(new PrefRegistrySimple());
   metrics::RegisterPrefs(pref_registry.get());
   cast_browser_process_->SetPrefService(

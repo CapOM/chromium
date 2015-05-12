@@ -13,7 +13,6 @@ import org.chromium.net.CronetTestActivity;
 import org.chromium.net.CronetTestBase;
 import org.chromium.net.MockUrlRequestJobFactory;
 import org.chromium.net.NativeTestServer;
-import org.chromium.net.UrlRequestContextConfig;
 import org.chromium.net.UrlRequestException;
 
 import java.io.ByteArrayOutputStream;
@@ -45,14 +44,11 @@ public class CronetHttpURLConnectionTest extends CronetTestBase {
     @Override
     protected void setUp() throws Exception {
         super.setUp();
-        UrlRequestContextConfig config = new UrlRequestContextConfig();
-        config.setStoragePath(prepareTestStorage());
-        config.enableHttpCache(UrlRequestContextConfig.HttpCache.DISK,
-                1000 * 1024);
         String[] commandLineArgs = {
-                CronetTestActivity.CONFIG_KEY, config.toString()};
-        launchCronetTestAppWithUrlAndCommandLineArgs(null,
-                commandLineArgs);
+                CronetTestActivity.CACHE_KEY, CronetTestActivity.CACHE_DISK,
+                CronetTestActivity.LIBRARY_INIT_KEY, CronetTestActivity.LIBRARY_INIT_WRAPPER,
+        };
+        launchCronetTestAppWithUrlAndCommandLineArgs(null, commandLineArgs);
         assertTrue(NativeTestServer.startNativeTestServer(
                 getInstrumentation().getTargetContext()));
     }
@@ -553,10 +549,8 @@ public class CronetHttpURLConnectionTest extends CronetTestBase {
         String data = "MyBigFunkyData";
         int dataLength = data.length();
         int repeatCount = 100000;
-        MockUrlRequestJobFactory mockUrlRequestJobFactory = new MockUrlRequestJobFactory(
-                getInstrumentation().getTargetContext());
-        URL url = new URL(mockUrlRequestJobFactory.getMockUrlForData(data,
-                repeatCount));
+        MockUrlRequestJobFactory.setUp();
+        URL url = new URL(MockUrlRequestJobFactory.getMockUrlForData(data, repeatCount));
         HttpURLConnection connection =
                 (HttpURLConnection) url.openConnection();
         InputStream in = connection.getInputStream();
@@ -613,10 +607,8 @@ public class CronetHttpURLConnectionTest extends CronetTestBase {
         String data = "MyBigFunkyData";
         int dataLength = data.length();
         int repeatCount = 100000;
-        MockUrlRequestJobFactory mockUrlRequestJobFactory = new MockUrlRequestJobFactory(
-                getInstrumentation().getTargetContext());
-        URL url = new URL(mockUrlRequestJobFactory.getMockUrlForData(data,
-                repeatCount));
+        MockUrlRequestJobFactory.setUp();
+        URL url = new URL(MockUrlRequestJobFactory.getMockUrlForData(data, repeatCount));
         HttpURLConnection connection =
                 (HttpURLConnection) url.openConnection();
         InputStream in = connection.getInputStream();

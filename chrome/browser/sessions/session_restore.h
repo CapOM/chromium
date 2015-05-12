@@ -39,6 +39,12 @@ class SessionRestore {
     SYNCHRONOUS                  = 1 << 2,
   };
 
+  enum SmartRestoreMode {
+    SMART_RESTORE_MODE_OFF,     // No sorting of tabs.
+    SMART_RESTORE_MODE_SIMPLE,  // Tabs are sorted using predetermined criteria.
+    SMART_RESTORE_MODE_MRU      // Same as above but takes into account MRU.
+  };
+
   // Notification callback list.
   using CallbackList = base::CallbackList<void(int)>;
 
@@ -98,10 +104,9 @@ class SessionRestore {
   static CallbackSubscription RegisterOnSessionRestoredCallback(
       const base::Callback<void(int)>& callback);
 
-  // Returns true if only active tabs are to be loaded during session restore
-  // (lazy load). Otherwise returns false if all tabs will be loaded when
-  // restored.
-  static bool WillLoadActiveTabsOnly();
+  // Returns true if smart session restore is enabled (ie. background tabs are
+  // sorted before being loaded).
+  static SmartRestoreMode GetSmartRestoreMode();
 
  private:
   SessionRestore();

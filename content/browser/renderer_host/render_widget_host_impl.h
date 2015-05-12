@@ -138,7 +138,7 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   void CopyFromBackingStore(const gfx::Rect& src_rect,
                             const gfx::Size& accelerated_dst_size,
                             ReadbackRequestCallback& callback,
-                            const SkColorType color_type) override;
+                            const SkColorType preferred_color_type) override;
   bool CanCopyFromBackingStore() override;
 #if defined(OS_ANDROID)
   void LockBackingStore() override;
@@ -163,8 +163,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   void RemoveMouseEventCallback(const MouseEventCallback& callback) override;
   void GetWebScreenInfo(blink::WebScreenInfo* result) override;
 
-  SkColorType PreferredReadbackFormat() override;
-
   // Forces redraw in the renderer and when the update reaches the browser
   // grabs snapshot from the compositor. Returns PNG-encoded snapshot.
   void GetSnapshotFromBrowser(
@@ -174,11 +172,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl
 
   // Notification that the screen info has changed.
   void NotifyScreenInfoChanged();
-
-  // Invalidates the cached screen info so that next resize request
-  // will carry the up to date screen info. Unlike
-  // |NotifyScreenInfoChanged|, this doesn't send a message to the renderer.
-  void InvalidateScreenInfo();
 
   // Sets the View of this RenderWidgetHost.
   void SetView(RenderWidgetHostViewBase* view);
@@ -724,14 +717,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl
 
   // True when waiting for RESIZE_ACK.
   bool resize_ack_pending_;
-
-  // Cached copy of the screen info so that it doesn't need to be updated every
-  // time the window is resized.
-  scoped_ptr<blink::WebScreenInfo> screen_info_;
-
-  // Set if screen_info_ may have changed and should be recomputed and force a
-  // resize message.
-  bool screen_info_out_of_date_;
 
   // The current size of the RenderWidget.
   gfx::Size current_size_;

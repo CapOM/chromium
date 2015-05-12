@@ -89,6 +89,11 @@ class ProcessManager : public KeyedService,
   // the extension isn't running or doesn't have a background page.
   ExtensionHost* GetBackgroundHostForExtension(const std::string& extension_id);
 
+  // Returns the ExtensionHost for the given |render_frame_host|, if there is
+  // one.
+  ExtensionHost* GetExtensionHostForRenderFrameHost(
+      content::RenderFrameHost* render_frame_host);
+
   // Returns true if the (lazy) background host for the given extension has
   // already been sent the unload event and is shutting down.
   bool IsBackgroundHostClosing(const std::string& extension_id);
@@ -98,7 +103,7 @@ class ProcessManager : public KeyedService,
   const Extension* GetExtensionForRenderFrameHost(
       content::RenderFrameHost* render_frame_host);
   const Extension* GetExtensionForWebContents(
-      content::WebContents* web_contents);
+      const content::WebContents* web_contents);
 
   // Getter and setter for the lazy background page's keepalive count. This is
   // the count of how many outstanding "things" are keeping the page alive.

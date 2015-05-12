@@ -72,8 +72,8 @@ class FixedInvalidationPictureLayerTilingClient
       const Region invalidation)
       : base_client_(base_client), invalidation_(invalidation) {}
 
-  scoped_refptr<Tile> CreateTile(float contents_scale,
-                                 const gfx::Rect& content_rect) override {
+  ScopedTilePtr CreateTile(float contents_scale,
+                           const gfx::Rect& content_rect) override {
     return base_client_->CreateTile(contents_scale, content_rect);
   }
 
@@ -90,16 +90,9 @@ class FixedInvalidationPictureLayerTilingClient
     return base_client_->GetPendingOrActiveTwinTiling(tiling);
   }
 
-  PictureLayerTiling* GetRecycledTwinTiling(
-      const PictureLayerTiling* tiling) override {
-    return base_client_->GetRecycledTwinTiling(tiling);
-  }
-
   TilePriority::PriorityBin GetMaxTilePriorityBin() const override {
     return base_client_->GetMaxTilePriorityBin();
   }
-
-  WhichTree GetTree() const override { return base_client_->GetTree(); }
 
   bool RequiresHighResToDraw() const override {
     return base_client_->RequiresHighResToDraw();
@@ -177,7 +170,7 @@ void RasterizeAndRecordBenchmarkImpl::RunOnLayer(PictureLayerImpl* layer) {
   // really matter.
   const LayerTreeSettings& settings = layer->layer_tree_impl()->settings();
   scoped_ptr<PictureLayerTilingSet> tiling_set = PictureLayerTilingSet::Create(
-      &client, settings.max_tiles_for_interest_area,
+      layer->GetTree(), &client, settings.max_tiles_for_interest_area,
       settings.skewport_target_time_in_seconds,
       settings.skewport_extrapolation_limit_in_content_pixels);
 

@@ -190,7 +190,10 @@ LayerTreeHostImpl::LayerTreeHostImpl(
     int id)
     : client_(client),
       proxy_(proxy),
+      content_is_suitable_for_gpu_rasterization_(true),
+      has_gpu_rasterization_trigger_(false),
       use_gpu_rasterization_(false),
+      use_msaa_(false),
       gpu_rasterization_status_(GpuRasterizationStatus::OFF_DEVICE),
       input_handler_client_(NULL),
       did_lock_scrolling_layer_(false),
@@ -305,6 +308,7 @@ void LayerTreeHostImpl::BeginCommit() {
 void LayerTreeHostImpl::CommitComplete() {
   TRACE_EVENT0("cc", "LayerTreeHostImpl::CommitComplete");
 
+  UpdateGpuRasterizationStatus();
   sync_tree()->set_needs_update_draw_properties();
 
   if (settings_.impl_side_painting) {
@@ -465,7 +469,22 @@ bool LayerTreeHostImpl::IsCurrentlyScrollingLayerAt(
   bool scroll_on_main_thread = false;
   LayerImpl* scrolling_layer_impl = FindScrollLayerForDeviceViewportPoint(
       device_viewport_point, type, layer_impl, &scroll_on_main_thread, NULL);
-  return CurrentlyScrollingLayer() == scrolling_layer_impl;
+
+  if (!scrolling_layer_impl)
+    return false;
+
+  if (CurrentlyScrollingLayer() == scrolling_layer_impl)
+    return true;
+
+  // For active scrolling state treat the inner/outer viewports interchangeably.
+  if ((CurrentlyScrollingLayer() == InnerViewportScrollLayer() &&
+       scrolling_layer_impl == OuterViewportScrollLayer()) ||
+      (CurrentlyScrollingLayer() == OuterViewportScrollLayer() &&
+       scrolling_layer_impl == InnerViewportScrollLayer())) {
+    return true;
+  }
+
+  return false;
 }
 
 bool LayerTreeHostImpl::HaveWheelEventHandlersAt(
@@ -971,6 +990,14 @@ DrawResult LayerTreeHostImpl::PrepareToDraw(FrameData* frame) {
   UMA_HISTOGRAM_CUSTOM_COUNTS(
       "Compositing.NumActiveLayers", active_tree_->NumLayers(), 1, 400, 20);
 
+  size_t total_picture_memory = 0;
+  for (const PictureLayerImpl* layer : active_tree()->picture_layers())
+    total_picture_memory += layer->GetRasterSource()->GetPictureMemoryUsage();
+  if (total_picture_memory != 0) {
+    UMA_HISTOGRAM_COUNTS("Compositing.PictureMemoryUsageKb",
+                         total_picture_memory / 1024);
+  }
+
   bool update_lcd_text = false;
   bool ok = active_tree_->UpdateDrawProperties(update_lcd_text);
   DCHECK(ok) << "UpdateDrawProperties failed during draw";
@@ -1193,56 +1220,27 @@ void LayerTreeHostImpl::DidModifyTilePriorities() {
   client_->SetNeedsPrepareTilesOnImplThread();
 }
 
-void LayerTreeHostImpl::GetPictureLayerImplPairs(
-    std::vector<PictureLayerImpl::Pair>* layer_pairs,
-    bool need_valid_tile_priorities) const {
-  DCHECK(layer_pairs->empty());
-
-  for (auto& layer : active_tree_->picture_layers()) {
-    if (need_valid_tile_priorities && !layer->HasValidTilePriorities())
-      continue;
-    PictureLayerImpl* twin_layer = layer->GetPendingOrActiveTwinLayer();
-    // Ignore the twin layer when tile priorities are invalid.
-    if (need_valid_tile_priorities && twin_layer &&
-        !twin_layer->HasValidTilePriorities()) {
-      twin_layer = nullptr;
-    }
-    layer_pairs->push_back(PictureLayerImpl::Pair(layer, twin_layer));
-  }
-
-  if (pending_tree_) {
-    for (auto& layer : pending_tree_->picture_layers()) {
-      if (need_valid_tile_priorities && !layer->HasValidTilePriorities())
-        continue;
-      if (PictureLayerImpl* twin_layer = layer->GetPendingOrActiveTwinLayer()) {
-        if (!need_valid_tile_priorities ||
-            twin_layer->HasValidTilePriorities()) {
-          // Already captured from the active tree.
-          continue;
-        }
-      }
-      layer_pairs->push_back(PictureLayerImpl::Pair(nullptr, layer));
-    }
-  }
-}
-
 scoped_ptr<RasterTilePriorityQueue> LayerTreeHostImpl::BuildRasterQueue(
     TreePriority tree_priority,
     RasterTilePriorityQueue::Type type) {
   TRACE_EVENT0("cc", "LayerTreeHostImpl::BuildRasterQueue");
-  picture_layer_pairs_.clear();
-  GetPictureLayerImplPairs(&picture_layer_pairs_, true);
-  return RasterTilePriorityQueue::Create(picture_layer_pairs_, tree_priority,
-                                         type);
+
+  return RasterTilePriorityQueue::Create(active_tree_->picture_layers(),
+                                         pending_tree_
+                                             ? pending_tree_->picture_layers()
+                                             : std::vector<PictureLayerImpl*>(),
+                                         tree_priority, type);
 }
 
 scoped_ptr<EvictionTilePriorityQueue> LayerTreeHostImpl::BuildEvictionQueue(
     TreePriority tree_priority) {
   TRACE_EVENT0("cc", "LayerTreeHostImpl::BuildEvictionQueue");
+
   scoped_ptr<EvictionTilePriorityQueue> queue(new EvictionTilePriorityQueue);
-  picture_layer_pairs_.clear();
-  GetPictureLayerImplPairs(&picture_layer_pairs_, false);
-  queue->Build(picture_layer_pairs_, tree_priority);
+  queue->Build(active_tree_->picture_layers(),
+               pending_tree_ ? pending_tree_->picture_layers()
+                             : std::vector<PictureLayerImpl*>(),
+               tree_priority);
   return queue;
 }
 
@@ -1457,9 +1455,10 @@ CompositorFrameMetadata LayerTreeHostImpl::MakeCompositorFrameMetadata() const {
   return metadata;
 }
 
-void LayerTreeHostImpl::DrawLayers(FrameData* frame,
-                                   base::TimeTicks frame_begin_time) {
+void LayerTreeHostImpl::DrawLayers(FrameData* frame) {
   TRACE_EVENT0("cc", "LayerTreeHostImpl::DrawLayers");
+
+  base::TimeTicks frame_begin_time = CurrentBeginFrameArgs().frame_time;
   DCHECK(CanDraw());
 
   if (!frame->composite_events.empty()) {
@@ -1585,13 +1584,42 @@ void LayerTreeHostImpl::FinishAllRendering() {
     renderer_->Finish();
 }
 
-void LayerTreeHostImpl::SetUseGpuRasterization(bool use_gpu) {
-  if (use_gpu == use_gpu_rasterization_)
+void LayerTreeHostImpl::UpdateGpuRasterizationStatus() {
+  bool use_gpu = false;
+  bool use_msaa = false;
+  bool using_msaa_for_complex_content =
+      renderer() && settings_.gpu_rasterization_msaa_sample_count > 0 &&
+      GetRendererCapabilities().max_msaa_samples >=
+          settings_.gpu_rasterization_msaa_sample_count;
+  if (settings_.gpu_rasterization_forced) {
+    use_gpu = true;
+    gpu_rasterization_status_ = GpuRasterizationStatus::ON_FORCED;
+    use_msaa = !content_is_suitable_for_gpu_rasterization_ &&
+               using_msaa_for_complex_content;
+    if (use_msaa) {
+      gpu_rasterization_status_ = GpuRasterizationStatus::MSAA_CONTENT;
+    }
+  } else if (!settings_.gpu_rasterization_enabled) {
+    gpu_rasterization_status_ = GpuRasterizationStatus::OFF_DEVICE;
+  } else if (!has_gpu_rasterization_trigger_) {
+    gpu_rasterization_status_ = GpuRasterizationStatus::OFF_VIEWPORT;
+  } else if (content_is_suitable_for_gpu_rasterization_) {
+    use_gpu = true;
+    gpu_rasterization_status_ = GpuRasterizationStatus::ON;
+  } else if (using_msaa_for_complex_content) {
+    use_gpu = use_msaa = true;
+    gpu_rasterization_status_ = GpuRasterizationStatus::MSAA_CONTENT;
+  } else {
+    gpu_rasterization_status_ = GpuRasterizationStatus::OFF_CONTENT;
+  }
+
+  if (use_gpu == use_gpu_rasterization_ && use_msaa == use_msaa_)
     return;
 
   // Note that this must happen first, in case the rest of the calls want to
   // query the new state of |use_gpu_rasterization_|.
   use_gpu_rasterization_ = use_gpu;
+  use_msaa_ = use_msaa;
 
   // Clean up and replace existing tile manager with another one that uses
   // appropriate rasterizer.
@@ -1610,6 +1638,7 @@ void LayerTreeHostImpl::SetUseGpuRasterization(bool use_gpu) {
 
 const RendererCapabilitiesImpl&
 LayerTreeHostImpl::GetRendererCapabilities() const {
+  CHECK(renderer_);
   return renderer_->Capabilities();
 }
 
@@ -1642,7 +1671,12 @@ bool LayerTreeHostImpl::SwapBuffers(const LayerTreeHostImpl::FrameData& frame) {
 void LayerTreeHostImpl::WillBeginImplFrame(const BeginFrameArgs& args) {
   // Sample the frame time now. This time will be used for updating animations
   // when we draw.
-  UpdateCurrentBeginFrameArgs(args);
+  DCHECK(!current_begin_frame_args_.IsValid());
+  current_begin_frame_args_ = args;
+  // TODO(mithro): Stop overriding the frame time once the usage of frame
+  // timing is unified.
+  current_begin_frame_args_.frame_time = gfx::FrameTime::Now();
+
   // Cache the begin impl frame interval
   begin_impl_frame_interval_ = args.interval;
 
@@ -1655,6 +1689,11 @@ void LayerTreeHostImpl::WillBeginImplFrame(const BeginFrameArgs& args) {
 
   for (auto& it : video_frame_controllers_)
     it->OnBeginFrame(args);
+}
+
+void LayerTreeHostImpl::DidFinishImplFrame() {
+  DCHECK(current_begin_frame_args_.IsValid());
+  current_begin_frame_args_ = BeginFrameArgs();
 }
 
 void LayerTreeHostImpl::UpdateViewportContainerSizes() {
@@ -1951,6 +1990,8 @@ void LayerTreeHostImpl::CreateAndSetRenderer() {
   }
   DCHECK(renderer_);
 
+  // Since the new renderer may be capable of MSAA, update status here.
+  UpdateGpuRasterizationStatus();
   renderer_->SetVisible(visible_);
   SetFullRootLayerDamage();
 
@@ -2020,10 +2061,13 @@ void LayerTreeHostImpl::CreateResourceAndTileTaskWorkerPool(
     *resource_pool =
         ResourcePool::Create(resource_provider_.get(), GL_TEXTURE_2D);
 
+    int msaa_sample_count =
+        use_msaa_ ? settings_.gpu_rasterization_msaa_sample_count : 0;
+
     *tile_task_worker_pool = GpuTileTaskWorkerPool::Create(
         task_runner, task_graph_runner, context_provider,
         resource_provider_.get(), settings_.use_distance_field_text,
-        settings_.gpu_rasterization_msaa_sample_count);
+        msaa_sample_count);
     return;
   }
 
@@ -3076,6 +3120,8 @@ void LayerTreeHostImpl::AddVideoFrameController(
     VideoFrameController* controller) {
   bool was_empty = video_frame_controllers_.empty();
   video_frame_controllers_.insert(controller);
+  if (current_begin_frame_args_.IsValid())
+    controller->OnBeginFrame(current_begin_frame_args_);
   if (was_empty)
     client_->SetVideoNeedsBeginFrames(true);
 }
@@ -3099,19 +3145,6 @@ void LayerTreeHostImpl::SetTreePriority(TreePriority priority) {
 
 TreePriority LayerTreeHostImpl::GetTreePriority() const {
   return global_tile_state_.tree_priority;
-}
-
-void LayerTreeHostImpl::UpdateCurrentBeginFrameArgs(
-    const BeginFrameArgs& args) {
-  DCHECK(!current_begin_frame_args_.IsValid());
-  current_begin_frame_args_ = args;
-  // TODO(skyostil): Stop overriding the frame time once the usage of frame
-  // timing is unified.
-  current_begin_frame_args_.frame_time = gfx::FrameTime::Now();
-}
-
-void LayerTreeHostImpl::ResetCurrentBeginFrameArgsForNextFrame() {
-  current_begin_frame_args_ = BeginFrameArgs();
 }
 
 BeginFrameArgs LayerTreeHostImpl::CurrentBeginFrameArgs() const {

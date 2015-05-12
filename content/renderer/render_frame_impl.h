@@ -25,10 +25,12 @@
 #include "content/renderer/renderer_webcookiejar_impl.h"
 #include "ipc/ipc_message.h"
 #include "media/blink/webmediaplayer_delegate.h"
+#include "third_party/WebKit/public/platform/modules/app_banner/WebAppBannerClient.h"
 #include "third_party/WebKit/public/web/WebAXObject.h"
 #include "third_party/WebKit/public/web/WebDataSource.h"
 #include "third_party/WebKit/public/web/WebFrameClient.h"
 #include "third_party/WebKit/public/web/WebHistoryCommitType.h"
+#include "third_party/WebKit/public/web/WebScriptExecutionCallback.h"
 #include "third_party/WebKit/public/web/WebTransitionElementData.h"
 #include "ui/gfx/range/range.h"
 
@@ -130,14 +132,16 @@ class CONTENT_EXPORT RenderFrameImpl
   // Creates a new RenderFrame with |routing_id| as a child of the RenderFrame
   // identified by |parent_routing_id| or as the top-level frame if the latter
   // is MSG_ROUTING_NONE. If |proxy_routing_id| is MSG_ROUTING_NONE, it creates
-  // the Blink WebLocalFrame and inserts it in the proper place in the frame
-  // tree. Otherwise, the frame is semi-orphaned until it commits, at which
-  // point it replaces the proxy identified by |proxy_routing_id|.
-  // Note: This is called only when RenderFrame is being created in response to
-  // IPC message from the browser process. All other frame creation is driven
-  // through Blink and Create.
+  // the Blink WebLocalFrame and inserts it into the frame tree after the frame
+  // identified by |previous_sibling_routing_id|, or as the first child if
+  // |previous_sibling_routing_id| is MSG_ROUTING_NONE. Otherwise, the frame is
+  // semi-orphaned until it commits, at which point it replaces the proxy
+  // identified by |proxy_routing_id|. Note: This is called only when
+  // RenderFrame is being created in response to IPC message from the browser
+  // process. All other frame creation is driven through Blink and Create.
   static void CreateFrame(int routing_id,
                           int parent_routing_id,
+                          int previous_sibling_routing_id,
                           int proxy_routing_id,
                           const FrameReplicationState& replicated_state,
                           CompositorDependencies* compositor_deps,
@@ -532,6 +536,7 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual bool enterFullscreen();
   virtual bool exitFullscreen();
   virtual blink::WebPermissionClient* permissionClient();
+  virtual blink::WebAppBannerClient* appBannerClient();
 
   // WebMediaPlayerDelegate implementation:
   void DidPlay(blink::WebMediaPlayer* player) override;
@@ -575,6 +580,30 @@ class CONTENT_EXPORT RenderFrameImpl
   FRIEND_TEST_ALL_PREFIXES(RendererAccessibilityTest,
                            AccessibilityMessagesQueueWhileSwappedOut);
 
+  // A wrapper class used as the callback for JavaScript executed
+  // in an isolated world.
+  class JavaScriptIsolatedWorldRequest
+      : public blink::WebScriptExecutionCallback {
+   public:
+    JavaScriptIsolatedWorldRequest(
+        int id,
+        bool notify_result,
+        int routing_id,
+        base::WeakPtr<RenderFrameImpl> render_frame_impl);
+    void completed(
+        const blink::WebVector<v8::Local<v8::Value>>& result) override;
+
+   private:
+    ~JavaScriptIsolatedWorldRequest();
+
+    int id_;
+    bool notify_result_;
+    int routing_id_;
+    base::WeakPtr<RenderFrameImpl> render_frame_impl_;
+
+    DISALLOW_COPY_AND_ASSIGN(JavaScriptIsolatedWorldRequest);
+  };
+
   typedef std::map<GURL, double> HostZoomLevels;
 
   // Functions to add and remove observers for this object.
@@ -617,7 +646,12 @@ class CONTENT_EXPORT RenderFrameImpl
                                   bool notify_result);
   void OnJavaScriptExecuteRequestForTests(const base::string16& javascript,
                                           int id,
-                                          bool notify_result);
+                                          bool notify_result,
+                                          bool has_user_gesture);
+  void OnJavaScriptExecuteRequestInIsolatedWorld(const base::string16& jscript,
+                                                 int id,
+                                                 bool notify_result,
+                                                 int world_id);
   void OnVisualStateRequest(uint64 key);
   void OnSetEditableSelectionOffsets(int start, int end);
   void OnSetCompositionFromExistingText(
@@ -779,6 +813,7 @@ class CONTENT_EXPORT RenderFrameImpl
   RendererMediaPlayerManager* GetMediaPlayerManager();
 #endif
 
+  bool AreSecureCodecsSupported();
   media::MediaPermission* GetMediaPermission();
   media::CdmFactory* GetCdmFactory();
 
@@ -788,6 +823,11 @@ class CONTENT_EXPORT RenderFrameImpl
   // case of the main frame, but not subframes).
   blink::WebLocalFrame* frame_;
 
+  // Boolean value indicating whether this RenderFrameImpl object is for a
+  // subframe or not. It remains accurate during destruction, even when |frame_|
+  // has been invalidated.
+  bool is_subframe_;
+
   // Frame is a local root if it is rendered in a process different than parent
   // or it is a main frame.
   bool is_local_root_;
@@ -795,6 +835,7 @@ class CONTENT_EXPORT RenderFrameImpl
   base::WeakPtr<RenderViewImpl> render_view_;
   int routing_id_;
   bool is_swapped_out_;
+
   // RenderFrameProxy exists only when is_swapped_out_ is true.
   // TODO(nasko): This can be removed once we don't have a swapped out state on
   // RenderFrame. See https://crbug.com/357747.
@@ -939,6 +980,8 @@ class CONTENT_EXPORT RenderFrameImpl
   RendererAccessibility* renderer_accessibility_;
 
   scoped_ptr<PermissionDispatcher> permission_client_;
+
+  scoped_ptr<blink::WebAppBannerClient> app_banner_client_;
 
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
   // The external popup for the currently showing select popup.

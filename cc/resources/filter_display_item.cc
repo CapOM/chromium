@@ -16,12 +16,21 @@
 
 namespace cc {
 
-FilterDisplayItem::FilterDisplayItem(const FilterOperations& filters,
-                                     gfx::RectF bounds)
-    : filters_(filters), bounds_(bounds) {
+FilterDisplayItem::FilterDisplayItem() {
 }
 
 FilterDisplayItem::~FilterDisplayItem() {
+}
+
+void FilterDisplayItem::SetNew(const FilterOperations& filters,
+                               const gfx::RectF& bounds) {
+  filters_ = filters;
+  bounds_ = bounds;
+
+  size_t memory_usage =
+      sizeof(skia::RefPtr<SkImageFilter>) + sizeof(gfx::RectF);
+  DisplayItem::SetNew(true /* suitable_for_gpu_raster */, 1 /* op_count */,
+                      memory_usage);
 }
 
 void FilterDisplayItem::Raster(SkCanvas* canvas,
@@ -44,18 +53,6 @@ void FilterDisplayItem::Raster(SkCanvas* canvas,
   canvas->translate(-bounds_.x(), -bounds_.y());
 }
 
-bool FilterDisplayItem::IsSuitableForGpuRasterization() const {
-  return true;
-}
-
-int FilterDisplayItem::ApproximateOpCount() const {
-  return 1;
-}
-
-size_t FilterDisplayItem::PictureMemoryUsage() const {
-  return sizeof(skia::RefPtr<SkImageFilter>) + sizeof(gfx::RectF);
-}
-
 void FilterDisplayItem::AsValueInto(
     base::trace_event::TracedValue* array) const {
   array->AppendString(base::StringPrintf("FilterDisplayItem bounds: [%s]",
@@ -63,6 +60,8 @@ void FilterDisplayItem::AsValueInto(
 }
 
 EndFilterDisplayItem::EndFilterDisplayItem() {
+  DisplayItem::SetNew(true /* suitable_for_gpu_raster */, 0 /* op_count */,
+                      0 /* memory_usage */);
 }
 
 EndFilterDisplayItem::~EndFilterDisplayItem() {
@@ -72,18 +71,6 @@ void EndFilterDisplayItem::Raster(SkCanvas* canvas,
                                   SkDrawPictureCallback* callback) const {
   canvas->restore();
   canvas->restore();
-}
-
-bool EndFilterDisplayItem::IsSuitableForGpuRasterization() const {
-  return true;
-}
-
-int EndFilterDisplayItem::ApproximateOpCount() const {
-  return 0;
-}
-
-size_t EndFilterDisplayItem::PictureMemoryUsage() const {
-  return 0;
 }
 
 void EndFilterDisplayItem::AsValueInto(

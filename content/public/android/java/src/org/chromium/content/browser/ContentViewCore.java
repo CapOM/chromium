@@ -1200,10 +1200,6 @@ public class ContentViewCore
                 || eventAction == MotionEvent.ACTION_POINTER_UP;
     }
 
-    /**
-     * @return Whether there are any active, content-targeted scroll or fling gestures.
-     */
-    @CalledByNative
     public boolean isScrollInProgress() {
         return mTouchScrollInProgress
                 || mPotentiallyActiveFlingCount > 0
@@ -2043,7 +2039,7 @@ public class ContentViewCore
                     final String query = getSelectedText();
                     if (TextUtils.isEmpty(query)) return;
 
-                    // See if ContentViewClient wants to override
+                    // See if ContentViewClient wants to override.
                     if (getContentViewClient().doesPerformWebSearch()) {
                         getContentViewClient().performWebSearch(query);
                         return;
@@ -2053,9 +2049,7 @@ public class ContentViewCore
                     i.putExtra(SearchManager.EXTRA_NEW_SEARCH, true);
                     i.putExtra(SearchManager.QUERY, query);
                     i.putExtra(Browser.EXTRA_APPLICATION_ID, getContext().getPackageName());
-                    if (activityFromContext(getContext()) == null) {
-                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    }
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     try {
                         getContext().startActivity(i);
                     } catch (android.content.ActivityNotFoundException ex) {
@@ -2879,6 +2873,10 @@ public class ContentViewCore
      */
     public void setBrowserAccessibilityManager(BrowserAccessibilityManager manager) {
         mBrowserAccessibilityManager = manager;
+
+        if (mBrowserAccessibilityManager != null && mRenderCoordinates.hasFrameInfo()) {
+            mBrowserAccessibilityManager.notifyFrameInfoInitialized();
+        }
     }
 
     /**
@@ -2904,8 +2902,7 @@ public class ContentViewCore
         }
 
         if (mNativeAccessibilityAllowed && !mNativeAccessibilityEnabled
-                && mNativeContentViewCore != 0
-                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                && mNativeContentViewCore != 0) {
             mNativeAccessibilityEnabled = true;
             nativeSetAccessibilityEnabled(mNativeContentViewCore, true);
         }

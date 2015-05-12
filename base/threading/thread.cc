@@ -6,6 +6,7 @@
 
 #include "base/bind.h"
 #include "base/lazy_instance.h"
+#include "base/location.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/third_party/dynamic_annotations/dynamic_annotations.h"
@@ -162,7 +163,7 @@ void Thread::StopSoon() {
     return;
 
   stopping_ = true;
-  message_loop_->PostTask(FROM_HERE, base::Bind(&ThreadQuitHelper));
+  task_runner()->PostTask(FROM_HERE, base::Bind(&ThreadQuitHelper));
 }
 
 bool Thread::IsRunning() const {
@@ -207,7 +208,7 @@ void Thread::ThreadMain() {
 
     // Complete the initialization of our Thread object.
     thread_id_ = PlatformThread::CurrentId();
-    PlatformThread::SetName(name_.c_str());
+    PlatformThread::SetName(name_);
     ANNOTATE_THREAD_NAME(name_.c_str());  // Tell the name to race detector.
     message_loop->set_thread_name(name_);
     message_loop->SetTimerSlack(startup_data_->options.timer_slack);

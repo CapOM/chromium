@@ -313,6 +313,7 @@ TEST_F(GLES2ImplementationTest, CompileShader) {
 // TODO(zmo): Implement unit test for CompressedTexImage2D
 // TODO(zmo): Implement unit test for CompressedTexSubImage2D
 // TODO(zmo): Implement unit test for CompressedTexImage3D
+// TODO(zmo): Implement unit test for CompressedTexSubImage3D
 
 TEST_F(GLES2ImplementationTest, CopyBufferSubData) {
   struct Cmds {
@@ -1079,6 +1080,7 @@ TEST_F(GLES2ImplementationTest, GetTexParameteriv) {
 // TODO(zmo): Implement unit test for GetUniformBlockIndex
 // TODO(zmo): Implement unit test for GetUniformfv
 // TODO(zmo): Implement unit test for GetUniformiv
+// TODO(zmo): Implement unit test for GetUniformuiv
 // TODO(zmo): Implement unit test for GetUniformIndices
 // TODO(zmo): Implement unit test for GetUniformLocation
 

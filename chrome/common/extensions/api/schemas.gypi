@@ -63,6 +63,7 @@
       'notifications.idl',
       'omnibox.json',
       'page_capture.json',
+      'passwords_private.idl',
       'permissions.json',
       'preferences_private.json',
       'reading_list_private.json',
@@ -83,8 +84,10 @@
       # WebRTC-specific bits and as such does not belong in
       # the enable_webrtc==0 section below.
       'webrtc_audio_private.idl',
+      'webrtc_desktop_capture_private.idl',
       'webrtc_logging_private.idl',
       'webstore_private.json',
+      'webstore_widget_private.idl',
       'windows.json',
     ],
     'main_schema_include_rules': [

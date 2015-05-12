@@ -104,6 +104,17 @@ virtual void CompressedTexImage3D(GLenum target,
                                   GLint border,
                                   GLsizei imageSize,
                                   const void* data) = 0;
+virtual void CompressedTexSubImage3D(GLenum target,
+                                     GLint level,
+                                     GLint xoffset,
+                                     GLint yoffset,
+                                     GLint zoffset,
+                                     GLsizei width,
+                                     GLsizei height,
+                                     GLsizei depth,
+                                     GLenum format,
+                                     GLsizei imageSize,
+                                     const void* data) = 0;
 virtual void CopyBufferSubData(GLenum readtarget,
                                GLenum writetarget,
                                GLintptr readoffset,
@@ -290,6 +301,7 @@ virtual void GetTransformFeedbackVarying(GLuint program,
 virtual GLuint GetUniformBlockIndex(GLuint program, const char* name) = 0;
 virtual void GetUniformfv(GLuint program, GLint location, GLfloat* params) = 0;
 virtual void GetUniformiv(GLuint program, GLint location, GLint* params) = 0;
+virtual void GetUniformuiv(GLuint program, GLint location, GLuint* params) = 0;
 virtual void GetUniformIndices(GLuint program,
                                GLsizei count,
                                const char* const* names,

@@ -525,6 +525,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Apps.AppListSearchQueryLength" units="characters">
+  <owner>calamity@chromium.org</owner>
+  <summary>
+    The length of the app list search query when a result is opened. This is
+    gathered per click of a search result.
+  </summary>
+</histogram>
+
+<histogram name="Apps.AppListSearchResultDistanceFromOrigin" units="keystrokes">
+  <owner>calamity@chromium.org</owner>
+  <summary>
+    The minimum number of arrow keys a user would need to press to navigate to
+    the opened search result. This is gathered per click of a search result.
+  </summary>
+</histogram>
+
 <histogram name="Apps.AppListSearchResultOpenDisplayType"
     enum="AppListSearchResultDisplayType">
   <owner>calamity@chromium.org</owner>
@@ -3346,25 +3362,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram
-    name="Compositing.DisplayListRecordingSource.UpdateInvalidatedAreaPerMs"
-    units="pixels/ms">
-  <owner>paint-dev@chromium.org</owner>
-  <summary>
-    Area of invalidated content, in pixels, divided by update (i.e. record), in
-    milliseconds. Recorded when display list recording source is updated.
-  </summary>
-</histogram>
-
-<histogram name="Compositing.DisplayListRecordingSource.UpdateUs"
-    units="microseconds">
-  <owner>paint-dev@chromium.org</owner>
-  <summary>
-    Time spent updating (i.e. recording) a display list, in microseconds.
-    Recorded when display list is updated.
-  </summary>
-</histogram>
-
 <histogram name="Compositing.NumActiveLayers">
   <owner>dneto@chromium.org</owner>
   <summary>
@@ -3373,36 +3370,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="Compositing.PicturePile.UpdateInvalidatedAreaPerMs"
-    units="pixels/ms">
+<histogram name="Compositing.PictureMemoryUsageKb" units="KB">
   <owner>paint-dev@chromium.org</owner>
   <summary>
-    Area of invalidated content, in pixels, divided by update (i.e. record), in
-    milliseconds. Recorded when picture pile is updated.
-  </summary>
-</histogram>
-
-<histogram name="Compositing.PicturePile.UpdateUs" units="microseconds">
-  <owner>paint-dev@chromium.org</owner>
-  <summary>
-    Time spent updating (i.e. recording) a picture pile, in microseconds.
-    Recorded when picture pile is updated.
-  </summary>
-</histogram>
-
-<histogram name="Compositing.RasterTask.RasterPixelsPerMs" units="pixels/ms">
-  <owner>paint-dev@chromium.org</owner>
-  <summary>
-    Rasterized area, in pixels, divided by rasterization time, in milliseconds,
-    of a compositor rasterization task. Recorded after the task finishes.
-  </summary>
-</histogram>
-
-<histogram name="Compositing.RasterTask.RasterUs" units="microseconds">
-  <owner>paint-dev@chromium.org</owner>
-  <summary>
-    Time spent completing a compositor rasterization task, in microseconds.
-    Recorded after the task finishes.
+    Total estimated memory used by SkPictures in the layer tree, in kilobytes.
+    Recorded once per frame, before the frame is drawn.
   </summary>
 </histogram>
 
@@ -4222,6 +4194,36 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Counts various events that trigger Chrome to bypass the primary
     configuration of the data reduction proxy.
+  </summary>
+</histogram>
+
+<histogram
+    name="DataReductionProxy.ConfigService.FetchFailedAttemptsBeforeSuccess">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The number of failed attempts when retrieving the configuration from the
+    Data Reduction Proxy API before a successful attempt took place.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.ConfigService.FetchLatency"
+    units="milliseconds">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Time from when the Data Reduction Proxy configuration request starts until
+    it completes.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.ConfigService.FetchResponseCode"
+    enum="HttpResponseCode">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Count per HttpResponseCode when attempting to retrieve the Data Reduction
+    Proxy configuration from the Data Reduction Proxy API.
   </summary>
 </histogram>
 
@@ -5759,6 +5761,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="DocumentScan.ConverterResult" enum="BooleanSuccess">
+  <owner>pstew@chromium.org</owner>
+  <summary>
+    Chrome OS document scan metric that tracks whether a document scan call to
+    the image conversion process suceeded.
+  </summary>
+</histogram>
+
+<histogram name="DocumentScan.ScanResult" enum="BooleanSuccess">
+  <owner>pstew@chromium.org</owner>
+  <summary>
+    Chrome OS document scan metric that tracks whether a document scan call to
+    the sane backend process suceeded.
+  </summary>
+</histogram>
+
 <histogram name="DomainBoundCerts.DBLoadedCount">
   <owner>mattm@chromium.org</owner>
   <summary>Number of certs loaded from domain bound cert database.</summary>
@@ -5989,6 +6007,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="DomDistiller.Time.DistillationTotal" units="milliseconds">
   <owner>yfriedman@chromium.org</owner>
   <summary>Complete time spent in DomDistiller's processing of a page.</summary>
+</histogram>
+
+<histogram name="DomDistiller.Time.DistillPage" units="milliseconds">
+  <owner>wychen@chromium.org</owner>
+  <summary>
+    Time spent in DistillPageImpl(), mostly ExecuteJavaScript(), including
+    compilation and execution.
+  </summary>
 </histogram>
 
 <histogram name="DomDistiller.Time.DocumentConstruction" units="milliseconds">
@@ -9442,6 +9468,154 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.HasPermissions_AutoDisable3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when it is
+    automatically disabled due to a permission increase (e.g., after an
+    extension upgrade). To find places where this histogram may be emitted, look
+    for calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument AutoDisable. For Sync users, this may be reported for each device,
+    depending on whether the Sync update or the extension auto-update happen
+    first.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_Install3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when it was
+    installed. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument Install. For Sync users, this is reported for each device.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_InstallAbort3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when installation
+    was aborted (e.g. because the parent window of the confirmation dialog went
+    away), not including installation errors and user cancels. To find places
+    where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    InstallAbort.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_InstallCancel3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when installation
+    was canceled. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument InstallCancel.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_Load3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when it was
+    loaded (which happens at profile open or extension install). To find places
+    where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument Load.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_ReEnable3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when it was
+    re-enabled from a confirmation prompt. To find places where this histogram
+    may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    ReEnable.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_ReEnableAbort3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when the
+    re-enable prompt was aborted (e.g. because the parent window of the
+    confirmation dialog went away), not including installation errors and manual
+    user cancels. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument ReEnableAbort.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_ReEnableCancel3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when the
+    re-enable was canceled from the confirmation prompt. To find places where
+    this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    ReEnableCancel.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_Uninstall3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when it was
+    uninstalled. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument Uninstall. For Sync users, this is reported for each device.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_WebStoreInstall3" enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when it was
+    installed through the web store. To find places where this histogram may be
+    emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    WebStoreInstall. Contrary to the more-general HasPermissions_Install3
+    histogram, this one is NOT reported for each device.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_WebStoreInstallAbort3"
+    enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when installation
+    from the web store was aborted (e.g. because the parent window of the
+    confirmation dialog went away), not including installation errors and user
+    cancels. To find places where this histogram may be emitted, look for calls
+    to ExtensionService::RecordPermissionMessagesHistogram with the argument
+    WebStoreInstallAbort.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.HasPermissions_WebStoreInstallCancel3"
+    enum="Boolean">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    Whether there were any permissions present in an extension when installation
+    from the web store was canceled. To find places where this histogram may be
+    emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    WebStoreInstallCancel.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.HostedAppLaunchContainer" enum="AppLaunchContainer">
   <owner>benwells@chromium.org</owner>
   <summary>
@@ -9917,7 +10091,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when it is automatically disabled
-    due to a permission increase (e.g., after an extension upgrade).
+    due to a permission increase (e.g., after an extension upgrade). To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    AutoDisable.
   </summary>
 </histogram>
 
@@ -9931,6 +10108,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_AutoDisable3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when it is automatically disabled
+    due to a permission increase (e.g., after an extension upgrade). To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    AutoDisable. For Sync users, this may be reported for each device, depending
+    on whether the Sync update or the extension auto-update happen first.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_Install" enum="ExtensionPermission">
   <obsolete>
     Deprecated as of 5/2014, replaced by Extensions.Permissions_Install2.
@@ -9938,7 +10129,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>kalman@chromium.org</owner>
   <owner>rpaquay@chromium.org</owner>
   <summary>
-    The permissions present in an extension when it was installed.
+    The permissions present in an extension when it was installed. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    Install.
   </summary>
 </histogram>
 
@@ -9947,6 +10141,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when it was installed.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.Permissions_Install3" enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when it was installed. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    Install. For Sync users, this is reported for each device.
   </summary>
 </histogram>
 
@@ -9959,7 +10164,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when installation was aborted, not
-    including installation errors and user cancels.
+    including installation errors and user cancels. To find places where this
+    histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    InstallAbort.
   </summary>
 </histogram>
 
@@ -9973,6 +10181,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_InstallAbort3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when installation was aborted (e.g.
+    because the parent window of the confirmation dialog went away), not
+    including installation errors and user cancels. To find places where this
+    histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    InstallAbort.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_InstallCancel"
     enum="ExtensionPermission">
   <obsolete>
@@ -9981,7 +10203,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>kalman@chromium.org</owner>
   <owner>rpaquay@chromium.org</owner>
   <summary>
-    The permissions present in an extension when installation was canceled.
+    The permissions present in an extension when installation was canceled. To
+    find places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    InstallCancel.
   </summary>
 </histogram>
 
@@ -9991,6 +10216,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when installation was canceled.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.Permissions_InstallCancel3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when installation was canceled. To
+    find places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    InstallCancel.
   </summary>
 </histogram>
 
@@ -10006,7 +10243,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Extensions.Permissions_Load2" enum="ExtensionPermission2">
   <owner>kalman@chromium.org</owner>
   <owner>rpaquay@chromium.org</owner>
-  <summary>The permissions present in an extension when it was loaded.</summary>
+  <summary>
+    The permissions present in an extension when it was loaded. To find places
+    where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument Load.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.Permissions_Load3" enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when it was loaded (which happens at
+    profile open or extension install). To find places where this histogram may
+    be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument Load.
+  </summary>
 </histogram>
 
 <histogram name="Extensions.Permissions_ReEnable" enum="ExtensionPermission">
@@ -10017,7 +10269,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when it was re-enabled from a
-    confirmation prompt.
+    confirmation prompt. To find places where this histogram may be emitted,
+    look for calls to ExtensionService::RecordPermissionMessagesHistogram with
+    the argument ReEnable.
   </summary>
 </histogram>
 
@@ -10030,6 +10284,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_ReEnable3" enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when it was re-enabled from a
+    confirmation prompt. To find places where this histogram may be emitted,
+    look for calls to ExtensionService::RecordPermissionMessagesHistogram with
+    the argument ReEnable.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_ReEnableAbort"
     enum="ExtensionPermission">
   <obsolete>
@@ -10039,7 +10304,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when the re-enable prompt was
-    aborted, not including installation errors and manual user cancels.
+    aborted, not including installation errors and manual user cancels. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    ReEnableAbort.
   </summary>
 </histogram>
 
@@ -10053,6 +10321,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_ReEnableAbort3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when the re-enable prompt was
+    aborted (e.g. because the parent window of the confirmation dialog went
+    away), not including installation errors and manual user cancels. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    ReEnableAbort.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_ReEnableCancel"
     enum="ExtensionPermission">
   <obsolete>
@@ -10062,7 +10344,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when the re-enable was canceled from
-    the confirmation prompt.
+    the confirmation prompt. To find places where this histogram may be emitted,
+    look for calls to ExtensionService::RecordPermissionMessagesHistogram with
+    the argument ReEnableCancel.
   </summary>
 </histogram>
 
@@ -10076,6 +10360,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_ReEnableCancel3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when the re-enable was canceled from
+    the confirmation prompt. To find places where this histogram may be emitted,
+    look for calls to ExtensionService::RecordPermissionMessagesHistogram with
+    the argument ReEnableCancel.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_Uninstall" enum="ExtensionPermission">
   <obsolete>
     Deprecated as of 5/2014, replaced by Extensions.Permissions_Uninstall2.
@@ -10083,7 +10379,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>kalman@chromium.org</owner>
   <owner>rpaquay@chromium.org</owner>
   <summary>
-    The permissions present in an extension when it was uninstalled.
+    The permissions present in an extension when it was uninstalled. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    Uninstall.
   </summary>
 </histogram>
 
@@ -10092,6 +10391,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when it was uninstalled.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.Permissions_Uninstall3" enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when it was uninstalled. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    Uninstall. For Sync users, this is reported for each device.
   </summary>
 </histogram>
 
@@ -10105,7 +10415,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when it was installed through the
-    web store.
+    web store. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument WebStoreInstall.
   </summary>
 </histogram>
 
@@ -10119,6 +10431,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_WebStoreInstall3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when it was installed through the
+    web store. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument WebStoreInstall. Contrary to the more-general Permissions_Install3
+    histogram, this one is NOT reported for each device.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_WebStoreInstallAbort"
     enum="ExtensionPermission">
   <obsolete>
@@ -10129,7 +10454,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when installation from the web store
-    was aborted, not including installation errors and user cancels.
+    was aborted, not including installation errors and user cancels. To find
+    places where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    WebStoreInstallAbort.
   </summary>
 </histogram>
 
@@ -10143,6 +10471,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Extensions.Permissions_WebStoreInstallAbort3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when installation from the web store
+    was aborted (e.g. because the parent window of the confirmation dialog went
+    away), not including installation errors and user cancels. To find places
+    where this histogram may be emitted, look for calls to
+    ExtensionService::RecordPermissionMessagesHistogram with the argument
+    WebStoreInstallAbort.
+  </summary>
+</histogram>
+
 <histogram name="Extensions.Permissions_WebStoreInstallCancel"
     enum="ExtensionPermission">
   <obsolete>
@@ -10153,7 +10495,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>rpaquay@chromium.org</owner>
   <summary>
     The permissions present in an extension when installation from the web store
-    was canceled.
+    was canceled. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument WebStoreInstallCancel.
   </summary>
 </histogram>
 
@@ -10164,6 +10508,30 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The permissions present in an extension when installation from the web store
     was canceled.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.Permissions_WebStoreInstallCancel3"
+    enum="ExtensionPermission3">
+  <owner>kalman@chromium.org</owner>
+  <owner>rpaquay@chromium.org</owner>
+  <summary>
+    The permissions present in an extension when installation from the web store
+    was canceled. To find places where this histogram may be emitted, look for
+    calls to ExtensionService::RecordPermissionMessagesHistogram with the
+    argument WebStoreInstallCancel.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.PopupCreateTime" units="milliseconds">
+  <owner>kalman@chromium.org</owner>
+  <summary>
+    The time taken between a user clicking on a button to open a popup, and the
+    popup finishing loading its initial URL. This is a good way to measure the
+    UI responsiveness of extension popups. It will be strictly larger than
+    Extensions.PopupLoadTime2, which only measures the time it takes to load -
+    there may be a delay between clicking and starting to load, for example, if
+    the popup's host got caught in a queue.
   </summary>
 </histogram>
 
@@ -10180,7 +10548,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The time taken for an extension popup to load its initial URL. This may not
     include the time taken for an extension process to start, if the extension
-    already has a background page running.
+    already has a background page running. It does not necessarily correlate
+    with the amount of time since the popup was *clicked* either, since there
+    may be a delay between the user clicking and the loading started.
+    Extensions.PopupCreateTime measures this instead.
   </summary>
 </histogram>
 
@@ -10393,6 +10764,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Extensions.ToolstripLoadTime" units="milliseconds">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Time taken to load a toolstrip.</summary>
+</histogram>
+
+<histogram name="Extensions.UninstallDialogAction"
+    enum="ExtensionUninstallDialogAction">
+  <owner>rdevlin.cronin@chromium.org</owner>
+  <summary>
+    The action that was taken from an extension uninstall dialog. Recorded once
+    per dialog shown. Only recorded if all possible actions (including report
+    abuse) were available on the dialog.
+  </summary>
 </histogram>
 
 <histogram name="Extensions.UninstallType" enum="ExtensionType">
@@ -10651,6 +11032,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The total number of bytes read for a chrome-extension:// URL, logged when
     the job is finished (either successfully or not).
+  </summary>
+</histogram>
+
+<histogram name="FaultTolerantHeap" enum="FaultTolerantHeap">
+  <owner>brucedawson@chromium.org</owner>
+  <summary>
+    Records several bits of information about whether the Windows
+    FaultTolerantHeap might be enabled. This is logged (from a delayed task)
+    when the browser process starts up.
   </summary>
 </histogram>
 
@@ -13627,6 +14017,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="LibraryLoader.PrefetchStatus" enum="BooleanSuccess">
+  <owner>lizeb@chromium.org</owner>
+  <summary>
+    Indicates whether the forking of a child process to prefetch the native
+    library succeeded. This metric is Android-specific, and is logged when the
+    browser starts.
+  </summary>
+</histogram>
+
 <histogram name="Linux.GlibcVersion" enum="LinuxGlibcVersion">
   <owner>thestig@chromium.org</owner>
   <summary>
@@ -13786,6 +14185,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Time from first display of the login prompt until the user completes signing
     in.
+  </summary>
+</histogram>
+
+<histogram name="Login.ReauthReason" enum="LoginReauthReasons">
+  <owner>ginkage@chromium.org</owner>
+  <summary>
+    Tracks the reason why a user was sent through the GAIA re-auth flow.
   </summary>
 </histogram>
 
@@ -14860,6 +15266,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Pixel format used in HTML5 video. Emitted on video load.</summary>
 </histogram>
 
+<histogram name="Media.VideoRenderer.CadenceChanges" units="changes">
+  <owner>dalecurtis@chromium.org</owner>
+  <summary>
+    Indicates how many cadence changes have occurred during playback, a zero
+    value is emitted at the beginning of playback. Subsequent values are emitted
+    during video rendering for each cadence change (up to a maximum of 10).
+  </summary>
+</histogram>
+
 <histogram name="Media.VideoRotation" enum="VideoRotation">
   <owner>suderman@chromium.org</owner>
   <summary>Metadata rotation in mp4 videos. Emitted during demuxing.</summary>
@@ -15201,6 +15616,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>kouhei@chromium.org</owner>
   <summary>
     The count of active plugin processes.  Recorded once per UMA ping.
+  </summary>
+</histogram>
+
+<histogram name="Memory.PressureLevel" enum="MemoryPressureLevel">
+  <owner>chrisha@chromium.org</owner>
+  <summary>
+    The memory pressure level, which is recorded periodically (once per second).
+    This is used to show the relative time that systems spend in each of the
+    memory pressure states.
   </summary>
 </histogram>
 
@@ -17795,10 +18219,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Net.ConnectionUsedSSLDeprecatedCipherFallback"
     enum="BooleanDeprecatedCiphers">
+  <obsolete>
+    Replaced with Net.ConnectionUsedSSLDeprecatedCipherFallback2 in Chrome 44.
+  </obsolete>
   <owner>davidben@chromium.org</owner>
   <summary>
     True if an HTTPS connection was made using the deprecated cipher suite
     fallback.
+  </summary>
+</histogram>
+
+<histogram name="Net.ConnectionUsedSSLDeprecatedCipherFallback2"
+    enum="BooleanDeprecatedCiphers">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    For each successful HTTPS request, whether it used the deprecated cipher
+    suite fallback.
   </summary>
 </histogram>
 
@@ -17814,10 +18250,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Net.ConnectionUsedSSLVersionFallback"
     enum="FallbackSSLVersion">
+  <obsolete>
+    Replaced with Net.ConnectionUsedSSLVersionFallback2 in Chrome 44.
+  </obsolete>
   <owner>agl@chromium.org</owner>
   <summary>
     Nonzero if the HTTP request was to a server which requires SSL version
     fallback.  The value indicates the SSL version the request fell back on.
+  </summary>
+</histogram>
+
+<histogram name="Net.ConnectionUsedSSLVersionFallback2"
+    enum="FallbackSSLVersion">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    For each successful HTTPS request, whether it used the SSL version fallback.
+    The value indicates the SSL version the request fell back on
   </summary>
 </histogram>
 
@@ -18762,12 +19210,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Net.GoogleConnectionUsedSSLVersionFallback"
     enum="FallbackSSLVersion">
+  <obsolete>
+    Replaced with Net.GoogleConnectionUsedSSLVersionFallback2 in Chrome 44.
+  </obsolete>
   <owner>agl@chromium.org</owner>
   <summary>
     Nonzero if the HTTP request was to a Google server which required SSL
     version fallback. The value indicates the SSL version the request fell back
     on. Since Google servers support TLS 1.2, any fallback is an indication of
     network middleware problems.
+  </summary>
+</histogram>
+
+<histogram name="Net.GoogleConnectionUsedSSLVersionFallback2"
+    enum="FallbackSSLVersion">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    For each successful HTTPS request to a Google server, whether it used the
+    SSL version fallback. The value indicates the SSL version the request fell
+    back on. Since Google servers support TLS 1.2, any fallback is an indication
+    of network middleware problems.
   </summary>
 </histogram>
 
@@ -19094,6 +19556,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The count of HTTP Response codes encountered, in response to MAIN_FRAME
     requests only; saving only the hundreds digit, e.g. 100-&gt;1, 300-&gt;3.
+  </summary>
+</histogram>
+
+<histogram name="Net.HttpServerProperties.UpdatePrefs"
+    enum="HttpServerPropertiesUpdatePrefsLocation">
+  <owner>rtenneti@chromium.org</owner>
+  <summary>
+    The location in http_server_properties_manager.cc where UpdatePrefs was
+    called.
   </summary>
 </histogram>
 
@@ -27384,6 +27855,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Platform.TPM.AuthErrorCode" enum="TPMResultCodeEnum">
+  <owner>semenzato@chromium.org</owner>
+  <summary>
+    Each sample is the result code of a TPM authorized command issued through
+    tcsd.  Success is 0.  For the other error codes, see
+    /usr/include/tss/tpm_error.h.
+  </summary>
+</histogram>
+
 <histogram name="Platform.TPM.DictionaryAttackCounter">
   <owner>dkrahn@chromium.org</owner>
   <summary>
@@ -27398,6 +27878,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Each sample is the status of an hourly attempt to reset the TPM dictionary
     attack counter.
+  </summary>
+</histogram>
+
+<histogram name="Platform.TPM.ErrorCode" enum="TPMResultCodeEnum">
+  <owner>semenzato@chromium.org</owner>
+  <summary>
+    Each sample is the result code of a TPM command issued through tcsd. Success
+    is 0.  For the other error codes, see /usr/include/tss/tpm_error.h.
   </summary>
 </histogram>
 
@@ -28619,6 +29107,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>yzshen@chromium.org</owner>
   <owner>thestig@chromium.org</owner>
   <summary>Collects Flash usage data.</summary>
+</histogram>
+
+<histogram name="Plugin.NPAPIRemovalInfobar.Removed.PluginGroup"
+    enum="PluginGroup">
+  <owner>wfh@chromium.org</owner>
+  <summary>
+    The plugin group of an NPAPI plugin that is no longer supported. Recorded
+    when the NPAPI removal infobar is shown for a plugin which is no longer
+    supported.
+  </summary>
+</histogram>
+
+<histogram name="Plugin.NPAPIRemovalInfobar.RemovedSoon.PluginGroup"
+    enum="PluginGroup">
+  <owner>wfh@chromium.org</owner>
+  <summary>
+    The plugin group of an NPAPI plugin that will be unsupported soon. Recorded
+    when the NPAPI removal infobar is shown after an NPAPI plugin first loads to
+    warn the user that NPAPI support for this plugin will be removed soon.
+  </summary>
 </histogram>
 
 <histogram name="Plugin.NPAPIStatus" enum="NPAPIPluginStatus">
@@ -31372,6 +31880,30 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Rappor.FailedUploadErrorCode" enum="NetErrorCodes">
   <owner>holte@chromium.org</owner>
   <summary>Net error codes for failed Rappor uploads.</summary>
+</histogram>
+
+<histogram name="rappor.last_daily_sample" enum="DailyEventIntervalType">
+  <obsolete>
+    Removed 2015/05/05.
+  </obsolete>
+  <owner>holte@chromium.org</owner>
+  <summary>
+    Rappor.DailyEvent.IntervalType reported under the wrong name.
+  </summary>
+</histogram>
+
+<histogram name="Rappor.LoadCohortResult" enum="RapporLoadResultType">
+  <owner>holte@chromium.org</owner>
+  <summary>
+    Success or errors encountered when loading Rappor cohort pref.
+  </summary>
+</histogram>
+
+<histogram name="Rappor.LoadSecretResult" enum="RapporLoadResultType">
+  <owner>holte@chromium.org</owner>
+  <summary>
+    Success or errors encountered when loading Rappor secret pref.
+  </summary>
 </histogram>
 
 <histogram name="Rappor.UploadResponseCode" enum="HttpResponseCode">
@@ -40286,6 +40818,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Enumeration of types of bookmark configuration failures.</summary>
 </histogram>
 
+<histogram name="Sync.BookmarksDuplicationsAtAssociation">
+  <owner>stanisc@chromium.org</owner>
+  <summary>
+    Estimated number of bookmark duplications after bookmark association.
+  </summary>
+</histogram>
+
+<histogram name="Sync.BookmarksNewDuplicationsAtAssociation">
+  <owner>stanisc@chromium.org</owner>
+  <summary>
+    Estimated number of new bookmark duplications after bookmark association.
+  </summary>
+</histogram>
+
 <histogram name="Sync.BookmarksStartFailure" enum="SyncStartResult">
   <obsolete>
     Replaced by BookmarksConfigureFailure. See crbug.com/478226.
@@ -40516,6 +41062,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </obsolete>
   <owner>zea@chromium.org</owner>
   <summary>Enumeration of types of dictionary association failures.</summary>
+</histogram>
+
+<histogram name="Sync.DirectoryCatastrophicError" enum="BooleanError">
+  <owner>maniscalco@chromium.org</owner>
+  <summary>
+    Whether the Sync Directory encountered a catastrophic error.
+  </summary>
 </histogram>
 
 <histogram name="Sync.DirectoryOpenFailedMac">
@@ -40892,6 +41445,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Number of partially synced types (those with a progress marker but no
     initial sync ended bit) that exist at sync startup.
   </summary>
+</histogram>
+
+<histogram name="Sync.PassphraseDecryptionSucceeded" enum="BooleanSuccess">
+  <owner>zea@chromium.org</owner>
+  <summary>Whether a passphrase decryption attempt succeeded or not.</summary>
+</histogram>
+
+<histogram name="Sync.PassphraseDialogDismissed" enum="SyncPassphraseDismissal">
+  <owner>zea@chromium.org</owner>
+  <summary>Enumeration of how a user dismissed the passphrase dialog.</summary>
 </histogram>
 
 <histogram name="Sync.PassphraseType" enum="SyncPassphraseType">
@@ -43489,6 +44052,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Time spent in scavenging phase of GC.</summary>
 </histogram>
 
+<histogram name="V8.Initializer.LoadV8Snapshot.Result"
+    enum="V8InitializerLoadV8SnapshotResult">
+  <owner>oth@chromium.org</owner>
+  <summary>Results from snapshot loading.</summary>
+</histogram>
+
+<histogram name="V8.Initializer.OpenV8File.Result"
+    enum="V8InitializerOpenV8FileResult">
+  <owner>oth@chromium.org</owner>
+  <summary>Results from opening V8 snapshot files.</summary>
+</histogram>
+
 <histogram name="V8.MemoryExternalFragmentationCellSpace" units="percent">
   <owner>jochen@chromium.org</owner>
   <owner>hpayer@chromium.org</owner>
@@ -43808,6 +44383,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Records number of experiment ids in the X-Client-Data header at the time the
     header is constructed.
+  </summary>
+</histogram>
+
+<histogram name="Variations.LoadPermanentConsistencyCountryResult"
+    enum="VariationsPermanentConsistencyCountryResult">
+  <owner>sclittle@chromium.org</owner>
+  <summary>
+    Records how the country code saved in prefs used for filtering permanent
+    consistency studies compares to the country code in the variations seed.
+    This is recorded each time the saved country code is loaded from the pref.
   </summary>
 </histogram>
 
@@ -47054,7 +47639,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="14" label="SERVICE_WORKER_BAD_URL"/>
   <int value="15" label="WC_INVALID_FRAME_SOURCE"/>
   <int value="16" label="RWHVM_UNEXPECTED_FRAME_TYPE"/>
-  <int value="17" label="DFH_BAD_EMBEDDER_MESSAGE"/>
+  <int value="17" label="RFPH_DETACH"/>
+  <int value="18" label="DFH_BAD_EMBEDDER_MESSAGE"/>
+  <int value="19" label="NC_AUTO_SUBFRAME"/>
 </enum>
 
 <enum name="BadMessageReasonExtensions" type="int">
@@ -48072,6 +48659,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="417" label="417: Expectation Failed"/>
   <int value="500" label="500: Internal Server Error"/>
   <int value="501" label="501: Not Implemented"/>
+  <int value="502" label="502: Bad Gateway"/>
   <int value="503" label="503: Service Unavailable"/>
   <int value="504" label="504: Gateway Timeout"/>
   <int value="505" label="505: HTTP Version Not Supported"/>
@@ -48836,10 +49424,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1148809156" label="chrmxtn.dll"/>
   <int value="1270622879" label="hk.dll"/>
   <int value="1409376135" label="windowsapihookdll32.dll"/>
+  <int value="1617407227" label="spappsv32.dll"/>
   <int value="1671476533" label="crdli64.dll"/>
   <int value="1680432366" label="virtualCamera.ax"/>
   <int value="1736709911" label="bitguard.dll"/>
   <int value="1763208296" label="safetynut.dll"/>
+  <int value="1806942655" label="dpinterface32.dll"/>
   <int value="1850669228" label="YCWebCameraSource.ax"/>
   <int value="1979101632" label="bsvc.dll"/>
   <int value="1996673448" label="scdetour.dll"/>
@@ -51114,8 +51704,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="677" label="HID_SENDFEATUREREPORT"/>
   <int value="678" label="HOTWORDPRIVATE_SETENABLED"/>
   <int value="679" label="HOTWORDPRIVATE_GETSTATUS"/>
-  <int value="680" label="APP_CURRENTWINDOWINTERNAL_SETBADGEICON"/>
-  <int value="681" label="APP_CURRENTWINDOWINTERNAL_CLEARBADGE"/>
+  <int value="680" label="DELETED_APP_CURRENTWINDOWINTERNAL_SETBADGEICON"/>
+  <int value="681" label="DELETED_APP_CURRENTWINDOWINTERNAL_CLEARBADGE"/>
   <int value="682" label="DELETED_WEBVIEW_SETZOOM"/>
   <int value="683" label="DELETED_WEBVIEW_GETZOOM"/>
   <int value="684" label="DEVELOPERPRIVATE_REQUESTFILESOURCE"/>
@@ -51434,7 +52024,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="983" label="FILEMANAGERPRIVATE_ISPIEXLOADERENABLED"/>
   <int value="984" label="HOTWORDPRIVATE_SPEAKERMODELEXISTSRESULT"/>
   <int value="985" label="SETTINGSPRIVATE_SETPREF"/>
-  <int value="986" label="DELETED_SETTINGSPRIVATE_SETNUMERICPREF"/>
+  <int value="986" label="DELETED_SETTINGSPRIVATE_SETDOUBLEPREF"/>
   <int value="987" label="DELETED_SETTINGSPRIVATE_SETSTRINGPREF"/>
   <int value="988" label="DELETED_SETTINGSPRIVATE_SETURLPREF"/>
   <int value="989" label="SETTINGSPRIVATE_GETALLPREFS"/>
@@ -51478,6 +52068,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1027" label="SEARCHENGINESPRIVATE_REMOVESEARCHENGINE"/>
   <int value="1028" label="SEARCHENGINESPRIVATE_UPDATESEARCHENGINE"/>
   <int value="1029" label="SEARCHENGINESPRIVATE_OPTINTOHOTWORDING"/>
+  <int value="1030" label="WEBSTOREWIDGETPRIVATE_INSTALLWEBSTOREITEM"/>
+  <int value="1031" label="WEBSTOREWIDGETPRIVATE_GETSTRINGS"/>
+  <int value="1032" label="WEBRTCDESKTOPCAPTUREPRIVATE_CHOOSEDESKTOPMEDIA"/>
+  <int value="1033"
+      label="WEBRTCDESKTOPCAPTUREPRIVATE_CANCELCHOOSEDESKTOPMEDIA"/>
+  <int value="1034" label="BLUETOOTHLOWENERGY_REGISTERADVERTISEMENT"/>
+  <int value="1035" label="BLUETOOTHLOWENERGY_UNREGISTERADVERTISEMENT"/>
+  <int value="1036" label="PASSWORDSPRIVATE_CANPASSWORDACCOUNTBEMANAGED"/>
+  <int value="1037" label="PASSWORDSPRIVATE_REMOVESAVEDPASSWORD"/>
+  <int value="1038" label="PASSWORDSPRIVATE_REMOVEPASSWORDEXCEPTION"/>
+  <int value="1039" label="PASSWORDSPRIVATE_GETPLAINTEXTPASSWORD"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -51677,6 +52278,206 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="78" label="kInterceptAllKeys"/>
   <int value="79" label="kSettingsPrivate"/>
   <int value="80" label="kPrinterProvider"/>
+  <int value="81" label="kSearchEnginesPrivate"/>
+  <int value="82" label="kAutofillPrivate"/>
+</enum>
+
+<enum name="ExtensionPermission3" type="int">
+<!-- Generated from ../../../extensions/common/permissions/api_permission.h -->
+
+  <int value="0" label="kInvalid"/>
+  <int value="1" label="kUnknown"/>
+  <int value="2" label="kAccessibilityFeaturesModify"/>
+  <int value="3" label="kAccessibilityFeaturesRead"/>
+  <int value="4" label="kAccessibilityPrivate"/>
+  <int value="5" label="kActiveTab"/>
+  <int value="6" label="kActivityLogPrivate"/>
+  <int value="7" label="kAlarms"/>
+  <int value="8" label="kAlphaEnabled"/>
+  <int value="9" label="kAlwaysOnTopWindows"/>
+  <int value="10" label="kAppView"/>
+  <int value="11" label="kAudio"/>
+  <int value="12" label="kAudioCapture"/>
+  <int value="13" label="kAudioModem"/>
+  <int value="14" label="kAutofillPrivate"/>
+  <int value="15" label="kAutomation"/>
+  <int value="16" label="kAutoTestPrivate"/>
+  <int value="17" label="kBackground"/>
+  <int value="18" label="kBluetoothPrivate"/>
+  <int value="19" label="kBookmark"/>
+  <int value="20" label="kBookmarkManagerPrivate"/>
+  <int value="21" label="kBrailleDisplayPrivate"/>
+  <int value="22" label="kBrowser"/>
+  <int value="23" label="kBrowsingData"/>
+  <int value="24" label="kCast"/>
+  <int value="25" label="kCastStreaming"/>
+  <int value="26" label="kChromeosInfoPrivate"/>
+  <int value="27" label="kClipboardRead"/>
+  <int value="28" label="kClipboardWrite"/>
+  <int value="29" label="kCloudPrintPrivate"/>
+  <int value="30" label="kCommandLinePrivate"/>
+  <int value="31" label="kCommandsAccessibility"/>
+  <int value="32" label="kContentSettings"/>
+  <int value="33" label="kContextMenus"/>
+  <int value="34" label="kCookie"/>
+  <int value="35" label="kCopresence"/>
+  <int value="36" label="kCopresencePrivate"/>
+  <int value="37" label="kCryptotokenPrivate"/>
+  <int value="38" label="kDataReductionProxy"/>
+  <int value="39" label="kDiagnostics"/>
+  <int value="40" label="kDial"/>
+  <int value="41" label="kDebugger"/>
+  <int value="42" label="kDeclarative"/>
+  <int value="43" label="kDeclarativeContent"/>
+  <int value="44" label="kDeclarativeWebRequest"/>
+  <int value="45" label="kDesktopCapture"/>
+  <int value="46" label="kDesktopCapturePrivate"/>
+  <int value="47" label="kDeveloperPrivate"/>
+  <int value="48" label="kDevtools"/>
+  <int value="49" label="kDns"/>
+  <int value="50" label="kDocumentScan"/>
+  <int value="51" label="kDownloads"/>
+  <int value="52" label="kDownloadsInternal"/>
+  <int value="53" label="kDownloadsOpen"/>
+  <int value="54" label="kDownloadsShelf"/>
+  <int value="55" label="kEasyUnlockPrivate"/>
+  <int value="56" label="kEchoPrivate"/>
+  <int value="57" label="kEmbeddedExtensionOptions"/>
+  <int value="58" label="kEnterprisePlatformKeys"/>
+  <int value="59" label="kEnterprisePlatformKeysPrivate"/>
+  <int value="60" label="kExperienceSamplingPrivate"/>
+  <int value="61" label="kExperimental"/>
+  <int value="62" label="kExtensionView"/>
+  <int value="63" label="kExternallyConnectableAllUrls"/>
+  <int value="64" label="kFeedbackPrivate"/>
+  <int value="65" label="kFileBrowserHandler"/>
+  <int value="66" label="kFileBrowserHandlerInternal"/>
+  <int value="67" label="kFileManagerPrivate"/>
+  <int value="68" label="kFileSystem"/>
+  <int value="69" label="kFileSystemDirectory"/>
+  <int value="70" label="kFileSystemProvider"/>
+  <int value="71" label="kFileSystemRequestFileSystem"/>
+  <int value="72" label="kFileSystemRetainEntries"/>
+  <int value="73" label="kFileSystemWrite"/>
+  <int value="74" label="kFileSystemWriteDirectory"/>
+  <int value="75" label="kFirstRunPrivate"/>
+  <int value="76" label="kFontSettings"/>
+  <int value="77" label="kFullscreen"/>
+  <int value="78" label="kGcdPrivate"/>
+  <int value="79" label="kGcm"/>
+  <int value="80" label="kGeolocation"/>
+  <int value="81" label="kHid"/>
+  <int value="82" label="kHistory"/>
+  <int value="83" label="kHomepage"/>
+  <int value="84" label="kHotwordPrivate"/>
+  <int value="85" label="kIdentity"/>
+  <int value="86" label="kIdentityEmail"/>
+  <int value="87" label="kIdentityPrivate"/>
+  <int value="88" label="kIdltest"/>
+  <int value="89" label="kIdle"/>
+  <int value="90" label="kImeWindowEnabled"/>
+  <int value="91" label="kInlineInstallPrivate"/>
+  <int value="92" label="kInput"/>
+  <int value="93" label="kInputMethodPrivate"/>
+  <int value="94" label="kInterceptAllKeys"/>
+  <int value="95" label="kLauncherSearchProvider"/>
+  <int value="96" label="kLocation"/>
+  <int value="97" label="kLogPrivate"/>
+  <int value="98" label="kManagement"/>
+  <int value="99" label="kMediaGalleries"/>
+  <int value="100" label="kMediaPlayerPrivate"/>
+  <int value="101" label="kMediaRouterPrivate"/>
+  <int value="102" label="kMetricsPrivate"/>
+  <int value="103" label="kMDns"/>
+  <int value="104" label="kMusicManagerPrivate"/>
+  <int value="105" label="kNativeMessaging"/>
+  <int value="106" label="kNetworkingConfig"/>
+  <int value="107" label="kNetworkingPrivate"/>
+  <int value="108" label="kNotificationProvider"/>
+  <int value="109" label="kNotifications"/>
+  <int value="110" label="kOverrideEscFullscreen"/>
+  <int value="111" label="kPageCapture"/>
+  <int value="112" label="kPointerLock"/>
+  <int value="113" label="kPlatformKeys"/>
+  <int value="114" label="kPlugin"/>
+  <int value="115" label="kPower"/>
+  <int value="116" label="kPreferencesPrivate"/>
+  <int value="117" label="kPrincipalsPrivate"/>
+  <int value="118" label="kPrinterProvider"/>
+  <int value="119" label="kPrivacy"/>
+  <int value="120" label="kProcesses"/>
+  <int value="121" label="kProxy"/>
+  <int value="122" label="kImageWriterPrivate"/>
+  <int value="123" label="kReadingListPrivate"/>
+  <int value="124" label="kRtcPrivate"/>
+  <int value="125" label="kSearchProvider"/>
+  <int value="126" label="kSearchEnginesPrivate"/>
+  <int value="127" label="kSerial"/>
+  <int value="128" label="kSessions"/>
+  <int value="129" label="kSettingsPrivate"/>
+  <int value="130" label="kSignedInDevices"/>
+  <int value="131" label="kSocket"/>
+  <int value="132" label="kStartupPages"/>
+  <int value="133" label="kStorage"/>
+  <int value="134" label="kStreamsPrivate"/>
+  <int value="135" label="kSyncFileSystem"/>
+  <int value="136" label="kSystemPrivate"/>
+  <int value="137" label="kSystemDisplay"/>
+  <int value="138" label="kSystemStorage"/>
+  <int value="139" label="kTab"/>
+  <int value="140" label="kTabCapture"/>
+  <int value="141" label="kTabCaptureForTab"/>
+  <int value="142" label="kTerminalPrivate"/>
+  <int value="143" label="kTopSites"/>
+  <int value="144" label="kTts"/>
+  <int value="145" label="kTtsEngine"/>
+  <int value="146" label="kUnlimitedStorage"/>
+  <int value="147" label="kU2fDevices"/>
+  <int value="148" label="kUsb"/>
+  <int value="149" label="kUsbDevice"/>
+  <int value="150" label="kVideoCapture"/>
+  <int value="151" label="kVirtualKeyboardPrivate"/>
+  <int value="152" label="kVpnProvider"/>
+  <int value="153" label="kWallpaper"/>
+  <int value="154" label="kWallpaperPrivate"/>
+  <int value="155" label="kWebcamPrivate"/>
+  <int value="156" label="kWebConnectable"/>
+  <int value="157" label="kWebNavigation"/>
+  <int value="158" label="kWebRequest"/>
+  <int value="159" label="kWebRequestBlocking"/>
+  <int value="160" label="kWebrtcAudioPrivate"/>
+  <int value="161" label="kWebrtcDesktopCapturePrivate"/>
+  <int value="162" label="kWebrtcLoggingPrivate"/>
+  <int value="163" label="kWebstorePrivate"/>
+  <int value="164" label="kWebstoreWidgetPrivate"/>
+  <int value="165" label="kWebView"/>
+  <int value="166" label="kWindowShape"/>
+  <int value="167" label="kScreenlockPrivate"/>
+  <int value="168" label="kSystemCpu"/>
+  <int value="169" label="kSystemMemory"/>
+  <int value="170" label="kSystemNetwork"/>
+  <int value="171" label="kSystemInfoCpu"/>
+  <int value="172" label="kSystemInfoMemory"/>
+  <int value="173" label="kBluetooth"/>
+  <int value="174" label="kBluetoothDevices"/>
+  <int value="175" label="kFavicon"/>
+  <int value="176" label="kFullAccess"/>
+  <int value="177" label="kHostReadOnly"/>
+  <int value="178" label="kHostReadWrite"/>
+  <int value="179" label="kHostsAll"/>
+  <int value="180" label="kHostsAllReadOnly"/>
+  <int value="181" label="kMediaGalleriesAllGalleriesCopyTo"/>
+  <int value="182" label="kMediaGalleriesAllGalleriesDelete"/>
+  <int value="183" label="kMediaGalleriesAllGalleriesRead"/>
+  <int value="184" label="kNetworkState"/>
+  <int value="185" label="kOverrideBookmarksUI"/>
+  <int value="186" label="kShouldWarnAllHosts"/>
+  <int value="187" label="kSocketAnyHost"/>
+  <int value="188" label="kSocketDomainHosts"/>
+  <int value="189" label="kSocketSpecificHosts"/>
+  <int value="190" label="kUsbDeviceList"/>
+  <int value="191" label="kUsbDeviceUnknownProduct"/>
+  <int value="192" label="kUsbDeviceUnknownVendor"/>
 </enum>
 
 <enum name="ExtensionServiceVerifyAllSuccess" type="int">
@@ -51694,6 +52495,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="HOSTED_APP"/>
   <int value="5" label="LEGACY_PACKAGED_APP"/>
   <int value="6" label="PLATFORM_APP"/>
+</enum>
+
+<enum name="ExtensionUninstallDialogAction" type="int">
+  <int value="0" label="Uninstall only"/>
+  <int value="1" label="Uninstall and report abuse"/>
+  <int value="2" label="Dialog canceled"/>
 </enum>
 
 <enum name="ExtensionUnpackFailureReason" type="int">
@@ -51804,6 +52611,45 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="FALLBACK_SSL3">Fell back on SSL 3.0.</int>
   <int value="2" label="FALLBACK_TLS1">Fell back on TLS 1.0.</int>
   <int value="3" label="FALLBACK_TLS1_1">Fell back on TLS 1.1.</int>
+</enum>
+
+<enum name="FaultTolerantHeap" type="int">
+  <int value="0" label="FTH_OFF">FTH is completely off.</int>
+  <int value="1" label="FTH_HKLM">FTH is enabled in HKLM.</int>
+  <int value="2" label="FTH_HKCU">FTH is enabled in HKCU.</int>
+  <int value="3" label="FTH_HKCU_HKLM">FTH is enabled in HKCU and HKLM.</int>
+  <int value="4" label="FTH_ACLAYERS">AcLayers.dll is loaded.</int>
+  <int value="5" label="FTH_ACLAYERS_HKLM">
+    AcLayers.dll is loaded and FTH is enabled in HKLM.
+  </int>
+  <int value="6" label="FTH_ACLAYERS_HKCU">
+    AcLayers.dll is loaded and FTH is enabled in HKCU.
+  </int>
+  <int value="7" label="FTH_ACLAYERS_HKCU_HKLM">
+    AcLayers.dll is loaded and FTH is enabled in HKCU and HKLM.
+  </int>
+  <int value="8" label="FTH_ACXTRNAL">AcXtrnal is loaded.</int>
+  <int value="9" label="FTH_ACXTRNAL_HKLM">
+    AcXtrnal is loaded and FTH is enabled in HKLM.
+  </int>
+  <int value="10" label="FTH_ACXTRNAL_HKCU">
+    AcXtrnal is loaded and FTH is enabled in HKCU.
+  </int>
+  <int value="11" label="FTH_ACXTRNAL_HKCU_HKLM">
+    AcXtrnal is loaded and FTH is enabled in HKCU and HKLM.
+  </int>
+  <int value="12" label="FTH_ACXTRNAL_ACLAYERS">
+    AcXtrmal and AcLayers.dll are loaded.
+  </int>
+  <int value="13" label="FTH_ACXTRNAL_ACLAYERS_HKLM">
+    AcXtrmal and AcLayers.dll are loaded and FTH is enabled in HKLM.
+  </int>
+  <int value="14" label="FTH_ACXTRNAL_ACLAYERS_HKCU">
+    AcXtrmal and AcLayers.dll are loaded and FTH is enabled in HKCU.
+  </int>
+  <int value="15" label="FTH_ACXTRNAL_ACLAYERS_HKCU_HKLM">
+    AcXtrmal and AcLayers.dll are loaded and FTH is enabled in HKCU and HKLM.
+  </int>
 </enum>
 
 <enum name="FeatureObserver" type="int">
@@ -52137,7 +52983,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="325" label="SVGForeignObjectElement"/>
   <int value="326" label="PrefixedElementRequestPointerLock"/>
   <int value="327" label="SelectionSetPosition"/>
-  <int value="328" label="AnimationPlayerFinishEvent"/>
+  <int value="328" label="AnimationFinishEvent"/>
   <int value="329" label="SVGSVGElementInXMLDocument"/>
   <int value="330" label="CanvasRenderingContext2DSetAlpha"/>
   <int value="331" label="CanvasRenderingContext2DSetCompositeOperation"/>
@@ -52347,17 +53193,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="542" label="SRIElementWithUnparsableIntegrityAttribute"/>
   <int value="543" label="SRIElementWithIntegrityAttributeAndInsecureOrigin"/>
   <int value="544" label="SRIElementWithIntegrityAttributeAndInsecureResource"/>
-  <int value="545" label="V8AnimationPlayer_StartTime_AttributeGetter"/>
-  <int value="546" label="V8AnimationPlayer_StartTime_AttributeSetter"/>
-  <int value="547" label="V8AnimationPlayer_CurrentTime_AttributeGetter"/>
-  <int value="548" label="V8AnimationPlayer_CurrentTime_AttributeSetter"/>
-  <int value="549" label="V8AnimationPlayer_PlaybackRate_AttributeGetter"/>
-  <int value="550" label="V8AnimationPlayer_PlaybackRate_AttributeSetter"/>
-  <int value="551" label="V8AnimationPlayer_PlayState_AttributeGetter"/>
-  <int value="552" label="V8AnimationPlayer_Finish_Method"/>
-  <int value="553" label="V8AnimationPlayer_Play_Method"/>
-  <int value="554" label="V8AnimationPlayer_Pause_Method"/>
-  <int value="555" label="V8AnimationPlayer_Reverse_Method"/>
+  <int value="545" label="V8Animation_StartTime_AttributeGetter"/>
+  <int value="546" label="V8Animation_StartTime_AttributeSetter"/>
+  <int value="547" label="V8Animation_CurrentTime_AttributeGetter"/>
+  <int value="548" label="V8Animation_CurrentTime_AttributeSetter"/>
+  <int value="549" label="V8Animation_PlaybackRate_AttributeGetter"/>
+  <int value="550" label="V8Animation_PlaybackRate_AttributeSetter"/>
+  <int value="551" label="V8Animation_PlayState_AttributeGetter"/>
+  <int value="552" label="V8Animation_Finish_Method"/>
+  <int value="553" label="V8Animation_Play_Method"/>
+  <int value="554" label="V8Animation_Pause_Method"/>
+  <int value="555" label="V8Animation_Reverse_Method"/>
   <int value="556" label="BreakIterator"/>
   <int value="557" label="ScreenOrientationAngle"/>
   <int value="558" label="ScreenOrientationType"/>
@@ -52504,9 +53350,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="696" label="WindowFind"/>
   <int value="697" label="WindowScreenLeft"/>
   <int value="698" label="WindowScreenTop"/>
-  <int value="699" label="V8AnimationPlayer_Cancel_Method"/>
-  <int value="700" label="V8AnimationPlayer_Onfinish_AttributeGetter"/>
-  <int value="701" label="V8AnimationPlayer_Onfinish_AttributeSetter"/>
+  <int value="699" label="V8Animation_Cancel_Method"/>
+  <int value="700" label="V8Animation_Onfinish_AttributeGetter"/>
+  <int value="701" label="V8Animation_Onfinish_AttributeSetter"/>
   <int value="702" label="ElementOffsetParent"/>
   <int value="703" label="ElementOffsetTop"/>
   <int value="704" label="ElementOffsetLeft"/>
@@ -52567,7 +53413,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="V8HTMLTextAreaElement_Autocapitalize_AttributeSetter"/>
   <int value="758" label="SVGHrefBaseVal"/>
   <int value="759" label="SVGHrefAnimVal"/>
-  <int value="760" label="AutocapitalizeAttribute"/>
+  <int value="760" label="V8CSSRuleList_Item_Method"/>
+  <int value="761" label="V8MediaList_Item_Method"/>
+  <int value="762" label="V8StyleSheetList_Item_Method"/>
+  <int value="763" label="StyleSheetListAnonymousNamedGetter"/>
+  <int value="764" label="AutocapitalizeAttribute"/>
+  <int value="765" label="FullscreenSecureOrigin"/>
+  <int value="766" label="FullscreenInsecureOrigin"/>
+  <int value="767" label="DialogInSandboxedContext"/>
+  <int value="768" label="SVGSMILAnimationInImageRegardlessOfCache"/>
+  <int value="769" label="PushSubscriptionId"/>
+  <int value="770" label="EncryptedMediaSecureOrigin"/>
+  <int value="771" label="EncryptedMediaInsecureOrigin"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -53126,6 +53983,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Heartbeat failure"/>
   <int value="3" label="Socket failure"/>
   <int value="4" label="Network change"/>
+  <int value="5" label="New heartbeat interval"/>
 </enum>
 
 <enum name="GCMEndpoints" type="int">
@@ -53159,6 +54017,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="8" label="Loading gservice settings failed"/>
   <int value="9" label="Loading account mapping failed"/>
   <int value="10" label="Loading last token time failed"/>
+  <int value="11" label="Loading heartbeat intervals failed"/>
+  <int value="12" label="Loading Instance ID data failed"/>
 </enum>
 
 <enum name="GCMOutgoingMessageTTLCategory" type="int">
@@ -53722,9 +54582,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="417" label="417: Expectation Failed"/>
   <int value="500" label="500: Internal Server Error"/>
   <int value="501" label="501: Not Implemented"/>
+  <int value="502" label="502: Bad Gateway"/>
   <int value="503" label="503: Service Unavailable"/>
   <int value="504" label="504: Gateway Timeout"/>
   <int value="505" label="505: HTTP Version Not Supported"/>
+</enum>
+
+<enum name="HttpServerPropertiesUpdatePrefsLocation" type="int">
+  <int value="0" label="SUPPORTS_SPDY"/>
+  <int value="1" label="HTTP_11_REQUIRED"/>
+  <int value="2" label="SET_ALTERNATIVE_SERVICE"/>
+  <int value="3" label="MARK_ALTERNATIVE_SERVICE_BROKEN"/>
+  <int value="4" label="MARK_ALTERNATIVE_SERVICE_RECENTLY_BROKEN"/>
+  <int value="5" label="CONFIRM_ALTERNATIVE_SERVICE"/>
+  <int value="6" label="CLEAR_ALTERNATIVE_SERVICE"/>
+  <int value="7" label="SET_SPDY_SETTING"/>
+  <int value="8" label="CLEAR_SPDY_SETTINGS"/>
+  <int value="9" label="CLEAR_ALL_SPDY_SETTINGS"/>
+  <int value="10" label="SET_SUPPORTS_QUIC"/>
+  <int value="11" label="SET_SERVER_NETWORK_STATS"/>
+  <int value="12" label="DETECTED_CORRUPTED_PREFS"/>
 </enum>
 
 <enum name="HttpSocketType" type="int">
@@ -55269,6 +56146,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1998927516" label="enable-md-settings"/>
   <int value="-1985025593" label="file-manager-enable-new-gallery"/>
   <int value="-1972383451" label="disable-pinch"/>
+  <int value="-1943507605" label="enable-new-video-renderer"/>
   <int value="-1941852572" label="floating-virtual-keyboard"/>
   <int value="-1940806558" label="enable-syncfs-directory-operation"/>
   <int value="-1938263248" label="enable-extension-info-dialog"/>
@@ -55336,6 +56214,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1349872906"
       label="disallow-autofill-sync-credential-for-reauth"/>
   <int value="-1349532167" label="enable-wifi-credential-sync"/>
+  <int value="-1346722635" label="gesture-selection"/>
   <int value="-1341092934" label="enable-accelerated-overflow-scroll"/>
   <int value="-1340055960" label="enable-streamlined-hosted-apps"/>
   <int value="-1334327410" label="ash-enable-touch-view-testing"/>
@@ -55368,9 +56247,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1052415111" label="malware-interstitial-v2"/>
   <int value="-1052219252" label="disable-captive-portal-bypass-proxy"/>
   <int value="-1022971520" label="enable-search-button-in-omnibox-for-str"/>
+  <int value="-1020450980" label="gesture-deletion"/>
   <int value="-996673716" label="enable-web-app-frame"/>
   <int value="-979057409" label="enable-seccomp-filter-sandbox"/>
   <int value="-979034258" label="disable-ntp-other-sessions-menu"/>
+  <int value="-972425050" label="gesture-editing"/>
   <int value="-949178861" label="enable-new-avatar-menu"/>
   <int value="-926422468" label="disable-embedded-shared-worker"/>
   <int value="-918618075" label="enable-service-worker"/>
@@ -55449,9 +56330,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-86788587" label="allow-autofill-sync-credential"/>
   <int value="-80353187" label="disable-display-color-calibration"/>
   <int value="-76631048" label="disable-offline-auto-reload-visible-only"/>
+  <int value="-70595606" label="ash-enable-unified-desktop"/>
   <int value="-68225452" label="enable-translate-new-ux"/>
   <int value="-58242474" label="ash-disable-swipe-to-close-in-overview-mode"/>
   <int value="-55944747" label="disable-child-account-detection"/>
+  <int value="-52483823" label="disable-new-video-renderer"/>
   <int value="-52241456" label="enable-single-click-autofill"/>
   <int value="-48920737" label="enable-smooth-scrolling"/>
   <int value="-23090520" label="disable-search-button-in-omnibox"/>
@@ -55570,8 +56453,10 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1142515376" label="enable-nacl"/>
   <int value="1150622273" label="enable-apps-file-associations"/>
   <int value="1163255347" label="ash-enable-touch-view-touch-feedback"/>
+  <int value="1166169237" label="disable-delay-agnostic-aec"/>
   <int value="1181056275" label="enable-cloud-backup"/>
   <int value="1185424279" label="enable-media-router"/>
+  <int value="1192302892" label="gesture-typing"/>
   <int value="1196644408" label="performance-monitor-gathering"/>
   <int value="1196834473" label="disable-smart-virtual-keyboard"/>
   <int value="1205849612" label="enable-sync-synced-notifications"/>
@@ -55615,6 +56500,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1486171015" label="disable-fill-on-account-select"/>
   <int value="1490043732" label="enable-fill-on-account-select"/>
   <int value="1490255042" label="enable-overlay-scrollbar"/>
+  <int value="1495341532" label="disable-mtp-write-support"/>
   <int value="1497924954" label="js-flags"/>
   <int value="1505194447" label="disable-transition-compositing"/>
   <int value="1510476448" label="disable-prefixed-encrypted-media"/>
@@ -55652,9 +56538,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1861251313"
       label="enable-message-center-always-scroll-up-upon-notification-removal"/>
   <int value="1865799183" label="javascript-harmony"/>
+  <int value="1891210939" label="enable-blink-features"/>
   <int value="1896456311" label="enable-password-save-in-page-navigation"/>
   <int value="1900529524" label="disable-touch-drag-drop"/>
   <int value="1906942630" label="enable-easy-unlock"/>
+  <int value="1915178511" label="disable-blink-features"/>
   <int value="1930901873" label="disable-sync-app-list"/>
   <int value="1939413645" label="enable-invalid-cert-collection"/>
   <int value="1944156526" label="sync-url"/>
@@ -55748,6 +56636,41 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="41" label="UNUSED">Unused</int>
   <int value="42" label="NO_KEY_NO_POLICY">Un-owned</int>
   <int value="43" label="RESERVED">Reserved</int>
+</enum>
+
+<enum name="LoginReauthReasons" type="int">
+  <int value="0" label="None">
+    No reason recorded so far, nothing to report. This value should never be
+    reported in histogram.
+  </int>
+  <int value="1" label="Other">Legacy profile holders.</int>
+  <int value="2" label="InvalidTokenHandle">
+    Password changed, revoked credentials, account deleted.
+  </int>
+  <int value="3" label="IncorrectPwdEntered">
+    Incorrect password entered 3 times at the pod.
+  </int>
+  <int value="4" label="IncorrectSAMLPwdEntered">
+    Incorrect password entered by a SAML user once. OS would show a tooltip
+    offering user to complete the online sign-in.
+  </int>
+  <int value="5" label="SAMLReauthPolicy">
+    Company policy required re-auth for SAML users.
+  </int>
+  <int value="6" label="MissingCryptohome">
+    Cryptohome is missing, most likely due to deletion during garbage
+    collection.
+  </int>
+  <int value="7" label="SyncFailed">
+    After prior login, OS failed to connect to the sync with the existing RT.
+    This could be due to a deleted account, password changed, account revoked,
+    etc.
+  </int>
+  <int value="8" label="PwdUpdateSkipped">
+    User cancelled the password change prompt. Chrome OS has to continue to send
+    the user through the online flow until user updates their cryptohome
+    password or agrees to start the new cryptohome.
+  </int>
 </enum>
 
 <enum name="LoginStateKeyGenerationStatus" type="int">
@@ -56573,6 +57496,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Http Live Stream Type"/>
 </enum>
 
+<enum name="MemoryPressureLevel" type="int">
+  <int value="0" label="No memory pressure"/>
+  <int value="1" label="Moderate memory pressure"/>
+  <int value="2" label="Critical memory pressure"/>
+</enum>
+
 <enum name="MetadataReadResult" type="int">
   <int value="0" label="Success"/>
   <int value="1" label="Open failure"/>
@@ -57175,8 +58104,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="7" label="More Button Clicked"/>
   <int value="8" label="Browser Initiated Reload"/>
   <int value="9" label="Both Buttons Shown"/>
-  <int value="10" label="Both Buttons Shown, Show Saved Copy Clicked"/>
-  <int value="11" label="Both Buttons Shown, Reload Clicked"/>
+  <int value="10" label="Both Buttons Shown, Reload Clicked"/>
+  <int value="11" label="Both Buttons Shown, Show Saved Copy Clicked"/>
   <int value="12" label="Easter egg activated"/>
 </enum>
 
@@ -58772,6 +59701,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="8" label="Clicked on a credential"/>
   <int value="9" label="Auto-signin toast timeout"/>
   <int value="10" label="Auto-signin toast clicked"/>
+  <int value="11" label="Clicked 'Google Smart Lock'"/>
 </enum>
 
 <enum name="PeerConnectionCounters" type="int">
@@ -59088,6 +60018,19 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="PLUGIN_NOT_REGISTERED"/>
   <int value="1" label="PLUGIN_AVAILABLE"/>
   <int value="2" label="PLUGIN_DISABLED"/>
+</enum>
+
+<enum name="PluginGroup" type="int">
+  <int value="0" label="Adobe Reader"/>
+  <int value="1" label="Other Plugin"/>
+  <int value="2" label="Java"/>
+  <int value="3" label="Quicktime"/>
+  <int value="4" label="Shockwave"/>
+  <int value="5" label="Real Player"/>
+  <int value="6" label="Silverlight"/>
+  <int value="7" label="Windows Media Player"/>
+  <int value="8" label="Google Talk"/>
+  <int value="9" label="Google Earth"/>
 </enum>
 
 <enum name="PluginListError" type="int">
@@ -60664,6 +61607,12 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="Upload Success"/>
   <int value="1" label="Upload Rejected"/>
   <int value="2" label="Queue Overflowed"/>
+</enum>
+
+<enum name="RapporLoadResultType" type="int">
+  <int value="0" label="LOAD_SUCCESS"/>
+  <int value="1" label="LOAD_EMPTY_VALUE"/>
+  <int value="2" label="LOAD_CORRUPT_VALUE"/>
 </enum>
 
 <enum name="RecentTabsAction" type="int">
@@ -63365,6 +64314,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="3" label="Not migrated for an unknown reason"/>
 </enum>
 
+<enum name="SyncPassphraseDismissal" type="int">
+  <int value="0" label="Passphrase accepted"/>
+  <int value="1" label="Cancel with wrong passphrase error"/>
+  <int value="2" label="Cancel without any passphrase attempted"/>
+  <int value="3" label="Followed reset link"/>
+</enum>
+
 <enum name="SyncPassphraseType" type="int">
   <int value="0" label="IMPLICIT_PASSPHRASE"/>
   <int value="1" label="KEYSTORE_PASSPHRASE"/>
@@ -63545,6 +64501,112 @@ To add a new entry, add it with any value and run test to compute valid value.
     The touchpad noise events (e.g. abrupt cursor jumps) caused by the noisy
     ground.
   </int>
+</enum>
+
+<enum name="TPMResultCodeEnum" type="int">
+  <int value="0" label="TPM_SUCCESS"/>
+  <int value="1" label="TPM_E_AUTHFAIL"/>
+  <int value="2" label="TPM_E_BADINDEX"/>
+  <int value="3" label="TPM_E_BAD_PARAMETER"/>
+  <int value="4" label="TPM_E_AUDITFAILURE"/>
+  <int value="5" label="TPM_E_CLEAR_DISABLED"/>
+  <int value="6" label="TPM_E_DEACTIVATED"/>
+  <int value="7" label="TPM_E_DISABLED"/>
+  <int value="8" label="TPM_E_DISABLED_CMD"/>
+  <int value="9" label="TPM_E_FAIL"/>
+  <int value="10" label="TPM_E_BAD_ORDINAL"/>
+  <int value="11" label="TPM_E_INSTALL_DISABLED"/>
+  <int value="12" label="TPM_E_INVALID_KEYHANDLE"/>
+  <int value="13" label="TPM_E_KEYNOTFOUND"/>
+  <int value="14" label="TPM_E_INAPPROPRIATE_ENC"/>
+  <int value="15" label="TPM_E_MIGRATEFAIL"/>
+  <int value="16" label="TPM_E_INVALID_PCR_INFO"/>
+  <int value="17" label="TPM_E_NOSPACE"/>
+  <int value="18" label="TPM_E_NOSRK"/>
+  <int value="19" label="TPM_E_NOTSEALED_BLOB"/>
+  <int value="20" label="TPM_E_OWNER_SET"/>
+  <int value="21" label="TPM_E_RESOURCES"/>
+  <int value="22" label="TPM_E_SHORTRANDOM"/>
+  <int value="23" label="TPM_E_SIZE"/>
+  <int value="24" label="TPM_E_WRONGPCRVAL"/>
+  <int value="25" label="TPM_E_BAD_PARAM_SIZE"/>
+  <int value="26" label="TPM_E_SHA_THREAD"/>
+  <int value="27" label="TPM_E_SHA_ERROR"/>
+  <int value="28" label="TPM_E_FAILEDSELFTEST"/>
+  <int value="29" label="TPM_E_AUTH2FAIL"/>
+  <int value="30" label="TPM_E_BADTAG"/>
+  <int value="31" label="TPM_E_IOERROR"/>
+  <int value="32" label="TPM_E_ENCRYPT_ERROR"/>
+  <int value="33" label="TPM_E_DECRYPT_ERROR"/>
+  <int value="34" label="TPM_E_INVALID_AUTHHANDLE"/>
+  <int value="35" label="TPM_E_NO_ENDORSEMENT"/>
+  <int value="36" label="TPM_E_INVALID_KEYUSAGE"/>
+  <int value="37" label="TPM_E_WRONG_ENTITYTYPE"/>
+  <int value="38" label="TPM_E_INVALID_POSTINIT"/>
+  <int value="39" label="TPM_E_INAPPROPRIATE_SIG"/>
+  <int value="40" label="TPM_E_BAD_KEY_PROPERTY"/>
+  <int value="41" label="TPM_E_BAD_MIGRATION"/>
+  <int value="42" label="TPM_E_BAD_SCHEME"/>
+  <int value="43" label="TPM_E_BAD_DATASIZE"/>
+  <int value="44" label="TPM_E_BAD_MODE"/>
+  <int value="45" label="TPM_E_BAD_PRESENCE"/>
+  <int value="46" label="TPM_E_BAD_VERSION"/>
+  <int value="47" label="TPM_E_NO_WRAP_TRANSPORT"/>
+  <int value="48" label="TPM_E_AUDITFAIL_UNSUCCESSFUL"/>
+  <int value="49" label="TPM_E_AUDITFAIL_SUCCESSFUL"/>
+  <int value="50" label="TPM_E_NOTRESETABLE"/>
+  <int value="51" label="TPM_E_NOTLOCAL"/>
+  <int value="52" label="TPM_E_BAD_TYPE"/>
+  <int value="53" label="TPM_E_INVALID_RESOURCE"/>
+  <int value="54" label="TPM_E_NOTFIPS"/>
+  <int value="55" label="TPM_E_INVALID_FAMILY"/>
+  <int value="56" label="TPM_E_NO_NV_PERMISSION"/>
+  <int value="57" label="TPM_E_REQUIRES_SIGN"/>
+  <int value="58" label="TPM_E_KEY_NOTSUPPORTED"/>
+  <int value="59" label="TPM_E_AUTH_CONFLICT"/>
+  <int value="60" label="TPM_E_AREA_LOCKED"/>
+  <int value="61" label="TPM_E_BAD_LOCALITY"/>
+  <int value="62" label="TPM_E_READ_ONLY"/>
+  <int value="63" label="TPM_E_PER_NOWRITE"/>
+  <int value="64" label="TPM_E_FAMILYCOUNT"/>
+  <int value="65" label="TPM_E_WRITE_LOCKED"/>
+  <int value="66" label="TPM_E_BAD_ATTRIBUTES"/>
+  <int value="67" label="TPM_E_INVALID_STRUCTURE"/>
+  <int value="68" label="TPM_E_KEY_OWNER_CONTROL"/>
+  <int value="69" label="TPM_E_BAD_COUNTER"/>
+  <int value="70" label="TPM_E_NOT_FULLWRITE"/>
+  <int value="71" label="TPM_E_CONTEXT_GAP"/>
+  <int value="72" label="TPM_E_MAXNVWRITES"/>
+  <int value="73" label="TPM_E_NOOPERATOR"/>
+  <int value="74" label="TPM_E_RESOURCEMISSING"/>
+  <int value="75" label="TPM_E_DELEGATE_LOCK"/>
+  <int value="76" label="TPM_E_DELEGATE_FAMILY"/>
+  <int value="77" label="TPM_E_DELEGATE_ADMIN"/>
+  <int value="78" label="TPM_E_TRANSPORT_NOTEXCLUSIVE"/>
+  <int value="79" label="TPM_E_OWNER_CONTROL"/>
+  <int value="80" label="TPM_E_DAA_RESOURCES"/>
+  <int value="81" label="TPM_E_DAA_INPUT_DATA0"/>
+  <int value="82" label="TPM_E_DAA_INPUT_DATA1"/>
+  <int value="83" label="TPM_E_DAA_ISSUER_SETTINGS"/>
+  <int value="84" label="TPM_E_DAA_TPM_SETTINGS"/>
+  <int value="85" label="TPM_E_DAA_STAGE"/>
+  <int value="86" label="TPM_E_DAA_ISSUER_VALIDITY"/>
+  <int value="87" label="TPM_E_DAA_WRONG_W"/>
+  <int value="88" label="TPM_E_BAD_HANDLE"/>
+  <int value="89" label="TPM_E_BAD_DELEGATE"/>
+  <int value="90" label="TPM_E_BADCONTEXT"/>
+  <int value="91" label="TPM_E_TOOMANYCONTEXTS"/>
+  <int value="92" label="TPM_E_MA_TICKET_SIGNATURE"/>
+  <int value="93" label="TPM_E_MA_DESTINATION"/>
+  <int value="94" label="TPM_E_MA_SOURCE"/>
+  <int value="95" label="TPM_E_MA_AUTHORITY"/>
+  <int value="97" label="TPM_E_PERMANENTEK"/>
+  <int value="98" label="TPM_E_BAD_SIGNATURE"/>
+  <int value="99" label="TPM_E_NOCONTEXTSPACE"/>
+  <int value="2048" label="TPM_E_RETRY"/>
+  <int value="2049" label="TPM_E_NEEDS_SELFTEST"/>
+  <int value="2050" label="TPM_E_DOING_SELFTEST"/>
+  <int value="2051" label="TPM_E_DEFEND_LOCK_RUNNING"/>
 </enum>
 
 <enum name="TrackedPreference" type="int">
@@ -63943,6 +65005,20 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="6" label="CHECKSUM_MISMATCH">Reject due to checksum mismatch</int>
 </enum>
 
+<enum name="V8InitializerLoadV8SnapshotResult" type="int">
+  <int value="0" label="SUCCESS">Load succeeded</int>
+  <int value="1" label="FAILED_OPEN">Failure to open snapshot file</int>
+  <int value="2" label="FAILED_MAP">Failed to map snapshot</int>
+  <int value="3" label="FAILED_VERIFY">Failed to verify snapshot</int>
+</enum>
+
+<enum name="V8InitializerOpenV8FileResult" type="int">
+  <int value="0" label="OPENED">Opened without issue</int>
+  <int value="1" label="OPENED_RETRY">Opened after one or more retries</int>
+  <int value="2" label="FAILED_IN_USE">Failed because file in use</int>
+  <int value="3" label="FAILED_OTHER">Failed for other reason</int>
+</enum>
+
 <enum name="ValidateMenuItemSelectorType" type="int">
   <int value="0"
       label="The menu items' associated action is an unknown selector."/>
@@ -63965,6 +65041,31 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Invalid Signature"/>
   <int value="3" label="Invalid Signature for Seed"/>
   <int value="4" label="Valid Signature for Seed"/>
+</enum>
+
+<enum name="VariationsPermanentConsistencyCountryResult" type="int">
+  <int value="0" label="Saved pref missing and no country code in seed"/>
+  <int value="1" label="Saved pref missing and country code in seed"/>
+  <int value="2" label="Saved pref invalid and no country code in seed"/>
+  <int value="3" label="Saved pref invalid and country code in seed"/>
+  <int value="4"
+      label="Saved pref present for current version and no country code in
+             seed"/>
+  <int value="5"
+      label="Saved pref present for different version and no country code in
+             seed"/>
+  <int value="6"
+      label="Saved pref present for current version and country code in seed
+             matches"/>
+  <int value="7"
+      label="Saved pref present for current version and country code in seed
+             is different"/>
+  <int value="8"
+      label="Saved pref present for different version and country code in
+             seed matches"/>
+  <int value="9"
+      label="Saved pref present for different version and country code in
+             seed is different"/>
 </enum>
 
 <enum name="VariationsResourceRequestsAllowedState" type="int">

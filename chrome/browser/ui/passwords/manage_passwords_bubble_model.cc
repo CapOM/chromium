@@ -8,6 +8,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/profiles/profile.h"
+#include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
@@ -19,6 +20,7 @@
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/password_manager/core/common/credential_manager_types.h"
 #include "components/password_manager/core/common/password_manager_ui.h"
+#include "components/signin/core/browser/signin_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_switches.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -97,7 +99,7 @@ ManagePasswordsBubbleModel::ManagePasswordsBubbleModel(
   }
 
   if (state_ == password_manager::ui::PENDING_PASSWORD_STATE) {
-    title_ = PendingStateTitleBasedOnSavePasswordPref();
+    UpdatePendingStateTitle();
   } else if (state_ == password_manager::ui::BLACKLIST_STATE) {
     title_ = l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_BLACKLISTED_TITLE);
   } else if (state_ == password_manager::ui::CONFIRMATION_STATE) {
@@ -191,12 +193,12 @@ void ManagePasswordsBubbleModel::OnNopeClicked() {
 
 void ManagePasswordsBubbleModel::OnConfirmationForNeverForThisSite() {
   never_save_passwords_ = true;
-  title_ = PendingStateTitleBasedOnSavePasswordPref();
+  UpdatePendingStateTitle();
 }
 
 void ManagePasswordsBubbleModel::OnUndoNeverForThisSite() {
   never_save_passwords_ = false;
-  title_ = PendingStateTitleBasedOnSavePasswordPref();
+  UpdatePendingStateTitle();
 }
 
 void ManagePasswordsBubbleModel::OnNeverForThisSiteClicked() {
@@ -239,6 +241,12 @@ void ManagePasswordsBubbleModel::OnManageLinkClicked() {
   dismissal_reason_ = metrics_util::CLICKED_MANAGE;
   ManagePasswordsUIController::FromWebContents(web_contents())
       ->NavigateToPasswordManagerSettingsPage();
+}
+
+void ManagePasswordsBubbleModel::OnBrandLinkClicked() {
+  dismissal_reason_ = metrics_util::CLICKED_BRAND_NAME;
+  ManagePasswordsUIController::FromWebContents(web_contents())
+      ->NavigateToSmartLockHelpArticle();
 }
 
 void ManagePasswordsBubbleModel::OnAutoSignInToastTimeout() {
@@ -300,14 +308,22 @@ int ManagePasswordsBubbleModel::PasswordFieldWidth() {
   return GetFieldWidth(PASSWORD_FIELD);
 }
 
-base::string16
-ManagePasswordsBubbleModel::PendingStateTitleBasedOnSavePasswordPref() const {
-  int message_id = 0;
-  if (never_save_passwords_)
-    message_id = IDS_MANAGE_PASSWORDS_BLACKLIST_CONFIRMATION_TITLE;
-  else if (IsNewUIActive())
-    message_id = IDS_PASSWORD_MANAGER_SAVE_PASSWORD_SMART_LOCK_PROMPT;
-  else
-    message_id = IDS_SAVE_PASSWORD;
-  return l10n_util::GetStringUTF16(message_id);
+void ManagePasswordsBubbleModel::UpdatePendingStateTitle() {
+  title_brand_link_range_ = gfx::Range();
+  if (never_save_passwords_) {
+    title_ = l10n_util::GetStringUTF16(
+        IDS_MANAGE_PASSWORDS_BLACKLIST_CONFIRMATION_TITLE);
+  } else if (password_bubble_experiment::IsEnabledSmartLockBranding(
+                 GetProfile())) {
+    // "Google Smart Lock" should be a hyperlink.
+    base::string16 brand_link =
+        l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_SMART_LOCK);
+    size_t offset = 0;
+    title_ = l10n_util::GetStringFUTF16(IDS_SAVE_PASSWORD, brand_link, &offset);
+    title_brand_link_range_ = gfx::Range(offset, offset + brand_link.length());
+  } else {
+    base::string16 brand_link =
+        l10n_util::GetStringUTF16(IDS_SAVE_PASSWORD_TITLE_BRAND);
+    title_ = l10n_util::GetStringFUTF16(IDS_SAVE_PASSWORD, brand_link);
+  }
 }

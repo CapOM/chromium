@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Bateri penuh</translation>
 <translation id="6895424601869865703">Tambah akaun untuk <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Papan kekunci pada skrin dilumpuhkan</translation>
-<translation id="1057289296854808272">Putaran dihidupkan (Ketik di sini untuk menukar)</translation>
+<translation id="5548285847212963613">Sambungan &quot;<ph name="EXTENSION_NAME"/>&quot; boleh membantu menyambung ke rangkaian ini.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> dan <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Butang Limpahan</translation>
 <translation id="7904094684485781019">Pentadbir akaun ini tidak membenarkan berbilang log masuk.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Dulang status</translation>
 <translation id="2248649616066688669">Anda boleh menggunakan Chromebook anda semasa disambungkan ke paparan luaran, walaupun semasa penutup ditutup.</translation>
 <translation id="2946640296642327832">Dayakan Bluetooth</translation>
+<translation id="5537725057119320332">Cast</translation>
 <translation id="6459472438155181876">Melanjutkan skrin ke <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Selular</translation>
 <translation id="6596816719288285829">Alamat IP</translation>
@@ -39,7 +40,6 @@
 Tekan Shift + Alt untuk menukar.</translation>
 <translation id="6043994281159824495">Log keluar sekarang</translation>
 <translation id="2127372758936585790">Pengecas berkuasa rendah</translation>
-<translation id="4625920103690741805">Putaran dikunci (Ketik di sini untuk menukar)</translation>
 <translation id="3799026279081545374">Anda mungkin mempunyai pengecas yang rosak. Jika anda tinggal di AS, sila hubungi 866-628-1371866-628-1371 untuk mendapatkan bantuan dan pengecas ganti. Jika anda tinggal di UK, sila hubungi 0800-026-06130800-026-0613. Jika anda tinggal di Ireland, sila hubungi 1-800-832-664. Jika anda tinggal di Kanada, sila hubungi 866-628-1372866-628-1372. Jika anda tinggal di Australia, sila hubungi 1-800-067-460.</translation>
 <translation id="3891340733213178823">Tekan Ctrl+Shift+Q dua kali untuk keluar.</translation>
 <translation id="5871632337994001636">Uruskan peranti...</translation>
@@ -167,7 +167,6 @@ Tekan Shift + Alt untuk menukar.</translation>
 <translation id="112308213915226829">Autosembunyi rak</translation>
 <translation id="7573962313813535744">Mod dok</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127">Menyegerakkan <ph name="COUNT"/> fail</translation>
 <translation id="5958529069007801266">Pengguna diselia</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">Kekunci CAPS LOCK dimatikan</translation>
@@ -186,6 +185,7 @@ Tekan Shift + Alt untuk menukar.</translation>
 <translation id="6165508094623778733">Ketahui lebih lanjut</translation>
 <translation id="7168224885072002358">Kembali kepada peleraian lama dalam <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Kamera dan mikrofon sedang digunakan.</translation>
+<translation id="6550675742724504774">Pilihan</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Tukar kembali kepada &quot;<ph name="FROM_LOCALE"/>&quot; (perlu dimulakan semula)</translation>
 <translation id="8103386449138765447">Mesej SMS: <ph name="MESSAGE_COUNT"/></translation>

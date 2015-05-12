@@ -853,6 +853,10 @@ _NAMED_TYPE_INFO = {
       'GL_TEXTURE_2D',
       'GL_TEXTURE_CUBE_MAP',
     ],
+    'valid_es3': [
+      'GL_TEXTURE_2D_ARRAY',
+      'GL_TEXTURE_3D',
+    ],
     'invalid': [
       'GL_PROXY_TEXTURE_CUBE_MAP',
     ]
@@ -1218,6 +1222,17 @@ _NAMED_TYPE_INFO = {
       'GL_TEXTURE_WRAP_S',
       'GL_TEXTURE_WRAP_T',
     ],
+    'valid_es3': [
+      'GL_TEXTURE_BASE_LEVEL',
+      'GL_TEXTURE_COMPARE_FUNC',
+      'GL_TEXTURE_COMPARE_MODE',
+      'GL_TEXTURE_IMMUTABLE_FORMAT',
+      'GL_TEXTURE_IMMUTABLE_LEVELS',
+      'GL_TEXTURE_MAX_LEVEL',
+      'GL_TEXTURE_MAX_LOD',
+      'GL_TEXTURE_MIN_LOD',
+      'GL_TEXTURE_WRAP_R',
+    ],
     'invalid': [
       'GL_GENERATE_MIPMAP',
     ],
@@ -1253,6 +1268,26 @@ _NAMED_TYPE_INFO = {
     'valid': [
       'GL_NEAREST',
       'GL_LINEAR',
+    ],
+  },
+  'TextureCompareFunc': {
+    'type': 'GLenum',
+    'valid': [
+      'GL_LEQUAL',
+      'GL_GEQUAL',
+      'GL_LESS',
+      'GL_GREATER',
+      'GL_EQUAL',
+      'GL_NOTEQUAL',
+      'GL_ALWAYS',
+      'GL_NEVER',
+    ],
+  },
+  'TextureCompareMode': {
+    'type': 'GLenum',
+    'valid': [
+      'GL_NONE',
+      'GL_COMPARE_REF_TO_TEXTURE',
     ],
   },
   'TextureUsage': {
@@ -2103,6 +2138,12 @@ _FUNCTION_INFO = {
     'data_transfer_methods': ['bucket', 'shm'],
     'unsafe': True,
   },
+  'CompressedTexSubImage3D': {
+    'type': 'Data',
+    'data_transfer_methods': ['bucket', 'shm'],
+    'decoder_func': 'DoCompressedTexSubImage3D',
+    'unsafe': True,
+  },
   'CopyTexSubImage3D': {
     'defer_reads': True,
     'unsafe': True,
@@ -2701,6 +2742,12 @@ _FUNCTION_INFO = {
     'type': 'Custom',
     'data_transfer_methods': ['shm'],
     'result': ['SizedResult<GLint>'],
+  },
+  'GetUniformuiv': {
+    'type': 'Custom',
+    'data_transfer_methods': ['shm'],
+    'result': ['SizedResult<GLuint>'],
+    'unsafe': True,
   },
   'GetUniformIndices': {
     'type': 'Custom',
@@ -4995,14 +5042,15 @@ class ManualHandler(CustomHandler):
 
 
 class DataHandler(TypeHandler):
-  """Handler for glBufferData, glBufferSubData, glTexImage2D, glTexSubImage2D,
-     glCompressedTexImage2D, glCompressedTexImageSub2D."""
+  """Handler for glBufferData, glBufferSubData, glTexImage*D, glTexSubImage*D,
+     glCompressedTexImage*D, glCompressedTexImageSub*D."""
   def __init__(self):
     TypeHandler.__init__(self)
 
   def InitFunction(self, func):
     """Overrriden from TypeHandler."""
-    if func.name == 'CompressedTexSubImage2DBucket':
+    if (func.name == 'CompressedTexSubImage2DBucket' or
+        func.name == 'CompressedTexSubImage3DBucket'):
       func.cmd_args = func.cmd_args[:-1]
       func.AddCmdArg(Argument('bucket_id', 'GLuint'))
 
@@ -5015,9 +5063,12 @@ class DataHandler(TypeHandler):
     if name == 'BufferData' or name == 'BufferSubData':
       file.Write("  uint32_t data_size = size;\n")
     elif (name == 'CompressedTexImage2D' or
-          name == 'CompressedTexSubImage2D'):
+          name == 'CompressedTexSubImage2D' or
+          name == 'CompressedTexImage3D' or
+          name == 'CompressedTexSubImage3D'):
       file.Write("  uint32_t data_size = imageSize;\n")
-    elif (name == 'CompressedTexSubImage2DBucket'):
+    elif (name == 'CompressedTexSubImage2DBucket' or
+          name == 'CompressedTexSubImage3DBucket'):
       file.Write("  Bucket* bucket = GetBucket(c.bucket_id);\n")
       file.Write("  uint32_t data_size = bucket->size();\n")
       file.Write("  GLsizei imageSize = data_size;\n")
@@ -5080,7 +5131,8 @@ class DataHandler(TypeHandler):
 
   def WriteBucketServiceImplementation(self, func, file):
     """Overrriden from TypeHandler."""
-    if not func.name == 'CompressedTexSubImage2DBucket':
+    if ((not func.name == 'CompressedTexSubImage2DBucket') and
+        (not func.name == 'CompressedTexSubImage3DBucket')):
       TypeHandler.WriteBucketServiceImplemenation(self, func, file)
 
 

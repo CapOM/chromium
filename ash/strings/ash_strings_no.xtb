@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Batteriet er fullt</translation>
 <translation id="6895424601869865703">Legg til en konto for <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Skjermtastaturet er deaktivert</translation>
-<translation id="1057289296854808272">Rotasjon på (trykk her for å endre)</translation>
+<translation id="5548285847212963613">Utvidelsen «<ph name="EXTENSION_NAME"/>» kan hjelpe deg med å koble deg til dette nettverket.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> og <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Overflyt-knappen</translation>
 <translation id="7904094684485781019">Administratoren for denne kontoen har forbudt multipålogging.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Status-felt</translation>
 <translation id="2248649616066688669">Du kan fortsette å bruke Chromebooken din mens den er tilkoblet en ekstern skjerm, selv når du lukker lokket.</translation>
 <translation id="2946640296642327832">Aktivér Bluetooth</translation>
+<translation id="5537725057119320332">Cast</translation>
 <translation id="6459472438155181876">Utvider skjermen til <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Mobil</translation>
 <translation id="6596816719288285829">IP-adresse</translation>
@@ -39,7 +40,6 @@
 Trykk på Shift + Alt for å bytte.</translation>
 <translation id="6043994281159824495">Logg av nå</translation>
 <translation id="2127372758936585790">Lading med lav effekt</translation>
-<translation id="4625920103690741805">Rotasjon låst (trykk her for å endre)</translation>
 <translation id="3799026279081545374">Det kan hende laderen din fungerer dårlig. Hvis du bor i USA, kan du ringe 866-628-1371 for å få hjelp og erstatning. Hvis du bor i Storbritannia, kan du ringe 0800-026-0613. Hvis du bor i Irland, kan du ringe 1-800-832-664. Hvis du bor i Canada, kan du ringe
 866-628-1372. Hvis du bor i Australia, kan du ringe 1-800-067-460.</translation>
 <translation id="3891340733213178823">Trykk på Control+Shift+Q to ganger for å logge av.</translation>
@@ -168,7 +168,6 @@ Trykk på Shift + Alt for å bytte.</translation>
 <translation id="112308213915226829">Skjul hylle automatisk</translation>
 <translation id="7573962313813535744">Dokket modus</translation>
 <translation id="2792498699870441125">Alt + Søk</translation>
-<translation id="8660803626959853127">Synkroniserer <ph name="COUNT"/> fil(er)</translation>
 <translation id="5958529069007801266">Administrert bruker</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">CAPS LOCK er av</translation>
@@ -188,6 +187,7 @@ Trykk på Søk eller Shift for å avbryte.</translation>
 <translation id="6165508094623778733">Les mer</translation>
 <translation id="7168224885072002358">Går tilbake til den gamle oppløsningen om <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Kameraet og mikrofonen er i bruk.</translation>
+<translation id="6550675742724504774">Alternativer</translation>
 <translation id="6406704438230478924">alt gr</translation>
 <translation id="3573179567135747900">Endre tilbake til <ph name="FROM_LOCALE"/> (krever omstart)</translation>
 <translation id="8103386449138765447">SMS-meldinger: <ph name="MESSAGE_COUNT"/></translation>

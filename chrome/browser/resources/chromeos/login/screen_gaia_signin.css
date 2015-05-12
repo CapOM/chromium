@@ -65,65 +65,49 @@ throbber-notice {
   display: none;
 }
 
-.custom-gaia-button {
-  background: transparent none;
-  background-position: center;
-  background-repeat: no-repeat;
-  height: 34px;
+#close-button-item,
+#back-button-item {
+  color: white;
   position: absolute;
-  top: 0;
-  width: 34px;
+  top: 10px;
   z-index: 1;
 }
 
+#close-button-item:disabled,
+#back-button-item:disabled {
+  color: rgb(127, 127, 127);
+}
+
 #close-button-item {
-  background-image: url(chrome://theme/IDR_LOGIN_CLOSE_BUTTTON);
-  right: 0;
-}
-
-html[dir=rtl] #close-button-item {
-  left: 0;
-  right: auto;
-}
-
-.loading #close-button-item,
-.new-gaia-flow .full-width #close-button-item {
-  background-image: url(chrome://theme/IDR_LOGIN_CLOSE_BUTTTON_ON_WHITE);
-}
-
-.loading.auth-completed #close-button-item {
-  display: none;
-}
-
-#close-button-item:disabled {
-  background-image: url(chrome://theme/IDR_LOGIN_CLOSE_BUTTTON_MASKED);
-}
-
-#close-button-item:hover {
-  cursor: pointer;
+  right: 10px;
 }
 
 #back-button-item {
-  background-image: url(chrome://theme/IDR_LOGIN_BACK_BUTTTON);
-  left: 0;
+  left: 10px;
+}
+
+html[dir=rtl] #close-button-item {
+  left: 10px;
+  right: auto;
 }
 
 html[dir=rtl] #back-button-item {
   -webkit-transform: scaleX(-1);
   left: auto;
-  right: 0;
+  right: 10px;
+}
+
+.loading #close-button-item,
+.new-gaia-flow .full-width #close-button-item {
+  color: rgba(0, 0, 0, .54);
 }
 
 .new-gaia-flow .full-width #back-button-item {
   display: none;
 }
 
-#back-button-item:disabled {
-  background-image: url(chrome://theme/IDR_LOGIN_BACK_BUTTTON_MASKED);
-}
-
-#back-button-item:hover {
-  cursor: pointer;
+.loading.auth-completed #close-button-item {
+  display: none;
 }
 
 .signin-text {
@@ -232,7 +216,7 @@ webview#signin-frame.show {
 }
 
 #createSupervisedUserSeparator {
-  background-color: rgba(128,128,128,0.3);
+  background-color: rgba(128, 128, 128, 0.3);
   height: 1px;
   width: 200px;
 }

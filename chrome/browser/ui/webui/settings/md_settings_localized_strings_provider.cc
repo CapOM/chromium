@@ -87,6 +87,9 @@ void AddDownloadsStrings(content::WebUIDataSource* html_source) {
 
 void AddDateTimeStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString(
+      "dateTimePageTitle",
+      IDS_SETTINGS_DATE_TIME_PAGE_TITLE);
+  html_source->AddLocalizedString(
       "dateTimeTimeZoneLabel",
       IDS_SETTINGS_DATE_TIME_TIME_ZONE_LABEL);
   html_source->AddLocalizedString(
@@ -101,6 +104,8 @@ void AddDateTimeStrings(content::WebUIDataSource* html_source) {
 void AddInternetStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString(
       "internetPageTitle", IDS_SETTINGS_INTERNET_PAGE_TITLE);
+  html_source->AddLocalizedString(
+      "internetDetailPageTitle", IDS_SETTINGS_INTERNET_DETAIL_PAGE_TITLE);
 }
 #endif
 
@@ -121,6 +126,27 @@ void AddSearchStrings(content::WebUIDataSource* html_source) {
       IDS_SETTINGS_SEARCH_OK_GOOGLE_DESCRIPTION_LABEL);
 }
 
+void AddSearchEnginesStrings(content::WebUIDataSource* html_source) {
+  html_source->AddLocalizedString("searchEnginesPageTitle",
+                                  IDS_SETTINGS_SEARCH_ENGINES_PAGE_TITLE);
+  html_source->AddLocalizedString(
+      "searchEnginesAddSearchEngineLabel",
+      IDS_SETTINGS_SEARCH_ENGINES_ADD_SEARCH_ENGINE_LABEL);
+  html_source->AddLocalizedString("searchEnginesLabel",
+                                  IDS_SETTINGS_SEARCH_ENGINES_LABEL);
+  html_source->AddLocalizedString(
+      "searchEnginesOtherLabel",
+      IDS_SETTINGS_SEARCH_ENGINES_OTHER_ENGINES_LABEL);
+  html_source->AddLocalizedString("searchEnginesDomainLabel",
+                                  IDS_SETTINGS_SEARCH_ENGINES_DOMAIN_LABEL);
+  html_source->AddLocalizedString("searchEnginesKeywordLabel",
+                                  IDS_SETTINGS_SEARCH_ENGINES_KEYWORD_LABEL);
+  html_source->AddLocalizedString("searchEnginesQueryURLLabel",
+                                  IDS_SETTINGS_SEARCH_ENGINES_QUERY_URL_LABEL);
+  html_source->AddLocalizedString("searchEnginesAddButtonLabel",
+                                  IDS_SETTINGS_SEARCH_ENGINES_ADD_BUTTON_LABEL);
+}
+
 }  // namespace
 
 namespace settings {
@@ -133,6 +159,7 @@ void AddLocalizedStrings(content::WebUIDataSource* html_source) {
   AddInternetStrings(html_source);
 #endif
   AddSearchStrings(html_source);
+  AddSearchEnginesStrings(html_source);
   html_source->SetJsonPath(kLocalizedStringsFile);
 }
 

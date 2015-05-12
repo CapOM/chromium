@@ -42,6 +42,7 @@ namespace views {
 class FullscreenHandler;
 class HWNDMessageHandlerDelegate;
 class InputMethod;
+class WindowsSessionChangeObserver;
 
 // These two messages aren't defined in winuser.h, but they are sent to windows
 // with captions. They appear to paint the window caption and frame.
@@ -76,7 +77,7 @@ const int WM_NCUAHDRAWFRAME = 0xAF;
                             WPARAM w_param, \
                             LPARAM l_param, \
                             LRESULT& l_result, \
-                            DWORD msg_map_id = 0) { \
+                            DWORD msg_map_id = 0) override { \
     base::WeakPtr<HWNDMessageHandler> ref(weak_factory.GetWeakPtr()); \
     BOOL old_msg_handled = msg_handled_; \
     BOOL ret = _ProcessWindowMessage(hwnd, msg, w_param, l_param, l_result, \
@@ -400,7 +401,6 @@ class VIEWS_EXPORT HWNDMessageHandler :
     CR_MSG_WM_THEMECHANGED(OnThemeChanged)
     CR_MSG_WM_WINDOWPOSCHANGED(OnWindowPosChanged)
     CR_MSG_WM_WINDOWPOSCHANGING(OnWindowPosChanging)
-    CR_MSG_WM_WTSSESSION_CHANGE(OnSessionChange)
   CR_END_MSG_MAP()
 
   // Message Handlers.
@@ -445,7 +445,6 @@ class VIEWS_EXPORT HWNDMessageHandler :
   void OnPaint(HDC dc);
   LRESULT OnReflectedMessage(UINT message, WPARAM w_param, LPARAM l_param);
   LRESULT OnScrollMessage(UINT message, WPARAM w_param, LPARAM l_param);
-  void OnSessionChange(WPARAM status_code, PWTSSESSION_NOTIFICATION session_id);
   LRESULT OnSetCursor(UINT message, WPARAM w_param, LPARAM l_param);
   void OnSetFocus(HWND last_focused_window);
   LRESULT OnSetIcon(UINT size_type, HICON new_icon);
@@ -457,6 +456,9 @@ class VIEWS_EXPORT HWNDMessageHandler :
   LRESULT OnTouchEvent(UINT message, WPARAM w_param, LPARAM l_param);
   void OnWindowPosChanging(WINDOWPOS* window_pos);
   void OnWindowPosChanged(WINDOWPOS* window_pos);
+
+  // Receives Windows Session Change notifications.
+  void OnSessionChange(WPARAM status_code);
 
   typedef std::vector<ui::TouchEvent> TouchEvents;
   // Helper to handle the list of touch events passed in. We need this because
@@ -585,9 +587,6 @@ class VIEWS_EXPORT HWNDMessageHandler :
   // If > 0 indicates a menu is running (we're showing a native menu).
   int menu_depth_;
 
-  // A factory used to lookup appbar autohide edges.
-  base::WeakPtrFactory<HWNDMessageHandler> autohide_factory_;
-
   // Generates touch-ids for touch-events.
   ui::SequentialIDGenerator id_generator_;
 
@@ -626,6 +625,16 @@ class VIEWS_EXPORT HWNDMessageHandler :
   // glass. Defaults to false.
   bool dwm_transition_desired_;
 
+  // Manages observation of Windows Session Change messages.
+  scoped_ptr<WindowsSessionChangeObserver> windows_session_change_observer_;
+
+  // The WeakPtrFactories below must occur last in the class definition so they
+  // get destroyed last.
+
+  // The factory used to lookup appbar autohide edges.
+  base::WeakPtrFactory<HWNDMessageHandler> autohide_factory_;
+
+  // The factory used with BEGIN_SAFE_MSG_MAP_EX.
   base::WeakPtrFactory<HWNDMessageHandler> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(HWNDMessageHandler);

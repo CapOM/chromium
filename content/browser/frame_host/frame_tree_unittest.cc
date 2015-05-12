@@ -140,13 +140,19 @@ TEST_F(FrameTreeTest, DISABLED_Shape) {
   ASSERT_EQ("1: []", GetTreeState(frame_tree));
 
   // Simulate attaching a series of frames to build the frame tree.
-  frame_tree->AddFrame(root, process_id, 14, std::string());
-  frame_tree->AddFrame(root, process_id, 15, std::string());
-  frame_tree->AddFrame(root, process_id, 16, std::string());
+  frame_tree->AddFrame(root, process_id, 14, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(root, process_id, 15, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(root, process_id, 16, std::string(),
+                       SandboxFlags::NONE);
 
-  frame_tree->AddFrame(root->child_at(0), process_id, 244, std::string());
-  frame_tree->AddFrame(root->child_at(1), process_id, 255, no_children_node);
-  frame_tree->AddFrame(root->child_at(0), process_id, 245, std::string());
+  frame_tree->AddFrame(root->child_at(0), process_id, 244, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(root->child_at(1), process_id, 255, no_children_node,
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(root->child_at(0), process_id, 245, std::string(),
+                       SandboxFlags::NONE);
 
   ASSERT_EQ("1: [14: [244: [], 245: []], "
                 "15: [255 'no children node': []], "
@@ -154,19 +160,26 @@ TEST_F(FrameTreeTest, DISABLED_Shape) {
             GetTreeState(frame_tree));
 
   FrameTreeNode* child_16 = root->child_at(2);
-  frame_tree->AddFrame(child_16, process_id, 264, std::string());
-  frame_tree->AddFrame(child_16, process_id, 265, std::string());
-  frame_tree->AddFrame(child_16, process_id, 266, std::string());
-  frame_tree->AddFrame(child_16, process_id, 267, deep_subtree);
-  frame_tree->AddFrame(child_16, process_id, 268, std::string());
+  frame_tree->AddFrame(child_16, process_id, 264, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_16, process_id, 265, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_16, process_id, 266, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_16, process_id, 267, deep_subtree,
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_16, process_id, 268, std::string(),
+                       SandboxFlags::NONE);
 
   FrameTreeNode* child_267 = child_16->child_at(3);
-  frame_tree->AddFrame(child_267, process_id, 365, std::string());
-  frame_tree->AddFrame(child_267->child_at(0), process_id, 455, std::string());
+  frame_tree->AddFrame(child_267, process_id, 365, std::string(),
+                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_267->child_at(0), process_id, 455, std::string(),
+                       SandboxFlags::NONE);
   frame_tree->AddFrame(child_267->child_at(0)->child_at(0), process_id, 555,
-                       std::string());
+                       std::string(), SandboxFlags::NONE);
   frame_tree->AddFrame(child_267->child_at(0)->child_at(0)->child_at(0),
-                       process_id, 655, std::string());
+                       process_id, 655, std::string(), SandboxFlags::NONE);
 
   // Now that's it's fully built, verify the tree structure is as expected.
   ASSERT_EQ("1: [14: [244: [], 245: []], "
@@ -244,6 +257,30 @@ TEST_F(FrameTreeTest, FindFrames) {
   EXPECT_EQ(nullptr, frame_tree->FindByName("no such frame"));
 }
 
+// Check that PreviousSibling() is retrieved correctly.
+TEST_F(FrameTreeTest, PreviousSibling) {
+  // Add a few child frames to the main frame.
+  FrameTree* frame_tree = contents()->GetFrameTree();
+  FrameTreeNode* root = frame_tree->root();
+  main_test_rfh()->OnCreateChildFrame(22, "child0", SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(23, "child1", SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(24, "child2", SandboxFlags::NONE);
+  FrameTreeNode* child0 = root->child_at(0);
+  FrameTreeNode* child1 = root->child_at(1);
+  FrameTreeNode* child2 = root->child_at(2);
+
+  // Add one grandchild frame.
+  child1->current_frame_host()->OnCreateChildFrame(33, "grandchild",
+                                                   SandboxFlags::NONE);
+  FrameTreeNode* grandchild = child1->child_at(0);
+
+  EXPECT_EQ(nullptr, root->PreviousSibling());
+  EXPECT_EQ(nullptr, child0->PreviousSibling());
+  EXPECT_EQ(child0, child1->PreviousSibling());
+  EXPECT_EQ(child1, child2->PreviousSibling());
+  EXPECT_EQ(nullptr, grandchild->PreviousSibling());
+}
+
 // Do some simple manipulations of the frame tree, making sure that
 // WebContentsObservers see a consistent view of the tree as we go.
 TEST_F(FrameTreeTest, ObserverWalksTreeDuringFrameCreation) {
@@ -310,7 +347,8 @@ TEST_F(FrameTreeTest, FailAddFrameWithWrongProcessId) {
   ASSERT_EQ("1: []", GetTreeState(frame_tree));
 
   // Simulate attaching a frame from mismatched process id.
-  ASSERT_FALSE(frame_tree->AddFrame(root, process_id + 1, 1, std::string()));
+  ASSERT_FALSE(frame_tree->AddFrame(root, process_id + 1, 1, std::string(),
+                                    SandboxFlags::NONE));
   ASSERT_EQ("1: []", GetTreeState(frame_tree));
 }
 

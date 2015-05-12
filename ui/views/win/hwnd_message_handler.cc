@@ -7,10 +7,9 @@
 #include <dwmapi.h>
 #include <oleacc.h>
 #include <shellapi.h>
-#include <wtsapi32.h>
-#pragma comment(lib, "wtsapi32.lib")
 
 #include "base/bind.h"
+#include "base/bind_helpers.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/trace_event/trace_event.h"
 #include "base/tracked_objects.h"
@@ -28,7 +27,6 @@
 #include "ui/events/event_utils.h"
 #include "ui/events/keycodes/keyboard_code_conversion_win.h"
 #include "ui/gfx/canvas.h"
-#include "ui/gfx/canvas_skia_paint.h"
 #include "ui/gfx/geometry/insets.h"
 #include "ui/gfx/icon_util.h"
 #include "ui/gfx/path.h"
@@ -43,6 +41,7 @@
 #include "ui/views/win/fullscreen_handler.h"
 #include "ui/views/win/hwnd_message_handler_delegate.h"
 #include "ui/views/win/scoped_fullscreen_visibility.h"
+#include "ui/views/win/windows_session_change_observer.h"
 
 namespace views {
 namespace {
@@ -207,34 +206,6 @@ BOOL CALLBACK SendDwmCompositionChanged(HWND window, LPARAM param) {
   return TRUE;
 }
 
-// See comments in OnNCPaint() for details of this struct.
-struct ClipState {
-  // The window being painted.
-  HWND parent;
-
-  // DC painting to.
-  HDC dc;
-
-  // Origin of the window in terms of the screen.
-  int x;
-  int y;
-};
-
-// See comments in OnNCPaint() for details of this function.
-static BOOL CALLBACK ClipDCToChild(HWND window, LPARAM param) {
-  ClipState* clip_state = reinterpret_cast<ClipState*>(param);
-  if (GetParent(window) == clip_state->parent && IsWindowVisible(window)) {
-    RECT bounds;
-    GetWindowRect(window, &bounds);
-    ExcludeClipRect(clip_state->dc,
-      bounds.left - clip_state->x,
-      bounds.top - clip_state->y,
-      bounds.right - clip_state->x,
-      bounds.bottom - clip_state->y);
-  }
-  return TRUE;
-}
-
 // The thickness of an auto-hide taskbar in pixels.
 const int kAutoHideTaskbarThicknessPx = 2;
 
@@ -353,7 +324,6 @@ HWNDMessageHandler::HWNDMessageHandler(HWNDMessageHandlerDelegate* delegate)
       waiting_for_redraw_layered_window_contents_(false),
       is_first_nccalc_(true),
       menu_depth_(0),
-      autohide_factory_(this),
       id_generator_(0),
       needs_scroll_styles_(false),
       in_size_loop_(false),
@@ -361,6 +331,7 @@ HWNDMessageHandler::HWNDMessageHandler(HWNDMessageHandlerDelegate* delegate)
       last_mouse_hwheel_time_(0),
       msg_handled_(FALSE),
       dwm_transition_desired_(false),
+      autohide_factory_(this),
       weak_factory_(this) {
 }
 
@@ -1464,7 +1435,9 @@ LRESULT HWNDMessageHandler::OnCreate(CREATESTRUCT* create_struct) {
   tracked_objects::ScopedTracker tracking_profile8(
       FROM_HERE_WITH_EXPLICIT_FUNCTION("440919 HWNDMessageHandler::OnCreate8"));
 
-  WTSRegisterSessionNotification(hwnd(), NOTIFY_FOR_THIS_SESSION);
+  windows_session_change_observer_.reset(new WindowsSessionChangeObserver(
+      base::Bind(&HWNDMessageHandler::OnSessionChange,
+                 base::Unretained(this))));
 
   // TODO(beng): move more of NWW::OnCreate here.
   return 0;
@@ -1475,7 +1448,7 @@ void HWNDMessageHandler::OnDestroy() {
   tracked_objects::ScopedTracker tracking_profile(
       FROM_HERE_WITH_EXPLICIT_FUNCTION("440919 HWNDMessageHandler::OnDestroy"));
 
-  WTSUnRegisterSessionNotification(hwnd());
+  windows_session_change_observer_.reset(nullptr);
   delegate_->HandleDestroying();
 }
 
@@ -1697,7 +1670,8 @@ LRESULT HWNDMessageHandler::OnKeyEvent(UINT message,
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "440919 HWNDMessageHandler::OnKeyEvent"));
 
-  MSG msg = { hwnd(), message, w_param, l_param, GetMessageTime() };
+  MSG msg = {
+      hwnd(), message, w_param, l_param, static_cast<DWORD>(GetMessageTime())};
   ui::KeyEvent key(msg);
   if (!delegate_->HandleUntranslatedKeyEvent(key))
     DispatchKeyEventPostIME(key);
@@ -2080,19 +2054,6 @@ void HWNDMessageHandler::OnNCPaint(HRGN rgn) {
     OffsetRect(&dirty_region, -window_rect.left, -window_rect.top);
   }
 
-  // In theory GetDCEx should do what we want, but I couldn't get it to work.
-  // In particular the docs mentiond DCX_CLIPCHILDREN, but as far as I can tell
-  // it doesn't work at all. So, instead we get the DC for the window then
-  // manually clip out the children.
-  HDC dc = GetWindowDC(hwnd());
-  ClipState clip_state;
-  clip_state.x = window_rect.left;
-  clip_state.y = window_rect.top;
-  clip_state.parent = hwnd();
-  clip_state.dc = dc;
-  EnumChildWindows(hwnd(), &ClipDCToChild,
-                   reinterpret_cast<LPARAM>(&clip_state));
-
   gfx::Rect old_paint_region = invalid_rect_;
   if (!old_paint_region.IsEmpty()) {
     // The root view has a region that needs to be painted. Include it in the
@@ -2104,21 +2065,8 @@ void HWNDMessageHandler::OnNCPaint(HRGN rgn) {
   }
 
   SchedulePaintInRect(gfx::Rect(dirty_region));
+  delegate_->HandlePaintAccelerated(gfx::Rect(dirty_region));
 
-  // gfx::CanvasSkiaPaint's destructor does the actual painting. As such, wrap
-  // the following in a block to force paint to occur so that we can release
-  // the dc.
-  if (!delegate_->HandlePaintAccelerated(gfx::Rect(dirty_region))) {
-    gfx::CanvasSkiaPaint canvas(dc,
-                                true,
-                                dirty_region.left,
-                                dirty_region.top,
-                                dirty_region.right - dirty_region.left,
-                                dirty_region.bottom - dirty_region.top);
-    delegate_->HandlePaint(&canvas);
-  }
-
-  ReleaseDC(hwnd(), dc);
   // When using a custom frame, we want to avoid calling DefWindowProc() since
   // that may render artifacts.
   SetMsgHandled(delegate_->IsUsingCustomFrame());
@@ -2175,11 +2123,8 @@ void HWNDMessageHandler::OnPaint(HDC dc) {
   HDC display_dc = BeginPaint(hwnd(), &ps);
   CHECK(display_dc);
 
-  // Try to paint accelerated first.
-  if (!IsRectEmpty(&ps.rcPaint) &&
-      !delegate_->HandlePaintAccelerated(gfx::Rect(ps.rcPaint))) {
-    delegate_->HandlePaint(NULL);
-  }
+  if (!IsRectEmpty(&ps.rcPaint))
+    delegate_->HandlePaintAccelerated(gfx::Rect(ps.rcPaint));
 
   EndPaint(hwnd(), &ps);
 }
@@ -2199,25 +2144,11 @@ LRESULT HWNDMessageHandler::OnScrollMessage(UINT message,
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "440919 HWNDMessageHandler::OnScrollMessage"));
 
-  MSG msg = { hwnd(), message, w_param, l_param, GetMessageTime() };
+  MSG msg = {
+      hwnd(), message, w_param, l_param, static_cast<DWORD>(GetMessageTime())};
   ui::ScrollEvent event(msg);
   delegate_->HandleScrollEvent(event);
   return 0;
-}
-
-void HWNDMessageHandler::OnSessionChange(WPARAM status_code,
-                                         PWTSSESSION_NOTIFICATION session_id) {
-  // TODO(vadimt): Remove ScopedTracker below once crbug.com/440919 is fixed.
-  tracked_objects::ScopedTracker tracking_profile(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "440919 HWNDMessageHandler::OnSessionChange"));
-
-  // Direct3D presents are ignored while the screen is locked, so force the
-  // window to be redrawn on unlock.
-  if (status_code == WTS_SESSION_UNLOCK)
-    ForceRedrawWindow(10);
-
-  SetMsgHandled(FALSE);
 }
 
 LRESULT HWNDMessageHandler::OnSetCursor(UINT message,
@@ -2632,6 +2563,18 @@ void HWNDMessageHandler::OnWindowPosChanged(WINDOWPOS* window_pos) {
   SetMsgHandled(FALSE);
 }
 
+void HWNDMessageHandler::OnSessionChange(WPARAM status_code) {
+  // TODO(vadimt): Remove ScopedTracker below once crbug.com/440919 is fixed.
+  tracked_objects::ScopedTracker tracking_profile(
+      FROM_HERE_WITH_EXPLICIT_FUNCTION(
+          "440919 HWNDMessageHandler::OnSessionChange"));
+
+  // Direct3D presents are ignored while the screen is locked, so force the
+  // window to be redrawn on unlock.
+  if (status_code == WTS_SESSION_UNLOCK)
+    ForceRedrawWindow(10);
+}
+
 void HWNDMessageHandler::HandleTouchEvents(const TouchEvents& touch_events) {
   base::WeakPtr<HWNDMessageHandler> ref(weak_factory_.GetWeakPtr());
   for (size_t i = 0; i < touch_events.size() && ref; ++i)
@@ -2745,7 +2688,8 @@ LRESULT HWNDMessageHandler::HandleMouseEventInternal(UINT message,
           "440919 HWNDMessageHandler::HandleMouseEventInternal4"));
 
   long message_time = GetMessageTime();
-  MSG msg = { hwnd(), message, w_param, l_param, message_time,
+  MSG msg = { hwnd(), message, w_param, l_param,
+              static_cast<DWORD>(message_time),
               { CR_GET_X_LPARAM(l_param), CR_GET_Y_LPARAM(l_param) } };
   ui::MouseEvent event(msg);
   if (IsSynthesizedMouseMessage(message, message_time, l_param))

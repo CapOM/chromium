@@ -9,6 +9,7 @@
 #include "base/memory/scoped_vector.h"
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
@@ -45,28 +46,6 @@ class QuotaPolicyChannelIDStoreTest : public testing::Test {
   }
 
  protected:
-  static base::Time GetTestCertExpirationTime() {
-    // Cert expiration time from 'dumpasn1 unittest.originbound.der':
-    // GeneralizedTime 19/11/2111 02:23:45 GMT
-    // base::Time::FromUTCExploded can't generate values past 2038 on 32-bit
-    // linux, so we use the raw value here.
-    return base::Time::FromInternalValue(GG_INT64_C(16121816625000000));
-  }
-
-  static base::Time GetTestCertCreationTime() {
-    // UTCTime 13/12/2011 02:23:45 GMT
-    base::Time::Exploded exploded_time;
-    exploded_time.year = 2011;
-    exploded_time.month = 12;
-    exploded_time.day_of_week = 0;  // Unused.
-    exploded_time.day_of_month = 13;
-    exploded_time.hour = 2;
-    exploded_time.minute = 23;
-    exploded_time.second = 45;
-    exploded_time.millisecond = 0;
-    return base::Time::FromUTCExploded(exploded_time);
-  }
-
   void SetUp() override {
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
     store_ = new QuotaPolicyChannelIDStore(
@@ -114,7 +93,7 @@ TEST_F(QuotaPolicyChannelIDStoreTest, TestPersistence) {
   base::RunLoop().RunUntilIdle();
   store_ = new QuotaPolicyChannelIDStore(
       temp_dir_.path().Append(kTestChannelIDFilename),
-      base::MessageLoopProxy::current(),
+      base::ThreadTaskRunnerHandle::Get(),
       NULL);
 
   // Reload and test for persistence
@@ -149,7 +128,7 @@ TEST_F(QuotaPolicyChannelIDStoreTest, TestPersistence) {
   channel_ids.clear();
   store_ = new QuotaPolicyChannelIDStore(
       temp_dir_.path().Append(kTestChannelIDFilename),
-      base::MessageLoopProxy::current(),
+      base::ThreadTaskRunnerHandle::Get(),
       NULL);
 
   // Reload and check if the channel ID has been removed.
@@ -181,7 +160,7 @@ TEST_F(QuotaPolicyChannelIDStoreTest, TestPolicy) {
   // Reload store, it should still have both channel IDs.
   store_ = new QuotaPolicyChannelIDStore(
       temp_dir_.path().Append(kTestChannelIDFilename),
-      base::MessageLoopProxy::current(),
+      base::ThreadTaskRunnerHandle::Get(),
       storage_policy);
   Load(&channel_ids);
   ASSERT_EQ(2U, channel_ids.size());
@@ -206,7 +185,7 @@ TEST_F(QuotaPolicyChannelIDStoreTest, TestPolicy) {
   channel_ids.clear();
   store_ = new QuotaPolicyChannelIDStore(
       temp_dir_.path().Append(kTestChannelIDFilename),
-      base::MessageLoopProxy::current(),
+      base::ThreadTaskRunnerHandle::Get(),
       NULL);
 
   // Reload and check that the nonpersistent.com channel IDs have been removed.

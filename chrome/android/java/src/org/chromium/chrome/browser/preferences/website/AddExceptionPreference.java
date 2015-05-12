@@ -113,8 +113,7 @@ public class AddExceptionPreference extends Preference implements OnPreferenceCl
                 .setTitle(R.string.website_settings_add_site_dialog_title)
                 .setMessage(mDialogMessage)
                 .setView(view)
-                .setPositiveButton(R.string.website_settings_add_site_add_button,
-                                   onClickListener)
+                .setPositiveButton(R.string.website_settings_add_site_add_button, onClickListener)
                 .setNegativeButton(R.string.cancel, onClickListener)
                 .show();
         final Button okButton = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE);

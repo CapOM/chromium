@@ -40,8 +40,16 @@ class COMPOSITOR_EXPORT ClipTransformRecorder {
   void Transform(const gfx::Transform& transform);
 
  private:
+  enum Closer {
+    CLIP_RECT,
+    CLIP_PATH,
+    TRANSFORM,
+  };
   const PaintContext& context_;
-  std::vector<cc::DisplayItem*> closers_;
+  // If someone needs to do more than this many operations with a single
+  // ClipTransformRecorder then increase the size of the closers_ array.
+  Closer closers_[4];
+  size_t num_closers_;
 
   DISALLOW_COPY_AND_ASSIGN(ClipTransformRecorder);
 };

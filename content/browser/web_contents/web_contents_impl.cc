@@ -3419,11 +3419,6 @@ void WebContentsImpl::ShowContextMenu(RenderFrameHost* render_frame_host,
                                       const ContextMenuParams& params) {
   ContextMenuParams context_menu_params(params);
   // Allow WebContentsDelegates to handle the context menu operation first.
-  if (GetBrowserPluginGuest()) {
-    WebContentsViewGuest* view_guest =
-        static_cast<WebContentsViewGuest*>(GetView());
-    context_menu_params = view_guest->ConvertContextMenuParams(params);
-  }
   if (delegate_ && delegate_->HandleContextMenu(context_menu_params))
     return;
 
@@ -3873,6 +3868,11 @@ void WebContentsImpl::UpdateTitle(RenderFrameHost* render_frame_host,
   NavigationEntryImpl* entry = controller_.GetEntryWithPageID(
       rvh->GetSiteInstance(), page_id);
 
+  // Re http://crbug.com/369661, page id is going away. This function should
+  // only ever be called for the last committed entry. When this is verified,
+  // this function can be greatly simplified.
+  CHECK_EQ(entry, controller_.GetLastCommittedEntry());
+
   // We can handle title updates when we don't have an entry in
   // UpdateTitleForEntry, but only if the update is from the current RVH.
   // TODO(avi): Change to make decisions based on the RenderFrameHost.
@@ -4226,13 +4226,15 @@ bool WebContentsImpl::CreateRenderViewForRenderManager(
 bool WebContentsImpl::CreateRenderFrameForRenderManager(
     RenderFrameHost* render_frame_host,
     int parent_routing_id,
+    int previous_sibling_routing_id,
     int proxy_routing_id) {
   TRACE_EVENT0("browser,navigation",
                "WebContentsImpl::CreateRenderFrameForRenderManager");
 
   RenderFrameHostImpl* rfh =
       static_cast<RenderFrameHostImpl*>(render_frame_host);
-  if (!rfh->CreateRenderFrame(parent_routing_id, proxy_routing_id))
+  if (!rfh->CreateRenderFrame(parent_routing_id, previous_sibling_routing_id,
+                              proxy_routing_id))
     return false;
 
   // TODO(nasko): When RenderWidgetHost is owned by RenderFrameHost, the passed

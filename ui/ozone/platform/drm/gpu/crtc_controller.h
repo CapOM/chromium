@@ -12,9 +12,9 @@
 #include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "ui/ozone/ozone_export.h"
+#include "ui/ozone/platform/drm/common/scoped_drm_types.h"
 #include "ui/ozone/platform/drm/gpu/hardware_display_plane_manager.h"
 #include "ui/ozone/platform/drm/gpu/overlay_plane.h"
-#include "ui/ozone/platform/drm/gpu/scoped_drm_types.h"
 
 namespace ui {
 
@@ -40,8 +40,6 @@ class OZONE_EXPORT CrtcController
   const scoped_refptr<DrmDevice>& drm() const { return drm_; }
   bool is_disabled() const { return is_disabled_; }
   uint64_t time_of_last_flip() const { return time_of_last_flip_; }
-
-  drmModeCrtc* saved_crtc() const { return saved_crtc_.get(); }
 
   // Perform the initial modesetting operation using |plane| as the buffer for
   // the primary plane. The CRTC configuration is specified by |mode|.
@@ -93,10 +91,6 @@ class OZONE_EXPORT CrtcController
   uint32_t connector_;
 
   drmModeModeInfo mode_;
-
-  // Store the state of the CRTC before we took over. Used to restore the CRTC
-  // once we no longer need it.
-  ScopedDrmCrtcPtr saved_crtc_;
 
   // Keeps track of the CRTC state. If a surface has been bound, then the value
   // is set to false. Otherwise it is true.

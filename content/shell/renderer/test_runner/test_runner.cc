@@ -288,8 +288,8 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
                                         const std::string& password);
   void AddWebPageOverlay();
   void RemoveWebPageOverlay();
-  void DisplayAsync();
-  void DisplayAsyncThen(v8::Local<v8::Function> callback);
+  void LayoutAndPaintAsync();
+  void LayoutAndPaintAsyncThen(v8::Local<v8::Function> callback);
   void GetManifestThen(v8::Local<v8::Function> callback);
   void CapturePixelsAsyncThen(v8::Local<v8::Function> callback);
   void CopyImageAtAndCapturePixelsAsyncThen(int x,
@@ -533,8 +533,10 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("addWebPageOverlay", &TestRunnerBindings::AddWebPageOverlay)
       .SetMethod("removeWebPageOverlay",
                  &TestRunnerBindings::RemoveWebPageOverlay)
-      .SetMethod("displayAsync", &TestRunnerBindings::DisplayAsync)
-      .SetMethod("displayAsyncThen", &TestRunnerBindings::DisplayAsyncThen)
+      .SetMethod("layoutAndPaintAsync",
+                 &TestRunnerBindings::LayoutAndPaintAsync)
+      .SetMethod("layoutAndPaintAsyncThen",
+                 &TestRunnerBindings::LayoutAndPaintAsyncThen)
       .SetMethod("getManifestThen", &TestRunnerBindings::GetManifestThen)
       .SetMethod("capturePixelsAsyncThen",
                  &TestRunnerBindings::CapturePixelsAsyncThen)
@@ -1357,14 +1359,15 @@ void TestRunnerBindings::RemoveWebPageOverlay() {
     runner_->RemoveWebPageOverlay();
 }
 
-void TestRunnerBindings::DisplayAsync() {
+void TestRunnerBindings::LayoutAndPaintAsync() {
   if (runner_)
-    runner_->DisplayAsync();
+    runner_->LayoutAndPaintAsync();
 }
 
-void TestRunnerBindings::DisplayAsyncThen(v8::Local<v8::Function> callback) {
+void TestRunnerBindings::LayoutAndPaintAsyncThen(
+    v8::Local<v8::Function> callback) {
   if (runner_)
-    runner_->DisplayAsyncThen(callback);
+    runner_->LayoutAndPaintAsyncThen(callback);
 }
 
 void TestRunnerBindings::GetManifestThen(v8::Local<v8::Function> callback) {
@@ -1638,7 +1641,7 @@ void TestRunner::Reset() {
   can_open_windows_ = false;
   dump_resource_load_callbacks_ = false;
   dump_resource_request_callbacks_ = false;
-  dump_resource_reqponse_mime_types_ = false;
+  dump_resource_response_mime_types_ = false;
   dump_window_status_changes_ = false;
   dump_progress_finished_callback_ = false;
   dump_spell_check_callbacks_ = false;
@@ -1798,7 +1801,7 @@ bool TestRunner::shouldDumpResourceRequestCallbacks() const {
 }
 
 bool TestRunner::shouldDumpResourceResponseMIMETypes() const {
-  return test_is_running_ && dump_resource_reqponse_mime_types_;
+  return test_is_running_ && dump_resource_response_mime_types_;
 }
 
 WebContentSettingsClient* TestRunner::GetWebContentSettings() const {
@@ -2627,7 +2630,7 @@ void TestRunner::DumpResourceRequestCallbacks() {
 }
 
 void TestRunner::DumpResourceResponseMIMETypes() {
-  dump_resource_reqponse_mime_types_ = true;
+  dump_resource_response_mime_types_ = true;
 }
 
 void TestRunner::SetImagesAllowed(bool allowed) {
@@ -2847,16 +2850,16 @@ void TestRunner::RemoveWebPageOverlay() {
   }
 }
 
-void TestRunner::DisplayAsync() {
-  proxy_->DisplayAsyncThen(base::Closure());
+void TestRunner::LayoutAndPaintAsync() {
+  proxy_->LayoutAndPaintAsyncThen(base::Closure());
 }
 
-void TestRunner::DisplayAsyncThen(v8::Local<v8::Function> callback) {
+void TestRunner::LayoutAndPaintAsyncThen(v8::Local<v8::Function> callback) {
   scoped_ptr<InvokeCallbackTask> task(
       new InvokeCallbackTask(this, callback));
-  proxy_->DisplayAsyncThen(base::Bind(&TestRunner::InvokeCallback,
-                                      weak_factory_.GetWeakPtr(),
-                                      base::Passed(&task)));
+  proxy_->LayoutAndPaintAsyncThen(base::Bind(&TestRunner::InvokeCallback,
+                                             weak_factory_.GetWeakPtr(),
+                                             base::Passed(&task)));
 }
 
 void TestRunner::GetManifestThen(v8::Local<v8::Function> callback) {

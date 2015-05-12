@@ -453,6 +453,14 @@ BookmarkAppHelper::BookmarkAppHelper(Profile* profile,
           extensions::pref_names::kBookmarkAppCreationLaunchType) ==
       extensions::LAUNCH_TYPE_WINDOW;
 
+  // The default app title is the page title, which can be quite long. Limit the
+  // default name used to something sensible.
+  const int kMaxDefaultTitle = 40;
+  if (web_app_info_.title.length() > kMaxDefaultTitle) {
+    web_app_info_.title = web_app_info_.title.substr(0, kMaxDefaultTitle - 3) +
+                          base::UTF8ToUTF16("...");
+  }
+
   registrar_.Add(this,
                  extensions::NOTIFICATION_CRX_INSTALLER_DONE,
                  content::Source<CrxInstaller>(crx_installer_.get()));
@@ -613,6 +621,16 @@ void BookmarkAppHelper::FinishInstallation(const Extension* extension) {
 #endif
     creation_locations.applications_menu_location =
         web_app::APP_MENU_LOCATION_SUBDIR_CHROMEAPPS;
+    web_app::CreateShortcuts(web_app::SHORTCUT_CREATION_BY_USER,
+                             creation_locations, current_profile, extension);
+    // Creating shortcuts in the start menu fails when the language is set
+    // to certain languages (e.g. Hindi). To work around this, the taskbar /
+    // quick launch icon is created separately to ensure it doesn't fail
+    // due to the start menu shortcut creation failing.
+    // See http://crbug.com/477297 and http://crbug.com/484577.
+    creation_locations.on_desktop = false;
+    creation_locations.applications_menu_location =
+        web_app::APP_MENU_LOCATION_NONE;
     creation_locations.in_quick_launch_bar = true;
     web_app::CreateShortcuts(web_app::SHORTCUT_CREATION_BY_USER,
                              creation_locations, current_profile, extension);

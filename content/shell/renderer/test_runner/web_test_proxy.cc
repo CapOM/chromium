@@ -34,6 +34,7 @@
 #include "third_party/WebKit/public/platform/WebCString.h"
 #include "third_party/WebKit/public/platform/WebClipboard.h"
 #include "third_party/WebKit/public/platform/WebCompositeAndReadbackAsyncCallback.h"
+#include "third_party/WebKit/public/platform/WebLayoutAndPaintAsyncCallback.h"
 #include "third_party/WebKit/public/platform/WebURLError.h"
 #include "third_party/WebKit/public/platform/WebURLRequest.h"
 #include "third_party/WebKit/public/platform/WebURLResponse.h"
@@ -77,6 +78,24 @@ class CaptureCallback : public blink::WebCompositeAndReadbackAsyncCallback {
   SkBitmap main_bitmap_;
   bool wait_for_popup_;
   gfx::Point popup_position_;
+};
+
+class LayoutAndPaintCallback : public blink::WebLayoutAndPaintAsyncCallback {
+ public:
+  LayoutAndPaintCallback(const base::Closure& callback)
+      : callback_(callback), wait_for_popup_(false) {
+  }
+  virtual ~LayoutAndPaintCallback() {
+  }
+
+  void set_wait_for_popup(bool wait) { wait_for_popup_ = wait; }
+
+  // WebLayoutAndPaintAsyncCallback implementation.
+  virtual void didLayoutAndPaint();
+
+ private:
+  base::Closure callback_;
+  bool wait_for_popup_;
 };
 
 class HostMethodTask : public WebMethodTask<WebTestProxyBase> {
@@ -641,19 +660,28 @@ void WebTestProxyBase::SetLogConsoleOutput(bool enabled) {
   log_console_output_ = enabled;
 }
 
-void WebTestProxyBase::DidDisplayAsync(const base::Closure& callback,
-                                       const SkBitmap& bitmap) {
-  // Verify we actually composited.
-  CHECK_NE(0, bitmap.info().fWidth);
-  CHECK_NE(0, bitmap.info().fHeight);
-  if (!callback.is_null())
-    callback.Run();
+void LayoutAndPaintCallback::didLayoutAndPaint() {
+  TRACE_EVENT0("shell", "LayoutAndPaintCallback::didLayoutAndPaint");
+  if (wait_for_popup_) {
+    wait_for_popup_ = false;
+    return;
+  }
+
+  if (!callback_.is_null())
+    callback_.Run();
+  delete this;
 }
 
-void WebTestProxyBase::DisplayAsyncThen(const base::Closure& callback) {
-  TRACE_EVENT0("shell", "WebTestProxyBase::DisplayAsyncThen");
-  CapturePixelsAsync(base::Bind(
-      &WebTestProxyBase::DidDisplayAsync, base::Unretained(this), callback));
+void WebTestProxyBase::LayoutAndPaintAsyncThen(const base::Closure& callback) {
+  TRACE_EVENT0("shell", "WebTestProxyBase::LayoutAndPaintAsyncThen");
+
+  LayoutAndPaintCallback* layout_and_paint_callback =
+      new LayoutAndPaintCallback(callback);
+  web_widget_->layoutAndPaintAsync(layout_and_paint_callback);
+  if (blink::WebPagePopup* popup = web_widget_->pagePopup()) {
+    layout_and_paint_callback->set_wait_for_popup(true);
+    popup->layoutAndPaintAsync(layout_and_paint_callback);
+  }
 }
 
 void WebTestProxyBase::GetScreenOrientationForTesting(

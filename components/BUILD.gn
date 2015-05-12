@@ -27,9 +27,11 @@ group("all_components") {
     "//components/cdm/common",
     "//components/cdm/renderer",
     "//components/cloud_devices/common",
+    "//components/chrome_apps",
     "//components/component_updater",
     "//components/content_settings/core/browser",
     "//components/content_settings/core/common",
+    "//components/copresence",
     "//components/crash/app",
     "//components/crash/browser",
     "//components/crx_file",
@@ -45,7 +47,9 @@ group("all_components") {
     "//components/favicon_base",
     "//components/feedback",
     "//components/gcm_driver",
+    "//components/gcm_driver/instance_id",
     "//components/google/core/browser",
+    "//components/guest_view:guest_view",
     "//components/history/content/browser",
     "//components/history/core/browser",
     "//components/history/core/common",
@@ -87,7 +91,7 @@ group("all_components") {
     "//components/search",
     "//components/search_engines",
     "//components/search_provider_logos",
-    "//components/sessions:sessions_content",
+    "//components/sessions",
     "//components/signin/core/browser",
     "//components/startup_metric_utils",
     "//components/strings",
@@ -142,6 +146,11 @@ group("all_components") {
       "//components/wifi_sync",
     ]
   }
+
+  if (!is_chromeos || !enable_extensions) {
+    deps -= [ "//components/chrome_apps" ]
+  }
+
   if (is_ios) {
     deps -= [
       "//components/history/content/browser",
@@ -178,6 +187,7 @@ group("all_components") {
       "//components/favicon_base",  # Should work, needs checking.
       "//components/feedback",  # Blocked on content.
       "//components/gcm_driver",  # Should work, needs checking.
+      "//components/gcm_driver/instance_id",  # Should work, needs checking.
       "//components/google/core/browser",  # Should work, needs checking.
       "//components/history/core/browser",  # Should work, needs checking.
       "//components/history/core/common",  # Should work, needs checking.
@@ -200,7 +210,7 @@ group("all_components") {
       "//components/renderer_context_menu",  # Blocked on content.
       "//components/search_engines",  # Should work, needs checking.
       "//components/search_provider_logos",  # Should work, needs checking.
-      "//components/sessions:sessions_content",  # Blocked on content.
+      "//components/sessions",  # Blocked on content.
       "//components/signin/core/browser",  # Should work, needs checking.
       "//components/translate/content/browser",  # Blocked on content.
       "//components/translate/content/common",  # Blocked on content.

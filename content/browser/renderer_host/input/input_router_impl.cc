@@ -76,6 +76,7 @@ InputRouterImpl::InputRouterImpl(IPC::Sender* sender,
       current_view_flags_(0),
       current_ack_source_(ACK_SOURCE_NONE),
       flush_requested_(false),
+      active_renderer_fling_count_(0),
       touch_event_queue_(this, config.touch_config),
       gesture_event_queue_(this, this, config.gesture_config) {
   DCHECK(sender);
@@ -157,6 +158,8 @@ void InputRouterImpl::SendKeyboardEvent(const NativeWebKeyboardEvent& key_event,
   // handler.
   key_queue_.push_back(key_event);
   LOCAL_HISTOGRAM_COUNTS_100("Renderer.KeyboardQueueSize", key_queue_.size());
+
+  gesture_event_queue_.FlingHasBeenHalted();
 
   // Only forward the non-native portions of our event.
   FilterAndSendWebInputEvent(key_event, latency_info, is_keyboard_shortcut);
@@ -245,12 +248,12 @@ void InputRouterImpl::RequestNotificationWhenFlushed() {
 bool InputRouterImpl::HasPendingEvents() const {
   return !touch_event_queue_.empty() ||
          !gesture_event_queue_.empty() ||
-         gesture_event_queue_.active_fling_count() ||
          !key_queue_.empty() ||
          mouse_move_pending_ ||
          mouse_wheel_pending_ ||
          select_message_pending_ ||
-         move_caret_pending_;
+         move_caret_pending_ ||
+         active_renderer_fling_count_ > 0;
 }
 
 bool InputRouterImpl::OnMessageReceived(const IPC::Message& message) {
@@ -496,8 +499,13 @@ void InputRouterImpl::OnSetTouchAction(TouchAction touch_action) {
 }
 
 void InputRouterImpl::OnDidStopFlinging() {
-  gesture_event_queue_.DidStopFlinging();
+  DCHECK_GT(active_renderer_fling_count_, 0);
+  // Note that we're only guaranteed to get a fling end notification from the
+  // renderer, not from any other consumers. Consequently, the GestureEventQueue
+  // cannot use this bookkeeping for logic like tap suppression.
+  --active_renderer_fling_count_;
   SignalFlushedIfNecessary();
+
   client_->DidStopFlinging();
 }
 
@@ -602,6 +610,12 @@ void InputRouterImpl::ProcessWheelAck(InputEventAckState ack_result,
 void InputRouterImpl::ProcessGestureAck(WebInputEvent::Type type,
                                         InputEventAckState ack_result,
                                         const ui::LatencyInfo& latency) {
+  if (type == blink::WebInputEvent::GestureFlingStart &&
+      ack_result == INPUT_EVENT_ACK_STATE_CONSUMED &&
+      current_ack_source_ == RENDERER) {
+    ++active_renderer_fling_count_;
+  }
+
   // |gesture_event_queue_| will forward to OnGestureEventAck when appropriate.
   gesture_event_queue_.ProcessGestureAck(ack_result, type, latency);
 }

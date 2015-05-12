@@ -65,7 +65,7 @@ PDFViewer.MIN_TOOLBAR_OFFSET = 15;
  */
 function PDFViewer(browserApi) {
   this.browserApi_ = browserApi;
-  this.loaded_ = false;
+  this.loadState_ = LoadState.LOADING;
   this.parentWindow_ = null;
 
   this.delayedScriptingMessages_ = [];
@@ -148,17 +148,15 @@ function PDFViewer(browserApi) {
   }
 
   if (this.isMaterial_) {
-    this.bookmarksPane_ = $('bookmarks-pane');
-
-    this.zoomSelector_ = $('zoom-selector');
-    this.zoomSelector_.zoomMin = Viewport.ZOOM_FACTOR_RANGE.min * 100;
-    this.zoomSelector_.zoomMax = Viewport.ZOOM_FACTOR_RANGE.max * 100;
-    this.zoomSelector_.addEventListener('zoom', function(e) {
+    this.zoomToolbar_ = $('zoom-toolbar');
+    this.zoomToolbar_.zoomMin = Viewport.ZOOM_FACTOR_RANGE.min * 100;
+    this.zoomToolbar_.zoomMax = Viewport.ZOOM_FACTOR_RANGE.max * 100;
+    this.zoomToolbar_.addEventListener('zoom', function(e) {
       this.viewport_.setZoom(e.detail.zoom);
     }.bind(this));
-    this.zoomSelector_.addEventListener('fit-to-width',
+    this.zoomToolbar_.addEventListener('fit-to-width',
         this.viewport_.fitToWidth.bind(this.viewport_));
-    this.zoomSelector_.addEventListener('fit-to-page',
+    this.zoomToolbar_.addEventListener('fit-to-page',
         this.viewport_.fitToPage.bind(this.viewport_));
 
     this.materialToolbar_ = $('material-toolbar');
@@ -167,16 +165,13 @@ function PDFViewer(browserApi) {
     this.materialToolbar_.addEventListener('print', this.print_.bind(this));
     this.materialToolbar_.addEventListener('rotate-right',
         this.rotateClockwise_.bind(this));
-    this.materialToolbar_.addEventListener('toggle-bookmarks', function() {
-      this.bookmarksPane_.buttonToggle();
-    }.bind(this));
 
     document.body.addEventListener('change-page', function(e) {
       this.viewport_.goToPage(e.detail.page);
     }.bind(this));
 
-    this.uiManager_ = new UiManager(window, this.materialToolbar_,
-                                    [this.bookmarksPane_]);
+    this.uiManager_ =
+        new UiManager(window, this.materialToolbar_, this.zoomToolbar_);
   }
 
   // Set up the ZoomManager.
@@ -374,6 +369,20 @@ PDFViewer.prototype = {
 
   /**
    * @private
+   * Sends a 'documentLoaded' message to the PDFScriptingAPI if the document has
+   * finished loading.
+   */
+  sendDocumentLoadedMessage_: function() {
+    if (this.loadState_ == LoadState.LOADING)
+      return;
+    this.sendScriptingMessage_({
+      type: 'documentLoaded',
+      load_state: this.loadState_
+    });
+  },
+
+  /**
+   * @private
    * Handle open pdf parameters. This function updates the viewport as per
    * the parameters mentioned in the url while opening pdf. The order is
    * important as later actions can override the effects of previous actions.
@@ -416,6 +425,8 @@ PDFViewer.prototype = {
         this.passwordScreen_.deny();
         this.passwordScreen_.active = false;
       }
+      this.loadState_ = LoadState.FAILED;
+      this.sendDocumentLoadedMessage_();
     } else if (progress == 100) {
       // Document load complete.
       if (this.lastViewportPosition_)
@@ -423,10 +434,8 @@ PDFViewer.prototype = {
       this.paramsParser_.getViewportFromUrlParams(
           this.browserApi_.getStreamInfo().originalUrl,
           this.handleURLParams_.bind(this));
-      this.loaded_ = true;
-      this.sendScriptingMessage_({
-        type: 'documentLoaded'
-      });
+      this.loadState_ = LoadState.SUCCESS;
+      this.sendDocumentLoadedMessage_();
       while (this.delayedScriptingMessages_.length > 0)
         this.handleScriptingMessage(this.delayedScriptingMessages_.shift());
 
@@ -561,7 +570,7 @@ PDFViewer.prototype = {
     var position = this.viewport_.position;
     var zoom = this.viewport_.zoom;
     if (this.isMaterial_)
-      this.zoomSelector_.zoomValue = 100 * zoom;
+      this.zoomToolbar_.zoomValue = 100 * zoom;
     this.plugin_.postMessage({
       type: 'viewport',
       zoom: zoom,
@@ -647,11 +656,8 @@ PDFViewer.prototype = {
     if (this.parentWindow_ != message.source) {
       this.parentWindow_ = message.source;
       // Ensure that we notify the embedder if the document is loaded.
-      if (this.loaded_) {
-        this.sendScriptingMessage_({
-          type: 'documentLoaded'
-        });
-      }
+      if (this.loadState_ != LoadState.LOADING)
+        this.sendDocumentLoadedMessage_();
     }
 
     if (this.handlePrintPreviewScriptingMessage_(message))
@@ -659,7 +665,7 @@ PDFViewer.prototype = {
 
     // Delay scripting messages from users of the scripting API until the
     // document is loaded. This simplifies use of the APIs.
-    if (!this.loaded_) {
+    if (this.loadState_ != LoadState.SUCCESS) {
       this.delayedScriptingMessages_.push(message);
       return;
     }
@@ -689,7 +695,7 @@ PDFViewer.prototype = {
         this.plugin_.postMessage(message.data);
         return true;
       case 'resetPrintPreviewMode':
-        this.loaded_ = false;
+        this.loadState_ = LoadState.LOADING;
         if (!this.inPrintPreviewMode_) {
           this.inPrintPreviewMode_ = true;
           this.viewport_.fitToPage();

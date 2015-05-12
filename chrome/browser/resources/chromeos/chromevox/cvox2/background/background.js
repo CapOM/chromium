@@ -12,6 +12,7 @@ goog.provide('global');
 
 goog.require('AutomationPredicate');
 goog.require('AutomationUtil');
+goog.require('ClassicCompatibility');
 goog.require('Output');
 goog.require('Output.EventType');
 goog.require('cursors.Cursor');
@@ -21,6 +22,17 @@ goog.scope(function() {
 var AutomationNode = chrome.automation.AutomationNode;
 var Dir = AutomationUtil.Dir;
 var EventType = chrome.automation.EventType;
+
+/**
+ * All possible modes ChromeVox can run.
+ * @enum {string}
+ */
+var ChromeVoxMode = {
+  CLASSIC: 'classic',
+  COMPAT: 'compat',
+  NEXT: 'next',
+  FORCE_NEXT: 'force_next'
+};
 
 /**
  * ChromeVox2 background page.
@@ -42,11 +54,14 @@ Background = function() {
   this.currentRange_ = null;
 
   /**
-   * Whether ChromeVox Next is active.
-   * @type {boolean}
+   * Which variant of ChromeVox is active.
+   * @type {ChromeVoxMode}
    * @private
    */
-  this.active_ = false;
+  this.mode_ = ChromeVoxMode.CLASSIC;
+
+  /** @type {!ClassicCompatibility} @private */
+  this.compat_ = new ClassicCompatibility(this.mode_ === ChromeVoxMode.COMPAT);
 
   // Manually bind all functions to |this|.
   for (var func in this) {
@@ -79,7 +94,7 @@ Background = function() {
 Background.prototype = {
   /** Forces ChromeVox Next to be active for all tabs. */
   forceChromeVoxNextActive: function() {
-    this.active_ = true;
+    this.setChromeVoxMode(ChromeVoxMode.FORCE_NEXT);
   },
 
   /**
@@ -110,28 +125,25 @@ Background.prototype = {
   /**
    * Handles chrome.commands.onCommand.
    * @param {string} command
+   * @param {boolean=} opt_skipCompat Whether to skip compatibility checks.
    */
-  onGotCommand: function(command) {
-    if (command == 'toggleChromeVoxVersion') {
-      this.toggleChromeVoxVersion();
+    onGotCommand: function(command, opt_skipCompat) {
+    if (!this.currentRange_)
       return;
+
+    if (!opt_skipCompat) {
+      if (this.compat_.onGotCommand(command))
+        return;
     }
 
-    if (!this.active_ || !this.currentRange_)
+    if (this.mode_ === ChromeVoxMode.CLASSIC)
       return;
 
     var current = this.currentRange_;
     var dir = Dir.FORWARD;
     var pred = null;
+    var predErrorMsg = undefined;
     switch (command) {
-      case 'nextHeading':
-        dir = Dir.FORWARD;
-        pred = AutomationPredicate.heading;
-        break;
-      case 'previousHeading':
-        dir = Dir.BACKWARD;
-        pred = AutomationPredicate.heading;
-        break;
       case 'nextCharacter':
         current = current.move(cursors.Unit.CHARACTER, Dir.FORWARD);
         break;
@@ -150,13 +162,95 @@ Background.prototype = {
       case 'previousLine':
         current = current.move(cursors.Unit.LINE, Dir.BACKWARD);
         break;
+      case 'nextButton':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.button;
+        predErrorMsg = 'no_next_button';
+        break;
+      case 'previousButton':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.button;
+        predErrorMsg = 'no_previous_button';
+        break;
+      case 'nextCheckBox':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.checkBox;
+        predErrorMsg = 'no_next_checkbox';
+        break;
+      case 'previousCheckBox':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.checkBox;
+        predErrorMsg = 'no_previous_checkbox';
+        break;
+      case 'nextComboBox':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.comboBox;
+        predErrorMsg = 'no_next_combo_box';
+        break;
+      case 'previousComboBox':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.comboBox;
+        predErrorMsg = 'no_previous_combo_box';
+        break;
+      case 'nextEditText':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.editText;
+        predErrorMsg = 'no_next_edit_text';
+        break;
+      case 'previousEditText':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.editText;
+        predErrorMsg = 'no_previous_edit_text';
+        break;
+      case 'nextFormField':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.formField;
+        predErrorMsg = 'no_next_form_field';
+        break;
+      case 'previousFormField':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.formField;
+        predErrorMsg = 'no_previous_form_field';
+        break;
+      case 'nextHeading':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.heading;
+        predErrorMsg = 'no_next_heading';
+        break;
+      case 'previousHeading':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.heading;
+        predErrorMsg = 'no_previous_heading';
+        break;
       case 'nextLink':
         dir = Dir.FORWARD;
         pred = AutomationPredicate.link;
+        predErrorMsg = 'no_next_link';
         break;
       case 'previousLink':
         dir = Dir.BACKWARD;
         pred = AutomationPredicate.link;
+        predErrorMsg = 'no_previous_link';
+        break;
+      case 'nextTable':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.table;
+        predErrorMsg = 'no_next_table';
+        break;
+      case 'previousTable':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.table;
+        predErrorMsg = 'no_previous_table';
+        break;
+      case 'nextVisitedLink':
+        dir = Dir.FORWARD;
+        pred = AutomationPredicate.visitedLink;
+        predErrorMsg = 'no_next_visited_link';
+        break;
+      case 'previousVisitedLink':
+        dir = Dir.BACKWARD;
+        pred = AutomationPredicate.visitedLink;
+        predErrorMsg = 'no_previous_visited_link';
         break;
       case 'nextElement':
         current = current.move(cursors.Unit.NODE, Dir.FORWARD);
@@ -181,8 +275,12 @@ Background.prototype = {
           current = cursors.Range.fromNode(node);
         break;
       case 'doDefault':
-        if (this.currentRange_)
-          this.currentRange_.getStart().getNode().doDefault();
+        if (this.currentRange_) {
+          var actionNode = this.currentRange_.getStart().getNode();
+          if (actionNode.role == chrome.automation.RoleType.inlineTextBox)
+            actionNode = actionNode.parent;
+          actionNode.doDefault();
+        }
         break;
       case 'continuousRead':
         global.isReadingContinuously = true;
@@ -210,8 +308,13 @@ Background.prototype = {
       var node = AutomationUtil.findNextNode(
           current.getBound(dir).getNode(), dir, pred);
 
-      if (node)
+      if (node) {
         current = cursors.Range.fromNode(node);
+      } else {
+          cvox.ChromeVox.tts.speak(cvox.ChromeVox.msgs.getMsg(predErrorMsg),
+                                  cvox.QueueMode.FLUSH);
+        return;
+      }
     }
 
     if (current) {
@@ -237,11 +340,21 @@ Background.prototype = {
       return;
 
     var prevRange = this.currentRange_;
+
     this.currentRange_ = cursors.Range.fromNode(node);
 
+    // Check to see if we've crossed roots. Only care about focused roots.
+    if (!prevRange ||
+        (prevRange.getStart().getNode().root != node.root &&
+         node.root.focused))
+      this.setupChromeVoxVariants_(node.root.attributes.url || '');
+
     // Don't process nodes inside of web content if ChromeVox Next is inactive.
-    if (node.root.role != chrome.automation.RoleType.desktop && !this.active_)
+    if (node.root.role != chrome.automation.RoleType.desktop &&
+        this.mode_ === ChromeVoxMode.CLASSIC) {
+      chrome.accessibilityPrivate.setFocusRing([]);
       return;
+    }
 
     new Output().withSpeechAndBraille(
             this.currentRange_, prevRange, evt.type)
@@ -253,11 +366,11 @@ Background.prototype = {
    * @param {Object} evt
    */
   onLoadComplete: function(evt) {
-    var next = this.isWhitelisted_(evt.target.attributes.url) || this.active_;
-    this.toggleChromeVoxVersion({next: next, classic: !next});
+    this.setupChromeVoxVariants_(evt.target.attributes.url);
+
     // Don't process nodes inside of web content if ChromeVox Next is inactive.
     if (evt.target.root.role != chrome.automation.RoleType.desktop &&
-        !this.active_)
+        this.mode_ === ChromeVoxMode.CLASSIC)
       return;
 
     if (this.currentRange_)
@@ -291,7 +404,7 @@ Background.prototype = {
   onTextOrTextSelectionChanged: function(evt) {
     // Don't process nodes inside of web content if ChromeVox Next is inactive.
     if (evt.target.root.role != chrome.automation.RoleType.desktop &&
-        !this.active_)
+        this.mode_ === ChromeVoxMode.CLASSIC)
       return;
 
     if (!evt.target.state.focused)
@@ -331,7 +444,7 @@ Background.prototype = {
   onValueChanged: function(evt) {
     // Don't process nodes inside of web content if ChromeVox Next is inactive.
     if (evt.target.root.role != chrome.automation.RoleType.desktop &&
-        !this.active_)
+        this.mode_ === ChromeVoxMode.CLASSIC)
       return;
 
     if (!evt.target.state.focused)
@@ -386,14 +499,43 @@ Background.prototype = {
   },
 
   /**
+   * @return {boolean}
+   * @private
+   */
+  isWhitelistedForCompat_: function(url) {
+    return url.indexOf('chrome://md-settings') != -1;
+  },
+
+  /**
    * @private
    * @param {string} url
    * @return {boolean} Whether the given |url| is whitelisted.
    */
-  isWhitelisted_: function(url) {
+  isWhitelistedForNext_: function(url) {
     return this.whitelist_.some(function(item) {
       return url.indexOf(item) != -1;
     }.bind(this));
+  },
+
+  /**
+   * Setup ChromeVox variants.
+   * @param {string} url
+   * @private
+   */
+  setupChromeVoxVariants_: function(url) {
+    if (this.mode_ === ChromeVoxMode.FORCE_NEXT)
+      return;
+
+    this.compat_.active = this.isWhitelistedForCompat_(url);
+    var mode = this.mode_;
+    if (this.compat_.active)
+      mode = ChromeVoxMode.COMPAT;
+    else if (this.isWhitelistedForNext_(url))
+      mode = ChromeVoxMode.NEXT;
+    else
+      mode = ChromeVoxMode.CLASSIC;
+
+    this.setChromeVoxMode(mode);
   },
 
   /**
@@ -408,28 +550,25 @@ Background.prototype = {
   },
 
   /**
-   * Toggles between ChromeVox Next and Classic.
-   * @param {{classic: boolean, next: boolean}=} opt_options Forceably set.
-  */
-  toggleChromeVoxVersion: function(opt_options) {
-    if (!opt_options) {
-      opt_options = {};
-      opt_options.next = !this.active_;
-      opt_options.classic = !opt_options.next;
-    }
+   * Sets the current ChromeVox mode.
+   * @param {ChromeVoxMode} mode
+   */
+  setChromeVoxMode: function(mode) {
+    if (mode === this.mode_)
+      return;
 
-    if (opt_options.next) {
+    if (mode === ChromeVoxMode.NEXT ||
+        mode === ChromeVoxMode.COMPAT ||
+        mode === ChromeVoxMode.FORCE_NEXT) {
       if (!chrome.commands.onCommand.hasListener(this.onGotCommand))
           chrome.commands.onCommand.addListener(this.onGotCommand);
-        this.active_ = true;
     } else {
       if (chrome.commands.onCommand.hasListener(this.onGotCommand))
         chrome.commands.onCommand.removeListener(this.onGotCommand);
-      this.active_ = false;
     }
 
     chrome.tabs.query({active: true}, function(tabs) {
-      if (opt_options.classic) {
+      if (mode === ChromeVoxMode.CLASSIC) {
         // This case should do nothing because Classic gets injected by the
         // extension system via our manifest. Once ChromeVox Next is enabled
         // for tabs, re-enable.
@@ -440,6 +579,9 @@ Background.prototype = {
         }.bind(this));
       }
     }.bind(this));
+
+    this.compat_.active = mode === ChromeVoxMode.COMPAT;
+    this.mode_ = mode;
   }
 };
 

@@ -45,19 +45,19 @@ enterprise_management::RemoteCommand_Type DeviceCommandRebootJob::GetType()
   return enterprise_management::RemoteCommand_Type_DEVICE_REBOOT;
 }
 
-bool DeviceCommandRebootJob::IsExpired(base::Time now) {
+bool DeviceCommandRebootJob::IsExpired(base::TimeTicks now) {
   return now > issued_time() + base::TimeDelta::FromMinutes(
                                    kCommandExpirationTimeInMinutes);
 }
 
 void DeviceCommandRebootJob::RunImpl(
-    const SucceededCallback& succeeded_callback,
-    const FailedCallback& failed_callback) {
+    const CallbackWithResult& succeeded_callback,
+    const CallbackWithResult& failed_callback) {
   // Determines the time delta between the command having been issued and the
   // boot time of the system.
   const base::TimeDelta uptime =
       base::TimeDelta::FromMilliseconds(base::SysInfo::Uptime());
-  const base::Time boot_time = base::Time::Now() - uptime;
+  const base::TimeTicks boot_time = base::TimeTicks::Now() - uptime;
   const base::TimeDelta delta = boot_time - issued_time();
   // If the reboot command was issued before the system booted, we inform the
   // server that the reboot succeeded. Otherwise, the reboot must still be

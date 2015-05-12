@@ -249,10 +249,6 @@ SK_API void SkDebugf_FileLine(const char* file, int line, bool fatal,
 #   define SK_LEGACY_DRAWPICTURECALLBACK
 #endif
 
-#ifndef    SK_SUPPORT_LEGACY_CUBIC_CHOPPER
-#   define SK_SUPPORT_LEGACY_CUBIC_CHOPPER
-#endif
-
 #ifndef    SK_SUPPORT_LEGACY_GETDEVICE
 #   define SK_SUPPORT_LEGACY_GETDEVICE
 #endif
@@ -261,20 +257,8 @@ SK_API void SkDebugf_FileLine(const char* file, int line, bool fatal,
 #   define SK_SUPPORT_LEGACY_PUBLIC_IMAGEINFO_FIELDS
 #endif
 
-#ifndef    SK_SUPPORT_LEGACY_IMAGEFILTER_TO_COLORFILTER
-#   define SK_SUPPORT_LEGACY_IMAGEFILTER_TO_COLORFILTER
-#endif
-
 #ifndef    SK_IGNORE_ETC1_SUPPORT
 #   define SK_IGNORE_ETC1_SUPPORT
-#endif
-
-#ifndef    SK_SUPPORT_LEGACY_RADIAL_GRADIENT_SQRT
-#   define SK_SUPPORT_LEGACY_RADIAL_GRADIENT_SQRT
-#endif
-
-#ifndef    SK_SUPPORT_LEGACY_BOOL_ONGETINFO
-#   define SK_SUPPORT_LEGACY_BOOL_ONGETINFO
 #endif
 
 #ifndef    SK_IGNORE_GPU_DITHER

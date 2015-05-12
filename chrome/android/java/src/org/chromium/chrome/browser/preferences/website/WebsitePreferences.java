@@ -32,7 +32,10 @@ import org.chromium.chrome.browser.preferences.LocationSettings;
 import org.chromium.chrome.browser.preferences.ManagedPreferenceDelegate;
 import org.chromium.chrome.browser.preferences.ManagedPreferencesUtils;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
+import org.chromium.chrome.browser.preferences.ProtectedContentResetCredentialConfirmDialogFragment;
 import org.chromium.chrome.browser.widget.TintedDrawable;
+import org.chromium.content.browser.MediaDrmCredentialManager;
+import org.chromium.content.browser.MediaDrmCredentialManager.MediaDrmCredentialManagerCallback;
 import org.chromium.ui.text.SpanApplier;
 import org.chromium.ui.text.SpanApplier.SpanInfo;
 
@@ -50,7 +53,8 @@ import java.util.Set;
  */
 public class WebsitePreferences extends PreferenceFragment
         implements OnPreferenceChangeListener, OnPreferenceClickListener,
-                   AddExceptionPreference.SiteAddedCallback {
+                   AddExceptionPreference.SiteAddedCallback,
+                   ProtectedContentResetCredentialConfirmDialogFragment.Listener {
     // The key to use to pass which category this preference should display,
     // e.g. Location/Popups/All sites (if blank).
     public static final String EXTRA_CATEGORY = "category";
@@ -81,12 +85,18 @@ public class WebsitePreferences extends PreferenceFragment
     // Keys for individual preferences.
     public static final String READ_WRITE_TOGGLE_KEY = "read_write_toggle";
     public static final String THIRD_PARTY_COOKIES_TOGGLE_KEY = "third_party_cookies";
+    public static final String EXPLAIN_PROTECTED_MEDIA_KEY = "protected_content_learn_more";
     private static final String ADD_EXCEPTION_KEY = "add_exception";
     // Keys for Allowed/Blocked preference groups/headers.
     private static final String ALLOWED_GROUP = "allowed_group";
     private static final String BLOCKED_GROUP = "blocked_group";
 
     private void getInfoForOrigins() {
+        if (mFilter.showGeolocationSites(mCategoryFilter)
+                && !LocationSettings.getInstance().isSystemLocationSettingEnabled()) {
+            return;  // No need to fetch any data if we're not going to show it.
+        }
+
         WebsitePermissionsFetcher fetcher = new WebsitePermissionsFetcher(new ResultsPopulator());
         fetcher.fetchPreferencesWithFilter(mCategoryFilter);
     }
@@ -218,6 +228,8 @@ public class WebsitePreferences extends PreferenceFragment
             return website.site().getPopupPermission() == ContentSetting.BLOCK;
         } else if (mFilter.showPushNotificationsSites(mCategoryFilter)) {
             return website.site().getPushNotificationPermission() == ContentSetting.BLOCK;
+        } else if (mFilter.showProtectedMediaSites(mCategoryFilter)) {
+            return website.site().getProtectedMediaIdentifierPermission() == ContentSetting.BLOCK;
         }
 
         return false;
@@ -299,7 +311,6 @@ public class WebsitePreferences extends PreferenceFragment
         MenuItem searchItem = menu.findItem(R.id.search);
         mSearchView = (SearchView) MenuItemCompat.getActionView(searchItem);
         mSearchView.setImeOptions(EditorInfo.IME_FLAG_NO_FULLSCREEN);
-
         SearchView.OnQueryTextListener queryTextListener =
                 new SearchView.OnQueryTextListener() {
                     @Override
@@ -317,6 +328,20 @@ public class WebsitePreferences extends PreferenceFragment
                     }
                 };
         mSearchView.setOnQueryTextListener(queryTextListener);
+
+        if (mFilter.showProtectedMediaSites(mCategoryFilter)) {
+            // Add a menu item to reset protected media identifier device credentials.
+            MenuItem resetMenu =
+                    menu.add(Menu.NONE, Menu.NONE, Menu.FIRST, R.string.reset_device_credentials);
+            resetMenu.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
+                @Override
+                public boolean onMenuItemClick(MenuItem menuItem) {
+                    new ProtectedContentResetCredentialConfirmDialogFragment(
+                            WebsitePreferences.this).show(getFragmentManager(), null);
+                    return true;
+                }
+            });
+        }
     }
 
     @Override
@@ -345,7 +370,6 @@ public class WebsitePreferences extends PreferenceFragment
     }
 
     // OnPreferenceChangeListener:
-
     @Override
     public boolean onPreferenceChange(Preference preference, Object newValue) {
         if (READ_WRITE_TOGGLE_KEY.equals(preference.getKey())) {
@@ -370,6 +394,9 @@ public class WebsitePreferences extends PreferenceFragment
                 PrefServiceBridge.getInstance().setAllowPopupsEnabled((boolean) newValue);
             } else if (mFilter.showPushNotificationsSites(mCategoryFilter)) {
                 PrefServiceBridge.getInstance().setPushNotificationsEnabled((boolean) newValue);
+            } else if (mFilter.showProtectedMediaSites(mCategoryFilter)) {
+                PrefServiceBridge.getInstance().setProtectedMediaIdentifierEnabled(
+                        (boolean) newValue);
             }
 
             // Categories that support adding exceptions also manage the 'Add site' preference.
@@ -391,6 +418,8 @@ public class WebsitePreferences extends PreferenceFragment
             ChromeSwitchPreference globalToggle = (ChromeSwitchPreference)
                     getPreferenceScreen().findPreference(READ_WRITE_TOGGLE_KEY);
             updateAllowedHeader(mAllowedSiteCount, !globalToggle.isChecked());
+
+            getInfoForOrigins();
         } else if (THIRD_PARTY_COOKIES_TOGGLE_KEY.equals(preference.getKey())) {
             PrefServiceBridge.getInstance().setBlockThirdPartyCookiesEnabled(!((boolean) newValue));
         }
@@ -409,7 +438,6 @@ public class WebsitePreferences extends PreferenceFragment
     }
 
     // OnPreferenceClickListener:
-
     @Override
     public boolean onPreferenceClick(Preference preference) {
         if (ALLOWED_GROUP.equals(preference.getKey()))  {
@@ -428,6 +456,7 @@ public class WebsitePreferences extends PreferenceFragment
         getInfoForOrigins();
     }
 
+    // AddExceptionPreference.SiteAddedCallback:
     @Override
     public void onAddSite(String hostname) {
         PrefServiceBridge.getInstance().nativeSetContentSettingForPattern(
@@ -506,15 +535,20 @@ public class WebsitePreferences extends PreferenceFragment
         ChromeSwitchPreference globalToggle = (ChromeSwitchPreference)
                 getPreferenceScreen().findPreference(READ_WRITE_TOGGLE_KEY);
 
+        // Configure/hide the third-party cookie toggle, as needed.
         Preference thirdPartyCookies = getPreferenceScreen().findPreference(
                 THIRD_PARTY_COOKIES_TOGGLE_KEY);
-
-        // Configure/hide the third-party cookie toggle, as needed.
         if (mFilter.showCookiesSites(mCategoryFilter)) {
             thirdPartyCookies.setOnPreferenceChangeListener(this);
             updateThirdPartyCookiesCheckBox();
         } else {
             getPreferenceScreen().removePreference(thirdPartyCookies);
+        }
+
+        // Show/hide the link that explains protected media settings, as needed.
+        if (!mFilter.showProtectedMediaSites(mCategoryFilter)) {
+            getPreferenceScreen().removePreference(
+                    getPreferenceScreen().findPreference(EXPLAIN_PROTECTED_MEDIA_KEY));
         }
 
         if (mFilter.showAllSites(mCategoryFilter)
@@ -545,6 +579,8 @@ public class WebsitePreferences extends PreferenceFragment
                     && (LocationSettings.getInstance().isChromeLocationSettingEnabled()
                                || !isCategoryManaged())) {
                 getPreferenceScreen().removePreference(globalToggle);
+                getPreferenceScreen().removePreference(allowedGroup);
+                getPreferenceScreen().removePreference(blockedGroup);
 
                 // Show the link to system settings since system location is disabled.
                 ChromeBasePreference locationMessage =
@@ -600,6 +636,9 @@ public class WebsitePreferences extends PreferenceFragment
                 } else if (mFilter.showPushNotificationsSites(mCategoryFilter)) {
                     globalToggle.setChecked(
                             PrefServiceBridge.getInstance().isPushNotificationsEnabled());
+                } else if (mFilter.showProtectedMediaSites(mCategoryFilter)) {
+                    globalToggle.setChecked(
+                            PrefServiceBridge.getInstance().isProtectedMediaIdentifierEnabled());
                 }
             }
         }
@@ -623,5 +662,18 @@ public class WebsitePreferences extends PreferenceFragment
         } else {
             ManagedPreferencesUtils.showManagedByAdministratorToast(getActivity());
         }
+    }
+
+    // ProtectedContentResetCredentialConfirmDialogFragment.Listener:
+    @Override
+    public void resetDeviceCredential() {
+        MediaDrmCredentialManager.resetCredentials(new MediaDrmCredentialManagerCallback() {
+            @Override
+            public void onCredentialResetFinished(boolean succeeded) {
+                if (succeeded) return;
+                String message = getString(R.string.protected_content_reset_failed);
+                Toast.makeText(getActivity(), message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 }

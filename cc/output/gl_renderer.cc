@@ -47,6 +47,7 @@
 #include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/gpu/GrContext.h"
 #include "third_party/skia/include/gpu/GrTexture.h"
+#include "third_party/skia/include/gpu/GrTextureProvider.h"
 #include "third_party/skia/include/gpu/SkGrTexturePixelRef.h"
 #include "third_party/skia/include/gpu/gl/GrGLInterface.h"
 #include "ui/gfx/geometry/quad_f.h"
@@ -357,6 +358,7 @@ GLRenderer::GLRenderer(RendererClient* client,
       context_caps.gpu.discard_framebuffer;
 
   capabilities_.allow_rasterize_on_demand = true;
+  capabilities_.max_msaa_samples = context_caps.gpu.max_samples;
 
   use_sync_query_ = context_caps.gpu.sync_query;
   use_blend_equation_advanced_ = context_caps.gpu.blend_equation_advanced;
@@ -665,8 +667,8 @@ static skia::RefPtr<SkImage> ApplyImageFilter(
   backend_texture_description.fConfig = kSkia8888_GrPixelConfig;
   backend_texture_description.fTextureHandle = lock.texture_id();
   backend_texture_description.fOrigin = kBottomLeft_GrSurfaceOrigin;
-  skia::RefPtr<GrTexture> texture =
-      skia::AdoptRef(use_gr_context->context()->wrapBackendTexture(
+  skia::RefPtr<GrTexture> texture = skia::AdoptRef(
+      use_gr_context->context()->textureProvider()->wrapBackendTexture(
           backend_texture_description));
   if (!texture) {
     TRACE_EVENT_INSTANT0("cc",
@@ -675,37 +677,26 @@ static skia::RefPtr<SkImage> ApplyImageFilter(
     return skia::RefPtr<SkImage>();
   }
 
-  SkImageInfo info =
+  SkImageInfo src_info =
       SkImageInfo::MakeN32Premul(source_texture_resource->size().width(),
                                  source_texture_resource->size().height());
   // Place the platform texture inside an SkBitmap.
   SkBitmap source;
-  source.setInfo(info);
+  source.setInfo(src_info);
   skia::RefPtr<SkGrPixelRef> pixel_ref =
-      skia::AdoptRef(new SkGrPixelRef(info, texture.get()));
+      skia::AdoptRef(new SkGrPixelRef(src_info, texture.get()));
   source.setPixelRef(pixel_ref.get());
 
-  // Create a scratch texture for backing store.
-  GrTextureDesc desc;
-  desc.fFlags = kRenderTarget_GrTextureFlagBit | kNoStencil_GrTextureFlagBit;
-  desc.fSampleCnt = 0;
-  desc.fWidth = source.width();
-  desc.fHeight = source.height();
-  desc.fConfig = kSkia8888_GrPixelConfig;
-  desc.fOrigin = kBottomLeft_GrSurfaceOrigin;
-  skia::RefPtr<GrTexture> backing_store =
-      skia::AdoptRef(use_gr_context->context()->refScratchTexture(
-          desc, GrContext::kExact_ScratchTexMatch));
-  if (!backing_store) {
-    TRACE_EVENT_INSTANT0("cc",
-                         "ApplyImageFilter scratch texture allocation failed",
+  // Create surface to draw into.
+  SkImageInfo dst_info =
+      SkImageInfo::MakeN32Premul(source.width(), source.height());
+  skia::RefPtr<SkSurface> surface = skia::AdoptRef(SkSurface::NewRenderTarget(
+      use_gr_context->context(), SkSurface::kYes_Budgeted, dst_info, 0));
+  if (!surface) {
+    TRACE_EVENT_INSTANT0("cc", "ApplyImageFilter surface allocation failed",
                          TRACE_EVENT_SCOPE_THREAD);
     return skia::RefPtr<SkImage>();
   }
-
-  // Create surface to draw into.
-  skia::RefPtr<SkSurface> surface = skia::AdoptRef(
-      SkSurface::NewRenderTargetDirect(backing_store->asRenderTarget()));
   skia::RefPtr<SkCanvas> canvas = skia::SharePtr(surface->getCanvas());
 
   // Draw the source bitmap through the filter to the canvas.
@@ -2169,7 +2160,7 @@ void GLRenderer::FlushTextureQuadCache(BoundGeometry flush_binding) {
       draw_cache_.resource_id,
       draw_cache_.nearest_neighbor ? GL_NEAREST : GL_LINEAR);
   DCHECK_EQ(GL_TEXTURE0, GetActiveTextureUnit(gl_));
-  gl_->BindTexture(GL_TEXTURE_2D, locked_quad.texture_id());
+  gl_->BindTexture(locked_quad.target(), locked_quad.texture_id());
 
   static_assert(sizeof(Float4) == 4 * sizeof(float),
                 "Float4 struct should be densely packed");
@@ -2231,20 +2222,24 @@ void GLRenderer::EnqueueTextureQuad(const DrawingFrame* frame,
       highp_threshold_min_,
       quad->shared_quad_state->visible_content_rect.bottom_right());
 
+  ResourceProvider::ScopedReadLockGL lock(resource_provider_,
+                                          quad->resource_id);
+  const SamplerType sampler = SamplerTypeFromTextureTarget(lock.target());
   // Choose the correct texture program binding
   TexTransformTextureProgramBinding binding;
   if (quad->premultiplied_alpha) {
     if (quad->background_color == SK_ColorTRANSPARENT) {
-      binding.Set(GetTextureProgram(tex_coord_precision));
+      binding.Set(GetTextureProgram(tex_coord_precision, sampler));
     } else {
-      binding.Set(GetTextureBackgroundProgram(tex_coord_precision));
+      binding.Set(GetTextureBackgroundProgram(tex_coord_precision, sampler));
     }
   } else {
     if (quad->background_color == SK_ColorTRANSPARENT) {
-      binding.Set(GetNonPremultipliedTextureProgram(tex_coord_precision));
-    } else {
       binding.Set(
-          GetNonPremultipliedTextureBackgroundProgram(tex_coord_precision));
+          GetNonPremultipliedTextureProgram(tex_coord_precision, sampler));
+    } else {
+      binding.Set(GetNonPremultipliedTextureBackgroundProgram(
+          tex_coord_precision, sampler));
     }
   }
 
@@ -3206,58 +3201,71 @@ const GLRenderer::TileProgramSwizzleAA* GLRenderer::GetTileProgramSwizzleAA(
 }
 
 const GLRenderer::TextureProgram* GLRenderer::GetTextureProgram(
-    TexCoordPrecision precision) {
+    TexCoordPrecision precision,
+    SamplerType sampler) {
   DCHECK_GE(precision, 0);
   DCHECK_LE(precision, LAST_TEX_COORD_PRECISION);
-  TextureProgram* program = &texture_program_[precision];
+  DCHECK_GE(sampler, 0);
+  DCHECK_LE(sampler, LAST_SAMPLER_TYPE);
+  TextureProgram* program = &texture_program_[precision][sampler];
   if (!program->initialized()) {
     TRACE_EVENT0("cc", "GLRenderer::textureProgram::initialize");
     program->Initialize(output_surface_->context_provider(), precision,
-                        SAMPLER_TYPE_2D);
+                        sampler);
   }
   return program;
 }
 
 const GLRenderer::NonPremultipliedTextureProgram*
-GLRenderer::GetNonPremultipliedTextureProgram(TexCoordPrecision precision) {
+GLRenderer::GetNonPremultipliedTextureProgram(TexCoordPrecision precision,
+                                              SamplerType sampler) {
   DCHECK_GE(precision, 0);
   DCHECK_LE(precision, LAST_TEX_COORD_PRECISION);
+  DCHECK_GE(sampler, 0);
+  DCHECK_LE(sampler, LAST_SAMPLER_TYPE);
   NonPremultipliedTextureProgram* program =
-      &nonpremultiplied_texture_program_[precision];
+      &nonpremultiplied_texture_program_[precision][sampler];
   if (!program->initialized()) {
     TRACE_EVENT0("cc",
                  "GLRenderer::NonPremultipliedTextureProgram::Initialize");
     program->Initialize(output_surface_->context_provider(), precision,
-                        SAMPLER_TYPE_2D);
+                        sampler);
   }
   return program;
 }
 
 const GLRenderer::TextureBackgroundProgram*
-GLRenderer::GetTextureBackgroundProgram(TexCoordPrecision precision) {
+GLRenderer::GetTextureBackgroundProgram(TexCoordPrecision precision,
+                                        SamplerType sampler) {
   DCHECK_GE(precision, 0);
   DCHECK_LE(precision, LAST_TEX_COORD_PRECISION);
-  TextureBackgroundProgram* program = &texture_background_program_[precision];
+  DCHECK_GE(sampler, 0);
+  DCHECK_LE(sampler, LAST_SAMPLER_TYPE);
+  TextureBackgroundProgram* program =
+      &texture_background_program_[precision][sampler];
   if (!program->initialized()) {
     TRACE_EVENT0("cc", "GLRenderer::textureProgram::initialize");
     program->Initialize(output_surface_->context_provider(), precision,
-                        SAMPLER_TYPE_2D);
+                        sampler);
   }
   return program;
 }
 
 const GLRenderer::NonPremultipliedTextureBackgroundProgram*
 GLRenderer::GetNonPremultipliedTextureBackgroundProgram(
-    TexCoordPrecision precision) {
+    TexCoordPrecision precision,
+    SamplerType sampler) {
   DCHECK_GE(precision, 0);
   DCHECK_LE(precision, LAST_TEX_COORD_PRECISION);
+  DCHECK_GE(sampler, 0);
+  DCHECK_LE(sampler, LAST_SAMPLER_TYPE);
   NonPremultipliedTextureBackgroundProgram* program =
-      &nonpremultiplied_texture_background_program_[precision];
+      &nonpremultiplied_texture_background_program_[precision][sampler];
   if (!program->initialized()) {
     TRACE_EVENT0("cc",
                  "GLRenderer::NonPremultipliedTextureProgram::Initialize");
     program->Initialize(output_surface_->context_provider(), precision,
-                        SAMPLER_TYPE_2D);
+                        sampler);
   }
   return program;
 }
@@ -3345,10 +3353,12 @@ void GLRenderer::CleanupSharedObjects() {
       render_pass_color_matrix_program_aa_[i][j].Cleanup(gl_);
     }
 
-    texture_program_[i].Cleanup(gl_);
-    nonpremultiplied_texture_program_[i].Cleanup(gl_);
-    texture_background_program_[i].Cleanup(gl_);
-    nonpremultiplied_texture_background_program_[i].Cleanup(gl_);
+    for (int j = 0; j <= LAST_SAMPLER_TYPE; ++j) {
+      texture_program_[i][j].Cleanup(gl_);
+      nonpremultiplied_texture_program_[i][j].Cleanup(gl_);
+      texture_background_program_[i][j].Cleanup(gl_);
+      nonpremultiplied_texture_background_program_[i][j].Cleanup(gl_);
+    }
     texture_io_surface_program_[i].Cleanup(gl_);
 
     video_yuv_program_[i].Cleanup(gl_);
@@ -3433,9 +3443,7 @@ void GLRenderer::ScheduleOverlays(DrawingFrame* frame) {
 
   ResourceProvider::ResourceIdArray resources;
   OverlayCandidateList& overlays = frame->overlay_list;
-  OverlayCandidateList::iterator it;
-  for (it = overlays.begin(); it != overlays.end(); ++it) {
-    const OverlayCandidate& overlay = *it;
+  for (const OverlayCandidate& overlay : overlays) {
     // Skip primary plane.
     if (overlay.plane_z_order == 0)
       continue;
@@ -3448,7 +3456,7 @@ void GLRenderer::ScheduleOverlays(DrawingFrame* frame) {
         overlay.plane_z_order,
         overlay.transform,
         pending_overlay_resources_.back()->texture_id(),
-        overlay.display_rect,
+        ToNearestRect(overlay.display_rect),
         overlay.uv_rect);
   }
 }

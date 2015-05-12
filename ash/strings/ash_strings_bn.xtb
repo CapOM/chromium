@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">ব্যাটারি পুরো চার্জ</translation>
 <translation id="6895424601869865703"><ph name="GIVEN_NAME"/> এর জন্য একটি অ্যাকাউন্ট যোগ করুন</translation>
 <translation id="1270290102613614947">অন-স্ক্রীন কীবোর্ড অক্ষম করা রয়েছে</translation>
-<translation id="1057289296854808272">ঘূর্ণন চালু (পরিবর্তন করতে এখানে আলতো চাপুন)</translation>
+<translation id="5548285847212963613">&quot;<ph name="EXTENSION_NAME"/>&quot; এক্সটেনশানটি এই নেটওয়ার্কের সাথে সংযোগ স্থাপন করতে সাহায্য করতে পারে৷</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> এবং <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">ওভারফ্লো বোতাম</translation>
 <translation id="7904094684485781019">এই অ্যাকাউন্টের প্রশাসক একাধিক সাইন ইন অননুমোদিত করেছেন৷</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">স্থিতি ট্রে</translation>
 <translation id="2248649616066688669">Chromebook এর সঙ্গে একটি বহিস্থিত প্রদর্শন সংযুক্ত থাকাকালীন আপনি এটি ব্যবহার করা চালিয়ে যেতে পারেন এমনকি যখন এটির লিড বন্ধ থাকে তখনো।</translation>
 <translation id="2946640296642327832">ব্লুটুথ সক্ষম করুন</translation>
+<translation id="5537725057119320332">কাস্ট করুন</translation>
 <translation id="6459472438155181876">স্ক্রীন <ph name="DISPLAY_NAME"/> তে প্রসারিত হচ্ছে</translation>
 <translation id="8206859287963243715">সেলুলার</translation>
 <translation id="6596816719288285829">IP ঠিকানা</translation>
@@ -39,7 +40,6 @@
 স্যুইচ করতে Shift + Alt টিপুন৷</translation>
 <translation id="6043994281159824495">এখনই সাইন আউট করুন</translation>
 <translation id="2127372758936585790">নিম্ন শক্তির চার্জার</translation>
-<translation id="4625920103690741805">ঘূর্ণন লক করা আছে (পরিবর্তন করতে এখানে আলতো চাপুন)</translation>
 <translation id="3799026279081545374">আপনার কাছে একটি খারাপ চার্জার থাকতে পারে৷ যদি আপনি মার্কিন যুক্তরাষ্ট্রে বাস করেন তবে সহায়তা পেতে এবং একটি প্রতিস্থাপনের জন্য দয়া করে ৮৬৬-৬২৮-১৩৭১ এ কল করুন৷ যদি আপনি যুক্তরাজ্য বাস করেন তবে দয়া করে ০৮০০-০২৬-০৬১৩ এ কল করুন৷ যদি আপনি আয়ারল্যান্ডে বাস করেন তবে দয়া করে ১-৮০০-৮৩২-৬৬৪ এ কল করুন৷ যদি আপনি কানাডায় বাস করেন তবে দয়া করে ৮৬৬-৬২৮-১৩৭২ এ কল করুন৷ যদি আপনি অস্ট্রেলিয়ায় বাস করেন তবে দয়া করে ১-৮০০-০৬৭-৪৬০ এ কল করুন৷</translation>
 <translation id="3891340733213178823">সাইন আউট করার জন্য দুবার Ctrl+Shift+Q টিপুন৷</translation>
 <translation id="5871632337994001636">ডিভাইসগুলি পরিচালন করুন...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">শেল্ফ স্বয়ংক্রিয়ভাবে লুকান</translation>
 <translation id="7573962313813535744">ডকযুক্ত মোড</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127"><ph name="COUNT"/>টি ফাইল (গুলি) সিঙ্ক হচ্ছে</translation>
 <translation id="5958529069007801266">তত্ত্বাবধানে থাকা ব্যবহারকারী</translation>
 <translation id="3709443003275901162">৯+</translation>
 <translation id="639644700271529076">CAPS LOCK বন্ধ আছে</translation>
@@ -187,6 +186,7 @@ Search অথবা বাতিল করতে Shift টিপুন৷</trans
 <translation id="6165508094623778733">আরো জানুন</translation>
 <translation id="7168224885072002358"><ph name="TIMEOUT_SECONDS"/> এ পুরানো রেসুলিউশানে ফেরানো হচ্ছে</translation>
 <translation id="743058460480092004">ক্যামেরা এবং মাইক্রোফোন ব্যবহার করা হচ্ছে।</translation>
+<translation id="6550675742724504774">বিকল্পসমূহ</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">&quot;<ph name="FROM_LOCALE"/>&quot; তে ফেরান (পুনর্সূচনা প্রয়োজন)</translation>
 <translation id="8103386449138765447">SMS বার্তা: <ph name="MESSAGE_COUNT"/></translation>

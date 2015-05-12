@@ -162,9 +162,24 @@ void ReparentAllWindows(aura::Window* src, aura::Window* dst) {
       kShellWindowId_SystemModalContainer,
       kShellWindowId_LockSystemModalContainer,
       kShellWindowId_UnparentedControlContainer,
-      kShellWindowId_OverlayContainer, };
-  for (size_t i = 0; i < arraysize(kContainerIdsToMove); i++) {
-    int id = kContainerIdsToMove[i];
+      kShellWindowId_OverlayContainer,
+  };
+  const int kExtraContainerIdsToMoveInUnifiedMode[] = {
+      kShellWindowId_LockScreenContainer,
+      kShellWindowId_LockScreenBackgroundContainer,
+  };
+  std::vector<int> container_ids(
+      kContainerIdsToMove,
+      kContainerIdsToMove + arraysize(kContainerIdsToMove));
+  // Check the default_multi_display_mode because this is also necessary
+  // in trasition between mirror <-> unified mode.
+  if (Shell::GetInstance()->display_manager()->default_multi_display_mode() ==
+      DisplayManager::UNIFIED) {
+    for (int id : kExtraContainerIdsToMoveInUnifiedMode)
+      container_ids.push_back(id);
+  }
+
+  for (int id : container_ids) {
     aura::Window* src_container = Shell::GetContainer(src, id);
     aura::Window* dst_container = Shell::GetContainer(dst, id);
     while (!src_container->children().empty()) {
@@ -851,6 +866,9 @@ void RootWindowController::CreateContainersInRootWindow(
       kShellWindowId_NonLockScreenContainersContainer,
       "NonLockScreenContainersContainer",
       root_window);
+  // Clip all windows inside this container, as half pixel of the window's
+  // texture may become visible when the screen is scaled. crbug.com/368591.
+  non_lock_screen_containers->layer()->SetMasksToBounds(true);
 
   aura::Window* lock_background_containers = CreateContainer(
       kShellWindowId_LockScreenBackgroundContainer,
@@ -945,13 +963,7 @@ void RootWindowController::CreateContainersInRootWindow(
       "LockScreenContainer",
       lock_screen_containers);
   wm::SetSnapsChildrenToPhysicalPixelBoundary(lock_container);
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kAshDisableLockLayoutManager)) {
-    lock_container->SetLayoutManager(
-            new WorkspaceLayoutManager(lock_container));
-  } else {
-    lock_container->SetLayoutManager(new LockLayoutManager(lock_container));
-  }
+  lock_container->SetLayoutManager(new LockLayoutManager(lock_container));
   SetUsesScreenCoordinates(lock_container);
   // TODO(beng): stopsevents
 

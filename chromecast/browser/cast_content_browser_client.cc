@@ -38,13 +38,14 @@
 #include "content/public/common/url_constants.h"
 #include "content/public/common/web_preferences.h"
 #include "gin/v8_initializer.h"
+#include "media/audio/audio_manager_factory.h"
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "ui/gl/gl_switches.h"
 
 #if defined(OS_ANDROID)
-#include "chromecast/browser/android/external_video_surface_container_impl.h"
 #include "components/crash/browser/crash_dump_manager_android.h"
+#include "components/external_video_surface/browser/android/external_video_surface_container_impl.h"
 #endif  // defined(OS_ANDROID)
 
 namespace chromecast {
@@ -66,7 +67,8 @@ CastContentBrowserClient::~CastContentBrowserClient() {
 content::BrowserMainParts* CastContentBrowserClient::CreateBrowserMainParts(
     const content::MainFunctionParams& parameters) {
   return new CastBrowserMainParts(parameters,
-                                  url_request_context_factory_.get());
+                                  url_request_context_factory_.get(),
+                                  PlatformCreateAudioManagerFactory());
 }
 
 void CastContentBrowserClient::RenderProcessWillLaunch(
@@ -373,7 +375,8 @@ void CastContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
 content::ExternalVideoSurfaceContainer*
 CastContentBrowserClient::OverrideCreateExternalVideoSurfaceContainer(
     content::WebContents* web_contents) {
-  return ExternalVideoSurfaceContainerImpl::Create(web_contents);
+  return external_video_surface::ExternalVideoSurfaceContainerImpl::Create(
+      web_contents);
 }
 #endif  // defined(OS_ANDROID) && defined(VIDEO_HOLE)
 

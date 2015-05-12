@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Akkumulátor feltöltve</translation>
 <translation id="6895424601869865703">Fiók hozzáadása <ph name="GIVEN_NAME"/> számára</translation>
 <translation id="1270290102613614947">Képernyő-billentyűzet kikapcsolva</translation>
-<translation id="1057289296854808272">Forgatás bekapcsolva (Koppintson ide a módosításhoz)</translation>
+<translation id="5548285847212963613">A(z) „<ph name="EXTENSION_NAME"/>” bővítmény segíthet a hálózathoz való csatlakozásban.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> és <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Túlcsordulás gomb</translation>
 <translation id="7904094684485781019">A fiók rendszergazdája letiltotta a többfiókos bejelentkezést.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Állapottálca</translation>
 <translation id="2248649616066688669">Amennyiben Chromebookjához külső kijelzőt csatlakoztat, akkor is tovább használhatja eszközét, ha annak fedele le van hajtva.</translation>
 <translation id="2946640296642327832">Bluetooth engedélyezése</translation>
+<translation id="5537725057119320332">Küldés</translation>
 <translation id="6459472438155181876">Képernyő kiterjesztése erre: <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Mobil</translation>
 <translation id="6596816719288285829">IP-cím</translation>
@@ -39,7 +40,6 @@
 A váltáshoz nyomja meg a Shift + Alt billentyűkódot.</translation>
 <translation id="6043994281159824495">Kijelentkezés most</translation>
 <translation id="2127372758936585790">Kis teljesítményű töltő</translation>
-<translation id="4625920103690741805">Forgatás zárolva (Koppintson ide a módosításhoz)</translation>
 <translation id="3799026279081545374">Lehet, hogy rossz a töltője. Ha az Amerikai Egyesült Államokban él, segítség és csere ügyében hívja a következő telefonszámot: 866-628-1371. Ha az Egyesült Királyságban él, hívja a következő telefonszámot: 0800-026-0613. Ha Írországban él, hívja a következő telefonszámot: 1-800-832-664. Ha Kanadában él, hívja a következő telefonszámot: 866-628-1372. Ha Ausztráliában él, hívja a következő telefonszámot: 1-800-067-460.</translation>
 <translation id="3891340733213178823">Nyomja meg a Ctrl+Shift+Q billentyűkombinációt kétszer a kijelentkezéshez.</translation>
 <translation id="5871632337994001636">Eszközök kezelése...</translation>
@@ -167,7 +167,6 @@ A váltáshoz nyomja meg a Shift + Alt billentyűkódot.</translation>
 <translation id="112308213915226829">Polc automatikus elrejtése</translation>
 <translation id="7573962313813535744">Dokkolt mód</translation>
 <translation id="2792498699870441125">Alt + Keresés</translation>
-<translation id="8660803626959853127"><ph name="COUNT"/> fájl szinkronizálása</translation>
 <translation id="5958529069007801266">Felügyelt felhasználó</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">A CAPS LOCK ki van kapcsolva</translation>
@@ -187,6 +186,7 @@ Kikapcsolásához nyomja meg a Keresés vagy a Shift billentyűt.</translation>
 <translation id="6165508094623778733">További információ</translation>
 <translation id="7168224885072002358">Visszaállítás a régi felbontásra <ph name="TIMEOUT_SECONDS"/> mp múlva</translation>
 <translation id="743058460480092004">A kamera és a mikrofon épp használatban van.</translation>
+<translation id="6550675742724504774">Beállítások</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Visszatérés ehhez: &quot;<ph name="FROM_LOCALE"/>&quot; (újraindítás szükséges)</translation>
 <translation id="8103386449138765447">SMS-üzenetek: <ph name="MESSAGE_COUNT"/></translation>

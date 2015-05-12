@@ -146,6 +146,18 @@ void GLES2InterfaceStub::CompressedTexImage3D(GLenum /* target */,
                                               GLsizei /* imageSize */,
                                               const void* /* data */) {
 }
+void GLES2InterfaceStub::CompressedTexSubImage3D(GLenum /* target */,
+                                                 GLint /* level */,
+                                                 GLint /* xoffset */,
+                                                 GLint /* yoffset */,
+                                                 GLint /* zoffset */,
+                                                 GLsizei /* width */,
+                                                 GLsizei /* height */,
+                                                 GLsizei /* depth */,
+                                                 GLenum /* format */,
+                                                 GLsizei /* imageSize */,
+                                                 const void* /* data */) {
+}
 void GLES2InterfaceStub::CopyBufferSubData(GLenum /* readtarget */,
                                            GLenum /* writetarget */,
                                            GLintptr /* readoffset */,
@@ -451,6 +463,10 @@ void GLES2InterfaceStub::GetUniformfv(GLuint /* program */,
 void GLES2InterfaceStub::GetUniformiv(GLuint /* program */,
                                       GLint /* location */,
                                       GLint* /* params */) {
+}
+void GLES2InterfaceStub::GetUniformuiv(GLuint /* program */,
+                                       GLint /* location */,
+                                       GLuint* /* params */) {
 }
 void GLES2InterfaceStub::GetUniformIndices(GLuint /* program */,
                                            GLsizei /* count */,

@@ -63,6 +63,7 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
 #include "content/public/common/url_utils.h"
+#include "content/public/renderer/isolated_world_ids.h"
 #include "ui/accessibility/ax_tree.h"
 #include "ui/accessibility/ax_tree_update.h"
 #include "url/gurl.h"
@@ -88,6 +89,9 @@ namespace {
 
 // The next value to use for the accessibility reset token.
 int g_next_accessibility_reset_token = 1;
+
+// The next value to use for the javascript callback id.
+int g_next_javascript_callback_id = 1;
 
 // The (process id, routing id) pair that identifies one RenderFrame.
 typedef std::pair<int32, int32> RenderFrameHostID;
@@ -272,19 +276,35 @@ void RenderFrameHostImpl::ExecuteJavaScript(
 void RenderFrameHostImpl::ExecuteJavaScript(
      const base::string16& javascript,
      const JavaScriptResultCallback& callback) {
-  static int next_id = 1;
-  int key = next_id++;
+  int key = g_next_javascript_callback_id++;
   Send(new FrameMsg_JavaScriptExecuteRequest(routing_id_,
                                              javascript,
                                              key, true));
   javascript_callbacks_.insert(std::make_pair(key, callback));
 }
 
-void RenderFrameHostImpl::ExecuteJavaScriptForTests(
+void RenderFrameHostImpl::ExecuteJavaScriptWithUserGestureForTests(
     const base::string16& javascript) {
   Send(new FrameMsg_JavaScriptExecuteRequestForTests(routing_id_,
                                                      javascript,
-                                                     0, false));
+                                                     0, false, true));
+}
+
+void RenderFrameHostImpl::ExecuteJavaScriptInIsolatedWorld(
+    const base::string16& javascript,
+    const JavaScriptResultCallback& callback,
+    int world_id) {
+  if (world_id <= ISOLATED_WORLD_ID_GLOBAL ||
+      world_id > ISOLATED_WORLD_ID_MAX) {
+    // Return if the world_id is not valid.
+    NOTREACHED();
+    return;
+  }
+
+  int key = g_next_javascript_callback_id++;
+  Send(new FrameMsg_JavaScriptExecuteRequestInIsolatedWorld(
+      routing_id_, javascript, key, true, world_id));
+  javascript_callbacks_.insert(std::make_pair(key, callback));
 }
 
 RenderViewHost* RenderFrameHostImpl::GetRenderViewHost() {
@@ -565,6 +585,7 @@ BrowserAccessibility* RenderFrameHostImpl::AccessibilityGetParentFrame() {
 }
 
 bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
+                                            int previous_sibling_routing_id,
                                             int proxy_routing_id) {
   TRACE_EVENT0("navigation", "RenderFrameHostImpl::CreateRenderFrame");
   DCHECK(!IsRenderFrameLive()) << "Creating frame twice";
@@ -578,22 +599,26 @@ bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
 
   DCHECK(GetProcess()->HasConnection());
 
-  FrameMsg_NewFrame_WidgetParams widget_params;
+  FrameMsg_NewFrame_Params params;
+  params.routing_id = routing_id_;
+  params.parent_routing_id = parent_routing_id;
+  params.proxy_routing_id = proxy_routing_id;
+  params.previous_sibling_routing_id = previous_sibling_routing_id;
+  params.replication_state = frame_tree_node()->current_replication_state();
+
   if (render_widget_host_) {
-    widget_params.routing_id = render_widget_host_->GetRoutingID();
-    widget_params.surface_id = render_widget_host_->surface_id();
-    widget_params.hidden = render_widget_host_->is_hidden();
+    params.widget_params.routing_id = render_widget_host_->GetRoutingID();
+    params.widget_params.surface_id = render_widget_host_->surface_id();
+    params.widget_params.hidden = render_widget_host_->is_hidden();
   } else {
     // MSG_ROUTING_NONE will prevent a new RenderWidget from being created in
     // the renderer process.
-    widget_params.routing_id = MSG_ROUTING_NONE;
-    widget_params.surface_id = 0;
-    widget_params.hidden = true;
+    params.widget_params.routing_id = MSG_ROUTING_NONE;
+    params.widget_params.surface_id = 0;
+    params.widget_params.hidden = true;
   }
 
-  Send(new FrameMsg_NewFrame(routing_id_, parent_routing_id, proxy_routing_id,
-                             frame_tree_node()->current_replication_state(),
-                             widget_params));
+  Send(new FrameMsg_NewFrame(params));
 
   // The RenderWidgetHost takes ownership of its view. It is tied to the
   // lifetime of the current RenderProcessHost for this RenderFrameHost.
@@ -691,15 +716,11 @@ void RenderFrameHostImpl::OnCreateChildFrame(int new_routing_id,
   if (rfh_state_ != RenderFrameHostImpl::STATE_DEFAULT)
     return;
 
-  RenderFrameHostImpl* new_frame = frame_tree_->AddFrame(
-      frame_tree_node_, GetProcess()->GetID(), new_routing_id, frame_name);
+  RenderFrameHostImpl* new_frame =
+      frame_tree_->AddFrame(frame_tree_node_, GetProcess()->GetID(),
+                            new_routing_id, frame_name, sandbox_flags);
   if (!new_frame)
     return;
-
-  // Set sandbox flags for the new frame.  The flags are committed immediately,
-  // since they should apply to the initial empty document in the frame.
-  new_frame->frame_tree_node()->set_sandbox_flags(sandbox_flags);
-  new_frame->frame_tree_node()->CommitPendingSandboxFlags();
 
   // We know that the RenderFrame has been created in this case, immediately
   // after the CreateChildFrame IPC was sent.
@@ -1549,6 +1570,9 @@ void RenderFrameHostImpl::RegisterMojoServices() {
   GetServiceRegistry()->AddService<mojo::MediaRenderer>(
       base::Bind(&CreateMediaRendererService));
 #endif
+
+  GetContentClient()->browser()->OverrideRenderFrameMojoServices(
+      GetServiceRegistry(), this);
 }
 
 void RenderFrameHostImpl::SetState(RenderFrameHostImplState rfh_state) {

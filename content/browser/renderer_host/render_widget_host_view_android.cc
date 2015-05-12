@@ -378,6 +378,12 @@ RenderWidgetHostViewAndroid::~RenderWidgetHostViewAndroid() {
   DCHECK(surface_id_.is_null());
 }
 
+void RenderWidgetHostViewAndroid::Blur() {
+  host_->SetInputMethodActive(false);
+  host_->Blur();
+  if (overscroll_controller_)
+    overscroll_controller_->Disable();
+}
 
 bool RenderWidgetHostViewAndroid::OnMessageReceived(
     const IPC::Message& message) {
@@ -434,11 +440,11 @@ void RenderWidgetHostViewAndroid::SetBounds(const gfx::Rect& rect) {
 
 void RenderWidgetHostViewAndroid::GetScaledContentBitmap(
     float scale,
-    SkColorType color_type,
+    SkColorType preferred_color_type,
     gfx::Rect src_subrect,
     ReadbackRequestCallback& result_callback) {
   if (!host_ || host_->is_hidden() || !IsSurfaceAvailableForCopy()) {
-    result_callback.Run(SkBitmap(), READBACK_NOT_SUPPORTED);
+    result_callback.Run(SkBitmap(), READBACK_SURFACE_UNAVAILABLE);
     return;
   }
   gfx::Size bounds = layer_->bounds();
@@ -452,8 +458,8 @@ void RenderWidgetHostViewAndroid::GetScaledContentBitmap(
   DCHECK_GT(device_scale_factor, 0);
   gfx::Size dst_size(
       gfx::ToCeiledSize(gfx::ScaleSize(bounds, scale / device_scale_factor)));
-  CopyFromCompositingSurface(
-      src_subrect, dst_size, result_callback, color_type);
+  CopyFromCompositingSurface(src_subrect, dst_size, result_callback,
+                             preferred_color_type);
 }
 
 scoped_refptr<cc::Layer> RenderWidgetHostViewAndroid::CreateDelegatedLayer()
@@ -527,13 +533,6 @@ void RenderWidgetHostViewAndroid::Focus() {
     overscroll_controller_->Enable();
 }
 
-void RenderWidgetHostViewAndroid::Blur() {
-  host_->SetInputMethodActive(false);
-  host_->Blur();
-  if (overscroll_controller_)
-    overscroll_controller_->Disable();
-}
-
 bool RenderWidgetHostViewAndroid::HasFocus() const {
   if (!content_view_core_)
     return false;  // ContentViewCore not created yet.
@@ -550,23 +549,7 @@ void RenderWidgetHostViewAndroid::Show() {
     return;
 
   is_showing_ = true;
-  if (layer_.get())
-    layer_->SetHideLayerAndSubtree(false);
-
-  if (overscroll_controller_)
-    overscroll_controller_->Enable();
-
-  frame_evictor_->SetVisible(true);
-
-  if (!host_ || !host_->is_hidden())
-    return;
-
-  host_->WasShown(ui::LatencyInfo());
-
-  if (content_view_core_) {
-    StartObservingRootWindow();
-    RequestVSyncUpdate(BEGIN_FRAME);
-  }
+  ShowInternal();
 }
 
 void RenderWidgetHostViewAndroid::Hide() {
@@ -574,24 +557,10 @@ void RenderWidgetHostViewAndroid::Hide() {
     return;
 
   is_showing_ = false;
-  if (layer_.get() && locks_on_frame_count_ == 0)
-    layer_->SetHideLayerAndSubtree(true);
 
-  if (overscroll_controller_)
-    overscroll_controller_->Disable();
-
-  frame_evictor_->SetVisible(false);
-
-  RunAckCallbacks(cc::SurfaceDrawStatus::DRAW_SKIPPED);
-
-  if (!host_ || host_->is_hidden())
-    return;
-
-  // Inform the renderer that we are being hidden so it can reduce its resource
-  // utilization.
-  host_->WasHidden();
-
-  StopObservingRootWindow();
+  bool hide_frontbuffer = true;
+  bool stop_observing_root_window = true;
+  HideInternal(hide_frontbuffer, stop_observing_root_window);
 }
 
 bool RenderWidgetHostViewAndroid::IsShowing() {
@@ -918,7 +887,7 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
     const gfx::Rect& src_subrect,
     const gfx::Size& dst_size,
     ReadbackRequestCallback& callback,
-    const SkColorType color_type) {
+    const SkColorType preferred_color_type) {
   TRACE_EVENT0("cc", "RenderWidgetHostViewAndroid::CopyFromCompositingSurface");
   if (!host_ || host_->is_hidden()) {
     callback.Run(SkBitmap(), READBACK_SURFACE_UNAVAILABLE);
@@ -926,7 +895,7 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
   }
   base::TimeTicks start_time = base::TimeTicks::Now();
   if (using_browser_compositor_ && !IsSurfaceAvailableForCopy()) {
-    callback.Run(SkBitmap(), READBACK_NOT_SUPPORTED);
+    callback.Run(SkBitmap(), READBACK_SURFACE_UNAVAILABLE);
     return;
   }
   const gfx::Display& display =
@@ -939,7 +908,7 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
 
   if (!using_browser_compositor_) {
     SynchronousCopyContents(src_subrect_in_pixel, dst_size_in_pixel, callback,
-                            color_type);
+                            preferred_color_type);
     UMA_HISTOGRAM_TIMES("Compositing.CopyFromSurfaceTimeSynchronous",
                         base::TimeTicks::Now() - start_time);
     return;
@@ -961,11 +930,8 @@ void RenderWidgetHostViewAndroid::CopyFromCompositingSurface(
   request = cc::CopyOutputRequest::CreateRequest(
       base::Bind(&RenderWidgetHostViewAndroid::
                      PrepareTextureCopyOutputResultForDelegatedReadback,
-                 dst_size_in_pixel,
-                 color_type,
-                 start_time,
-                 readback_layer,
-                 callback));
+                 dst_size_in_pixel, preferred_color_type, start_time,
+                 readback_layer, callback));
   if (!src_subrect_in_pixel.IsEmpty())
     request->set_area(src_subrect_in_pixel);
   readback_layer->RequestCopyOfOutput(request.Pass());
@@ -1411,6 +1377,53 @@ void RenderWidgetHostViewAndroid::AcceleratedSurfaceInitialized(int route_id) {
   accelerated_surface_route_id_ = route_id;
 }
 
+void RenderWidgetHostViewAndroid::ShowInternal() {
+  DCHECK(is_showing_);
+  if (!host_ || !host_->is_hidden())
+    return;
+
+  if (layer_.get())
+    layer_->SetHideLayerAndSubtree(false);
+
+  frame_evictor_->SetVisible(true);
+
+  if (overscroll_controller_)
+    overscroll_controller_->Enable();
+
+  host_->WasShown(ui::LatencyInfo());
+
+  if (content_view_core_) {
+    StartObservingRootWindow();
+    RequestVSyncUpdate(BEGIN_FRAME);
+  }
+}
+
+void RenderWidgetHostViewAndroid::HideInternal(
+    bool hide_frontbuffer,
+    bool stop_observing_root_window) {
+  if (hide_frontbuffer) {
+    if (layer_.get() && locks_on_frame_count_ == 0)
+      layer_->SetHideLayerAndSubtree(true);
+
+    frame_evictor_->SetVisible(false);
+  }
+
+  if (stop_observing_root_window)
+    StopObservingRootWindow();
+
+  if (!host_ || host_->is_hidden())
+    return;
+
+  if (overscroll_controller_)
+    overscroll_controller_->Disable();
+
+  RunAckCallbacks(cc::SurfaceDrawStatus::DRAW_SKIPPED);
+
+  // Inform the renderer that we are being hidden so it can reduce its resource
+  // utilization.
+  host_->WasHidden();
+}
+
 void RenderWidgetHostViewAndroid::AttachLayers() {
   if (!content_view_core_)
     return;
@@ -1438,6 +1451,12 @@ void RenderWidgetHostViewAndroid::RemoveLayers() {
 void RenderWidgetHostViewAndroid::RequestVSyncUpdate(uint32 requests) {
   bool should_request_vsync = !outstanding_vsync_requests_ && requests;
   outstanding_vsync_requests_ |= requests;
+
+  // If the host has been hidden, defer vsync requests until it is shown
+  // again via |Show()|.
+  if (!host_ || host_->is_hidden())
+    return;
+
   // Note that if we're not currently observing the root window, outstanding
   // vsync requests will be pushed if/when we resume observing in
   // |StartObservingRootWindow()|.
@@ -1447,6 +1466,7 @@ void RenderWidgetHostViewAndroid::RequestVSyncUpdate(uint32 requests) {
 
 void RenderWidgetHostViewAndroid::StartObservingRootWindow() {
   DCHECK(content_view_core_window_android_);
+  DCHECK(is_showing_);
   if (observing_root_window_)
     return;
 
@@ -1582,12 +1602,8 @@ InputEventAckState RenderWidgetHostViewAndroid::FilterInputEvent(
     return INPUT_EVENT_ACK_STATE_CONSUMED;
   }
 
-  if (content_view_core_) {
-    InputEventAckState ack_result =
-      content_view_core_->FilterInputEvent(input_event);
-    if (ack_result != INPUT_EVENT_ACK_STATE_NOT_CONSUMED)
-      return ack_result;
-  }
+  if (content_view_core_ && content_view_core_->FilterInputEvent(input_event))
+    return INPUT_EVENT_ACK_STATE_CONSUMED;
 
   if (!host_)
     return INPUT_EVENT_ACK_STATE_NOT_CONSUMED;
@@ -1763,7 +1779,8 @@ void RenderWidgetHostViewAndroid::SetContentViewCore(
   if (!content_view_core_)
     return;
 
-  StartObservingRootWindow();
+  if (is_showing_)
+    StartObservingRootWindow();
 
   if (resize)
     WasResized();
@@ -1804,6 +1821,17 @@ void RenderWidgetHostViewAndroid::OnCompositingDidCommit() {
   RunAckCallbacks(cc::SurfaceDrawStatus::DRAWN);
 }
 
+void RenderWidgetHostViewAndroid::OnRootWindowVisibilityChanged(bool visible) {
+  DCHECK(is_showing_);
+  if (visible) {
+    ShowInternal();
+  } else {
+    bool hide_frontbuffer = true;
+    bool stop_observing_root_window = false;
+    HideInternal(hide_frontbuffer, stop_observing_root_window);
+  }
+}
+
 void RenderWidgetHostViewAndroid::OnAttachCompositor() {
   DCHECK(content_view_core_);
   if (!overscroll_controller_)
@@ -1820,7 +1848,7 @@ void RenderWidgetHostViewAndroid::OnDetachCompositor() {
 void RenderWidgetHostViewAndroid::OnVSync(base::TimeTicks frame_time,
                                           base::TimeDelta vsync_period) {
   TRACE_EVENT0("cc,benchmark", "RenderWidgetHostViewAndroid::OnVSync");
-  if (!host_)
+  if (!host_ || host_->is_hidden())
     return;
 
   if (outstanding_vsync_requests_ & FLUSH_INPUT) {
@@ -1844,6 +1872,20 @@ void RenderWidgetHostViewAndroid::OnVSync(base::TimeTicks frame_time,
 void RenderWidgetHostViewAndroid::OnAnimate(base::TimeTicks begin_frame_time) {
   if (Animate(begin_frame_time))
     SetNeedsAnimate();
+}
+
+void RenderWidgetHostViewAndroid::OnActivityPaused() {
+  TRACE_EVENT0("browser", "RenderWidgetHostViewAndroid::OnActivityPaused");
+  DCHECK(is_showing_);
+  bool hide_frontbuffer = false;
+  bool stop_observing_root_window = false;
+  HideInternal(hide_frontbuffer, stop_observing_root_window);
+}
+
+void RenderWidgetHostViewAndroid::OnActivityResumed() {
+  TRACE_EVENT0("browser", "RenderWidgetHostViewAndroid::OnActivityResumed");
+  DCHECK(is_showing_);
+  ShowInternal();
 }
 
 void RenderWidgetHostViewAndroid::OnLostResources() {
@@ -1898,6 +1940,8 @@ void RenderWidgetHostViewAndroid::PrepareTextureCopyOutputResult(
                                                 output_size_in_pixel.height(),
                                                 color_type,
                                                 kOpaque_SkAlphaType))) {
+    scoped_callback_runner.Reset(
+        base::Bind(callback, SkBitmap(), READBACK_BITMAP_ALLOCATION_FAILURE));
     return;
   }
 

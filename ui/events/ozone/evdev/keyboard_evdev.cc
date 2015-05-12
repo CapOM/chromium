@@ -9,7 +9,7 @@
 #include "ui/events/event.h"
 #include "ui/events/event_constants.h"
 #include "ui/events/event_utils.h"
-#include "ui/events/keycodes/dom4/keycode_converter.h"
+#include "ui/events/keycodes/dom/keycode_converter.h"
 #include "ui/events/ozone/evdev/event_modifiers_evdev.h"
 #include "ui/events/ozone/evdev/keyboard_util_evdev.h"
 #include "ui/events/ozone/layout/keyboard_layout_engine.h"
@@ -173,6 +173,18 @@ void KeyboardEvdev::ScheduleKeyRepeat(const base::TimeDelta& delay) {
 }
 
 void KeyboardEvdev::OnRepeatTimeout(unsigned int sequence) {
+  if (repeat_sequence_ != sequence)
+    return;
+
+  // Post a task behind any pending key releases in the message loop
+  // FIFO. This ensures there's no spurious repeats during periods of UI
+  // thread jank.
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE, base::Bind(&KeyboardEvdev::OnRepeatCommit,
+                            weak_ptr_factory_.GetWeakPtr(), repeat_sequence_));
+}
+
+void KeyboardEvdev::OnRepeatCommit(unsigned int sequence) {
   if (repeat_sequence_ != sequence)
     return;
 

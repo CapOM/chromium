@@ -13,6 +13,10 @@
 #include "chrome/test/base/interactive_test_utils.h"
 #include "chrome/test/base/test_launcher_utils.h"
 #include "chrome/test/base/ui_test_utils.h"
+#include "components/guest_view/browser/guest_view_base.h"
+#include "components/guest_view/browser/guest_view_manager.h"
+#include "components/guest_view/browser/guest_view_manager_factory.h"
+#include "components/guest_view/browser/test_guest_view_manager.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -24,10 +28,6 @@
 #include "extensions/browser/app_window/app_window.h"
 #include "extensions/browser/app_window/app_window_registry.h"
 #include "extensions/browser/guest_view/extensions_guest_view_manager_delegate.h"
-#include "extensions/browser/guest_view/guest_view_base.h"
-#include "extensions/browser/guest_view/guest_view_manager.h"
-#include "extensions/browser/guest_view/guest_view_manager_factory.h"
-#include "extensions/browser/guest_view/test_guest_view_manager.h"
 #include "extensions/test/extension_test_message_listener.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "ui/base/ime/composition_text.h"
@@ -37,8 +37,10 @@
 
 using extensions::AppWindow;
 using extensions::ExtensionsGuestViewManagerDelegate;
-using extensions::GuestViewManager;
-using extensions::TestGuestViewManager;
+using guest_view::GuestViewBase;
+using guest_view::GuestViewManager;
+using guest_view::TestGuestViewManager;
+using guest_view::TestGuestViewManagerFactory;
 
 class WebViewInteractiveTest
     : public extensions::PlatformAppBrowserTest {
@@ -49,7 +51,7 @@ class WebViewInteractiveTest
         corner_(gfx::Point()),
         mouse_click_result_(false),
         first_click_(true) {
-    extensions::GuestViewManager::set_factory_for_testing(&factory_);
+    GuestViewManager::set_factory_for_testing(&factory_);
   }
 
   TestGuestViewManager* GetGuestViewManager() {
@@ -61,7 +63,7 @@ class WebViewInteractiveTest
       manager = static_cast<TestGuestViewManager*>(
           GuestViewManager::CreateWithDelegate(
               browser()->profile(),
-              scoped_ptr<guestview::GuestViewManagerDelegate>(
+              scoped_ptr<guest_view::GuestViewManagerDelegate>(
                   new ExtensionsGuestViewManagerDelegate(
                       browser()->profile()))));
     }
@@ -244,7 +246,7 @@ class WebViewInteractiveTest
 
     guest_web_contents_ = source->GetWebContents();
     embedder_web_contents_ =
-        extensions::GuestViewBase::FromWebContents(guest_web_contents_)->
+        GuestViewBase::FromWebContents(guest_web_contents_)->
             embedder_web_contents();
 
     gfx::Rect offset = embedder_web_contents_->GetContainerBounds();
@@ -480,7 +482,7 @@ class WebViewInteractiveTest
   }
 
  protected:
-  extensions::TestGuestViewManagerFactory factory_;
+  TestGuestViewManagerFactory factory_;
   content::WebContents* guest_web_contents_;
   content::WebContents* embedder_web_contents_;
   gfx::Point corner_;
@@ -840,6 +842,23 @@ IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest,
   // Before the embedder goes away, both the guests should go away.
   // This ensures that unattached guests are gone if opener is gone.
   GetGuestViewManager()->WaitForAllGuestsDeleted();
+}
+
+// Tests whether <webview> context menu sees <webview> local coordinates
+// in its RenderViewContextMenu params.
+// Local coordinates are required for plugin actions to work properly.
+IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, ContextMenuParamCoordinates) {
+  TestHelper("testCoordinates", "web_view/context_menus/coordinates",
+             NO_TEST_SERVER);
+  ASSERT_TRUE(guest_web_contents());
+
+  ContextMenuWaiter menu_observer(content::NotificationService::AllSources());
+  SimulateRWHMouseClick(guest_web_contents()->GetRenderViewHost(),
+                        blink::WebMouseEvent::ButtonRight, 10, 20);
+  // Wait until the context menu is opened and closed.
+  menu_observer.WaitForMenuOpenAndClose();
+  ASSERT_EQ(10, menu_observer.params().x);
+  ASSERT_EQ(20, menu_observer.params().y);
 }
 
 IN_PROC_BROWSER_TEST_F(WebViewInteractiveTest, ExecuteCode) {

@@ -25,6 +25,7 @@ class DownloadNotificationItem : public content::DownloadItem::Observer {
  public:
   class Delegate {
    public:
+    virtual void OnCreated(DownloadNotificationItem* item) = 0;
     virtual void OnDownloadStarted(DownloadNotificationItem* item) = 0;
     virtual void OnDownloadStopped(DownloadNotificationItem* item) = 0;
     virtual void OnDownloadRemoved(DownloadNotificationItem* item) = 0;
@@ -40,6 +41,11 @@ class DownloadNotificationItem : public content::DownloadItem::Observer {
 
  private:
   friend class test::DownloadNotificationItemTest;
+
+  enum NotificationUpdateType {
+    ADD_NEW,
+    UPDATE_EXISTING
+  };
 
   class NotificationWatcher : public NotificationDelegate {
    public:
@@ -77,7 +83,8 @@ class DownloadNotificationItem : public content::DownloadItem::Observer {
   void OnDownloadRemoved(content::DownloadItem* item) override;
   void OnDownloadDestroyed(content::DownloadItem* item) override;
 
-  void UpdateNotificationData();
+  void CloseNotificationByUser();
+  void UpdateNotificationData(NotificationUpdateType type);
   void SetNotificationImage(int resource_id);
 
   NotificationUIManager* notification_ui_manager() const;

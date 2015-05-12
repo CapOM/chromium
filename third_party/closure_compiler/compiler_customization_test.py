@@ -6,26 +6,22 @@
 import os
 import unittest
 
-from checker import Checker
+from compile import Checker
 from processor import FileCache, Processor
 
 
-ASSERT_FILE = os.path.join("..", "..", "ui", "webui", "resources", "js",
-    "assert.js")
-CR_FILE = os.path.join("..", "..", "ui", "webui", "resources", "js", "cr.js")
-UI_FILE = os.path.join("..", "..", "ui", "webui", "resources", "js", "cr",
-    "ui.js")
-
-
-def rel_to_abs(rel_path):
-  script_path = os.path.dirname(os.path.abspath(__file__))
-  return os.path.join(script_path, rel_path)
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_SRC_DIR = os.path.join(_SCRIPT_DIR, os.pardir, os.pardir)
+_RESOURCES_DIR = os.path.join(_SRC_DIR, "ui", "webui", "resources", "js")
+_ASSERT_JS = os.path.join(_RESOURCES_DIR, "assert.js")
+_CR_JS = os.path.join(_RESOURCES_DIR, "cr.js")
+_CR_UI_JS = os.path.join(_RESOURCES_DIR, "cr", "ui.js")
 
 
 class CompilerCustomizationTest(unittest.TestCase):
-  _ASSERT_DEFINITION = Processor(rel_to_abs(ASSERT_FILE)).contents
-  _CR_DEFINE_DEFINITION = Processor(rel_to_abs(CR_FILE)).contents
-  _CR_UI_DECORATE_DEFINITION = Processor(rel_to_abs(UI_FILE)).contents
+  _ASSERT_DEFINITION = Processor(_ASSERT_JS).contents
+  _CR_DEFINE_DEFINITION = Processor(_CR_JS).contents
+  _CR_UI_DECORATE_DEFINITION = Processor(_CR_UI_JS).contents
 
   def setUp(self):
     self._checker = Checker()
