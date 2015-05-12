@@ -37,9 +37,6 @@
     attributes="enterpriseInfo emailDomain">
   <template>
     <link rel="stylesheet" href="offline_gaia.css">
-    <gaia-core-icon-button id="backButton" icon="arrow-back"
-        on-tap="{{onBack}}">
-    </gaia-core-icon-button>
     <core-animated-pages id="animatedPages" transitions="slide-from-right"
         valueattr="id"
         on-core-animated-pages-transition-end="{{onTransitionEnd}}" flex>
@@ -52,11 +49,13 @@
             </p>
           </div>
           <div class="footer" flex vertical layout justified>
-            <gaia-input-form id="emailInput" inputType="email"
-                emailDomain="{{emailDomain}}"
-                i18n-values="errorMsg:offlineLoginInvalidEmail;
-                             inputLabel:offlineLoginEmail;
-                             buttonText:offlineLoginNextBtn">
+            <gaia-input-form i18n-values="buttonText:offlineLoginNextBtn"
+                on-submit="{{onEmailSubmitted}}">
+              <gaia-input id="emailInput" type="email" required
+                  domain="{{emailDomain}}"
+                  i18n-values="error:offlineLoginInvalidEmail;
+                               label:offlineLoginEmail">
+              </gaia-input>
             </gaia-input-form>
             <img self-center src="chrome://theme/IDR_LOGO_GOOGLE_COLOR_90"
                 alt="">
@@ -67,11 +66,13 @@
         <gaia-card>
           <gaia-header class="header" id="passwordHeader">
           </gaia-header>
-          <gaia-input-form id="passwordInput" class="footer"
-              inputType="password"
-              i18n-values="errorMsg:offlineLoginInvalidPassword;
-                           inputLabel:offlineLoginPassword;
-                           buttonText:offlineLoginNextBtn">
+          <gaia-input-form class="footer"
+              i18n-values="buttonText:offlineLoginNextBtn"
+              on-submit="{{onPasswordSubmitted}}">
+            <gaia-input id="passwordInput" type="password" required
+                i18n-values="error:offlineLoginInvalidPassword;
+                             label:offlineLoginPassword">
+            </gaia-input>
             <gaia-paper-button noink class="link-button"
                 i18n-content="offlineLoginForgotPasswordBtn"
                 on-tap="{{onForgotPasswordClicked}}">
@@ -87,5 +88,8 @@
         </gaia-card>
       </section>
     </core-animated-pages>
+    <button id="backButton" is="gaia-icon-button" icon="arrow-back"
+        i18n-values="aria-label:backButton" on-click="{{onBack}}">
+    </button>
   </template>
 </polymer-element>

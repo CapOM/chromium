@@ -21,29 +21,16 @@ namespace cc {
 
 class CC_EXPORT CompositingDisplayItem : public DisplayItem {
  public:
+  CompositingDisplayItem();
   ~CompositingDisplayItem() override;
 
-  static scoped_ptr<CompositingDisplayItem> Create(
-      uint8_t alpha,
-      SkXfermode::Mode xfermode,
-      SkRect* bounds,
-      skia::RefPtr<SkColorFilter> color_filter) {
-    return make_scoped_ptr(
-        new CompositingDisplayItem(alpha, xfermode, bounds, color_filter));
-  }
+  void SetNew(uint8_t alpha,
+              SkXfermode::Mode xfermode,
+              SkRect* bounds,
+              skia::RefPtr<SkColorFilter> color_filter);
 
   void Raster(SkCanvas* canvas, SkDrawPictureCallback* callback) const override;
-
-  bool IsSuitableForGpuRasterization() const override;
-  int ApproximateOpCount() const override;
-  size_t PictureMemoryUsage() const override;
   void AsValueInto(base::trace_event::TracedValue* array) const override;
-
- protected:
-  CompositingDisplayItem(uint8_t alpha,
-                         SkXfermode::Mode,
-                         SkRect* bounds,
-                         skia::RefPtr<SkColorFilter>);
 
  private:
   uint8_t alpha_;
@@ -55,6 +42,7 @@ class CC_EXPORT CompositingDisplayItem : public DisplayItem {
 
 class CC_EXPORT EndCompositingDisplayItem : public DisplayItem {
  public:
+  EndCompositingDisplayItem();
   ~EndCompositingDisplayItem() override;
 
   static scoped_ptr<EndCompositingDisplayItem> Create() {
@@ -62,14 +50,7 @@ class CC_EXPORT EndCompositingDisplayItem : public DisplayItem {
   }
 
   void Raster(SkCanvas* canvas, SkDrawPictureCallback* callback) const override;
-
-  bool IsSuitableForGpuRasterization() const override;
-  int ApproximateOpCount() const override;
-  size_t PictureMemoryUsage() const override;
   void AsValueInto(base::trace_event::TracedValue* array) const override;
-
- protected:
-  EndCompositingDisplayItem();
 };
 
 }  // namespace cc

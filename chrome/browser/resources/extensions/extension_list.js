@@ -57,6 +57,15 @@ ExtensionFocusRow.prototype = {
     return equivalent || this.focusableElements[0];
   },
 
+  /** @override */
+  makeActive: function(active) {
+    cr.ui.FocusRow.prototype.makeActive.call(this, active);
+
+    // Only highlight if the row has focus.
+    this.classList.toggle('extension-highlight',
+                          active && this.contains(document.activeElement));
+  },
+
   /** Updates the list of focusable elements. */
   updateFocusableElements: function() {
     this.focusableElements.length = 0;
@@ -264,18 +273,26 @@ cr.define('extensions', function() {
           case EventType.ERROR_ADDED:
           case EventType.ERRORS_REMOVED:
           case EventType.PREFS_CHANGED:
-            if (eventData.extensionInfo)
+            if (eventData.extensionInfo) {
               this.updateExtension_(eventData.extensionInfo);
+              this.focusGrid_.ensureRowActive();
+            }
             break;
           case EventType.UNINSTALLED:
             var index = this.getIndexOfExtension_(eventData.item_id);
             this.extensions_.splice(index, 1);
             var childNode = $(eventData.item_id);
             childNode.parentNode.removeChild(childNode);
+            this.focusGrid_.removeRow(assertInstanceof(childNode,
+                                                       ExtensionFocusRow));
+            this.focusGrid_.ensureRowActive();
             break;
           default:
             assertNotReached();
         }
+
+        if (eventData.event_type == EventType.UNLOADED)
+          this.hideEmbeddedExtensionOptions_(eventData.item_id);
 
         if (eventData.event_type == EventType.INSTALLED ||
             eventData.event_type == EventType.UNINSTALLED) {
@@ -336,8 +353,10 @@ cr.define('extensions', function() {
       this.updateFocusableElements();
 
       var idToHighlight = this.getIdQueryParam_();
-      if (idToHighlight && $(idToHighlight))
+      if (idToHighlight && $(idToHighlight)) {
         this.scrollToNode_(idToHighlight);
+        this.setInitialFocus_(idToHighlight);
+      }
 
       var idToOpenOptions = this.getOptionsQueryParam_();
       if (idToOpenOptions && $(idToOpenOptions))
@@ -375,9 +394,6 @@ cr.define('extensions', function() {
      * @private
      */
     showExtensionNodes_: function() {
-      // Remove the rows from |focusGrid_| without destroying them.
-      this.focusGrid_.rows.length = 0;
-
       // Any node that is not updated will be removed.
       var seenIds = [];
 
@@ -430,6 +446,30 @@ cr.define('extensions', function() {
       var scrollTop = $(extensionId).offsetTop - scrollFudge *
           $(extensionId).clientHeight;
       setScrollTopForDocument(document, scrollTop);
+    },
+
+    /**
+     * @param {string} extensionId The id of the extension that should have
+     *     initial focus
+     * @private
+     */
+    setInitialFocus_: function(extensionId) {
+      var focusRow = assertInstanceof($(extensionId), ExtensionFocusRow);
+      var columnTypePriority = ['enabled', 'enterprise', 'website', 'details'];
+      var elementToFocus = null;
+      var elementPriority = columnTypePriority.length;
+
+      for (var i = 0; i < focusRow.focusableElements.length; ++i) {
+        var element = focusRow.focusableElements[i];
+        var priority =
+            columnTypePriority.indexOf(element.getAttribute('column-type'));
+        if (priority > -1 && priority < elementPriority) {
+          elementToFocus = element;
+          elementPriority = priority;
+        }
+      }
+
+      focusRow.getEquivalentElement(elementToFocus).focus();
     },
 
     /**
@@ -632,6 +672,12 @@ cr.define('extensions', function() {
       // when adding only one new row.
       this.insertBefore(row, nextNode);
       this.updateNode_(extension, row);
+
+      var nextRow = null;
+      if (nextNode)
+        nextRow = assertInstanceof(nextNode, ExtensionFocusRow);
+
+      this.focusGrid_.addRowBefore(row, nextRow);
     },
 
     /**
@@ -663,9 +709,6 @@ cr.define('extensions', function() {
         classes.push('may-not-modify');
       }
       row.classList.add.apply(row.classList, classes);
-
-      row.classList.toggle('extension-highlight',
-                           row.id == this.getIdQueryParam_());
 
       var item = row.querySelector('.extension-list-item');
       item.style.backgroundImage = 'url(' + extension.iconUrl + ')';
@@ -990,7 +1033,6 @@ cr.define('extensions', function() {
       }
 
       row.updateFocusableElements();
-      this.focusGrid_.addRow(row);
     },
 
     /**
@@ -1058,19 +1100,38 @@ cr.define('extensions', function() {
         if (cr.ui.FocusOutlineManager.forDocument(document).visible)
           overlay.setInitialFocus();
       };
-      overlay.setExtensionAndShowOverlay(extensionId, extension.name,
-                                         extension.iconUrl, shownCallback);
+      overlay.setExtensionAndShow(extensionId, extension.name,
+                                  extension.iconUrl, shownCallback);
       this.optionsShown_ = true;
 
       var self = this;
       $('overlay').addEventListener('cancelOverlay', function f() {
         self.optionsShown_ = false;
         $('overlay').removeEventListener('cancelOverlay', f);
+
+        // Remove the options query string.
+        uber.replaceState({}, '');
       });
 
       // TODO(dbeam): why do we need to focus <extensionoptions> before and
       // after its showing animation? Makes very little sense to me.
       overlay.setInitialFocus();
+    },
+
+    /**
+     * Hides the extension options overlay for the extension with id
+     * |extensionId|. If there is an overlay showing for a different extension,
+     * nothing happens.
+     * @param {string} extensionId ID of the extension to hide.
+     * @private
+     */
+    hideEmbeddedExtensionOptions_: function(extensionId) {
+      if (!this.optionsShown_)
+        return;
+
+      var overlay = extensions.ExtensionOptionsOverlay.getInstance();
+      if (overlay.getExtensionId() == extensionId)
+        overlay.close();
     },
 
     /**

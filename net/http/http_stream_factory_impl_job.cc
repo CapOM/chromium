@@ -449,10 +449,6 @@ int HttpStreamFactoryImpl::Job::OnHostResolution(
 }
 
 void HttpStreamFactoryImpl::Job::OnIOComplete(int result) {
-  // TODO(pkasting): Remove ScopedTracker below once crbug.com/455884 is fixed.
-  tracked_objects::ScopedTracker tracking_profile(
-      FROM_HERE_WITH_EXPLICIT_FUNCTION(
-          "455884 HttpStreamFactoryImpl::Job::OnIOComplete"));
   RunLoop(result);
 }
 
@@ -1014,6 +1010,12 @@ int HttpStreamFactoryImpl::Job::DoInitConnectionComplete(int result) {
     return result;
   }
 
+  if (IsSpdyAlternate() && !using_spdy_) {
+    job_status_ = STATUS_BROKEN;
+    MaybeMarkAlternativeServiceBroken();
+    return ERR_NPN_NEGOTIATION_FAILED;
+  }
+
   if (!ssl_started && result < 0 && IsAlternate()) {
     job_status_ = STATUS_BROKEN;
     // TODO(bnc): if (result == ERR_ALTERNATIVE_CERT_NOT_VALID_FOR_ORIGIN), then
@@ -1101,6 +1103,8 @@ int HttpStreamFactoryImpl::Job::DoCreateStream() {
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "462811 HttpStreamFactoryImpl::Job::DoCreateStream"));
   DCHECK(connection_->socket() || existing_spdy_session_.get() || using_quic_);
+  if (IsAlternate())
+    DCHECK(IsSpdyAlternate());
 
   next_state_ = STATE_CREATE_STREAM_COMPLETE;
 
@@ -1111,6 +1115,7 @@ int HttpStreamFactoryImpl::Job::DoCreateStream() {
     SetSocketMotivation();
 
   if (!using_spdy_) {
+    DCHECK(!IsSpdyAlternate());
     // We may get ftp scheme when fetching ftp resources through proxy.
     bool using_proxy = (proxy_info_.is_http() || proxy_info_.is_https()) &&
                        (request_info_.url.SchemeIs("http") ||
@@ -1261,57 +1266,30 @@ bool HttpStreamFactoryImpl::Job::IsSpdyAlternate() const {
 void HttpStreamFactoryImpl::Job::InitSSLConfig(const HostPortPair& server,
                                                SSLConfig* ssl_config,
                                                bool is_proxy) const {
+  if (!is_proxy) {
+    // Prior to HTTP/2 and SPDY, some servers use TLS renegotiation to request
+    // TLS client authentication after the HTTP request was sent. Allow
+    // renegotiation for only those connections.
+    //
+    // Note that this does NOT implement the provision in
+    // https://http2.github.io/http2-spec/#rfc.section.9.2.1 which allows the
+    // server to request a renegotiation immediately before sending the
+    // connection preface as waiting for the preface would cost the round trip
+    // that False Start otherwise saves.
+    ssl_config->renego_allowed_default = true;
+    ssl_config->renego_allowed_for_protos.push_back(kProtoHTTP11);
+  }
+
   if (proxy_info_.is_https() && ssl_config->send_client_cert) {
     // When connecting through an HTTPS proxy, disable TLS False Start so
     // that client authentication errors can be distinguished between those
     // originating from the proxy server (ERR_PROXY_CONNECTION_FAILED) and
     // those originating from the endpoint (ERR_SSL_PROTOCOL_ERROR /
     // ERR_BAD_SSL_CLIENT_AUTH_CERT).
-    // TODO(rch): This assumes that the HTTPS proxy will only request a
-    // client certificate during the initial handshake.
-    // http://crbug.com/59292
+    //
+    // This assumes the proxy will only request certificates on the initial
+    // handshake; renegotiation on the proxy connection is unsupported.
     ssl_config->false_start_enabled = false;
-  }
-
-  enum {
-    FALLBACK_NONE = 0,    // SSL version fallback did not occur.
-    FALLBACK_SSL3 = 1,    // Fell back to SSL 3.0.
-    FALLBACK_TLS1 = 2,    // Fell back to TLS 1.0.
-    FALLBACK_TLS1_1 = 3,  // Fell back to TLS 1.1.
-    FALLBACK_MAX
-  };
-
-  int fallback = FALLBACK_NONE;
-  if (ssl_config->version_fallback) {
-    switch (ssl_config->version_max) {
-      case SSL_PROTOCOL_VERSION_SSL3:
-        fallback = FALLBACK_SSL3;
-        break;
-      case SSL_PROTOCOL_VERSION_TLS1:
-        fallback = FALLBACK_TLS1;
-        break;
-      case SSL_PROTOCOL_VERSION_TLS1_1:
-        fallback = FALLBACK_TLS1_1;
-        break;
-    }
-  }
-  UMA_HISTOGRAM_ENUMERATION("Net.ConnectionUsedSSLVersionFallback",
-                            fallback, FALLBACK_MAX);
-
-  UMA_HISTOGRAM_BOOLEAN("Net.ConnectionUsedSSLDeprecatedCipherFallback",
-                        ssl_config->enable_deprecated_cipher_suites);
-
-  // We also wish to measure the amount of fallback connections for a host that
-  // we know implements TLS up to 1.2. Ideally there would be no fallback here
-  // but high numbers of SSLv3 would suggest that SSLv3 fallback is being
-  // caused by network middleware rather than buggy HTTPS servers.
-  const std::string& host = server.host();
-  if (!is_proxy &&
-      host.size() >= 10 &&
-      host.compare(host.size() - 10, 10, "google.com") == 0 &&
-      (host.size() == 10 || host[host.size()-11] == '.')) {
-    UMA_HISTOGRAM_ENUMERATION("Net.GoogleConnectionUsedSSLVersionFallback",
-                              fallback, FALLBACK_MAX);
   }
 
   if (request_info_.load_flags & LOAD_VERIFY_EV_CERT)

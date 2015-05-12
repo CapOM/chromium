@@ -166,14 +166,27 @@ ui::MenuModel* ExtensionActionViewController::GetContextMenu() {
   if (!ExtensionIsValid() || !extension()->ShowConfigureContextMenus())
     return nullptr;
 
+  ExtensionContextMenuModel::ButtonVisibility visibility =
+      ExtensionContextMenuModel::VISIBLE;
+  if (toolbar_actions_bar_) {
+    if (toolbar_actions_bar_->popped_out_action() == this)
+      visibility = ExtensionContextMenuModel::TRANSITIVELY_VISIBLE;
+    else if (!toolbar_actions_bar_->IsActionVisible(this))
+      visibility = ExtensionContextMenuModel::OVERFLOWED;
+    // Else, VISIBLE is correct.
+  }
   // Reconstruct the menu every time because the menu's contents are dynamic.
   context_menu_model_ = make_scoped_refptr(new ExtensionContextMenuModel(
-      extension(), browser_, this));
+      extension(), browser_, visibility, this));
   return context_menu_model_.get();
 }
 
-bool ExtensionActionViewController::IsMenuRunning() const {
-  return platform_delegate_->IsMenuRunning();
+void ExtensionActionViewController::OnContextMenuClosed() {
+  if (toolbar_actions_bar_ &&
+      toolbar_actions_bar_->popped_out_action() == this &&
+      !is_showing_popup()) {
+    toolbar_actions_bar_->UndoPopOut();
+  }
 }
 
 bool ExtensionActionViewController::CanDrag() const {
@@ -198,7 +211,7 @@ bool ExtensionActionViewController::ExecuteAction(PopupShowAction show_action,
 
   if (extensions::ExtensionActionAPI::Get(browser_->profile())
           ->ExecuteExtensionAction(
-              extension_, browser_, grant_tab_permissions) ==
+              extension_.get(), browser_, grant_tab_permissions) ==
       ExtensionAction::ACTION_SHOW_POPUP) {
     GURL popup_url = extension_action_->GetPopupUrl(
         SessionTabHelper::IdForTab(view_delegate_->GetCurrentWebContents()));
@@ -256,12 +269,6 @@ void ExtensionActionViewController::HideActivePopup() {
     // popups.
     HidePopup();
   }
-}
-
-void ExtensionActionViewController::OnMenuClosed() {
-  if (toolbar_actions_bar_->popped_out_action() == this &&
-      !is_showing_popup())
-    toolbar_actions_bar_->UndoPopOut();
 }
 
 bool ExtensionActionViewController::GetExtensionCommand(
@@ -356,7 +363,7 @@ void ExtensionActionViewController::OnPopupClosed() {
   if (toolbar_actions_bar_) {
     toolbar_actions_bar_->SetPopupOwner(nullptr);
     if (toolbar_actions_bar_->popped_out_action() == this &&
-        !platform_delegate_->IsMenuRunning())
+        !view_delegate_->IsMenuRunning())
       toolbar_actions_bar_->UndoPopOut();
   }
   view_delegate_->OnPopupClosed();

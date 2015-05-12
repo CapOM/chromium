@@ -1,16 +1,4 @@
 {
-  "Android GN": {
-    "additional_compile_targets": [
-      "chrome_shell_apk"
-    ],
-    "gtest_tests": []
-  },
-  "Android GN (dbg)": {
-    "additional_compile_targets": [
-      "chrome_shell_apk"
-    ],
-    "gtest_tests": []
-  },
   "Linux ChromiumOS Tests (1)": {
     "gtest_tests": [
       {
@@ -397,6 +385,7 @@
       "extensions_unittests",
       "gcm_unit_tests",
       "gfx_unittests",
+      "gl_unittests",
       "gn_unittests",
       "google_apis_unittests",
       "gpu_unittests",
@@ -457,6 +446,7 @@
       "extensions_unittests",
       "gcm_unit_tests",
       "gfx_unittests",
+      "gl_unittests",
       "gn_unittests",
       "google_apis_unittests",
       "gpu_unittests",

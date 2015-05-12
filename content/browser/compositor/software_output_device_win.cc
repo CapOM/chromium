@@ -9,7 +9,6 @@
 #include "third_party/skia/include/core/SkDevice.h"
 #include "ui/compositor/compositor.h"
 #include "ui/gfx/canvas.h"
-#include "ui/gfx/canvas_skia_paint.h"
 #include "ui/gfx/gdi_util.h"
 #include "ui/gfx/skia_util.h"
 
@@ -94,14 +93,6 @@ void SoftwareOutputDeviceWin::EndPaint(cc::SoftwareFrameData* frame_data) {
     skia::DrawToNativeContext(canvas, hdc, rect.x(), rect.y(), &src_rect);
     ::ReleaseDC(hwnd_, hdc);
   }
-}
-
-void SoftwareOutputDeviceWin::CopyToPixels(const gfx::Rect& rect,
-                                           void* pixels) {
-  DCHECK(contents_);
-  SkImageInfo info = SkImageInfo::MakeN32Premul(rect.width(), rect.height());
-  contents_->sk_canvas()->readPixels(
-      info, pixels, info.minRowBytes(), rect.x(), rect.y());
 }
 
 }  // namespace content

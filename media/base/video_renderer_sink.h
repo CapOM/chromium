@@ -27,8 +27,13 @@ class MEDIA_EXPORT VideoRendererSink {
     // rendering within the requested interval.  Intervals are expected to be
     // regular, contiguous, and monotonically increasing.  Irregular intervals
     // may affect the rendering decisions made by the underlying callback.
+    //
+    // If |background_rendering| is true, the VideoRenderSink is pumping
+    // callbacks at a lower frequency than normal and the results of the
+    // Render() call may not be used.
     virtual scoped_refptr<VideoFrame> Render(base::TimeTicks deadline_min,
-                                             base::TimeTicks deadline_max) = 0;
+                                             base::TimeTicks deadline_max,
+                                             bool background_rendering) = 0;
 
     // Called by the sink when a VideoFrame previously returned via Render() was
     // not actually rendered.  Must be called before the next Render() call.
@@ -55,6 +60,10 @@ class MEDIA_EXPORT VideoRendererSink {
   // is amazing and the old path is not! http://crbug.com/439548
   virtual void PaintFrameUsingOldRenderingPath(
       const scoped_refptr<VideoFrame>& frame) = 0;
+
+  // TODO(dalecurtis): We may need OnSizeChanged() and OnOpacityChanged()
+  // methods on this interface if background rendering is handled inside of
+  // the media layer instead of by VideoFrameCompositor.
 
   virtual ~VideoRendererSink() {}
 };

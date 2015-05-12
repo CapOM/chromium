@@ -5,25 +5,22 @@
 package org.chromium.android_webview;
 
 import android.annotation.SuppressLint;
-import android.app.SearchManager;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.provider.Browser;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.webkit.URLUtil;
 import android.webkit.WebChromeClient;
 import android.widget.FrameLayout;
 
+import org.chromium.base.Log;
 import org.chromium.content.browser.ContentVideoViewClient;
 import org.chromium.content.browser.ContentViewClient;
 import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content.browser.SelectActionMode;
 import org.chromium.content.browser.SelectActionModeCallback.ActionHandler;
-
-import java.net.URISyntaxException;
 
 /**
  * ContentViewClient implementation for WebView
@@ -63,8 +60,8 @@ public class AwContentViewClient extends ContentViewClient implements ContentVid
         // Perform generic parsing of the URI to turn it into an Intent.
         try {
             intent = Intent.parseUri(contentUrl, Intent.URI_INTENT_SCHEME);
-        } catch (URISyntaxException ex) {
-            Log.w(TAG, "Bad URI " + contentUrl + ": " + ex.getMessage());
+        } catch (Exception ex) {
+            Log.w(TAG, "Bad URI " + contentUrl, ex);
             return;
         }
         // Sanitize the Intent, ensuring web pages can not bypass browser
@@ -197,24 +194,5 @@ public class AwContentViewClient extends ContentViewClient implements ContentVid
     @Override
     public boolean isExternalFlingActive() {
         return mAwContents.isFlingActive();
-    }
-
-    @Override
-    public boolean doesPerformWebSearch() {
-        return true;
-    }
-
-    @Override
-    public void performWebSearch(String query) {
-        Intent i = new Intent(Intent.ACTION_WEB_SEARCH);
-        i.putExtra(SearchManager.EXTRA_NEW_SEARCH, true);
-        i.putExtra(SearchManager.QUERY, query);
-        i.putExtra(Browser.EXTRA_APPLICATION_ID, mContext.getPackageName());
-        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        try {
-            mContext.startActivity(i);
-        } catch (android.content.ActivityNotFoundException ex) {
-            // If no app handles it, do nothing.
-        }
     }
 }

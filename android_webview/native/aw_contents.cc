@@ -523,13 +523,17 @@ void AwContents::HideGeolocationPrompt(const GURL& origin) {
   }
 }
 
-void AwContents::OnPermissionRequest(AwPermissionRequest* request) {
+void AwContents::OnPermissionRequest(
+    base::android::ScopedJavaLocalRef<jobject> j_request,
+    AwPermissionRequest* request) {
+  DCHECK(!j_request.is_null());
+  DCHECK(request);
+
   JNIEnv* env = AttachCurrentThread();
-  ScopedJavaLocalRef<jobject> j_request = request->CreateJavaPeer();
   ScopedJavaLocalRef<jobject> j_ref = java_ref_.get(env);
-  if (j_request.is_null() || j_ref.is_null()) {
-    permission_request_handler_->CancelRequest(
-        request->GetOrigin(), request->GetResources());
+  if (j_ref.is_null()) {
+    permission_request_handler_->CancelRequest(request->GetOrigin(),
+                                               request->GetResources());
     return;
   }
 
@@ -850,7 +854,7 @@ jboolean AwContents::RestoreFromOpaqueState(
   std::vector<uint8> state_vector;
   base::android::JavaByteArrayToByteVector(env, state, &state_vector);
 
-  Pickle pickle(reinterpret_cast<const char*>(state_vector.begin()),
+  Pickle pickle(reinterpret_cast<const char*>(state_vector.data()),
                 state_vector.size());
   PickleIterator iterator(pickle);
 

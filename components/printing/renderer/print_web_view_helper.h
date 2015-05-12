@@ -62,11 +62,7 @@ class FrameReference {
 
   void Reset(blink::WebLocalFrame* frame);
 
-  bool IsFrameValid() const;
-
-  const blink::WebLocalFrame* GetFrame() const;
   blink::WebLocalFrame* GetFrame();
-  const blink::WebView* view() const;
   blink::WebView* view();
 
  private:
@@ -93,9 +89,6 @@ class PrintWebViewHelper
     // Returns the element to be printed. Returns a null WebElement if
     // a pdf plugin element can't be extracted from the frame.
     virtual blink::WebElement GetPdfElement(blink::WebLocalFrame* frame) = 0;
-
-    // Used to know whether the content to print could be nested in an iframe.
-    virtual bool IsOutOfProcessPdfEnabled() = 0;
 
     virtual bool IsPrintPreviewEnabled() = 0;
 

@@ -134,10 +134,12 @@ void ImageDecoder::DecodeImageInSandbox(
   batch_mode_timer_->Reset();
 
   switch (image_codec) {
+#if defined(OS_CHROMEOS)
     case ROBUST_JPEG_CODEC:
       utility_process_host_->Send(new ChromeUtilityMsg_RobustJPEGDecodeImage(
           image_data, request_id));
       break;
+#endif  // defined(OS_CHROMEOS)
     case DEFAULT_CODEC:
       utility_process_host_->Send(new ChromeUtilityMsg_DecodeImage(
           image_data, shrink_to_fit, request_id));
@@ -160,8 +162,8 @@ void ImageDecoder::CancelImpl(ImageRequest* image_request) {
 void ImageDecoder::StartBatchMode() {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
   utility_process_host_ =
-      UtilityProcessHost::Create(this, base::MessageLoopProxy::current().get())
-          ->AsWeakPtr();
+      UtilityProcessHost::Create(
+          this, base::ThreadTaskRunnerHandle::Get().get())->AsWeakPtr();
   utility_process_host_->SetName(l10n_util::GetStringUTF16(
       IDS_UTILITY_PROCESS_IMAGE_DECODER_NAME));
   if (!utility_process_host_->StartBatchMode()) {
@@ -172,10 +174,46 @@ void ImageDecoder::StartBatchMode() {
 
 void ImageDecoder::StopBatchMode() {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  {
+    // Check for outstanding requests and wait for them to finish.
+    base::AutoLock lock(map_lock_);
+    if (!image_request_id_map_.empty()) {
+      batch_mode_timer_->Reset();
+      return;
+    }
+  }
+
   if (utility_process_host_) {
     utility_process_host_->EndBatchMode();
     utility_process_host_.reset();
   }
+}
+
+void ImageDecoder::FailAllRequests() {
+  RequestMap requests;
+  {
+    base::AutoLock lock(map_lock_);
+    requests = image_request_id_map_;
+  }
+
+  // Since |OnProcessCrashed| and |OnProcessLaunchFailed| are run asynchronously
+  // from the actual event, it's possible for a new utility process to have been
+  // created and sent requests by the time these functions are run. This results
+  // in failing requests that are unaffected by the crash. Although not ideal,
+  // this is valid and simpler than tracking which request is sent to which
+  // utility process, and whether the request has been sent at all.
+  for (const auto& request : requests)
+    OnDecodeImageFailed(request.first);
+}
+
+void ImageDecoder::OnProcessCrashed(int exit_code) {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  FailAllRequests();
+}
+
+void ImageDecoder::OnProcessLaunchFailed() {
+  DCHECK_CURRENTLY_ON(BrowserThread::IO);
+  FailAllRequests();
 }
 
 bool ImageDecoder::OnMessageReceived(

@@ -47,6 +47,7 @@
 #include "media/midi/midi_port_info.h"
 
 namespace media {
+namespace midi {
 namespace {
 
 static const size_t kBufferLength = 32 * 1024;
@@ -330,6 +331,10 @@ struct MidiInputDeviceState final : base::RefCounted<MidiInputDeviceState> {
   // True if |start_time| is initialized. This field is not used so far, but
   // kept for the debugging purpose.
   bool start_time_initialized;
+
+ private:
+  friend class base::RefCounted<MidiInputDeviceState>;
+  ~MidiInputDeviceState() {}
 };
 
 struct MidiOutputDeviceState final : base::RefCounted<MidiOutputDeviceState> {
@@ -355,6 +360,10 @@ struct MidiOutputDeviceState final : base::RefCounted<MidiOutputDeviceState> {
   // TODO(toyoshim): Use std::atomic<bool> when it is allowed in Chromium
   // project.
   volatile bool closed;
+
+ private:
+  friend class base::RefCounted<MidiOutputDeviceState>;
+  ~MidiOutputDeviceState() {}
 };
 
 // The core logic of MIDI device handling for Windows. Basically this class is
@@ -1126,8 +1135,37 @@ void MidiManagerWin::DispatchSendMidiData(MidiManagerClient* client,
   client->AccumulateMidiBytesSent(data.size());
 }
 
+void MidiManagerWin::OnCompleteInitialization(MidiResult result) {
+  CompleteInitialization(result);
+}
+
+void MidiManagerWin::OnAddInputPort(MidiPortInfo info) {
+  AddInputPort(info);
+}
+
+void MidiManagerWin::OnAddOutputPort(MidiPortInfo info) {
+  AddOutputPort(info);
+}
+
+void MidiManagerWin::OnSetInputPortState(uint32 port_index,
+                                         MidiPortState state) {
+  SetInputPortState(port_index, state);
+}
+
+void MidiManagerWin::OnSetOutputPortState(uint32 port_index,
+                                          MidiPortState state) {
+  SetOutputPortState(port_index, state);
+}
+
+void MidiManagerWin::OnReceiveMidiData(uint32 port_index,
+                                       const std::vector<uint8>& data,
+                                       base::TimeTicks time) {
+  ReceiveMidiData(port_index, &data[0], data.size(), time);
+}
+
 MidiManager* MidiManager::Create() {
   return new MidiManagerWin();
 }
 
+}  // namespace midi
 }  // namespace media

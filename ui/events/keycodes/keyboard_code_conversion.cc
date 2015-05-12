@@ -7,8 +7,8 @@
 #include <algorithm>
 
 #include "ui/events/event_constants.h"
-#include "ui/events/keycodes/dom3/dom_code.h"
-#include "ui/events/keycodes/dom3/dom_key.h"
+#include "ui/events/keycodes/dom/dom_code.h"
+#include "ui/events/keycodes/dom/dom_key.h"
 #include "ui/events/keycodes/dom_us_layout_data.h"
 
 namespace ui {
@@ -425,6 +425,21 @@ bool DomCodeToControlCharacter(DomCode dom_code,
       return true;
     default:
       return false;
+  }
+}
+
+DomKey CharacterToDomKey(uint32 character) {
+  switch (character) {
+    case 0x08:
+      return DomKey::BACKSPACE;
+    case 0x09:
+      return DomKey::TAB;
+    case 0x0D:
+      return DomKey::ENTER;
+    case 0x1B:
+      return DomKey::ESCAPE;
+    default:
+      return DomKey::CHARACTER;
   }
 }
 

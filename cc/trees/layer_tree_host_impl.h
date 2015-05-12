@@ -80,6 +80,7 @@ enum class GpuRasterizationStatus {
   ON_FORCED,
   OFF_DEVICE,
   OFF_VIEWPORT,
+  MSAA_CONTENT,
   OFF_CONTENT
 };
 
@@ -232,7 +233,7 @@ class CC_EXPORT LayerTreeHostImpl
   // DidDrawAllLayers must also be called, regardless of whether DrawLayers is
   // called between the two.
   virtual DrawResult PrepareToDraw(FrameData* frame);
-  virtual void DrawLayers(FrameData* frame, base::TimeTicks frame_begin_time);
+  virtual void DrawLayers(FrameData* frame);
   // Must be called if and only if PrepareToDraw was called.
   void DidDrawAllLayers(const FrameData& frame);
 
@@ -319,15 +320,19 @@ class CC_EXPORT LayerTreeHostImpl
 
   virtual bool InitializeRenderer(scoped_ptr<OutputSurface> output_surface);
   TileManager* tile_manager() { return tile_manager_.get(); }
-  void SetUseGpuRasterization(bool use_gpu);
+
+  void set_has_gpu_rasterization_trigger(bool flag) {
+    has_gpu_rasterization_trigger_ = flag;
+  }
+  void set_content_is_suitable_for_gpu_rasterization(bool flag) {
+    content_is_suitable_for_gpu_rasterization_ = flag;
+  }
+  void UpdateGpuRasterizationStatus();
   bool use_gpu_rasterization() const { return use_gpu_rasterization_; }
+  bool use_msaa() const { return use_msaa_; }
 
   GpuRasterizationStatus gpu_rasterization_status() const {
     return gpu_rasterization_status_;
-  }
-  void set_gpu_rasterization_status(
-      GpuRasterizationStatus gpu_rasterization_status) {
-    gpu_rasterization_status_ = gpu_rasterization_status;
   }
 
   bool create_low_res_tiling() const {
@@ -339,6 +344,7 @@ class CC_EXPORT LayerTreeHostImpl
 
   virtual bool SwapBuffers(const FrameData& frame);
   virtual void WillBeginImplFrame(const BeginFrameArgs& args);
+  virtual void DidFinishImplFrame();
   void DidModifyTilePriorities();
 
   LayerTreeImpl* active_tree() { return active_tree_.get(); }
@@ -442,8 +448,6 @@ class CC_EXPORT LayerTreeHostImpl
   void SetTreePriority(TreePriority priority);
   TreePriority GetTreePriority() const;
 
-  void UpdateCurrentBeginFrameArgs(const BeginFrameArgs& args);
-  void ResetCurrentBeginFrameArgsForNextFrame();
   virtual BeginFrameArgs CurrentBeginFrameArgs() const;
 
   // Expected time between two begin impl frame calls.
@@ -492,9 +496,6 @@ class CC_EXPORT LayerTreeHostImpl
   // to unregister itself.
   void InsertSwapPromiseMonitor(SwapPromiseMonitor* monitor);
   void RemoveSwapPromiseMonitor(SwapPromiseMonitor* monitor);
-
-  void GetPictureLayerImplPairs(std::vector<PictureLayerImpl::Pair>* layers,
-                                bool need_valid_tile_priorities) const;
 
   // TODO(weiliangc): Replace RequiresHighResToDraw with scheduler waits for
   // ReadyToDraw. crbug.com/469175
@@ -640,7 +641,10 @@ class CC_EXPORT LayerTreeHostImpl
   // |tile_manager_| can also be NULL when raster_enabled is false.
   scoped_ptr<ResourceProvider> resource_provider_;
   scoped_ptr<TileManager> tile_manager_;
+  bool content_is_suitable_for_gpu_rasterization_;
+  bool has_gpu_rasterization_trigger_;
   bool use_gpu_rasterization_;
+  bool use_msaa_;
   GpuRasterizationStatus gpu_rasterization_status_;
   scoped_ptr<TileTaskWorkerPool> tile_task_worker_pool_;
   scoped_ptr<ResourcePool> resource_pool_;
@@ -749,7 +753,6 @@ class CC_EXPORT LayerTreeHostImpl
   int id_;
 
   std::set<SwapPromiseMonitor*> swap_promise_monitor_;
-  std::vector<PictureLayerImpl::Pair> picture_layer_pairs_;
 
   bool requires_high_res_to_draw_;
   bool is_likely_to_require_a_draw_;

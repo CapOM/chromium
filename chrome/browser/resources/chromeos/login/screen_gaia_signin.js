@@ -179,17 +179,9 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
         e.preventDefault();
       });
 
-      $('back-button-item').addEventListener('mousedown', function(e) {
-        e.preventDefault();
-      });
-
       $('back-button-item').addEventListener('click', function(e) {
         $('back-button-item').hidden = true;
         $('signin-frame').back();
-        e.preventDefault();
-      });
-
-      $('close-button-item').addEventListener('mousedown', function(e) {
         e.preventDefault();
       });
 
@@ -404,8 +396,6 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
 
       // Reset SAML
       this.classList.toggle('full-width', false);
-      if (Oobe.getInstance().currentScreen === this)
-        Oobe.getInstance().updateScreenSize(this);
       this.samlPasswordConfirmAttempt_ = 0;
 
       this.updateAuthExtension(data);
@@ -423,18 +413,20 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
       if (this.isNewGaiaFlow) {
         $('inner-container').classList.add('new-gaia-flow');
         $('progress-dots').hidden = true;
-        if (data.enterpriseDomain)
-          params.enterpriseDomain = data.enterpriseDomain;
         params.chromeType = data.chromeType;
         params.isNewGaiaFlowChromeOS = true;
         $('login-header-bar').showGuestButton = true;
-        params.deviceId = data.deviceId;
       }
 
       if (data.gaiaEndpoint)
         params.gaiaPath = data.gaiaEndpoint;
 
       $('login-header-bar').newGaiaFlow = this.isNewGaiaFlow;
+
+      // Screen size could have been changed because of 'new-gaia-flow' or
+      // 'full-width' classes.
+      if (Oobe.getInstance().currentScreen === this)
+        Oobe.getInstance().updateScreenSize(this);
 
       if (data.forceReload ||
           JSON.stringify(this.gaiaAuthParams_) != JSON.stringify(params)) {
@@ -651,10 +643,11 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      * Invoked when the user has successfully authenticated via SAML, the
      * principals API was not used and the auth host needs the user to confirm
      * the scraped password.
+     * @param {string} email The authenticated user's e-mail.
      * @param {number} passwordCount The number of passwords that were scraped.
      * @private
      */
-    onAuthConfirmPassword_: function(passwordCount) {
+    onAuthConfirmPassword_: function(email, passwordCount) {
       this.loading = true;
       Oobe.getInstance().headerHidden = false;
 
@@ -663,6 +656,7 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
 
       if (this.samlPasswordConfirmAttempt_ < 2) {
         login.ConfirmPasswordScreen.show(
+            email,
             this.samlPasswordConfirmAttempt_,
             this.onConfirmPasswordCollected_.bind(this));
       } else {

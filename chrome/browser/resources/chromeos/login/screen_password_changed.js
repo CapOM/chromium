@@ -45,7 +45,8 @@ login.createScreen('PasswordChangedScreen', 'password-changed', function() {
 
       var gaiaPasswordChanged = $('gaia-password-changed');
       gaiaPasswordChanged.addEventListener('cancel', function(e) {
-          chrome.send('cancelPasswordChangedFlow');
+          chrome.send('cancelPasswordChangedFlow',
+              [$('gaia-password-changed').email]);
           gaiaPasswordChanged.reset();
         });
 
@@ -133,16 +134,12 @@ login.createScreen('PasswordChangedScreen', 'password-changed', function() {
           value ? 'add' : 'remove']('disabled');
     },
 
-    get isNewGaiaFlow() {
-      return document.querySelector('.new-gaia-flow') != undefined;
-    },
-
     /**
      * Cancels password migration and drops the user back to the login screen.
      */
     cancel: function() {
       this.disabled = true;
-      chrome.send('cancelPasswordChangedFlow');
+      chrome.send('cancelPasswordChangedFlow', ['']);
     },
 
     /**
@@ -158,7 +155,7 @@ login.createScreen('PasswordChangedScreen', 'password-changed', function() {
     },
 
     onAfterShow: function(data) {
-      if (this.isNewGaiaFlow)
+      if (Oobe.isNewGaiaFlow())
         $('gaia-password-changed').focus();
     },
 
@@ -182,7 +179,7 @@ login.createScreen('PasswordChangedScreen', 'password-changed', function() {
      * @param {boolean} showError Whether to show the incorrect password error.
      */
     show: function(showError, email) {
-      if (this.isNewGaiaFlow) {
+      if (Oobe.isNewGaiaFlow()) {
         $('password-changed-contents').hidden = true;
         $('password-changed-controls').hidden = true;
         var gaiaPasswordChanged = $('gaia-password-changed');
@@ -205,7 +202,7 @@ login.createScreen('PasswordChangedScreen', 'password-changed', function() {
       Oobe.getInstance().headerHidden = false;
       Oobe.showScreen({id: SCREEN_PASSWORD_CHANGED});
       $('login-header-bar').signinUIState = SIGNIN_UI_STATE.PASSWORD_CHANGED;
-      if (!this.isNewGaiaFlow)
+      if (!Oobe.isNewGaiaFlow())
         $('password-changed-ok-button').disabled = true;
     }
   };

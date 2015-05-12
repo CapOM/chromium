@@ -37,6 +37,7 @@
 #include "content/renderer/input/input_handler_manager.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
 #include "third_party/WebKit/public/platform/WebCompositeAndReadbackAsyncCallback.h"
+#include "third_party/WebKit/public/platform/WebLayoutAndPaintAsyncCallback.h"
 #include "third_party/WebKit/public/platform/WebSize.h"
 #include "third_party/WebKit/public/web/WebKit.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
@@ -207,6 +208,7 @@ RenderWidgetCompositor::RenderWidgetCompositor(
     : num_failed_recreate_attempts_(0),
       widget_(widget),
       compositor_deps_(compositor_deps),
+      layout_and_paint_async_callback_(nullptr),
       weak_factory_(this) {
 }
 
@@ -232,12 +234,6 @@ void RenderWidgetCompositor::Initialize() {
   if (cmd->HasSwitch(switches::kEnableCompositorAnimationTimelines)) {
     settings.use_compositor_animation_timelines = true;
     blink::WebRuntimeFeatures::enableCompositorAnimationTimelines(true);
-  }
-  if (cmd->HasSwitch(switches::kEnableBeginFrameScheduling) &&
-      !widget_->for_oopif()) {
-    // TODO(simonhong): Apply BeginFrame scheduling for OOPIF.
-    // See crbug.com/471411.
-    settings.use_external_begin_frame_source = true;
   }
 
   settings.default_tile_size = CalculateDefaultTileSize(widget_);
@@ -315,7 +311,8 @@ void RenderWidgetCompositor::Initialize() {
   settings.use_pinch_virtual_viewport =
       cmd->HasSwitch(cc::switches::kEnablePinchVirtualViewport);
   settings.verify_property_trees =
-      cmd->HasSwitch(cc::switches::kEnablePropertyTreeVerification);
+      cmd->HasSwitch(cc::switches::kEnablePropertyTreeVerification) &&
+      settings.impl_side_painting;
   settings.renderer_settings.allow_antialiasing &=
       !cmd->HasSwitch(cc::switches::kDisableCompositedAntialiasing);
   settings.single_thread_proxy_scheduler =
@@ -431,6 +428,8 @@ void RenderWidgetCompositor::Initialize() {
   // TODO(danakj): Only do this on low end devices.
   settings.create_low_res_tiling = true;
 
+  settings.use_external_begin_frame_source = true;
+
 #elif !defined(OS_MACOSX)
   if (ui::IsOverlayScrollbarEnabled()) {
     settings.scrollbar_animator = cc::LayerTreeSettings::THINNING;
@@ -456,6 +455,14 @@ void RenderWidgetCompositor::Initialize() {
     settings.create_low_res_tiling = true;
   if (cmd->HasSwitch(switches::kDisableLowResTiling))
     settings.create_low_res_tiling = false;
+  if (cmd->HasSwitch(switches::kEnableBeginFrameScheduling))
+    settings.use_external_begin_frame_source = true;
+
+  if (widget_->for_oopif()) {
+    // TODO(simonhong): Apply BeginFrame scheduling for OOPIF.
+    // See crbug.com/471411.
+    settings.use_external_begin_frame_source = false;
+  }
 
   scoped_refptr<base::SingleThreadTaskRunner> compositor_thread_task_runner =
       compositor_deps_->GetCompositorImplThreadTaskRunner();
@@ -475,16 +482,19 @@ void RenderWidgetCompositor::Initialize() {
         compositor_deps_->CreateExternalBeginFrameSource(widget_->routing_id());
   }
 
+  cc::LayerTreeHost::InitParams params;
+  params.client = this;
+  params.shared_bitmap_manager = shared_bitmap_manager;
+  params.gpu_memory_buffer_manager = gpu_memory_buffer_manager;
+  params.settings = &settings;
+  params.task_graph_runner = task_graph_runner;
+  params.main_task_runner = main_thread_compositor_task_runner;
+  params.external_begin_frame_source = external_begin_frame_source.Pass();
   if (compositor_thread_task_runner.get()) {
     layer_tree_host_ = cc::LayerTreeHost::CreateThreaded(
-        this, shared_bitmap_manager, gpu_memory_buffer_manager,
-        task_graph_runner, settings, main_thread_compositor_task_runner,
-        compositor_thread_task_runner, external_begin_frame_source.Pass());
+        compositor_thread_task_runner, &params);
   } else {
-    layer_tree_host_ = cc::LayerTreeHost::CreateSingleThreaded(
-        this, this, shared_bitmap_manager, gpu_memory_buffer_manager,
-        task_graph_runner, settings, main_thread_compositor_task_runner,
-        external_begin_frame_source.Pass());
+    layer_tree_host_ = cc::LayerTreeHost::CreateSingleThreaded(this, &params);
   }
   DCHECK(layer_tree_host_);
 }
@@ -715,22 +725,43 @@ void CompositeAndReadbackAsyncCallback(
   }
 }
 
+void RenderWidgetCompositor::layoutAndPaintAsync(
+    blink::WebLayoutAndPaintAsyncCallback* callback) {
+  DCHECK(!temporary_copy_output_request_ && !layout_and_paint_async_callback_);
+  layout_and_paint_async_callback_ = callback;
+  ScheduleCommit();
+}
+
 void RenderWidgetCompositor::compositeAndReadbackAsync(
     blink::WebCompositeAndReadbackAsyncCallback* callback) {
-  DCHECK(!temporary_copy_output_request_);
+  DCHECK(!temporary_copy_output_request_ && !layout_and_paint_async_callback_);
   temporary_copy_output_request_ =
       cc::CopyOutputRequest::CreateBitmapRequest(
           base::Bind(&CompositeAndReadbackAsyncCallback, callback));
   // Force a commit to happen. The temporary copy output request will
   // be installed after layout which will happen as a part of the commit, for
   // widgets that delay the creation of their output surface.
-  bool threaded = !!compositor_deps_->GetCompositorImplThreadTaskRunner().get();
-  if (!threaded &&
-      !layer_tree_host_->settings().single_thread_proxy_scheduler) {
-    layer_tree_host_->Composite(gfx::FrameTime::Now());
+  ScheduleCommit();
+}
+
+bool RenderWidgetCompositor::CommitIsSynchronous() const {
+  return !compositor_deps_->GetCompositorImplThreadTaskRunner().get() &&
+         !layer_tree_host_->settings().single_thread_proxy_scheduler;
+}
+
+void RenderWidgetCompositor::ScheduleCommit() {
+  if (CommitIsSynchronous()) {
+    base::MessageLoop::current()->PostTask(
+        FROM_HERE, base::Bind(&RenderWidgetCompositor::SynchronousCommit,
+                              weak_factory_.GetWeakPtr()));
   } else {
     layer_tree_host_->SetNeedsCommit();
   }
+}
+
+void RenderWidgetCompositor::SynchronousCommit() {
+  DCHECK(CommitIsSynchronous());
+  layer_tree_host_->Composite(gfx::FrameTime::Now());
 }
 
 void RenderWidgetCompositor::finishAllRendering() {
@@ -896,6 +927,10 @@ void RenderWidgetCompositor::DidFailToInitializeOutputSurface() {
 }
 
 void RenderWidgetCompositor::WillCommit() {
+  if (!layout_and_paint_async_callback_)
+    return;
+  layout_and_paint_async_callback_->didLayoutAndPaint();
+  layout_and_paint_async_callback_ = nullptr;
 }
 
 void RenderWidgetCompositor::DidCommit() {

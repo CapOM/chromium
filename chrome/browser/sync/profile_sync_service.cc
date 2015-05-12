@@ -22,6 +22,7 @@
 #include "base/profiler/scoped_tracker.h"
 #include "base/strings/string16.h"
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/thread_restrictions.h"
 #include "build/build_config.h"
 #include "chrome/browser/browser_process.h"
@@ -2146,7 +2147,9 @@ bool ProfileSyncService::SetDecryptionPassphrase(
     const std::string& passphrase) {
   if (IsPassphraseRequired()) {
     DVLOG(1) << "Setting passphrase for decryption.";
-    return backend_->SetDecryptionPassphrase(passphrase);
+    bool result = backend_->SetDecryptionPassphrase(passphrase);
+    UMA_HISTOGRAM_BOOLEAN("Sync.PassphraseDecryptionSucceeded", result);
+    return result;
   } else {
     NOTREACHED() << "SetDecryptionPassphrase must not be called when "
                     "IsPassphraseRequired() is false.";
@@ -2638,7 +2641,7 @@ void ProfileSyncService::CheckSyncBackupIfNeeded() {
           FROM_HERE,
           base::Bind(syncer::CheckSyncDbLastModifiedTime,
                      profile_->GetPath().Append(kSyncBackupDataFolderName),
-                     base::MessageLoopProxy::current(),
+                     base::ThreadTaskRunnerHandle::Get(),
                      base::Bind(&ProfileSyncService::CheckSyncBackupCallback,
                                 weak_factory_.GetWeakPtr())));
     } else {
@@ -2646,7 +2649,7 @@ void ProfileSyncService::CheckSyncBackupIfNeeded() {
           content::BrowserThread::FILE, FROM_HERE,
           base::Bind(syncer::CheckSyncDbLastModifiedTime,
                      profile_->GetPath().Append(kSyncBackupDataFolderName),
-                     base::MessageLoopProxy::current(),
+                     base::ThreadTaskRunnerHandle::Get(),
                      base::Bind(&ProfileSyncService::CheckSyncBackupCallback,
                                 weak_factory_.GetWeakPtr())));
     }

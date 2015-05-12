@@ -22,6 +22,7 @@
 #include "base/task_runner.h"
 #include "base/values.h"
 #include "components/history/core/browser/history_backend.h"
+#include "components/history/core/browser/history_constants.h"
 #include "components/history/core/browser/history_db_task.h"
 #include "components/history/core/browser/page_usage_data.h"
 #include "components/history/core/browser/top_sites_cache.h"
@@ -74,7 +75,14 @@ const int kDaysOfHistory = 90;
 const int64 kUpdateIntervalSecs = 15;
 // Intervals between requests to HistoryService.
 const int64 kMinUpdateIntervalMinutes = 1;
+#if !defined(OS_IOS)
 const int64 kMaxUpdateIntervalMinutes = 60;
+#else
+// On iOS, having the max at 60 results in the topsites database being
+// not updated often enough since the app isn't usually running for long
+// stretches of time.
+const int64 kMaxUpdateIntervalMinutes = 5;
+#endif  // !defined(OS_IOS)
 
 // Use 100 quality (highest quality) because we're very sensitive to
 // artifacts for these small sized, highly detailed images.
@@ -317,11 +325,11 @@ bool TopSitesImpl::HasBlacklistedItems() const {
 void TopSitesImpl::AddBlacklistedURL(const GURL& url) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
-  base::Value* dummy = base::Value::CreateNullValue();
+  scoped_ptr<base::Value> dummy = base::Value::CreateNullValue();
   {
     DictionaryPrefUpdate update(pref_service_, blacklist_pref_name_);
     base::DictionaryValue* blacklist = update.Get();
-    blacklist->SetWithoutPathExpansion(GetURLHash(url), dummy);
+    blacklist->SetWithoutPathExpansion(GetURLHash(url), dummy.Pass());
   }
 
   ResetThreadSafeCache();

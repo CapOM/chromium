@@ -84,8 +84,6 @@ PRUNE_DIRS = (VCS_METADATA_DIRS +
 ADDITIONAL_PATHS = (
     os.path.join('breakpad'),
     os.path.join('chrome', 'common', 'extensions', 'docs', 'examples'),
-    os.path.join('chrome', 'browser', 'resources', 'settings', 'routing',
-                 'more_routing'),
     os.path.join('chrome', 'test', 'chromeos', 'autotest'),
     os.path.join('chrome', 'test', 'data'),
     os.path.join('native_client'),
@@ -98,9 +96,9 @@ ADDITIONAL_PATHS = (
     os.path.join('tools', 'page_cycler', 'acid3'),
     os.path.join('url', 'third_party', 'mozilla'),
     os.path.join('v8'),
-    # Fake directory so we can include the strongtalk license.
+    # Fake directories to include the strongtalk and fdlibm licenses.
     os.path.join('v8', 'strongtalk'),
-    os.path.join('v8', 'third_party', 'fdlibm'),
+    os.path.join('v8', 'fdlibm'),
 )
 
 
@@ -223,12 +221,12 @@ SPECIAL_CASES = {
         # Absolute path here is resolved as relative to the source root.
         "License File": "/v8/LICENSE.strongtalk",
     },
-    os.path.join('v8', 'third_party', 'fdlibm'): {
+    os.path.join('v8', 'fdlibm'): {
         "Name": "fdlibm",
         "URL": "http://www.netlib.org/fdlibm/",
         "License": "Freely Distributable",
         # Absolute path here is resolved as relative to the source root.
-        "License File" : "/v8/third_party/fdlibm/LICENSE",
+        "License File" : "/v8/src/third_party/fdlibm/LICENSE",
         "License Android Compatible" : "yes",
     },
     os.path.join('third_party', 'khronos_glcts'): {

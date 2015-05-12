@@ -745,8 +745,7 @@ void View::Paint(const ui::PaintContext& parent_context) {
     DCHECK_IMPLIES(!parent(), bounds().origin() == gfx::Point());
     offset_to_parent = GetMirroredPosition().OffsetFromOrigin();
   }
-  ui::PaintContext context =
-      parent_context.CloneWithPaintOffset(offset_to_parent);
+  ui::PaintContext context(parent_context, offset_to_parent);
 
   bool is_invalidated = true;
   if (context.CanCheckInvalid()) {
@@ -781,10 +780,8 @@ void View::Paint(const ui::PaintContext& parent_context) {
 
   // If the view is backed by a layer, it should paint with itself as the origin
   // rather than relative to its parent.
-  scoped_ptr<ui::ClipTransformRecorder> clip_transform_recorder;
+  ui::ClipTransformRecorder clip_transform_recorder(context);
   if (!layer()) {
-    clip_transform_recorder.reset(new ui::ClipTransformRecorder(context));
-
     // Set the clip rect to the bounds of this View. Note that the X (or left)
     // position we pass to ClipRect takes into consideration whether or not the
     // View uses a right-to-left layout so that we paint the View in its
@@ -794,7 +791,7 @@ void View::Paint(const ui::PaintContext& parent_context) {
     if (parent_)
       clip_rect_in_parent.set_x(
           parent_->GetMirroredXForRect(clip_rect_in_parent));
-    clip_transform_recorder->ClipRect(clip_rect_in_parent);
+    clip_transform_recorder.ClipRect(clip_rect_in_parent);
 
     // Translate the graphics such that 0,0 corresponds to where
     // this View is located relative to its parent.
@@ -803,12 +800,13 @@ void View::Paint(const ui::PaintContext& parent_context) {
     transform_from_parent.Translate(offset_from_parent.x(),
                                     offset_from_parent.y());
     transform_from_parent.PreconcatTransform(GetTransform());
-    clip_transform_recorder->Transform(transform_from_parent);
+    clip_transform_recorder.Transform(transform_from_parent);
   }
 
   if (is_invalidated || !paint_cache_.UseCache(context)) {
     ui::PaintRecorder recorder(context, &paint_cache_);
     gfx::Canvas* canvas = recorder.canvas();
+    // TODO(danakj): This is not needed with impl-side/slimming paint.
     gfx::ScopedCanvas scoped_canvas(canvas);
 
     // If the View we are about to paint requested the canvas to be flipped, we

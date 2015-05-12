@@ -2,6 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/chrome_build.gni")
+
+# This config sets the define that controls which Wallet service to contact
+# for features using Wallet integration. Unofficial builds won't have the
+# proper API keys so it uses the "sandbox" test servers instead.
+config("wallet_service") {
+  if (is_official_build) {
+    defines = [ "ENABLE_PROD_WALLET_SERVICE=1" ]
+  }
+}
+
 # GYP version: components/autofill.gyp:autofill_core_browser
 static_library("browser") {
   sources = [
@@ -73,6 +84,8 @@ static_library("browser") {
     "form_structure.h",
     "name_field.cc",
     "name_field.h",
+    "options_util.cc",
+    "options_util.h",
     "password_generator.cc",
     "password_generator.h",
     "personal_data_manager.cc",
@@ -117,11 +130,6 @@ static_library("browser") {
     "webdata/autofill_webdata_service_observer.h",
   ]
 
-  # Controls whether Wallet cards can be saved to the local instance of chrome.
-  if (!is_desktop_linux) {
-    defines = [ "ENABLE_SAVE_WALLET_CARDS_LOCALLY" ]
-  }
-
   deps = [
     "//base",
     "//base:i18n",
@@ -151,7 +159,14 @@ static_library("browser") {
     "//url",
   ]
 
-  configs += [ "//build/config/compiler:no_size_t_to_int_warning" ]
+  configs += [
+    ":wallet_service",
+    "//build/config/compiler:no_size_t_to_int_warning",
+  ]
+
+  if (is_mac) {
+    libs = [ "AddressBook.framework" ]
+  }
 }
 
 static_library("test_support") {

@@ -208,6 +208,15 @@ class StartPageService::StartPageWebContentsDelegate
     return new_tab_params.target_contents;
   }
 
+  bool PreHandleGestureEvent(content::WebContents* /*source*/,
+                             const blink::WebGestureEvent& event) override {
+    // Disable pinch zooming on the start page web contents.
+    return event.type == blink::WebGestureEvent::GesturePinchBegin ||
+           event.type == blink::WebGestureEvent::GesturePinchUpdate ||
+           event.type == blink::WebGestureEvent::GesturePinchEnd;
+  }
+
+
  private:
   Profile* profile_;
 
@@ -623,8 +632,8 @@ void StartPageService::FetchDoodleJson() {
 
   GURL google_base_url(UIThreadSearchTermsData(profile_).GoogleBaseURLValue());
   GURL doodle_url = google_base_url.ReplaceComponents(replacements);
-  doodle_fetcher_.reset(
-      net::URLFetcher::Create(0, doodle_url, net::URLFetcher::GET, this));
+  doodle_fetcher_ =
+      net::URLFetcher::Create(0, doodle_url, net::URLFetcher::GET, this);
   doodle_fetcher_->SetRequestContext(profile_->GetRequestContext());
   doodle_fetcher_->SetLoadFlags(net::LOAD_DO_NOT_SAVE_COOKIES);
   doodle_fetcher_->Start();

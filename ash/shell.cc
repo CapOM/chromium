@@ -121,6 +121,7 @@
 #include "ash/accelerators/magnifier_key_scroller.h"
 #include "ash/accelerators/spoken_feedback_toggler.h"
 #include "ash/ash_constants.h"
+#include "ash/content/display/display_color_manager_chromeos.h"
 #include "ash/content/display/screen_orientation_controller_chromeos.h"
 #include "ash/display/display_change_observer_chromeos.h"
 #include "ash/display/display_configurator_animation.h"
@@ -411,8 +412,8 @@ void Shell::OnLockStateChanged(bool locked) {
 
 void Shell::OnCastingSessionStartedOrStopped(bool started) {
 #if defined(OS_CHROMEOS)
-  if (projecting_observer_)
-    projecting_observer_->OnCastingSessionStartedOrStopped(started);
+  FOR_EACH_OBSERVER(ShellObserver, observers_,
+                    OnCastingSessionStartedOrStopped(started));
 #endif
 }
 
@@ -811,6 +812,7 @@ Shell::~Shell() {
   keyboard::KeyboardController::ResetInstance(NULL);
 
 #if defined(OS_CHROMEOS)
+  display_color_manager_.reset();
   if (display_change_observer_)
     display_configurator_->RemoveObserver(display_change_observer_.get());
   if (display_configurator_animation_)
@@ -818,8 +820,10 @@ Shell::~Shell() {
         display_configurator_animation_.get());
   if (display_error_observer_)
     display_configurator_->RemoveObserver(display_error_observer_.get());
-  if (projecting_observer_)
+  if (projecting_observer_) {
     display_configurator_->RemoveObserver(projecting_observer_.get());
+    RemoveShellObserver(projecting_observer_.get());
+  }
   display_change_observer_.reset();
 
   PowerStatus::Shutdown();
@@ -846,6 +850,7 @@ void Shell::Init(const ShellInitParams& init_params) {
   projecting_observer_.reset(
       new ProjectingObserver(dbus_thread_manager->GetPowerManagerClient()));
   display_configurator_->AddObserver(projecting_observer_.get());
+  AddShellObserver(projecting_observer_.get());
 
   if (!display_initialized && base::SysInfo::IsRunningOnChromeOS()) {
     display_change_observer_.reset(new DisplayChangeObserver);
@@ -860,6 +865,8 @@ void Shell::Init(const ShellInitParams& init_params) {
         delegate_->IsFirstRunAfterBoot() ? kChromeOsBootColor : 0);
     display_initialized = true;
   }
+  display_color_manager_.reset(
+      new DisplayColorManager(display_configurator_.get()));
 #endif  // defined(OS_CHROMEOS)
   if (!display_initialized)
     display_manager_->InitDefaultDisplay();

@@ -56,10 +56,10 @@ set -eu
 
 
 if [[ -n ${LLVM_FORCE_HEAD_REVISION:-''} ]]; then
-  # Use a real version number rather than HEAD to make sure that
-  # --print-revision, stamp file logic, etc. all works naturally.
+  # Use a real revision number rather than HEAD to make sure that the stamp file
+  # logic works.
   CLANG_REVISION=$(svn info "$LLVM_REPO_URL" \
-      | grep 'Last Changed Rev' | awk '{ printf $4; }')
+      | grep 'Revision:' | awk '{ printf $2; }')
   PACKAGE_VERSION="${CLANG_REVISION}-0"
 fi
 
@@ -91,7 +91,11 @@ while [[ $# > 0 ]]; do
       force_local_build=yes
       ;;
     --print-revision)
-      echo $PACKAGE_VERSION
+      if [[ -n ${LLVM_FORCE_HEAD_REVISION:-''} ]]; then
+        svn info "$LLVM_DIR" | grep 'Revision:' | awk '{ printf $2; }'
+      else
+        echo $PACKAGE_VERSION
+      fi
       exit 0
       ;;
     --run-tests)
@@ -665,7 +669,7 @@ if [[ -n "${with_android}" ]]; then
       --platform=android-14 \
       --install-dir="${LLVM_BUILD_DIR}/android-toolchain" \
       --system=linux-x86_64 \
-      --stl=stlport \
+      --stl=libcxx \
       --toolchain=arm-linux-androideabi-4.9
 
   # Android NDK r9d copies a broken unwind.h into the toolchain, see

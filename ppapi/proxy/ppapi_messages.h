@@ -450,7 +450,7 @@ IPC_STRUCT_TRAITS_MEMBER(profile)
 IPC_STRUCT_TRAITS_MEMBER(max_resolution)
 IPC_STRUCT_TRAITS_MEMBER(max_framerate_numerator)
 IPC_STRUCT_TRAITS_MEMBER(max_framerate_denominator)
-IPC_STRUCT_TRAITS_MEMBER(acceleration)
+IPC_STRUCT_TRAITS_MEMBER(hardware_accelerated)
 IPC_STRUCT_TRAITS_END()
 
 #if !defined(OS_NACL) && !defined(NACL_WIN64)
@@ -783,8 +783,9 @@ IPC_MESSAGE_ROUTED3(
     int32_t /* result */)
 
 // PPP_ContentDecryptor_Dev
-IPC_MESSAGE_ROUTED4(PpapiMsg_PPPContentDecryptor_Initialize,
+IPC_MESSAGE_ROUTED5(PpapiMsg_PPPContentDecryptor_Initialize,
                     PP_Instance /* instance */,
+                    uint32_t /* promise_id */,
                     ppapi::proxy::SerializedVar /* key_system, String */,
                     PP_Bool /* allow_distinctive_identifier */,
                     PP_Bool /* allow_persistent_state */)
@@ -1204,9 +1205,11 @@ IPC_SYNC_MESSAGE_ROUTED3_1(
 IPC_SYNC_MESSAGE_ROUTED1_1(PpapiHostMsg_PPBTesting_GetLiveObjectsForInstance,
                            PP_Instance /* instance */,
                            uint32 /* result */)
-IPC_SYNC_MESSAGE_ROUTED1_1(PpapiHostMsg_PPBTesting_IsPeripheral,
-                           PP_Instance /* instance */,
-                           PP_Bool /* result */)
+IPC_SYNC_MESSAGE_ROUTED1_0(PpapiHostMsg_PPBTesting_PostPowerSaverStatus,
+                           PP_Instance /* instance */)
+IPC_SYNC_MESSAGE_ROUTED1_0(
+    PpapiHostMsg_PPBTesting_SubscribeToPowerSaverNotifications,
+    PP_Instance /* instance */)
 IPC_MESSAGE_ROUTED2(PpapiHostMsg_PPBTesting_SimulateInputEvent,
                     PP_Instance /* instance */,
                     ppapi::InputEventData /* input_event */)

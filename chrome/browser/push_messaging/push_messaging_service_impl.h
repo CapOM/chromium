@@ -19,13 +19,12 @@
 #include "content/public/common/push_messaging_status.h"
 #include "third_party/WebKit/public/platform/modules/push_messaging/WebPushPermissionStatus.h"
 
-class Profile;
-class PushMessagingApplicationId;
+#if defined(ENABLE_NOTIFICATIONS)
+#include "chrome/browser/push_messaging/push_messaging_notification_manager.h"
+#endif
 
-namespace content {
-struct NotificationDatabaseData;
-struct PlatformNotificationData;
-}
+class Profile;
+class PushMessagingAppIdentifier;
 
 namespace gcm {
 class GCMDriver;
@@ -108,60 +107,12 @@ class PushMessagingServiceImpl : public content::PushMessagingService,
 
   // OnMessage methods ---------------------------------------------------------
 
-  void DeliverMessageCallback(const std::string& app_id_guid,
+  void DeliverMessageCallback(const std::string& app_id,
                               const GURL& requesting_origin,
                               int64 service_worker_registration_id,
                               const gcm::GCMClient::IncomingMessage& message,
                               const base::Closure& message_handled_closure,
                               content::PushDeliveryStatus status);
-
-  // Developers are required to display a Web Notification in response to an
-  // incoming push message in order to clarify to the user that something has
-  // happened in the background. When they forget to do so, display a default
-  // notification on their behalf.
-  void RequireUserVisibleUX(const GURL& requesting_origin,
-                            int64_t service_worker_registration_id,
-                            const base::Closure& message_handled_closure);
-
-  static void DidGetNotificationsFromDatabaseIOProxy(
-      const base::WeakPtr<PushMessagingServiceImpl>& ui_weak_ptr,
-      const GURL& requesting_origin,
-      int64_t service_worker_registration_id,
-      const base::Closure& message_handled_closure,
-      bool success,
-      const std::vector<content::NotificationDatabaseData>& data);
-
-  void DidGetNotificationsFromDatabase(
-      const GURL& requesting_origin,
-      int64_t service_worker_registration_id,
-      const base::Closure& message_handled_closure,
-      bool success,
-      const std::vector<content::NotificationDatabaseData>& data);
-
-  void DidGetNotificationsShownAndNeeded(
-      const GURL& requesting_origin,
-      int64_t service_worker_registration_id,
-      bool notification_shown,
-      bool notification_needed,
-      const base::Closure& message_handled_closure,
-      const std::string& data,
-      bool success,
-      bool not_found);
-
-  static void DidWriteNotificationDataIOProxy(
-      const base::WeakPtr<PushMessagingServiceImpl>& ui_weak_ptr,
-      const GURL& requesting_origin,
-      const content::PlatformNotificationData& notification_data,
-      const base::Closure& message_handled_closure,
-      bool success,
-      int64_t persistent_notification_id);
-
-  void DidWriteNotificationData(
-      const GURL& requesting_origin,
-      const content::PlatformNotificationData& notification_data,
-      const base::Closure& message_handled_closure,
-      bool success,
-      int64_t persistent_notification_id);
 
   // Register methods ----------------------------------------------------------
 
@@ -171,20 +122,20 @@ class PushMessagingServiceImpl : public content::PushMessagingService,
       content::PushRegistrationStatus status);
 
   void DidRegister(
-      const PushMessagingApplicationId& application_id,
+      const PushMessagingAppIdentifier& app_identifier,
       const content::PushMessagingService::RegisterCallback& callback,
       const std::string& registration_id,
       gcm::GCMClient::Result result);
 
   void DidRequestPermission(
-      const PushMessagingApplicationId& application_id,
+      const PushMessagingAppIdentifier& app_identifier,
       const std::string& sender_id,
       const content::PushMessagingService::RegisterCallback& callback,
       ContentSetting content_setting);
 
   // Unregister methods --------------------------------------------------------
 
-  void Unregister(const std::string& app_id_guid,
+  void Unregister(const std::string& app_id,
                   const std::string& sender_id,
                   const content::PushMessagingService::UnregisterCallback&);
 
@@ -194,10 +145,12 @@ class PushMessagingServiceImpl : public content::PushMessagingService,
 
   // OnContentSettingChanged methods -------------------------------------------
 
-  void UnregisterBecausePermissionRevoked(const PushMessagingApplicationId& id,
-                                          const base::Closure& closure,
-                                          const std::string& sender_id,
-                                          bool success, bool not_found);
+  void UnregisterBecausePermissionRevoked(
+      const PushMessagingAppIdentifier& app_identifier,
+      const base::Closure& closure,
+      const std::string& sender_id,
+      bool success,
+      bool not_found);
 
   // Helper methods ------------------------------------------------------------
 
@@ -213,6 +166,10 @@ class PushMessagingServiceImpl : public content::PushMessagingService,
 
   base::Closure message_callback_for_testing_;
   base::Closure content_setting_changed_callback_for_testing_;
+
+#if defined(ENABLE_NOTIFICATIONS)
+  PushMessagingNotificationManager notification_manager_;
+#endif
 
   base::WeakPtrFactory<PushMessagingServiceImpl> weak_factory_;
 

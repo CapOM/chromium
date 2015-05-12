@@ -8,7 +8,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
@@ -26,6 +25,7 @@ import org.chromium.base.library_loader.ProcessInitException;
 import org.chromium.chrome.browser.child_accounts.ChildAccountFeedbackReporter;
 import org.chromium.chrome.browser.child_accounts.ChildAccountService;
 import org.chromium.chrome.browser.dom_distiller.DomDistillerFeedbackReporter;
+import org.chromium.chrome.browser.externalauth.ExternalAuthUtils;
 import org.chromium.chrome.browser.firstrun.FirstRunActivity;
 import org.chromium.chrome.browser.init.InvalidStartupDialog;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
@@ -33,7 +33,6 @@ import org.chromium.chrome.browser.partnercustomizations.PartnerBrowserCustomiza
 import org.chromium.chrome.browser.preferences.LocationSettings;
 import org.chromium.chrome.browser.preferences.Preferences;
 import org.chromium.chrome.browser.preferences.PreferencesLauncher;
-import org.chromium.chrome.browser.preferences.ProtectedContentPreferences;
 import org.chromium.chrome.browser.preferences.autofill.AutofillPreferences;
 import org.chromium.chrome.browser.preferences.password.ManageSavedPasswordsPreferences;
 import org.chromium.chrome.browser.preferences.privacy.PrivacyPreferences;
@@ -88,16 +87,6 @@ public abstract class ChromiumApplication extends ContentApplication {
      */
     public void openSyncSettings(String accountName) {
         // TODO(aurimas): implement this once SyncCustomizationFragment is upstreamed.
-    }
-
-    /**
-     * Opens a protected content settings page, if available.
-     */
-    @CalledByNative
-    protected void openProtectedContentSettings() {
-        assert Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT;
-        PreferencesLauncher.launchSettingsPage(this,
-                ProtectedContentPreferences.class.getName());
     }
 
     @CalledByNative
@@ -332,5 +321,12 @@ public abstract class ChromiumApplication extends ContentApplication {
     public org.chromium.chrome.browser.child_accounts.ExternalFeedbackReporter
             createChildAccountFeedbackLauncher() {
         return new ChildAccountFeedbackReporter.NoOpExternalFeedbackReporter();
+    }
+
+    /**
+     * @return An instance of ExternalAuthUtils to be installed as a singleton.
+     */
+    public ExternalAuthUtils createExternalAuthUtils() {
+        return new ExternalAuthUtils();
     }
 }

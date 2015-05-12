@@ -54,6 +54,7 @@
 #include "content/public/renderer/content_renderer_client.h"
 #include "content/public/renderer/context_menu_client.h"
 #include "content/public/renderer/document_state.h"
+#include "content/public/renderer/isolated_world_ids.h"
 #include "content/public/renderer/navigation_state.h"
 #include "content/public/renderer/render_frame_observer.h"
 #include "content/public/renderer/renderer_ppapi_host.h"
@@ -564,6 +565,7 @@ RenderFrameImpl* RenderFrameImpl::FromRoutingID(int32 routing_id) {
 void RenderFrameImpl::CreateFrame(
     int routing_id,
     int parent_routing_id,
+    int previous_sibling_routing_id,
     int proxy_routing_id,
     const FrameReplicationState& replicated_state,
     CompositorDependencies* compositor_deps,
@@ -583,12 +585,19 @@ void RenderFrameImpl::CreateFrame(
     CHECK(parent_proxy);
     blink::WebRemoteFrame* parent_web_frame = parent_proxy->web_frame();
 
+    blink::WebFrame* previous_sibling_web_frame = nullptr;
+    RenderFrameProxy* previous_sibling_proxy =
+        RenderFrameProxy::FromRoutingID(previous_sibling_routing_id);
+    if (previous_sibling_proxy)
+      previous_sibling_web_frame = previous_sibling_proxy->web_frame();
+
     // Create the RenderFrame and WebLocalFrame, linking the two.
     render_frame =
         RenderFrameImpl::Create(parent_proxy->render_view(), routing_id);
     web_frame = parent_web_frame->createLocalChild(
         WebString::fromUTF8(replicated_state.name),
-        ContentToWebSandboxFlags(replicated_state.sandbox_flags), render_frame);
+        ContentToWebSandboxFlags(replicated_state.sandbox_flags), render_frame,
+        previous_sibling_web_frame);
   } else {
     RenderFrameProxy* proxy =
         RenderFrameProxy::FromRoutingID(proxy_routing_id);
@@ -653,6 +662,7 @@ blink::WebSandboxFlags RenderFrameImpl::ContentToWebSandboxFlags(
 // RenderFrameImpl ----------------------------------------------------------
 RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
     : frame_(NULL),
+      is_subframe_(false),
       is_local_root_(false),
       render_view_(render_view->AsWeakPtr()),
       routing_id_(routing_id),
@@ -720,8 +730,19 @@ RenderFrameImpl::~RenderFrameImpl() {
     render_view_->UnregisterVideoHoleFrame(this);
 #endif
 
-  if (render_frame_proxy_)
-    delete render_frame_proxy_;
+  if (!is_subframe_) {
+    // RenderFrameProxy is "owned" by RenderFrameImpl in the case it is
+    // the main frame. Ensure it is deleted along with this object.
+    if (render_frame_proxy_) {
+      // The following method calls back into this object and clears
+      // |render_frame_proxy_|.
+      render_frame_proxy_->frameDetached();
+    }
+
+    // Ensure the RenderView doesn't point to this object, once it is destroyed.
+    CHECK_EQ(render_view_->main_render_frame_, this);
+    render_view_->main_render_frame_ = nullptr;
+  }
 
   render_view_->UnregisterRenderFrame(this);
   g_routing_id_frame_map.Get().erase(routing_id_);
@@ -739,6 +760,7 @@ void RenderFrameImpl::SetWebFrame(blink::WebLocalFrame* web_frame) {
 }
 
 void RenderFrameImpl::Initialize() {
+  is_subframe_ = !!frame_->parent();
   is_local_root_ = !frame_->parent() || frame_->parent()->isWebRemoteFrame();
 
 #if defined(ENABLE_PLUGINS)
@@ -1031,6 +1053,8 @@ bool RenderFrameImpl::OnMessageReceived(const IPC::Message& msg) {
                         OnJavaScriptExecuteRequest)
     IPC_MESSAGE_HANDLER(FrameMsg_JavaScriptExecuteRequestForTests,
                         OnJavaScriptExecuteRequestForTests)
+    IPC_MESSAGE_HANDLER(FrameMsg_JavaScriptExecuteRequestInIsolatedWorld,
+                        OnJavaScriptExecuteRequestInIsolatedWorld)
     IPC_MESSAGE_HANDLER(FrameMsg_VisualStateRequest,
                         OnVisualStateRequest)
     IPC_MESSAGE_HANDLER(FrameMsg_SetEditableSelectionOffsets,
@@ -1384,18 +1408,95 @@ void RenderFrameImpl::OnJavaScriptExecuteRequest(
 void RenderFrameImpl::OnJavaScriptExecuteRequestForTests(
     const base::string16& jscript,
     int id,
-    bool notify_result) {
+    bool notify_result,
+    bool has_user_gesture) {
   TRACE_EVENT_INSTANT0("test_tracing", "OnJavaScriptExecuteRequestForTests",
                        TRACE_EVENT_SCOPE_THREAD);
 
   // A bunch of tests expect to run code in the context of a user gesture, which
   // can grant additional privileges (e.g. the ability to create popups).
-  blink::WebScopedUserGesture gesture;
-  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  scoped_ptr<blink::WebScopedUserGesture> gesture(
+      has_user_gesture ? new blink::WebScopedUserGesture : nullptr);
+  v8::HandleScope handle_scope(blink::mainThreadIsolate());
   v8::Local<v8::Value> result =
       frame_->executeScriptAndReturnValue(WebScriptSource(jscript));
 
   HandleJavascriptExecutionResult(jscript, id, notify_result, result);
+}
+
+void RenderFrameImpl::OnJavaScriptExecuteRequestInIsolatedWorld(
+    const base::string16& jscript,
+    int id,
+    bool notify_result,
+    int world_id) {
+  TRACE_EVENT_INSTANT0("test_tracing",
+                       "OnJavaScriptExecuteRequestInIsolatedWorld",
+                       TRACE_EVENT_SCOPE_THREAD);
+
+  if (world_id <= ISOLATED_WORLD_ID_GLOBAL ||
+      world_id > ISOLATED_WORLD_ID_MAX) {
+    // Return if the world_id is not valid. world_id is passed as a plain int
+    // over IPC and needs to be verified here, in the IPC endpoint.
+    NOTREACHED();
+    return;
+  }
+
+  v8::HandleScope handle_scope(v8::Isolate::GetCurrent());
+  WebScriptSource script = WebScriptSource(jscript);
+  JavaScriptIsolatedWorldRequest* request = new JavaScriptIsolatedWorldRequest(
+      id, notify_result, routing_id_, weak_factory_.GetWeakPtr());
+  frame_->requestExecuteScriptInIsolatedWorld(world_id, &script, 1, 0, false,
+                                              request);
+}
+
+RenderFrameImpl::JavaScriptIsolatedWorldRequest::JavaScriptIsolatedWorldRequest(
+    int id,
+    bool notify_result,
+    int routing_id,
+    base::WeakPtr<RenderFrameImpl> render_frame_impl)
+    : id_(id),
+      notify_result_(notify_result),
+      routing_id_(routing_id),
+      render_frame_impl_(render_frame_impl) {
+}
+
+RenderFrameImpl::JavaScriptIsolatedWorldRequest::
+    ~JavaScriptIsolatedWorldRequest() {
+}
+
+void RenderFrameImpl::JavaScriptIsolatedWorldRequest::completed(
+    const blink::WebVector<v8::Local<v8::Value>>& result) {
+  if (!render_frame_impl_.get()) {
+    return;
+  }
+
+  if (notify_result_) {
+    base::ListValue list;
+    if (!result.isEmpty()) {
+      // It's safe to always use the main world context when converting
+      // here. V8ValueConverterImpl shouldn't actually care about the
+      // context scope, and it switches to v8::Object's creation context
+      // when encountered. (from extensions/renderer/script_injection.cc)
+      v8::Local<v8::Context> context =
+          render_frame_impl_.get()->frame_->mainWorldScriptContext();
+      v8::Context::Scope context_scope(context);
+      V8ValueConverterImpl converter;
+      converter.SetDateAllowed(true);
+      converter.SetRegExpAllowed(true);
+      for (const auto& value : result) {
+        scoped_ptr<base::Value> result_value(
+            converter.FromV8Value(value, context));
+        list.Append(result_value ? result_value.Pass()
+                                 : base::Value::CreateNullValue());
+      }
+    } else {
+      list.Set(0, base::Value::CreateNullValue());
+    }
+    render_frame_impl_.get()->Send(
+        new FrameHostMsg_JavaScriptExecuteResponse(routing_id_, id_, list));
+  }
+
+  delete this;
 }
 
 void RenderFrameImpl::HandleJavascriptExecutionResult(
@@ -1411,8 +1512,10 @@ void RenderFrameImpl::HandleJavascriptExecutionResult(
       V8ValueConverterImpl converter;
       converter.SetDateAllowed(true);
       converter.SetRegExpAllowed(true);
-      base::Value* result_value = converter.FromV8Value(result, context);
-      list.Set(0, result_value ? result_value : base::Value::CreateNullValue());
+      scoped_ptr<base::Value> result_value(
+          converter.FromV8Value(result, context));
+      list.Set(0, result_value ? result_value.Pass()
+                               : base::Value::CreateNullValue());
     } else {
       list.Set(0, base::Value::CreateNullValue());
     }
@@ -2104,8 +2207,6 @@ void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
   CHECK(!is_detaching_);
   DCHECK(!frame_ || frame_ == frame);
 
-  bool is_subframe = !!frame->parent();
-
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, FrameDetached());
   FOR_EACH_OBSERVER(RenderViewObserver, render_view_->observers(),
                     FrameDetached(frame));
@@ -2125,7 +2226,7 @@ void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
   CHECK_EQ(it->second, this);
   g_frame_map.Get().erase(it);
 
-  if (is_subframe) {
+  if (is_subframe_) {
     if (base::CommandLine::ForCurrentProcess()->HasSwitch(
             switches::kSitePerProcess) && render_widget_) {
       render_widget_->UnregisterRenderFrame(this);
@@ -2139,10 +2240,8 @@ void RenderFrameImpl::frameDetached(blink::WebFrame* frame) {
   frame->close();
   frame_ = nullptr;
 
-  if (is_subframe) {
-    delete this;
-    // Object is invalid after this point.
-  }
+  delete this;
+  // Object is invalid after this point.
 }
 
 void RenderFrameImpl::frameFocused() {
@@ -2551,6 +2650,13 @@ void RenderFrameImpl::didCommitProvisionalLoad(
     CHECK(proxy);
     proxy->web_frame()->swap(frame_);
     proxy_routing_id_ = MSG_ROUTING_NONE;
+
+    // If this is the main frame going from a remote frame to a local frame,
+    // it needs to set RenderViewImpl's pointer for the main frame to itself.
+    if (!is_subframe_) {
+      CHECK(!render_view_->main_render_frame_);
+      render_view_->main_render_frame_ = this;
+    }
   }
 
   // When we perform a new navigation, we need to update the last committed
@@ -2598,24 +2704,20 @@ void RenderFrameImpl::didCommitProvisionalLoad(
           render_view_->history_list_offset_ + 1;
     }
   } else {
-    // Inspect the navigation_state on this frame to see if the navigation
-    // corresponds to a session history navigation...  Note: |frame| may or
-    // may not be the toplevel frame, but for the case of capturing session
-    // history, the first committed frame suffices.  We keep track of whether
-    // we've seen this commit before so that only capture session history once
-    // per navigation.
-    //
-    // Note that we need to check if the page ID changed. In the case of a
-    // reload, the page ID doesn't change, and UpdateSessionHistory gets the
-    // previous URL and the current page ID, which would be wrong.
-    if (navigation_state->request_params().page_id != -1 &&
-        navigation_state->request_params().page_id != render_view_->page_id_) {
+    const RequestNavigationParams& request_params =
+        navigation_state->request_params();
+    if (request_params.page_id != -1) {
       // This is a successful session history navigation!
-      render_view_->page_id_ = navigation_state->request_params().page_id;
+      render_view_->page_id_ = request_params.page_id;
 
       render_view_->history_list_offset_ =
-          navigation_state->request_params().pending_history_list_offset;
+          request_params.pending_history_list_offset;
     }
+    // Page id is going away (http://crbug.com/369661); ensure that a
+    // replacement that doesn't use page id is equivalent in all cases.
+    CHECK_EQ(request_params.page_id != -1,
+             request_params.nav_entry_id != 0 &&
+             !request_params.intended_as_new_entry);
   }
 
   bool sent = Send(
@@ -3499,6 +3601,11 @@ blink::WebUserMediaClient* RenderFrameImpl::userMediaClient() {
 blink::WebEncryptedMediaClient* RenderFrameImpl::encryptedMediaClient() {
   if (!web_encrypted_media_client_) {
     web_encrypted_media_client_.reset(new media::WebEncryptedMediaClientImpl(
+        // base::Unretained(this) is safe because WebEncryptedMediaClientImpl
+        // is destructed before |this|, and does not give away ownership of the
+        // callback.
+        base::Bind(&RenderFrameImpl::AreSecureCodecsSupported,
+                   base::Unretained(this)),
         GetCdmFactory(), GetMediaPermission()));
   }
   return web_encrypted_media_client_.get();
@@ -3690,6 +3797,15 @@ blink::WebPermissionClient* RenderFrameImpl::permissionClient() {
   return permission_client_.get();
 }
 
+blink::WebAppBannerClient* RenderFrameImpl::appBannerClient() {
+  if (!app_banner_client_) {
+    app_banner_client_ =
+        GetContentClient()->renderer()->CreateAppBannerClient(this);
+  }
+
+  return app_banner_client_.get();
+}
+
 void RenderFrameImpl::DidPlay(blink::WebMediaPlayer* player) {
   Send(new FrameHostMsg_MediaPlayingNotification(
       routing_id_, reinterpret_cast<int64>(player), player->hasVideo(),
@@ -3767,8 +3883,12 @@ void RenderFrameImpl::SendDidCommitProvisionalLoad(
   params.http_status_code = response.httpStatusCode();
   params.url_is_unreachable = ds->hasUnreachableURL();
   params.is_post = false;
+  params.intended_as_new_entry =
+      navigation_state->request_params().intended_as_new_entry;
+  params.did_create_new_entry = commit_type == blink::WebStandardCommit;
   params.post_id = -1;
   params.page_id = render_view_->page_id_;
+  params.nav_entry_id = navigation_state->request_params().nav_entry_id;
   // We need to track the RenderViewHost routing_id because of downstream
   // dependencies (crbug.com/392171 DownloadRequestHandle, SaveFileManager,
   // ResourceDispatcherHostImpl, MediaStreamUIProxy,
@@ -4068,9 +4188,7 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
 
-  bool is_subframe = !!info.frame->parent();
-
-  if (command_line.HasSwitch(switches::kSitePerProcess) && is_subframe) {
+  if (command_line.HasSwitch(switches::kSitePerProcess) && is_subframe_) {
     // There's no reason to ignore navigations on subframes, since the swap out
     // logic no longer applies.
   } else {
@@ -4194,7 +4312,7 @@ WebNavigationPolicy RenderFrameImpl::DecidePolicyForNavigation(
     // handled by the browser so that ordinary renderer processes don't get
     // blessed with file permissions.
     int cumulative_bindings = RenderProcess::current()->GetEnabledBindings();
-    bool is_initial_navigation = render_view_->page_id_ == -1;
+    bool is_initial_navigation = render_view_->history_list_length_ == 0;
     bool should_fork = HasWebUIScheme(url) || HasWebUIScheme(old_url) ||
         (cumulative_bindings & BINDINGS_POLICY_WEB_UI) ||
         url.SchemeIs(kViewSourceScheme) ||
@@ -4374,6 +4492,10 @@ void RenderFrameImpl::NavigateInternal(
 
     // We must know the page ID of the page we are navigating back to.
     DCHECK_NE(request_params.page_id, -1);
+    // We must know the nav entry ID of the page we are navigating back to,
+    // which should be the case because history navigations are routed via the
+    // browser.
+    DCHECK_NE(0, request_params.nav_entry_id);
     scoped_ptr<HistoryEntry> entry =
         PageStateToHistoryEntry(request_params.page_state);
     if (entry) {
@@ -4822,6 +4944,16 @@ media::MediaPermission* RenderFrameImpl::GetMediaPermission() {
   if (!media_permission_dispatcher_)
     media_permission_dispatcher_ = new MediaPermissionDispatcher(this);
   return media_permission_dispatcher_;
+}
+
+bool RenderFrameImpl::AreSecureCodecsSupported() {
+#if defined(OS_ANDROID)
+  // Hardware-secure codecs are only supported if secure surfaces are enabled.
+  return render_view_->renderer_preferences_
+      .use_video_overlay_for_embedded_encrypted_video;
+#else
+  return false;
+#endif  // defined(OS_ANDROID)
 }
 
 media::CdmFactory* RenderFrameImpl::GetCdmFactory() {

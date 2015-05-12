@@ -229,6 +229,17 @@ size_t ToolbarActionsBar::GetIconCount() const {
   if (!model_)
     return 0u;
 
+  int pop_out_modifier = 0;
+  // If there is a popped out action, it could affect the number of visible
+  // icons - but only if it wouldn't otherwise be visible.
+  if (popped_out_action_) {
+    size_t popped_out_index =
+        std::find(toolbar_actions_.begin(),
+                  toolbar_actions_.end(),
+                  popped_out_action_) - toolbar_actions_.begin();
+    pop_out_modifier = popped_out_index >= model_->visible_icon_count() ? 1 : 0;
+  }
+
   // We purposefully do not account for any "popped out" actions in overflow
   // mode. This is because the popup cannot be showing while the overflow menu
   // is open, so there's no concern there. Also, if the user has a popped out
@@ -237,7 +248,7 @@ size_t ToolbarActionsBar::GetIconCount() const {
   // want to "slide" the action back in.
   size_t visible_icons = in_overflow_mode() ?
       toolbar_actions_.size() - model_->visible_icon_count() :
-      model_->visible_icon_count() + (popped_out_action_ ? 1 : 0);
+      model_->visible_icon_count() + pop_out_modifier;
 
 #if DCHECK_IS_ON()
   // Good time for some sanity checks: We should never try to display more
@@ -362,10 +373,15 @@ void ToolbarActionsBar::CreateActions() {
     checked_extension_bubble_ = true;
     // CreateActions() can be called as part of the browser window set up, which
     // we need to let finish before showing the actions.
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(&ToolbarActionsBar::MaybeShowExtensionBubble,
-                   weak_ptr_factory_.GetWeakPtr()));
+    scoped_ptr<extensions::ExtensionMessageBubbleController> controller =
+        ExtensionMessageBubbleFactory(browser_->profile()).GetController();
+    if (controller) {
+      base::MessageLoop::current()->PostTask(
+          FROM_HERE,
+          base::Bind(&ToolbarActionsBar::MaybeShowExtensionBubble,
+                     weak_ptr_factory_.GetWeakPtr(),
+                     base::Passed(controller.Pass())));
+    }
   }
 }
 
@@ -425,8 +441,11 @@ void ToolbarActionsBar::OnDragDrop(int dragged_index,
 }
 
 void ToolbarActionsBar::OnAnimationEnded() {
-  // Check if we were waiting for animation to finish to run a popup.
-  if (!popped_out_closure_.is_null()) {
+  // Check if we were waiting for animation to complete to either show a
+  // message bubble, or to show a popup.
+  if (pending_extension_bubble_controller_) {
+    MaybeShowExtensionBubble(pending_extension_bubble_controller_.Pass());
+  } else if (!popped_out_closure_.is_null()) {
     popped_out_closure_.Run();
     popped_out_closure_.Reset();
   }
@@ -492,12 +511,23 @@ ToolbarActionViewController* ToolbarActionsBar::GetMainControllerForAction(
       main_bar_->GetActionForId(action->GetId()) : action;
 }
 
-void ToolbarActionsBar::MaybeShowExtensionBubble() {
-  scoped_ptr<extensions::ExtensionMessageBubbleController> controller =
-      ExtensionMessageBubbleFactory(browser_->profile()).GetController();
-  if (controller) {
-    controller->HighlightExtensionsIfNecessary();
-    delegate_->ShowExtensionMessageBubble(controller.Pass());
+void ToolbarActionsBar::MaybeShowExtensionBubble(
+    scoped_ptr<extensions::ExtensionMessageBubbleController> controller) {
+  controller->HighlightExtensionsIfNecessary();  // Safe to call multiple times.
+  if (delegate_->IsAnimating()) {
+    // If the toolbar is animating, we can't effectively anchor the bubble,
+    // so wait until animation stops.
+    pending_extension_bubble_controller_ = controller.Pass();
+  } else {
+    const extensions::ExtensionIdList& affected_extensions =
+        controller->GetExtensionIdList();
+    ToolbarActionViewController* anchor_action = nullptr;
+    for (const std::string& id : affected_extensions) {
+      anchor_action = GetActionForId(id);
+      if (anchor_action)
+        break;
+    }
+    delegate_->ShowExtensionMessageBubble(controller.Pass(), anchor_action);
   }
 }
 

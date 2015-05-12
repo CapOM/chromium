@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Μπαταρία πλήρης</translation>
 <translation id="6895424601869865703">Προσθέστε έναν λογαριασμό για <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Το πληκτρολόγιο οθόνης είναι απενεργοποιημένο</translation>
-<translation id="1057289296854808272">Ενεργοποίηση περιστροφής (Πατήστε εδώ για να αλλάξετε την επιλογή)</translation>
+<translation id="5548285847212963613">Η επέκταση &quot;<ph name="EXTENSION_NAME"/>&quot; μπορεί να διευκολύνει τη σύνδεση σε αυτό το δίκτυο.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> και <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Κουμπί επιπρόσθετης ροής</translation>
 <translation id="7904094684485781019">Ο διαχειριστής αυτού του λογαριασμού δεν έχει επιτρέψει τις πολλαπλές συνδέσεις.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Δίσκος κατάστασης</translation>
 <translation id="2248649616066688669">Μπορείτε να συνεχίσετε να χρησιμοποιείτε το Chromebook σας, ενώ είναι συνδεδεμένο σε μια εξωτερική οθόνη, ακόμα και αν το καπάκι είναι κλειστό.</translation>
 <translation id="2946640296642327832">Ενεργοποίηση Bluetooth</translation>
+<translation id="5537725057119320332">Μετάδοση</translation>
 <translation id="6459472438155181876">Επέκταση οθόνης σε <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Κινητό</translation>
 <translation id="6596816719288285829">Διεύθυνση IP</translation>
@@ -39,7 +40,6 @@
 Πατήστε Shift + Alt για εναλλαγή.</translation>
 <translation id="6043994281159824495">Έξοδος τώρα</translation>
 <translation id="2127372758936585790">Χαμηλή ισχύς φορτιστή</translation>
-<translation id="4625920103690741805">Κλείδωμα περιστροφής (Πατήστε εδώ για να αλλάξετε την επιλογή)</translation>
 <translation id="3799026279081545374">Ενδέχεται ο φορτιστής σας να έχει κάποια βλάβη. Εάν διαμένετε στις ΗΠΑ, καλέστε στο 866-628-1371 για να λάβετε βοήθεια και υλικό αντικατάστασης. Εάν διαμένετε στο ΗΒ, καλέστε στο 0800-026-0613. Εάν διαμένετε στην Ιρλανδία, καλέστε στο 1-800-832-664. Εάν διαμένετε στον Καναδά, καλέστε στο 866-628-1372. Εάν διαμένετε στην Αυστραλία, καλέστε στο 1-800-067-460.</translation>
 <translation id="3891340733213178823">Πατήστε Ctrl + Shift + Q δύο φορές για να αποσυνδεθείτε.</translation>
 <translation id="5871632337994001636">Διαχείριση συσκευών…</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">Αυτόματη απόκρυψη ραφιού</translation>
 <translation id="7573962313813535744">Λειτουργία βάσης σύνδεσης</translation>
 <translation id="2792498699870441125">Alt+Search</translation>
-<translation id="8660803626959853127">Συγχρονισμός <ph name="COUNT"/> αρχείων</translation>
 <translation id="5958529069007801266">Εποπτευόμενος χρήστης</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">Το CAPS LOCK είναι απενεργοποιημένο</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">Μάθετε περισσότερα</translation>
 <translation id="7168224885072002358">Επαναφορά στην προηγούμενη ανάλυση σε <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Η κάμερα και το μικρόφωνο χρησιμοποιούνται.</translation>
+<translation id="6550675742724504774">Επιλογές</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Αλλάξτε το πάλι σε &quot;<ph name="FROM_LOCALE"/>&quot; (απαιτείται επανεκκίνηση)</translation>
 <translation id="8103386449138765447">Μηνύματα SMS: <ph name="MESSAGE_COUNT"/></translation>

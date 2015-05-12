@@ -6,6 +6,7 @@
 #define CONTENT_CHILD_BLINK_PLATFORM_IMPL_H_
 
 #include "base/compiler_specific.h"
+#include "base/containers/scoped_ptr_hash_map.h"
 #include "base/threading/thread_local_storage.h"
 #include "base/timer/timer.h"
 #include "base/trace_event/trace_event.h"
@@ -32,6 +33,7 @@ class MessageLoop;
 }
 
 namespace content {
+class BackgroundSyncProvider;
 class FlingCurveConfiguration;
 class NotificationDispatcher;
 class PermissionDispatcher;
@@ -40,6 +42,7 @@ class ThreadSafeSender;
 class WebBluetoothImpl;
 class WebCryptoImpl;
 class WebGeofencingProviderImpl;
+class WebMemoryDumpProviderAdapter;
 
 class CONTENT_EXPORT BlinkPlatformImpl
     : NON_EXPORTED_BASE(public blink::Platform) {
@@ -125,17 +128,14 @@ class CONTENT_EXPORT BlinkPlatformImpl
       const char** arg_names,
       const unsigned char* arg_types,
       const unsigned long long* arg_values,
-#ifndef WEB_CONVERTABLE_TO_TRACE_FORMAT_IS_MOVED
-      // TODO(hiroshige): Remove #ifndef once the Blink-side CL is landed.
-      const blink::WebConvertableToTraceFormat* convertable_values,
-#else
       blink::WebConvertableToTraceFormat* convertable_values,
-#endif
       unsigned char flags);
   virtual void updateTraceEventDuration(
       const unsigned char* category_group_enabled,
       const char* name,
       TraceEventHandle);
+  virtual void registerMemoryDumpProvider(blink::WebMemoryDumpProvider* wmdp);
+  virtual void unregisterMemoryDumpProvider(blink::WebMemoryDumpProvider* wmdp);
   virtual blink::WebData loadResource(const char* name);
   virtual blink::WebString queryLocalizedString(
       blink::WebLocalizedString::Name name);
@@ -168,6 +168,7 @@ class CONTENT_EXPORT BlinkPlatformImpl
   virtual blink::WebPushProvider* pushProvider();
   virtual blink::WebNavigatorConnectProvider* navigatorConnectProvider();
   virtual blink::WebPermissionClient* permissionClient();
+  virtual blink::WebSyncProvider* backgroundSyncProvider();
 
   void SuspendSharedTimer();
   void ResumeSharedTimer();
@@ -203,11 +204,15 @@ class CONTENT_EXPORT BlinkPlatformImpl
   webcrypto::WebCryptoImpl web_crypto_;
   scoped_ptr<WebGeofencingProviderImpl> geofencing_provider_;
   scoped_ptr<WebBluetoothImpl> bluetooth_;
+  base::ScopedPtrHashMap<blink::WebMemoryDumpProvider*,
+                         scoped_ptr<WebMemoryDumpProviderAdapter>>
+      memory_dump_providers_;
 
   scoped_refptr<ThreadSafeSender> thread_safe_sender_;
   scoped_refptr<NotificationDispatcher> notification_dispatcher_;
   scoped_refptr<PushDispatcher> push_dispatcher_;
   scoped_ptr<PermissionDispatcher> permission_client_;
+  scoped_ptr<BackgroundSyncProvider> sync_provider_;
 };
 
 }  // namespace content

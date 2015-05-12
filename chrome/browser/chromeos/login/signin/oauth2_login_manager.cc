@@ -9,18 +9,12 @@
 
 #include "base/command_line.h"
 #include "base/metrics/histogram.h"
-#include "base/prefs/pref_service.h"
-#include "base/strings/string_util.h"
-#include "chrome/browser/browser_process.h"
-#include "chrome/browser/chromeos/login/signin/token_handle_util.h"
-#include "chrome/browser/chromeos/login/startup_utils.h"
-#include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/account_tracker_service_factory.h"
 #include "chrome/browser/signin/chrome_signin_client_factory.h"
+#include "chrome/browser/signin/gaia_cookie_manager_service_factory.h"
 #include "chrome/browser/signin/profile_oauth2_token_service_factory.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
-#include "chrome/common/chrome_switches.h"
 #include "chromeos/chromeos_switches.h"
 #include "components/signin/core/browser/account_tracker_service.h"
 #include "components/signin/core/browser/profile_oauth2_token_service.h"
@@ -29,9 +23,7 @@
 #include "components/user_manager/user.h"
 #include "components/user_manager/user_manager.h"
 #include "google_apis/gaia/gaia_auth_util.h"
-#include "google_apis/gaia/gaia_constants.h"
 #include "google_apis/gaia/gaia_urls.h"
-#include "net/url_request/url_request_context_getter.h"
 
 namespace chromeos {
 
@@ -46,8 +38,7 @@ static const int kMaxRetries = 5;
 OAuth2LoginManager::OAuth2LoginManager(Profile* user_profile)
     : user_profile_(user_profile),
       restore_strategy_(RESTORE_FROM_COOKIE_JAR),
-      state_(SESSION_RESTORE_NOT_STARTED),
-      weak_factory_(this) {
+      state_(SESSION_RESTORE_NOT_STARTED) {
   GetTokenService()->AddObserver(this);
 
   // For telemetry, we mark session restore completed to avoid warnings from
@@ -262,18 +253,6 @@ void OAuth2LoginManager::OnOAuth2TokensAvailable(
   DCHECK(refresh_token_.empty());
   refresh_token_.assign(oauth2_tokens.refresh_token);
   oauthlogin_access_token_ = oauth2_tokens.access_token;
-  if (StartupUtils::IsWebviewSigninEnabled()) {
-    auto user = chromeos::ProfileHelper::Get()->GetUserByProfile(user_profile_);
-    DCHECK(user);
-    if (user) {
-      token_handle_util_.reset(
-          new TokenHandleUtil(user_manager::UserManager::Get()));
-      token_handle_util_->GetTokenHandle(
-          user->GetUserID(), oauthlogin_access_token_,
-          base::Bind(&OAuth2LoginManager::OnTokenHandleComplete,
-                     weak_factory_.GetWeakPtr()));
-    }
-  }
   StoreOAuth2Token();
 }
 
@@ -285,11 +264,9 @@ void OAuth2LoginManager::OnOAuth2TokensFetchFailed() {
 
 void OAuth2LoginManager::VerifySessionCookies() {
   DCHECK(!login_verifier_.get());
-  login_verifier_.reset(
-      new OAuth2LoginVerifier(this,
-                              g_browser_process->system_request_context(),
-                              user_profile_->GetRequestContext(),
-                              oauthlogin_access_token_));
+  login_verifier_.reset(new OAuth2LoginVerifier(
+      this, GaiaCookieManagerServiceFactory::GetForProfile(user_profile_),
+      GetPrimaryAccountId(), oauthlogin_access_token_));
 
   if (restore_strategy_ == RESTORE_FROM_SAVED_OAUTH2_REFRESH_TOKEN) {
     login_verifier_->VerifyUserCookies(user_profile_);
@@ -325,11 +302,10 @@ void OAuth2LoginManager::OnSessionMergeFailure(bool connection_error) {
                                   SESSION_RESTORE_FAILED);
 }
 
-void OAuth2LoginManager::OnListAccountsSuccess(const std::string& data) {
+void OAuth2LoginManager::OnListAccountsSuccess(
+    const std::vector<std::pair<std::string, bool>>& accounts) {
   MergeVerificationOutcome outcome = POST_MERGE_SUCCESS;
   // Let's analyze which accounts we see logged in here:
-  std::vector<std::pair<std::string, bool> > accounts;
-  gaia::ParseListAccountsData(data, &accounts);
   std::string user_email = gaia::CanonicalizeEmail(GetPrimaryAccountId());
   if (!accounts.empty()) {
     bool found = false;
@@ -428,13 +404,6 @@ void OAuth2LoginManager::SetSessionRestoreState(
 
   FOR_EACH_OBSERVER(Observer, observer_list_,
                     OnSessionRestoreStateChanged(user_profile_, state_));
-}
-
-void OAuth2LoginManager::OnTokenHandleComplete(
-    const user_manager::UserID& user_id,
-    TokenHandleUtil::TokenHandleStatus status) {
-  base::MessageLoop::current()->DeleteSoon(FROM_HERE,
-                                           token_handle_util_.release());
 }
 
 void OAuth2LoginManager::SetSessionRestoreStartForTesting(

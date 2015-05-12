@@ -28,6 +28,15 @@ Polymer('cr-settings-search-page', {
     prefs: null,
 
     /**
+     * Route for the page.
+     *
+     * @attribute route
+     * @type {string}
+     * @default ''
+     */
+    route: '',
+
+    /**
      * Whether the page is a subpage.
      *
      * @attribute subpage
@@ -66,7 +75,7 @@ Polymer('cr-settings-search-page', {
      * List of default search engines available.
      *
      * @attribute searchEngines
-     * @type {Array<!SearchEngine}
+     * @type {Array<!SearchEngine>}
      * @default null
      */
     searchEngines: null,
@@ -122,5 +131,10 @@ Polymer('cr-settings-search-page', {
     }, this);
 
     this.searchEngines = defaultEngines;
-  }
+  },
+
+  /** @private */
+  manageSearchEngines_: function() {
+    MoreRouting.navigateTo('search-engines');
+  },
 });

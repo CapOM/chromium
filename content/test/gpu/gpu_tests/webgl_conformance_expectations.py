@@ -1,19 +1,34 @@
 # Copyright (c) 2013 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import os
 
 from gpu_test_expectations import GpuTestExpectations
 
 # See the GpuTestExpectations class for documentation.
 
 class WebGLConformanceExpectations(GpuTestExpectations):
+  def __init__(self, conformance_path):
+    self.conformance_path = conformance_path
+    GpuTestExpectations.__init__(self)
+
+  def Fail(self, pattern, condition=None, bug=None):
+    self.CheckPatternIsValid(pattern)
+    GpuTestExpectations.Fail(self, pattern, condition, bug)
+
+  def Skip(self, pattern, condition=None, bug=None):
+    self.CheckPatternIsValid(pattern)
+    GpuTestExpectations.Skip(self, pattern, condition, bug)
+
+  def CheckPatternIsValid(self, pattern):
+    full_path = os.path.normpath(os.path.join(self.conformance_path, pattern))
+
+    if not os.path.exists(full_path):
+      raise Exception('The WebGL conformance test path specified in' +
+        'expectation does not exist: ' + full_path)
+
   def SetExpectations(self):
     # Fails on all platforms
-    self.Fail(
-        'conformance/ogles/GL/biuDepthRange/biuDepthRange_001_to_002.html',
-        bug=478570)
-    self.Fail('conformance/ogles/GL/gl_FragCoord/gl_FragCoord_001_to_003.html',
-        bug=478570)
     self.Fail('deqp/data/gles2/shaders/constant_expressions.html',
         bug=478572)
     self.Fail('deqp/data/gles2/shaders/fragdata.html',
@@ -24,12 +39,20 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         bug=478572)
     self.Fail('deqp/data/gles2/shaders/scoping.html',
         bug=478572)
+    self.Fail('conformance/glsl/misc/const-variable-initialization.html',
+        bug=485632)
+    self.Fail('conformance/misc/expando-loss.html',
+        bug=485634)
 
     # Win failures
-    self.Fail('conformance/glsl/misc/ternary-operators-in-global-initializers.html',
+    self.Fail('conformance/glsl/misc/' +
+              'ternary-operators-in-global-initializers.html',
         ['win'], bug=415694)
-    self.Fail('conformance/glsl/misc/struct-specifiers-in-uniforms.html',
-        ['win'], bug=433412)
+    self.Fail('conformance/glsl/bugs/' +
+              'pow-of-small-constant-in-user-defined-function.html',
+        ['win'], bug=485641)
+    self.Fail('conformance/glsl/bugs/sampler-struct-function-arg.html',
+        ['win'], bug=485642)
 
     # Win7 / Intel failures
     self.Fail('conformance/rendering/gl-scissor-test.html',
@@ -204,6 +227,8 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['linux', ('amd', 0x6779)], bug=479981)
     self.Fail('conformance/textures/texture-size-cube-maps.html',
         ['linux', ('amd', 0x6779)], bug=479983)
+    self.Fail('conformance/uniforms/uniform-default-values.html',
+        ['linux', ('amd', 0x6779)], bug=482013)
 
     # Android failures
     self.Fail('deqp/data/gles2/shaders/constants.html',
@@ -340,3 +365,51 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['mac'], bug=436493)
     self.Fail('conformance/textures/texture-upload-size.html',
         ['linux'], bug=436493)
+
+    ##############################################################
+    # WEBGL 2 TESTS FAILURES
+    ##############################################################
+
+    self.Fail('deqp/data/gles3/shaders/arrays.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/constants.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/constant_expressions.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/conversions.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/fragdata.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/functions.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/linkage.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/preprocessor.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/qualification_order.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/scoping.html', bug=483282)
+
+    self.Fail('deqp/functional/gles3/textureformat.html', bug=483282)
+    self.Fail('deqp/functional/gles3/transformfeedback.html', bug=483282)
+    self.Fail('deqp/functional/gles3/uniformbuffers.html', bug=483282)
+
+    self.Fail('conformance2/attribs/gl-vertex-attrib.html', bug=483282)
+    self.Fail('conformance2/attribs/gl-vertex-attrib-i-render.html', bug=483282)
+    self.Fail('conformance2/attribs/gl-vertexattribipointer.html', bug=483282)
+    self.Fail('conformance2/attribs/gl-vertexattribipointer-offsets.html',
+        bug=483282)
+
+    self.Fail('conformance2/context/constants-and-properties-2.html',
+        bug=483282)
+
+    self.Fail('conformance2/core/draw-buffers.html', bug=483282)
+    self.Fail('conformance2/core/frag-depth.html', bug=483282)
+    self.Fail('conformance2/core/tex-mipmap-levels.html', bug=483282)
+
+    self.Fail('conformance2/core/tex-new-formats.html', bug=483282)
+    self.Fail('conformance2/core/tex-storage-2d.html', bug=483282)
+    self.Fail('conformance2/core/tex-storage-and-subimage-3d.html', bug=483282)
+    self.Fail('conformance2/core/texture-npot.html', bug=483282)
+
+    self.Fail('conformance2/glsl3/misplaced-version-directive.html', bug=483282)
+
+    self.Fail('conformance2/state/gl-get-calls.html', bug=483282)
+    self.Fail('conformance2/state/gl-object-get-calls.html', bug=483282)
+
+    self.Fail('conformance2/buffers/buffer-copying-contents.html', bug=483282)
+    self.Fail('conformance2/buffers/buffer-copying-restrictions.html',
+        bug=483282)
+    self.Fail('conformance2/buffers/buffer-type-restrictions.html', bug=483282)
+    self.Fail('conformance2/buffers/getBufferSubData.html', bug=483282)

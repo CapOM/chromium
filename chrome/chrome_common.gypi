@@ -101,6 +101,8 @@
       'common/search_types.h',
       'common/search_urls.cc',
       'common/search_urls.h',
+      'common/secure_origin_whitelist.cc',
+      'common/secure_origin_whitelist.h',
       'common/spellcheck_common.cc',
       'common/spellcheck_common.h',
       'common/spellcheck_marker.h',
@@ -129,10 +131,6 @@
       'common/extensions/api/commands/commands_handler.h',
       'common/extensions/api/extension_action/action_info.cc',
       'common/extensions/api/extension_action/action_info.h',
-      'common/extensions/api/file_browser_handlers/file_browser_handler.cc',
-      'common/extensions/api/file_browser_handlers/file_browser_handler.h',
-      'common/extensions/api/input_ime/input_components_handler.cc',
-      'common/extensions/api/input_ime/input_components_handler.h',
       'common/extensions/api/notifications/notification_style.cc',
       'common/extensions/api/notifications/notification_style.h',
       'common/extensions/api/omnibox/omnibox_handler.cc',
@@ -205,6 +203,14 @@
       'common/extensions/permissions/chrome_permission_message_rules.h',
       'common/extensions/sync_helper.cc',
       'common/extensions/sync_helper.h',
+    ],
+    'chrome_common_extensions_chromeos_sources': [
+      'common/extensions/api/file_browser_handlers/file_browser_handler.cc',
+      'common/extensions/api/file_browser_handlers/file_browser_handler.h',
+      'common/extensions/api/file_system_provider_capabilities/file_system_provider_capabilities_handler.cc',
+      'common/extensions/api/file_system_provider_capabilities/file_system_provider_capabilities_handler.h',
+      'common/extensions/api/input_ime/input_components_handler.cc',
+      'common/extensions/api/input_ime/input_components_handler.h',
     ],
     'chrome_common_full_safe_browsing_sources': [
       'common/safe_browsing/binary_feature_extractor.cc',
@@ -365,6 +371,14 @@
           'export_dependent_settings': [
             '<(DEPTH)/chrome/common/extensions/api/api.gyp:chrome_api',
           ],
+          'conditions': [
+            ['chromeos==1', {
+              'sources': [ '<@(chrome_common_extensions_chromeos_sources)' ],
+            }],
+          ],
+        }],
+        ['enable_extensions==1 and chromeos==1', {
+          'sources': [ '<@(chrome_common_extensions_chromeos_sources)' ],
         }],
         ['OS=="win" or OS=="mac"', {
           'sources': [ '<@(chrome_common_win_mac_sources)' ],

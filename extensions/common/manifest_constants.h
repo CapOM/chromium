@@ -175,6 +175,7 @@ extern const char kUIOverride[];
 extern const char kUpdateURL[];
 extern const char kUrlHandlers[];
 extern const char kUrlHandlerTitle[];
+extern const char kUsbPrinters[];
 extern const char kVersion[];
 extern const char kVersionName[];
 extern const char kWebAccessibleResources[];
@@ -184,7 +185,9 @@ extern const char kWebviewName[];
 extern const char kWebviewAccessibleResources[];
 extern const char kWebviewPartitions[];
 extern const char kWhitelist[];
-
+#if defined(OS_CHROMEOS)
+extern const char kFileSystemProviderCapabilities[];
+#endif
 }  // namespace manifest_keys
 
 // Some values expected in manifests.
@@ -476,6 +479,8 @@ extern const char kUnrecognizedManifestProperty[];
 extern const char kWebRequestConflictsWithLazyBackground[];
 #if defined(OS_CHROMEOS)
 extern const char kIllegalPlugins[];
+extern const char kInvalidFileSystemProviderMissingCapabilities[];
+extern const char kInvalidFileSystemProviderMissingPermission[];
 #endif
 
 }  // namespace manifest_errors

@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">電池已充滿</translation>
 <translation id="6895424601869865703">新增<ph name="GIVEN_NAME"/>的帳戶</translation>
 <translation id="1270290102613614947">螢幕小鍵盤已停用</translation>
-<translation id="1057289296854808272">已開啟旋轉功能 (輕按此處即可變更)</translation>
+<translation id="5548285847212963613">「<ph name="EXTENSION_NAME"/>」擴充功能可協助連線至這個網路。</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> 小時 <ph name="MINUTE"/> 分鐘</translation>
 <translation id="30155388420722288">溢位按鈕</translation>
 <translation id="7904094684485781019">這個帳戶的管理員已禁止多重登入。</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">狀態匣</translation>
 <translation id="2248649616066688669">連接外埠顯示器之後，您可以繼續使用 Chromebook (即使將上蓋闔上)。</translation>
 <translation id="2946640296642327832">啟用藍牙</translation>
+<translation id="5537725057119320332">投放</translation>
 <translation id="6459472438155181876">正在擴充 <ph name="DISPLAY_NAME"/> 畫面</translation>
 <translation id="8206859287963243715">手機</translation>
 <translation id="6596816719288285829">IP 位址</translation>
@@ -39,7 +40,6 @@
 按下 Shift + Alt 鍵即可切換。</translation>
 <translation id="6043994281159824495">立即登出</translation>
 <translation id="2127372758936585790">低功率充電器</translation>
-<translation id="4625920103690741805">已鎖定旋轉功能 (輕按此處即可變更)</translation>
 <translation id="3799026279081545374">您的充電器可能有問題。如需相關協助或索取新的充電器，請致電 866-628-1371 (美國)、0800-026-0613 (英國)、1-800-832-664 (愛爾蘭)、866-628-1372 (加拿大) 或 1-800-067-460 (澳洲)。</translation>
 <translation id="3891340733213178823">按兩下 Ctrl+Shift+Q 鍵即可登出。</translation>
 <translation id="5871632337994001636">管理裝置...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">自動隱藏檔案櫃</translation>
 <translation id="7573962313813535744">停駐模式</translation>
 <translation id="2792498699870441125">Alt + 搜尋鍵</translation>
-<translation id="8660803626959853127">正在同步處理 <ph name="COUNT"/> 個檔案</translation>
 <translation id="5958529069007801266">受監管的使用者</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">大寫鍵已關閉</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">瞭解詳情</translation>
 <translation id="7168224885072002358">系統將在 <ph name="TIMEOUT_SECONDS"/> 秒後還原成原來的解析度</translation>
 <translation id="743058460480092004">攝影機和麥克風正在使用中。</translation>
+<translation id="6550675742724504774">選項</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">改回「<ph name="FROM_LOCALE"/>」(需要重新啟動)</translation>
 <translation id="8103386449138765447">簡訊數：<ph name="MESSAGE_COUNT"/></translation>

@@ -30,6 +30,8 @@ class Size;
 }
 
 namespace ui {
+struct DisplayConfigureRequest;
+struct GammaRampRGBEntry;
 class DisplayLayoutManager;
 class DisplayMode;
 class DisplaySnapshot;
@@ -222,8 +224,9 @@ class DISPLAY_EXPORT DisplayConfigurator : public NativeDisplayObserver {
 
   // Sets all the displays into pre-suspend mode; usually this means
   // configure them for their resume state. This allows faster resume on
-  // machines where display configuration is slow.
-  void SuspendDisplays();
+  // machines where display configuration is slow. On completion of the display
+  // configuration |callback| is executed.
+  void SuspendDisplays(const ConfigurationCallback& callback);
 
   // Reprobes displays to handle changes made while the system was
   // suspended.
@@ -259,6 +262,10 @@ class DISPLAY_EXPORT DisplayConfigurator : public NativeDisplayObserver {
   // Updates the color calibration to |new_profile|.
   bool SetColorCalibrationProfile(int64_t display_id,
                                   ui::ColorCalibrationProfile new_profile);
+
+  // Sets the gamma ramp for |display_id| to the values in |lut|.
+  bool SetGammaRamp(int64_t display_id,
+                    const std::vector<GammaRampRGBEntry>& lut);
 
  private:
   class DisplayLayoutManagerImpl;

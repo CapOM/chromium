@@ -17,6 +17,12 @@ KEYBOARD_EXPORT extern const char kEnableSwipeSelection[];
 // contents of the virtual keyboard container.
 KEYBOARD_EXPORT extern const char kDisableInputView[];
 
+// Disables material design styling of the keyboard.
+KEYBOARD_EXPORT extern const char kDisableNewMDInputView[];
+
+// Disables voice input.
+KEYBOARD_EXPORT extern const char kDisableVoiceInput[];
+
 // Enables an IME extension API to set a URL for specifying the contents
 // of the virtual keyboard container.
 KEYBOARD_EXPORT extern const char kEnableInputView[];
@@ -24,14 +30,24 @@ KEYBOARD_EXPORT extern const char kEnableInputView[];
 // Enables experimental features for IME extensions.
 KEYBOARD_EXPORT extern const char kEnableExperimentalInputViewFeatures[];
 
-// Enables gesture typing for the virtual keyboard.
-KEYBOARD_EXPORT extern const char kEnableGestureTyping[];
+// Gesture typing flag for the virtual keyboard.
+KEYBOARD_EXPORT extern const char kGestureTyping[];
 
 // Enables gesture typing for the virtual keyboard.
-KEYBOARD_EXPORT extern const char kEnableGestureSelection[];
+KEYBOARD_EXPORT extern const char kGestureTypingEnabled[];
 
-// Enables gesture typing for the virtual keyboard.
-KEYBOARD_EXPORT extern const char kEnableGestureDeletion[];
+// Disables gesture typing for the virtual keyboard.
+KEYBOARD_EXPORT extern const char kGestureTypingDisabled[];
+
+// Controls the appearance of the settings option to enable gesture editing
+// for the virtual keyboard.
+KEYBOARD_EXPORT extern const char kGestureEditing[];
+
+// Enables gesture editing for the virtual keyboard.
+KEYBOARD_EXPORT extern const char kGestureEditingEnabled[];
+
+// Disables gesture editing for the virtual keyboard.
+KEYBOARD_EXPORT extern const char kGestureEditingDisabled[];
 
 // Enables the virtual keyboard.
 KEYBOARD_EXPORT extern const char kEnableVirtualKeyboard[];

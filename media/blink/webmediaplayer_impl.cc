@@ -699,7 +699,9 @@ void WebMediaPlayerImpl::OnWaitingForDecryptionKey() {
 
 void WebMediaPlayerImpl::SetCdm(const CdmAttachedCB& cdm_attached_cb,
                                 CdmContext* cdm_context) {
-  pipeline_.SetCdm(cdm_context, cdm_attached_cb);
+  // If CDM initialization succeeded, tell the pipeline about it.
+  if (cdm_context)
+    pipeline_.SetCdm(cdm_context, cdm_attached_cb);
 }
 
 void WebMediaPlayerImpl::OnCdmAttached(
@@ -993,7 +995,7 @@ scoped_refptr<VideoFrame>
 WebMediaPlayerImpl::GetCurrentFrameFromCompositor() {
   TRACE_EVENT0("media", "WebMediaPlayerImpl::GetCurrentFrameFromCompositor");
   if (compositor_task_runner_->BelongsToCurrentThread())
-    return compositor_->GetCurrentFrame();
+    return compositor_->GetCurrentFrameAndUpdateIfStale();
 
   // Use a posted task and waitable event instead of a lock otherwise
   // WebGL/Canvas can see different content than what the compositor is seeing.

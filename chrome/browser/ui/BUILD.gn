@@ -98,7 +98,6 @@ source_set("ui") {
       "//third_party/WebKit/public:resources",
       "//third_party/adobe/flash:flapper_version_h",
       "//third_party/expat",
-      "//third_party/hunspell",
       "//third_party/leveldatabase",
       "//third_party/mojo/src/mojo/edk/system",
       "//third_party/npapi",
@@ -428,6 +427,7 @@ source_set("ui") {
                            ".",
                            "//chrome")
     deps += [ "//chrome/browser/media/router:router_core" ]
+    defines += [ "ENABLE_MEDIA_ROUTER=1" ]
   }
   if (enable_webrtc) {
     sources += rebase_path(gypi_values.chrome_browser_ui_webrtc_sources,
@@ -439,9 +439,6 @@ source_set("ui") {
         rebase_path(gypi_values.chrome_browser_ui_service_discovery_sources,
                     ".",
                     "//chrome")
-  }
-  if (enable_spellcheck) {
-    deps += [ "//third_party/hunspell" ]
   }
 }
 
@@ -485,8 +482,6 @@ source_set("test_support") {
     "login/login_prompt_test_utils.h",
     "passwords/manage_passwords_ui_controller_mock.cc",
     "passwords/manage_passwords_ui_controller_mock.h",
-    "pdf/pdf_browsertest_base.cc",
-    "pdf/pdf_browsertest_base.h",
     "test/test_confirm_bubble_model.cc",
     "test/test_confirm_bubble_model.h",
     "toolbar/test_toolbar_action_view_controller.cc",

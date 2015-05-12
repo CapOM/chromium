@@ -19,7 +19,7 @@
 #include "chrome/browser/notifications/notification_test_util.h"
 #include "chrome/browser/notifications/platform_notification_service_impl.h"
 #include "chrome/browser/profiles/profile.h"
-#include "chrome/browser/push_messaging/push_messaging_application_id.h"
+#include "chrome/browser/push_messaging/push_messaging_app_identifier.h"
 #include "chrome/browser/push_messaging/push_messaging_constants.h"
 #include "chrome/browser/push_messaging/push_messaging_service_factory.h"
 #include "chrome/browser/push_messaging/push_messaging_service_impl.h"
@@ -39,9 +39,6 @@
 #include "content/public/test/test_utils.h"
 #include "ui/base/window_open_disposition.h"
 
-#if defined(OS_ANDROID)
-#include "base/android/build_info.h"
-#endif
 
 namespace {
 // Class to instantiate on the stack that is meant to be used with
@@ -150,11 +147,15 @@ class PushMessagingBrowserTest : public InProcessBrowserTest {
   void TryToSubscribeSuccessfully(
       const std::string& expected_push_subscription_id);
 
-  PushMessagingApplicationId GetServiceWorkerAppId(
+  std::string GetEndpointForSubscriptionId(const std::string& subscription_id) {
+    return std::string(kPushMessagingEndpoint) + "/" + subscription_id;
+  }
+
+  PushMessagingAppIdentifier GetAppIdentifierForServiceWorkerRegistration(
       int64 service_worker_registration_id);
 
   void SendMessageAndWaitUntilHandled(
-      const PushMessagingApplicationId& app_id,
+      const PushMessagingAppIdentifier& app_identifier,
       const gcm::GCMClient::IncomingMessage& message);
 
   net::SpawnedTestServer* https_server() const { return https_server_.get(); }
@@ -200,6 +201,20 @@ class PushMessagingBadManifestBrowserTest : public PushMessagingBrowserTest {
   }
 };
 
+class PushMessagingManifestUserVisibleOnlyTrueTest
+    : public PushMessagingBrowserTest {
+  std::string GetTestURL() override {
+    return "files/push_messaging/test_user_visible_only_manifest.html";
+  }
+};
+
+class PushMessagingBrowserTestEmptySubscriptionOptions
+    : public PushMessagingBrowserTest {
+  std::string GetTestURL() override {
+    return "files/push_messaging/test_no_subscription_options.html";
+  }
+};
+
 IN_PROC_BROWSER_TEST_F(PushMessagingBadManifestBrowserTest,
                        SubscribeFailsNotVisibleMessages) {
   std::string script_result;
@@ -223,25 +238,26 @@ void PushMessagingBrowserTest::TryToSubscribeSuccessfully(
   EXPECT_EQ("permission status - granted", script_result);
 
   EXPECT_TRUE(RunScript("subscribePush()", &script_result));
-  EXPECT_EQ(std::string(kPushMessagingEndpoint) + " - "
-            + expected_push_subscription_id, script_result);
+  EXPECT_EQ(GetEndpointForSubscriptionId(expected_push_subscription_id),
+            script_result);
 }
 
-PushMessagingApplicationId PushMessagingBrowserTest::GetServiceWorkerAppId(
+PushMessagingAppIdentifier
+PushMessagingBrowserTest::GetAppIdentifierForServiceWorkerRegistration(
     int64 service_worker_registration_id) {
   GURL origin = https_server()->GetURL(std::string()).GetOrigin();
-  PushMessagingApplicationId application_id = PushMessagingApplicationId::Get(
+  PushMessagingAppIdentifier app_identifier = PushMessagingAppIdentifier::Get(
       GetBrowser()->profile(), origin, service_worker_registration_id);
-  EXPECT_TRUE(application_id.IsValid());
-  return application_id;
+  EXPECT_FALSE(app_identifier.is_null());
+  return app_identifier;
 }
 
 void PushMessagingBrowserTest::SendMessageAndWaitUntilHandled(
-    const PushMessagingApplicationId& app_id,
+    const PushMessagingAppIdentifier& app_identifier,
     const gcm::GCMClient::IncomingMessage& message) {
   base::RunLoop run_loop;
   push_service()->SetMessageCallbackForTesting(run_loop.QuitClosure());
-  push_service()->OnMessage(app_id.app_id_guid(), message);
+  push_service()->OnMessage(app_identifier.app_id(), message);
   run_loop.Run();
 }
 
@@ -249,8 +265,9 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
                        SubscribeSuccessNotificationsGranted) {
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
 }
 
@@ -263,10 +280,12 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   InfoBarResponder accepting_responder(GetInfoBarService(), true);
   ASSERT_TRUE(RunScript("subscribePush()", &script_result));
-  EXPECT_EQ(std::string(kPushMessagingEndpoint) + " - 1-0", script_result);
+  EXPECT_EQ(GetEndpointForSubscriptionId("1-0"),
+            script_result);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
 }
 
@@ -306,6 +325,55 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribeFailureNoManifest) {
 
 // TODO(johnme): Test subscribing from a worker - see https://crbug.com/437298.
 
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTestEmptySubscriptionOptions,
+                       RegisterFailureEmptyPushSubscriptionOptions) {
+  std::string script_result;
+
+  ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
+  ASSERT_EQ("ok - service worker registered", script_result);
+
+  InfoBarResponder accepting_responder(GetInfoBarService(), true);
+  ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
+  ASSERT_EQ("permission status - granted", script_result);
+
+  ASSERT_TRUE(RunScript("subscribePush()", &script_result));
+  EXPECT_EQ("AbortError - Registration failed - permission denied",
+            script_result);
+}
+
+IN_PROC_BROWSER_TEST_F(PushMessagingBadManifestBrowserTest,
+                       RegisterFailsNotVisibleMessages) {
+  std::string script_result;
+
+  ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
+  ASSERT_EQ("ok - service worker registered", script_result);
+  ASSERT_TRUE(RunScript("subscribePush()", &script_result));
+  EXPECT_EQ("AbortError - Registration failed - permission denied",
+            script_result);
+}
+
+IN_PROC_BROWSER_TEST_F(PushMessagingManifestUserVisibleOnlyTrueTest,
+                       ManifestKeyConsidered) {
+  // Chrome 42 introduced the "gcm_user_visible_only" manifest key, but Chrome
+  // 43 supersedes this by the standardized PushSubscriptionOptions.userVisible
+  // option. We maintain support for the manifest key without specifying the
+  // subscription option, so verify that it is still being considered.
+  std::string script_result;
+
+  ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
+  ASSERT_EQ("ok - service worker registered", script_result);
+
+  InfoBarResponder accepting_responder(GetInfoBarService(), true);
+  ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
+  EXPECT_EQ("permission status - granted", script_result);
+
+  ASSERT_TRUE(RunScript("subscribePush()", &script_result));
+  EXPECT_EQ(GetEndpointForSubscriptionId("1-0"), script_result);
+
+  ASSERT_TRUE(RunScript("permissionState()", &script_result));
+  EXPECT_EQ("permission status - granted", script_result);
+}
+
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribePersisted) {
   std::string script_result;
 
@@ -315,8 +383,9 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribePersisted) {
   // different).
 
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
-  PushMessagingApplicationId app_id_sw0 = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id_sw0.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier sw0_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(sw0_identifier.app_id(), gcm_service()->last_registered_app_id());
 
   LoadTestPage("files/push_messaging/subscope1/test.html");
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
@@ -331,13 +400,15 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribePersisted) {
   // Service Worker which still controls the page.
   LoadTestPage("files/push_messaging/subscope2/test.html");
   TryToSubscribeSuccessfully("1-1" /* expected_push_subscription_id */);
-  PushMessagingApplicationId app_id_sw2 = GetServiceWorkerAppId(2LL);
-  EXPECT_EQ(app_id_sw2.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier sw2_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(2LL);
+  EXPECT_EQ(sw2_identifier.app_id(), gcm_service()->last_registered_app_id());
 
   LoadTestPage("files/push_messaging/subscope1/test.html");
   TryToSubscribeSuccessfully("1-2" /* expected_push_subscription_id */);
-  PushMessagingApplicationId app_id_sw1 = GetServiceWorkerAppId(1LL);
-  EXPECT_EQ(app_id_sw1.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier sw1_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(1LL);
+  EXPECT_EQ(sw1_identifier.app_id(), gcm_service()->last_registered_app_id());
 
   // Now test that the Service Worker registration IDs and push subscription IDs
   // generated above were persisted to SW storage, by checking that they are
@@ -349,15 +420,15 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribePersisted) {
 
   LoadTestPage("files/push_messaging/subscope1/test.html");
   TryToSubscribeSuccessfully("1-2" /* expected_push_subscription_id */);
-  EXPECT_EQ(app_id_sw1.app_id_guid(), gcm_service()->last_registered_app_id());
+  EXPECT_EQ(sw1_identifier.app_id(), gcm_service()->last_registered_app_id());
 
   LoadTestPage("files/push_messaging/subscope2/test.html");
   TryToSubscribeSuccessfully("1-1" /* expected_push_subscription_id */);
-  EXPECT_EQ(app_id_sw1.app_id_guid(), gcm_service()->last_registered_app_id());
+  EXPECT_EQ(sw1_identifier.app_id(), gcm_service()->last_registered_app_id());
 
   LoadTestPage();
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
-  EXPECT_EQ(app_id_sw1.app_id_guid(), gcm_service()->last_registered_app_id());
+  EXPECT_EQ(sw1_identifier.app_id(), gcm_service()->last_registered_app_id());
 }
 
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PushEventSuccess) {
@@ -365,8 +436,9 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PushEventSuccess) {
 
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
 
   ASSERT_TRUE(RunScript("isControlled()", &script_result));
@@ -380,7 +452,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PushEventSuccess) {
   gcm::GCMClient::IncomingMessage message;
   message.sender_id = "1234567890";
   message.data["data"] = "testdata";
-  push_service()->OnMessage(app_id.app_id_guid(), message);
+  push_service()->OnMessage(app_identifier.app_id(), message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result));
   EXPECT_EQ("testdata", script_result);
 }
@@ -390,8 +462,9 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PushEventNoServiceWorker) {
 
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
 
   ASSERT_TRUE(RunScript("isControlled()", &script_result));
@@ -407,7 +480,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PushEventNoServiceWorker) {
   ASSERT_EQ("service worker unregistration status: true", script_result);
 
   // When the push service will receive it next message, given that there is no
-  // SW available, it should unregister |app_id|.
+  // SW available, it should unregister |app_identifier.app_id()|.
   UnregistrationCallback callback;
   gcm_service()->SetUnregisterCallback(base::Bind(&UnregistrationCallback::Run,
                                                   base::Unretained(&callback)));
@@ -415,10 +488,10 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PushEventNoServiceWorker) {
   gcm::GCMClient::IncomingMessage message;
   message.sender_id = "1234567890";
   message.data["data"] = "testdata";
-  push_service()->OnMessage(app_id.app_id_guid(), message);
+  push_service()->OnMessage(app_identifier.app_id(), message);
 
   callback.WaitUntilSatisfied();
-  EXPECT_EQ(app_id.app_id_guid(), callback.app_id());
+  EXPECT_EQ(app_identifier.app_id(), callback.app_id());
 
   // No push data should have been received.
   ASSERT_TRUE(RunScript("resultQueue.popImmediately()", &script_result));
@@ -432,8 +505,9 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
 
   ASSERT_TRUE(RunScript("isControlled()", &script_result));
@@ -458,7 +532,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   message.sender_id = "1234567890";
   for (int n = 0; n < 2; n++) {
     message.data["data"] = "testdata";
-    SendMessageAndWaitUntilHandled(app_id, message);
+    SendMessageAndWaitUntilHandled(app_identifier, message);
     ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result));
     EXPECT_EQ("testdata", script_result);
     EXPECT_EQ(0u, notification_manager()->GetNotificationCount());
@@ -473,12 +547,12 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   // should show a forced one, but only on the 2nd occurrence since we allow one
   // mistake per 10 push events.
   message.data["data"] = "testdata";
-  SendMessageAndWaitUntilHandled(app_id, message);
+  SendMessageAndWaitUntilHandled(app_identifier, message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("testdata", script_result);
   EXPECT_EQ(0u, notification_manager()->GetNotificationCount());
   message.data["data"] = "testdata";
-  SendMessageAndWaitUntilHandled(app_id, message);
+  SendMessageAndWaitUntilHandled(app_identifier, message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("testdata", script_result);
 
@@ -492,7 +566,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   // Currently, this notification will stick around until the user or webapp
   // explicitly dismisses it (though we may change this later).
   message.data["data"] = "shownotification";
-  SendMessageAndWaitUntilHandled(app_id, message);
+  SendMessageAndWaitUntilHandled(app_identifier, message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("shownotification", script_result);
   EXPECT_EQ(2u, notification_manager()->GetNotificationCount());
@@ -504,7 +578,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   // should not show a forced one.
   message.data["data"] = "shownotification";
   for (int n = 0; n < 9; n++) {
-    SendMessageAndWaitUntilHandled(app_id, message);
+    SendMessageAndWaitUntilHandled(app_identifier, message);
     ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
     EXPECT_EQ("shownotification", script_result);
     EXPECT_EQ(1u, notification_manager()->GetNotificationCount());
@@ -516,7 +590,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   // Now that 10 push messages in a row have shown notifications, we should
   // allow the next one to mistakenly not show a notification.
   message.data["data"] = "testdata";
-  SendMessageAndWaitUntilHandled(app_id, message);
+  SendMessageAndWaitUntilHandled(app_identifier, message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("testdata", script_result);
   EXPECT_EQ(0u, notification_manager()->GetNotificationCount());
@@ -530,8 +604,9 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
 
   ASSERT_TRUE(RunScript("isControlled()", &script_result));
@@ -550,7 +625,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   gcm::GCMClient::IncomingMessage message;
   message.sender_id = "1234567890";
   message.data["data"] = "shownotification-without-waituntil";
-  push_service()->OnMessage(app_id.app_id_guid(), message);
+  push_service()->OnMessage(app_identifier.app_id(), message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("immediate:shownotification-without-waituntil", script_result);
 
@@ -566,14 +641,14 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 }
 #endif
 
-IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysDefault) {
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysPrompt) {
   std::string script_result;
 
   ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
   ASSERT_EQ("ok - service worker registered", script_result);
 
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  ASSERT_EQ("permission status - default", script_result);
+  ASSERT_EQ("permission status - prompt", script_result);
 }
 
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysGranted) {
@@ -587,7 +662,8 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, PermissionStateSaysGranted) {
   EXPECT_EQ("permission status - granted", script_result);
 
   ASSERT_TRUE(RunScript("subscribePush()", &script_result));
-  EXPECT_EQ(std::string(kPushMessagingEndpoint) + " - 1-0", script_result);
+  EXPECT_EQ(GetEndpointForSubscriptionId("1-0"),
+            script_result);
 
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
   EXPECT_EQ("permission status - granted", script_result);
@@ -676,7 +752,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   message_loop_runner->Run();
 
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  EXPECT_EQ("permission status - default", script_result);
+  EXPECT_EQ("permission status - prompt", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("false - not subscribed", script_result);
@@ -710,7 +786,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   message_loop_runner->Run();
 
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  EXPECT_EQ("permission status - default", script_result);
+  EXPECT_EQ("permission status - prompt", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("false - not subscribed", script_result);
@@ -773,7 +849,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   message_loop_runner->Run();
 
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  EXPECT_EQ("permission status - default", script_result);
+  EXPECT_EQ("permission status - prompt", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("false - not subscribed", script_result);
@@ -807,7 +883,7 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   message_loop_runner->Run();
 
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  EXPECT_EQ("permission status - default", script_result);
+  EXPECT_EQ("permission status - prompt", script_result);
 
   ASSERT_TRUE(RunScript("hasSubscription()", &script_result));
   EXPECT_EQ("false - not subscribed", script_result);
@@ -956,11 +1032,13 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
 
-  PushMessagingApplicationId app_id = GetServiceWorkerAppId(0LL);
-  EXPECT_EQ(app_id.app_id_guid(), gcm_service()->last_registered_app_id());
-  PushMessagingApplicationId stored_app_id = PushMessagingApplicationId::Get(
-      GetBrowser()->profile(), app_id.app_id_guid());
-  EXPECT_TRUE(stored_app_id.IsValid());
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
+  PushMessagingAppIdentifier stored_app_identifier =
+      PushMessagingAppIdentifier::Get(GetBrowser()->profile(),
+                                      app_identifier.app_id());
+  EXPECT_FALSE(stored_app_identifier.is_null());
 
   // Simulate a user clearing site data (including Service Workers, crucially).
   BrowsingDataRemover* remover =
@@ -983,10 +1061,11 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   run_loop.Run();
 
-  // app_id should no longer be stored in prefs
-  PushMessagingApplicationId stored_app_id2 = PushMessagingApplicationId::Get(
-      GetBrowser()->profile(), app_id.app_id_guid());
-  EXPECT_FALSE(stored_app_id2.IsValid());
+  // |app_identifier| should no longer be stored in prefs.
+  PushMessagingAppIdentifier stored_app_identifier2 =
+      PushMessagingAppIdentifier::Get(GetBrowser()->profile(),
+                                      app_identifier.app_id());
+  EXPECT_TRUE(stored_app_identifier2.is_null());
 }
 
 class PushMessagingIncognitoBrowserTest : public PushMessagingBrowserTest {

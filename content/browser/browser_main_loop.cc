@@ -17,6 +17,7 @@
 #include "base/profiler/scoped_profile.h"
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_split.h"
 #include "base/system_monitor/system_monitor.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/threading/thread_restrictions.h"
@@ -25,9 +26,11 @@
 #include "base/trace_event/trace_event.h"
 #include "content/browser/browser_thread_impl.h"
 #include "content/browser/device_sensors/device_inertial_sensor_service.h"
+#include "content/browser/dom_storage/dom_storage_area.h"
 #include "content/browser/download/save_file_manager.h"
 #include "content/browser/gamepad/gamepad_service.h"
 #include "content/browser/gpu/browser_gpu_channel_host_factory.h"
+#include "content/browser/gpu/browser_gpu_memory_buffer_manager.h"
 #include "content/browser/gpu/compositor_util.h"
 #include "content/browser/gpu/gpu_data_manager_impl.h"
 #include "content/browser/gpu/gpu_process_host.h"
@@ -88,6 +91,7 @@
 #endif
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
+#include "base/mac/memory_pressure_monitor_mac.h"
 #include "content/browser/bootstrap_sandbox_mac.h"
 #include "content/browser/cocoa/system_hotkey_helper_mac.h"
 #include "content/browser/compositor/browser_compositor_view_mac.h"
@@ -99,6 +103,7 @@
 #include <commctrl.h>
 #include <shellapi.h>
 
+#include "base/win/memory_pressure_monitor.h"
 #include "content/browser/system_message_window_win.h"
 #include "content/common/sandbox_win.h"
 #include "net/base/winsock_init.h"
@@ -296,6 +301,34 @@ NOINLINE void ResetThread_IndexedDb(scoped_ptr<base::Thread> thread) {
 
 MSVC_POP_WARNING()
 MSVC_ENABLE_OPTIMIZE();
+
+#if defined(OS_WIN)
+// Creates a memory pressure monitor using automatic thresholds, or those
+// specified on the command-line. Ownership is passed to the caller.
+base::win::MemoryPressureMonitor* CreateWinMemoryPressureMonitor(
+    const base::CommandLine& parsed_command_line) {
+  std::vector<std::string> thresholds;
+  base::SplitString(
+      parsed_command_line.GetSwitchValueASCII(
+          switches::kMemoryPressureThresholdsMb),
+      ',',
+      &thresholds);
+
+  int moderate_threshold_mb = 0;
+  int critical_threshold_mb = 0;
+  if (thresholds.size() == 2 &&
+      base::StringToInt(thresholds[0], &moderate_threshold_mb) &&
+      base::StringToInt(thresholds[1], &critical_threshold_mb) &&
+      moderate_threshold_mb >= critical_threshold_mb &&
+      critical_threshold_mb >= 0) {
+    return new base::win::MemoryPressureMonitor(moderate_threshold_mb,
+                                                critical_threshold_mb);
+  }
+
+  // In absence of valid switches use the automatic defaults.
+  return new base::win::MemoryPressureMonitor();
+}
+#endif  // defined(OS_WIN)
 
 }  // namespace
 
@@ -581,6 +614,13 @@ void BrowserMainLoop::MainMessageLoopStart() {
     base::MessageLoop::current()->AddTaskObserver(memory_observer_.get());
   }
 
+  if (parsed_command_line_.HasSwitch(
+          switches::kEnableAggressiveDOMStorageFlushing)) {
+    TRACE_EVENT0("startup",
+                 "BrowserMainLoop::Subsystem:EnableAggressiveCommitDelay");
+    DOMStorageArea::EnableAggressiveCommitDelay();
+  }
+
   base::trace_event::MemoryDumpManager::GetInstance()->Initialize();
 
   // Enable the dump providers.
@@ -609,6 +649,11 @@ int BrowserMainLoop::PreCreateThreads() {
     memory_pressure_monitor_.reset(new base::MemoryPressureMonitorChromeOS(
         chromeos::switches::GetMemoryPressureThresholds()));
   }
+#elif defined(OS_MACOSX) && !defined(OS_IOS)
+  memory_pressure_monitor_.reset(new base::MemoryPressureMonitorMac());
+#elif defined(OS_WIN)
+  memory_pressure_monitor_.reset(CreateWinMemoryPressureMonitor(
+      parsed_command_line_));
 #endif
 
 #if defined(ENABLE_PLUGINS)
@@ -872,7 +917,7 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
     resource_dispatcher_host_.get()->Shutdown();
   }
 
-#if defined(OS_CHROMEOS)
+#if defined(OS_CHROMEOS) || defined(OS_MACOSX)
   memory_pressure_monitor_.reset();
 #endif
 
@@ -1098,6 +1143,12 @@ int BrowserMainLoop::BrowserThreadsStarted() {
   BrowserGpuChannelHostFactory::Initialize(established_gpu_channel);
 #endif
 
+  // Enable the GpuMemoryBuffer dump provider with IO thread affinity. Note that
+  // unregistration happens on the IO thread (See
+  // BrowserProcessSubThread::IOThreadPreCleanUp).
+  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
+      BrowserGpuMemoryBufferManager::current(), io_thread_->task_runner());
+
   {
     TRACE_EVENT0("startup", "BrowserThreadsStarted::Subsystem:AudioMan");
     audio_manager_.reset(media::AudioManager::CreateWithHangTimer(
@@ -1106,7 +1157,7 @@ int BrowserMainLoop::BrowserThreadsStarted() {
 
   {
     TRACE_EVENT0("startup", "BrowserThreadsStarted::Subsystem:MidiManager");
-    midi_manager_.reset(media::MidiManager::Create());
+    midi_manager_.reset(media::midi::MidiManager::Create());
   }
 
 #if defined(OS_LINUX) && defined(USE_UDEV)

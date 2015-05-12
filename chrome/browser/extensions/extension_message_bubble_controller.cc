@@ -6,6 +6,8 @@
 
 #include "base/bind.h"
 #include "base/metrics/histogram.h"
+#include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/extension_message_bubble.h"
 #include "chrome/browser/extensions/extension_toolbar_model.h"
@@ -20,6 +22,11 @@
 #include "ui/base/l10n/l10n_util.h"
 
 namespace extensions {
+
+namespace {
+// How many extensions to show in the bubble (max).
+const int kMaxExtensionsToShow = 7;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // ExtensionMessageBubbleController::Delegate
@@ -88,7 +95,8 @@ ExtensionMessageBubbleController::ExtensionMessageBubbleController(
     : profile_(profile),
       user_action_(ACTION_BOUNDARY),
       delegate_(delegate),
-      initialized_(false) {
+      initialized_(false),
+      did_highlight_(false) {
 }
 
 ExtensionMessageBubbleController::~ExtensionMessageBubbleController() {
@@ -117,6 +125,25 @@ ExtensionMessageBubbleController::GetExtensionList() {
   return return_value;
 }
 
+base::string16 ExtensionMessageBubbleController::GetExtensionListForDisplay() {
+  if (!delegate_->ShouldShowExtensionList())
+    return base::string16();
+
+  std::vector<base::string16> extension_list = GetExtensionList();
+  if (extension_list.size() > kMaxExtensionsToShow) {
+    int old_size = extension_list.size();
+    extension_list.erase(extension_list.begin() + kMaxExtensionsToShow,
+                         extension_list.end());
+    extension_list.push_back(delegate_->GetOverflowText(base::IntToString16(
+        old_size - kMaxExtensionsToShow)));
+  }
+  const base::char16 bullet_point = 0x2022;
+  base::string16 prefix = bullet_point + base::ASCIIToUTF16(" ");
+  for (base::string16& str : extension_list)
+    str.insert(0, prefix);
+  return JoinString(extension_list, base::ASCIIToUTF16("\n"));
+}
+
 const ExtensionIdList& ExtensionMessageBubbleController::GetExtensionIdList() {
   return *GetOrCreateExtensionList();
 }
@@ -124,7 +151,8 @@ const ExtensionIdList& ExtensionMessageBubbleController::GetExtensionIdList() {
 bool ExtensionMessageBubbleController::CloseOnDeactivate() { return false; }
 
 void ExtensionMessageBubbleController::HighlightExtensionsIfNecessary() {
-  if (delegate_->ShouldHighlightExtensions()) {
+  if (delegate_->ShouldHighlightExtensions() && !did_highlight_) {
+    did_highlight_ = true;
     const ExtensionIdList& extension_ids = GetExtensionIdList();
     DCHECK(!extension_ids.empty());
     ExtensionToolbarModel::Get(profile_)->HighlightExtensions(extension_ids);
@@ -141,8 +169,8 @@ void ExtensionMessageBubbleController::OnBubbleAction() {
 
   delegate_->LogAction(ACTION_EXECUTE);
   delegate_->PerformAction(*GetOrCreateExtensionList());
-  AcknowledgeExtensions();
-  delegate_->OnClose();
+
+  OnClose();
 }
 
 void ExtensionMessageBubbleController::OnBubbleDismiss() {
@@ -157,8 +185,8 @@ void ExtensionMessageBubbleController::OnBubbleDismiss() {
   user_action_ = ACTION_DISMISS;
 
   delegate_->LogAction(ACTION_DISMISS);
-  AcknowledgeExtensions();
-  delegate_->OnClose();
+
+  OnClose();
 }
 
 void ExtensionMessageBubbleController::OnLinkClicked() {
@@ -176,8 +204,7 @@ void ExtensionMessageBubbleController::OnLinkClicked() {
                                ui::PAGE_TRANSITION_LINK,
                                false));
   }
-  AcknowledgeExtensions();
-  delegate_->OnClose();
+  OnClose();
 }
 
 void ExtensionMessageBubbleController::AcknowledgeExtensions() {
@@ -204,6 +231,12 @@ ExtensionIdList* ExtensionMessageBubbleController::GetOrCreateExtensionList() {
   }
 
   return &extension_list_;
+}
+
+void ExtensionMessageBubbleController::OnClose() {
+  AcknowledgeExtensions();
+  if (did_highlight_)
+    ExtensionToolbarModel::Get(profile_)->StopHighlighting();
 }
 
 }  // namespace extensions

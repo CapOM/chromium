@@ -21,6 +21,9 @@
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
+#include "components/guest_view/browser/guest_view_manager.h"
+#include "components/guest_view/browser/guest_view_manager_factory.h"
+#include "components/guest_view/browser/test_guest_view_manager.h"
 #include "content/public/browser/gpu_data_manager.h"
 #include "content/public/browser/interstitial_page.h"
 #include "content/public/browser/interstitial_page_delegate.h"
@@ -37,9 +40,6 @@
 #include "extensions/browser/api/declarative_webrequest/webrequest_constants.h"
 #include "extensions/browser/app_window/native_app_window.h"
 #include "extensions/browser/guest_view/extensions_guest_view_manager_delegate.h"
-#include "extensions/browser/guest_view/guest_view_manager.h"
-#include "extensions/browser/guest_view/guest_view_manager_factory.h"
-#include "extensions/browser/guest_view/test_guest_view_manager.h"
 #include "extensions/browser/guest_view/web_view/web_view_guest.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extensions_client.h"
@@ -69,9 +69,10 @@
 
 using extensions::ContextMenuMatcher;
 using extensions::ExtensionsGuestViewManagerDelegate;
-using extensions::GuestViewManager;
-using extensions::TestGuestViewManager;
 using extensions::MenuItem;
+using guest_view::GuestViewManager;
+using guest_view::TestGuestViewManager;
+using guest_view::TestGuestViewManagerFactory;
 using prerender::PrerenderLinkManager;
 using prerender::PrerenderLinkManagerFactory;
 using task_manager::browsertest_util::MatchAboutBlankTab;
@@ -134,7 +135,7 @@ class WebContentsHiddenObserver : public content::WebContentsObserver {
 // context menu was shown.
 class ContextMenuCallCountObserver {
  public:
-  ContextMenuCallCountObserver ()
+  ContextMenuCallCountObserver()
       : num_times_shown_(0),
         menu_observer_(chrome::NOTIFICATION_RENDER_VIEW_CONTEXT_MENU_SHOWN,
                        base::Bind(&ContextMenuCallCountObserver::OnMenuShown,
@@ -812,7 +813,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
       manager = static_cast<TestGuestViewManager*>(
           GuestViewManager::CreateWithDelegate(
               browser()->profile(),
-              scoped_ptr<guestview::GuestViewManagerDelegate>(
+              scoped_ptr<guest_view::GuestViewManagerDelegate>(
                   new ExtensionsGuestViewManagerDelegate(
                       browser()->profile()))));
     }
@@ -821,7 +822,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
 
   WebViewTest() : guest_web_contents_(NULL),
                   embedder_web_contents_(NULL) {
-    extensions::GuestViewManager::set_factory_for_testing(&factory_);
+    GuestViewManager::set_factory_for_testing(&factory_);
   }
 
  private:
@@ -837,7 +838,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
   scoped_ptr<content::FakeSpeechRecognitionManager>
       fake_speech_recognition_manager_;
 
-  extensions::TestGuestViewManagerFactory factory_;
+  TestGuestViewManagerFactory factory_;
   // Note that these are only set if you launch app using LoadAppWithGuest().
   content::WebContents* guest_web_contents_;
   content::WebContents* embedder_web_contents_;
@@ -2425,13 +2426,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, ClearDataCache) {
   TestHelper("testClearCache", "web_view/clear_data_cache", NEEDS_TEST_SERVER);
 }
 
-// This test is disabled on Win due to being flaky. http://crbug.com/294592
-#if defined(OS_WIN)
-#define MAYBE_ConsoleMessage DISABLED_ConsoleMessage
-#else
-#define MAYBE_ConsoleMessage ConsoleMessage
-#endif
-IN_PROC_BROWSER_TEST_F(WebViewTest, MAYBE_ConsoleMessage) {
+IN_PROC_BROWSER_TEST_F(WebViewTest, ConsoleMessage) {
   ASSERT_TRUE(RunPlatformAppTestWithArg(
       "platform_apps/web_view/common", "console_messages"))
           << message_;
@@ -2783,7 +2778,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, MAYBE_WebViewInBackgroundPage) {
 IN_PROC_BROWSER_TEST_F(WebViewTest, AllowTransparencyAndAllowScalingPropagate) {
   LoadAppWithGuest("web_view/simple");
 
-  ASSERT_TRUE(!!GetGuestWebContents());
+  ASSERT_TRUE(GetGuestWebContents());
   extensions::WebViewGuest* guest =
       extensions::WebViewGuest::FromWebContents(GetGuestWebContents());
   ASSERT_TRUE(guest->allow_transparency());

@@ -12,6 +12,7 @@
 #include "base/memory/weak_ptr.h"
 #include "net/base/completion_callback.h"
 #include "net/base/io_buffer.h"
+#include "net/cert/cert_verifier.h"
 #include "net/cert/cert_verify_result.h"
 #include "net/cert/ct_verify_result.h"
 #include "net/socket/client_socket_handle.h"
@@ -37,7 +38,6 @@ namespace net {
 
 class CertVerifier;
 class CTVerifier;
-class SingleRequestCertVerifier;
 class SSLCertRequestInfo;
 class SSLInfo;
 
@@ -189,6 +189,9 @@ class SSLClientSocketOpenSSL : public SSLClientSocket {
   // this socket.
   std::string GetSessionCacheKey() const;
 
+  // Returns true if renegotiations are allowed.
+  bool IsRenegotiationAllowed() const;
+
   bool transport_send_busy_;
   bool transport_recv_busy_;
 
@@ -243,9 +246,6 @@ class SSLClientSocketOpenSSL : public SSLClientSocket {
   // network.
   bool was_ever_used_;
 
-  // Stores client authentication information between ClientAuthHandler and
-  // GetSSLCertRequestInfo calls.
-  bool client_auth_cert_needed_;
   // List of DER-encoded X.509 DistinguishedName of certificate authorities
   // allowed by the server.
   std::vector<std::string> cert_authorities_;
@@ -254,7 +254,7 @@ class SSLClientSocketOpenSSL : public SSLClientSocket {
   std::vector<SSLClientCertType> cert_key_types_;
 
   CertVerifier* const cert_verifier_;
-  scoped_ptr<SingleRequestCertVerifier> verifier_;
+  scoped_ptr<CertVerifier::Request> cert_verifier_request_;
   base::TimeTicks start_cert_verification_time_;
 
   // Certificate Transparency: Verifier and result holder.

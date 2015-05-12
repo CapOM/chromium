@@ -2,7 +2,7 @@
 <translation id="3595596368722241419">Батерията е заредена</translation>
 <translation id="6895424601869865703">Добавяне на профил за <ph name="GIVEN_NAME"/></translation>
 <translation id="1270290102613614947">Екранната клавиатура е деактивирана</translation>
-<translation id="1057289296854808272">Завъртането е включено (докоснете тук за промяна)</translation>
+<translation id="5548285847212963613">Разширението <ph name="EXTENSION_NAME"/> може да помогне за свързването с тази мрежа.</translation>
 <translation id="7814236020522506259"><ph name="HOUR"/> и <ph name="MINUTE"/></translation>
 <translation id="30155388420722288">Бутон „Препълване“</translation>
 <translation id="7904094684485781019">Администраторът на този профил е забранил централизирания вход.</translation>
@@ -31,6 +31,7 @@
 <translation id="2297568595583585744">Област на състоянието</translation>
 <translation id="2248649616066688669">Можете да продължите да използвате Chromebook, докато е свързан с външен дисплей, дори и със затворен капак.</translation>
 <translation id="2946640296642327832">Активиране на Bluetooth</translation>
+<translation id="5537725057119320332">Предаване</translation>
 <translation id="6459472438155181876">Екранът се разширява на „<ph name="DISPLAY_NAME"/>“</translation>
 <translation id="8206859287963243715">Клетъчно</translation>
 <translation id="6596816719288285829">IP адрес</translation>
@@ -39,7 +40,6 @@
 Натиснете „Shift + Alt“, за да превключите.</translation>
 <translation id="6043994281159824495">Изход сега</translation>
 <translation id="2127372758936585790">Зарядно устройство с малка мощност</translation>
-<translation id="4625920103690741805">Завъртането е заключено (докоснете тук за промяна)</translation>
 <translation id="3799026279081545374">Възможно е зарядното ви устройство да е дефектно. За да получите помощ и да го замените, моля, обадете се на номера за държавата, в която живеете – 866-628-1371 за САЩ, 0800-026-0613 за Великобритания, 1-800-832-664 за Ирландия, 866-628-1372 за Канада и 1-800-067-460 за Австралия.</translation>
 <translation id="3891340733213178823">Натиснете два пъти „Ctrl+Shift+Q“ за изход.</translation>
 <translation id="5871632337994001636">Управление на устройствата...</translation>
@@ -167,7 +167,6 @@
 <translation id="112308213915226829">Автоматично скриване на лавицата</translation>
 <translation id="7573962313813535744">Режим с докинг станция</translation>
 <translation id="2792498699870441125">Alt + търсене</translation>
-<translation id="8660803626959853127">Синхронизира/т се <ph name="COUNT"/> файл/а</translation>
 <translation id="5958529069007801266">Контролиран потребител</translation>
 <translation id="3709443003275901162">9+</translation>
 <translation id="639644700271529076">„CAPS LOCK“ е изключен</translation>
@@ -187,6 +186,7 @@
 <translation id="6165508094623778733">Научете повече</translation>
 <translation id="7168224885072002358">Старата разделителна способност ще се възстанови след <ph name="TIMEOUT_SECONDS"/></translation>
 <translation id="743058460480092004">Камерата и микрофонът се използват.</translation>
+<translation id="6550675742724504774">Опции</translation>
 <translation id="6406704438230478924">altgr</translation>
 <translation id="3573179567135747900">Връщане към „<ph name="FROM_LOCALE"/>“ (изисква рестартиране)</translation>
 <translation id="8103386449138765447">SMS съобщения: <ph name="MESSAGE_COUNT"/></translation>

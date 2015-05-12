@@ -359,7 +359,6 @@ Profile* ProfileManager::GetActiveUserProfile() {
     return chromeos::ProfileHelper::Get()->GetProfileByUserUnsafe(user);
 
 #endif
-#if !defined(OS_WIN)
   Profile* profile =
       profile_manager->GetActiveUserOrOffTheRecordProfileFromPath(
           profile_manager->user_data_dir());
@@ -370,10 +369,6 @@ Profile* ProfileManager::GetActiveUserProfile() {
   // figure out how common this is. http://crbug.com/383019
   CHECK(profile) << profile_manager->user_data_dir().AsUTF8Unsafe();
   return profile;
-#else
-  return profile_manager->GetProfile(
-      profile_manager->GetLastUsedProfileDir(profile_manager->user_data_dir()));
-#endif
 }
 
 Profile* ProfileManager::GetProfile(const base::FilePath& profile_dir) {
@@ -425,8 +420,8 @@ void ProfileManager::CreateProfileAsync(
     std::string icon_url_std = base::UTF16ToASCII(icon_url);
     if (profiles::IsDefaultAvatarIconUrl(icon_url_std, &icon_index)) {
       // add profile to cache with user selected name and avatar
-      cache.AddProfileToCache(profile_path, name, base::string16(), icon_index,
-                              supervised_user_id);
+      cache.AddProfileToCache(profile_path, name, std::string(),
+                              base::string16(), icon_index, supervised_user_id);
     }
 
     if (!supervised_user_id.empty()) {
@@ -707,8 +702,10 @@ void ProfileManager::ScheduleProfileForDeletion(
   // On the Mac, the browser process is not killed when all browser windows are
   // closed, so just in case we are deleting the active profile, and no other
   // profile has been loaded, we must pre-load a next one.
+  PrefService* local_state = g_browser_process->local_state();
+  DCHECK(local_state);
   const std::string last_used_profile =
-      g_browser_process->local_state()->GetString(prefs::kProfileLastUsed);
+      local_state->GetString(prefs::kProfileLastUsed);
   if (last_used_profile == profile_dir.BaseName().MaybeAsASCII() ||
       last_used_profile == GetGuestProfilePath().BaseName().MaybeAsASCII()) {
     CreateProfileAsync(last_non_supervised_profile_path,
@@ -742,6 +739,7 @@ void ProfileManager::AutoloadProfiles() {
   // If running in the background is disabled for the browser, do not autoload
   // any profiles.
   PrefService* local_state = g_browser_process->local_state();
+  DCHECK(local_state);
   if (!local_state->HasPrefPath(prefs::kBackgroundModeEnabled) ||
       !local_state->GetBoolean(prefs::kBackgroundModeEnabled)) {
     return;
@@ -1174,9 +1172,10 @@ void ProfileManager::FinishDeletingProfile(
     const base::FilePath& new_active_profile_dir) {
   // Update the last used profile pref before closing browser windows. This
   // way the correct last used profile is set for any notification observers.
-  g_browser_process->local_state()->SetString(
-      prefs::kProfileLastUsed,
-      new_active_profile_dir.BaseName().MaybeAsASCII());
+  PrefService* local_state = g_browser_process->local_state();
+  DCHECK(local_state);
+  local_state->SetString(prefs::kProfileLastUsed,
+                         new_active_profile_dir.BaseName().MaybeAsASCII());
 
   ProfileInfoCache& cache = GetProfileInfoCache();
   // TODO(sail): Due to bug 88586 we don't delete the profile instance. Once we
@@ -1204,9 +1203,8 @@ void ProfileManager::FinishDeletingProfile(
           profile)->DisableForUser();
     }
 
-    bool profile_is_signed_in = !cache.GetUserNameOfProfileAtIndex(
-        cache.GetIndexOfProfileWithPath(profile_dir)).empty();
-    ProfileMetrics::LogProfileDelete(profile_is_signed_in);
+    ProfileMetrics::LogProfileDelete(cache.ProfileIsAuthenticatedAtIndex(
+        cache.GetIndexOfProfileWithPath(profile_dir)));
     // Some platforms store passwords in keychains. They should be removed.
     scoped_refptr<password_manager::PasswordStore> password_store =
         PasswordStoreFactory::GetForProfile(
@@ -1258,13 +1256,18 @@ void ProfileManager::AddProfileToCache(Profile* profile) {
 
   SigninManagerBase* signin_manager =
       SigninManagerFactory::GetForProfile(profile);
-  base::string16 username = base::UTF8ToUTF16(
-      signin_manager->GetAuthenticatedUsername());
+  AccountTrackerService* account_tracker =
+      AccountTrackerServiceFactory::GetForProfile(profile);
+  AccountTrackerService::AccountInfo account_info =
+      account_tracker->GetAccountInfo(
+          signin_manager->GetAuthenticatedAccountId());
+  base::string16 username = base::UTF8ToUTF16(account_info.email);
 
   size_t profile_index = cache.GetIndexOfProfileWithPath(profile->GetPath());
   if (profile_index != std::string::npos) {
-    // The ProfileInfoCache's username must match the Signin Manager's username.
-    cache.SetUserNameOfProfileAtIndex(profile_index, username);
+    // The ProfileInfoCache's info must match the Signin Manager.
+    cache.SetAuthInfoOfProfileAtIndex(profile_index, account_info.gaia,
+                                      username);
     return;
   }
 
@@ -1281,6 +1284,7 @@ void ProfileManager::AddProfileToCache(Profile* profile) {
 
   cache.AddProfileToCache(profile->GetPath(),
                           profile_name,
+                          account_info.gaia,
                           username,
                           icon_index,
                           supervised_user_id);

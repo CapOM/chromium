@@ -135,6 +135,18 @@ void CompressedTexImage3D(GLenum target,
                           GLsizei imageSize,
                           const void* data) override;
 
+void CompressedTexSubImage3D(GLenum target,
+                             GLint level,
+                             GLint xoffset,
+                             GLint yoffset,
+                             GLint zoffset,
+                             GLsizei width,
+                             GLsizei height,
+                             GLsizei depth,
+                             GLenum format,
+                             GLsizei imageSize,
+                             const void* data) override;
+
 void CopyBufferSubData(GLenum readtarget,
                        GLenum writetarget,
                        GLintptr readoffset,
@@ -388,6 +400,8 @@ GLuint GetUniformBlockIndex(GLuint program, const char* name) override;
 void GetUniformfv(GLuint program, GLint location, GLfloat* params) override;
 
 void GetUniformiv(GLuint program, GLint location, GLint* params) override;
+
+void GetUniformuiv(GLuint program, GLint location, GLuint* params) override;
 
 void GetUniformIndices(GLuint program,
                        GLsizei count,

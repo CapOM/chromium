@@ -23,14 +23,18 @@
 #include "base/synchronization/lock.h"
 #include "base/synchronization/waitable_event.h"
 #include "base/sys_info.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/platform_thread.h"
 #include "base/time/time.h"
+#include "base/trace_event/memory_dump_manager.h"
 #include "blink/public/resources/grit/blink_image_resources.h"
 #include "blink/public/resources/grit/blink_resources.h"
 #include "components/mime_util/mime_util.h"
 #include "components/scheduler/child/webthread_impl_for_worker_scheduler.h"
 #include "content/app/resources/grit/content_resources.h"
 #include "content/app/strings/grit/content_strings.h"
+#include "content/child/background_sync/background_sync_provider.h"
+#include "content/child/background_sync/background_sync_provider_thread_proxy.h"
 #include "content/child/bluetooth/web_bluetooth_impl.h"
 #include "content/child/child_thread_impl.h"
 #include "content/child/content_child_helpers.h"
@@ -44,6 +48,7 @@
 #include "content/child/push_messaging/push_provider.h"
 #include "content/child/thread_safe_sender.h"
 #include "content/child/web_discardable_memory_impl.h"
+#include "content/child/web_memory_dump_provider_adapter.h"
 #include "content/child/web_url_loader_impl.h"
 #include "content/child/web_url_request_util.h"
 #include "content/child/websocket_bridge.h"
@@ -55,13 +60,14 @@
 #include "third_party/WebKit/public/platform/WebConvertableToTraceFormat.h"
 #include "third_party/WebKit/public/platform/WebData.h"
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
+#include "third_party/WebKit/public/platform/WebMemoryDumpProvider.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
 #include "third_party/WebKit/public/platform/WebWaitableEvent.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
 #include "ui/base/layout.h"
 #include "ui/events/gestures/blink/web_gesture_curve_impl.h"
-#include "ui/events/keycodes/dom4/keycode_converter.h"
+#include "ui/events/keycodes/dom/keycode_converter.h"
 
 using blink::WebData;
 using blink::WebFallbackThemeEngine;
@@ -144,19 +150,12 @@ class MemoryUsageCache {
 class ConvertableToTraceFormatWrapper
     : public base::trace_event::ConvertableToTraceFormat {
  public:
-#ifndef WEB_CONVERTABLE_TO_TRACE_FORMAT_IS_MOVED
-  // TODO(hiroshige): Remove #ifndef once the Blink-side CL is landed.
-  explicit ConvertableToTraceFormatWrapper(
-      const blink::WebConvertableToTraceFormat& convertable)
-      : convertable_(convertable) {}
-#else
   // We move a reference pointer from |convertable| to |convertable_|,
   // rather than copying, for thread safety. https://crbug.com/478149
   explicit ConvertableToTraceFormatWrapper(
       blink::WebConvertableToTraceFormat& convertable) {
     convertable_.moveFrom(convertable);
   }
-#endif
   void AppendAsTraceFormat(std::string* out) const override {
     *out += convertable_.asTraceFormat().utf8();
   }
@@ -458,6 +457,8 @@ void BlinkPlatformImpl::InternalInit() {
     push_dispatcher_ = ChildThreadImpl::current()->push_dispatcher();
     permission_client_.reset(new PermissionDispatcher(
         ChildThreadImpl::current()->service_registry()));
+    sync_provider_.reset(new BackgroundSyncProvider(
+        ChildThreadImpl::current()->service_registry()));
   }
 
   if (main_thread_task_runner_.get()) {
@@ -656,12 +657,7 @@ blink::Platform::TraceEventHandle BlinkPlatformImpl::addTraceEvent(
     const char** arg_names,
     const unsigned char* arg_types,
     const unsigned long long* arg_values,
-#ifndef WEB_CONVERTABLE_TO_TRACE_FORMAT_IS_MOVED
-    // TODO(hiroshige): Remove #ifndef once the Blink-side CL is landed.
-    const blink::WebConvertableToTraceFormat* convertable_values,
-#else
     blink::WebConvertableToTraceFormat* convertable_values,
-#endif
     unsigned char flags) {
   scoped_refptr<base::trace_event::ConvertableToTraceFormat>
       convertable_wrappers[2];
@@ -703,6 +699,30 @@ void BlinkPlatformImpl::updateTraceEventDuration(
   memcpy(&traceEventHandle, &handle, sizeof(handle));
   TRACE_EVENT_API_UPDATE_TRACE_EVENT_DURATION(
       category_group_enabled, name, traceEventHandle);
+}
+
+void BlinkPlatformImpl::registerMemoryDumpProvider(
+    blink::WebMemoryDumpProvider* wmdp) {
+  WebMemoryDumpProviderAdapter* wmdp_adapter =
+      new WebMemoryDumpProviderAdapter(wmdp);
+  bool did_insert =
+      memory_dump_providers_.add(wmdp, make_scoped_ptr(wmdp_adapter)).second;
+  if (!did_insert)
+    return;
+  wmdp_adapter->set_is_registered(true);
+  base::trace_event::MemoryDumpManager::GetInstance()->RegisterDumpProvider(
+      wmdp_adapter, base::ThreadTaskRunnerHandle::Get());
+}
+
+void BlinkPlatformImpl::unregisterMemoryDumpProvider(
+    blink::WebMemoryDumpProvider* wmdp) {
+  scoped_ptr<WebMemoryDumpProviderAdapter> wmdp_adapter =
+      memory_dump_providers_.take_and_erase(wmdp);
+  if (!wmdp_adapter)
+    return;
+  base::trace_event::MemoryDumpManager::GetInstance()->UnregisterDumpProvider(
+      wmdp_adapter.get());
+  wmdp_adapter->set_is_registered(false);
 }
 
 namespace {
@@ -1182,6 +1202,17 @@ blink::WebPermissionClient* BlinkPlatformImpl::permissionClient() {
 
   return PermissionDispatcherThreadProxy::GetThreadInstance(
       main_thread_task_runner_.get(), permission_client_.get());
+}
+
+blink::WebSyncProvider* BlinkPlatformImpl::backgroundSyncProvider() {
+  if (!sync_provider_.get())
+    return nullptr;
+
+  if (IsMainThread())
+    return sync_provider_.get();
+
+  return BackgroundSyncProviderThreadProxy::GetThreadInstance(
+      main_thread_task_runner_.get(), sync_provider_.get());
 }
 
 WebThemeEngine* BlinkPlatformImpl::themeEngine() {

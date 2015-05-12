@@ -11,16 +11,17 @@
 #include "base/callback.h"
 #include "base/memory/scoped_vector.h"
 #include "base/time/time.h"
-#include "media/base/media_export.h"
+#include "media/midi/usb_midi_export.h"
 
 namespace media {
+namespace midi {
 
 class MidiManagerUsb;
 class UsbMidiDevice;
 
 // Delegate class for UsbMidiDevice.
 // Each method is called when an corresponding event arrives at the device.
-class MEDIA_EXPORT UsbMidiDeviceDelegate {
+class USB_MIDI_EXPORT UsbMidiDeviceDelegate {
  public:
   virtual ~UsbMidiDeviceDelegate() {}
 
@@ -40,7 +41,7 @@ class MEDIA_EXPORT UsbMidiDeviceDelegate {
 // UsbMidiDevice represents a USB-MIDI device.
 // This is an interface class and each platform-dependent implementation class
 // will be a derived class.
-class MEDIA_EXPORT UsbMidiDevice {
+class USB_MIDI_EXPORT UsbMidiDevice {
  public:
   typedef ScopedVector<UsbMidiDevice> Devices;
 
@@ -82,6 +83,7 @@ class MEDIA_EXPORT UsbMidiDevice {
   virtual void Send(int endpoint_number, const std::vector<uint8>& data) = 0;
 };
 
+}  // namespace midi
 }  // namespace media
 
 #endif  // MEDIA_MIDI_USB_MIDI_DEVICE_H_

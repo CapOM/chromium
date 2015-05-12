@@ -32,6 +32,7 @@
 #include "chrome/browser/chromeos/login/error_screens_histogram_helper.h"
 #include "chrome/browser/chromeos/login/hwid_checker.h"
 #include "chrome/browser/chromeos/login/lock/screen_locker.h"
+#include "chrome/browser/chromeos/login/reauth_stats.h"
 #include "chrome/browser/chromeos/login/screens/core_oobe_actor.h"
 #include "chrome/browser/chromeos/login/screens/network_error.h"
 #include "chrome/browser/chromeos/login/startup_utils.h"
@@ -443,18 +444,31 @@ void SigninScreenHandler::DeclareLocalizedValues(
   builder->Add("removeUserWarningButtonTitle",
                IDS_LOGIN_POD_USER_REMOVE_WARNING_BUTTON);
 
-  builder->Add("samlNotice",
-               StartupUtils::IsWebviewSigninEnabled()
-                   ? IDS_LOGIN_SAML_NOTICE_NEW_GAIA_FLOW
-                   : IDS_LOGIN_SAML_NOTICE);
-
-  builder->Add("confirmPasswordTitle", IDS_LOGIN_CONFIRM_PASSWORD_TITLE);
-  builder->Add("confirmPasswordLabel", IDS_LOGIN_CONFIRM_PASSWORD_LABEL);
+  if (StartupUtils::IsWebviewSigninEnabled()) {
+    builder->Add("samlNotice", IDS_LOGIN_SAML_NOTICE_NEW_GAIA_FLOW);
+    builder->Add("confirmPasswordTitle",
+                 IDS_LOGIN_CONFIRM_PASSWORD_TITLE_NEW_GAIA_FLOW);
+    builder->Add("confirmPasswordLabel",
+                 IDS_LOGIN_CONFIRM_PASSWORD_LABEL_NEW_GAIA_FLOW);
+  } else {
+    builder->Add("samlNotice", IDS_LOGIN_SAML_NOTICE);
+    builder->Add("confirmPasswordTitle", IDS_LOGIN_CONFIRM_PASSWORD_TITLE);
+    builder->Add("confirmPasswordLabel", IDS_LOGIN_CONFIRM_PASSWORD_LABEL);
+  }
   builder->Add("confirmPasswordConfirmButton",
                IDS_LOGIN_CONFIRM_PASSWORD_CONFIRM_BUTTON);
   builder->Add("confirmPasswordText", IDS_LOGIN_CONFIRM_PASSWORD_TEXT);
   builder->Add("confirmPasswordErrorText",
                IDS_LOGIN_CONFIRM_PASSWORD_ERROR_TEXT);
+
+  builder->Add("confirmPasswordIncorrectPassword",
+               IDS_LOGIN_CONFIRM_PASSWORD_INCORRECT_PASSWORD);
+  builder->Add("accountSetupCancelDialogTitle",
+               IDS_LOGIN_ACCOUNT_SETUP_CANCEL_DIALOG_TITLE);
+  builder->Add("accountSetupCancelDialogNo",
+               IDS_LOGIN_ACCOUNT_SETUP_CANCEL_DIALOG_NO);
+  builder->Add("accountSetupCancelDialogYes",
+               IDS_LOGIN_ACCOUNT_SETUP_CANCEL_DIALOG_YES);
 
   builder->Add("fatalEnrollmentError",
                IDS_ENTERPRISE_ENROLLMENT_AUTH_FATAL_ERROR);
@@ -511,6 +525,10 @@ void SigninScreenHandler::RegisterMessages() {
               &SigninScreenHandler::HandleGetTouchViewState);
   AddCallback("logRemoveUserWarningShown",
               &SigninScreenHandler::HandleLogRemoveUserWarningShown);
+  AddCallback("firstIncorrectPasswordAttempt",
+              &SigninScreenHandler::HandleFirstIncorrectPasswordAttempt);
+  AddCallback("maxIncorrectPasswordAttempts",
+              &SigninScreenHandler::HandleMaxIncorrectPasswordAttempts);
 
   // This message is sent by the kiosk app menu, but is handled here
   // so we can tell the delegate to launch the app.
@@ -1088,6 +1106,8 @@ void SigninScreenHandler::HandleShowAddUser(const base::ListValue* args) {
   if (args)
     args->GetString(0, &email);
   gaia_screen_handler_->PopulateEmail(email);
+  if (!email.empty())
+    SendReauthReason(email);
   OnShowAddUser();
 }
 
@@ -1192,7 +1212,10 @@ void SigninScreenHandler::HandleLoginVisible(const std::string& source) {
     OnPreferencesChanged();
 }
 
-void SigninScreenHandler::HandleCancelPasswordChangedFlow() {
+void SigninScreenHandler::HandleCancelPasswordChangedFlow(
+    const std::string& user_id) {
+  if (!user_id.empty())
+    RecordReauthReason(user_id, ReauthReason::PASSWORD_UPDATE_SKIPPED);
   gaia_screen_handler_->StartClearingCookies(
       base::Bind(&SigninScreenHandler::CancelPasswordChangedFlowInternal,
                  weak_factory_.GetWeakPtr()));
@@ -1315,6 +1338,20 @@ void SigninScreenHandler::HandleGetTouchViewState() {
 void SigninScreenHandler::HandleLogRemoveUserWarningShown() {
   ProfileMetrics::LogProfileDeleteUser(
       ProfileMetrics::DELETE_PROFILE_USER_MANAGER_SHOW_WARNING);
+}
+
+void SigninScreenHandler::HandleFirstIncorrectPasswordAttempt(
+    const std::string& email) {
+  // TODO(ginkage): Fix this case once crbug.com/469987 is ready.
+  /*
+    if (user_manager::UserManager::Get()->FindUsingSAML(email))
+      RecordReauthReason(email, ReauthReason::INCORRECT_SAML_PASSWORD_ENTERED);
+  */
+}
+
+void SigninScreenHandler::HandleMaxIncorrectPasswordAttempts(
+    const std::string& email) {
+  RecordReauthReason(email, ReauthReason::INCORRECT_PASSWORD_ENTERED);
 }
 
 bool SigninScreenHandler::AllWhitelistedUsersPresent() {

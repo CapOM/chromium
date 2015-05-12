@@ -103,6 +103,7 @@
 #include "net/url_request/url_request_filter.h"
 #include "net/url_request/url_request_interceptor.h"
 #include "net/url_request/url_request_job.h"
+#include "ppapi/shared_impl/ppapi_switches.h"
 #include "ui/base/l10n/l10n_util.h"
 #include "url/gurl.h"
 
@@ -1056,7 +1057,9 @@ class NeverRunsExternalProtocolHandlerDelegate
   void BlockRequest() override {}
   void RunExternalProtocolDialog(const GURL& url,
                                  int render_process_host_id,
-                                 int routing_id) override {
+                                 int routing_id,
+                                 ui::PageTransition page_transition,
+                                 bool has_user_gesture) override {
     NOTREACHED();
   }
   void LaunchUrlWithoutSecurityCheck(const GURL& url) override { NOTREACHED(); }
@@ -1108,7 +1111,9 @@ class PrerenderBrowserTest : virtual public InProcessBrowserTest {
   void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitchASCII(switches::kPrerenderMode,
                                     switches::kPrerenderModeSwitchValueEnabled);
-    ASSERT_TRUE(ppapi::RegisterTestPlugin(command_line));
+    command_line->AppendSwitch(switches::kEnablePepperTesting);
+
+    ASSERT_TRUE(ppapi::RegisterPowerSaverTestPlugin(command_line));
   }
 
   void SetUpOnMainThread() override {
@@ -1655,8 +1660,8 @@ class PrerenderBrowserTest : virtual public InProcessBrowserTest {
 
     if (new_web_contents) {
       NewTabNavigationOrSwapObserver observer;
-      render_frame_host->
-          ExecuteJavaScriptForTests(base::ASCIIToUTF16(javascript));
+      render_frame_host->ExecuteJavaScriptWithUserGestureForTests(
+          base::ASCIIToUTF16(javascript));
       observer.Wait();
     } else {
       NavigationOrSwapObserver observer(current_browser()->tab_strip_model(),
@@ -1968,8 +1973,8 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderAlertAfterOnload) {
 // Checks that plugins are not loaded while a page is being preloaded, but
 // are loaded when the page is displayed.
 IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderDelayLoadPlugin) {
-  PrerenderTestURL("files/prerender/plugin_delay_load.html", FINAL_STATUS_USED,
-                   1);
+  PrerenderTestURL("files/prerender/prerender_plugin_delay_load.html",
+                   FINAL_STATUS_USED, 1);
   NavigateToDestURL();
 }
 
@@ -1981,9 +1986,16 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderContentSettingDetect) {
   content_settings_map->SetDefaultContentSetting(
       CONTENT_SETTINGS_TYPE_PLUGINS, CONTENT_SETTING_DETECT_IMPORTANT_CONTENT);
 
-  PrerenderTestURL("files/prerender/plugin_delay_load.html", FINAL_STATUS_USED,
-                   1);
+  PrerenderTestURL("files/prerender/prerender_plugin_power_saver.html",
+                   FINAL_STATUS_USED, 1);
+
+  DisableJavascriptCalls();
   NavigateToDestURL();
+  bool second_placeholder_present = false;
+  ASSERT_TRUE(content::ExecuteScriptAndExtractBool(
+      GetActiveWebContents(), "AwaitPluginPrerollAndPlaceholder();",
+      &second_placeholder_present));
+  EXPECT_TRUE(second_placeholder_present);
 }
 
 // For Content Setting BLOCK, checks that plugins are never loaded.
@@ -1993,8 +2005,8 @@ IN_PROC_BROWSER_TEST_F(PrerenderBrowserTest, PrerenderContentSettingBlock) {
   content_settings_map->SetDefaultContentSetting(CONTENT_SETTINGS_TYPE_PLUGINS,
                                                  CONTENT_SETTING_BLOCK);
 
-  PrerenderTestURL("files/prerender/plugin_never_load.html", FINAL_STATUS_USED,
-                   1);
+  PrerenderTestURL("files/prerender/prerender_plugin_never_load.html",
+                   FINAL_STATUS_USED, 1);
   NavigateToDestURL();
 }
 

@@ -42,6 +42,7 @@ public class ContentShellActivity extends Activity {
 
     private ShellManager mShellManager;
     private WindowAndroid mWindowAndroid;
+    private Intent mLastSentIntent;
 
     @Override
     @SuppressFBWarnings("DM_EXIT")
@@ -71,7 +72,8 @@ public class ContentShellActivity extends Activity {
 
         setContentView(R.layout.content_shell_activity);
         mShellManager = (ShellManager) findViewById(R.id.shell_container);
-        mWindowAndroid = new ActivityWindowAndroid(this);
+        final boolean listenToActivityState = true;
+        mWindowAndroid = new ActivityWindowAndroid(this, listenToActivityState);
         mWindowAndroid.restoreInstanceState(savedInstanceState);
         mShellManager.setWindow(mWindowAndroid);
         // Set up the animation placeholder to be the SurfaceView. This disables the
@@ -183,14 +185,6 @@ public class ContentShellActivity extends Activity {
     }
 
     @Override
-    protected void onStop() {
-        super.onStop();
-
-        ContentViewCore contentViewCore = getActiveContentViewCore();
-        if (contentViewCore != null) contentViewCore.onHide();
-    }
-
-    @Override
     protected void onStart() {
         super.onStart();
 
@@ -202,6 +196,16 @@ public class ContentShellActivity extends Activity {
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         mWindowAndroid.onActivityResult(requestCode, resultCode, data);
+    }
+
+    @Override
+    public void startActivity(Intent i) {
+        mLastSentIntent = i;
+        super.startActivity(i);
+    }
+
+    public Intent getLastSentIntent() {
+        return mLastSentIntent;
     }
 
     private static String getUrlFromIntent(Intent intent) {

@@ -89,20 +89,20 @@ void ProxyDecryptor::CreateCdm(CdmFactory* cdm_factory,
 void ProxyDecryptor::OnCdmCreated(const std::string& key_system,
                                   const GURL& security_origin,
                                   const CdmContextReadyCB& cdm_context_ready_cb,
-                                  scoped_ptr<MediaKeys> cdm) {
+                                  scoped_ptr<MediaKeys> cdm,
+                                  const std::string& /* error_message */) {
   is_creating_cdm_ = false;
 
   if (!cdm) {
     cdm_context_ready_cb.Run(nullptr);
-    return;
+  } else {
+    key_system_ = key_system;
+    security_origin_ = security_origin;
+    is_clear_key_ = IsClearKey(key_system) || IsExternalClearKey(key_system);
+    media_keys_ = cdm.Pass();
+
+    cdm_context_ready_cb.Run(media_keys_->GetCdmContext());
   }
-
-  key_system_ = key_system;
-  security_origin_ = security_origin;
-  is_clear_key_ = IsClearKey(key_system) || IsExternalClearKey(key_system);
-  media_keys_ = cdm.Pass();
-
-  cdm_context_ready_cb.Run(media_keys_->GetCdmContext());
 
   for (const auto& request : pending_requests_)
     GenerateKeyRequestInternal(request->init_data_type, request->init_data);

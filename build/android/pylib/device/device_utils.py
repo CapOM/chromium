@@ -560,7 +560,7 @@ class DeviceUtils(object):
           logging.info('Large output mode enabled. Will write output to device '
                        'and read results from file.')
           handle_large_command(cmd)
-          return self.ReadFile(large_output_file.name)
+          return self.ReadFile(large_output_file.name, force_pull=True)
       else:
         try:
           return handle_large_command(cmd)
@@ -789,7 +789,7 @@ class DeviceUtils(object):
   def SendKeyEvent(self, keycode, timeout=None, retries=None):
     """Sends a keycode to the device.
 
-    See: http://developer.android.com/reference/android/view/KeyEvent.html
+    See the pylib.constants.keyevent module for suitable keycode values.
 
     Args:
       keycode: A integer keycode to send to the device.
@@ -1043,7 +1043,7 @@ class DeviceUtils(object):
       + r'(?P<date>\S+) +(?P<time>\S+) +(?P<name>.+)$')
 
   @decorators.WithTimeoutAndRetriesFromInstance()
-  def ReadFile(self, device_path, as_root=False,
+  def ReadFile(self, device_path, as_root=False, force_pull=False,
                timeout=None, retries=None):
     """Reads the contents of a file from the device.
 
@@ -1052,6 +1052,9 @@ class DeviceUtils(object):
                    from the device.
       as_root: A boolean indicating whether the read should be executed with
                root privileges.
+      force_pull: A boolean indicating whether to force the operation to be
+          performed by pulling a file from the device. The default is, when the
+          contents are short, to retrieve the contents using cat instead.
       timeout: timeout in seconds
       retries: number of retries
 
@@ -1065,20 +1068,20 @@ class DeviceUtils(object):
       CommandTimeoutError on timeout.
       DeviceUnreachableError on missing device.
     """
-    # TODO(jbudorick): Implement a generic version of Stat() that handles
-    # as_root=True, then switch this implementation to use that.
-    size = None
-    ls_out = self.RunShellCommand(['ls', '-l', device_path], as_root=as_root,
-                                  check_return=True)
-    for line in ls_out:
-      m = self._LS_RE.match(line)
-      if m and m.group('name') == posixpath.basename(device_path):
-        size = int(m.group('size'))
-        break
-    else:
+    def get_size(path):
+      # TODO(jbudorick): Implement a generic version of Stat() that handles
+      # as_root=True, then switch this implementation to use that.
+      ls_out = self.RunShellCommand(['ls', '-l', device_path], as_root=as_root,
+                                    check_return=True)
+      for line in ls_out:
+        m = self._LS_RE.match(line)
+        if m and m.group('name') == posixpath.basename(device_path):
+          return int(m.group('size'))
       logging.warning('Could not determine size of %s.', device_path)
+      return None
 
-    if 0 < size <= self._MAX_ADB_OUTPUT_LENGTH:
+    if (not force_pull
+        and 0 < get_size(device_path) <= self._MAX_ADB_OUTPUT_LENGTH):
       return _JoinLines(self.RunShellCommand(
           ['cat', device_path], as_root=as_root, check_return=True))
     elif as_root and self.NeedsSU():
@@ -1530,41 +1533,6 @@ class DeviceUtils(object):
       retries: number of retries
     """
     return logcat_monitor.LogcatMonitor(self.adb, *args, **kwargs)
-
-  @decorators.WithTimeoutAndRetriesFromInstance()
-  def GetDevicePieWrapper(self, timeout=None, retries=None):
-    """Gets the absolute path to the run_pie wrapper on the device.
-
-    We have to build our device executables to be PIE, but they need to be able
-    to run on versions of android that don't support PIE (i.e. ICS and below).
-    To do so, we push a wrapper to the device that lets older android versions
-    run PIE executables. This method pushes that wrapper to the device if
-    necessary and returns the path to it.
-
-    This is exposed publicly to allow clients to write scripts using run_pie
-    (e.g. md5sum.CalculateDeviceMd5Sum).
-
-    Args:
-      timeout: timeout in seconds
-      retries: number of retries
-
-    Returns:
-      The path to the PIE wrapper on the device, or an empty string if the
-      device does not require the wrapper.
-    """
-    if 'run_pie' not in self._cache:
-      pie = ''
-      if (self.build_version_sdk <
-          constants.ANDROID_SDK_VERSION_CODES.JELLY_BEAN):
-        host_pie_path = os.path.join(constants.GetOutDirectory(), 'run_pie')
-        if not os.path.exists(host_pie_path):
-          raise device_errors.CommandFailedError('Please build run_pie')
-        pie = '%s/run_pie' % constants.TEST_EXECUTABLE_DIR
-        self.adb.Push(host_pie_path, pie)
-
-      self._cache['run_pie'] = pie
-
-    return self._cache['run_pie']
 
   def GetClientCache(self, client_name):
     """Returns client cache."""

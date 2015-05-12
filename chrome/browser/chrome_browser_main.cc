@@ -797,14 +797,19 @@ void ChromeBrowserMainParts::ToolkitInitialized() {
 void ChromeBrowserMainParts::PreMainMessageLoopStart() {
   TRACE_EVENT0("startup", "ChromeBrowserMainParts::PreMainMessageLoopStart");
 
-  device_event_log::Initialize(0 /* default max entries */);
-
   for (size_t i = 0; i < chrome_extra_parts_.size(); ++i)
     chrome_extra_parts_[i]->PreMainMessageLoopStart();
 }
 
 void ChromeBrowserMainParts::PostMainMessageLoopStart() {
   TRACE_EVENT0("startup", "ChromeBrowserMainParts::PostMainMessageLoopStart");
+
+  // device_event_log must be initialized after the message loop. Calls to
+  // {DEVICE}_LOG prior to here will only be logged with VLOG. Some
+  // platforms (e.g. chromeos) may have already initialized this.
+  if (!device_event_log::IsInitialized())
+    device_event_log::Initialize(0 /* default max entries */);
+
   for (size_t i = 0; i < chrome_extra_parts_.size(); ++i)
     chrome_extra_parts_[i]->PostMainMessageLoopStart();
 }
@@ -870,8 +875,6 @@ int ChromeBrowserMainParts::PreCreateThreadsImpl() {
           tracked_objects::ThreadData::PROFILING_ACTIVE;
     if (flag.compare("0") != 0)
       status = tracked_objects::ThreadData::DEACTIVATED;
-    else if (flag.compare("child") != 0)
-      status = tracked_objects::ThreadData::PROFILING_CHILDREN_ACTIVE;
     tracked_objects::ThreadData::InitializeAndSetTrackingStatus(status);
   }
 

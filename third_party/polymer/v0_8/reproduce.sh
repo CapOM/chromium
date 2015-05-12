@@ -26,6 +26,7 @@ rm -rf components/{iron-component-page,webcomponentsjs}
 # Test and demo directories aren't needed.
 rm -rf components/*/{test,demo}
 rm -rf components/polymer/explainer
+rm -rf components/observe-js/{examples,conf,benchmark}
 
 # Make checkperms.py happy.
 find components/iron-selector -type f -exec chmod -x {} \;
@@ -33,8 +34,8 @@ chmod +x components/polymer/build.bat
 
 # Remove carriage returns to make CQ happy.
 find components -type f \( -name \*.html -o -name \*.css -o -name \*.js\
-  -o -name \*.md -o -name \*.sh -o -name \*.json -o -name \*.gitignore \)\
-  -print0 | xargs -0 sed -i -e $'s/\r$//g'
+  -o -name \*.md -o -name \*.sh -o -name \*.json -o -name \*.gitignore\
+  -o -name \*.bat \) -print0 | xargs -0 sed -i -e $'s/\r$//g'
 
 ./extract_inline_scripts.sh components components-chromium
 

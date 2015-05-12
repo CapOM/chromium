@@ -56,7 +56,7 @@ class ContentViewCoreImpl : public ContentViewCore,
   void ShowPastePopup(int x, int y) override;
   void GetScaledContentBitmap(
       float scale,
-      SkColorType color_type,
+      SkColorType preferred_color_type,
       gfx::Rect src_subrect,
       ReadbackRequestCallback& result_callback) override;
   float GetDpiScale() const override;
@@ -241,7 +241,7 @@ class ContentViewCoreImpl : public ContentViewCore,
   bool HasFocus();
   void OnGestureEventAck(const blink::WebGestureEvent& event,
                          InputEventAckState ack_result);
-  InputEventAckState FilterInputEvent(const blink::WebInputEvent& event);
+  bool FilterInputEvent(const blink::WebInputEvent& event);
   void OnSelectionChanged(const std::string& text);
   void OnSelectionEvent(ui::SelectionEventType event,
                         const gfx::PointF& selection_anchor,

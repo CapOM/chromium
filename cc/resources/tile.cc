@@ -23,7 +23,7 @@ Tile::Tile(TileManager* tile_manager,
            int layer_id,
            int source_frame_number,
            int flags)
-    : RefCountedManaged<Tile>(tile_manager),
+    : tile_manager_(tile_manager),
       desired_texture_size_(desired_texture_size),
       content_rect_(content_rect),
       contents_scale_(contents_scale),
@@ -56,16 +56,6 @@ void Tile::AsValueWithPriorityInto(const TilePriority& priority,
 
   res->SetInteger("layer_id", layer_id_);
 
-  // TODO(vmpstr): Remove active and pending priority once tracing is using
-  // combined priority or at least can support both.
-  res->BeginDictionary("active_priority");
-  priority_.AsValueInto(res);
-  res->EndDictionary();
-
-  res->BeginDictionary("pending_priority");
-  priority_.AsValueInto(res);
-  res->EndDictionary();
-
   res->BeginDictionary("combined_priority");
   priority.AsValueInto(res);
   res->EndDictionary();
@@ -76,7 +66,7 @@ void Tile::AsValueWithPriorityInto(const TilePriority& priority,
 
   res->SetBoolean("has_resource", HasResource());
   res->SetBoolean("is_using_gpu_memory", HasResource() || HasRasterTask());
-  res->SetString("resolution", TileResolutionToString(priority_.resolution));
+  res->SetString("resolution", TileResolutionToString(priority.resolution));
 
   res->SetInteger("scheduled_priority", scheduled_priority_);
 
@@ -89,6 +79,11 @@ size_t Tile::GPUMemoryUsageInBytes() const {
   if (draw_info_.resource_)
     return draw_info_.resource_->bytes();
   return 0;
+}
+
+void Tile::Deleter::operator()(Tile* tile) const {
+  TileManager* tile_manager = tile->tile_manager_;
+  tile_manager->Release(tile);
 }
 
 }  // namespace cc

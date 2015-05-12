@@ -98,7 +98,6 @@ void CoreOobeHandler::DeclareLocalizedValues(
 
   // Strings for Asset Identifier shown in version string.
   builder->Add("assetIdLabel", IDS_OOBE_ASSET_ID_LABEL);
-  builder->Add("noneSpecified", IDS_OOBE_NONE_SPECIFIED);
 }
 
 void CoreOobeHandler::Initialize() {
@@ -388,13 +387,11 @@ void CoreOobeHandler::UpdateDeviceRequisition() {
 }
 
 void CoreOobeHandler::UpdateKeyboardState() {
-  if (!login::LoginScrollIntoViewEnabled())
-    return;
-
   keyboard::KeyboardController* keyboard_controller =
       keyboard::KeyboardController::GetInstance();
   if (keyboard_controller) {
     gfx::Rect bounds = keyboard_controller->current_keyboard_bounds();
+    ShowControlBar(bounds.IsEmpty());
     SetKeyboardState(!bounds.IsEmpty(), bounds);
   }
 }
