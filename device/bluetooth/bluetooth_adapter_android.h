@@ -31,7 +31,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   static bool RegisterJNI(JNIEnv* env);
 
   // True if this app has android permissions necessary for Bluetooth.
-  bool HasBluetoothPermission() const;
+  bool HasBluetoothCapability() const;
 
   // BluetoothAdapter:
   std::string GetAddress() const override;

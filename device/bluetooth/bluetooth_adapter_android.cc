@@ -46,8 +46,8 @@ bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
 }
 
-bool BluetoothAdapterAndroid::HasBluetoothPermission() const {
-  return Java_BluetoothAdapter_hasBluetoothPermission(
+bool BluetoothAdapterAndroid::HasBluetoothCapability() const {
+  return Java_BluetoothAdapter_hasBluetoothCapability(
       AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 

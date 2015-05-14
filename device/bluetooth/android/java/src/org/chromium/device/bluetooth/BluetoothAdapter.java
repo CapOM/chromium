@@ -21,7 +21,7 @@ import org.chromium.base.Log;
 final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
-    private final boolean mHasBluetoothPermission;
+    private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
 
     @CalledByNative
@@ -42,20 +42,20 @@ final class BluetoothAdapter {
 
     // Constructs a BluetoothAdapter.
     private BluetoothAdapter(Context context) {
-        mHasBluetoothPermission =
+        final boolean hasPermissions =
                 context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
                         == PackageManager.PERMISSION_GRANTED
                 && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
                         == PackageManager.PERMISSION_GRANTED;
-        if (!mHasBluetoothPermission) {
-            Log.w(TAG,
-                    "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions required.");
-            return;
-        }
-
-        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
-            mHasBluetoothPermission = false;
-            Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
+        final boolean hasLowEnergyFeature =
+                context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
+        mHasBluetoothCapability = hasPermissions && hasLowEnergyFeature;
+        if (!mHasBluetoothCapability) {
+            if (!hasPermissions)
+                Log.w(TAG,
+                        "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions required.");
+            if (!hasLowEnergyFeature)
+                Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
             return;
         }
 
@@ -64,8 +64,8 @@ final class BluetoothAdapter {
     }
 
     @CalledByNative
-    private boolean hasBluetoothPermission() {
-        return mHasBluetoothPermission;
+    private boolean hasBluetoothCapability() {
+        return mHasBluetoothCapability;
     }
 
     // ---------------------------------------------------------------------------------------------

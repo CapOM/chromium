@@ -26,7 +26,7 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
   InitWithPermission();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_TRUE(adapter_->HasBluetoothPermission());
+  EXPECT_TRUE(adapter_->HasBluetoothCapability());
   if (!adapter_->IsPresent()) {
     LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
     return;
@@ -44,7 +44,7 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
 TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
   InitWithoutPermission();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_FALSE(adapter_->HasBluetoothPermission());
+  EXPECT_FALSE(adapter_->HasBluetoothCapability());
   EXPECT_EQ(adapter_->GetAddress().length(), 0u);
   EXPECT_EQ(adapter_->GetName().length(), 0u);
   EXPECT_FALSE(adapter_->IsPresent());
