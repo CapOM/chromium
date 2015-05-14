@@ -53,6 +53,12 @@ final class BluetoothAdapter {
             return;
         }
 
+        if (!getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)) {
+            mHasBluetoothPermission = false;
+            Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
+            return;
+        }
+
         mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
         if (mAdapter == null) Log.i(TAG, "No adapter found.");
     }
@@ -104,4 +110,7 @@ final class BluetoothAdapter {
     private boolean isDiscovering() {
         return isPresent() && mAdapter.isDiscovering();
     }
+
+    @CalledByNative
+    private void addDiscoverySession() {}
 }

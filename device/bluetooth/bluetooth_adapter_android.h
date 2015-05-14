@@ -92,6 +92,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   std::string address_;
   std::string name_;
 
+  std::vector<std::pair<base::Closure, ErrorCallback>>
+      on_start_discovery_callbacks_;
+
   // Note: This should remain the last member so it'll be destroyed and
   // invalidate its weak pointers before any other members are destroyed.
   base::WeakPtrFactory<BluetoothAdapterAndroid> weak_ptr_factory_;
