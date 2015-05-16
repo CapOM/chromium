@@ -147,7 +147,10 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
   // TODO(scheib): Support filters (issue number <<<<<<<<<<<<<<<<<< )
-  error_callback.Run();
+  on_start_discovery_callbacks_.push_back(
+      std::make_pair(callback, error_callback));
+  Java_BluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
+                                            j_bluetooth_adapter_.obj());
 }
 
 void BluetoothAdapterAndroid::RemoveDiscoverySession(

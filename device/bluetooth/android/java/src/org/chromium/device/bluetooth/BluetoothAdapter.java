@@ -5,6 +5,8 @@
 package org.chromium.device.bluetooth;
 
 import android.Manifest;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
@@ -12,6 +14,8 @@ import android.content.pm.PackageManager;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
+
+import java.util.List;
 
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
@@ -23,6 +27,10 @@ final class BluetoothAdapter {
 
     private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
+    private ScanCallback mLeScanCallback;
+
+    // ---------------------------------------------------------------------------------------------
+    // Construction
 
     @CalledByNative
     private static BluetoothAdapter create(Context context) {
@@ -60,8 +68,14 @@ final class BluetoothAdapter {
         }
 
         mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-        if (mAdapter == null) Log.i(TAG, "No adapter found.");
+        if (mAdapter == null)
+            Log.i(TAG, "No adapter found.");
+        else
+            Log.i(TAG, "BluetoothAdapter successfully constructed.");
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // Accessors @CalledByNative for BluetoothAdapterAndroid:
 
     @CalledByNative
     private boolean hasBluetoothCapability() {
@@ -69,7 +83,7 @@ final class BluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // BluetoothAdapterAndroid.h interface:
+    // BluetoothAdapterAndroid interface @CalledByNative for BluetoothAdapterAndroid:
 
     @CalledByNative
     private String getAddress() {
@@ -112,5 +126,45 @@ final class BluetoothAdapter {
     }
 
     @CalledByNative
-    private void addDiscoverySession() {}
+    private void addDiscoverySession() {
+        Log.i(TAG, "addDiscoverySession");
+        if (!isPowered()) {
+            Log.i(TAG, "addDiscoverySession: Fails: !isPowered");
+            // TODO error callbacks.
+            return;
+        }
+
+        if (mLeScanCallback != null) {
+            Log.i(TAG, "addDiscoverySession: Already scanning.");
+            // TODO call callbacks?
+            return;
+        }
+
+        mLeScanCallback = new ScanCallback() {
+            @Override
+            public void onBatchScanResults(List<ScanResult> results) {
+                Log.i(TAG, "onBatchScanResults");
+                for (ScanResult result : results) {
+                    // mAdapter.add(result);
+                }
+                // mAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onScanResult(int callbackType, ScanResult result) {
+                Log.i(TAG, "onScanResult");
+                // mAdapter.add(result);
+                // mAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onScanFailed(int errorCode) {
+                Log.i(TAG, "onScanFailed: %d", errorCode);
+                // TODO
+            }
+        };
+        mAdapter.getBluetoothLeScanner().startScan(mLeScanCallback);
+    }
+
+    // ---------------------------------------------------------------------------------------------
 }
