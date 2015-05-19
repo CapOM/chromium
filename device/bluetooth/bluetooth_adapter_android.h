@@ -6,7 +6,6 @@
 #define DEVICE_BLUETOOTH_BLUETOOTH_ADAPTER_ANDROID_H_
 
 #include "base/android/jni_android.h"
-#include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 
@@ -15,9 +14,6 @@ class SequencedTaskRunner;
 }  // namespace base
 
 namespace device {
-
-class BluetoothAdapterAndroidTest;
-//FORWARD_DECLARE_TEST(BluetoothAdapterAndroidTest, Construct);
 
 // The BluetoothAdapterAndroid class implements BluetoothAdapter for the
 // Android platform.
@@ -74,9 +70,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
       const CreateAdvertisementErrorCallback& error_callback) override;
 
  protected:
-  friend BluetoothAdapterAndroidTest;
-  FRIEND_TEST_ALL_PREFIXES(BluetoothAdapterAndroidTest, Construct);
-
   BluetoothAdapterAndroid();
   ~BluetoothAdapterAndroid() override;
 

@@ -26,15 +26,10 @@ BluetoothDispatcherHost::BluetoothDispatcherHost()
       bluetooth_request_device_reject_type_(BluetoothError::NOT_FOUND),
       weak_ptr_factory_(this) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  LOG(WARNING) << __FUNCTION__ << " " << __LINE__;
-
-  if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable()){
-  LOG(WARNING) << __FUNCTION__ << " " << __LINE__;
-
+  if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
     BluetoothAdapterFactory::GetAdapter(
         base::Bind(&BluetoothDispatcherHost::set_adapter,
                    weak_ptr_factory_.GetWeakPtr()));
-  }
 }
 
 void BluetoothDispatcherHost::OnDestruct() const {
@@ -74,11 +69,8 @@ void BluetoothDispatcherHost::set_adapter(
   if (adapter_.get())
     adapter_->RemoveObserver(this);
   adapter_ = adapter;
-  if (adapter_.get()){
-  LOG(WARNING) << __FUNCTION__ << " " << __LINE__;
-
+  if (adapter_.get())
     adapter_->AddObserver(this);
-  }
 }
 
 void BluetoothDispatcherHost::OnRequestDevice(int thread_id, int request_id) {
