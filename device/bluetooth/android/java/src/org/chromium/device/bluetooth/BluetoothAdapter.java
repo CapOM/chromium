@@ -127,22 +127,20 @@ final class BluetoothAdapter {
     }
 
     @CalledByNative
-    private void addDiscoverySession() {
+    private boolean addDiscoverySession() {
         Log.i(TAG, "addDiscoverySession");
         if (!isPowered()) {
             Log.i(TAG, "addDiscoverySession: Fails: !isPowered");
-            // TODO error callbacks.
-            return;
+            return false;
         }
 
         if (mLeScanCallback != null) {
             Log.i(TAG, "addDiscoverySession: Already scanning.");
-            // TODO call callbacks?
-            return;
+            return true;
         }
 
         ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
-//        scanSettingsBuilder.setReportDelay(100);
+        // scanSettingsBuilder.setReportDelay(0); Causes a SCAN_FAILED_FEATURE_UNSUPPORTED.
         scanSettingsBuilder.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
 
         mLeScanCallback = new ScanCallback() {
@@ -157,19 +155,33 @@ final class BluetoothAdapter {
 
             @Override
             public void onScanResult(int callbackType, ScanResult result) {
-                Log.i(TAG, "onScanResult");
+                Log.i(TAG, "onScanResult %s", result.toString());
                 // mAdapter.add(result);
                 // mAdapter.notifyDataSetChanged();
             }
 
             @Override
             public void onScanFailed(int errorCode) {
-                Log.i(TAG, "onScanFailed: %d", errorCode);
-                // TODO
+                Log.w(TAG, "onScanFailed: %d", errorCode);
             }
         };
-        mAdapter.getBluetoothLeScanner().startScan(null, scanSettingsBuilder.build(), mLeScanCallback); 
+
+        mAdapter.getBluetoothLeScanner().startScan(
+                null /* filters */, scanSettingsBuilder.build(), mLeScanCallback);
         Log.i(TAG, "addDiscoverySession END");
+        return true;
+    }
+
+    @CalledByNative
+    private boolean removeDiscoverySession() {
+        Log.i(TAG, "removeDiscoverySession");
+        if (mLeScanCallback == null) {
+            Log.w(TAG, "No scan in progress.");
+            return false;
+        }
+        mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        mLeScanCallback = null;
+        return true;
     }
 
     // ---------------------------------------------------------------------------------------------
