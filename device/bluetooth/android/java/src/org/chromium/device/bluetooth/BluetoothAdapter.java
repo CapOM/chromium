@@ -11,6 +11,7 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
+import android.os.Build;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
@@ -51,6 +52,7 @@ final class BluetoothAdapter {
 
     // Constructs a BluetoothAdapter.
     private BluetoothAdapter(Context context) {
+        final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
         final boolean hasPermissions =
                 context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
                         == PackageManager.PERMISSION_GRANTED
@@ -58,12 +60,15 @@ final class BluetoothAdapter {
                         == PackageManager.PERMISSION_GRANTED;
         final boolean hasLowEnergyFeature =
                 context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
-        mHasBluetoothCapability = hasPermissions && hasLowEnergyFeature;
+        mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
         if (!mHasBluetoothCapability) {
-            if (!hasPermissions)
+            if (!hasMinAPI)
+                Log.i(TAG, "Bluetooth API disabled; SDK version (%d) too low.",
+                        Build.VERSION.SDK_INT);
+            else if (!hasPermissions)
                 Log.w(TAG,
                         "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions required.");
-            if (!hasLowEnergyFeature)
+            else if (!hasLowEnergyFeature)
                 Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
             return;
         }
