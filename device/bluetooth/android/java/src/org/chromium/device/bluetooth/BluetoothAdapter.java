@@ -7,6 +7,7 @@ package org.chromium.device.bluetooth;
 import android.Manifest;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
@@ -140,6 +141,10 @@ final class BluetoothAdapter {
             return;
         }
 
+        ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
+//        scanSettingsBuilder.setReportDelay(100);
+        scanSettingsBuilder.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
+
         mLeScanCallback = new ScanCallback() {
             @Override
             public void onBatchScanResults(List<ScanResult> results) {
@@ -163,7 +168,8 @@ final class BluetoothAdapter {
                 // TODO
             }
         };
-        mAdapter.getBluetoothLeScanner().startScan(mLeScanCallback);
+        mAdapter.getBluetoothLeScanner().startScan(null, scanSettingsBuilder.build(), mLeScanCallback); 
+        Log.i(TAG, "addDiscoverySession END");
     }
 
     // ---------------------------------------------------------------------------------------------
