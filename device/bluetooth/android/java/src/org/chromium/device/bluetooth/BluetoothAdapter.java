@@ -163,6 +163,14 @@ final class BluetoothAdapter {
             @Override
             public void onScanFailed(int errorCode) {
                 Log.w(TAG, "onScanFailed: %d", errorCode);
+                // DISCUSS IN CODE REVIEW.
+                //
+                // TODO(scheib): Current device/bluetooth API doesn't support a way to communicate
+                // this asynchronous failure. If there was a way to communicate asynchronous
+                // success, then the response to AddDiscoverySession would be delayed until then or
+                // this error. But without only the error we must presume success.
+                //
+                // NEED ISSUE NUMBER.
             }
         };
 
