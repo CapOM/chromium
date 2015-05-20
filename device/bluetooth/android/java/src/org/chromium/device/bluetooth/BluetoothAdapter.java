@@ -134,7 +134,6 @@ final class BluetoothAdapter {
 
     @CalledByNative
     private boolean addDiscoverySession() {
-        Log.i(TAG, "addDiscoverySession");
         if (!isPowered()) {
             Log.i(TAG, "addDiscoverySession: Fails: !isPowered");
             return false;
@@ -144,10 +143,13 @@ final class BluetoothAdapter {
             Log.i(TAG, "addDiscoverySession: Already scanning.");
             return true;
         }
+        Log.i(TAG, "addDiscoverySession");
         mNumDiscoverySessions++;
 
         ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
-        // scanSettingsBuilder.setReportDelay(0); Causes a SCAN_FAILED_FEATURE_UNSUPPORTED.
+        // Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some
+        // devices) if scanSettingsBuilder.setReportDelay() is set or if
+        // SCAN_MODE_LOW_LATENCY isn't used.
         scanSettingsBuilder.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
 
         if (mLeScanCallback == null) mLeScanCallback = new DiscoveryScanCallback();
@@ -162,7 +164,7 @@ final class BluetoothAdapter {
         switch (--mNumDiscoverySessions) {
             case -1:
                 assert false;
-                Log.w(TAG, "No scan in progress.");
+                Log.w(TAG, "removeDiscoverySession: No scan in progress.");
                 mNumDiscoverySessions = 0;
                 return false;
             case 0:
@@ -177,18 +179,12 @@ final class BluetoothAdapter {
         @Override
         public void onBatchScanResults(List<ScanResult> results) {
             Log.i(TAG, "onBatchScanResults");
-            for (ScanResult result : results) {
-                // mAdapter.add(result);
-            }
-            // mAdapter.notifyDataSetChanged();
         }
 
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
             Log.i(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
                     result.getDevice().getName());
-            // mAdapter.add(result);
-            // mAdapter.notifyDataSetChanged();
         }
 
         @Override

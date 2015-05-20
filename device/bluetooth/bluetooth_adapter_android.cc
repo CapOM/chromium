@@ -146,7 +146,7 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  // TODO(scheib): Support filters (issue number <<<<<<<<<<<<<<<<<< )
+  // TODO(scheib): Support filters crbug.com/490401
   if (Java_BluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
                                                 j_bluetooth_adapter_.obj())) {
     callback.Run();
