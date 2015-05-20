@@ -63,14 +63,15 @@ final class BluetoothAdapter {
                 context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
         mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
         if (!mHasBluetoothCapability) {
-            if (!hasMinAPI)
+            if (!hasMinAPI) {
                 Log.i(TAG, "Bluetooth API disabled; SDK version (%d) too low.",
                         Build.VERSION.SDK_INT);
-            else if (!hasPermissions)
+            } else if (!hasPermissions) {
                 Log.w(TAG, "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions "
                                 + "required.");
-            else if (!hasLowEnergyFeature)
+            } else if (!hasLowEnergyFeature) {
                 Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
+            }
             return;
         }
 
