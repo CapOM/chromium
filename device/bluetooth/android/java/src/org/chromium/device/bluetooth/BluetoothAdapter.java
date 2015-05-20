@@ -29,6 +29,7 @@ final class BluetoothAdapter {
 
     private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
+    private int mNumDiscoverySessions = 0;
     private ScanCallback mLeScanCallback;
 
     // ---------------------------------------------------------------------------------------------
@@ -139,63 +140,65 @@ final class BluetoothAdapter {
             return false;
         }
 
-        if (mLeScanCallback != null) {
+        if (mNumDiscoverySessions > 0) {
             Log.i(TAG, "addDiscoverySession: Already scanning.");
             return true;
         }
+        mNumDiscoverySessions++;
 
         ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
         // scanSettingsBuilder.setReportDelay(0); Causes a SCAN_FAILED_FEATURE_UNSUPPORTED.
         scanSettingsBuilder.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
 
-        mLeScanCallback = new ScanCallback() {
-            @Override
-            public void onBatchScanResults(List<ScanResult> results) {
-                Log.i(TAG, "onBatchScanResults");
-                for (ScanResult result : results) {
-                    // mAdapter.add(result);
-                }
-                // mAdapter.notifyDataSetChanged();
-            }
-
-            @Override
-            public void onScanResult(int callbackType, ScanResult result) {
-                Log.i(TAG, "onScanResult %s", result.toString());
-                // mAdapter.add(result);
-                // mAdapter.notifyDataSetChanged();
-            }
-
-            @Override
-            public void onScanFailed(int errorCode) {
-                Log.w(TAG, "onScanFailed: %d", errorCode);
-                // DISCUSS IN CODE REVIEW.
-                //
-                // TODO(scheib): Current device/bluetooth API doesn't support a way to communicate
-                // this asynchronous failure. If there was a way to communicate asynchronous
-                // success, then the response to AddDiscoverySession would be delayed until then or
-                // this error. But without only the error we must presume success.
-                //
-                // NEED ISSUE NUMBER.
-            }
-        };
-
+        if (mLeScanCallback == null) mLeScanCallback = new DiscoveryScanCallback();
         mAdapter.getBluetoothLeScanner().startScan(
                 null /* filters */, scanSettingsBuilder.build(), mLeScanCallback);
-        Log.i(TAG, "addDiscoverySession END");
         return true;
     }
 
     @CalledByNative
     private boolean removeDiscoverySession() {
         Log.i(TAG, "removeDiscoverySession");
-        if (mLeScanCallback == null) {
-            Log.w(TAG, "No scan in progress.");
-            return false;
+        switch (--mNumDiscoverySessions) {
+            case -1:
+                Log.w(TAG, "No scan in progress.");
+                return false;
+            case 0:
+                mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
         }
-        mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
-        mLeScanCallback = null;
         return true;
     }
 
     // ---------------------------------------------------------------------------------------------
+
+    private class DiscoveryScanCallback extends ScanCallback {
+        @Override
+        public void onBatchScanResults(List<ScanResult> results) {
+            Log.i(TAG, "onBatchScanResults");
+            for (ScanResult result : results) {
+                // mAdapter.add(result);
+            }
+            // mAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            Log.i(TAG, "onScanResult %s %s", result.getDevice().getAddress(),result.getDevice().getName());
+            // mAdapter.add(result);
+            // mAdapter.notifyDataSetChanged();
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            Log.w(TAG, "onScanFailed: %d", errorCode);
+            // DISCUSS IN CODE REVIEW.
+            //
+            // TODO(scheib): Current device/bluetooth API doesn't support a way to communicate
+            // this asynchronous failure. If there was a way to communicate asynchronous
+            // success, then the response to AddDiscoverySession would be delayed until then or
+            // this error. But without only the error we must presume success.
+            //
+            // NEED ISSUE NUMBER.
+        }
+    }
 }

@@ -149,8 +149,6 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
   // TODO(scheib): Support filters (issue number <<<<<<<<<<<<<<<<<< )
   if (Java_BluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
                                                 j_bluetooth_adapter_.obj())) {
-    // MOVE COUNTER TO JAVA
-    num_discovery_sessions_++;
     callback.Run();
   } else {
     error_callback.Run();
@@ -161,17 +159,11 @@ void BluetoothAdapterAndroid::RemoveDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  if (--num_discovery_sessions_ == 0) {
-    if (Java_BluetoothAdapter_removeDiscoverySession(
-            AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
-      // MOVE COUNTER TO JAVA
-      num_discovery_sessions_++;
-      callback.Run();
-    } else {
-      error_callback.Run();
-    }
-  } else {
+  if (Java_BluetoothAdapter_removeDiscoverySession(
+          AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
     callback.Run();
+  } else {
+    error_callback.Run();
   }
 }
 
