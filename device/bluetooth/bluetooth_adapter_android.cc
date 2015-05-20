@@ -146,7 +146,6 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  // TODO(scheib): Support filters (issue number <<<<<<<<<<<<<<<<<< )
   error_callback.Run();
 }
 
@@ -161,7 +160,6 @@ void BluetoothAdapterAndroid::SetDiscoveryFilter(
     scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  NOTIMPLEMENTED();
   error_callback.Run();
 }
 

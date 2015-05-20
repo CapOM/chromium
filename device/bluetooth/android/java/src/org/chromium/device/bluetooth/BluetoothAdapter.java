@@ -110,7 +110,4 @@ final class BluetoothAdapter {
     private boolean isDiscovering() {
         return isPresent() && mAdapter.isDiscovering();
     }
-
-    @CalledByNative
-    private void addDiscoverySession() {}
 }
