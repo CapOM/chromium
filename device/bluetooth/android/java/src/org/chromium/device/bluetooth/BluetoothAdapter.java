@@ -76,10 +76,11 @@ final class BluetoothAdapter {
         }
 
         mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-        if (mAdapter == null)
+        if (mAdapter == null) {
             Log.i(TAG, "No adapter found.");
-        else
+        } else {
             Log.i(TAG, "BluetoothAdapter successfully constructed.");
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
