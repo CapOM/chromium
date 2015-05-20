@@ -33,7 +33,7 @@ final class BluetoothAdapter {
     private ScanCallback mLeScanCallback;
 
     // ---------------------------------------------------------------------------------------------
-    // Construction
+    // Construction:
 
     @CalledByNative
     private static BluetoothAdapter create(Context context) {
@@ -174,6 +174,7 @@ final class BluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
+    // Implementation details:
 
     private class DiscoveryScanCallback extends ScanCallback {
         @Override
