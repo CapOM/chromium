@@ -67,8 +67,8 @@ final class BluetoothAdapter {
                 Log.i(TAG, "Bluetooth API disabled; SDK version (%d) too low.",
                         Build.VERSION.SDK_INT);
             else if (!hasPermissions)
-                Log.w(TAG,
-                        "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions required.");
+                Log.w(TAG, "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions "
+                                + "required.");
             else if (!hasLowEnergyFeature)
                 Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
             return;
