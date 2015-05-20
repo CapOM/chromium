@@ -161,7 +161,9 @@ final class BluetoothAdapter {
         Log.i(TAG, "removeDiscoverySession");
         switch (--mNumDiscoverySessions) {
             case -1:
+                assert false;
                 Log.w(TAG, "No scan in progress.");
+                mNumDiscoverySessions = 0;
                 return false;
             case 0:
                 mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
@@ -183,7 +185,8 @@ final class BluetoothAdapter {
 
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
-            Log.i(TAG, "onScanResult %s %s", result.getDevice().getAddress(),result.getDevice().getName());
+            Log.i(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
+                    result.getDevice().getName());
             // mAdapter.add(result);
             // mAdapter.notifyDataSetChanged();
         }
