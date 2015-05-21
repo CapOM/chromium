@@ -137,15 +137,15 @@ final class BluetoothAdapter {
     @CalledByNative
     private boolean addDiscoverySession() {
         if (!isPowered()) {
-            Log.i(TAG, "addDiscoverySession: Fails: !isPowered");
+            Log.d(TAG, "addDiscoverySession: Fails: !isPowered");
             return false;
         }
 
         if (mNumDiscoverySessions > 0) {
-            Log.i(TAG, "addDiscoverySession: Already scanning.");
+            Log.d(TAG, "addDiscoverySession: Already scanning.");
             return true;
         }
-        Log.i(TAG, "addDiscoverySession");
+        Log.d(TAG, "addDiscoverySession");
         mNumDiscoverySessions++;
 
         ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
@@ -162,7 +162,7 @@ final class BluetoothAdapter {
 
     @CalledByNative
     private boolean removeDiscoverySession() {
-        Log.i(TAG, "removeDiscoverySession");
+        Log.d(TAG, "removeDiscoverySession");
         switch (--mNumDiscoverySessions) {
             case -1:
                 assert false;
@@ -181,12 +181,12 @@ final class BluetoothAdapter {
     private class DiscoveryScanCallback extends ScanCallback {
         @Override
         public void onBatchScanResults(List<ScanResult> results) {
-            Log.i(TAG, "onBatchScanResults");
+            Log.v(TAG, "onBatchScanResults");
         }
 
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
-            Log.i(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
+            Log.v(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
                     result.getDevice().getName());
         }
 
