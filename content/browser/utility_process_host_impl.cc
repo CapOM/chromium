@@ -188,8 +188,9 @@ bool UtilityProcessHostImpl::StartMojoMode() {
 }
 
 ServiceRegistry* UtilityProcessHostImpl::GetServiceRegistry() {
-  DCHECK(mojo_application_host_);
-  return mojo_application_host_->service_registry();
+  if (mojo_application_host_)
+    return mojo_application_host_->service_registry();
+  return nullptr;
 }
 
 void UtilityProcessHostImpl::SetName(const base::string16& name) {
@@ -222,6 +223,7 @@ bool UtilityProcessHostImpl::StartProcess() {
             channel_id, BrowserThread::UnsafeGetMessageLoopForThread(
                             BrowserThread::IO)->task_runner())));
     in_process_thread_->Start();
+    OnProcessLaunched();
   } else {
     const base::CommandLine& browser_command_line =
         *base::CommandLine::ForCurrentProcess();

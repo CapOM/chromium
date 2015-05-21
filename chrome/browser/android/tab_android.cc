@@ -687,6 +687,16 @@ ScopedJavaLocalRef<jobject> TabAndroid::GetFavicon(JNIEnv* env,
   return bitmap;
 }
 
+SkBitmap TabAndroid::GetFaviconBitmap() {
+  JNIEnv* env = base::android::AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> javaBitmap =
+      Java_Tab_getFavicon(env, weak_java_tab_.get(env).obj());
+  if (!javaBitmap.obj())
+    return SkBitmap();
+
+  return gfx::CreateSkBitmapFromJavaBitmap(gfx::JavaBitmap(javaBitmap.obj()));
+}
+
 prerender::PrerenderManager* TabAndroid::GetPrerenderManager() const {
   Profile* profile = GetProfile();
   if (!profile)
@@ -740,6 +750,12 @@ void TabAndroid::UpdateTopControlsState(JNIEnv* env,
         interstitial_view_host->GetRoutingID(), constraints_state,
         current_state, animate));
   }
+}
+
+void TabAndroid::ShowOriginalImage(JNIEnv* env, jobject obj) {
+  content::RenderFrameHost* render_frame_host = web_contents()->GetMainFrame();
+  render_frame_host->Send(new ChromeViewMsg_RequestReloadImageForContextNode(
+      render_frame_host->GetRoutingID()));
 }
 
 void TabAndroid::SearchByImageInNewTabAsync(JNIEnv* env, jobject obj) {

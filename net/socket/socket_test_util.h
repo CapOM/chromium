@@ -166,7 +166,7 @@ struct MockReadWrite {
   const char* data;
   int data_len;
 
-  // For OrderedSocketData, which only allows reads to occur in a particular
+  // For data providers that only allows reads to occur in a particular
   // sequence.  If a read occurs before the given |sequence_number| is reached,
   // an ERR_IO_PENDING is returned.
   int sequence_number;    // The sequence number at which a read is allowed
@@ -198,6 +198,8 @@ class SocketDataProvider {
   virtual MockRead OnRead() = 0;
   virtual MockWriteResult OnWrite(const std::string& data) = 0;
   virtual void Reset() = 0;
+  virtual bool AllReadDataConsumed() const = 0;
+  virtual bool AllWriteDataConsumed() const = 0;
 
   // Accessor for the socket which is using the SocketDataProvider.
   AsyncSocket* socket() { return socket_; }
@@ -263,8 +265,8 @@ class StaticSocketDataHelper {
   size_t read_count() const { return read_count_; }
   size_t write_count() const { return write_count_; }
 
-  bool at_read_eof() const { return read_index_ >= read_count_; }
-  bool at_write_eof() const { return write_index_ >= write_count_; }
+  bool AllReadDataConsumed() const { return read_index_ >= read_count_; }
+  bool AllWriteDataConsumed() const { return write_index_ >= write_count_; }
 
  private:
   MockRead* reads_;
@@ -294,14 +296,13 @@ class StaticSocketDataProvider : public SocketDataProvider {
   MockRead OnRead() override;
   MockWriteResult OnWrite(const std::string& data) override;
   void Reset() override;
+  bool AllReadDataConsumed() const override;
+  bool AllWriteDataConsumed() const override;
 
   size_t read_index() const { return helper_.read_index(); }
   size_t write_index() const { return helper_.write_index(); }
   size_t read_count() const { return helper_.read_count(); }
   size_t write_count() const { return helper_.write_count(); }
-
-  bool at_read_eof() const { return helper_.at_read_eof(); }
-  bool at_write_eof() const { return helper_.at_write_eof(); }
 
  protected:
   StaticSocketDataHelper* helper() { return &helper_; }
@@ -310,44 +311,6 @@ class StaticSocketDataProvider : public SocketDataProvider {
   StaticSocketDataHelper helper_;
 
   DISALLOW_COPY_AND_ASSIGN(StaticSocketDataProvider);
-};
-
-// SocketDataProvider which can make decisions about next mock reads based on
-// received writes. It can also be used to enforce order of operations, for
-// example that tested code must send the "Hello!" message before receiving
-// response. This is useful for testing conversation-like protocols like FTP.
-class DynamicSocketDataProvider : public SocketDataProvider {
- public:
-  DynamicSocketDataProvider();
-  ~DynamicSocketDataProvider() override;
-
-  int short_read_limit() const { return short_read_limit_; }
-  void set_short_read_limit(int limit) { short_read_limit_ = limit; }
-
-  void allow_unconsumed_reads(bool allow) { allow_unconsumed_reads_ = allow; }
-
-  // SocketDataProvider implementation.
-  MockRead OnRead() override;
-  MockWriteResult OnWrite(const std::string& data) override = 0;
-  void Reset() override;
-
- protected:
-  // The next time there is a read from this socket, it will return |data|.
-  // Before calling SimulateRead next time, the previous data must be consumed.
-  void SimulateRead(const char* data, size_t length);
-  void SimulateRead(const char* data) { SimulateRead(data, std::strlen(data)); }
-
- private:
-  std::deque<MockRead> reads_;
-
-  // Max number of bytes we will read at a time. 0 means no limit.
-  int short_read_limit_;
-
-  // If true, we'll not require the client to consume all data before we
-  // mock the next read.
-  bool allow_unconsumed_reads_;
-
-  DISALLOW_COPY_AND_ASSIGN(DynamicSocketDataProvider);
 };
 
 // SSLSocketDataProviders only need to keep track of the return code from calls
@@ -418,61 +381,6 @@ class DelayedSocketData : public StaticSocketDataProvider {
   DISALLOW_COPY_AND_ASSIGN(DelayedSocketData);
 };
 
-// A DataProvider where the reads are ordered.
-// If a read is requested before its sequence number is reached, we return an
-// ERR_IO_PENDING (that way we don't have to explicitly add a MockRead just to
-// wait).
-// The sequence number is incremented on every read and write operation.
-// The message loop may be interrupted by setting the high bit of the sequence
-// number in the MockRead's sequence number.  When that MockRead is reached,
-// we post a Quit message to the loop.  This allows us to interrupt the reading
-// of data before a complete message has arrived, and provides support for
-// testing server push when the request is issued while the response is in the
-// middle of being received.
-class OrderedSocketData : public StaticSocketDataProvider {
- public:
-  // |reads| the list of MockRead completions.
-  // |writes| the list of MockWrite completions.
-  // Note: All MockReads and MockWrites must be async.
-  // Note: For stream sockets, the MockRead list must end with a EOF, e.g., a
-  //       MockRead(true, 0, 0);
-  OrderedSocketData(MockRead* reads,
-                    size_t reads_count,
-                    MockWrite* writes,
-                    size_t writes_count);
-  ~OrderedSocketData() override;
-
-  // |connect| the result for the connect phase.
-  // |reads| the list of MockRead completions.
-  // |writes| the list of MockWrite completions.
-  // Note: All MockReads and MockWrites must be async.
-  // Note: For stream sockets, the MockRead list must end with a EOF, e.g., a
-  //       MockRead(true, 0, 0);
-  OrderedSocketData(const MockConnect& connect,
-                    MockRead* reads,
-                    size_t reads_count,
-                    MockWrite* writes,
-                    size_t writes_count);
-
-  // Posts a quit message to the current message loop, if one is running.
-  void EndLoop();
-
-  // StaticSocketDataProvider:
-  MockRead OnRead() override;
-  MockWriteResult OnWrite(const std::string& data) override;
-  void Reset() override;
-  void CompleteRead() override;
-
- private:
-  int sequence_number_;
-  int loop_stop_stage_;
-  bool blocked_;
-
-  base::WeakPtrFactory<OrderedSocketData> weak_factory_;
-
-  DISALLOW_COPY_AND_ASSIGN(OrderedSocketData);
-};
-
 // Uses the sequence_number field in the mock reads and writes to
 // complete the operations in a specified order.
 class SequencedSocketData : public SocketDataProvider {
@@ -499,12 +407,11 @@ class SequencedSocketData : public SocketDataProvider {
   MockRead OnRead() override;
   MockWriteResult OnWrite(const std::string& data) override;
   void Reset() override;
+  bool AllReadDataConsumed() const override;
+  bool AllWriteDataConsumed() const override;
 
-  // Returns true if all data has been read.
-  bool at_read_eof() const;
-
-  // Returns true if all data has been written.
-  bool at_write_eof() const;
+  bool IsReadPaused();
+  void CompleteRead();
 
  private:
   // Defines the state for the read or write path.
@@ -513,7 +420,9 @@ class SequencedSocketData : public SocketDataProvider {
     PENDING,     // An async operation in waiting for another opteration to
                  // complete.
     COMPLETING,  // A task has been posted to complet an async operation.
+    PAUSED,      // IO is paused until CompleteRead() is called.
   };
+
   void OnReadComplete();
   void OnWriteComplete();
 
@@ -589,7 +498,7 @@ class DeterministicMockTCPClientSocket;
 //
 // For examples of how to use this class, see:
 //   deterministic_socket_data_unittests.cc
-class DeterministicSocketData : public StaticSocketDataProvider {
+class DeterministicSocketData {
  public:
   // The Delegate is an abstract interface which handles the communication from
   // the DeterministicSocketData to the Deterministic MockSocket.  The
@@ -621,7 +530,7 @@ class DeterministicSocketData : public StaticSocketDataProvider {
                           size_t reads_count,
                           MockWrite* writes,
                           size_t writes_count);
-  ~DeterministicSocketData() override;
+  ~DeterministicSocketData();
 
   // Consume all the data up to the give stop point (via SetStop()).
   void Run();
@@ -630,29 +539,31 @@ class DeterministicSocketData : public StaticSocketDataProvider {
   void RunFor(int steps);
 
   // Stop at step |seq|, which must be in the future.
-  virtual void SetStop(int seq);
+  void SetStop(int seq);
 
   // Stop |seq| steps after the current step.
-  virtual void StopAfter(int seq);
+  void StopAfter(int seq);
+
   bool stopped() const { return stopped_; }
   void SetStopped(bool val) { stopped_ = val; }
   MockRead& current_read() { return current_read_; }
   MockWrite& current_write() { return current_write_; }
   int sequence_number() const { return sequence_number_; }
   void set_delegate(base::WeakPtr<Delegate> delegate) { delegate_ = delegate; }
-
-  // StaticSocketDataProvider:
+  MockConnect connect_data() const { return connect_; }
+  void set_connect_data(const MockConnect& connect) { connect_ = connect; }
 
   // When the socket calls Read(), that calls OnRead(), and expects either
   // ERR_IO_PENDING or data.
-  MockRead OnRead() override;
+  MockRead OnRead();
 
   // When the socket calls Write(), it always completes synchronously. OnWrite()
   // checks to make sure the written data matches the expected data. The
   // callback will not be invoked until its sequence number is reached.
-  MockWriteResult OnWrite(const std::string& data) override;
-  void Reset() override;
-  void CompleteRead() override {}
+  MockWriteResult OnWrite(const std::string& data);
+
+  bool AllReadDataConsumed() const;
+  bool AllWriteDataConsumed() const;
 
  private:
   // Invoke the read and write callbacks, if the timing is appropriate.
@@ -664,7 +575,8 @@ class DeterministicSocketData : public StaticSocketDataProvider {
                                     size_t reads_count,
                                     MockWrite* writes,
                                     size_t writes_count);
-
+  StaticSocketDataHelper helper_;
+  MockConnect connect_;
   int sequence_number_;
   MockRead current_read_;
   MockWrite current_write_;
@@ -779,6 +691,9 @@ class MockClientSocket : public SSLClientSocket {
   const BoundNetLog& NetLog() const override;
   void SetSubresourceSpeculation() override {}
   void SetOmniboxSpeculation() override {}
+  void GetConnectionAttempts(ConnectionAttempts* out) const override;
+  void ClearConnectionAttempts() override {}
+  void AddConnectionAttempts(const ConnectionAttempts& attempts) override {}
 
   // SSLClientSocket implementation.
   void GetSSLCertRequestInfo(SSLCertRequestInfo* cert_request_info) override;
@@ -790,6 +705,7 @@ class MockClientSocket : public SSLClientSocket {
   int GetTLSUniqueChannelBinding(std::string* out) override;
   NextProtoStatus GetNextProto(std::string* proto) const override;
   ChannelIDService* GetChannelIDService() const override;
+  SSLFailureState GetSSLFailureState() const override;
 
  protected:
   ~MockClientSocket() override;
@@ -841,6 +757,9 @@ class MockTCPClientSocket : public MockClientSocket, public AsyncSocket {
   bool UsingTCPFastOpen() const override;
   bool WasNpnNegotiated() const override;
   bool GetSSLInfo(SSLInfo* ssl_info) override;
+  void GetConnectionAttempts(ConnectionAttempts* out) const override;
+  void ClearConnectionAttempts() override;
+  void AddConnectionAttempts(const ConnectionAttempts& attempts) override;
 
   // AsyncSocket:
   void OnReadComplete(const MockRead& data) override;
@@ -920,7 +839,6 @@ class DeterministicSocketHelper {
 // Mock UDP socket to be used in conjunction with DeterministicSocketData.
 class DeterministicMockUDPClientSocket
     : public DatagramClientSocket,
-      public AsyncSocket,
       public DeterministicSocketData::Delegate,
       public base::SupportsWeakPtr<DeterministicMockUDPClientSocket> {
  public:
@@ -953,11 +871,6 @@ class DeterministicMockUDPClientSocket
   // DatagramClientSocket implementation.
   int Connect(const IPEndPoint& address) override;
 
-  // AsyncSocket implementation.
-  void OnReadComplete(const MockRead& data) override;
-  void OnWriteComplete(int rv) override;
-  void OnConnectComplete(const MockConnect& data) override;
-
   void set_source_port(uint16 port) { source_port_ = port; }
 
  private:
@@ -972,7 +885,6 @@ class DeterministicMockUDPClientSocket
 // Mock TCP socket to be used in conjunction with DeterministicSocketData.
 class DeterministicMockTCPClientSocket
     : public MockClientSocket,
-      public AsyncSocket,
       public DeterministicSocketData::Delegate,
       public base::SupportsWeakPtr<DeterministicMockTCPClientSocket> {
  public:
@@ -1003,11 +915,6 @@ class DeterministicMockTCPClientSocket
   bool UsingTCPFastOpen() const override;
   bool WasNpnNegotiated() const override;
   bool GetSSLInfo(SSLInfo* ssl_info) override;
-
-  // AsyncSocket:
-  void OnReadComplete(const MockRead& data) override;
-  void OnWriteComplete(int rv) override;
-  void OnConnectComplete(const MockConnect& data) override;
 
  private:
   DeterministicSocketHelper helper_;

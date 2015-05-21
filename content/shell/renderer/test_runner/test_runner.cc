@@ -7,9 +7,7 @@
 #include <limits>
 
 #include "base/logging.h"
-#include "content/public/test/layouttest_support.h"
 #include "content/shell/common/test_runner/test_preferences.h"
-#include "content/shell/renderer/binding_helpers.h"
 #include "content/shell/renderer/test_runner/mock_credential_manager_client.h"
 #include "content/shell/renderer/test_runner/mock_web_speech_recognizer.h"
 #include "content/shell/renderer/test_runner/test_interfaces.h"
@@ -328,11 +326,27 @@ gin::WrapperInfo TestRunnerBindings::kWrapperInfo = {
 // static
 void TestRunnerBindings::Install(base::WeakPtr<TestRunner> runner,
                                  WebFrame* frame) {
+  v8::Isolate* isolate = blink::mainThreadIsolate();
+  v8::HandleScope handle_scope(isolate);
+  v8::Local<v8::Context> context = frame->mainWorldScriptContext();
+  if (context.IsEmpty())
+    return;
+
+  v8::Context::Scope context_scope(context);
+
+  TestRunnerBindings* wrapped = new TestRunnerBindings(runner);
+  gin::Handle<TestRunnerBindings> bindings =
+      gin::CreateHandle(isolate, wrapped);
+  if (bindings.IsEmpty())
+    return;
+  v8::Local<v8::Object> global = context->Global();
+  v8::Local<v8::Value> v8_bindings = bindings.ToV8();
+
   std::vector<std::string> names;
   names.push_back("testRunner");
   names.push_back("layoutTestController");
-  return InstallAsWindowProperties(
-      new TestRunnerBindings(runner), frame, names);
+  for (size_t i = 0; i < names.size(); ++i)
+    global->Set(gin::StringToV8(isolate, names[i].c_str()), v8_bindings);
 }
 
 TestRunnerBindings::TestRunnerBindings(base::WeakPtr<TestRunner> runner)
@@ -2866,9 +2880,9 @@ void TestRunner::GetManifestThen(v8::Local<v8::Function> callback) {
   scoped_ptr<InvokeCallbackTask> task(
       new InvokeCallbackTask(this, callback));
 
-  FetchManifest(web_view_, web_view_->mainFrame()->document().manifestURL(),
-      base::Bind(&TestRunner::GetManifestCallback,
-                 weak_factory_.GetWeakPtr(),
+  delegate_->FetchManifest(
+      web_view_, web_view_->mainFrame()->document().manifestURL(),
+      base::Bind(&TestRunner::GetManifestCallback, weak_factory_.GetWeakPtr(),
                  base::Passed(&task)));
 }
 
@@ -2917,10 +2931,10 @@ void TestRunner::CapturePixelsCallback(scoped_ptr<InvokeCallbackTask> task,
 
   // Size can be 0 for cases where copyImageAt was called on position
   // that doesn't have an image.
-  int width = snapshot.info().fWidth;
+  int width = snapshot.info().width();
   argv[0] = v8::Number::New(isolate, width);
 
-  int height = snapshot.info().fHeight;
+  int height = snapshot.info().height();
   argv[1] = v8::Number::New(isolate, height);
 
   blink::WebArrayBuffer buffer =

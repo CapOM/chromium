@@ -15,6 +15,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "content/common/content_export.h"
+#include "content/common/media/cdm_messages.h"
 #include "content/common/media/cdm_messages_enums.h"
 #include "content/public/browser/browser_message_filter.h"
 #include "content/public/common/permission_status.mojom.h"
@@ -109,8 +110,7 @@ class CONTENT_EXPORT BrowserCdmManager : public BrowserMessageFilter {
   void OnInitializeCdm(int render_frame_id,
                        int cdm_id,
                        uint32_t promise_id,
-                       const std::string& key_system,
-                       const GURL& frame_url);
+                       const CdmHostMsg_InitializeCdm_Params& params);
   void OnSetServerCertificate(int render_frame_id,
                               int cdm_id,
                               uint32_t promise_id,
@@ -138,7 +138,8 @@ class CONTENT_EXPORT BrowserCdmManager : public BrowserMessageFilter {
               int cdm_id,
               uint32_t promise_id,
               const std::string& key_system,
-              const GURL& security_origin);
+              const GURL& security_origin,
+              bool use_hw_secure_codecs);
 
   // Removes all CDMs associated with |render_frame_id|.
   void RemoveAllCdmForFrame(int render_frame_id);

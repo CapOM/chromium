@@ -12,8 +12,14 @@
 
 namespace experimental_flags {
 
+// Whether background crash report upload should generate a local notification.
+bool IsAlertOnBackgroundUploadEnabled();
+
 // Returns true if the contents of the clipboard can be used for autocomplete.
 bool IsOpenFromClipboardEnabled();
+
+// Whether the app uses WKWebView instead of UIWebView.
+bool IsWKWebViewEnabled();
 
 // Returns the size in MB of the memory wedge to insert during a cold start.
 // If 0, no memory wedge should be inserted.

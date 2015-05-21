@@ -56,12 +56,6 @@ cr.define('ntp', function() {
   var shouldShowLoginBubble = false;
 
   /**
-   * The 'other-sessions-menu-button' element.
-   * @type {!ntp.OtherSessionsMenuButton|undefined}
-   */
-  var otherSessionsButton;
-
-  /**
    * The time when all sections are ready.
    * @type {number|undefined}
    * @private
@@ -137,8 +131,6 @@ cr.define('ntp', function() {
             function() { chrome.send('onLearnMore'); });
       }
     }
-    if (loadTimeData.getBoolean('isDiscoveryInNTPEnabled'))
-      sectionsToWaitFor++;
     measureNavDots();
 
     // Load the current theme colors.
@@ -150,23 +142,6 @@ cr.define('ntp', function() {
     notificationContainer.addEventListener(
         'webkitTransitionEnd', onNotificationTransitionEnd);
 
-    if (loadTimeData.getBoolean('showRecentlyClosed')) {
-      cr.ui.decorate(getRequiredElement('recently-closed-menu-button'),
-          ntp.RecentMenuButton);
-      chrome.send('getRecentlyClosedTabs');
-    } else {
-      $('recently-closed-menu-button').hidden = true;
-    }
-
-    if (loadTimeData.getBoolean('showOtherSessionsMenu')) {
-      otherSessionsButton = /** @type {!ntp.OtherSessionsMenuButton} */(
-          getRequiredElement('other-sessions-menu-button'));
-      cr.ui.decorate(otherSessionsButton, ntp.OtherSessionsMenuButton);
-      otherSessionsButton.initialize(loadTimeData.getBoolean('isUserSignedIn'));
-    } else {
-      getRequiredElement('other-sessions-menu-button').hidden = true;
-    }
-
     if (loadTimeData.getBoolean('showMostvisited')) {
       var mostVisited = new ntp.MostVisitedPage();
       // Move the footer into the most visited page if we are in "bare minimum"
@@ -177,21 +152,6 @@ cr.define('ntp', function() {
                                 loadTimeData.getString('mostvisited'),
                                 false);
       chrome.send('getMostVisited');
-    }
-
-    if (loadTimeData.getBoolean('isDiscoveryInNTPEnabled')) {
-      var suggestionsScript = document.createElement('script');
-      suggestionsScript.src = 'suggestions_page.js';
-      suggestionsScript.onload = function() {
-         newTabView.appendTilePage(new ntp.SuggestionsPage(),
-                                   loadTimeData.getString('suggestions'),
-                                   false,
-                                   (newTabView.appsPages.length > 0) ?
-                                       newTabView.appsPages[0] : null);
-         chrome.send('getSuggestions');
-         cr.dispatchSimpleEvent(document, 'sectionready', true, true);
-      };
-      document.querySelector('head').appendChild(suggestionsScript);
     }
 
     if (!loadTimeData.getBoolean('showWebStoreIcon')) {
@@ -546,11 +506,6 @@ cr.define('ntp', function() {
       notificationContainer.hidden = true;
   }
 
-  function setRecentlyClosedTabs(dataItems) {
-    $('recently-closed-menu-button').dataItems = dataItems;
-    layoutFooter();
-  }
-
   /**
    * @param {Array<PageData>} data
    * @param {boolean} hasBlacklistedUrls
@@ -558,10 +513,6 @@ cr.define('ntp', function() {
   function setMostVisitedPages(data, hasBlacklistedUrls) {
     newTabView.mostVisitedPage.data = data;
     cr.dispatchSimpleEvent(document, 'sectionready', true, true);
-  }
-
-  function setSuggestionsPages(data, hasBlacklistedUrls) {
-    newTabView.suggestionsPage.data = data;
   }
 
   /**
@@ -590,6 +541,7 @@ cr.define('ntp', function() {
     /** @const */ var showLogin = loginHeader || loginSubHeader;
 
     $('login-container').hidden = !showLogin;
+    $('login-container').classList.toggle('signed-in', isUserSignedIn);
     $('card-slider-frame').classList.toggle('showing-login-area', !!showLogin);
 
     if (showLogin) {
@@ -608,10 +560,6 @@ cr.define('ntp', function() {
       shouldShowLoginBubble = false;
     } else if (loginBubble) {
       loginBubble.reposition();
-    }
-    if (otherSessionsButton) {
-      otherSessionsButton.updateSignInState(isUserSignedIn);
-      layoutFooter();
     }
   }
 
@@ -698,13 +646,6 @@ cr.define('ntp', function() {
     newTabView.enterRearrangeMode();
   }
 
-  function setForeignSessions(sessionList, isTabSyncEnabled) {
-    if (otherSessionsButton) {
-      otherSessionsButton.setForeignSessions(sessionList, isTabSyncEnabled);
-      layoutFooter();
-    }
-  }
-
   /**
    * Callback invoked by chrome with the apps available.
    *
@@ -770,10 +711,7 @@ cr.define('ntp', function() {
     saveAppPageName: saveAppPageName,
     setAppToBeHighlighted: setAppToBeHighlighted,
     setBookmarkBarAttached: setBookmarkBarAttached,
-    setForeignSessions: setForeignSessions,
     setMostVisitedPages: setMostVisitedPages,
-    setSuggestionsPages: setSuggestionsPages,
-    setRecentlyClosedTabs: setRecentlyClosedTabs,
     setFaviconDominantColor: setFaviconDominantColor,
     showNotification: showNotification,
     themeChanged: themeChanged,

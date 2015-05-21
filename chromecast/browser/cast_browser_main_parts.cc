@@ -16,6 +16,7 @@
 #include "base/path_service.h"
 #include "base/prefs/pref_registry_simple.h"
 #include "base/run_loop.h"
+#include "base/thread_task_runner_handle.h"
 #include "cc/base/switches.h"
 #include "chromecast/base/cast_paths.h"
 #include "chromecast/base/cast_sys_info_util.h"
@@ -33,6 +34,7 @@
 #include "chromecast/common/platform_client_auth.h"
 #include "chromecast/media/base/key_systems_common.h"
 #include "chromecast/net/connectivity_checker.h"
+#include "chromecast/public/cast_media_shlib.h"
 #include "chromecast/public/cast_sys_info.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/gpu_data_manager.h"
@@ -40,7 +42,6 @@
 #include "media/audio/audio_manager.h"
 #include "media/audio/audio_manager_factory.h"
 #include "media/base/browser_cdm_factory.h"
-#include "media/base/media_switches.h"
 
 #if defined(OS_ANDROID)
 #include "chromecast/browser/media/cast_media_client_android.h"
@@ -54,6 +55,7 @@
 #endif
 
 #if defined(USE_AURA)
+#include "ui/aura/env.h"
 #include "ui/aura/test/test_screen.h"
 #include "ui/gfx/screen.h"
 #endif
@@ -161,7 +163,6 @@ DefaultCommandLineSwitch g_default_switches[] = {
   // Disables Chromecast-specific WiFi-related features on ATV for now.
   { switches::kNoWifi, "" },
   { switches::kEnableOverlayFullscreenVideo, ""},
-  { switches::kDisableInfobarForProtectedMediaIdentifier, ""},
   { switches::kDisableGestureRequirementForMediaPlayback, ""},
 #endif
   // Always enable HTMLMediaElement logs.
@@ -236,7 +237,7 @@ void CastBrowserMainParts::PreMainMessageLoopStart() {
 
 void CastBrowserMainParts::PostMainMessageLoopStart() {
   cast_browser_process_->SetMetricsHelper(make_scoped_ptr(
-      new metrics::CastMetricsHelper(base::MessageLoopProxy::current())));
+      new metrics::CastMetricsHelper(base::ThreadTaskRunnerHandle::Get())));
 
 #if defined(OS_ANDROID)
   base::MessageLoopForUI::current()->Start();
@@ -273,6 +274,7 @@ int CastBrowserMainParts::PreCreateThreads() {
 }
 
 void CastBrowserMainParts::PreMainMessageLoopRun() {
+#if !defined(OS_ANDROID)
   // Set GL strings so GPU config code can make correct feature blacklisting/
   // whitelisting decisions.
   // Note: SetGLStrings MUST be called after GpuDataManager::Initialize.
@@ -280,16 +282,17 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
   content::GpuDataManager::GetInstance()->SetGLStrings(
       sys_info->GetGlVendor(), sys_info->GetGlRenderer(),
       sys_info->GetGlVersion());
+#endif  // !defined(OS_ANDROID)
 
   scoped_refptr<PrefRegistrySimple> pref_registry(new PrefRegistrySimple());
   metrics::RegisterPrefs(pref_registry.get());
   cast_browser_process_->SetPrefService(
       PrefServiceHelper::CreatePrefService(pref_registry.get()));
 
+  const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
 #if defined(OS_ANDROID)
   ::media::SetMediaClientAndroid(new media::CastMediaClientAndroid());
 #else
-  const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
   if (cmd_line->HasSwitch(switches::kEnableCmaMediaPipeline))
     ::media::SetBrowserCdmFactory(new media::CastBrowserCdmFactory());
 #endif  // defined(OS_ANDROID)
@@ -314,6 +317,8 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
 
   cast_browser_process_->SetRemoteDebuggingServer(
       make_scoped_ptr(new RemoteDebuggingServer()));
+
+  media::CastMediaShlib::Initialize(cmd_line->argv());
 
   cast_browser_process_->SetCastService(CastService::Create(
       cast_browser_process_->browser_context(),
@@ -370,8 +375,15 @@ void CastBrowserMainParts::PostMainMessageLoopRun() {
   cast_browser_process_->cast_service()->Finalize();
   cast_browser_process_->metrics_service_client()->Finalize();
   cast_browser_process_.reset();
+
+#if defined(USE_AURA)
+  aura::Env::DeleteInstance();
+#endif
+
   DeregisterKillOnAlarm();
 #endif
+
+  media::CastMediaShlib::Finalize();
 }
 
 }  // namespace shell

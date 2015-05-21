@@ -109,7 +109,7 @@ class VideoRendererAlgorithmTest : public testing::Test {
 
   size_t frames_queued() const { return algorithm_.frame_queue_.size(); }
 
-  int GetCadence(double frame_rate, double display_rate) {
+  std::string GetCadence(double frame_rate, double display_rate) {
     TickGenerator display_tg(tick_clock_->NowTicks(), display_rate);
     TickGenerator frame_tg(base::TimeTicks(), frame_rate);
     time_source_.StartTicking();
@@ -122,7 +122,8 @@ class VideoRendererAlgorithmTest : public testing::Test {
     EXPECT_TRUE(RenderAndStep(&display_tg, &frames_dropped));
 
     // Store cadence before reseting the algorithm.
-    const int cadence = algorithm_.cadence_estimator_.get_cadence_for_testing();
+    const std::string cadence =
+        algorithm_.cadence_estimator_.GetCadenceForTesting();
     time_source_.StopTicking();
     algorithm_.Reset();
     return cadence;
@@ -230,7 +231,7 @@ class VideoRendererAlgorithmTest : public testing::Test {
         // The frame estimate should be off by at most one frame.
         const size_t estimated_frames_queued =
             frames_queued() /
-            algorithm_.cadence_estimator_.get_cadence_for_testing();
+            algorithm_.cadence_estimator_.cadence_size_for_testing();
         ASSERT_NEAR(algorithm_.EffectiveFramesQueued(), estimated_frames_queued,
                     1);
       }
@@ -632,9 +633,10 @@ TEST_F(VideoRendererAlgorithmTest, SortedFrameQueue) {
 
   // Since a frame has already been rendered, queuing this frame and calling
   // Render() should result in it being dropped; even though it's a better
-  // candidate for the desired interval.
+  // candidate for the desired interval.  The frame is dropped during enqueue so
+  // it won't show up in frames_queued().
   algorithm_.EnqueueFrame(CreateFrame(tg.interval(1)));
-  EXPECT_EQ(3u, frames_queued());
+  EXPECT_EQ(2u, frames_queued());
   EXPECT_EQ(2u, algorithm_.EffectiveFramesQueued());
   frame = RenderAndStep(&tg, &frames_dropped);
   EXPECT_EQ(1u, frames_dropped);
@@ -729,6 +731,55 @@ TEST_F(VideoRendererAlgorithmTest, BestFrameByCadenceOverdisplayed) {
   ASSERT_EQ(1, GetCurrentFrameDisplayCount());
   ASSERT_EQ(0, GetCurrentFrameDropCount());
   ASSERT_EQ(2, GetCurrentFrameIdealDisplayCount());
+}
+
+TEST_F(VideoRendererAlgorithmTest, BestFrameByCadenceOverdisplayedForDrift) {
+  // Use 24.94 to ensure drift expires pretty rapidly (8.36s in this case).
+  TickGenerator frame_tg(base::TimeTicks(), 24.94);
+  TickGenerator display_tg(tick_clock_->NowTicks(), 50);
+  time_source_.StartTicking();
+  disable_cadence_hysteresis();
+
+  scoped_refptr<VideoFrame> last_frame;
+  bool have_overdisplayed_frame = false;
+  while (!have_overdisplayed_frame) {
+    while (algorithm_.EffectiveFramesQueued() < 2) {
+      algorithm_.EnqueueFrame(
+          CreateFrame(frame_tg.current() - base::TimeTicks()));
+      frame_tg.step();
+    }
+
+    size_t frames_dropped = 0;
+    last_frame = RenderAndStep(&display_tg, &frames_dropped);
+    ASSERT_TRUE(last_frame);
+    ASSERT_TRUE(is_using_cadence());
+    ASSERT_EQ(0u, frames_dropped);
+    ASSERT_EQ(2, GetCurrentFrameIdealDisplayCount());
+    have_overdisplayed_frame = GetCurrentFrameDisplayCount() > 2;
+  }
+
+  ASSERT_TRUE(last_render_had_glitch());
+
+  // We've reached the point where the current frame is over displayed due to
+  // drift, the next frame should resume cadence without accounting for the
+  // overdisplayed frame.
+
+  size_t frames_dropped = 0;
+  scoped_refptr<VideoFrame> next_frame =
+      RenderAndStep(&display_tg, &frames_dropped);
+  ASSERT_EQ(0u, frames_dropped);
+  ASSERT_NE(last_frame, next_frame);
+  ASSERT_TRUE(is_using_cadence());
+  ASSERT_EQ(2, GetCurrentFrameIdealDisplayCount());
+  ASSERT_EQ(1, GetCurrentFrameDisplayCount());
+  last_frame = next_frame;
+
+  next_frame = RenderAndStep(&display_tg, &frames_dropped);
+  ASSERT_EQ(0u, frames_dropped);
+  ASSERT_EQ(last_frame, next_frame);
+  ASSERT_TRUE(is_using_cadence());
+  ASSERT_EQ(2, GetCurrentFrameIdealDisplayCount());
+  ASSERT_EQ(2, GetCurrentFrameDisplayCount());
 }
 
 TEST_F(VideoRendererAlgorithmTest, BestFrameByCoverage) {
@@ -888,10 +939,10 @@ TEST_F(VideoRendererAlgorithmTest, BestFrameByFractionalCadence) {
   }
 }
 
-// Verify a 3:2 frame pattern for 23.974fps in 60Hz; doubles as a test for best
-// frame by coverage.
+// Verify a 3:2 frame pattern for 23.974fps and 24fps in 60Hz.
 TEST_F(VideoRendererAlgorithmTest, FilmCadence) {
   const double kTestRates[] = {NTSC(24), 24};
+  disable_cadence_hysteresis();
 
   for (double frame_rate : kTestRates) {
     scoped_refptr<VideoFrame> current_frame;
@@ -916,7 +967,7 @@ TEST_F(VideoRendererAlgorithmTest, FilmCadence) {
           }
 
           current_frame = frame;
-          ASSERT_FALSE(is_using_cadence());
+          ASSERT_TRUE(is_using_cadence());
         });
 
     if (HasFatalFailure())
@@ -926,28 +977,28 @@ TEST_F(VideoRendererAlgorithmTest, FilmCadence) {
 
 // Spot check common display and frame rate pairs for correctness.
 TEST_F(VideoRendererAlgorithmTest, CadenceCalculations) {
-  ASSERT_FALSE(GetCadence(24, 60));
-  ASSERT_FALSE(GetCadence(NTSC(24), 60));
-  ASSERT_FALSE(GetCadence(25, 60));
-  ASSERT_EQ(2, GetCadence(NTSC(30), 60));
-  ASSERT_EQ(2, GetCadence(30, 60));
-  ASSERT_FALSE(GetCadence(50, 60));
-  ASSERT_EQ(1, GetCadence(NTSC(60), 60));
-  ASSERT_EQ(2, GetCadence(120, 60));
+  ASSERT_EQ("[3:2]", GetCadence(24, 60));
+  ASSERT_EQ("[3:2]", GetCadence(NTSC(24), 60));
+  ASSERT_EQ("[]", GetCadence(25, 60));
+  ASSERT_EQ("[2]", GetCadence(NTSC(30), 60));
+  ASSERT_EQ("[2]", GetCadence(30, 60));
+  ASSERT_EQ("[]", GetCadence(50, 60));
+  ASSERT_EQ("[1]", GetCadence(NTSC(60), 60));
+  ASSERT_EQ("[1:0]", GetCadence(120, 60));
 
   // 50Hz is common in the EU.
-  ASSERT_FALSE(GetCadence(NTSC(24), 50));
-  ASSERT_FALSE(GetCadence(24, 50));
-  ASSERT_EQ(2, GetCadence(NTSC(25), 50));
-  ASSERT_EQ(2, GetCadence(25, 50));
-  ASSERT_FALSE(GetCadence(NTSC(30), 50));
-  ASSERT_FALSE(GetCadence(30, 50));
-  ASSERT_FALSE(GetCadence(NTSC(60), 50));
-  ASSERT_FALSE(GetCadence(60, 50));
+  ASSERT_EQ("[]", GetCadence(NTSC(24), 50));
+  ASSERT_EQ("[]", GetCadence(24, 50));
+  ASSERT_EQ("[2]", GetCadence(NTSC(25), 50));
+  ASSERT_EQ("[2]", GetCadence(25, 50));
+  ASSERT_EQ("[]", GetCadence(NTSC(30), 50));
+  ASSERT_EQ("[]", GetCadence(30, 50));
+  ASSERT_EQ("[]", GetCadence(NTSC(60), 50));
+  ASSERT_EQ("[]", GetCadence(60, 50));
 
-  ASSERT_FALSE(GetCadence(25, NTSC(60)));
-  ASSERT_EQ(2, GetCadence(120, NTSC(60)));
-  ASSERT_EQ(60, GetCadence(1, NTSC(60)));
+  ASSERT_EQ("[]", GetCadence(25, NTSC(60)));
+  ASSERT_EQ("[1:0]", GetCadence(120, NTSC(60)));
+  ASSERT_EQ("[60]", GetCadence(1, NTSC(60)));
 }
 
 TEST_F(VideoRendererAlgorithmTest, RemoveExpiredFrames) {
@@ -983,7 +1034,7 @@ TEST_F(VideoRendererAlgorithmTest, RemoveExpiredFrames) {
   // Advance expiry enough that one frame is removed, but one remains and is
   // still counted as effective.
   ASSERT_EQ(
-      1u, algorithm_.RemoveExpiredFrames(tg.current() + tg.interval(1) * 0.75));
+      1u, algorithm_.RemoveExpiredFrames(tg.current() + tg.interval(1) * 0.9));
   EXPECT_EQ(1u, frames_queued());
   EXPECT_EQ(1u, algorithm_.EffectiveFramesQueued());
 
@@ -1140,8 +1191,7 @@ TEST_F(VideoRendererAlgorithmTest, EnqueueFrames) {
   algorithm_.EnqueueFrame(frame_1);
   EXPECT_EQ(1u, frames_queued());
 
-  // Enqueuing a frame with the same timestamp should not increase the queue and
-  // just replace the existing frame if we haven't rendered it.
+  // Enqueuing a frame with the same timestamp should always be dropped.
   scoped_refptr<VideoFrame> frame_2 = CreateFrame(tg.interval(0));
   algorithm_.EnqueueFrame(frame_2);
   EXPECT_EQ(1u, frames_queued());
@@ -1150,18 +1200,37 @@ TEST_F(VideoRendererAlgorithmTest, EnqueueFrames) {
   scoped_refptr<VideoFrame> rendered_frame =
       RenderAndStep(&tg, &frames_dropped);
   EXPECT_EQ(1u, frames_queued());
-  EXPECT_EQ(frame_2, rendered_frame);
+  EXPECT_EQ(frame_1, rendered_frame);
 
   // The replaced frame should count as dropped.
   EXPECT_EQ(1u, frames_dropped);
 
-  // Trying to replace frame_2 with frame_1 should do nothing.
-  algorithm_.EnqueueFrame(frame_1);
+  // Trying to replace frame_1 with frame_2 should do nothing.
+  algorithm_.EnqueueFrame(frame_2);
   EXPECT_EQ(1u, frames_queued());
 
   rendered_frame = RenderAndStep(&tg, &frames_dropped);
   EXPECT_EQ(1u, frames_queued());
-  EXPECT_EQ(frame_2, rendered_frame);
+  EXPECT_EQ(frame_1, rendered_frame);
+  EXPECT_EQ(1u, frames_dropped);
+
+  // Trying to add a frame < 1 ms after the last frame should drop the frame.
+  algorithm_.EnqueueFrame(CreateFrame(base::TimeDelta::FromMicroseconds(999)));
+  rendered_frame = RenderAndStep(&tg, &frames_dropped);
+  EXPECT_EQ(1u, frames_queued());
+  EXPECT_EQ(frame_1, rendered_frame);
+  EXPECT_EQ(1u, frames_dropped);
+
+  scoped_refptr<VideoFrame> frame_3 = CreateFrame(tg.interval(1));
+  algorithm_.EnqueueFrame(frame_3);
+  EXPECT_EQ(2u, frames_queued());
+
+  // Trying to add a frame < 1 ms before the last frame should drop the frame.
+  algorithm_.EnqueueFrame(
+      CreateFrame(tg.interval(1) - base::TimeDelta::FromMicroseconds(999)));
+  rendered_frame = RenderAndStep(&tg, &frames_dropped);
+  EXPECT_EQ(1u, frames_queued());
+  EXPECT_EQ(frame_3, rendered_frame);
   EXPECT_EQ(1u, frames_dropped);
 }
 

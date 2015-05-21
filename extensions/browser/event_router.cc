@@ -155,14 +155,21 @@ void EventRouter::DispatchEvent(IPC::Sender* ipc_sender,
                                 const EventFilteringInfo& info) {
   int event_id = g_extension_event_id.GetNext();
 
+  if (!BrowserThread::CurrentlyOn(BrowserThread::UI)) {
+    // This is called from WebRequest API.
+    // TODO(lazyboy): Skip this entirely: http://crbug.com/488747.
+    BrowserThread::PostTask(
+        BrowserThread::UI, FROM_HERE,
+        base::Bind(&EventRouter::IncrementInFlightEventsOnUI,
+                   browser_context_id, extension_id, event_id, event_name));
+  } else {
+    IncrementInFlightEventsOnUI(browser_context_id, extension_id, event_id,
+                                event_name);
+  }
+
   DispatchExtensionMessage(ipc_sender, browser_context_id, extension_id,
                            event_id, event_name, event_args.get(), user_gesture,
                            info);
-
-  BrowserThread::PostTask(
-      BrowserThread::UI, FROM_HERE,
-      base::Bind(&EventRouter::IncrementInFlightEventsOnUI, browser_context_id,
-                 extension_id, event_id, event_name));
 }
 
 EventRouter::EventRouter(BrowserContext* browser_context,
@@ -631,8 +638,7 @@ bool EventRouter::MaybeLoadLazyBackgroundPageToDispatchEvent(
   if (!CanDispatchEventToBrowserContext(context, extension, event))
     return false;
 
-  LazyBackgroundTaskQueue* queue = ExtensionSystem::Get(
-      context)->lazy_background_task_queue();
+  LazyBackgroundTaskQueue* queue = LazyBackgroundTaskQueue::Get(context);
   if (queue->ShouldEnqueueTask(context, extension)) {
     linked_ptr<Event> dispatched_event(event);
 
@@ -745,8 +751,8 @@ void EventRouter::Observe(int type,
       const Extension* extension =
           content::Details<const Extension>(details).ptr();
       if (BackgroundInfo::HasLazyBackgroundPage(extension)) {
-        LazyBackgroundTaskQueue* queue = ExtensionSystem::Get(
-            browser_context_)->lazy_background_task_queue();
+        LazyBackgroundTaskQueue* queue =
+            LazyBackgroundTaskQueue::Get(browser_context_);
         queue->AddPendingTask(browser_context_, extension->id(),
                               base::Bind(&DoNothing));
       }

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "ui/gl/gl_context.h"
 #include "ui/gl/gl_implementation.h"
@@ -309,7 +310,7 @@ void InitializeStaticGLBindingsGL() {
 }
 
 GLApi* GetCurrentGLApi() {
-  return g_current_gl_context_tls->Get();
+  return g_current_gl_context_tls ? g_current_gl_context_tls->Get() : nullptr;
 }
 
 void SetGLApi(GLApi* api) {
@@ -331,6 +332,7 @@ const GLVersionInfo* GetGLVersionInfo() {
 void InitializeDynamicGLBindingsGL(GLContext* context) {
   g_driver_gl.InitializeCustomDynamicBindings(context);
   DCHECK(context && context->IsCurrent(NULL) && !g_version_info);
+  g_real_gl->InitializeWithContext();
   g_version_info = new GLVersionInfo(
       context->GetGLVersion().c_str(),
       context->GetGLRenderer().c_str(),
@@ -404,7 +406,48 @@ RealGLApi::~RealGLApi() {
 }
 
 void RealGLApi::Initialize(DriverGL* driver) {
+  InitializeWithCommandLine(driver, base::CommandLine::ForCurrentProcess());
+}
+
+void RealGLApi::InitializeWithCommandLine(DriverGL* driver,
+                                          base::CommandLine* command_line) {
+  DCHECK(command_line);
   InitializeBase(driver);
+
+  const std::string disabled_extensions = command_line->GetSwitchValueASCII(
+      switches::kDisableGLExtensions);
+  if (!disabled_extensions.empty()) {
+    Tokenize(disabled_extensions, ", ;", &disabled_exts_);
+  }
+}
+
+void RealGLApi::InitializeWithContext() {
+  InitializeFilteredExtensions();
+}
+
+void RealGLApi::glGetIntegervFn(GLenum pname, GLint* params) {
+  if (!filtered_exts_.empty() && pname == GL_NUM_EXTENSIONS) {
+    *params = static_cast<GLint>(filtered_exts_.size());
+  } else {
+    GLApiBase::glGetIntegervFn(pname, params);
+  }
+}
+
+const GLubyte* RealGLApi::glGetStringFn(GLenum name) {
+  if (!filtered_exts_.empty() && name == GL_EXTENSIONS) {
+    return reinterpret_cast<const GLubyte*>(filtered_exts_str_.c_str());
+  }
+  return GLApiBase::glGetStringFn(name);
+}
+
+const GLubyte* RealGLApi::glGetStringiFn(GLenum name, GLuint index) {
+  if (!filtered_exts_str_.empty() && name == GL_EXTENSIONS) {
+    if (index >= filtered_exts_.size()) {
+      return NULL;
+    }
+    return reinterpret_cast<const GLubyte*>(filtered_exts_[index].c_str());
+  }
+  return GLApiBase::glGetStringiFn(name, index);
 }
 
 void RealGLApi::glFlushFn() {
@@ -413,6 +456,40 @@ void RealGLApi::glFlushFn() {
 
 void RealGLApi::glFinishFn() {
   GLApiBase::glFinishFn();
+}
+
+void RealGLApi::InitializeFilteredExtensions() {
+  if (!disabled_exts_.empty() && filtered_exts_.empty()) {
+    DCHECK(filtered_exts_.empty() && filtered_exts_str_.empty());
+    // Fill in filtered_exts_ vector first.
+    if (gfx::GetGLImplementation() !=
+        gfx::kGLImplementationDesktopGLCoreProfile) {
+      const char* gl_extensions = reinterpret_cast<const char*>(
+          GLApiBase::glGetStringFn(GL_EXTENSIONS));
+      if (gl_extensions)
+        base::SplitString(gl_extensions, ' ', &filtered_exts_);
+    } else {
+      GLint num_extensions = 0;
+      GLApiBase::glGetIntegervFn(GL_NUM_EXTENSIONS, &num_extensions);
+      for (GLint i = 0; i < num_extensions; ++i) {
+        const char* gl_extension = reinterpret_cast<const char*>(
+            GLApiBase::glGetStringiFn(GL_EXTENSIONS, i));
+        DCHECK(gl_extension != NULL);
+        filtered_exts_.push_back(gl_extension);
+      }
+    }
+
+    // Filter out extensions from the command line.
+    for (const std::string& disabled_ext : disabled_exts_) {
+      filtered_exts_.erase(std::remove(filtered_exts_.begin(),
+                                       filtered_exts_.end(),
+                                       disabled_ext),
+                           filtered_exts_.end());
+    }
+
+    // Construct filtered extensions string for GL_EXTENSIONS string lookups.
+    filtered_exts_str_ = JoinString(filtered_exts_, " ");
+  }
 }
 
 TraceGLApi::~TraceGLApi() {

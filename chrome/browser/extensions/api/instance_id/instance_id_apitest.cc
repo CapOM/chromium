@@ -10,7 +10,7 @@
 #include "chrome/browser/services/gcm/fake_gcm_profile_service.h"
 #include "chrome/browser/services/gcm/gcm_profile_service_factory.h"
 #include "chrome/browser/services/gcm/instance_id/instance_id_profile_service_factory.h"
-#include "chrome/common/chrome_switches.h"
+#include "chrome/common/extensions/features/feature_channel.h"
 #include "chrome/test/base/ui_test_utils.h"
 #include "components/gcm_driver/instance_id/fake_gcm_driver_for_instance_id.h"
 #include "extensions/test/result_catcher.h"
@@ -32,29 +32,26 @@ KeyedService* BuildFakeGCMProfileService(content::BrowserContext* context) {
 
 class InstanceIDApiTest : public ExtensionApiTest {
  public:
-  InstanceIDApiTest() {}
+  InstanceIDApiTest();
 
  protected:
   void SetUpOnMainThread() override;
-  void SetUpCommandLine(base::CommandLine* command_line) override;
 
  private:
+  extensions::ScopedCurrentChannel current_channel_;
+
   DISALLOW_COPY_AND_ASSIGN(InstanceIDApiTest);
 };
+
+InstanceIDApiTest::InstanceIDApiTest()
+    : current_channel_(chrome::VersionInfo::CHANNEL_DEV) {
+}
 
 void InstanceIDApiTest::SetUpOnMainThread() {
   gcm::GCMProfileServiceFactory::GetInstance()->SetTestingFactory(
       browser()->profile(), &BuildFakeGCMProfileService);
 
   ExtensionApiTest::SetUpOnMainThread();
-}
-
-void InstanceIDApiTest::SetUpCommandLine(base::CommandLine* command_line) {
-  ExtensionApiTest::SetUpCommandLine(command_line);
-
-  // Makes sure InstanceID is enabled for testing.
-  command_line->AppendSwitchASCII(
-      switches::kForceFieldTrials, "InstanceID/Enabled/");
 }
 
 IN_PROC_BROWSER_TEST_F(InstanceIDApiTest, GetID) {
@@ -88,6 +85,18 @@ IN_PROC_BROWSER_TEST_F(InstanceIDApiTest, Incognito) {
 
   EXPECT_TRUE(catcher.GetNextResult()) << catcher.message();
   EXPECT_TRUE(incognito_catcher.GetNextResult()) << incognito_catcher.message();
+}
+
+IN_PROC_BROWSER_TEST_F(InstanceIDApiTest, BetaChannel) {
+  extensions::ScopedCurrentChannel current_channel_override(
+      chrome::VersionInfo::CHANNEL_BETA);
+  ASSERT_TRUE(RunExtensionTest("instance_id/channel"));
+}
+
+IN_PROC_BROWSER_TEST_F(InstanceIDApiTest, StableChannel) {
+  extensions::ScopedCurrentChannel current_channel_override(
+      chrome::VersionInfo::CHANNEL_STABLE);
+  ASSERT_TRUE(RunExtensionTest("instance_id/channel"));
 }
 
 }  // namespace extensions

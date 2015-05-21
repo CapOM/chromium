@@ -7,8 +7,9 @@
 #include "base/callback.h"
 #include "base/lazy_instance.h"
 #include "cc/blink/web_layer_impl.h"
+#include "content/browser/bluetooth/bluetooth_dispatcher_host.h"
+#include "content/browser/renderer_host/render_process_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
-#include "content/child/bluetooth/web_bluetooth_impl.h"
 #include "content/child/geofencing/web_geofencing_provider_impl.h"
 #include "content/common/gpu/image_transport_surface.h"
 #include "content/public/common/page_state.h"
@@ -23,6 +24,7 @@
 #include "content/shell/renderer/test_runner/test_common.h"
 #include "content/shell/renderer/test_runner/web_frame_test_proxy.h"
 #include "content/shell/renderer/test_runner/web_test_proxy.h"
+#include "device/bluetooth/bluetooth_adapter.h"
 #include "third_party/WebKit/public/platform/WebBatteryStatus.h"
 #include "third_party/WebKit/public/platform/WebGamepads.h"
 #include "third_party/WebKit/public/platform/modules/device_orientation/WebDeviceMotionData.h"
@@ -312,11 +314,17 @@ void SetDeviceColorProfile(RenderView* render_view, const std::string& name) {
       SetDeviceColorProfileForTesting(color_profile);
 }
 
-void SetBluetoothMockDataSetForTesting(const std::string& name) {
-  RenderThreadImpl::current()
-      ->blink_platform_impl()
-      ->BluetoothImplForTesting()
-      ->SetBluetoothMockDataSetForTesting(name);
+void SetBluetoothAdapter(int render_process_id,
+                         scoped_refptr<device::BluetoothAdapter> adapter) {
+  RenderProcessHostImpl* render_process_host_impl =
+      static_cast<RenderProcessHostImpl*>(
+          RenderProcessHost::FromID(render_process_id));
+
+  BluetoothDispatcherHost* dispatcher_host =
+      render_process_host_impl->GetBluetoothDispatcherHost();
+
+  if (dispatcher_host != NULL)
+    dispatcher_host->SetBluetoothAdapterForTesting(adapter.Pass());
 }
 
 void SetGeofencingMockProvider(bool service_available) {

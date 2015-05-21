@@ -5,18 +5,24 @@
 #ifndef MANDOLINE_UI_BROWSER_BROWSER_H_
 #define MANDOLINE_UI_BROWSER_BROWSER_H_
 
-#include "base/memory/weak_ptr.h"
 #include "components/view_manager/public/cpp/view_manager.h"
 #include "components/view_manager/public/cpp/view_manager_delegate.h"
-#include "components/window_manager/window_manager_app.h"
-#include "components/window_manager/window_manager_delegate.h"
+#include "components/view_manager/public/interfaces/view_manager_root.mojom.h"
 #include "mandoline/services/navigation/public/interfaces/navigation.mojom.h"
 #include "mandoline/ui/browser/navigator_host_impl.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/application_delegate.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/application_impl.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/connect.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/service_provider_impl.h"
+#include "mandoline/ui/browser/omnibox.mojom.h"
+#include "mandoline/ui/browser/view_embedder.mojom.h"
+#include "mojo/application/public/cpp/application_delegate.h"
+#include "mojo/application/public/cpp/application_impl.h"
+#include "mojo/application/public/cpp/connect.h"
+#include "mojo/application/public/cpp/service_provider_impl.h"
+#include "mojo/common/weak_binding_set.h"
 #include "ui/mojo/events/input_events.mojom.h"
+#include "url/gurl.h"
+
+namespace mojo {
+class ViewManagerInit;
+}
 
 namespace mandoline {
 
@@ -25,15 +31,21 @@ class MergedServiceProvider;
 
 class Browser : public mojo::ApplicationDelegate,
                 public mojo::ViewManagerDelegate,
-                public window_manager::WindowManagerDelegate,
-                public mojo::InterfaceFactory<mojo::NavigatorHost> {
+                public mojo::ViewManagerRootClient,
+                public OmniboxClient,
+                public ViewEmbedder,
+                public mojo::InterfaceFactory<mojo::NavigatorHost>,
+                public mojo::InterfaceFactory<ViewEmbedder> {
  public:
   Browser();
   ~Browser() override;
 
-  base::WeakPtr<Browser> GetWeakPtr();
-
   void ReplaceContentWithURL(const mojo::String& url);
+
+  mojo::View* content() { return content_; }
+  mojo::View* omnibox() { return omnibox_; }
+
+  const GURL& current_url() const { return current_url_; }
 
  private:
   // Overridden from mojo::ApplicationDelegate:
@@ -49,35 +61,49 @@ class Browser : public mojo::ApplicationDelegate,
                mojo::ServiceProviderPtr exposed_services) override;
   void OnViewManagerDisconnected(mojo::ViewManager* view_manager) override;
 
-  // Overridden from WindowManagerDelegate:
+  // Overridden from ViewManagerRootClient:
+  void OnAccelerator(mojo::EventPtr event) override;
+
+  // Overridden from OmniboxClient:
+  void OpenURL(const mojo::String& url) override;
+
+  // Overridden from ViewEmbedder:
   void Embed(const mojo::String& url,
              mojo::InterfaceRequest<mojo::ServiceProvider> services,
              mojo::ServiceProviderPtr exposed_services) override;
-  void OnAcceleratorPressed(mojo::View* view,
-                            mojo::KeyboardCode keyboard_code,
-                            mojo::EventFlags flags) override;
 
   // Overridden from mojo::InterfaceFactory<mojo::NavigatorHost>:
   void Create(mojo::ApplicationConnection* connection,
               mojo::InterfaceRequest<mojo::NavigatorHost> request) override;
 
-  scoped_ptr<window_manager::WindowManagerApp> window_manager_app_;
+  // Overridden from mojo::InterfaceFactory<ViewEmbedder>:
+  void Create(mojo::ApplicationConnection* connection,
+              mojo::InterfaceRequest<ViewEmbedder> request) override;
+
+  void ShowOmnibox(const mojo::String& url,
+                   mojo::InterfaceRequest<mojo::ServiceProvider> services,
+                   mojo::ServiceProviderPtr exposed_services);
+
+  scoped_ptr<mojo::ViewManagerInit> view_manager_init_;
 
   // Only support being embedded once, so both application-level
   // and embedding-level state are shared on the same object.
   mojo::View* root_;
   mojo::View* content_;
+  mojo::View* omnibox_;
   std::string default_url_;
   std::string pending_url_;
 
   mojo::ServiceProviderImpl exposed_services_impl_;
   scoped_ptr<MergedServiceProvider> merged_service_provider_;
 
+  mojo::WeakBindingSet<ViewEmbedder> view_embedder_bindings_;
+
   NavigatorHostImpl navigator_host_;
 
-  scoped_ptr<BrowserUI> ui_;
+  GURL current_url_;
 
-  base::WeakPtrFactory<Browser> weak_factory_;
+  scoped_ptr<BrowserUI> ui_;
 
   DISALLOW_COPY_AND_ASSIGN(Browser);
 };

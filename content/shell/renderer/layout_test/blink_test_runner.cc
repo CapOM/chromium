@@ -36,6 +36,7 @@
 #include "content/shell/renderer/layout_test/gc_controller.h"
 #include "content/shell/renderer/layout_test/layout_test_render_process_observer.h"
 #include "content/shell/renderer/layout_test/leak_detector.h"
+#include "content/shell/renderer/test_runner/gamepad_controller.h"
 #include "content/shell/renderer/test_runner/mock_screen_orientation_client.h"
 #include "content/shell/renderer/test_runner/web_task.h"
 #include "content/shell/renderer/test_runner/web_test_interfaces.h"
@@ -188,6 +189,31 @@ class UseSynchronousResizeModeVisitor : public RenderViewVisitor {
   bool enable_;
 };
 
+class MockGamepadProvider : public RendererGamepadProvider {
+ public:
+  explicit MockGamepadProvider(GamepadController* controller)
+      : RendererGamepadProvider(nullptr), controller_(controller) {}
+  ~MockGamepadProvider() override {
+    StopIfObserving();
+  }
+
+  // RendererGamepadProvider implementation.
+  void SampleGamepads(blink::WebGamepads& gamepads) override {
+    controller_->SampleGamepads(gamepads);
+  }
+  void Start(blink::WebPlatformEventListener* listener) override {
+    controller_->SetListener(static_cast<blink::WebGamepadListener*>(listener));
+    RendererGamepadProvider::Start(listener);
+  }
+  void SendStartMessage() override {}
+  void SendStopMessage() override {}
+
+ private:
+  scoped_ptr<GamepadController> controller_;
+
+  DISALLOW_COPY_AND_ASSIGN(MockGamepadProvider);
+};
+
 }  // namespace
 
 BlinkTestRunner::BlinkTestRunner(RenderView* render_view)
@@ -215,7 +241,8 @@ void BlinkTestRunner::SetEditCommand(const std::string& name,
 }
 
 void BlinkTestRunner::SetGamepadProvider(
-    scoped_ptr<RendererGamepadProvider> provider) {
+    GamepadController* controller) {
+  scoped_ptr<MockGamepadProvider> provider(new MockGamepadProvider(controller));
   SetMockGamepadProvider(provider.Pass());
 }
 
@@ -437,7 +464,7 @@ void BlinkTestRunner::SetDeviceColorProfile(const std::string& name) {
 }
 
 void BlinkTestRunner::SetBluetoothMockDataSet(const std::string& name) {
-  content::SetBluetoothMockDataSetForTesting(name);
+  Send(new LayoutTestHostMsg_SetBluetoothAdapter(name));
 }
 
 void BlinkTestRunner::SetGeofencingMockProvider(bool service_available) {
@@ -577,6 +604,14 @@ std::string BlinkTestRunner::DumpHistoryForWindow(WebTestProxyBase* proxy) {
                              current_entry_indexes_[pos]);
 }
 
+void BlinkTestRunner::FetchManifest(
+      blink::WebView* view,
+      const GURL& url,
+      const base::Callback<void(const blink::WebURLResponse& response,
+                                const std::string& data)>& callback) {
+  ::content::FetchManifest(view, url, callback);
+}
+
 void BlinkTestRunner::SetPermission(const std::string& name,
                                     const std::string& value,
                                     const GURL& origin,
@@ -599,6 +634,15 @@ void BlinkTestRunner::SetPermission(const std::string& name,
 
 void BlinkTestRunner::ResetPermissions() {
   Send(new LayoutTestHostMsg_ResetPermissions(routing_id()));
+}
+
+blink::WebLayer* BlinkTestRunner::InstantiateWebLayer(
+    scoped_refptr<cc::TextureLayer> layer) {
+  return ::content::InstantiateWebLayer(layer);
+}
+
+cc::SharedBitmapManager* BlinkTestRunner::GetSharedBitmapManager() {
+  return RenderThread::Get()->GetSharedBitmapManager();
 }
 
 // RenderViewObserver  --------------------------------------------------------
@@ -713,8 +757,8 @@ void BlinkTestRunner::CaptureDump() {
 }
 
 void BlinkTestRunner::CaptureDumpPixels(const SkBitmap& snapshot) {
-  DCHECK_NE(0, snapshot.info().fWidth);
-  DCHECK_NE(0, snapshot.info().fHeight);
+  DCHECK_NE(0, snapshot.info().width());
+  DCHECK_NE(0, snapshot.info().height());
 
   SkAutoLockPixels snapshot_lock(snapshot);
   // The snapshot arrives from the GPU process via shared memory. Because MSan

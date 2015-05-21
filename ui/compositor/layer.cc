@@ -653,7 +653,9 @@ void Layer::UpdateNinePatchLayerBorder(const gfx::Rect& border) {
 void Layer::SetColor(SkColor color) { GetAnimator()->SetColor(color); }
 
 SkColor Layer::GetTargetColor() {
-  return GetAnimator()->GetTargetColor();
+  if (GetAnimator()->IsAnimatingProperty(LayerAnimationElement::COLOR))
+    return GetAnimator()->GetTargetColor();
+  return cc_layer_->background_color();
 }
 
 SkColor Layer::background_color() const {
@@ -796,7 +798,7 @@ class LayerDebugInfo : public base::trace_event::ConvertableToTraceFormat {
   void AppendAsTraceFormat(std::string* out) const override {
     base::DictionaryValue dictionary;
     dictionary.SetString("layer_name", name_);
-    base::JSONWriter::Write(&dictionary, out);
+    base::JSONWriter::Write(dictionary, out);
   }
 
  private:

@@ -34,13 +34,15 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
     @Override
     public boolean shouldShowContextMenu(ContextMenuParams params) {
         return params != null && (params.isAnchor() || params.isEditable() || params.isImage()
-                || params.isSelectedText() || params.isVideo() || params.isCustomMenu());
+                || params.isSelectedText() || params.isVideo());
     }
 
     @Override
     public void buildContextMenu(ContextMenu menu, Context context, ContextMenuParams params) {
         if (!TextUtils.isEmpty(params.getLinkUrl()) && !params.getLinkUrl().equals(BLANK_URL)) {
             menu.setHeaderTitle(params.getLinkUrl());
+        } else if (!TextUtils.isEmpty(params.getTitleText())) {
+            menu.setHeaderTitle(params.getTitleText());
         }
 
         if (mMenuInflater == null) mMenuInflater = new MenuInflater(context);
@@ -81,6 +83,10 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                 menu.findItem(R.id.contextmenu_open_original_image_in_new_tab).setVisible(false);
             }
 
+            if (!params.imageWasFetchedLoFi()) {
+                menu.findItem(R.id.contextmenu_show_original_image).setVisible(false);
+            }
+
             // Avoid showing open image option for same image which is already opened.
             if (mDelegate.getPageUrl().equals(params.getSrcUrl())) {
                 menu.findItem(R.id.contextmenu_open_image).setVisible(false);
@@ -114,6 +120,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         } else if (itemId == R.id.contextmenu_open_image_in_new_tab
                 || itemId == R.id.contextmenu_open_original_image_in_new_tab) {
             mDelegate.onOpenImageInNewTab(params.getSrcUrl(), params.getReferrer());
+        } else if (itemId == R.id.contextmenu_show_original_image) {
+            mDelegate.onShowOriginalImage();
         } else if (itemId == R.id.contextmenu_copy_link_address_text) {
             mDelegate.onSaveToClipboard(params.getUnfilteredLinkUrl(), true);
         } else if (itemId == R.id.contextmenu_copy_email_address) {

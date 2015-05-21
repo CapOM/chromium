@@ -92,6 +92,9 @@ class SSLClientSocketNSS : public SSLClientSocket {
   bool WasEverUsed() const override;
   bool UsingTCPFastOpen() const override;
   bool GetSSLInfo(SSLInfo* ssl_info) override;
+  void GetConnectionAttempts(ConnectionAttempts* out) const override;
+  void ClearConnectionAttempts() override {}
+  void AddConnectionAttempts(const ConnectionAttempts& attempts) override {}
 
   // Socket implementation.
   int Read(IOBuffer* buf,
@@ -102,7 +105,10 @@ class SSLClientSocketNSS : public SSLClientSocket {
             const CompletionCallback& callback) override;
   int SetReceiveBufferSize(int32 size) override;
   int SetSendBufferSize(int32 size) override;
+
+  // SSLClientSocket implementation.
   ChannelIDService* GetChannelIDService() const override;
+  SSLFailureState GetSSLFailureState() const override;
 
  protected:
   // SSLClientSocket implementation.

@@ -12,7 +12,6 @@
 #include "base/metrics/field_trial.h"
 #include "base/single_thread_task_runner.h"
 #include "base/strings/string_util.h"
-#include "base/threading/platform_thread.h"
 #include "base/time/default_tick_clock.h"
 #include "base/trace_event/trace_event.h"
 #include "media/base/bind_to_current_loop.h"
@@ -21,6 +20,8 @@
 #include "media/base/media_switches.h"
 #include "media/base/pipeline.h"
 #include "media/base/video_frame.h"
+#include "media/renderers/gpu_video_accelerator_factories.h"
+#include "media/video/gpu_memory_buffer_video_frame_pool.h"
 
 namespace media {
 
@@ -43,6 +44,7 @@ VideoRendererImpl::VideoRendererImpl(
     VideoRendererSink* sink,
     ScopedVector<VideoDecoder> decoders,
     bool drop_frames,
+    const scoped_refptr<GpuVideoAcceleratorFactories>& gpu_factories,
     const scoped_refptr<MediaLog>& media_log)
     : task_runner_(task_runner),
       use_new_video_renderering_path_(ShouldUseVideoRenderingPath()),
@@ -50,6 +52,8 @@ VideoRendererImpl::VideoRendererImpl(
       sink_started_(false),
       video_frame_stream_(
           new VideoFrameStream(task_runner, decoders.Pass(), media_log)),
+      gpu_memory_buffer_pool_(
+          new GpuMemoryBufferVideoFramePool(task_runner, gpu_factories)),
       low_delay_(false),
       received_end_of_stream_(false),
       rendered_end_of_stream_(false),
@@ -697,6 +701,7 @@ bool VideoRendererImpl::HaveReachedBufferingCap() {
 
 void VideoRendererImpl::StartSink() {
   DCHECK(task_runner_->BelongsToCurrentThread());
+  DCHECK_GT(algorithm_->frames_queued(), 0u);
   sink_->Start(this);
   sink_started_ = true;
   was_background_rendering_ = false;

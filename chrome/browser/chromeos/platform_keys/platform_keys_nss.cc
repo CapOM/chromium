@@ -451,14 +451,16 @@ void SignRSAOnWorkerThread(scoped_ptr<SignRSAState> state) {
   std::vector<uint8> public_key_vector(
       public_key_uint8, public_key_uint8 + state->public_key_.size());
 
-  // TODO(pneubeck): This searches all slots. Change to look only at |slot_|.
-  crypto::ScopedSECKEYPrivateKey rsa_key(
-      crypto::FindNSSKeyFromPublicKeyInfo(public_key_vector));
+  crypto::ScopedSECKEYPrivateKey rsa_key;
+  if (state->slot_) {
+    rsa_key = crypto::FindNSSKeyFromPublicKeyInfoInSlot(public_key_vector,
+                                                        state->slot_.get());
+  } else {
+    rsa_key = crypto::FindNSSKeyFromPublicKeyInfo(public_key_vector);
+  }
 
-  // Fail if the key was not found. If a specific slot was requested, also fail
-  // if the key was found in the wrong slot.
-  if (!rsa_key || SECKEY_GetPrivateKeyType(rsa_key.get()) != rsaKey ||
-      (state->slot_ && rsa_key->pkcs11Slot != state->slot_)) {
+  // Fail if the key was not found or is of the wrong type.
+  if (!rsa_key || SECKEY_GetPrivateKeyType(rsa_key.get()) != rsaKey) {
     state->OnError(FROM_HERE, kErrorKeyNotFound);
     return;
   }
@@ -756,15 +758,20 @@ void SignRSAPKCS1Raw(const std::string& token_id,
                   browser_context, state_ptr);
 }
 
-void SelectClientCertificates(const ClientCertificateRequest& request,
-                              const SelectCertificatesCallback& callback,
-                              content::BrowserContext* browser_context) {
+void SelectClientCertificates(
+    const std::vector<std::string>& certificate_authorities,
+    const SelectCertificatesCallback& callback,
+    content::BrowserContext* browser_context) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
 
   scoped_refptr<net::SSLCertRequestInfo> cert_request_info(
       new net::SSLCertRequestInfo);
-  cert_request_info->cert_key_types = request.certificate_key_types;
-  cert_request_info->cert_authorities = request.certificate_authorities;
+
+  // Currently we do not pass down the requested certificate type to the net
+  // layer, as it does not support filtering certificates by type. Rather, we
+  // do not constrain the certificate type here, instead the caller has to apply
+  // filtering afterwards.
+  cert_request_info->cert_authorities = certificate_authorities;
 
   const user_manager::User* user =
       chromeos::ProfileHelper::Get()->GetUserByProfile(

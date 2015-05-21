@@ -244,6 +244,9 @@ Press any key to continue exploring.
   <message name="IDS_FILE_BROWSER_FORMAT_DEVICE_BUTTON_LABEL" desc="Title of the action for formatting removable device.">
     Format device
   </message>
+  <message name="IDS_FILE_BROWSER_CONFIGURE_VOLUME_BUTTON_LABEL" desc="Title of the action for configuring the selected volume.">
+    Configure
+  </message>
   <message name="IDS_FILE_BROWSER_UNMOUNT_DEVICE_BUTTON_LABEL" desc="Title of the action for unmounting removable device.">
     Eject device
   </message>
@@ -2339,6 +2342,9 @@ Press any key to continue exploring.
   </message>
   <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_MIRRORING_DISPLAY_NAME" desc="The text shown at display name field when mirroring.">
     Mirroring
+  </message>
+  <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_ENABLE_UNIFIED_DESKTOP" desc="The section title for the option to enable unified desktop mode.">
+    Enable Unified Desktop
   </message>
   <message name="IDS_OPTIONS_SETTINGS_DISPLAY_OPTIONS_SET_PRIMARY" desc="Button label to set a display primary.">
     Make primary
@@ -4841,6 +4847,9 @@ Battery full
   <message name="IDS_STATUSBAR_LAYOUT_USA_DVORAK" desc="In the language menu button, this shows the input mode [US Dvorak keyboard].">
     US Dvorak
   </message>
+  <message name="IDS_STATUSBAR_LAYOUT_USA_DVP" desc="In the language menu button, this shows the input mode [US Programmer Dvorak keyboard].">
+    US Programmer Dvorak
+  </message>
   <message name="IDS_STATUSBAR_LAYOUT_USA_COLEMAK" desc="In the language menu button, this shows the input mode [US Colemak keyboard].">
     US Colemak
   </message>
@@ -5126,6 +5135,9 @@ Battery full
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_US_DVORAK" desc="The input method name shows in system tray menu, this shows [US Dvorak keyboard].">
     US Dvorak keyboard
+  </message>
+  <message name="IDS_IME_NAME_KEYBOARD_US_DVP" desc="The input method name shows in system tray menu, this shows [US Programmer Dvorak keyboard].">
+    US Programmer Dvorak keyboard
   </message>
   <message name="IDS_IME_NAME_KEYBOARD_US_EXTENDED" desc="The input method name shows in system tray menu, this shows [US Extended keyboard].">
     US Extended keyboard
@@ -6072,7 +6084,7 @@ All users must sign out to continue.
     Learn more about Enterprise Enrollment
   </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_ATTRIBUTE_EXPLANATION" desc="Device attribute message to be shown on attribute update prompt screen.">
-    Enter new or update existing information to be associated with this device. 
+    Optional — enter new or update existing information to be associated with this device.
   </message>
   <message name="IDS_ENTERPRISE_ENROLLMENT_EXPLAIN_ATTRIBUTE_LINK" desc="Text on the link to the device attribute update help article.">
     Learn more.
@@ -6312,12 +6324,6 @@ All users must sign out to continue.
   <message name="IDS_OPTIONS_RESOLVE_TIMEZONE_BY_GEOLOCATION_DESCRIPTION" desc="Label for checkbox to allow automatic timezone update by user geolocation.">
     Set time zone automatically using your location
   </message>
-  <message name="IDS_FLAGS_ENABLE_FIREWALL_HOLE_PUNCHING_NAME" desc="Name of the option to enable punching holes in the Chrome OS firewall.">
-    Enable firewall hole punching.
-  </message>
-  <message name="IDS_FLAGS_ENABLE_FIREWALL_HOLE_PUNCHING_DESCRIPTION" desc="Description of the option to enable punching holes in the Chrome OS firewall.">
-    Enable punching holes in the Chrome OS firewall for Chrome Apps that open a TCP/IP server socket or UDP socket.
-  </message>
   <message name="IDS_FILE_SYSTEM_REQUEST_FILE_SYSTEM_DIALOG_TITLE" desc="Title of a prompt dialog for granting permissions to a volume (eg. USB drive, SD card, MTP device) with the specified name.">
     Permission requested
   </message>
@@ -6358,6 +6364,12 @@ All users must sign out to continue.
   </message>
   <message name="IDS_WEBSTORE_WIDGET_DEFAULT_ERROR" desc="Default message shown when Chrome Web Store Widget app window content fails to load (e.g. if it fails to load Chrome Web Store Gallery in a webview).">
     Could not connect to the Chrome Web Store.
+  </message>
+  <message name="IDS_FLAGS_PRINTER_PROVIDER_SEARCH_APP_NAME" desc="Name of the flag used to enable launching Chrome Web Store Gallery widget app for searching for printer provider apps.">
+    Chrome Web Store Gallery app for printer drivers
+  </message>
+  <message name="IDS_FLAGS_PRINTER_PROVIDER_SEARCH_APP_DESCRIPTION" desc="Description of a flag in chrome://flags that enables launching Chrome Web Store Gallery widget app for searching for printer provider apps.">
+    Enables Chrome Web Store Gallery app for printer drivers. The app searches Chrome Web Store for extensions that support printing to a USB printer with specific USB ID.
   </message>
 
 </grit-part>

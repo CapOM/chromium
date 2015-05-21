@@ -933,7 +933,8 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       message_port_message_filter_.get()));
   if (browser_command_line.HasSwitch(
           switches::kEnableExperimentalWebPlatformFeatures)) {
-    AddFilter(new BluetoothDispatcherHost());
+    bluetooth_dispatcher_host_ = new BluetoothDispatcherHost();
+    AddFilter(bluetooth_dispatcher_host_.get());
   }
 }
 
@@ -964,11 +965,6 @@ int RenderProcessHostImpl::GetNextRoutingID() {
 void RenderProcessHostImpl::ResumeDeferredNavigation(
     const GlobalRequestID& request_id) {
   widget_helper_->ResumeDeferredNavigation(request_id);
-}
-
-void RenderProcessHostImpl::ResumeResponseDeferredAtStart(
-    const GlobalRequestID& request_id) {
-  widget_helper_->ResumeResponseDeferredAtStart(request_id);
 }
 
 void RenderProcessHostImpl::NotifyTimezoneChange(const std::string& zone_id) {
@@ -1231,6 +1227,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisablePrefixedEncryptedMedia,
     switches::kDisableSeccompFilterSandbox,
     switches::kDisableSharedWorkers,
+    switches::kDisableSpeechAPI,
     switches::kDisableSVG1DOM,
     switches::kDisableThreadedCompositing,
     switches::kDisableThreadedScrolling,
@@ -1269,7 +1266,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnablePreciseMemoryInfo,
     switches::kEnablePreferCompositingToLCDText,
     switches::kEnablePushMessagePayload,
-    switches::kEnablePushMessagingHasPermission,
     switches::kEnableRendererMojoChannel,
     switches::kEnableSeccompFilterSandbox,
     switches::kEnableSkiaBenchmarking,
@@ -1300,6 +1296,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kMemoryMetrics,
     switches::kNoReferrers,
     switches::kNoSandbox,
+    switches::kOverridePluginPowerSaverForTesting,
     switches::kPpapiInProcess,
     switches::kProfilerTiming,
     switches::kReducedReferrerGranularity,
@@ -1331,7 +1328,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     cc::switches::kDisableThreadedAnimation,
     cc::switches::kEnableGpuBenchmarking,
     cc::switches::kEnableMainFrameBeforeActivation,
-    cc::switches::kMaxTilesForInterestArea,
     cc::switches::kMaxUnusedResourceMemoryUsagePercentage,
     cc::switches::kShowCompositedLayerBorders,
     cc::switches::kShowFPSCounter,
@@ -1371,7 +1367,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #endif
 #if defined(OS_WIN)
     switches::kDisableDirectWrite,
-    switches::kEnableWin32kRendererLockDown,
     switches::kDisableWin32kRendererLockDown,
     switches::kTraceExportEventsToETW,
 #endif
@@ -2320,6 +2315,12 @@ void RenderProcessHostImpl::OnProcessLaunched() {
 }
 
 void RenderProcessHostImpl::OnProcessLaunchFailed() {
+  // If this object will be destructed soon, then observers have already been
+  // sent a RenderProcessHostDestroyed notification, and we must observe our
+  // contract that says that will be the last call.
+  if (deleting_soon_)
+    return;
+
   RendererClosedDetails details { base::TERMINATION_STATUS_PROCESS_WAS_KILLED,
                                   -1 };
   ProcessDied(true, &details);
@@ -2458,6 +2459,10 @@ void RenderProcessHostImpl::DecrementWorkerRefCount() {
 void RenderProcessHostImpl::GetAudioOutputControllers(
     const GetAudioOutputControllersCallback& callback) const {
   audio_renderer_host()->GetOutputControllers(callback);
+}
+
+BluetoothDispatcherHost* RenderProcessHostImpl::GetBluetoothDispatcherHost() {
+  return bluetooth_dispatcher_host_.get();
 }
 
 }  // namespace content

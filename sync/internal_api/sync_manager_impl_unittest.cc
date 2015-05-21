@@ -572,6 +572,35 @@ TEST_F(SyncApiTest, WriteEncryptedTitle) {
   }
 }
 
+// Non-unique name should not be empty. For bookmarks non-unique name is copied
+// from bookmark title. This test verifies that setting bookmark title to ""
+// results in single space title and non-unique name in internal representation.
+// GetTitle should still return empty string.
+TEST_F(SyncApiTest, WriteEmptyBookmarkTitle) {
+  int bookmark_id;
+  {
+    WriteTransaction trans(FROM_HERE, user_share());
+    ReadNode root_node(&trans);
+    root_node.InitByRootLookup();
+
+    WriteNode bookmark_node(&trans);
+    ASSERT_TRUE(bookmark_node.InitBookmarkByCreation(root_node, NULL));
+    bookmark_id = bookmark_node.GetId();
+    bookmark_node.SetTitle("");
+  }
+  {
+    ReadTransaction trans(FROM_HERE, user_share());
+    ReadNode root_node(&trans);
+    root_node.InitByRootLookup();
+
+    ReadNode bookmark_node(&trans);
+    ASSERT_EQ(BaseNode::INIT_OK, bookmark_node.InitByIdLookup(bookmark_id));
+    EXPECT_EQ("", bookmark_node.GetTitle());
+    EXPECT_EQ(" ", bookmark_node.GetEntry()->GetSpecifics().bookmark().title());
+    EXPECT_EQ(" ", bookmark_node.GetEntry()->GetNonUniqueName());
+  }
+}
+
 TEST_F(SyncApiTest, BaseNodeSetSpecifics) {
   int64 child_id = MakeNodeWithRoot(user_share(), BOOKMARKS, "testtag");
   WriteTransaction trans(FROM_HERE, user_share());
@@ -1075,7 +1104,7 @@ class SyncManagerTest : public testing::Test,
 TEST_F(SyncManagerTest, GetAllNodesForTypeTest) {
   ModelSafeRoutingInfo routing_info;
   GetModelSafeRoutingInfo(&routing_info);
-  sync_manager_.StartSyncingNormally(routing_info);
+  sync_manager_.StartSyncingNormally(routing_info, base::Time());
 
   scoped_ptr<base::ListValue> node_list(
       sync_manager_.GetAllNodesForType(syncer::PREFERENCES));
@@ -2377,7 +2406,7 @@ class MockSyncScheduler : public FakeSyncScheduler {
   MockSyncScheduler() : FakeSyncScheduler() {}
   virtual ~MockSyncScheduler() {}
 
-  MOCK_METHOD1(Start, void(SyncScheduler::Mode));
+  MOCK_METHOD2(Start, void(SyncScheduler::Mode, base::Time));
   MOCK_METHOD1(ScheduleConfiguration, void(const ConfigurationParams&));
 };
 
@@ -2437,7 +2466,7 @@ TEST_F(SyncManagerTestWithMockScheduler, BasicConfiguration) {
   ModelTypeSet disabled_types = Difference(ModelTypeSet::All(), enabled_types);
 
   ConfigurationParams params;
-  EXPECT_CALL(*scheduler(), Start(SyncScheduler::CONFIGURATION_MODE));
+  EXPECT_CALL(*scheduler(), Start(SyncScheduler::CONFIGURATION_MODE, _));
   EXPECT_CALL(*scheduler(), ScheduleConfiguration(_)).
       WillOnce(SaveArg<0>(&params));
 
@@ -2489,7 +2518,7 @@ TEST_F(SyncManagerTestWithMockScheduler, ReConfiguration) {
   ModelTypeSet enabled_types = GetRoutingInfoTypes(new_routing_info);
 
   ConfigurationParams params;
-  EXPECT_CALL(*scheduler(), Start(SyncScheduler::CONFIGURATION_MODE));
+  EXPECT_CALL(*scheduler(), Start(SyncScheduler::CONFIGURATION_MODE, _));
   EXPECT_CALL(*scheduler(), ScheduleConfiguration(_)).
       WillOnce(SaveArg<0>(&params));
 

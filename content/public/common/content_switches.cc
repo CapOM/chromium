@@ -232,15 +232,14 @@ const char kDisableSetuidSandbox[]          = "disable-setuid-sandbox";
 // Disable shared workers.
 const char kDisableSharedWorkers[]          = "disable-shared-workers";
 
-// For tests, disable single thread scheduler and only manually composite.
-const char kDisableSingleThreadProxyScheduler[] =
-    "disable-single-thread-proxy-scheduler";
-
 // Disable smooth scrolling for testing.
 const char kDisableSmoothScrolling[]        = "disable-smooth-scrolling";
 
 // Disables the use of a 3D software rasterizer.
 const char kDisableSoftwareRasterizer[]     = "disable-software-rasterizer";
+
+// Disables the Web Speech API.
+const char kDisableSpeechAPI[]                 = "disable-speech-api";
 
 // Disables SVG 1.1 DOM.
 const char kDisableSVG1DOM[]                = "disable-svg1dom";
@@ -391,10 +390,6 @@ const char kEnablePreciseMemoryInfo[] = "enable-precise-memory-info";
 
 // Enables payloads for received push messages when using the W3C Push API.
 const char kEnablePushMessagePayload[] = "enable-push-message-payload";
-
-// Enable hasPermission() method of the W3C Push API.
-const char kEnablePushMessagingHasPermission[] =
-        "enable-push-messaging-has-permission";
 
 // Set options to cache V8 data. (off, preparse data, or code)
 const char kV8CacheOptions[] = "v8-cache-options";
@@ -634,6 +629,14 @@ const char kDisableAppContainer[]           = "disable-appcontainer";
 
 // Number of worker threads used to rasterize content.
 const char kNumRasterThreads[]              = "num-raster-threads";
+
+// Override the behavior of plugin throttling for testing.
+// By default the throttler is only enabled for a hard-coded list of plugins.
+// Set the value to 'never' to disable throttling.
+// Set the value to 'ignore-list' to ignore the hard-coded list.
+// Set the value to 'always' to always throttle every plugin instance.
+const char kOverridePluginPowerSaverForTesting[] =
+    "override-plugin-power-saver-for-testing";
 
 // Controls the behavior of history navigation in response to horizontal
 // overscroll.
@@ -981,13 +984,9 @@ const char kDeviceScaleFactor[]     = "device-scale-factor";
 // Disable the Legacy Window which corresponds to the size of the WebContents.
 const char kDisableLegacyIntermediateWindow[] = "disable-legacy-window";
 
-// Enables or disables the Win32K process mitigation policy for renderer
-// processes which prevents them from invoking user32 and gdi32 system calls
-// which enter the kernel. This is only supported on Windows 8 and beyond.
+// Disables the Win32K process mitigation policy for renderer processes.
 const char kDisableWin32kRendererLockDown[] =
     "disable-win32k-renderer-lockdown";
-const char kEnableWin32kRendererLockDown[] =
-    "enable-win32k-renderer-lockdown";
 
 // DirectWrite FontCache is shared by browser to renderers using shared memory.
 // This switch allows us to pass the shared memory handle to the renderer.

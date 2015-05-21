@@ -5,6 +5,7 @@
 #ifndef CHROME_RENDERER_CHROME_CONTENT_RENDERER_CLIENT_H_
 #define CHROME_RENDERER_CHROME_CONTENT_RENDERER_CLIENT_H_
 
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -150,6 +151,9 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   void RecordRapporURL(const std::string& metric, const GURL& url) override;
   scoped_ptr<blink::WebAppBannerClient> CreateAppBannerClient(
       content::RenderFrame* render_frame) override;
+  void AddImageContextMenuProperties(
+      const blink::WebURLResponse& response,
+      std::map<std::string, std::string>* properties) override;
 
 #if defined(ENABLE_EXTENSIONS)
   // Takes ownership.
@@ -164,11 +168,13 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   void SetSpellcheck(SpellCheck* spellcheck);
 #endif
 
+#if defined(ENABLE_PLUGINS)
   static blink::WebPlugin* CreatePlugin(
       content::RenderFrame* render_frame,
       blink::WebLocalFrame* frame,
       const blink::WebPluginParams& params,
       const ChromeViewHostMsg_GetPluginInfo_Output& output);
+#endif
 
 #if defined(ENABLE_PLUGINS) && defined(ENABLE_EXTENSIONS)
   static bool IsExtensionOrSharedModuleWhitelisted(

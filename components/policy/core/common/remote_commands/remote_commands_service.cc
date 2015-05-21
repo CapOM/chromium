@@ -22,6 +22,7 @@ RemoteCommandsService::RemoteCommandsService(
     scoped_ptr<RemoteCommandsFactory> factory,
     CloudPolicyClient* client)
     : factory_(factory.Pass()), client_(client), weak_factory_(this) {
+  DCHECK(client_);
   queue_.AddObserver(this);
 }
 

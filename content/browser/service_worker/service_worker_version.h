@@ -71,6 +71,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   typedef base::Callback<void(ServiceWorkerStatusCode,
                               bool /* accept_connction */)>
       CrossOriginConnectCallback;
+  typedef base::Callback<void(ServiceWorkerStatusCode, const std::vector<int>&)>
+      SendStashedPortsCallback;
 
   enum RunningStatus {
     STOPPED = EmbeddedWorkerInstance::STOPPED,
@@ -259,6 +261,16 @@ class CONTENT_EXPORT ServiceWorkerVersion
       const std::vector<TransferredMessagePort>& sent_message_ports,
       const StatusCallback& callback);
 
+  // Transfers one or more stashed message ports to the associated embedded
+  // worker, and asynchronously calls |callback| with the new route ids for the
+  // transferred ports as soon as the ports are sent to the renderer.
+  // Once the ports are received by the renderer, the ports themselves will
+  // inform MessagePortService, which will enable actual messages to be sent.
+  void SendStashedMessagePorts(
+      const std::vector<TransferredMessagePort>& stashed_message_ports,
+      const std::vector<base::string16>& port_names,
+      const SendStashedPortsCallback& callback);
+
   // Adds and removes |provider_host| as a controllee of this ServiceWorker.
   // A potential controllee is a host having the version as its .installing
   // or .waiting version.
@@ -328,6 +340,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
                            TimeoutStartingWorker);
   FRIEND_TEST_ALL_PREFIXES(ServiceWorkerVersionBrowserTest,
                            TimeoutWorkerInEvent);
+
+  class ServiceWorkerEventMetrics;
 
   typedef ServiceWorkerVersion self;
   using ServiceWorkerClients = std::vector<ServiceWorkerClientInfo>;
@@ -427,6 +441,7 @@ class CONTENT_EXPORT ServiceWorkerVersion
   void OnSkipWaiting(int request_id);
   void OnClaimClients(int request_id);
   void OnPongFromWorker();
+  void OnStashMessagePort(int message_port_id, const base::string16& name);
 
   void OnFocusClientFinished(int request_id,
                              const std::string& client_uuid,
@@ -552,6 +567,8 @@ class CONTENT_EXPORT ServiceWorkerVersion
   // If not OK, the reason that StartWorker failed. Used for
   // running |start_callbacks_|.
   ServiceWorkerStatusCode start_worker_status_ = SERVICE_WORKER_OK;
+
+  scoped_ptr<ServiceWorkerEventMetrics> metrics_;
 
   base::WeakPtrFactory<ServiceWorkerVersion> weak_factory_;
 

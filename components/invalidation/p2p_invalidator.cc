@@ -102,13 +102,12 @@ bool P2PNotificationData::Equals(const P2PNotificationData& other) const {
 }
 
 std::string P2PNotificationData::ToString() const {
-  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
-  dict->SetString(kSenderIdKey, sender_id_);
-  dict->SetString(kNotificationTypeKey,
-                  P2PNotificationTargetToString(target_));
-  dict->Set(kInvalidationsKey, invalidation_map_.ToValue().release());
+  base::DictionaryValue dict;
+  dict.SetString(kSenderIdKey, sender_id_);
+  dict.SetString(kNotificationTypeKey, P2PNotificationTargetToString(target_));
+  dict.Set(kInvalidationsKey, invalidation_map_.ToValue().release());
   std::string json;
-  base::JSONWriter::Write(dict.get(), &json);
+  base::JSONWriter::Write(dict, &json);
   return json;
 }
 
@@ -159,7 +158,7 @@ void P2PInvalidator::RegisterHandler(InvalidationHandler* handler) {
   registrar_.RegisterHandler(handler);
 }
 
-void P2PInvalidator::UpdateRegisteredIds(InvalidationHandler* handler,
+bool P2PInvalidator::UpdateRegisteredIds(InvalidationHandler* handler,
                                          const ObjectIdSet& ids) {
   DCHECK(thread_checker_.CalledOnValidThread());
   ObjectIdSet new_ids;
@@ -168,12 +167,14 @@ void P2PInvalidator::UpdateRegisteredIds(InvalidationHandler* handler,
                       old_ids.begin(), old_ids.end(),
                       std::inserter(new_ids, new_ids.end()),
                       ObjectIdLessThan());
-  registrar_.UpdateRegisteredIds(handler, ids);
+  if (!registrar_.UpdateRegisteredIds(handler, ids))
+    return false;
   const P2PNotificationData notification_data(
       invalidator_client_id_,
       send_notification_target_,
       ObjectIdInvalidationMap::InvalidateAll(ids));
   SendNotificationData(notification_data);
+  return true;
 }
 
 void P2PInvalidator::UnregisterHandler(InvalidationHandler* handler) {

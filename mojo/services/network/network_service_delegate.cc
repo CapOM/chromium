@@ -9,7 +9,7 @@
 #include "base/files/file_path.h"
 #include "base/message_loop/message_loop.h"
 #include "base/path_service.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/application_connection.h"
+#include "mojo/application/public/cpp/application_connection.h"
 
 NetworkServiceDelegate::NetworkServiceDelegate() {}
 
@@ -40,5 +40,9 @@ void NetworkServiceDelegate::Create(
     mojo::ApplicationConnection* connection,
     mojo::InterfaceRequest<mojo::NetworkService> request) {
   mojo::BindToRequest(
-      new mojo::NetworkServiceImpl(connection, context_.get()), &request);
+      new mojo::NetworkServiceImpl(
+          connection,
+          context_.get(),
+          app_lifetime_helper_.CreateAppRefCount()),
+      &request);
 }

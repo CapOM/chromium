@@ -84,6 +84,7 @@ class DownloadNotificationItem : public content::DownloadItem::Observer {
   void OnDownloadDestroyed(content::DownloadItem* item) override;
 
   void CloseNotificationByUser();
+  void CloseNotificationByNonUser();
   void UpdateNotificationData(NotificationUpdateType type);
   void SetNotificationImage(int resource_id);
 
@@ -99,19 +100,19 @@ class DownloadNotificationItem : public content::DownloadItem::Observer {
   // if IsDangerous() is true.
   base::string16 GetWarningText() const;
 
-  scoped_ptr<std::vector<DownloadCommands::Command>> GetPossibleActions() const;
+  Browser* GetBrowser();
 
-  bool openable_;
-  bool downloading_;
-  int image_resource_id_;
+  // Returns the list of possible extra (all except the default) actions.
+  scoped_ptr<std::vector<DownloadCommands::Command>> GetExtraActions() const;
+
+  int image_resource_id_ = 0;
+  content::DownloadItem::DownloadState previous_download_state_ =
+      content::DownloadItem::MAX_DOWNLOAD_STATE;  // As uninitialized state
   Profile* profile_;
   scoped_refptr<NotificationWatcher> watcher_;
-
   scoped_ptr<Notification> notification_;
-
   content::DownloadItem* item_;
   scoped_ptr<std::vector<DownloadCommands::Command>> button_actions_;
-
   Delegate* const delegate_;
 
   DISALLOW_COPY_AND_ASSIGN(DownloadNotificationItem);

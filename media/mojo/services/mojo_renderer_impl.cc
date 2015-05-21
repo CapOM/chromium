@@ -11,9 +11,9 @@
 #include "media/base/bind_to_current_loop.h"
 #include "media/base/demuxer_stream_provider.h"
 #include "media/mojo/services/mojo_demuxer_stream_impl.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/connect.h"
+#include "mojo/application/public/cpp/connect.h"
+#include "mojo/application/public/interfaces/service_provider.mojom.h"
 #include "third_party/mojo/src/mojo/public/cpp/bindings/interface_impl.h"
-#include "third_party/mojo/src/mojo/public/interfaces/application/service_provider.mojom.h"
 
 namespace media {
 
@@ -61,11 +61,11 @@ void MojoRendererImpl::Initialize(
 
   mojo::DemuxerStreamPtr audio_stream;
   if (audio)
-    mojo::BindToProxy(new MojoDemuxerStreamImpl(audio), &audio_stream);
+    new MojoDemuxerStreamImpl(audio, GetProxy(&audio_stream));
 
   mojo::DemuxerStreamPtr video_stream;
   if (video)
-    mojo::BindToProxy(new MojoDemuxerStreamImpl(video), &video_stream);
+    new MojoDemuxerStreamImpl(video, GetProxy(&video_stream));
 
   mojo::MediaRendererClientPtr client_ptr;
   binding_.Bind(GetProxy(&client_ptr));

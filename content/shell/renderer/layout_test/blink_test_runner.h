@@ -55,7 +55,7 @@ class BlinkTestRunner : public RenderViewObserver,
   void ClearEditCommand() override;
   void SetEditCommand(const std::string& name,
                       const std::string& value) override;
-  void SetGamepadProvider(scoped_ptr<RendererGamepadProvider>) override;
+  void SetGamepadProvider(GamepadController* controller) override;
   void SetDeviceLightData(const double data) override;
   void SetDeviceMotionData(const blink::WebDeviceMotionData& data) override;
   void SetDeviceOrientationData(
@@ -109,11 +109,19 @@ class BlinkTestRunner : public RenderViewObserver,
                        const std::string& frame_name) override;
   bool AllowExternalPages() override;
   std::string DumpHistoryForWindow(WebTestProxyBase* proxy) override;
+  void FetchManifest(
+      blink::WebView* view,
+      const GURL& url,
+      const base::Callback<void(const blink::WebURLResponse& response,
+                                const std::string& data)>& callback) override;
   void SetPermission(const std::string& name,
                      const std::string& value,
                      const GURL& origin,
                      const GURL& embedding_origin) override;
   void ResetPermissions() override;
+  blink::WebLayer* InstantiateWebLayer(
+      scoped_refptr<cc::TextureLayer> layer) override;
+  cc::SharedBitmapManager* GetSharedBitmapManager() override;
 
   void Reset();
 

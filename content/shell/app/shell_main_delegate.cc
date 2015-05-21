@@ -12,6 +12,7 @@
 #include "base/lazy_instance.h"
 #include "base/logging.h"
 #include "base/path_service.h"
+#include "build/build_config.h"
 #include "cc/base/switches.h"
 #include "content/public/browser/browser_main_runner.h"
 #include "content/public/common/content_switches.h"
@@ -27,6 +28,7 @@
 #include "content/shell/renderer/layout_test/layout_test_content_renderer_client.h"
 #include "content/shell/renderer/shell_content_renderer_client.h"
 #include "media/base/media_switches.h"
+#include "media/base/mime_util.h"
 #include "net/cookies/cookie_monster.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/base/ui_base_paths.h"
@@ -193,8 +195,6 @@ bool ShellMainDelegate::BasicStartupComplete(int* exit_code) {
     command_line.AppendSwitch(switches::kDisableDelegatedRenderer);
     command_line.AppendSwitch(cc::switches::kCompositeToMailbox);
 
-    command_line.AppendSwitch(cc::switches::kEnablePropertyTreeVerification);
-
     command_line.AppendSwitch(switches::kEnablePreciseMemoryInfo);
 
     command_line.AppendSwitchASCII(switches::kHostResolverRules,
@@ -206,7 +206,7 @@ bool ShellMainDelegate::BasicStartupComplete(int* exit_code) {
     // Unless/until WebM files are added to the media layout tests, we need to
     // avoid removing MP4/H264/AAC so that layout tests can run on Android.
 #if !defined(OS_ANDROID)
-    net::RemoveProprietaryMediaTypesAndCodecsForTests();
+    media::RemoveProprietaryMediaTypesAndCodecsForTests();
 #endif
 
     if (!BlinkTestPlatformInitialize()) {

@@ -39,7 +39,6 @@
 #include "content/public/browser/url_data_source.h"
 #include "extensions/browser/content_verifier.h"
 #include "extensions/browser/content_verifier_delegate.h"
-#include "extensions/browser/declarative_user_script_manager.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_pref_store.h"
 #include "extensions/browser/extension_pref_value_map.h"
@@ -100,7 +99,6 @@ ExtensionSystemImpl::Shared::~Shared() {
 }
 
 void ExtensionSystemImpl::Shared::InitPrefs() {
-  lazy_background_task_queue_.reset(new LazyBackgroundTaskQueue(profile_));
   event_router_.reset(new EventRouter(profile_, ExtensionPrefs::Get(profile_)));
   // Two state stores. The latter, which contains declarative rules, must be
   // loaded immediately so that the rules are ready before we issue network
@@ -142,7 +140,7 @@ void ExtensionSystemImpl::Shared::RegisterManagementPolicyProviders() {
   }
 #endif  // defined(OS_CHROMEOS)
 
-  management_policy_->RegisterProvider(install_verifier_.get());
+  management_policy_->RegisterProvider(InstallVerifier::Get(profile_));
 }
 
 namespace {
@@ -304,8 +302,6 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   ExtensionErrorReporter::Init(allow_noisy_errors);
 
   shared_user_script_master_.reset(new SharedUserScriptMaster(profile_));
-  declarative_user_script_manager_.reset(
-      new DeclarativeUserScriptManager(profile_));
 
   // ExtensionService depends on RuntimeData.
   runtime_data_.reset(new RuntimeData(ExtensionRegistry::Get(profile_)));
@@ -324,9 +320,7 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   // These services must be registered before the ExtensionService tries to
   // load any extensions.
   {
-    install_verifier_.reset(
-        new InstallVerifier(ExtensionPrefs::Get(profile_), profile_));
-    install_verifier_->Init();
+    InstallVerifier::Get(profile_)->Init();
     content_verifier_ = new ContentVerifier(
         profile_, new ContentVerifierDelegateImpl(extension_service_.get()));
     ContentVerifierDelegate::Mode mode =
@@ -430,28 +424,14 @@ ExtensionSystemImpl::Shared::shared_user_script_master() {
   return shared_user_script_master_.get();
 }
 
-DeclarativeUserScriptManager*
-ExtensionSystemImpl::Shared::declarative_user_script_manager() {
-  return declarative_user_script_manager_.get();
-}
-
 InfoMap* ExtensionSystemImpl::Shared::info_map() {
   if (!extension_info_map_.get())
     extension_info_map_ = new InfoMap();
   return extension_info_map_.get();
 }
 
-LazyBackgroundTaskQueue*
-    ExtensionSystemImpl::Shared::lazy_background_task_queue() {
-  return lazy_background_task_queue_.get();
-}
-
 EventRouter* ExtensionSystemImpl::Shared::event_router() {
   return event_router_.get();
-}
-
-InstallVerifier* ExtensionSystemImpl::Shared::install_verifier() {
-  return install_verifier_.get();
 }
 
 QuotaService* ExtensionSystemImpl::Shared::quota_service() {
@@ -508,11 +488,6 @@ SharedUserScriptMaster* ExtensionSystemImpl::shared_user_script_master() {
   return shared_->shared_user_script_master();
 }
 
-DeclarativeUserScriptManager*
-ExtensionSystemImpl::declarative_user_script_manager() {
-  return shared_->declarative_user_script_manager();
-}
-
 StateStore* ExtensionSystemImpl::state_store() {
   return shared_->state_store();
 }
@@ -523,20 +498,12 @@ StateStore* ExtensionSystemImpl::rules_store() {
 
 InfoMap* ExtensionSystemImpl::info_map() { return shared_->info_map(); }
 
-LazyBackgroundTaskQueue* ExtensionSystemImpl::lazy_background_task_queue() {
-  return shared_->lazy_background_task_queue();
-}
-
 EventRouter* ExtensionSystemImpl::event_router() {
   return shared_->event_router();
 }
 
 const OneShotEvent& ExtensionSystemImpl::ready() const {
   return shared_->ready();
-}
-
-InstallVerifier* ExtensionSystemImpl::install_verifier() {
-  return shared_->install_verifier();
 }
 
 QuotaService* ExtensionSystemImpl::quota_service() {

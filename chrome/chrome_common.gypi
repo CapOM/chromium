@@ -110,6 +110,8 @@
       'common/spellcheck_result.h',
       'common/switch_utils.cc',
       'common/switch_utils.h',
+      'common/trace_event_args_whitelist.cc',
+      'common/trace_event_args_whitelist.h',
       'common/tts_messages.h',
       'common/tts_utterance_request.cc',
       'common/tts_utterance_request.h',
@@ -686,6 +688,21 @@
         'proto_out_dir': 'chrome/common/safe_browsing',
       },
       'includes': [ '../build/protoc.gypi' ],
+    },
+    {
+      # GN version: //chrome/common:mojo_bindings
+      'target_name': 'common_mojo_bindings',
+      'type': 'static_library',
+      'includes': [
+        '../third_party/mojo/mojom_bindings_generator.gypi'
+      ],
+      'sources': [
+        'common/resource_usage_reporter.mojom',
+      ],
+      'dependencies': [
+        '../mojo/mojo_base.gyp:mojo_environment_chromium',
+        '../third_party/mojo/mojo_public.gyp:mojo_cpp_bindings',
+      ],
     },
   ],
 }

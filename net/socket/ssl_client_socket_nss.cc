@@ -106,6 +106,7 @@
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/ssl/ssl_cipher_suite_names.h"
 #include "net/ssl/ssl_connection_status_flags.h"
+#include "net/ssl/ssl_failure_state.h"
 #include "net/ssl/ssl_info.h"
 
 #if defined(USE_NSS_CERTS)
@@ -2060,19 +2061,14 @@ void SSLClientSocketNSS::Core::UpdateConnectionStatus() {
         SSL_CONNECTION_COMPRESSION_SHIFT;
 
     int version = SSL_CONNECTION_VERSION_UNKNOWN;
-    if (channel_info.protocolVersion < SSL_LIBRARY_VERSION_3_0) {
-      // All versions less than SSL_LIBRARY_VERSION_3_0 are treated as SSL
-      // version 2.
-      version = SSL_CONNECTION_VERSION_SSL2;
-    } else if (channel_info.protocolVersion == SSL_LIBRARY_VERSION_3_0) {
-      version = SSL_CONNECTION_VERSION_SSL3;
-    } else if (channel_info.protocolVersion == SSL_LIBRARY_VERSION_TLS_1_0) {
+    if (channel_info.protocolVersion == SSL_LIBRARY_VERSION_TLS_1_0) {
       version = SSL_CONNECTION_VERSION_TLS1;
     } else if (channel_info.protocolVersion == SSL_LIBRARY_VERSION_TLS_1_1) {
       version = SSL_CONNECTION_VERSION_TLS1_1;
     } else if (channel_info.protocolVersion == SSL_LIBRARY_VERSION_TLS_1_2) {
       version = SSL_CONNECTION_VERSION_TLS1_2;
     }
+    DCHECK_NE(SSL_CONNECTION_VERSION_UNKNOWN, version);
     nss_handshake_state_.ssl_connection_status |=
         (version & SSL_CONNECTION_VERSION_MASK) <<
         SSL_CONNECTION_VERSION_SHIFT;
@@ -2496,6 +2492,10 @@ bool SSLClientSocketNSS::GetSSLInfo(SSLInfo* ssl_info) {
   return true;
 }
 
+void SSLClientSocketNSS::GetConnectionAttempts(ConnectionAttempts* out) const {
+  out->clear();
+}
+
 void SSLClientSocketNSS::GetSSLCertRequestInfo(
     SSLCertRequestInfo* cert_request_info) {
   EnterFunction("");
@@ -2915,9 +2915,6 @@ int SSLClientSocketNSS::InitializeSSLPeerName() {
   // Shard the session cache based on maximum protocol version. This causes
   // fallback connections to use a separate session cache.
   switch (ssl_config_.version_max) {
-    case SSL_PROTOCOL_VERSION_SSL3:
-      peer_id += "ssl3";
-      break;
     case SSL_PROTOCOL_VERSION_TLS1:
       peer_id += "tls1";
       break;
@@ -3210,6 +3207,12 @@ SSLClientSocketNSS::GetUnverifiedServerCertificateChain() const {
 
 ChannelIDService* SSLClientSocketNSS::GetChannelIDService() const {
   return channel_id_service_;
+}
+
+SSLFailureState SSLClientSocketNSS::GetSSLFailureState() const {
+  if (completed_handshake_)
+    return SSL_FAILURE_NONE;
+  return SSL_FAILURE_UNKNOWN;
 }
 
 }  // namespace net

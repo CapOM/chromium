@@ -91,6 +91,14 @@ public final class NativeTestServer {
         return nativeGetFileURL("/notfound.html");
     }
 
+    public static String getHostPort() {
+        return nativeGetHostPort();
+    }
+
+    public static boolean isDataReductionProxySupported() {
+        return nativeIsDataReductionProxySupported();
+    }
+
     @CalledByNative
     private static void onHostResolverProcRegistered() {
         sHostResolverBlock.open();
@@ -107,4 +115,6 @@ public final class NativeTestServer {
     private static native String nativeGetRedirectToEchoBody();
     private static native String nativeGetFileURL(String filePath);
     private static native String nativeGetSdchURL();
+    private static native String nativeGetHostPort();
+    private static native boolean nativeIsDataReductionProxySupported();
 }

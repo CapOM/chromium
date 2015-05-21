@@ -295,6 +295,9 @@ OutOfProcessInstance::OutOfProcessInstance(PP_Instance instance)
 
 OutOfProcessInstance::~OutOfProcessInstance() {
   RemovePerInstanceObject(kPPPPdfInterface, this);
+  // Explicitly reset the PDFEngine during destruction as it may call back into
+  // this object.
+  engine_.reset();
 }
 
 bool OutOfProcessInstance::Init(uint32_t argc,
@@ -469,7 +472,7 @@ void OutOfProcessInstance::HandleMessage(const pp::Var& message) {
           engine_->HasPermission(PDFEngine::PERMISSION_COPY_ACCESSIBLE);
       node.SetBoolean(kAccessibleCopyable, has_permissions);
       std::string json;
-      base::JSONWriter::Write(&node, &json);
+      base::JSONWriter::Write(node, &json);
       reply.Set(pp::Var(kJSAccessibilityJSON), pp::Var(json));
     }
     PostMessage(reply);

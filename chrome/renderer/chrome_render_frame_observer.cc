@@ -94,12 +94,16 @@ bool ChromeRenderFrameObserver::OnMessageReceived(const IPC::Message& message) {
     return false;
 
   IPC_BEGIN_MESSAGE_MAP(ChromeRenderFrameObserver, message)
+    IPC_MESSAGE_HANDLER(ChromeViewMsg_RequestReloadImageForContextNode,
+                        OnRequestReloadImageForContextNode)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_RequestThumbnailForContextNode,
                         OnRequestThumbnailForContextNode)
     IPC_MESSAGE_HANDLER(PrintMsg_PrintNodeUnderContextMenu,
                         OnPrintNodeUnderContextMenu)
     IPC_MESSAGE_HANDLER(ChromeViewMsg_AppBannerPromptRequest,
                         OnAppBannerPromptRequest)
+    IPC_MESSAGE_HANDLER(ChromeViewMsg_AppBannerDebugMessageRequest,
+                        OnAppBannerDebugMessageRequest)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
 
@@ -118,6 +122,14 @@ void ChromeRenderFrameObserver::OnSetIsPrerendering(bool is_prerendering) {
     // The PrerenderHelper will destroy itself either after recording histograms
     // or on destruction of the RenderView.
     new prerender::PrerenderHelper(render_frame());
+  }
+}
+
+void ChromeRenderFrameObserver::OnRequestReloadImageForContextNode() {
+  WebNode context_node = render_frame()->GetContextMenuNode();
+  if (!context_node.isNull() && context_node.isElementNode() &&
+      render_frame()->GetWebFrame()) {
+    render_frame()->GetWebFrame()->reloadImage(context_node);
   }
 }
 
@@ -207,4 +219,10 @@ void ChromeRenderFrameObserver::OnAppBannerPromptRequest(
 
   Send(new ChromeViewHostMsg_AppBannerPromptReply(
       routing_id(), request_id, reply));
+}
+
+void ChromeRenderFrameObserver::OnAppBannerDebugMessageRequest(
+    const std::string& message) {
+  render_frame()->GetWebFrame()->addMessageToConsole(blink::WebConsoleMessage(
+      blink::WebConsoleMessage::LevelDebug, base::UTF8ToUTF16(message)));
 }

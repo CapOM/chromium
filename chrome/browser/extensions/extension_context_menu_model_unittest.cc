@@ -4,6 +4,7 @@
 
 #include "chrome/browser/extensions/extension_context_menu_model.h"
 
+#include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/api/extension_action/extension_action_api.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_service_test_base.h"
@@ -23,13 +24,18 @@
 #include "extensions/common/feature_switch.h"
 #include "extensions/common/manifest.h"
 #include "extensions/common/manifest_constants.h"
+#include "extensions/common/manifest_handlers/options_page_info.h"
 #include "extensions/common/value_builder.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/base/l10n/l10n_util.h"
+#include "ui/gfx/image/image.h"
 
 namespace extensions {
 
 namespace {
+
+// Label for test extension menu item.
+const char* kTestExtensionItemLabel = "test-ext-item";
 
 // Build an extension to pass to the menu constructor, with the an action
 // specified by |action_key|.
@@ -84,6 +90,8 @@ class ExtensionContextMenuModelTest : public ExtensionServiceTestBase {
   void RefreshMenu(ExtensionContextMenuModel* model);
 
   // Returns the number of extension menu items that show up in |model|.
+  // For this test, all the extension items have samel label
+  // |kTestExtensionItemLabel|.
   int CountExtensionItems(ExtensionContextMenuModel* model);
 
  private:
@@ -92,7 +100,6 @@ class ExtensionContextMenuModelTest : public ExtensionServiceTestBase {
 
 ExtensionContextMenuModelTest::ExtensionContextMenuModelTest() : cur_id_(0) {
 }
-
 
 void ExtensionContextMenuModelTest::AddContextItemAndRefreshModel(
     MenuManager* manager,
@@ -104,24 +111,29 @@ void ExtensionContextMenuModelTest::AddContextItemAndRefreshModel(
   const MenuItem::ExtensionKey key(extension->id());
   MenuItem::Id id(false, key);
   id.uid = ++cur_id_;
-  manager->AddContextItem(extension,
-                          new MenuItem(id,
-                                       "test",
-                                       false,  // checked
-                                       true,   // enabled
-                                       type,
-                                       contexts));
+  manager->AddContextItem(extension, new MenuItem(id, kTestExtensionItemLabel,
+                                                  false,  // checked
+                                                  true,   // enabled
+                                                  type, contexts));
   RefreshMenu(model);
 }
 
 void ExtensionContextMenuModelTest::RefreshMenu(
     ExtensionContextMenuModel* model) {
+  model->Clear();
   model->InitMenu(model->GetExtension(), ExtensionContextMenuModel::VISIBLE);
 }
 
 int ExtensionContextMenuModelTest::CountExtensionItems(
     ExtensionContextMenuModel* model) {
-  return model->extension_items_count_;
+  base::string16 expected_label = base::ASCIIToUTF16(kTestExtensionItemLabel);
+  int num_items_found = 0;
+  for (int i = 0; i < model->GetItemCount(); ++i) {
+    if (expected_label == model->GetLabelAt(i))
+      ++num_items_found;
+  }
+  EXPECT_EQ(num_items_found, model->extension_items_count_);
+  return num_items_found;
 }
 
 // Tests that applicable menu items are disabled when a ManagementPolicy
@@ -129,13 +141,61 @@ int ExtensionContextMenuModelTest::CountExtensionItems(
 TEST_F(ExtensionContextMenuModelTest, RequiredInstallationsDisablesItems) {
   InitializeEmptyExtensionService();
 
-  // First, test that a component extension cannot be uninstalled by the
-  // standard management policy.
+  // Test that management policy can determine whether or not policy-installed
+  // extensions can be installed/uninstalled.
   scoped_refptr<const Extension> extension =
-      BuildExtension("component",
-                     manifest_keys::kBrowserAction,
-                     Manifest::COMPONENT);
+      BuildExtension("extension",
+                     manifest_keys::kPageAction,
+                     Manifest::EXTERNAL_POLICY);
   ASSERT_TRUE(extension.get());
+  service()->AddExtension(extension.get());
+
+  scoped_ptr<Browser> browser = CreateBrowser(profile());
+  scoped_refptr<ExtensionContextMenuModel> menu(
+      new ExtensionContextMenuModel(extension.get(), browser.get()));
+
+  ExtensionSystem* system = ExtensionSystem::Get(profile());
+  system->management_policy()->UnregisterAllProviders();
+
+  // Uninstallation should be, by default, enabled.
+  EXPECT_TRUE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::UNINSTALL));
+
+  TestManagementPolicyProvider policy_provider(
+      TestManagementPolicyProvider::PROHIBIT_MODIFY_STATUS);
+  system->management_policy()->RegisterProvider(&policy_provider);
+
+  // If there's a policy provider that requires the extension stay enabled, then
+  // uninstallation should be disabled.
+  EXPECT_FALSE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::UNINSTALL));
+  int uninstall_index =
+      menu->GetIndexOfCommandId(ExtensionContextMenuModel::UNINSTALL);
+  // There should also be an icon to visually indicate why uninstallation is
+  // forbidden.
+  gfx::Image icon;
+  EXPECT_TRUE(menu->GetIconAt(uninstall_index, &icon));
+  EXPECT_FALSE(icon.IsEmpty());
+
+  // Don't leave |policy_provider| dangling.
+  system->management_policy()->UnregisterProvider(&policy_provider);
+}
+
+// Tests the context menu for a component extension.
+TEST_F(ExtensionContextMenuModelTest, ComponentExtensionContextMenu) {
+  InitializeEmptyExtensionService();
+
+  std::string name("component");
+  scoped_ptr<base::DictionaryValue> manifest =
+      DictionaryBuilder().Set("name", name)
+                         .Set("version", "1")
+                         .Set("manifest_version", 2)
+                         .Set("browser_action", DictionaryBuilder().Pass())
+                         .Build();
+
+  scoped_refptr<const Extension> extension =
+      ExtensionBuilder().SetManifest(make_scoped_ptr(manifest->DeepCopy()))
+                        .SetID(crx_file::id_util::GenerateId("component"))
+                        .SetLocation(Manifest::COMPONENT)
+                        .Build();
   service()->AddExtension(extension.get());
 
   scoped_ptr<Browser> browser = CreateBrowser(profile());
@@ -143,34 +203,33 @@ TEST_F(ExtensionContextMenuModelTest, RequiredInstallationsDisablesItems) {
   scoped_refptr<ExtensionContextMenuModel> menu(
       new ExtensionContextMenuModel(extension.get(), browser.get()));
 
-  // Uninstallation should be disabled.
-  EXPECT_FALSE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::UNINSTALL));
+  // A component extension's context menu should not include options for
+  // managing extensions or removing it, and should only include an option for
+  // the options page if the extension has one (which this one doesn't).
+  EXPECT_EQ(-1,
+            menu->GetIndexOfCommandId(ExtensionContextMenuModel::CONFIGURE));
+  EXPECT_EQ(-1,
+            menu->GetIndexOfCommandId(ExtensionContextMenuModel::UNINSTALL));
+  EXPECT_EQ(-1, menu->GetIndexOfCommandId(ExtensionContextMenuModel::MANAGE));
+  // The "name" option should be present, but not enabled for component
+  // extensions.
+  EXPECT_NE(-1, menu->GetIndexOfCommandId(ExtensionContextMenuModel::NAME));
+  EXPECT_FALSE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::NAME));
 
-  // Also test that management policy can determine whether or not
-  // policy-installed extensions can be installed/uninstalled.
-  extension = BuildExtension("extension",
-                             manifest_keys::kPageAction,
-                             Manifest::INTERNAL);
-  ASSERT_TRUE(extension.get());
-  service()->AddExtension(extension.get());
-
+  // Check that a component extension with an options page does have the options
+  // menu item, and it is enabled.
+  manifest->SetString("options_page", "options_page.html");
+  extension =
+      ExtensionBuilder().SetManifest(manifest.Pass())
+                        .SetID(crx_file::id_util::GenerateId("component_opts"))
+                        .SetLocation(Manifest::COMPONENT)
+                        .Build();
   menu = new ExtensionContextMenuModel(extension.get(), browser.get());
-
-  ExtensionSystem* system = ExtensionSystem::Get(profile());
-  system->management_policy()->UnregisterAllProviders();
-
-  // Actions should be enabled.
-  ASSERT_TRUE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::UNINSTALL));
-
-  TestManagementPolicyProvider policy_provider(
-      TestManagementPolicyProvider::PROHIBIT_MODIFY_STATUS);
-  system->management_policy()->RegisterProvider(&policy_provider);
-
-  // Now the actions are disabled.
-  ASSERT_FALSE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::UNINSTALL));
-
-  // Don't leave |policy_provider| dangling.
-  system->management_policy()->UnregisterProvider(&policy_provider);
+  service()->AddExtension(extension.get());
+  EXPECT_TRUE(extensions::OptionsPageInfo::HasOptionsPage(extension.get()));
+  EXPECT_NE(-1,
+            menu->GetIndexOfCommandId(ExtensionContextMenuModel::CONFIGURE));
+  EXPECT_TRUE(menu->IsCommandIdEnabled(ExtensionContextMenuModel::CONFIGURE));
 }
 
 TEST_F(ExtensionContextMenuModelTest, ExtensionItemTest) {

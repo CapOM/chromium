@@ -378,6 +378,7 @@ extern const char kProfileGAIAInfoUpdateTime[];
 extern const char kProfileGAIAInfoPictureURL[];
 
 extern const char kProfileAvatarTutorialShown[];
+extern const char kProfileAvatarRightClickTutorialDismissed[];
 
 extern const char kInvertNotificationShown[];
 
@@ -575,6 +576,15 @@ extern const char kSignInPromoStartupCount[];
 extern const char kSignInPromoUserSkipped[];
 extern const char kSignInPromoShowOnFirstRunAllowed[];
 extern const char kSignInPromoShowNTPBubble[];
+#endif
+
+#if !defined(OS_CHROMEOS) && !defined(OS_ANDROID) && !defined(OS_IOS)
+extern const char kCrossDevicePromoOptedOut[];
+extern const char kCrossDevicePromoActive[];
+extern const char kCrossDevicePromoObservedSingleAccountCookie[];
+extern const char kCrossDevicePromoNextFetchListDevicesTime[];
+extern const char kCrossDevicePromoNumDevices[];
+extern const char kCrossDevicePromoLastDeviceActiveTime[];
 #endif
 
 extern const char kWebAppCreateOnDesktop[];

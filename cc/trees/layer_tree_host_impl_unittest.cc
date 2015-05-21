@@ -40,7 +40,6 @@
 #include "cc/quads/solid_color_draw_quad.h"
 #include "cc/quads/texture_draw_quad.h"
 #include "cc/quads/tile_draw_quad.h"
-#include "cc/resources/layer_tiling_data.h"
 #include "cc/test/animation_test_common.h"
 #include "cc/test/begin_frame_args_test.h"
 #include "cc/test/fake_layer_tree_host_impl.h"
@@ -59,6 +58,7 @@
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "cc/test/test_task_graph_runner.h"
 #include "cc/test/test_web_graphics_context_3d.h"
+#include "cc/tiles/layer_tiling_data.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "cc/trees/single_thread_proxy.h"
 #include "media/base/media.h"
@@ -1129,6 +1129,75 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoom) {
     ExpectContains(*scroll_info.get(), scroll_layer->id(),
                    gfx::Vector2d(0, scroll_delta.y() / page_scale_delta));
   }
+}
+
+TEST_F(LayerTreeHostImplTest, ImplPinchZoomWheelBubbleBetweenViewports) {
+  LayerImpl* inner_scroll_layer =
+      SetupScrollAndContentsLayers(gfx::Size(100, 100));
+
+  // Adjust the content layer to be larger than the outer viewport container so
+  // that we get scrolling in both viewports.
+  LayerImpl* content_layer =
+      host_impl_->OuterViewportScrollLayer()->children().back();
+  LayerImpl* outer_scroll_layer = host_impl_->OuterViewportScrollLayer();
+  LayerImpl* inner_clip_layer =
+      host_impl_->InnerViewportScrollLayer()->parent()->parent();
+  inner_clip_layer->SetBounds(gfx::Size(100, 100));
+  inner_clip_layer->SetContentBounds(gfx::Size(100, 100));
+  outer_scroll_layer->SetBounds(gfx::Size(200, 200));
+  outer_scroll_layer->SetContentBounds(gfx::Size(200, 200));
+  content_layer->SetBounds(gfx::Size(200, 200));
+  content_layer->SetContentBounds(gfx::Size(200, 200));
+
+  host_impl_->SetViewportSize(gfx::Size(100, 100));
+
+  DrawFrame();
+
+  // Zoom into the page by a 2X factor
+  float min_page_scale = 1.f, max_page_scale = 4.f;
+  float page_scale_factor = 2.f;
+  host_impl_->active_tree()->PushPageScaleFromMainThread(
+      page_scale_factor, min_page_scale, max_page_scale);
+  host_impl_->SetPageScaleOnActiveTree(page_scale_factor);
+
+  // Scroll by a small amount, there should be no bubbling up to the inner
+  // viewport.
+  host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::WHEEL);
+  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(10.f, 20.f));
+  host_impl_->ScrollEnd();
+
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(5, 10),
+      outer_scroll_layer->CurrentScrollOffset());
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(),
+      inner_scroll_layer->CurrentScrollOffset());
+
+  // Scroll by the outer viewport's max scroll extent, there the remainder
+  // should bubble up to the inner viewport.
+  host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::WHEEL);
+  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(200.f, 200.f));
+  host_impl_->ScrollEnd();
+
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(100, 100),
+      outer_scroll_layer->CurrentScrollOffset());
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(5, 10),
+      inner_scroll_layer->CurrentScrollOffset());
+
+  // Scroll by the inner viewport's max scroll extent, it should all go to the
+  // inner viewport.
+  host_impl_->ScrollBegin(gfx::Point(0, 0), InputHandler::WHEEL);
+  host_impl_->ScrollBy(gfx::Point(0, 0), gfx::Vector2dF(90.f, 80.f));
+  host_impl_->ScrollEnd();
+
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(100, 100),
+      outer_scroll_layer->CurrentScrollOffset());
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(50, 50),
+      inner_scroll_layer->CurrentScrollOffset());
 }
 
 TEST_F(LayerTreeHostImplTest, ScrollWithSwapPromises) {
@@ -4495,7 +4564,7 @@ class BlendStateCheckLayer : public LayerImpl {
   gfx::Rect quad_rect_;
   gfx::Rect opaque_content_rect_;
   gfx::Rect quad_visible_rect_;
-  ResourceProvider::ResourceId resource_id_;
+  ResourceId resource_id_;
 };
 
 TEST_F(LayerTreeHostImplTest, BlendingOffWhenDrawingOpaqueLayers) {
@@ -5682,7 +5751,7 @@ class FakeMaskLayerImpl : public LayerImpl {
     return make_scoped_ptr(new FakeMaskLayerImpl(tree_impl, id));
   }
 
-  void GetContentsResourceId(ResourceProvider::ResourceId* resource_id,
+  void GetContentsResourceId(ResourceId* resource_id,
                              gfx::Size* resource_size) const override {
     *resource_id = 0;
   }
@@ -5931,11 +6000,9 @@ TEST_F(LayerTreeHostImplTest, MemoryPolicy) {
   // when visible.
   LayerTreeSettings settings;
   settings.gpu_rasterization_enabled = true;
-  host_impl_ = LayerTreeHostImpl::Create(
-      settings, this, &proxy_, &stats_instrumentation_, NULL, NULL, NULL, 0);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->UpdateGpuRasterizationStatus();
+  CreateHostImpl(settings, CreateOutputSurface());
+  host_impl_->SetContentIsSuitableForGpuRasterization(true);
+  host_impl_->SetHasGpuRasterizationTrigger(true);
   host_impl_->SetVisible(true);
   host_impl_->SetMemoryPolicy(policy1);
   EXPECT_EQ(policy1.bytes_limit_when_visible, current_limit_bytes_);
@@ -5977,22 +6044,22 @@ TEST_F(LayerTreeHostImplTest, RequireHighResAfterGpuRasterizationToggles) {
 
   host_impl_->ResetRequiresHighResToDraw();
 
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_->set_has_gpu_rasterization_trigger(false);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetContentIsSuitableForGpuRasterization(true);
+  host_impl_->SetHasGpuRasterizationTrigger(false);
+  host_impl_->UpdateTreeResourcesForGpuRasterizationIfNeeded();
   EXPECT_FALSE(host_impl_->RequiresHighResToDraw());
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(true);
+  host_impl_->UpdateTreeResourcesForGpuRasterizationIfNeeded();
   EXPECT_TRUE(host_impl_->RequiresHighResToDraw());
-  host_impl_->set_has_gpu_rasterization_trigger(false);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(false);
+  host_impl_->UpdateTreeResourcesForGpuRasterizationIfNeeded();
   EXPECT_TRUE(host_impl_->RequiresHighResToDraw());
 
   host_impl_->ResetRequiresHighResToDraw();
 
   EXPECT_FALSE(host_impl_->RequiresHighResToDraw());
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(true);
+  host_impl_->UpdateTreeResourcesForGpuRasterizationIfNeeded();
   EXPECT_TRUE(host_impl_->RequiresHighResToDraw());
 }
 
@@ -6034,16 +6101,14 @@ TEST_F(LayerTreeHostImplTest, UIResourceManagement) {
   UIResourceBitmap bitmap(gfx::Size(1, 1), is_opaque);
   host_impl_->CreateUIResource(ui_resource_id, bitmap);
   EXPECT_EQ(1u, context3d->NumTextures());
-  ResourceProvider::ResourceId id1 =
-      host_impl_->ResourceIdForUIResource(ui_resource_id);
+  ResourceId id1 = host_impl_->ResourceIdForUIResource(ui_resource_id);
   EXPECT_NE(0u, id1);
 
   // Multiple requests with the same id is allowed.  The previous texture is
   // deleted.
   host_impl_->CreateUIResource(ui_resource_id, bitmap);
   EXPECT_EQ(1u, context3d->NumTextures());
-  ResourceProvider::ResourceId id2 =
-      host_impl_->ResourceIdForUIResource(ui_resource_id);
+  ResourceId id2 = host_impl_->ResourceIdForUIResource(ui_resource_id);
   EXPECT_NE(0u, id2);
   EXPECT_NE(id1, id2);
 
@@ -6086,8 +6151,7 @@ TEST_F(LayerTreeHostImplTest, CreateETC1UIResource) {
   UIResourceId ui_resource_id = 1;
   host_impl_->CreateUIResource(ui_resource_id, bitmap);
   EXPECT_EQ(1u, context3d->NumTextures());
-  ResourceProvider::ResourceId id1 =
-      host_impl_->ResourceIdForUIResource(ui_resource_id);
+  ResourceId id1 = host_impl_->ResourceIdForUIResource(ui_resource_id);
   EXPECT_NE(0u, id1);
 }
 
@@ -7727,22 +7791,19 @@ TEST_F(LayerTreeHostImplTest, AddVideoFrameControllerOutsideFrame) {
 TEST_F(LayerTreeHostImplTest, GpuRasterizationStatusModes) {
   EXPECT_FALSE(host_impl_->use_gpu_rasterization());
 
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(true);
+  host_impl_->SetContentIsSuitableForGpuRasterization(true);
   EXPECT_EQ(GpuRasterizationStatus::ON, host_impl_->gpu_rasterization_status());
   EXPECT_TRUE(host_impl_->use_gpu_rasterization());
 
-  host_impl_->set_has_gpu_rasterization_trigger(false);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(false);
+  host_impl_->SetContentIsSuitableForGpuRasterization(true);
   EXPECT_EQ(GpuRasterizationStatus::OFF_VIEWPORT,
             host_impl_->gpu_rasterization_status());
   EXPECT_FALSE(host_impl_->use_gpu_rasterization());
 
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(false);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(true);
+  host_impl_->SetContentIsSuitableForGpuRasterization(false);
   EXPECT_EQ(GpuRasterizationStatus::OFF_CONTENT,
             host_impl_->gpu_rasterization_status());
   EXPECT_FALSE(host_impl_->use_gpu_rasterization());
@@ -7756,9 +7817,8 @@ TEST_F(LayerTreeHostImplTest, GpuRasterizationStatusModes) {
   msaaSettings.gpu_rasterization_msaa_sample_count = 4;
   EXPECT_TRUE(CreateHostImpl(
       msaaSettings, FakeOutputSurface::Create3d(context_with_msaa.Pass())));
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(false);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(true);
+  host_impl_->SetContentIsSuitableForGpuRasterization(false);
   EXPECT_EQ(GpuRasterizationStatus::MSAA_CONTENT,
             host_impl_->gpu_rasterization_status());
   EXPECT_TRUE(host_impl_->use_gpu_rasterization());
@@ -7767,9 +7827,8 @@ TEST_F(LayerTreeHostImplTest, GpuRasterizationStatusModes) {
   LayerTreeSettings settings = DefaultSettings();
   settings.gpu_rasterization_enabled = false;
   EXPECT_TRUE(CreateHostImpl(settings, FakeOutputSurface::Create3d()));
-  host_impl_->set_has_gpu_rasterization_trigger(true);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(true);
+  host_impl_->SetContentIsSuitableForGpuRasterization(true);
   EXPECT_EQ(GpuRasterizationStatus::OFF_DEVICE,
             host_impl_->gpu_rasterization_status());
   EXPECT_FALSE(host_impl_->use_gpu_rasterization());
@@ -7777,12 +7836,46 @@ TEST_F(LayerTreeHostImplTest, GpuRasterizationStatusModes) {
   settings.gpu_rasterization_forced = true;
   EXPECT_TRUE(CreateHostImpl(settings, FakeOutputSurface::Create3d()));
 
-  host_impl_->set_has_gpu_rasterization_trigger(false);
-  host_impl_->set_content_is_suitable_for_gpu_rasterization(false);
-  host_impl_->UpdateGpuRasterizationStatus();
+  host_impl_->SetHasGpuRasterizationTrigger(false);
+  host_impl_->SetContentIsSuitableForGpuRasterization(false);
   EXPECT_EQ(GpuRasterizationStatus::ON_FORCED,
             host_impl_->gpu_rasterization_status());
   EXPECT_TRUE(host_impl_->use_gpu_rasterization());
+}
+
+// A mock output surface which lets us detect calls to ForceReclaimResources.
+class MockReclaimResourcesOutputSurface : public FakeOutputSurface {
+ public:
+  static scoped_ptr<MockReclaimResourcesOutputSurface> Create3d() {
+    return make_scoped_ptr(new MockReclaimResourcesOutputSurface(
+        TestContextProvider::Create(), TestContextProvider::Create(), false));
+  }
+
+  MOCK_METHOD0(ForceReclaimResources, void());
+
+ protected:
+  MockReclaimResourcesOutputSurface(
+      scoped_refptr<ContextProvider> context_provider,
+      scoped_refptr<ContextProvider> worker_context_provider,
+      bool delegated_rendering)
+      : FakeOutputSurface(context_provider,
+                          worker_context_provider,
+                          delegated_rendering) {}
+};
+
+// Display::Draw (and the planned Display Scheduler) currently rely on resources
+// being reclaimed to block drawing between BeginCommit / Swap. This test
+// ensures that BeginCommit triggers ForceReclaimResources. See
+// crbug.com/489515.
+TEST_F(LayerTreeHostImplTest, BeginCommitReclaimsResources) {
+  scoped_ptr<MockReclaimResourcesOutputSurface> output_surface(
+      MockReclaimResourcesOutputSurface::Create3d());
+  // Hold an unowned pointer to the output surface to use for mock expectations.
+  MockReclaimResourcesOutputSurface* mock_output_surface = output_surface.get();
+
+  CreateHostImpl(DefaultSettings(), output_surface.Pass());
+  EXPECT_CALL(*mock_output_surface, ForceReclaimResources()).Times(1);
+  host_impl_->BeginCommit();
 }
 
 }  // namespace

@@ -137,7 +137,7 @@ void CreateTestTwoColoredTextureDrawQuad(const gfx::Rect& rect,
       pixels[i * rect.width() + k] = pixel_stripe_color;
     }
   }
-  ResourceProvider::ResourceId resource = resource_provider->CreateResource(
+  ResourceId resource = resource_provider->CreateResource(
       rect.size(), GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       RGBA_8888);
   resource_provider->SetPixels(resource,
@@ -172,7 +172,7 @@ void CreateTestTextureDrawQuad(const gfx::Rect& rect,
   size_t num_pixels = static_cast<size_t>(rect.width()) * rect.height();
   std::vector<uint32_t> pixels(num_pixels, pixel_color);
 
-  ResourceProvider::ResourceId resource = resource_provider->CreateResource(
+  ResourceId resource = resource_provider->CreateResource(
       rect.size(), GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       RGBA_8888);
   resource_provider->CopyToResource(
@@ -224,22 +224,19 @@ void CreateTestYUVVideoDrawQuad_FromVideoFrame(
   EXPECT_EQ(media::VideoFrame::NumPlanes(video_frame->format()),
             resources.release_callbacks.size());
 
-  ResourceProvider::ResourceId y_resource =
-      resource_provider->CreateResourceFromTextureMailbox(
-          resources.mailboxes[media::VideoFrame::kYPlane],
-          SingleReleaseCallbackImpl::Create(
-              resources.release_callbacks[media::VideoFrame::kYPlane]));
-  ResourceProvider::ResourceId u_resource =
-      resource_provider->CreateResourceFromTextureMailbox(
-          resources.mailboxes[media::VideoFrame::kUPlane],
-          SingleReleaseCallbackImpl::Create(
-              resources.release_callbacks[media::VideoFrame::kUPlane]));
-  ResourceProvider::ResourceId v_resource =
-      resource_provider->CreateResourceFromTextureMailbox(
-          resources.mailboxes[media::VideoFrame::kVPlane],
-          SingleReleaseCallbackImpl::Create(
-              resources.release_callbacks[media::VideoFrame::kVPlane]));
-  ResourceProvider::ResourceId a_resource = 0;
+  ResourceId y_resource = resource_provider->CreateResourceFromTextureMailbox(
+      resources.mailboxes[media::VideoFrame::kYPlane],
+      SingleReleaseCallbackImpl::Create(
+          resources.release_callbacks[media::VideoFrame::kYPlane]));
+  ResourceId u_resource = resource_provider->CreateResourceFromTextureMailbox(
+      resources.mailboxes[media::VideoFrame::kUPlane],
+      SingleReleaseCallbackImpl::Create(
+          resources.release_callbacks[media::VideoFrame::kUPlane]));
+  ResourceId v_resource = resource_provider->CreateResourceFromTextureMailbox(
+      resources.mailboxes[media::VideoFrame::kVPlane],
+      SingleReleaseCallbackImpl::Create(
+          resources.release_callbacks[media::VideoFrame::kVPlane]));
+  ResourceId a_resource = 0;
   if (with_alpha) {
     a_resource = resource_provider->CreateResourceFromTextureMailbox(
         resources.mailboxes[media::VideoFrame::kAPlane],
@@ -260,11 +257,21 @@ void CreateTestYUVVideoDrawQuad_FromVideoFrame(
                               video_frame->coded_size()));
   }
 
+  gfx::RectF ya_tex_coord_rect(tex_coord_rect.x() * ya_tex_size.width(),
+                               tex_coord_rect.y() * ya_tex_size.height(),
+                               tex_coord_rect.width() * ya_tex_size.width(),
+                               tex_coord_rect.height() * ya_tex_size.height());
+  gfx::RectF uv_tex_coord_rect(tex_coord_rect.x() * uv_tex_size.width(),
+                               tex_coord_rect.y() * uv_tex_size.height(),
+                               tex_coord_rect.width() * uv_tex_size.width(),
+                               tex_coord_rect.height() * uv_tex_size.height());
+
   YUVVideoDrawQuad* yuv_quad =
       render_pass->CreateAndAppendDrawQuad<YUVVideoDrawQuad>();
   yuv_quad->SetNew(shared_state, rect, opaque_rect, visible_rect,
-                   tex_coord_rect, ya_tex_size, uv_tex_size, y_resource,
-                   u_resource, v_resource, a_resource, color_space);
+                   ya_tex_coord_rect, uv_tex_coord_rect, ya_tex_size,
+                   uv_tex_size, y_resource, u_resource, v_resource, a_resource,
+                   color_space);
 }
 
 void CreateTestYUVVideoDrawQuad_Striped(
@@ -1669,10 +1676,9 @@ TYPED_TEST(RendererPixelTest, RenderPassAndMaskWithPartialQuad) {
     rect.Inset(6, 6, 4, 4);
   }
 
-  ResourceProvider::ResourceId mask_resource_id =
-      this->resource_provider_->CreateResource(
-          mask_rect.size(), GL_CLAMP_TO_EDGE,
-          ResourceProvider::TEXTURE_HINT_IMMUTABLE, RGBA_8888);
+  ResourceId mask_resource_id = this->resource_provider_->CreateResource(
+      mask_rect.size(), GL_CLAMP_TO_EDGE,
+      ResourceProvider::TEXTURE_HINT_IMMUTABLE, RGBA_8888);
   {
     SkAutoLockPixels lock(bitmap);
     this->resource_provider_->CopyToResource(
@@ -2454,10 +2460,9 @@ TYPED_TEST(RendererPixelTest, TileDrawQuadNearestNeighbor) {
   }
 
   gfx::Size tile_size(2, 2);
-  ResourceProvider::ResourceId resource =
-      this->resource_provider_->CreateResource(
-          tile_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
-          RGBA_8888);
+  ResourceId resource = this->resource_provider_->CreateResource(
+      tile_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
 
   {
     SkAutoLockPixels lock(bitmap);
@@ -2486,6 +2491,112 @@ TYPED_TEST(RendererPixelTest, TileDrawQuadNearestNeighbor) {
       &pass_list,
       base::FilePath(FILE_PATH_LITERAL("four_blue_green_checkers.png")),
       ExactPixelComparator(true)));
+}
+
+// This disables filtering by setting |nearest_neighbor| to true on the
+// TextureDrawQuad.
+TYPED_TEST(SoftwareRendererPixelTest, TextureDrawQuadNearestNeighbor) {
+  gfx::Rect viewport(this->device_viewport_size_);
+  bool nearest_neighbor = true;
+
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(2, 2);
+  {
+    SkAutoLockPixels lock(bitmap);
+    SkCanvas canvas(bitmap);
+    canvas.drawPoint(0, 0, SK_ColorGREEN);
+    canvas.drawPoint(0, 1, SK_ColorBLUE);
+    canvas.drawPoint(1, 0, SK_ColorBLUE);
+    canvas.drawPoint(1, 1, SK_ColorGREEN);
+  }
+
+  gfx::Size tile_size(2, 2);
+  ResourceId resource = this->resource_provider_->CreateResource(
+      tile_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
+
+  {
+    SkAutoLockPixels lock(bitmap);
+    this->resource_provider_->CopyToResource(
+        resource, static_cast<uint8_t*>(bitmap.getPixels()), tile_size);
+  }
+
+  RenderPassId id(1, 1);
+  gfx::Transform transform_to_root;
+  scoped_ptr<RenderPass> pass =
+      CreateTestRenderPass(id, viewport, transform_to_root);
+
+  gfx::Transform content_to_target_transform;
+  SharedQuadState* shared_state = CreateTestSharedQuadState(
+      content_to_target_transform, viewport, pass.get());
+
+  float vertex_opacity[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  TextureDrawQuad* quad = pass->CreateAndAppendDrawQuad<TextureDrawQuad>();
+  quad->SetNew(shared_state, viewport, gfx::Rect(), viewport, resource, false,
+               gfx::PointF(0, 0), gfx::PointF(1, 1), SK_ColorBLACK,
+               vertex_opacity, false, nearest_neighbor);
+
+  RenderPassList pass_list;
+  pass_list.push_back(pass.Pass());
+
+  EXPECT_TRUE(this->RunPixelTest(
+      &pass_list,
+      base::FilePath(FILE_PATH_LITERAL("four_blue_green_checkers.png")),
+      FuzzyPixelComparator(false, 2.f, 0.f, 256.f, 256, 0.f)));
+}
+
+// This ensures filtering is enabled by setting |nearest_neighbor| to false on
+// the TextureDrawQuad.
+TYPED_TEST(SoftwareRendererPixelTest, TextureDrawQuadLinear) {
+  gfx::Rect viewport(this->device_viewport_size_);
+  bool nearest_neighbor = false;
+
+  SkBitmap bitmap;
+  bitmap.allocN32Pixels(2, 2);
+  {
+    SkAutoLockPixels lock(bitmap);
+    SkCanvas canvas(bitmap);
+    canvas.drawPoint(0, 0, SK_ColorGREEN);
+    canvas.drawPoint(0, 1, SK_ColorBLUE);
+    canvas.drawPoint(1, 0, SK_ColorBLUE);
+    canvas.drawPoint(1, 1, SK_ColorGREEN);
+  }
+
+  gfx::Size tile_size(2, 2);
+  ResourceId resource = this->resource_provider_->CreateResource(
+      tile_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
+
+  {
+    SkAutoLockPixels lock(bitmap);
+    this->resource_provider_->CopyToResource(
+        resource, static_cast<uint8_t*>(bitmap.getPixels()), tile_size);
+  }
+
+  RenderPassId id(1, 1);
+  gfx::Transform transform_to_root;
+  scoped_ptr<RenderPass> pass =
+      CreateTestRenderPass(id, viewport, transform_to_root);
+
+  gfx::Transform content_to_target_transform;
+  SharedQuadState* shared_state = CreateTestSharedQuadState(
+      content_to_target_transform, viewport, pass.get());
+
+  float vertex_opacity[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+  TextureDrawQuad* quad = pass->CreateAndAppendDrawQuad<TextureDrawQuad>();
+  quad->SetNew(shared_state, viewport, gfx::Rect(), viewport, resource, false,
+               gfx::PointF(0, 0), gfx::PointF(1, 1), SK_ColorBLACK,
+               vertex_opacity, false, nearest_neighbor);
+
+  RenderPassList pass_list;
+  pass_list.push_back(pass.Pass());
+
+  // Allow for a small amount of error as the blending alogrithm used by Skia is
+  // affected by the offset in the expanded rect.
+  EXPECT_TRUE(this->RunPixelTest(
+      &pass_list,
+      base::FilePath(FILE_PATH_LITERAL("four_blue_green_checkers_linear.png")),
+      FuzzyPixelComparator(false, 100.f, 0.f, 16.f, 16.f, 0.f)));
 }
 
 TYPED_TEST(SoftwareRendererPixelTest, PictureDrawQuadNonIdentityScale) {
@@ -2811,10 +2922,9 @@ TYPED_TEST(RendererPixelTest, WrapModeRepeat) {
     colors[2], colors[2], colors[3], colors[3],
     colors[2], colors[2], colors[3], colors[3],
   };
-  ResourceProvider::ResourceId resource =
-      this->resource_provider_->CreateResource(
-          texture_size, GL_REPEAT, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
-          RGBA_8888);
+  ResourceId resource = this->resource_provider_->CreateResource(
+      texture_size, GL_REPEAT, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
   this->resource_provider_->CopyToResource(
       resource, reinterpret_cast<uint8_t*>(pixels), texture_size);
 

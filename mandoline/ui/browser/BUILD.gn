@@ -19,11 +19,7 @@ mojo_native_application("window_manager") {
   deps = [
     ":kiosk_wm_lib",
     "//mandoline/services/navigation/public/interfaces",
-    "//mojo/application",
-    "//mojo/common:common",
-    "//third_party/mojo/src/mojo/public/cpp/bindings",
-    "//third_party/mojo/src/mojo/public/cpp/utility",
-    "//third_party/mojo/src/mojo/public/interfaces/application",
+    "//mojo/application/public/cpp",
   ]
 }
 
@@ -50,15 +46,14 @@ source_set("kiosk_wm_lib") {
   }
 
   deps = [
+    ":interfaces",
     "//base",
     "//components/view_manager/public/cpp",
-    "//components/window_manager:lib",
     "//mandoline/services/navigation/public/interfaces",
+    "//mojo/application/public/interfaces",
     "//mojo/converters/geometry",
     "//skia",
     "//third_party/mojo/src/mojo/public/cpp/bindings",
-    "//third_party/mojo/src/mojo/public/cpp/utility",
-    "//third_party/mojo/src/mojo/public/interfaces/application",
     "//ui/gfx/geometry",
     "//ui/mojo/events:interfaces",
   ]
@@ -66,4 +61,15 @@ source_set("kiosk_wm_lib") {
   if (!is_android) {
     deps += [ "//mandoline/ui/aura" ]
   }
+}
+
+mojom("interfaces") {
+  sources = [
+    "omnibox.mojom",
+    "view_embedder.mojom",
+  ]
+
+  deps = [
+    "//mojo/application/public/interfaces",
+  ]
 }

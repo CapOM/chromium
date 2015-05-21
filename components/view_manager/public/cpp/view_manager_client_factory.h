@@ -6,7 +6,7 @@
 #define COMPONENTS_VIEW_MANAGER_PUBLIC_CPP_VIEW_MANAGER_CLIENT_FACTORY_H_
 
 #include "components/view_manager/public/interfaces/view_manager.mojom.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/interface_factory.h"
+#include "mojo/application/public/cpp/interface_factory.h"
 
 namespace mojo {
 
@@ -20,14 +20,6 @@ class ViewManagerClientFactory : public InterfaceFactory<ViewManagerClient> {
  public:
   ViewManagerClientFactory(Shell* shell, ViewManagerDelegate* delegate);
   ~ViewManagerClientFactory() override;
-
-  // Creates a ViewManagerClient from the supplied arguments. Returns ownership
-  // to the caller.
-  static ViewManagerClient* WeakBindViewManagerToPipe(
-      InterfaceRequest<ViewManagerClient> request,
-      ViewManagerServicePtr view_manager_service,
-      Shell* shell,
-      ViewManagerDelegate* delegate);
 
   // InterfaceFactory<ViewManagerClient> implementation.
   void Create(ApplicationConnection* connection,

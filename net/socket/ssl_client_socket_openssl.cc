@@ -38,6 +38,7 @@
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/ssl/ssl_client_session_cache_openssl.h"
 #include "net/ssl/ssl_connection_status_flags.h"
+#include "net/ssl/ssl_failure_state.h"
 #include "net/ssl/ssl_info.h"
 
 #if defined(OS_WIN)
@@ -100,10 +101,6 @@ int EncodeSSLConnectionStatus(uint16 cipher_suite,
 // this SSL connection.
 int GetNetSSLVersion(SSL* ssl) {
   switch (SSL_version(ssl)) {
-    case SSL2_VERSION:
-      return SSL_CONNECTION_VERSION_SSL2;
-    case SSL3_VERSION:
-      return SSL_CONNECTION_VERSION_SSL3;
     case TLS1_VERSION:
       return SSL_CONNECTION_VERSION_TLS1;
     case TLS1_1_VERSION:
@@ -111,6 +108,7 @@ int GetNetSSLVersion(SSL* ssl) {
     case TLS1_2_VERSION:
       return SSL_CONNECTION_VERSION_TLS1_2;
     default:
+      NOTREACHED();
       return SSL_CONNECTION_VERSION_UNKNOWN;
   }
 }
@@ -371,6 +369,7 @@ SSLClientSocketOpenSSL::SSLClientSocketOpenSSL(
       channel_id_sent_(false),
       handshake_completed_(false),
       certificate_verified_(false),
+      ssl_failure_state_(SSL_FAILURE_NONE),
       transport_security_state_(context.transport_security_state),
       policy_enforcer_(context.cert_policy_enforcer),
       net_log_(transport_->socket()->NetLog()),
@@ -398,6 +397,10 @@ SSLClientSocket::NextProtoStatus SSLClientSocketOpenSSL::GetNextProto(
 ChannelIDService*
 SSLClientSocketOpenSSL::GetChannelIDService() const {
   return channel_id_service_;
+}
+
+SSLFailureState SSLClientSocketOpenSSL::GetSSLFailureState() const {
+  return ssl_failure_state_;
 }
 
 int SSLClientSocketOpenSSL::ExportKeyingMaterial(
@@ -507,7 +510,10 @@ void SSLClientSocketOpenSSL::Disconnect() {
   npn_proto_.clear();
 
   channel_id_sent_ = false;
+  handshake_completed_ = false;
+  certificate_verified_ = false;
   channel_id_request_handle_.Cancel();
+  ssl_failure_state_ = SSL_FAILURE_NONE;
 }
 
 bool SSLClientSocketOpenSSL::IsConnected() const {
@@ -624,6 +630,11 @@ bool SSLClientSocketOpenSSL::GetSSLInfo(SSLInfo* ssl_info) {
   return true;
 }
 
+void SSLClientSocketOpenSSL::GetConnectionAttempts(
+    ConnectionAttempts* out) const {
+  out->clear();
+}
+
 int SSLClientSocketOpenSSL::Read(IOBuffer* buf,
                                  int buf_len,
                                  const CompletionCallback& callback) {
@@ -713,24 +724,14 @@ int SSLClientSocketOpenSSL::Init() {
 
   SSL_set_bio(ssl_, ssl_bio, ssl_bio);
 
+  DCHECK_LT(SSL3_VERSION, ssl_config_.version_min);
+  DCHECK_LT(SSL3_VERSION, ssl_config_.version_max);
+  SSL_set_min_version(ssl_, ssl_config_.version_min);
+  SSL_set_max_version(ssl_, ssl_config_.version_max);
+
   // OpenSSL defaults some options to on, others to off. To avoid ambiguity,
   // set everything we care about to an absolute value.
   SslSetClearMask options;
-  options.ConfigureFlag(SSL_OP_NO_SSLv2, true);
-  bool ssl3_enabled = (ssl_config_.version_min == SSL_PROTOCOL_VERSION_SSL3);
-  options.ConfigureFlag(SSL_OP_NO_SSLv3, !ssl3_enabled);
-  bool tls1_enabled = (ssl_config_.version_min <= SSL_PROTOCOL_VERSION_TLS1 &&
-                       ssl_config_.version_max >= SSL_PROTOCOL_VERSION_TLS1);
-  options.ConfigureFlag(SSL_OP_NO_TLSv1, !tls1_enabled);
-  bool tls1_1_enabled =
-      (ssl_config_.version_min <= SSL_PROTOCOL_VERSION_TLS1_1 &&
-       ssl_config_.version_max >= SSL_PROTOCOL_VERSION_TLS1_1);
-  options.ConfigureFlag(SSL_OP_NO_TLSv1_1, !tls1_1_enabled);
-  bool tls1_2_enabled =
-      (ssl_config_.version_min <= SSL_PROTOCOL_VERSION_TLS1_2 &&
-       ssl_config_.version_max >= SSL_PROTOCOL_VERSION_TLS1_2);
-  options.ConfigureFlag(SSL_OP_NO_TLSv1_2, !tls1_2_enabled);
-
   options.ConfigureFlag(SSL_OP_NO_COMPRESSION, true);
 
   // TODO(joth): Set this conditionally, see http://crbug.com/55410
@@ -892,7 +893,6 @@ base::LazyInstance<base::ThreadLocalBoolean>::Leaky g_first_run_completed =
 
 int SSLClientSocketOpenSSL::DoHandshake() {
   crypto::OpenSSLErrStackTracer err_tracer(FROM_HERE);
-  int net_error = OK;
 
   int rv;
 
@@ -914,52 +914,8 @@ int SSLClientSocketOpenSSL::DoHandshake() {
     }
   }
 
-  if (rv == 1) {
-    if (ssl_config_.version_fallback &&
-        ssl_config_.version_max < ssl_config_.version_fallback_min) {
-      return ERR_SSL_FALLBACK_BEYOND_MINIMUM_VERSION;
-    }
-
-    // SSL handshake is completed. If NPN wasn't negotiated, see if ALPN was.
-    if (npn_status_ == kNextProtoUnsupported) {
-      const uint8_t* alpn_proto = NULL;
-      unsigned alpn_len = 0;
-      SSL_get0_alpn_selected(ssl_, &alpn_proto, &alpn_len);
-      if (alpn_len > 0) {
-        npn_proto_.assign(reinterpret_cast<const char*>(alpn_proto), alpn_len);
-        npn_status_ = kNextProtoNegotiated;
-        set_negotiation_extension(kExtensionALPN);
-      }
-    }
-
-    RecordNegotiationExtension();
-    RecordChannelIDSupport(channel_id_service_, channel_id_sent_,
-                           ssl_config_.channel_id_enabled,
-                           crypto::ECPrivateKey::IsSupported());
-
-    // Only record OCSP histograms if OCSP was requested.
-    if (ssl_config_.signed_cert_timestamps_enabled ||
-        cert_verifier_->SupportsOCSPStapling()) {
-      const uint8_t* ocsp_response;
-      size_t ocsp_response_len;
-      SSL_get0_ocsp_response(ssl_, &ocsp_response, &ocsp_response_len);
-
-      set_stapled_ocsp_response_received(ocsp_response_len != 0);
-      UMA_HISTOGRAM_BOOLEAN("Net.OCSPResponseStapled", ocsp_response_len != 0);
-    }
-
-    const uint8_t* sct_list;
-    size_t sct_list_len;
-    SSL_get0_signed_cert_timestamp_list(ssl_, &sct_list, &sct_list_len);
-    set_signed_cert_timestamps_received(sct_list_len != 0);
-
-    if (IsRenegotiationAllowed())
-      SSL_set_reject_peer_renegotiations(ssl_, 0);
-
-    // Verify the certificate.
-    UpdateServerCert();
-    GotoState(STATE_VERIFY_CERT);
-  } else {
+  int net_error = OK;
+  if (rv <= 0) {
     int ssl_error = SSL_get_error(ssl_, rv);
     if (ssl_error == SSL_ERROR_WANT_CHANNEL_ID_LOOKUP) {
       // The server supports channel ID. Stop to look one up before returning to
@@ -974,20 +930,97 @@ int SSLClientSocketOpenSSL::DoHandshake() {
 
     OpenSSLErrorInfo error_info;
     net_error = MapOpenSSLErrorWithDetails(ssl_error, err_tracer, &error_info);
-
-    // If not done, stay in this state
     if (net_error == ERR_IO_PENDING) {
+      // If not done, stay in this state
       GotoState(STATE_HANDSHAKE);
+      return ERR_IO_PENDING;
+    }
+
+    LOG(ERROR) << "handshake failed; returned " << rv << ", SSL error code "
+               << ssl_error << ", net_error " << net_error;
+    net_log_.AddEvent(
+        NetLog::TYPE_SSL_HANDSHAKE_ERROR,
+        CreateNetLogOpenSSLErrorCallback(net_error, ssl_error, error_info));
+
+    // Classify the handshake failure. This is used to determine causes of the
+    // TLS version fallback.
+
+    // |cipher| is the current outgoing cipher suite, so it is non-null iff
+    // ChangeCipherSpec was sent.
+    const SSL_CIPHER* cipher = SSL_get_current_cipher(ssl_);
+    if (SSL_get_state(ssl_) == SSL3_ST_CR_SRVR_HELLO_A) {
+      ssl_failure_state_ = SSL_FAILURE_CLIENT_HELLO;
+    } else if (cipher && (SSL_CIPHER_get_id(cipher) ==
+                              TLS1_CK_DHE_RSA_WITH_AES_128_GCM_SHA256 ||
+                          SSL_CIPHER_get_id(cipher) ==
+                              TLS1_CK_RSA_WITH_AES_128_GCM_SHA256)) {
+      ssl_failure_state_ = SSL_FAILURE_BUGGY_GCM;
+    } else if (cipher && ssl_config_.send_client_cert) {
+      ssl_failure_state_ = SSL_FAILURE_CLIENT_AUTH;
+    } else if (ERR_GET_LIB(error_info.error_code) == ERR_LIB_SSL &&
+               ERR_GET_REASON(error_info.error_code) ==
+                   SSL_R_OLD_SESSION_VERSION_NOT_RETURNED) {
+      ssl_failure_state_ = SSL_FAILURE_SESSION_MISMATCH;
+    } else if (cipher && npn_status_ != kNextProtoUnsupported) {
+      ssl_failure_state_ = SSL_FAILURE_NEXT_PROTO;
     } else {
-      LOG(ERROR) << "handshake failed; returned " << rv
-                 << ", SSL error code " << ssl_error
-                 << ", net_error " << net_error;
-      net_log_.AddEvent(
-          NetLog::TYPE_SSL_HANDSHAKE_ERROR,
-          CreateNetLogOpenSSLErrorCallback(net_error, ssl_error, error_info));
+      ssl_failure_state_ = SSL_FAILURE_UNKNOWN;
     }
   }
+
+  GotoState(STATE_HANDSHAKE_COMPLETE);
   return net_error;
+}
+
+int SSLClientSocketOpenSSL::DoHandshakeComplete(int result) {
+  if (result < 0)
+    return result;
+
+  if (ssl_config_.version_fallback &&
+      ssl_config_.version_max < ssl_config_.version_fallback_min) {
+    return ERR_SSL_FALLBACK_BEYOND_MINIMUM_VERSION;
+  }
+
+  // SSL handshake is completed. If NPN wasn't negotiated, see if ALPN was.
+  if (npn_status_ == kNextProtoUnsupported) {
+    const uint8_t* alpn_proto = NULL;
+    unsigned alpn_len = 0;
+    SSL_get0_alpn_selected(ssl_, &alpn_proto, &alpn_len);
+    if (alpn_len > 0) {
+      npn_proto_.assign(reinterpret_cast<const char*>(alpn_proto), alpn_len);
+      npn_status_ = kNextProtoNegotiated;
+      set_negotiation_extension(kExtensionALPN);
+    }
+  }
+
+  RecordNegotiationExtension();
+  RecordChannelIDSupport(channel_id_service_, channel_id_sent_,
+                         ssl_config_.channel_id_enabled,
+                         crypto::ECPrivateKey::IsSupported());
+
+  // Only record OCSP histograms if OCSP was requested.
+  if (ssl_config_.signed_cert_timestamps_enabled ||
+      cert_verifier_->SupportsOCSPStapling()) {
+    const uint8_t* ocsp_response;
+    size_t ocsp_response_len;
+    SSL_get0_ocsp_response(ssl_, &ocsp_response, &ocsp_response_len);
+
+    set_stapled_ocsp_response_received(ocsp_response_len != 0);
+    UMA_HISTOGRAM_BOOLEAN("Net.OCSPResponseStapled", ocsp_response_len != 0);
+  }
+
+  const uint8_t* sct_list;
+  size_t sct_list_len;
+  SSL_get0_signed_cert_timestamp_list(ssl_, &sct_list, &sct_list_len);
+  set_signed_cert_timestamps_received(sct_list_len != 0);
+
+  if (IsRenegotiationAllowed())
+    SSL_set_reject_peer_renegotiations(ssl_, 0);
+
+  // Verify the certificate.
+  UpdateServerCert();
+  GotoState(STATE_VERIFY_CERT);
+  return OK;
 }
 
 int SSLClientSocketOpenSSL::DoChannelIDLookup() {
@@ -1297,6 +1330,9 @@ int SSLClientSocketOpenSSL::DoHandshakeLoop(int last_io_result) {
     switch (state) {
       case STATE_HANDSHAKE:
         rv = DoHandshake();
+        break;
+      case STATE_HANDSHAKE_COMPLETE:
+        rv = DoHandshakeComplete(rv);
         break;
       case STATE_CHANNEL_ID_LOOKUP:
         DCHECK_EQ(OK, rv);
@@ -1870,9 +1906,6 @@ std::string SSLClientSocketOpenSSL::GetSessionCacheKey() const {
   // fallback connections to use a separate session cache.
   result.append("/");
   switch (ssl_config_.version_max) {
-    case SSL_PROTOCOL_VERSION_SSL3:
-      result.append("ssl3");
-      break;
     case SSL_PROTOCOL_VERSION_TLS1:
       result.append("tls1");
       break;

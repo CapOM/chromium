@@ -40,6 +40,7 @@
 #include "net/spdy/spdy_session.h"
 #include "net/spdy/spdy_session_pool.h"
 #include "net/ssl/ssl_cert_request_info.h"
+#include "net/ssl/ssl_failure_state.h"
 
 namespace net {
 
@@ -296,7 +297,7 @@ void HttpStreamFactoryImpl::Job::OnStreamReadyCallback() {
   DCHECK(!IsPreconnecting());
   DCHECK(!stream_factory_->for_websockets_);
 
-  MaybeCopyConnectionAttemptsFromClientSocketHandleToRequest();
+  MaybeCopyConnectionAttemptsFromSocketOrHandle();
 
   if (IsOrphaned()) {
     stream_factory_->OnOrphanedJobComplete(this);
@@ -319,7 +320,7 @@ void HttpStreamFactoryImpl::Job::OnWebSocketHandshakeStreamReadyCallback() {
   // never be ready.
   DCHECK(!IsOrphaned());
 
-  MaybeCopyConnectionAttemptsFromClientSocketHandleToRequest();
+  MaybeCopyConnectionAttemptsFromSocketOrHandle();
 
   request_->Complete(was_npn_negotiated(),
                      protocol_negotiated(),
@@ -341,7 +342,7 @@ void HttpStreamFactoryImpl::Job::OnNewSpdySessionReadyCallback() {
   base::WeakPtr<SpdySession> spdy_session = new_spdy_session_;
   new_spdy_session_.reset();
 
-  MaybeCopyConnectionAttemptsFromClientSocketHandleToRequest();
+  MaybeCopyConnectionAttemptsFromSocketOrHandle();
 
   // TODO(jgraettinger): Notify the factory, and let that notify |request_|,
   // rather than notifying |request_| directly.
@@ -362,12 +363,16 @@ void HttpStreamFactoryImpl::Job::OnNewSpdySessionReadyCallback() {
 void HttpStreamFactoryImpl::Job::OnStreamFailedCallback(int result) {
   DCHECK(!IsPreconnecting());
 
-  MaybeCopyConnectionAttemptsFromClientSocketHandleToRequest();
+  MaybeCopyConnectionAttemptsFromSocketOrHandle();
 
-  if (IsOrphaned())
+  if (IsOrphaned()) {
     stream_factory_->OnOrphanedJobComplete(this);
-  else
-    request_->OnStreamFailed(this, result, server_ssl_config_);
+  } else {
+    SSLFailureState ssl_failure_state =
+        connection_ ? connection_->ssl_failure_state() : SSL_FAILURE_NONE;
+    request_->OnStreamFailed(this, result, server_ssl_config_,
+                             ssl_failure_state);
+  }
   // |this| may be deleted after this call.
 }
 
@@ -375,7 +380,7 @@ void HttpStreamFactoryImpl::Job::OnCertificateErrorCallback(
     int result, const SSLInfo& ssl_info) {
   DCHECK(!IsPreconnecting());
 
-  MaybeCopyConnectionAttemptsFromClientSocketHandleToRequest();
+  MaybeCopyConnectionAttemptsFromSocketOrHandle();
 
   if (IsOrphaned())
     stream_factory_->OnOrphanedJobComplete(this);
@@ -799,11 +804,10 @@ int HttpStreamFactoryImpl::Job::DoInitConnection() {
     HostPortPair destination = proxy_info_.is_quic()
                                    ? proxy_info_.proxy_server().host_port_pair()
                                    : server_;
-    next_state_ = STATE_INIT_CONNECTION_COMPLETE;
     bool secure_quic = using_ssl_ || proxy_info_.is_quic();
     int rv = quic_request_.Request(
         destination, secure_quic, request_info_.privacy_mode,
-        request_info_.method, net_log_, io_callback_);
+        origin_url_.host(), request_info_.method, net_log_, io_callback_);
     if (rv == OK) {
       using_existing_quic_session_ = true;
     } else {
@@ -1526,12 +1530,23 @@ HttpStreamFactoryImpl::Job::GetSocketGroup() const {
   return ClientSocketPoolManager::NORMAL_GROUP;
 }
 
+// If the connection succeeds, failed connection attempts leading up to the
+// success will be returned via the successfully connected socket. If the
+// connection fails, failed connection attempts will be returned via the
+// ClientSocketHandle. Check whether a socket was returned and copy the
+// connection attempts from the proper place.
 void HttpStreamFactoryImpl::Job::
-    MaybeCopyConnectionAttemptsFromClientSocketHandleToRequest() {
+    MaybeCopyConnectionAttemptsFromSocketOrHandle() {
   if (IsOrphaned() || !connection_)
     return;
 
-  request_->AddConnectionAttempts(connection_->connection_attempts());
+  if (connection_->socket()) {
+    ConnectionAttempts socket_attempts;
+    connection_->socket()->GetConnectionAttempts(&socket_attempts);
+    request_->AddConnectionAttempts(socket_attempts);
+  } else {
+    request_->AddConnectionAttempts(connection_->connection_attempts());
+  }
 }
 
 }  // namespace net

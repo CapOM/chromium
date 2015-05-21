@@ -27,6 +27,7 @@
 #include "chrome/browser/android/download/chrome_download_delegate.h"
 #include "chrome/browser/android/favicon_helper.h"
 #include "chrome/browser/android/feature_utilities.h"
+#include "chrome/browser/android/feedback/connectivity_checker.h"
 #include "chrome/browser/android/find_in_page/find_in_page_bridge.h"
 #include "chrome/browser/android/foreign_session_helper.h"
 #include "chrome/browser/android/fullscreen/fullscreen_infobar_delegate.h"
@@ -57,7 +58,6 @@
 #include "chrome/browser/android/signin/signin_manager_android.h"
 #include "chrome/browser/android/tab_android.h"
 #include "chrome/browser/android/tab_state.h"
-#include "chrome/browser/android/transition_page_helper.h"
 #include "chrome/browser/android/url_utilities.h"
 #include "chrome/browser/android/voice_search_tab_helper.h"
 #include "chrome/browser/android/warmup_manager.h"
@@ -78,6 +78,7 @@
 #include "chrome/browser/search_engines/template_url_service_android.h"
 #include "chrome/browser/signin/android_profile_oauth2_token_service.h"
 #include "chrome/browser/speech/tts_android.h"
+#include "chrome/browser/ssl/connection_security_helper_android.h"
 #include "chrome/browser/supervised_user/child_accounts/child_account_feedback_reporter_android.h"
 #include "chrome/browser/supervised_user/child_accounts/child_account_service_android.h"
 #include "chrome/browser/sync/profile_sync_service_android.h"
@@ -179,6 +180,8 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"ConfirmInfoBarDelegate", RegisterConfirmInfoBarDelegate},
     {"ConnectionInfoPopupAndroid",
      ConnectionInfoPopupAndroid::RegisterConnectionInfoPopupAndroid},
+    {"ConnectionSecurityHelper", RegisterConnectionSecurityHelperAndroid},
+    {"ConnectivityChecker", RegisterConnectivityChecker},
     {"ContentViewUtil", RegisterContentViewUtil},
     {"ContextMenuHelper", RegisterContextMenuHelper},
     {"CookiesFetcher", RegisterCookiesFetcher},
@@ -263,7 +266,6 @@ static base::android::RegistrationMethod kChromeRegisteredMethods[] = {
     {"TabState", RegisterTabState},
     {"TemplateUrlServiceAndroid", TemplateUrlServiceAndroid::Register},
     {"ToolbarModelAndroid", ToolbarModelAndroid::RegisterToolbarModelAndroid},
-    {"TransitionPageHelper", TransitionPageHelper::Register},
     {"TranslateInfoBarDelegate", RegisterTranslateInfoBarDelegate},
     {"TtsPlatformImpl", TtsPlatformImplAndroid::Register},
     {"UmaSessionStats", RegisterUmaSessionStats},

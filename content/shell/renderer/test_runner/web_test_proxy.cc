@@ -13,7 +13,6 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/trace_event.h"
-#include "content/public/common/content_switches.h"
 #include "content/shell/renderer/test_runner/accessibility_controller.h"
 #include "content/shell/renderer/test_runner/event_sender.h"
 #include "content/shell/renderer/test_runner/mock_color_chooser.h"
@@ -312,12 +311,7 @@ std::string DumpFramesAsMarkup(blink::WebFrame* frame, bool recursive) {
 }
 
 std::string DumpDocumentText(blink::WebFrame* frame) {
-  // We use the document element's text instead of the body text here because
-  // not all documents have a body, such as XML documents.
-  blink::WebElement document_element = frame->document().documentElement();
-  if (document_element.isNull())
-    return std::string();
-  return document_element.innerText().utf8();
+  return frame->document().contentAsTextForTesting().utf8();
 }
 
 std::string DumpFramesAsText(blink::WebFrame* frame, bool recursive) {
@@ -390,10 +384,6 @@ WebTestProxyBase::WebTestProxyBase()
       web_widget_(NULL),
       spellcheck_(new SpellCheckClient(this)),
       chooser_count_(0) {
-  // TODO(enne): using the scheduler introduces additional composite steps
-  // that create flakiness.  This should go away eventually.
-  base::CommandLine::ForCurrentProcess()->AppendSwitch(
-      switches::kDisableSingleThreadProxyScheduler);
   Reset();
 }
 
@@ -587,9 +577,9 @@ void CaptureCallback::didCompositeAndReadback(const SkBitmap& bitmap) {
   TRACE_EVENT2("shell",
                "CaptureCallback::didCompositeAndReadback",
                "x",
-               bitmap.info().fWidth,
+               bitmap.info().width(),
                "y",
-               bitmap.info().fHeight);
+               bitmap.info().height());
   if (!wait_for_popup_) {
     callback_.Run(bitmap);
     delete this;
@@ -906,6 +896,12 @@ bool WebTestProxyBase::CreateView(blink::WebLocalFrame* frame,
                                   const blink::WebString& frame_name,
                                   blink::WebNavigationPolicy policy,
                                   bool suppress_opener) {
+  if (test_interfaces_->GetTestRunner()->shouldDumpNavigationPolicy()) {
+    delegate_->PrintMessage("Default policy for createView for '" +
+                            URLDescription(request.url()) + "' is '" +
+                            WebNavigationPolicyToString(policy) + "'\n");
+  }
+
   if (!test_interfaces_->GetTestRunner()->canOpenWindows())
     return false;
   if (test_interfaces_->GetTestRunner()->shouldDumpCreateView())

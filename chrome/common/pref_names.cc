@@ -1106,6 +1106,11 @@ const char kProfileGAIAInfoPictureURL[] = "profile.gaia_info_picture_url";
 const char kProfileAvatarTutorialShown[] =
     "profile.avatar_bubble_tutorial_shown";
 
+// Boolean that specifies if the user has already dismissed the right-click user
+// switching tutorial.
+const char kProfileAvatarRightClickTutorialDismissed[] =
+    "profile.avatar_bubble_right_click_tutorial_dismissed";
+
 // Indicates if we've already shown a notification that high contrast
 // mode is on, recommending high-contrast extensions and themes.
 const char kInvertNotificationShown[] = "invert_notification_version_2_shown";
@@ -1600,6 +1605,31 @@ const char kSignInPromoShowOnFirstRunAllowed[] =
 // Boolean that specifies if we should show a bubble in the new tab page.
 // The bubble is used to confirm that the user is signed into sync.
 const char kSignInPromoShowNTPBubble[] = "sync_promo.show_ntp_bubble";
+#endif
+
+#if !defined(OS_CHROMEOS) && !defined(OS_ANDROID) && !defined(OS_IOS)
+// Boolean tracking whether the user chose to opt out of the x-device promo.
+const char kCrossDevicePromoOptedOut[] = "x_device_promo.opted_out";
+
+// Boolean tracking whether the x-device promo is currently active.
+const char kCrossDevicePromoActive[] = "x_device_promo.active";
+
+// Int64, representing the time when we first observed a single GAIA account in
+// the cookie. If the most recent observation does not contain exactly one
+// account, this pref does not exist.
+const char kCrossDevicePromoObservedSingleAccountCookie[] =
+    "x_device_promo.single_account_observed";
+
+// Int64, representing the time to next call the ListDevices endpoint.
+const char kCrossDevicePromoNextFetchListDevicesTime[] =
+    "x_device_promo.next_list_devices_fetch";
+
+// Int containing the number of other devices where the profile's account syncs.
+const char kCrossDevicePromoNumDevices[] = "x_device_promo.num_devices";
+
+// Int64, representing the time when we last saw activity on another device.
+const char kCrossDevicePromoLastDeviceActiveTime[] =
+    "x_device_promo.last_device_active_time";
 #endif
 
 // Create web application shortcut dialog preferences.

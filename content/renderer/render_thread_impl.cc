@@ -32,7 +32,7 @@
 #include "cc/base/switches.h"
 #include "cc/blink/web_external_bitmap_impl.h"
 #include "cc/blink/web_layer_impl.h"
-#include "cc/resources/tile_task_worker_pool.h"
+#include "cc/raster/task_graph_runner.h"
 #include "components/scheduler/renderer/renderer_scheduler.h"
 #include "content/child/appcache/appcache_dispatcher.h"
 #include "content/child/appcache/appcache_frontend_impl.h"
@@ -138,6 +138,7 @@
 #include "third_party/WebKit/public/web/WebSecurityPolicy.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "third_party/icu/source/i18n/unicode/timezone.h"
+#include "third_party/mojo/src/mojo/public/cpp/bindings/strong_binding.h"
 #include "third_party/skia/include/core/SkGraphics.h"
 #include "ui/base/layout.h"
 #include "ui/base/ui_base_switches.h"
@@ -340,11 +341,11 @@ void LowMemoryNotificationOnThisThread() {
   isolate->LowMemoryNotification();
 }
 
-class RenderFrameSetupImpl : public mojo::InterfaceImpl<RenderFrameSetup> {
+class RenderFrameSetupImpl : public RenderFrameSetup {
  public:
-  RenderFrameSetupImpl()
-      : routing_id_highmark_(-1) {
-  }
+  explicit RenderFrameSetupImpl(
+      mojo::InterfaceRequest<RenderFrameSetup> request)
+      : routing_id_highmark_(-1), binding_(this, request.Pass()) {}
 
   void ExchangeServiceProviders(
       int32_t frame_routing_id,
@@ -371,10 +372,11 @@ class RenderFrameSetupImpl : public mojo::InterfaceImpl<RenderFrameSetup> {
 
  private:
   int32_t routing_id_highmark_;
+  mojo::StrongBinding<RenderFrameSetup> binding_;
 };
 
 void CreateRenderFrameSetup(mojo::InterfaceRequest<RenderFrameSetup> request) {
-  mojo::BindToRequest(new RenderFrameSetupImpl(), &request);
+  new RenderFrameSetupImpl(request.Pass());
 }
 
 blink::WebGraphicsContext3D::Attributes GetOffscreenAttribs() {
@@ -1138,11 +1140,22 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
 }
 
 void RenderThreadImpl::RegisterSchemes() {
-  // swappedout: pages should not be accessible, and should also
-  // be treated as empty documents that can commit synchronously.
+  // swappedout:
   WebString swappedout_scheme(base::ASCIIToUTF16(kSwappedOutScheme));
   WebSecurityPolicy::registerURLSchemeAsDisplayIsolated(swappedout_scheme);
   WebSecurityPolicy::registerURLSchemeAsEmptyDocument(swappedout_scheme);
+
+  // chrome:
+  WebString chrome_scheme(base::ASCIIToUTF16(kChromeUIScheme));
+  WebSecurityPolicy::registerURLSchemeAsDisplayIsolated(chrome_scheme);
+  WebSecurityPolicy::registerURLSchemeAsNotAllowingJavascriptURLs(
+      chrome_scheme);
+  WebSecurityPolicy::registerURLSchemeAsSecure(chrome_scheme);
+  WebSecurityPolicy::registerURLSchemeAsCORSEnabled(chrome_scheme);
+
+  // chrome-devtools:
+  WebString devtools_scheme(base::ASCIIToUTF16(kChromeDevToolsScheme));
+  WebSecurityPolicy::registerURLSchemeAsDisplayIsolated(devtools_scheme);
 }
 
 void RenderThreadImpl::NotifyTimezoneChange() {
@@ -1415,8 +1428,9 @@ bool RenderThreadImpl::IsElasticOverscrollEnabled() {
 }
 
 bool RenderThreadImpl::UseSingleThreadScheduler() {
-  base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
-  return !cmd->HasSwitch(switches::kDisableSingleThreadProxyScheduler);
+  // TODO(enne): using the scheduler introduces additional composite steps
+  // that create flakiness.  This should go away eventually.
+  return !layout_test_mode_;
 }
 
 uint32 RenderThreadImpl::GetImageTextureTarget() {
@@ -1469,8 +1483,9 @@ bool RenderThreadImpl::IsMainThread() {
   return !!current();
 }
 
-scoped_refptr<base::MessageLoopProxy> RenderThreadImpl::GetIOLoopProxy() {
-  return io_message_loop_proxy_;
+scoped_refptr<base::SingleThreadTaskRunner>
+RenderThreadImpl::GetIOThreadTaskRunner() {
+  return io_thread_task_runner_;
 }
 
 scoped_ptr<base::SharedMemory> RenderThreadImpl::AllocateSharedMemory(
@@ -1614,7 +1629,7 @@ GpuChannelHost* RenderThreadImpl::EstablishGpuChannelSync(
 
   // Cache some variables that are needed on the compositor thread for our
   // implementation of GpuChannelHostFactory.
-  io_message_loop_proxy_ = ChildProcess::current()->io_message_loop_proxy();
+  io_thread_task_runner_ = ChildProcess::current()->io_message_loop_proxy();
 
   gpu_channel_ =
       GpuChannelHost::Create(this,

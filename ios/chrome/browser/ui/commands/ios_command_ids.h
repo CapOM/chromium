@@ -20,6 +20,7 @@
 #define IDC_VOICE_SEARCH                               40902
 #define IDC_NEW_INCOGNITO_TAB                          40903
 #define IDC_CLOSE_ALL_TABS                             40904
+#define IDC_SHOW_SIGNIN_IOS                            40905
 #define IDC_SWITCH_BROWSER_MODES                       40906
 #define IDC_FIND_CLOSE                                 40907
 #define IDC_FIND_UPDATE                                40908
@@ -54,6 +55,7 @@
 #define IDC_SHOW_ACCOUNTS_SETTINGS                     40943
 #define IDC_CLOSE_SETTINGS                             40944
 #define IDC_SHOW_SAVE_PASSWORDS_SETTINGS               40945
+#define IDC_READER_MODE                                40947
 // Do not use IDs above 40999 while the iOS build still depends on //chrome, to
 // avoid conflicts.
 // TODO(droger): Remove this comment once iOS no longer depends on //chrome.

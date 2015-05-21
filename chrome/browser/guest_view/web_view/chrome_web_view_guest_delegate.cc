@@ -35,7 +35,6 @@ namespace extensions {
 ChromeWebViewGuestDelegate::ChromeWebViewGuestDelegate(
     WebViewGuest* web_view_guest)
     : pending_context_menu_request_id_(0),
-      chromevox_injected_(false),
       web_view_guest_(web_view_guest),
       weak_ptr_factory_(this) {
 }
@@ -50,6 +49,11 @@ bool ChromeWebViewGuestDelegate::HandleContextMenu(
   DCHECK(menu_delegate);
 
   pending_menu_ = menu_delegate->BuildMenu(guest_web_contents(), params);
+  // It's possible for the returned menu to be null, so early out to avoid
+  // a crash. TODO(wjmaclean): find out why it's possible for this to happen
+  // in the first place, and if it's an error.
+  if (!pending_menu_)
+    return false;
 
   // Pass it to embedder.
   int request_id = ++pending_context_menu_request_id_;
@@ -81,29 +85,6 @@ void ChromeWebViewGuestDelegate::OnAttachWebViewHelpers(
       contents,
       scoped_ptr<pdf::PDFWebContentsHelperClient>(
           new ChromePDFWebContentsHelperClient()));
-}
-
-void ChromeWebViewGuestDelegate::OnDidCommitProvisionalLoadForFrame(
-    bool is_main_frame) {
-  if (is_main_frame)
-    chromevox_injected_ = false;
-}
-
-void ChromeWebViewGuestDelegate::OnDidInitialize() {
-#if defined(OS_CHROMEOS)
-  chromeos::AccessibilityManager* accessibility_manager =
-      chromeos::AccessibilityManager::Get();
-  CHECK(accessibility_manager);
-  accessibility_subscription_ = accessibility_manager->RegisterCallback(
-      base::Bind(&ChromeWebViewGuestDelegate::OnAccessibilityStatusChanged,
-                 weak_ptr_factory_.GetWeakPtr()));
-#endif
-}
-
-void ChromeWebViewGuestDelegate::OnDocumentLoadedInFrame(
-    content::RenderFrameHost* render_frame_host) {
-  if (!render_frame_host->GetParent())
-    InjectChromeVoxIfNeeded(render_frame_host->GetRenderViewHost());
 }
 
 void ChromeWebViewGuestDelegate::OnGuestDestroyed() {
@@ -148,34 +129,5 @@ void ChromeWebViewGuestDelegate::OnShowContextMenu(
       ContextMenuDelegate::FromWebContents(guest_web_contents());
   menu_delegate->ShowMenu(pending_menu_.Pass());
 }
-
-void ChromeWebViewGuestDelegate::InjectChromeVoxIfNeeded(
-    content::RenderViewHost* render_view_host) {
-#if defined(OS_CHROMEOS)
-  if (!chromevox_injected_) {
-    chromeos::AccessibilityManager* manager =
-        chromeos::AccessibilityManager::Get();
-    if (manager && manager->IsSpokenFeedbackEnabled()) {
-      manager->InjectChromeVox(render_view_host);
-      chromevox_injected_ = true;
-    }
-  }
-#endif
-}
-
-#if defined(OS_CHROMEOS)
-void ChromeWebViewGuestDelegate::OnAccessibilityStatusChanged(
-    const chromeos::AccessibilityStatusEventDetails& details) {
-  if (details.notification_type == chromeos::ACCESSIBILITY_MANAGER_SHUTDOWN) {
-    accessibility_subscription_.reset();
-  } else if (details.notification_type ==
-      chromeos::ACCESSIBILITY_TOGGLE_SPOKEN_FEEDBACK) {
-    if (details.enabled)
-      InjectChromeVoxIfNeeded(guest_web_contents()->GetRenderViewHost());
-    else
-      chromevox_injected_ = false;
-  }
-}
-#endif
 
 }  // namespace extensions

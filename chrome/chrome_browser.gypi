@@ -96,6 +96,8 @@
       'browser/android/favicon_helper.h',
       'browser/android/feature_utilities.cc',
       'browser/android/feature_utilities.h',
+      'browser/android/feedback/connectivity_checker.cc',
+      'browser/android/feedback/connectivity_checker.h',
       'browser/android/find_in_page/find_in_page_bridge.cc',
       'browser/android/find_in_page/find_in_page_bridge.h',
       'browser/android/foreign_session_helper.cc',
@@ -182,8 +184,6 @@
       'browser/android/thumbnail/thumbnail.h',
       'browser/android/thumbnail/thumbnail_cache.cc',
       'browser/android/thumbnail/thumbnail_cache.h',
-      'browser/android/transition_page_helper.cc',
-      'browser/android/transition_page_helper.h',
       'browser/android/url_utilities.cc',
       'browser/android/url_utilities.h',
       'browser/android/voice_search_tab_helper.cc',
@@ -210,6 +210,8 @@
       'browser/autofill/validation_rules_storage_factory.h',
       'browser/banners/app_banner_data_fetcher.cc',
       'browser/banners/app_banner_data_fetcher.h',
+      'browser/banners/app_banner_debug_log.cc',
+      'browser/banners/app_banner_debug_log.h',
       'browser/banners/app_banner_manager.cc',
       'browser/banners/app_banner_manager.h',
       'browser/banners/app_banner_metrics.cc',
@@ -304,6 +306,8 @@
       'browser/component_updater/component_patcher_operation_out_of_process.h',
       'browser/component_updater/component_updater_resource_throttle.cc',
       'browser/component_updater/component_updater_resource_throttle.h',
+      'browser/component_updater/component_updater_url_constants.cc',
+      'browser/component_updater/component_updater_url_constants.h',
       'browser/component_updater/ev_whitelist_component_installer.cc',
       'browser/component_updater/ev_whitelist_component_installer.h',
       'browser/component_updater/pnacl_component_installer.cc',
@@ -316,8 +320,6 @@
       'browser/component_updater/sw_reporter_installer_win.h',
       'browser/component_updater/swiftshader_component_installer.cc',
       'browser/component_updater/swiftshader_component_installer.h',
-      'browser/component_updater/component_updater_url_constants.cc',
-      'browser/component_updater/component_updater_url_constants.h',
       'browser/crash_upload_list.cc',
       'browser/crash_upload_list.h',
       'browser/crash_upload_list_mac.cc',
@@ -616,6 +618,8 @@
       'browser/prerender/prerender_util.h',
       'browser/process_info_snapshot.h',
       'browser/process_info_snapshot_mac.cc',
+      'browser/process_resource_usage.cc',
+      'browser/process_resource_usage.h',
       'browser/process_singleton.h',
       'browser/process_singleton_win.cc',
       'browser/push_messaging/push_messaging_app_identifier.cc',
@@ -704,6 +708,8 @@
       'browser/speech/tts_platform.cc',
       'browser/speech/tts_platform.h',
       'browser/speech/tts_win.cc',
+      'browser/ssl/connection_security_helper_android.cc',
+      'browser/ssl/connection_security_helper_android.h',
       'browser/status_icons/status_icon.cc',
       'browser/status_icons/status_icon.h',
       'browser/status_icons/status_icon_menu_model.cc',
@@ -832,6 +838,10 @@
       'browser/profiles/avatar_menu_observer.h',
       'browser/profiles/profile_list_desktop.cc',
       'browser/profiles/profile_list_desktop.h',
+      'browser/signin/cross_device_promo.cc',
+      'browser/signin/cross_device_promo.h',
+      'browser/signin/cross_device_promo_factory.cc',
+      'browser/signin/cross_device_promo_factory.h',
     ],
     # Miscellaneous files that were brought up on iOS before the decision not
     # to use chrome/ for iOS. These, plus a few of the directory-specific
@@ -1667,6 +1677,7 @@
       'android/java/src/org/chromium/chrome/browser/enhanced_bookmarks/EnhancedBookmarksBridge.java',
       'android/java/src/org/chromium/chrome/browser/favicon/FaviconHelper.java',
       'android/java/src/org/chromium/chrome/browser/favicon/LargeIconBridge.java',
+      'android/java/src/org/chromium/chrome/browser/feedback/ConnectivityChecker.java',
       'android/java/src/org/chromium/chrome/browser/findinpage/FindInPageBridge.java',
       'android/java/src/org/chromium/chrome/browser/fullscreen/FullscreenInfoBarDelegate.java',
       'android/java/src/org/chromium/chrome/browser/ForeignSessionHelper.java',
@@ -1710,7 +1721,6 @@
       'android/java/src/org/chromium/chrome/browser/signin/OAuth2TokenService.java',
       'android/java/src/org/chromium/chrome/browser/signin/SigninManager.java',
       'android/java/src/org/chromium/chrome/browser/sync/ProfileSyncService.java',
-      'android/java/src/org/chromium/chrome/browser/tab/TransitionPageHelper.java',
       'android/java/src/org/chromium/chrome/browser/tabmodel/SingleTabModel.java',
       'android/java/src/org/chromium/chrome/browser/tabmodel/TabModelJniBridge.java',
       'android/java/src/org/chromium/chrome/browser/Tab.java',
@@ -1732,6 +1742,7 @@
       'android/java/src/org/chromium/chrome/browser/infobar/SavePasswordInfoBar.java',
       'android/java/src/org/chromium/chrome/browser/invalidation/InvalidationServiceFactory.java',
       'android/java/src/org/chromium/chrome/browser/metrics/LaunchMetrics.java',
+      'android/java/src/org/chromium/chrome/browser/ssl/ConnectionSecurityHelper.java',
       'android/java/src/org/chromium/chrome/browser/toolbar/ToolbarModel.java',
     ],
     'chrome_browser_mdns_sources': [
@@ -1755,12 +1766,12 @@
       'browser/metrics/chrome_stability_metrics_provider.cc',
       'browser/metrics/chrome_stability_metrics_provider.h',
       'browser/metrics/drive_metrics_provider.cc',
+      'browser/metrics/drive_metrics_provider.h',
       'browser/metrics/drive_metrics_provider_android.cc',
       'browser/metrics/drive_metrics_provider_ios.mm',
       'browser/metrics/drive_metrics_provider_linux.cc',
       'browser/metrics/drive_metrics_provider_mac.mm',
       'browser/metrics/drive_metrics_provider_win.cc',
-      'browser/metrics/drive_metrics_provider.h',
       'browser/metrics/field_trial_synchronizer.cc',
       'browser/metrics/field_trial_synchronizer.h',
       'browser/metrics/first_web_contents_profiler.cc',
@@ -1795,8 +1806,6 @@
       'browser/metrics/time_ticks_experiment_win.h',
       'browser/metrics/variations/generated_resources_map.h',
       'browser/metrics/variations/generated_resources_map_lookup.cc',
-      'browser/metrics/variations/variations_url_constants.cc',
-      'browser/metrics/variations/variations_url_constants.h',
       'browser/metrics/variations/variations_registry_syncer_win.cc',
       'browser/metrics/variations/variations_registry_syncer_win.h',
       'browser/metrics/variations/variations_request_scheduler.cc',
@@ -1805,6 +1814,8 @@
       'browser/metrics/variations/variations_seed_store.h',
       'browser/metrics/variations/variations_service.cc',
       'browser/metrics/variations/variations_service.h',
+      'browser/metrics/variations/variations_url_constants.cc',
+      'browser/metrics/variations/variations_url_constants.h',
     ],
     'chrome_browser_nacl_sources': [
       'browser/nacl_host/nacl_browser_delegate_impl.cc',
@@ -1822,8 +1833,6 @@
       'browser/net/chrome_cookie_notification_details.h',
       'browser/net/chrome_extensions_network_delegate.cc',
       'browser/net/chrome_extensions_network_delegate.h',
-      'browser/net/chrome_fraudulent_certificate_reporter.cc',
-      'browser/net/chrome_fraudulent_certificate_reporter.h',
       'browser/net/chrome_http_user_agent_settings.cc',
       'browser/net/chrome_http_user_agent_settings.h',
       'browser/net/chrome_net_log.cc',
@@ -1964,6 +1973,7 @@
     'chrome_browser_password_manager_sources': [
       'browser/password_manager/chrome_password_manager_client.cc',
       'browser/password_manager/chrome_password_manager_client.h',
+      'browser/password_manager/password_manager_util.cc',
       'browser/password_manager/password_manager_util.h',
       'browser/password_manager/password_manager_util_android.cc',
       'browser/password_manager/password_manager_util_linux.cc',
@@ -2069,6 +2079,10 @@
       'browser/policy/cloud/cloud_policy_invalidator.h',
       'browser/policy/cloud/policy_header_service_factory.cc',
       'browser/policy/cloud/policy_header_service_factory.h',
+      'browser/policy/cloud/remote_commands_invalidator.cc',
+      'browser/policy/cloud/remote_commands_invalidator.h',
+      'browser/policy/cloud/remote_commands_invalidator_impl.cc',
+      'browser/policy/cloud/remote_commands_invalidator_impl.h',
       'browser/policy/cloud/user_cloud_policy_invalidator.cc',
       'browser/policy/cloud/user_cloud_policy_invalidator.h',
       'browser/policy/cloud/user_cloud_policy_invalidator_factory.cc',
@@ -2359,8 +2373,8 @@
       'browser/rlz/rlz_mac.cc',
       'browser/rlz/rlz_win.cc',
     ],
-    # Used for safe browsing in basic mode (safe_browsing=2) as well as full
-    # mode (safe_browsing=1).
+    # "Safe Browsing Basic" files used for safe browsing in full mode
+    # (safe_browsing=1), mobile (=2), and mobile-extended (=3).
     'chrome_browser_safe_browsing_basic_sources': [
       'browser/renderer_host/safe_browsing_resource_throttle_factory.cc',
       'browser/renderer_host/safe_browsing_resource_throttle_factory.h',
@@ -2383,7 +2397,19 @@
       'browser/safe_browsing/ui_manager.cc',
       'browser/safe_browsing/ui_manager.h',
     ],
-    # Files in addition to the "basic" ones to use for full safe browsing.
+    # "Safe Browsing Extended Mobile" files in addition to the "basic" ones
+    # to use for mobile_extended mode. This has some in common with "full."
+    'chrome_browser_safe_browsing_mobile_extended_sources': [
+      'browser/renderer_host/safe_browsing_resource_throttle.cc',
+      'browser/renderer_host/safe_browsing_resource_throttle.h',
+      'browser/safe_browsing/android_safe_browsing_api_handler.cc',
+      'browser/safe_browsing/android_safe_browsing_api_handler.h',
+      'browser/safe_browsing/database_manager.h',
+      'browser/safe_browsing/remote_database_manager.cc',
+      'browser/safe_browsing/remote_database_manager.h',
+    ],
+    # "Safe Browsing Full" files in addition to the "basic" ones to use for
+    # full safe browsing. This has some in common with "mobile_extended."
     'chrome_browser_safe_browsing_full_sources': [
       'browser/download/download_completion_blocker.cc',
       'browser/download/download_completion_blocker.h',
@@ -2399,7 +2425,6 @@
       'browser/safe_browsing/client_side_detection_host.h',
       'browser/safe_browsing/client_side_detection_service.cc',
       'browser/safe_browsing/client_side_detection_service.h',
-      'browser/safe_browsing/database_manager.cc',
       'browser/safe_browsing/database_manager.h',
       'browser/safe_browsing/download_feedback.cc',
       'browser/safe_browsing/download_feedback.h',
@@ -2455,6 +2480,8 @@
       'browser/safe_browsing/incident_reporting/variations_seed_signature_analyzer.h',
       'browser/safe_browsing/incident_reporting/variations_seed_signature_incident.cc',
       'browser/safe_browsing/incident_reporting/variations_seed_signature_incident.h',
+      'browser/safe_browsing/local_database_manager.cc',
+      'browser/safe_browsing/local_database_manager.h',
       'browser/safe_browsing/path_sanitizer.cc',
       'browser/safe_browsing/path_sanitizer.h',
       'browser/safe_browsing/prefix_set.cc',
@@ -2658,10 +2685,17 @@
       'browser/spellchecker/word_trimmer.h',
     ],
     'chrome_browser_ssl_sources': [
+      'browser/ssl/certificate_error_report.cc',
+      'browser/ssl/certificate_error_report.h',
+      'browser/ssl/chrome_fraudulent_certificate_reporter.cc',
+      'browser/ssl/chrome_fraudulent_certificate_reporter.h',
       'browser/ssl/chrome_ssl_host_state_delegate.cc',
       'browser/ssl/chrome_ssl_host_state_delegate.h',
       'browser/ssl/chrome_ssl_host_state_delegate_factory.cc',
       'browser/ssl/chrome_ssl_host_state_delegate_factory.h',
+      'browser/ssl/connection_security_helper.cc',
+      'browser/ssl/connection_security_helper.h',
+      'browser/ssl/connection_security_helper_android.cc',
       'browser/ssl/ssl_blocking_page.cc',
       'browser/ssl/ssl_blocking_page.h',
       'browser/ssl/ssl_cert_reporter.h',
@@ -2881,21 +2915,23 @@
       'browser/caps/generate_state_json.h',
 
       # New Task Manager Sources:
-      'browser/task_management/providers/browser_process_task_provider.cc',
-      'browser/task_management/providers/browser_process_task_provider.h',
       'browser/task_management/providers/browser_process_task.cc',
       'browser/task_management/providers/browser_process_task.h',
-      'browser/task_management/providers/child_process_task_provider.cc',
-      'browser/task_management/providers/child_process_task_provider.h',
+      'browser/task_management/providers/browser_process_task_provider.cc',
+      'browser/task_management/providers/browser_process_task_provider.h',
       'browser/task_management/providers/child_process_task.cc',
       'browser/task_management/providers/child_process_task.h',
-      'browser/task_management/providers/task_provider_observer.h',
-      'browser/task_management/providers/task_provider.cc',
-      'browser/task_management/providers/task_provider.h',
+      'browser/task_management/providers/child_process_task_provider.cc',
+      'browser/task_management/providers/child_process_task_provider.h',
       'browser/task_management/providers/task.cc',
       'browser/task_management/providers/task.h',
+      'browser/task_management/providers/task_provider.cc',
+      'browser/task_management/providers/task_provider.h',
+      'browser/task_management/providers/task_provider_observer.h',
       'browser/task_management/providers/web_contents/renderer_task.cc',
       'browser/task_management/providers/web_contents/renderer_task.h',
+      'browser/task_management/providers/web_contents/subframe_task.cc',
+      'browser/task_management/providers/web_contents/subframe_task.h',
 
       # Old Task Manager Sources:
       'browser/task_manager/background_information.cc',
@@ -2997,6 +3033,7 @@
         'chrome_resources.gyp:theme_resources',
         'common',
         'common_net',
+        'encrypted_cert_logger_proto',
         'in_memory_url_index_cache_proto',
         'probe_message_proto',
         '../components/components.gyp:autofill_core_browser',
@@ -3116,6 +3153,7 @@
         ['OS != "ios"', {
           'dependencies': [
             'apps',
+            'common_mojo_bindings',
             'debugger',
             'installer_util',
             '../third_party/re2/re2.gyp:re2',
@@ -3294,7 +3332,7 @@
         ['enable_spellcheck==1', {
           'sources': [ '<@(chrome_browser_spellchecker_sources)' ],
           'dependencies': [
-            '../third_party/hunspell_new/hunspell.gyp:hunspell',
+            '../third_party/hunspell/hunspell.gyp:hunspell',
           ],
         }],
         ['disable_nacl==0', {
@@ -3358,6 +3396,12 @@
           'conditions': [
             ['safe_browsing == 1', {
               'sources': [ '<@(chrome_browser_safe_browsing_full_sources)' ],
+              'dependencies': [
+                'safe_browsing_proto',
+              ],
+            }],
+            ['safe_browsing == 3', {
+              'sources': [ '<@(chrome_browser_safe_browsing_mobile_extended_sources)' ],
               'dependencies': [
                 'safe_browsing_proto',
               ],
@@ -3703,10 +3747,23 @@
     {
       # Protobuf compiler / generator for the fraudulent certificate reporting
       # protocol buffer.
-      # GN version: //chrome/browser/net:cert_logger_proto
+      # GN version: //chrome/browser/ssl:cert_logger_proto
       'target_name': 'cert_logger_proto',
       'type': 'static_library',
-      'sources': [ 'browser/net/cert_logger.proto', ],
+      'sources': [ 'browser/ssl/cert_logger.proto', ],
+      'variables': {
+        'proto_in_dir': 'browser/ssl',
+        'proto_out_dir': 'chrome/browser/ssl',
+      },
+      'includes': [ '../build/protoc.gypi', ],
+    },
+    {
+      # Protobuf compiler / generator for the encrypted certificate
+      #  reports protocol buffer.
+      # GN version: //chrome/browser/net:encrypted_cert_logger_proto
+      'target_name': 'encrypted_cert_logger_proto',
+      'type': 'static_library',
+      'sources': [ 'browser/net/encrypted_cert_logger.proto', ],
       'variables': {
         'proto_in_dir': 'browser/net',
         'proto_out_dir': 'chrome/browser/net',
@@ -3820,10 +3877,10 @@
         },
         {
           # GN: //chrome/android:chrome_android_java_enums_srcjar
-          'target_name': 'toolbar_model_security_levels_java',
+          'target_name': 'connection_security_helper_security_levels_java',
           'type': 'none',
           'variables': {
-            'source_file': 'browser/ui/toolbar/toolbar_model.h',
+            'source_file': 'browser/ssl/connection_security_helper.h',
           },
           'includes': [ '../build/android/java_cpp_enum.gypi' ],
         },

@@ -12,6 +12,8 @@
     'mojom_generated_outputs': [
       '<!@(python <(DEPTH)/third_party/mojo/src/mojo/public/tools/bindings/mojom_list_outputs.py --basedir <(mojom_base_output_dir) <@(mojom_files))',
     ],
+    'mojom_include_path%': '<(DEPTH)',
+    'require_interface_bindings%': 1,
   },
   # Given mojom files as inputs, generate sources.  These sources will be
   # exported to another target (via dependent_settings) to be compiled.  This
@@ -41,7 +43,8 @@
         'stamp_filename': '<(PRODUCT_DIR)/java_mojo/<(_target_name)/<(_target_name).stamp',
         'mojom_import_args%': [
          '-I<(DEPTH)',
-         '-I<(DEPTH)/third_party/mojo/src'
+         '-I<(DEPTH)/third_party/mojo/src',
+         '-I<(mojom_include_path)',
         ],
       },
       'inputs': [
@@ -65,10 +68,18 @@
       'message': 'Generating Mojo bindings from <@(mojom_files)',
     }
   ],
+  'conditions': [
+    ['require_interface_bindings==1', {
+      'dependencies': [
+        '<(DEPTH)/third_party/mojo/mojo_public.gyp:mojo_interface_bindings_generation',
+      ],
+    }],
+  ],
   # Prevent the generated sources from being injected into the "all" target by
   # preventing the code generator from being directly depended on by the "all"
   # target.
   'suppress_wildcard': '1',
+  'hard_dependency': '1',
   'direct_dependent_settings': {
     # A target directly depending on this action will compile the generated
     # sources.
@@ -102,6 +113,7 @@
           '<@(mojom_bindings_generator_sources)',
           '<@(mojom_files)',
         ],
+        'mojom_generated_sources': [ '<@(mojom_generated_outputs)' ],
       },
     }
   },

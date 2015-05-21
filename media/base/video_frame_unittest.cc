@@ -258,7 +258,8 @@ TEST(VideoFrame, TextureNoLongerNeededCallbackIsCalled) {
         gfx::Rect(10, 10),  // visible_rect
         gfx::Size(10, 10),  // natural_size
         base::TimeDelta(),  // timestamp
-        false);             // allow_overlay
+        false,              // allow_overlay
+        true);              // has_alpha
     EXPECT_EQ(VideoFrame::TEXTURE_RGBA, frame->texture_format());
   }
   // Nobody set a sync point to |frame|, so |frame| set |called_sync_point| to 0
@@ -375,6 +376,14 @@ TEST(VideoFrameMetadata, SetAndThenGetAllKeysForAllTypes) {
     std::string string_value;
     EXPECT_TRUE(metadata.GetString(key, &string_value));
     EXPECT_EQ(base::StringPrintf("\xfe%d\xff", i), string_value);
+    metadata.Clear();
+
+    EXPECT_FALSE(metadata.HasKey(key));
+    metadata.SetTimeDelta(key, base::TimeDelta::FromInternalValue(42 + i));
+    EXPECT_TRUE(metadata.HasKey(key));
+    base::TimeDelta delta_value;
+    EXPECT_TRUE(metadata.GetTimeDelta(key, &delta_value));
+    EXPECT_EQ(base::TimeDelta::FromInternalValue(42 + i), delta_value);
     metadata.Clear();
 
     EXPECT_FALSE(metadata.HasKey(key));

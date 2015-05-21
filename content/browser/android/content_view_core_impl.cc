@@ -32,7 +32,6 @@
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_view_android.h"
-#include "content/browser/transition_request_manager.h"
 #include "content/browser/web_contents/web_contents_view_android.h"
 #include "content/common/frame_messages.h"
 #include "content/common/input/web_input_event_traits.h"
@@ -54,6 +53,7 @@
 #include "ui/android/view_android.h"
 #include "ui/android/window_android.h"
 #include "ui/gfx/android/java_bitmap.h"
+#include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/screen.h"
@@ -584,6 +584,13 @@ bool ContentViewCoreImpl::HasFocus() {
   return Java_ContentViewCore_hasFocus(env, obj.obj());
 }
 
+void ContentViewCoreImpl::RequestDisallowInterceptTouchEvent() {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
+  if (!obj.is_null())
+    Java_ContentViewCore_requestDisallowInterceptTouchEvent(env, obj.obj());
+}
+
 void ContentViewCoreImpl::OnSelectionChanged(const std::string& text) {
   JNIEnv* env = AttachCurrentThread();
   ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
@@ -793,7 +800,7 @@ void ContentViewCoreImpl::MoveRangeSelectionExtent(const gfx::PointF& extent) {
   if (!web_contents_)
     return;
 
-  web_contents_->MoveRangeSelectionExtent(gfx::Point(extent.x(), extent.y()));
+  web_contents_->MoveRangeSelectionExtent(gfx::ToRoundedPoint(extent));
 }
 
 void ContentViewCoreImpl::SelectBetweenCoordinates(const gfx::PointF& base,
@@ -801,8 +808,8 @@ void ContentViewCoreImpl::SelectBetweenCoordinates(const gfx::PointF& base,
   if (!web_contents_)
     return;
 
-  gfx::Point base_point = gfx::Point(base.x(), base.y());
-  gfx::Point extent_point = gfx::Point(extent.x(), extent.y());
+  gfx::Point base_point = gfx::ToRoundedPoint(base);
+  gfx::Point extent_point = gfx::ToRoundedPoint(extent);
   if (base_point == extent_point)
     return;
 

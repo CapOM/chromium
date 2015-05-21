@@ -10,6 +10,7 @@
 #include "base/basictypes.h"
 #include "cc/base/cc_export.h"
 #include "ui/gfx/geometry/rect.h"
+#include "ui/gfx/geometry/scroll_offset.h"
 #include "ui/gfx/transform.h"
 
 namespace cc {
@@ -96,7 +97,7 @@ struct CC_EXPORT TransformNodeData {
   gfx::Vector2dF sublayer_scale;
 
   // TODO(vollick): will be moved when accelerated effects are implemented.
-  gfx::Vector2dF scroll_offset;
+  gfx::ScrollOffset scroll_offset;
 
   // We scroll snap where possible, but this has an effect on scroll
   // compensation: the snap is yet more scrolling that must be compensated for.
@@ -140,8 +141,16 @@ class CC_EXPORT PropertyTree {
 
   int Insert(const T& tree_node, int parent_id);
 
-  T* Node(int i) { return i > -1 ? &nodes_[i] : nullptr; }
-  const T* Node(int i) const { return i > -1 ? &nodes_[i] : nullptr; }
+  T* Node(int i) {
+    // TODO(vollick): remove this.
+    CHECK(i < static_cast<int>(nodes_.size()));
+    return i > -1 ? &nodes_[i] : nullptr;
+  }
+  const T* Node(int i) const {
+    // TODO(vollick): remove this.
+    CHECK(i < static_cast<int>(nodes_.size()));
+    return i > -1 ? &nodes_[i] : nullptr;
+  }
 
   T* parent(const T* t) { return Node(t->parent_id); }
   const T* parent(const T* t) const { return Node(t->parent_id); }
@@ -245,6 +254,7 @@ class CC_EXPORT PropertyTrees final {
   OpacityTree opacity_tree;
   ClipTree clip_tree;
   bool needs_rebuild;
+  int sequence_number;
 };
 
 }  // namespace cc

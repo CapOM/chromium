@@ -28,6 +28,7 @@
 #include "chrome/browser/interstitials/security_interstitial_metrics_helper.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/renderer_preferences_util.h"
+#include "chrome/browser/ssl/certificate_error_report.h"
 #include "chrome/browser/ssl/ssl_cert_reporter.h"
 #include "chrome/browser/ssl/ssl_error_classification.h"
 #include "chrome/browser/ssl/ssl_error_info.h"
@@ -251,7 +252,8 @@ SSLBlockingPage::SSLBlockingPage(content::WebContents* web_contents,
       overridable_(IsOverridable(
           options_mask,
           Profile::FromBrowserContext(web_contents->GetBrowserContext()))),
-      danger_overridable_(true),
+      danger_overridable_(DoesPolicyAllowDangerOverride(
+          Profile::FromBrowserContext(web_contents->GetBrowserContext()))),
       strict_enforcement_((options_mask & STRICT_ENFORCEMENT) != 0),
       expired_but_previously_allowed_(
           (options_mask & EXPIRED_BUT_PREVIOUSLY_ALLOWED) != 0),
@@ -586,7 +588,7 @@ void SSLBlockingPage::OnProceed() {
 
   // Finish collecting information about invalid certificates, if the
   // user opted in to.
-  FinishCertCollection();
+  FinishCertCollection(CertificateErrorReport::USER_PROCEEDED);
 
   RecordSSLExpirationPageEventState(
       expired_but_previously_allowed_, true, overridable_);
@@ -600,7 +602,7 @@ void SSLBlockingPage::OnDontProceed() {
 
   // Finish collecting information about invalid certificates, if the
   // user opted in to.
-  FinishCertCollection();
+  FinishCertCollection(CertificateErrorReport::USER_DID_NOT_PROCEED);
 
   RecordSSLExpirationPageEventState(
       expired_but_previously_allowed_, false, overridable_);
@@ -649,7 +651,8 @@ std::string SSLBlockingPage::GetSamplingEventName() const {
   return event_name;
 }
 
-void SSLBlockingPage::FinishCertCollection() {
+void SSLBlockingPage::FinishCertCollection(
+    CertificateErrorReport::ProceedDecision user_proceeded) {
   if (!ShouldShowCertificateReporterCheckbox())
     return;
 
@@ -663,8 +666,30 @@ void SSLBlockingPage::FinishCertCollection() {
       SecurityInterstitialMetricsHelper::EXTENDED_REPORTING_IS_ENABLED);
 
   if (ShouldReportCertificateError()) {
-    ssl_cert_reporter_->ReportInvalidCertificateChain(request_url().host(),
-                                                      ssl_info_);
+    std::string serialized_report;
+    CertificateErrorReport report(request_url().host(), ssl_info_);
+
+    CertificateErrorReport::InterstitialReason report_interstitial_reason;
+    switch (interstitial_reason_) {
+      case SSL_REASON_SSL:
+        report_interstitial_reason = CertificateErrorReport::INTERSTITIAL_SSL;
+        break;
+      case SSL_REASON_BAD_CLOCK:
+        report_interstitial_reason = CertificateErrorReport::INTERSTITIAL_CLOCK;
+        break;
+    }
+
+    report.SetInterstitialInfo(
+        report_interstitial_reason, user_proceeded,
+        overridable_ ? CertificateErrorReport::INTERSTITIAL_OVERRIDABLE
+                     : CertificateErrorReport::INTERSTITIAL_NOT_OVERRIDABLE);
+
+    if (!report.Serialize(&serialized_report)) {
+      LOG(ERROR) << "Failed to serialize certificate report.";
+      return;
+    }
+
+    ssl_cert_reporter_->ReportInvalidCertificateChain(serialized_report);
   }
 }
 
@@ -712,4 +737,10 @@ bool SSLBlockingPage::IsOverridable(int options_mask,
       !(options_mask & SSLBlockingPage::STRICT_ENFORCEMENT) &&
       profile->GetPrefs()->GetBoolean(prefs::kSSLErrorOverrideAllowed);
   return is_overridable;
+}
+
+// static
+bool SSLBlockingPage::DoesPolicyAllowDangerOverride(
+    const Profile* const profile) {
+  return profile->GetPrefs()->GetBoolean(prefs::kSSLErrorOverrideAllowed);
 }

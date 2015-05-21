@@ -127,7 +127,7 @@ bool GetHeaders(base::DictionaryValue* params, std::string* headers) {
   if (!params->GetList("headers", &header_list))
     return false;
   std::string double_quote_headers;
-  base::JSONWriter::Write(header_list, &double_quote_headers);
+  base::JSONWriter::Write(*header_list, &double_quote_headers);
   base::ReplaceChars(double_quote_headers, "\"", "'", headers);
   return true;
 }
@@ -1584,9 +1584,6 @@ TEST_P(HttpNetworkTransactionTest, NonKeepAliveConnectionReset) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 }
 
 // What do various browsers do when the server closes a non-keepalive
@@ -1645,7 +1642,6 @@ TEST_P(HttpNetworkTransactionTest, ThrottleBeforeNetworkStart) {
   // Should have deferred for network start.
   EXPECT_TRUE(net_start_handler.observed_before_network_start());
   EXPECT_EQ(LOAD_STATE_WAITING_FOR_DELEGATE, trans->GetLoadState());
-  EXPECT_TRUE(trans->GetResponseInfo() == NULL);
 
   trans->ResumeNetworkStart();
   rv = callback.WaitForResult();
@@ -1686,7 +1682,6 @@ TEST_P(HttpNetworkTransactionTest, ThrottleAndCancelBeforeNetworkStart) {
   // Should have deferred for network start.
   EXPECT_TRUE(net_start_handler.observed_before_network_start());
   EXPECT_EQ(LOAD_STATE_WAITING_FOR_DELEGATE, trans->GetLoadState());
-  EXPECT_TRUE(trans->GetResponseInfo() == NULL);
 }
 
 // Next 2 cases (KeepAliveEarlyClose and KeepAliveEarlyClose2) are regression
@@ -3691,22 +3686,22 @@ TEST_P(HttpNetworkTransactionTest, HttpsProxySpdyConnectSpdy) {
       spdy_util_.ConstructSpdyWindowUpdate(1, wrapped_body->size()));
 
   MockWrite spdy_writes[] = {
-      CreateMockWrite(*connect, 1),
-      CreateMockWrite(*wrapped_get, 3),
-      CreateMockWrite(*window_update_get_resp, 5),
+      CreateMockWrite(*connect, 0),
+      CreateMockWrite(*wrapped_get, 2),
+      CreateMockWrite(*window_update_get_resp, 6),
       CreateMockWrite(*window_update_body, 7),
   };
 
   MockRead spdy_reads[] = {
-      CreateMockRead(*conn_resp, 2, ASYNC),
+      CreateMockRead(*conn_resp, 1, ASYNC),
+      MockRead(ASYNC, ERR_IO_PENDING, 3),
       CreateMockRead(*wrapped_get_resp, 4, ASYNC),
-      CreateMockRead(*wrapped_body, 6, ASYNC),
+      CreateMockRead(*wrapped_body, 5, ASYNC),
       MockRead(ASYNC, 0, 8),
   };
 
-  OrderedSocketData spdy_data(
-      spdy_reads, arraysize(spdy_reads),
-      spdy_writes, arraysize(spdy_writes));
+  SequencedSocketData spdy_data(spdy_reads, arraysize(spdy_reads), spdy_writes,
+                                arraysize(spdy_writes));
   session_deps_.socket_factory->AddSocketDataProvider(&spdy_data);
 
   SSLSocketDataProvider ssl(ASYNC, OK);
@@ -3721,6 +3716,10 @@ TEST_P(HttpNetworkTransactionTest, HttpsProxySpdyConnectSpdy) {
   int rv = trans->Start(&request, callback1.callback(), log.bound());
   EXPECT_EQ(ERR_IO_PENDING, rv);
 
+  // Allow the SpdyProxyClientSocket's write callback to complete.
+  base::MessageLoop::current()->RunUntilIdle();
+  // Now allow the read of the response to complete.
+  spdy_data.CompleteRead();
   rv = callback1.WaitForResult();
   EXPECT_EQ(OK, rv);
 
@@ -5003,9 +5002,6 @@ TEST_P(HttpNetworkTransactionTest, LargeHeadersNoBody) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_RESPONSE_HEADERS_TOO_BIG, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 }
 
 // Make sure that we don't try to reuse a TCPClientSocket when failing to
@@ -5054,9 +5050,6 @@ TEST_P(HttpNetworkTransactionTest,
 
   rv = callback1.WaitForResult();
   EXPECT_EQ(ERR_TUNNEL_CONNECTION_FAILED, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 
   // Empty the current queue.  This is necessary because idle sockets are
   // added to the connection pool asynchronously with a PostTask.
@@ -8534,9 +8527,6 @@ TEST_P(HttpNetworkTransactionTest, UploadUnreadableFile) {
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_ACCESS_DENIED, rv);
 
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_FALSE(response);
-
   base::DeleteFile(temp_file, false);
 }
 
@@ -10186,10 +10176,7 @@ TEST_P(HttpNetworkTransactionTest, GenerateAuthToken) {
       // Compare results with expected data.
       EXPECT_EQ(read_write_round.expected_rv, rv);
       const HttpResponseInfo* response = trans.GetResponseInfo();
-      if (read_write_round.expected_rv == OK) {
-        ASSERT_TRUE(response != NULL);
-      } else {
-        EXPECT_TRUE(response == NULL);
+      if (read_write_round.expected_rv != OK) {
         EXPECT_EQ(round + 1, test_config.num_auth_rounds);
         continue;
       }
@@ -11089,8 +11076,8 @@ TEST_P(HttpNetworkTransactionTest,
 
   // [ssl_]data3 contains the data for the third SSL handshake. When a
   // connection to a server fails during an SSL handshake,
-  // HttpNetworkTransaction will attempt to fallback to TLSv1 if the previous
-  // connection was attempted with TLSv1.1. This is transparent to the caller
+  // HttpNetworkTransaction will attempt to fallback to TLSv1.1 if the previous
+  // connection was attempted with TLSv1.2. This is transparent to the caller
   // of the HttpNetworkTransaction. Because this test failure is due to
   // requiring a client certificate, this fallback handshake should also
   // fail.
@@ -11102,8 +11089,8 @@ TEST_P(HttpNetworkTransactionTest,
 
   // [ssl_]data4 contains the data for the fourth SSL handshake. When a
   // connection to a server fails during an SSL handshake,
-  // HttpNetworkTransaction will attempt to fallback to SSLv3 if the previous
-  // connection was attempted with TLSv1. This is transparent to the caller
+  // HttpNetworkTransaction will attempt to fallback to TLSv1 if the previous
+  // connection was attempted with TLSv1.1. This is transparent to the caller
   // of the HttpNetworkTransaction. Because this test failure is due to
   // requiring a client certificate, this fallback handshake should also
   // fail.
@@ -11112,13 +11099,6 @@ TEST_P(HttpNetworkTransactionTest,
   session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl_data4);
   StaticSocketDataProvider data4(NULL, 0, NULL, 0);
   session_deps_.socket_factory->AddSocketDataProvider(&data4);
-
-  // Need one more if TLSv1.2 is enabled.
-  SSLSocketDataProvider ssl_data5(ASYNC, ERR_SSL_PROTOCOL_ERROR);
-  ssl_data5.cert_request_info = cert_request.get();
-  session_deps_.socket_factory->AddSSLSocketDataProvider(&ssl_data5);
-  StaticSocketDataProvider data5(NULL, 0, NULL, 0);
-  session_deps_.socket_factory->AddSocketDataProvider(&data5);
 
   scoped_refptr<HttpNetworkSession> session(CreateSession(&session_deps_));
   scoped_ptr<HttpTransaction> trans(
@@ -11885,8 +11865,8 @@ class AltSvcCertificateVerificationTest : public HttpNetworkTransactionTest {
       reads.push_back(MockRead(ASYNC, OK, 3));
     }
 
-    OrderedSocketData data(vector_as_array(&reads), reads.size(),
-                           vector_as_array(&writes), writes.size());
+    SequencedSocketData data(vector_as_array(&reads), reads.size(),
+                             vector_as_array(&writes), writes.size());
     session_deps_.socket_factory->AddSocketDataProvider(&data);
 
     // Connection to the origin fails.
@@ -11931,6 +11911,10 @@ class AltSvcCertificateVerificationTest : public HttpNetworkTransactionTest {
 
     int rv = trans1->Start(&request1, callback1.callback(), BoundNetLog());
     EXPECT_EQ(ERR_IO_PENDING, rv);
+    base::MessageLoop::current()->RunUntilIdle();
+    if (data.IsReadPaused()) {
+      data.CompleteRead();
+    }
     rv = callback1.WaitForResult();
     if (valid) {
       EXPECT_EQ(OK, rv);
@@ -12743,8 +12727,6 @@ TEST_P(HttpNetworkTransactionTest, HttpSyncConnectError) {
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_REFUSED, rv);
 
-  EXPECT_EQ(NULL, trans->GetResponseInfo());
-
   // We don't care whether this succeeds or fails, but it shouldn't crash.
   HttpRequestHeaders request_headers;
   trans->GetFullRequestHeaders(&request_headers);
@@ -12777,8 +12759,6 @@ TEST_P(HttpNetworkTransactionTest, HttpAsyncConnectError) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_REFUSED, rv);
-
-  EXPECT_EQ(NULL, trans->GetResponseInfo());
 
   // We don't care whether this succeeds or fails, but it shouldn't crash.
   HttpRequestHeaders request_headers;
@@ -12819,8 +12799,6 @@ TEST_P(HttpNetworkTransactionTest, HttpSyncWriteError) {
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
 
-  EXPECT_EQ(NULL, trans->GetResponseInfo());
-
   HttpRequestHeaders request_headers;
   EXPECT_TRUE(trans->GetFullRequestHeaders(&request_headers));
   EXPECT_TRUE(request_headers.HasHeader("Host"));
@@ -12854,8 +12832,6 @@ TEST_P(HttpNetworkTransactionTest, HttpAsyncWriteError) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  EXPECT_EQ(NULL, trans->GetResponseInfo());
 
   HttpRequestHeaders request_headers;
   EXPECT_TRUE(trans->GetFullRequestHeaders(&request_headers));
@@ -12894,8 +12870,6 @@ TEST_P(HttpNetworkTransactionTest, HttpSyncReadError) {
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
 
-  EXPECT_EQ(NULL, trans->GetResponseInfo());
-
   HttpRequestHeaders request_headers;
   EXPECT_TRUE(trans->GetFullRequestHeaders(&request_headers));
   EXPECT_TRUE(request_headers.HasHeader("Host"));
@@ -12932,8 +12906,6 @@ TEST_P(HttpNetworkTransactionTest, HttpAsyncReadError) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  EXPECT_EQ(NULL, trans->GetResponseInfo());
 
   HttpRequestHeaders request_headers;
   EXPECT_TRUE(trans->GetFullRequestHeaders(&request_headers));
@@ -13963,9 +13935,6 @@ TEST_P(HttpNetworkTransactionTest, PostIgnoresNonErrorResponseAfterReset) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 }
 
 TEST_P(HttpNetworkTransactionTest,
@@ -14010,9 +13979,6 @@ TEST_P(HttpNetworkTransactionTest,
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 }
 
 TEST_P(HttpNetworkTransactionTest, PostIgnoresHttp09ResponseAfterReset) {
@@ -14053,9 +14019,6 @@ TEST_P(HttpNetworkTransactionTest, PostIgnoresHttp09ResponseAfterReset) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 }
 
 TEST_P(HttpNetworkTransactionTest, PostIgnoresPartial400HeadersAfterReset) {
@@ -14096,9 +14059,6 @@ TEST_P(HttpNetworkTransactionTest, PostIgnoresPartial400HeadersAfterReset) {
 
   rv = callback.WaitForResult();
   EXPECT_EQ(ERR_CONNECTION_RESET, rv);
-
-  const HttpResponseInfo* response = trans->GetResponseInfo();
-  EXPECT_TRUE(response == NULL);
 }
 
 // Verify that proxy headers are not sent to the destination server when

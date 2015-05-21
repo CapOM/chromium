@@ -42,13 +42,13 @@ import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.metrics.UmaUtils;
 import org.chromium.chrome.browser.printing.TabPrinter;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityHelper;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityHelperSecurityLevel;
 import org.chromium.chrome.browser.tab.SadTabViewFactory;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
 import org.chromium.chrome.browser.tabmodel.TabModelBase;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
-import org.chromium.chrome.browser.toolbar.ToolbarModel;
-import org.chromium.chrome.browser.ui.toolbar.ToolbarModelSecurityLevel;
 import org.chromium.components.navigation_interception.InterceptNavigationDelegate;
 import org.chromium.content.browser.ContentView;
 import org.chromium.content.browser.ContentViewClient;
@@ -339,6 +339,11 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         @Override
         public void onSaveImageToClipboard(String url) {
             mClipboard.setHTMLText("<img src=\"" + url + "\">", url, url);
+        }
+
+        @Override
+        public void onShowOriginalImage() {
+            if (mNativeTabAndroid != 0) nativeShowOriginalImage(mNativeTabAndroid);
         }
 
         @Override
@@ -1144,11 +1149,11 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
-     * @return The current {ToolbarModelSecurityLevel} for the tab.
+     * @return The current {@link ConnectionSecurityHelperSecurityLevel} for the tab.
      */
     // TODO(tedchoc): Remove this and transition all clients to use ToolbarModel directly.
     public int getSecurityLevel() {
-        return ToolbarModel.getSecurityLevelForWebContents(getWebContents());
+        return ConnectionSecurityHelper.getSecurityLevelForWebContents(getWebContents());
     }
 
     /**
@@ -1832,6 +1837,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * @return The bitmap of the favicon scaled to 16x16dp. null if no favicon
      *         is specified or it requires the default favicon.
      */
+    @CalledByNative
     public Bitmap getFavicon() {
         // If we have no content or a native page, return null.
         if (getContentViewCore() == null) return null;
@@ -2193,7 +2199,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * @param didFinishLoad Whether WebContentsObserver::DidFinishLoad() has
      *         already been called.
      */
-    protected void swapContentViewCore(ContentViewCore newContentViewCore,
+    public void swapContentViewCore(ContentViewCore newContentViewCore,
             boolean deleteOldNativeWebContents, boolean didStartLoad, boolean didFinishLoad) {
         int originalWidth = 0;
         int originalHeight = 0;
@@ -2450,8 +2456,9 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
                 && !url.startsWith(UrlConstants.CHROME_NATIVE_SCHEME);
 
         int securityState = getSecurityLevel();
-        enableHidingTopControls &= (securityState != ToolbarModelSecurityLevel.SECURITY_ERROR
-                && securityState != ToolbarModelSecurityLevel.SECURITY_WARNING);
+        enableHidingTopControls &=
+                (securityState != ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR
+                        && securityState != ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING);
 
         enableHidingTopControls &=
                 !AccessibilityUtil.isAccessibilityEnabled(getApplicationContext());
@@ -2767,6 +2774,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private native void nativeCreateHistoricalTab(long nativeTabAndroid);
     private native void nativeUpdateTopControlsState(
             long nativeTabAndroid, int constraints, int current, boolean animate);
+    private native void nativeShowOriginalImage(long nativeTabAndroid);
     private native void nativeSearchByImageInNewTabAsync(long nativeTabAndroid);
     private native long nativeGetBookmarkId(long nativeTabAndroid, boolean onlyEditable);
     private native void nativeSetInterceptNavigationDelegate(long nativeTabAndroid,

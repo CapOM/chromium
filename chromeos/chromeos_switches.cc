@@ -111,9 +111,9 @@ const char kEnableConsumerManagement[] = "enable-consumer-management";
 // If this switch is set, the device cannot be remotely disabled by its owner.
 const char kDisableDeviceDisabling[] = "disable-device-disabling";
 
-// If this switch is set, the new Korean IME will be available in
+// If this switch is set, the new Korean IME will not be available in
 // chrome://settings/languages.
-const char kEnableNewKoreanIme[] = "enable-new-korean-ime";
+const char kDisableNewKoreanIme[] = "disable-new-korean-ime";
 
 // Disables mtp write support.
 const char kDisableMtpWriteSupport[] = "disable-mtp-write-support";
@@ -324,9 +324,6 @@ const char kDisableTimeZoneTrackingOption[] =
 // Disable new GAIA sign-in flow.
 const char kDisableWebviewSigninFlow[] = "disable-webview-signin-flow";
 
-// Enable Chrome OS firewall hole-punching for Chrome Apps.
-const char kEnableFirewallHolePunching[] = "enable-firewall-hole-punching";
-
 // Enables searching for an app that supports a plugged in USB printer. When a
 // user plugs in USB printer, they are shown a notification offering to search
 // Chroem Web Store for an app that has printerProvider permission and can
@@ -351,40 +348,38 @@ bool MemoryPressureHandlingEnabled() {
   return true;
 }
 
-base::MemoryPressureMonitorChromeOS::MemoryPressureThresholds
+base::chromeos::MemoryPressureMonitor::MemoryPressureThresholds
 GetMemoryPressureThresholds() {
+  using MemoryPressureMonitor = base::chromeos::MemoryPressureMonitor;
+
   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           kMemoryPressureThresholds)) {
     const std::string group_name =
         base::FieldTrialList::FindFullName(kMemoryPressureExperimentName);
     if (group_name == kConservativeThreshold)
-      return base::MemoryPressureMonitorChromeOS::THRESHOLD_CONSERVATIVE;
+      return MemoryPressureMonitor::THRESHOLD_CONSERVATIVE;
     if (group_name == kAggressiveCacheDiscardThreshold)
-      return base::MemoryPressureMonitorChromeOS::
-          THRESHOLD_AGGRESSIVE_CACHE_DISCARD;
+      return MemoryPressureMonitor::THRESHOLD_AGGRESSIVE_CACHE_DISCARD;
     if (group_name == kAggressiveTabDiscardThreshold)
-      return base::MemoryPressureMonitorChromeOS::
-          THRESHOLD_AGGRESSIVE_TAB_DISCARD;
+      return MemoryPressureMonitor::THRESHOLD_AGGRESSIVE_TAB_DISCARD;
     if (group_name == kAggressiveThreshold)
-      return base::MemoryPressureMonitorChromeOS::THRESHOLD_AGGRESSIVE;
-    return base::MemoryPressureMonitorChromeOS::THRESHOLD_DEFAULT;
+      return MemoryPressureMonitor::THRESHOLD_AGGRESSIVE;
+    return MemoryPressureMonitor::THRESHOLD_DEFAULT;
   }
 
   const std::string option =
       base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII(
           kMemoryPressureThresholds);
   if (option == kConservativeThreshold)
-    return base::MemoryPressureMonitorChromeOS::THRESHOLD_CONSERVATIVE;
+    return MemoryPressureMonitor::THRESHOLD_CONSERVATIVE;
   if (option == kAggressiveCacheDiscardThreshold)
-    return base::MemoryPressureMonitorChromeOS::
-        THRESHOLD_AGGRESSIVE_CACHE_DISCARD;
+    return MemoryPressureMonitor::THRESHOLD_AGGRESSIVE_CACHE_DISCARD;
   if (option == kAggressiveTabDiscardThreshold)
-    return base::MemoryPressureMonitorChromeOS::
-        THRESHOLD_AGGRESSIVE_TAB_DISCARD;
+    return MemoryPressureMonitor::THRESHOLD_AGGRESSIVE_TAB_DISCARD;
   if (option == kAggressiveThreshold)
-    return base::MemoryPressureMonitorChromeOS::THRESHOLD_AGGRESSIVE;
+    return MemoryPressureMonitor::THRESHOLD_AGGRESSIVE;
 
-  return base::MemoryPressureMonitorChromeOS::THRESHOLD_DEFAULT;
+  return MemoryPressureMonitor::THRESHOLD_DEFAULT;
 }
 
 }  // namespace switches

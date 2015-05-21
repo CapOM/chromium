@@ -60,3 +60,12 @@ class PowerTop25(benchmark.Benchmark):
   @classmethod
   def Name(cls):
     return 'power.top_25'
+
+  def CreateUserStorySet(self, _):
+    # Exclude techcrunch.com. It is not suitable for this benchmark because it
+    # does not consistently become quiescent within 60 seconds.
+    user_stories = self.page_set()
+    found = next((x for x in user_stories if 'techcrunch.com' in x.url), None)
+    if found:
+      user_stories.RemoveUserStory(found)
+    return user_stories

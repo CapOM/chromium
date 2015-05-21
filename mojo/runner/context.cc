@@ -19,13 +19,13 @@
 #include "base/strings/string_util.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
+#include "mojo/application/public/cpp/application_connection.h"
+#include "mojo/application/public/cpp/application_delegate.h"
+#include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/common/trace_controller_impl.h"
 #include "mojo/common/tracing_impl.h"
 #include "mojo/edk/embedder/embedder.h"
 #include "mojo/edk/embedder/simple_platform_support.h"
-#include "mojo/public/cpp/application/application_connection.h"
-#include "mojo/public/cpp/application/application_delegate.h"
-#include "mojo/public/cpp/application/application_impl.h"
 #include "mojo/runner/in_process_native_runner.h"
 #include "mojo/runner/out_of_process_native_runner.h"
 #include "mojo/runner/switches.h"
@@ -316,6 +316,21 @@ void Context::Run(const GURL& url) {
   application_manager_.ConnectToApplication(
       url, GURL(), GetProxy(&services), exposed_services.Pass(),
       base::Bind(&Context::OnApplicationEnd, base::Unretained(this), url));
+}
+
+void Context::RunCommandLineApplication() {
+  // If an app isn't specified (i.e. for an apptest), run the window manager.
+  GURL app_url("mojo:window_manager");
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  base::CommandLine::StringVector args = command_line->GetArgs();
+  for (size_t i = 0; i < args.size(); ++i) {
+    GURL possible_app(args[i]);
+    if (possible_app.SchemeIs("mojo")) {
+      app_url = possible_app;
+      break;
+    }
+  }
+  Run(app_url);
 }
 
 void Context::OnApplicationEnd(const GURL& url) {

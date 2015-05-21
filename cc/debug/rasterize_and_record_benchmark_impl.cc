@@ -12,7 +12,7 @@
 #include "cc/debug/lap_timer.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/layers/picture_layer_impl.h"
-#include "cc/resources/tile_task_worker_pool.h"
+#include "cc/raster/tile_task_worker_pool.h"
 #include "cc/trees/layer_tree_host_common.h"
 #include "cc/trees/layer_tree_host_impl.h"
 #include "cc/trees/layer_tree_impl.h"
@@ -170,20 +170,21 @@ void RasterizeAndRecordBenchmarkImpl::RunOnLayer(PictureLayerImpl* layer) {
   // really matter.
   const LayerTreeSettings& settings = layer->layer_tree_impl()->settings();
   scoped_ptr<PictureLayerTilingSet> tiling_set = PictureLayerTilingSet::Create(
-      layer->GetTree(), &client, settings.max_tiles_for_interest_area,
+      layer->GetTree(), &client,
+      settings.tiling_interest_area_viewport_multiplier,
       settings.skewport_target_time_in_seconds,
       settings.skewport_extrapolation_limit_in_content_pixels);
 
   PictureLayerTiling* tiling = tiling_set->AddTiling(layer->contents_scale_x(),
                                                      layer->GetRasterSource());
   tiling->CreateAllTilesForTesting();
+  RasterSource* raster_source = tiling->raster_source();
   for (PictureLayerTiling::CoverageIterator it(
            tiling, layer->contents_scale_x(), layer->visible_content_rect());
        it;
        ++it) {
     DCHECK(*it);
 
-    RasterSource* raster_source = (*it)->raster_source();
     gfx::Rect content_rect = (*it)->content_rect();
     float contents_scale = (*it)->contents_scale();
 

@@ -69,8 +69,7 @@ class ExtensionUninstallDialogDelegateView : public views::DialogDelegateView {
  public:
   ExtensionUninstallDialogDelegateView(
       ExtensionUninstallDialogViews* dialog_view,
-      const extensions::Extension* extension,
-      const extensions::Extension* triggering_extension,
+      bool triggered_by_extension,
       gfx::ImageSkia* image);
   ~ExtensionUninstallDialogDelegateView() override;
 
@@ -81,6 +80,7 @@ class ExtensionUninstallDialogDelegateView : public views::DialogDelegateView {
  private:
   // views::DialogDelegate:
   views::View* CreateExtraView() override;
+  bool GetExtraViewPadding(int* padding) override;
   base::string16 GetDialogButtonLabel(ui::DialogButton button) const override;
   int GetDefaultDialogButton() const override {
     // Default to accept when triggered via chrome://extensions page.
@@ -135,7 +135,7 @@ void ExtensionUninstallDialogViews::Show() {
   }
 
   view_ = new ExtensionUninstallDialogDelegateView(
-      this, extension_, triggering_extension_, &icon_);
+      this, triggering_extension_.get() != nullptr, &icon_);
   constrained_window::CreateBrowserModalDialogViews(view_, parent_)->Show();
 }
 
@@ -162,11 +162,10 @@ void ExtensionUninstallDialogViews::ExtensionUninstallCanceled() {
 
 ExtensionUninstallDialogDelegateView::ExtensionUninstallDialogDelegateView(
     ExtensionUninstallDialogViews* dialog_view,
-    const extensions::Extension* extension,
-    const extensions::Extension* triggering_extension,
+    bool triggered_by_extension,
     gfx::ImageSkia* image)
     : dialog_(dialog_view),
-      triggered_by_extension_(triggering_extension != NULL),
+      triggered_by_extension_(triggered_by_extension),
       report_abuse_checkbox_(nullptr) {
   // Scale down to icon size, but allow smaller icons (don't scale up).
   gfx::Size size(image->width(), image->height());
@@ -201,6 +200,13 @@ views::View* ExtensionUninstallDialogDelegateView::CreateExtraView() {
         l10n_util::GetStringUTF16(IDS_EXTENSION_PROMPT_UNINSTALL_REPORT_ABUSE));
   }
   return report_abuse_checkbox_;
+}
+
+bool ExtensionUninstallDialogDelegateView::GetExtraViewPadding(int* padding) {
+  // We want a little more padding between the "report abuse" checkbox and the
+  // buttons.
+  *padding = views::kUnrelatedControlLargeHorizontalSpacing;
+  return true;
 }
 
 base::string16 ExtensionUninstallDialogDelegateView::GetDialogButtonLabel(

@@ -229,8 +229,7 @@ void SoftwareRenderer::PrepareSurfaceForPass(
   }
 }
 
-bool SoftwareRenderer::IsSoftwareResource(
-    ResourceProvider::ResourceId resource_id) const {
+bool SoftwareRenderer::IsSoftwareResource(ResourceId resource_id) const {
   switch (resource_provider_->GetResourceType(resource_id)) {
     case ResourceProvider::RESOURCE_TYPE_GL_TEXTURE:
       return false;
@@ -438,7 +437,7 @@ void SoftwareRenderer::DrawTextureQuad(const DrawingFrame* frame,
       QuadVertexRect(), quad->rect, quad->visible_rect);
   SkRect quad_rect = gfx::RectFToSkRect(visible_quad_vertex_rect);
 
-  if (quad->flipped)
+  if (quad->y_flipped)
     current_canvas_->scale(1, -1);
 
   bool blend_background = quad->background_color != SK_ColorTRANSPARENT &&
@@ -453,6 +452,8 @@ void SoftwareRenderer::DrawTextureQuad(const DrawingFrame* frame,
     background_paint.setColor(quad->background_color);
     current_canvas_->drawRect(quad_rect, background_paint);
   }
+  current_paint_.setFilterQuality(
+      quad->nearest_neighbor ? kNone_SkFilterQuality : kLow_SkFilterQuality);
   SkShader::TileMode tile_mode = WrapModeToTileMode(lock.wrap_mode());
   if (tile_mode != SkShader::kClamp_TileMode) {
     SkMatrix matrix;

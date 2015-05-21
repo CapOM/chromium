@@ -16,8 +16,6 @@
 #include "cc/layers/picture_layer.h"
 #include "cc/quads/draw_quad.h"
 #include "cc/quads/tile_draw_quad.h"
-#include "cc/resources/tiling_set_raster_queue_all.h"
-#include "cc/resources/tiling_set_raster_queue_required.h"
 #include "cc/test/begin_frame_args_test.h"
 #include "cc/test/fake_content_layer_client.h"
 #include "cc/test/fake_impl_proxy.h"
@@ -31,6 +29,8 @@
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "cc/test/test_task_graph_runner.h"
 #include "cc/test/test_web_graphics_context_3d.h"
+#include "cc/tiles/tiling_set_raster_queue_all.h"
+#include "cc/tiles/tiling_set_raster_queue_required.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/geometry/rect_conversions.h"
@@ -257,9 +257,11 @@ class PictureLayerImplTest : public testing::Test {
     bool resourceless_software_draw = false;
     layer->UpdateTiles(resourceless_software_draw);
   }
-  static void VerifyAllTilesExistAndHavePile(
+  static void VerifyAllPrioritizedTilesExistAndHavePile(
       const PictureLayerTiling* tiling,
       PicturePileImpl* pile) {
+    auto prioritized_tiles =
+        tiling->UpdateAndGetAllPrioritizedTilesForTesting();
     for (PictureLayerTiling::CoverageIterator iter(
              tiling,
              tiling->contents_scale(),
@@ -267,7 +269,7 @@ class PictureLayerImplTest : public testing::Test {
          iter;
          ++iter) {
       EXPECT_TRUE(*iter);
-      EXPECT_EQ(pile, iter->raster_source());
+      EXPECT_EQ(pile, prioritized_tiles[*iter].raster_source());
     }
   }
 
@@ -696,6 +698,8 @@ TEST_F(PictureLayerImplTest, ClonePartialInvalidation) {
     gfx::Rect content_invalidation = gfx::ScaleToEnclosingRect(
         layer_invalidation,
         tiling->contents_scale());
+    auto prioritized_tiles =
+        tiling->UpdateAndGetAllPrioritizedTilesForTesting();
     for (PictureLayerTiling::CoverageIterator iter(
              tiling,
              tiling->contents_scale(),
@@ -706,7 +710,7 @@ TEST_F(PictureLayerImplTest, ClonePartialInvalidation) {
       // invalidated and it has the latest raster source.
       if (*iter) {
         EXPECT_FALSE(iter.geometry_rect().IsEmpty());
-        EXPECT_EQ(pending_pile.get(), iter->raster_source());
+        EXPECT_EQ(pending_pile.get(), prioritized_tiles[*iter].raster_source());
         EXPECT_TRUE(iter.geometry_rect().Intersects(content_invalidation));
       } else {
         // We don't create tiles in non-invalidated regions.
@@ -721,6 +725,8 @@ TEST_F(PictureLayerImplTest, ClonePartialInvalidation) {
     const PictureLayerTiling* tiling = tilings->tiling_at(i);
     gfx::Rect content_invalidation =
         gfx::ScaleToEnclosingRect(layer_invalidation, tiling->contents_scale());
+    auto prioritized_tiles =
+        tiling->UpdateAndGetAllPrioritizedTilesForTesting();
     for (PictureLayerTiling::CoverageIterator iter(
              tiling,
              tiling->contents_scale(),
@@ -730,7 +736,7 @@ TEST_F(PictureLayerImplTest, ClonePartialInvalidation) {
       EXPECT_TRUE(*iter);
       EXPECT_FALSE(iter.geometry_rect().IsEmpty());
       // Pile will be updated upon activation.
-      EXPECT_EQ(active_pile.get(), iter->raster_source());
+      EXPECT_EQ(active_pile.get(), prioritized_tiles[*iter].raster_source());
     }
   }
 }
@@ -753,7 +759,8 @@ TEST_F(PictureLayerImplTest, CloneFullInvalidation) {
   const PictureLayerTilingSet* tilings = pending_layer_->tilings();
   EXPECT_GT(tilings->num_tilings(), 0u);
   for (size_t i = 0; i < tilings->num_tilings(); ++i)
-    VerifyAllTilesExistAndHavePile(tilings->tiling_at(i), pending_pile.get());
+    VerifyAllPrioritizedTilesExistAndHavePile(tilings->tiling_at(i),
+                                              pending_pile.get());
 }
 
 TEST_F(PictureLayerImplTest, UpdateTilesCreatesTilings) {
@@ -1363,7 +1370,7 @@ TEST_F(PictureLayerImplTest, HugeMasksGetScaledDown) {
   // Mask layers have a tiling with a single tile in it.
   EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
   // The mask resource exists.
-  ResourceProvider::ResourceId mask_resource_id;
+  ResourceId mask_resource_id;
   gfx::Size mask_texture_size;
   active_mask->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
   EXPECT_NE(0u, mask_resource_id);
@@ -1505,7 +1512,7 @@ TEST_F(PictureLayerImplTest, ScaledMaskLayer) {
   // Mask layers have a tiling with a single tile in it.
   EXPECT_EQ(1u, active_mask->HighResTiling()->AllTilesForTesting().size());
   // The mask resource exists.
-  ResourceProvider::ResourceId mask_resource_id;
+  ResourceId mask_resource_id;
   gfx::Size mask_texture_size;
   active_mask->GetContentsResourceId(&mask_resource_id, &mask_texture_size);
   EXPECT_NE(0u, mask_resource_id);
@@ -2088,7 +2095,7 @@ TEST_F(PictureLayerImplTest, HighResRequiredWhenMissingHighResFlagOn) {
   // Verify active tree not ready.
   Tile* some_active_tile =
       active_layer_->HighResTiling()->AllTilesForTesting()[0];
-  EXPECT_FALSE(some_active_tile->IsReadyToDraw());
+  EXPECT_FALSE(some_active_tile->draw_info().IsReadyToDraw());
 
   // When high res are required, all tiles in active high res tiling should be
   // required for activation.
@@ -2113,7 +2120,7 @@ TEST_F(PictureLayerImplTest, AllHighResRequiredEvenIfNotChanged) {
 
   Tile* some_active_tile =
       active_layer_->HighResTiling()->AllTilesForTesting()[0];
-  EXPECT_FALSE(some_active_tile->IsReadyToDraw());
+  EXPECT_FALSE(some_active_tile->draw_info().IsReadyToDraw());
 
   // Since there are no invalidations, pending tree should have no tiles.
   EXPECT_TRUE(pending_layer_->HighResTiling()->AllTilesForTesting().empty());
@@ -2134,7 +2141,7 @@ TEST_F(PictureLayerImplTest, DisallowRequiredForActivation) {
 
   Tile* some_active_tile =
       active_layer_->HighResTiling()->AllTilesForTesting()[0];
-  EXPECT_FALSE(some_active_tile->IsReadyToDraw());
+  EXPECT_FALSE(some_active_tile->draw_info().IsReadyToDraw());
 
   EXPECT_TRUE(pending_layer_->HighResTiling()->AllTilesForTesting().empty());
   EXPECT_TRUE(pending_layer_->LowResTiling()->AllTilesForTesting().empty());
@@ -2436,9 +2443,9 @@ TEST_F(PictureLayerImplTest, SyncTilingAfterGpuRasterizationToggles) {
   // Gpu rasterization is disabled by default.
   EXPECT_FALSE(host_impl_.use_gpu_rasterization());
   // Toggling the gpu rasterization clears all tilings on both trees.
-  host_impl_.set_has_gpu_rasterization_trigger(true);
-  host_impl_.set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(true);
+  host_impl_.SetContentIsSuitableForGpuRasterization(true);
+  host_impl_.UpdateTreeResourcesForGpuRasterizationIfNeeded();
   EXPECT_EQ(0u, pending_layer_->tilings()->num_tilings());
   EXPECT_EQ(0u, active_layer_->tilings()->num_tilings());
 
@@ -2459,16 +2466,15 @@ TEST_F(PictureLayerImplTest, SyncTilingAfterGpuRasterizationToggles) {
 
   // Toggling the gpu rasterization clears all tilings on both trees.
   EXPECT_TRUE(host_impl_.use_gpu_rasterization());
-  host_impl_.set_has_gpu_rasterization_trigger(false);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(false);
+  host_impl_.UpdateTreeResourcesForGpuRasterizationIfNeeded();
   EXPECT_EQ(GpuRasterizationStatus::OFF_VIEWPORT,
             host_impl_.gpu_rasterization_status());
   EXPECT_EQ(0u, pending_layer_->tilings()->num_tilings());
   EXPECT_EQ(0u, active_layer_->tilings()->num_tilings());
 
-  host_impl_.set_has_gpu_rasterization_trigger(true);
-  host_impl_.set_content_is_suitable_for_gpu_rasterization(false);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(true);
+  host_impl_.SetContentIsSuitableForGpuRasterization(false);
   EXPECT_EQ(GpuRasterizationStatus::OFF_CONTENT,
             host_impl_.gpu_rasterization_status());
 }
@@ -2514,8 +2520,7 @@ TEST_F(PictureLayerImplTest, LowResTilingWithoutGpuRasterization) {
   gfx::Size layer_bounds(default_tile_size.width() * 4,
                          default_tile_size.height() * 4);
 
-  host_impl_.set_has_gpu_rasterization_trigger(false);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(false);
 
   SetupDefaultTrees(layer_bounds);
   EXPECT_FALSE(host_impl_.use_gpu_rasterization());
@@ -2528,9 +2533,8 @@ TEST_F(PictureLayerImplTest, NoLowResTilingWithGpuRasterization) {
   gfx::Size layer_bounds(default_tile_size.width() * 4,
                          default_tile_size.height() * 4);
 
-  host_impl_.set_has_gpu_rasterization_trigger(true);
-  host_impl_.set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(true);
+  host_impl_.SetContentIsSuitableForGpuRasterization(true);
 
   SetupDefaultTrees(layer_bounds);
   EXPECT_TRUE(host_impl_.use_gpu_rasterization());
@@ -2539,9 +2543,8 @@ TEST_F(PictureLayerImplTest, NoLowResTilingWithGpuRasterization) {
 }
 
 TEST_F(PictureLayerImplTest, RequiredTilesWithGpuRasterization) {
-  host_impl_.set_has_gpu_rasterization_trigger(true);
-  host_impl_.set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(true);
+  host_impl_.SetContentIsSuitableForGpuRasterization(true);
 
   gfx::Size viewport_size(1000, 1000);
   host_impl_.SetViewportSize(viewport_size);
@@ -2555,8 +2558,8 @@ TEST_F(PictureLayerImplTest, RequiredTilesWithGpuRasterization) {
 
   active_layer_->HighResTiling()->UpdateAllRequiredStateForTesting();
 
-  // High res tiling should have 64 tiles (4x16 tile grid).
-  EXPECT_EQ(64u, active_layer_->HighResTiling()->AllTilesForTesting().size());
+  // High res tiling should have 36 tiles (3X12 tile grid).
+  EXPECT_EQ(36u, active_layer_->HighResTiling()->AllTilesForTesting().size());
 
   // Visible viewport should be covered by 4 tiles.  No other
   // tiles should be required for activation.
@@ -2841,9 +2844,9 @@ TEST_F(PictureLayerImplTest, HighResTilingDuringAnimationForGpuRasterization) {
   gfx::Size viewport_size(1000, 1000);
   SetupDefaultTrees(layer_bounds);
   host_impl_.SetViewportSize(viewport_size);
-  host_impl_.set_has_gpu_rasterization_trigger(true);
-  host_impl_.set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(true);
+  host_impl_.SetContentIsSuitableForGpuRasterization(true);
+  host_impl_.UpdateTreeResourcesForGpuRasterizationIfNeeded();
 
   float contents_scale = 1.f;
   float device_scale = 1.3f;
@@ -2972,7 +2975,7 @@ TEST_F(PictureLayerImplTest, TilingSetRasterQueue) {
   while (!required_queue->IsEmpty()) {
     PrioritizedTile prioritized_tile = required_queue->Top();
     EXPECT_TRUE(prioritized_tile.tile()->required_for_activation());
-    EXPECT_FALSE(prioritized_tile.tile()->IsReadyToDraw());
+    EXPECT_FALSE(prioritized_tile.tile()->draw_info().IsReadyToDraw());
     ++required_for_activation_count;
     required_queue->Pop();
   }
@@ -3080,7 +3083,7 @@ TEST_F(PictureLayerImplTest, TilingSetRasterQueueActiveTree) {
   while (!queue->IsEmpty()) {
     PrioritizedTile prioritized_tile = queue->Top();
     EXPECT_TRUE(prioritized_tile.tile()->required_for_draw());
-    EXPECT_FALSE(prioritized_tile.tile()->IsReadyToDraw());
+    EXPECT_FALSE(prioritized_tile.tile()->draw_info().IsReadyToDraw());
     queue->Pop();
   }
 
@@ -3568,7 +3571,7 @@ TEST_F(NoLowResPictureLayerImplTest, AllHighResRequiredEvenIfNotChanged) {
 
   Tile* some_active_tile =
       active_layer_->HighResTiling()->AllTilesForTesting()[0];
-  EXPECT_FALSE(some_active_tile->IsReadyToDraw());
+  EXPECT_FALSE(some_active_tile->draw_info().IsReadyToDraw());
 
   // Since there is no invalidation, pending tree should have no tiles.
   EXPECT_TRUE(pending_layer_->HighResTiling()->AllTilesForTesting().empty());
@@ -4599,33 +4602,6 @@ TEST_F(PictureLayerImplTest, PendingOrActiveTwinLayer) {
   EXPECT_FALSE(active_layer_->GetPendingOrActiveTwinLayer());
 }
 
-TEST_F(PictureLayerImplTest, RecycledTwinLayer) {
-  gfx::Size tile_size(102, 102);
-  gfx::Size layer_bounds(1000, 1000);
-
-  scoped_refptr<FakePicturePileImpl> pile =
-      FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
-  SetupPendingTree(pile);
-  EXPECT_FALSE(pending_layer_->GetRecycledTwinLayer());
-
-  ActivateTree();
-  EXPECT_TRUE(active_layer_->GetRecycledTwinLayer());
-  EXPECT_EQ(old_pending_layer_, active_layer_->GetRecycledTwinLayer());
-
-  SetupPendingTree(pile);
-  EXPECT_FALSE(pending_layer_->GetRecycledTwinLayer());
-  EXPECT_FALSE(active_layer_->GetRecycledTwinLayer());
-
-  ActivateTree();
-  EXPECT_TRUE(active_layer_->GetRecycledTwinLayer());
-  EXPECT_EQ(old_pending_layer_, active_layer_->GetRecycledTwinLayer());
-
-  // Make an empty pending tree.
-  host_impl_.CreatePendingTree();
-  host_impl_.pending_tree()->DetachLayerTree();
-  EXPECT_FALSE(active_layer_->GetRecycledTwinLayer());
-}
-
 void PictureLayerImplTest::TestQuadsForSolidColor(bool test_for_solid) {
   base::TimeTicks time_ticks;
   time_ticks += base::TimeDelta::FromMilliseconds(1);
@@ -4991,8 +4967,12 @@ TEST_F(PictureLayerImplTest, UpdateLCDInvalidatesPendingTree) {
   EXPECT_TRUE(pending_layer_->HighResTiling()->has_tiles());
   std::vector<Tile*> tiles =
       pending_layer_->HighResTiling()->AllTilesForTesting();
+  auto prioritized_tiles = pending_layer_->HighResTiling()
+                               ->UpdateAndGetAllPrioritizedTilesForTesting();
+
   for (Tile* tile : tiles)
-    EXPECT_EQ(pending_layer_->raster_source(), tile->raster_source());
+    EXPECT_EQ(pending_layer_->raster_source(),
+              prioritized_tiles[tile].raster_source());
 
   pending_layer_->draw_properties().can_use_lcd_text = false;
   pending_layer_->UpdateCanUseLCDTextAfterCommit();
@@ -5001,8 +4981,11 @@ TEST_F(PictureLayerImplTest, UpdateLCDInvalidatesPendingTree) {
   EXPECT_NE(pending_pile.get(), pending_layer_->raster_source());
   EXPECT_TRUE(pending_layer_->HighResTiling()->has_tiles());
   tiles = pending_layer_->HighResTiling()->AllTilesForTesting();
+  prioritized_tiles = pending_layer_->HighResTiling()
+                          ->UpdateAndGetAllPrioritizedTilesForTesting();
   for (Tile* tile : tiles)
-    EXPECT_EQ(pending_layer_->raster_source(), tile->raster_source());
+    EXPECT_EQ(pending_layer_->raster_source(),
+              prioritized_tiles[tile].raster_source());
 }
 
 class TileSizeSettings : public GpuRasterizationEnabledSettings {
@@ -5028,9 +5011,8 @@ TEST_F(TileSizeTest, TileSizes) {
   host_impl_.SetViewportSize(gfx::Size(1000, 1000));
   gfx::Size result;
 
-  host_impl_.set_content_is_suitable_for_gpu_rasterization(true);
-  host_impl_.set_has_gpu_rasterization_trigger(false);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetContentIsSuitableForGpuRasterization(true);
+  host_impl_.SetHasGpuRasterizationTrigger(false);
   EXPECT_EQ(host_impl_.gpu_rasterization_status(),
             GpuRasterizationStatus::OFF_VIEWPORT);
 
@@ -5051,8 +5033,7 @@ TEST_F(TileSizeTest, TileSizes) {
 
   // Gpu-rasterization uses 25% viewport-height tiles.
   // The +2's below are for border texels.
-  host_impl_.set_has_gpu_rasterization_trigger(true);
-  host_impl_.UpdateGpuRasterizationStatus();
+  host_impl_.SetHasGpuRasterizationTrigger(true);
   EXPECT_EQ(host_impl_.gpu_rasterization_status(), GpuRasterizationStatus::ON);
   host_impl_.SetViewportSize(gfx::Size(2000, 2000));
 

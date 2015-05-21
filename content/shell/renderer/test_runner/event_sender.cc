@@ -8,7 +8,6 @@
 #include "base/logging.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
-#include "content/public/common/page_zoom.h"
 #include "content/shell/renderer/test_runner/mock_spell_check.h"
 #include "content/shell/renderer/test_runner/test_interfaces.h"
 #include "content/shell/renderer/test_runner/web_test_delegate.h"
@@ -1376,7 +1375,12 @@ void EventSender::KeyDown(const std::string& code_str,
     if (!code) {
       WebString web_code_str =
           WebString::fromUTF8(code_str.data(), code_str.size());
-      DCHECK_EQ(1u, web_code_str.length());
+      if (web_code_str.length() != 1u) {
+        v8::Isolate* isolate = blink::mainThreadIsolate();
+        isolate->ThrowException(v8::Exception::TypeError(
+            gin::StringToV8(isolate, "Invalid web code.")));
+        return;
+      }
       text = code = web_code_str.at(0);
       needs_shift_key_modifier = NeedsShiftModifier(code);
       if ((code & 0xFF) >= 'a' && (code & 0xFF) <= 'z')
@@ -1563,7 +1567,7 @@ void EventSender::SetPageZoomFactor(double zoom_factor) {
 
   for (size_t i = 0; i < window_list.size(); ++i) {
     window_list.at(i)->GetWebView()->setZoomLevel(
-        ZoomFactorToZoomLevel(zoom_factor));
+        std::log(zoom_factor) / std::log(1.2));
   }
 }
 

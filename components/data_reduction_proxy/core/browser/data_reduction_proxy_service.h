@@ -43,14 +43,16 @@ class DataReductionProxyService
     : public base::NonThreadSafe,
       public DataReductionProxyEventStorageDelegate {
  public:
-  // The caller must ensure that |settings| and |request_context| remain alive
-  // for the lifetime of the |DataReductionProxyService| instance. This instance
+  // The caller must ensure that |settings|, |prefs|, |request_context|, and
+  // |io_task_runner| remain alive for the lifetime of the
+  // |DataReductionProxyService| instance. |prefs| may be null. This instance
   // will take ownership of |compression_stats|.
   // TODO(jeremyim): DataReductionProxyService should own
   // DataReductionProxySettings and not vice versa.
   DataReductionProxyService(
       scoped_ptr<DataReductionProxyCompressionStats> compression_stats,
       DataReductionProxySettings* settings,
+      PrefService* prefs,
       net::URLRequestContextGetter* request_context_getter,
       scoped_refptr<base::SingleThreadTaskRunner> io_task_runner);
 
@@ -89,6 +91,9 @@ class DataReductionProxyService
   // Records whether the Data Reduction Proxy is unreachable or not.
   void SetUnreachable(bool unreachable);
 
+  // Stores an int64 value in |prefs_|.
+  void SetInt64Pref(const std::string& pref_path, int64 value);
+
   // Bridge methods to safely call to the UI thread objects.
   // Virtual for testing.
   virtual void SetProxyPrefs(bool enabled,
@@ -103,10 +108,6 @@ class DataReductionProxyService
   // Accessor methods.
   DataReductionProxyCompressionStats* compression_stats() const {
     return compression_stats_.get();
-  }
-
-  DataReductionProxySettings* settings() const {
-    return settings_;
   }
 
   DataReductionProxyEventStore* event_store() const {
@@ -128,6 +129,9 @@ class DataReductionProxyService
   scoped_ptr<DataReductionProxyEventStore> event_store_;
 
   DataReductionProxySettings* settings_;
+
+  // A prefs service for storing data.
+  PrefService* prefs_;
 
   // Used to post tasks to |io_data_|.
   scoped_refptr<base::SingleThreadTaskRunner> io_task_runner_;

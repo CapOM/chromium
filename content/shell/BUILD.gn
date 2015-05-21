@@ -45,6 +45,8 @@ static_library("content_shell_lib") {
     "browser/ipc_echo_message_filter.h",
     "browser/layout_test/layout_test_android.cc",
     "browser/layout_test/layout_test_android.h",
+    "browser/layout_test/layout_test_bluetooth_adapter_provider.cc",
+    "browser/layout_test/layout_test_bluetooth_adapter_provider.h",
     "browser/layout_test/layout_test_browser_context.cc",
     "browser/layout_test/layout_test_browser_context.h",
     "browser/layout_test/layout_test_browser_main.cc",
@@ -258,6 +260,7 @@ static_library("content_shell_lib") {
     "//content/gpu",
     "//content/test:layouttest_support",
     "//device/bluetooth",
+    "//device/bluetooth:mocks",
     "//gin",
     "//gpu",
     "//ipc",
@@ -266,6 +269,8 @@ static_library("content_shell_lib") {
     "//net:net_resources",
     "//skia",
     "//storage/browser",
+    "//testing/gmock",
+    "//testing/gtest",
     "//third_party/WebKit/public:blink",
     "//third_party/WebKit/public:image_resources",
     "//third_party/WebKit/public:resources",
@@ -539,5 +544,36 @@ if (!is_android && !is_mac) {
     deps = [
       ":content_shell_lib",
     ]
+  }
+}
+
+if (is_mac || is_win) {
+  # GYP version: content/content_shell_and_tests.gyp:layout_test_helper
+  executable("layout_test_helper") {
+    sources = [
+      "renderer/test_runner/helper/layout_test_helper_mac.mm",
+      "renderer/test_runner/helper/layout_test_helper_win.cc",
+    ]
+
+    if (is_mac) {
+      libs = [ "AppKit.framework" ]
+    }
+  }
+}
+
+if (is_win) {
+  # GYP version: content/content_shell_and_tests.gyp:content_shell_crash_service
+  executable("crash_service") {
+    sources = [
+      "tools/content_shell_crash_service.cc",
+    ]
+
+    deps = [
+      "//base",
+      "//components/crash/tools:crash_service",
+    ]
+
+    configs -= [ "//build/config/win:console" ]
+    configs += [ "//build/config/win:windowed" ]
   }
 }

@@ -208,9 +208,11 @@ DisplayMode_Params CreateDisplayModeParams(const drmModeModeInfo& mode) {
 DisplaySnapshot_Params CreateDisplaySnapshotParams(
     HardwareDisplayControllerInfo* info,
     int fd,
-    size_t display_index) {
+    size_t display_index,
+    const gfx::Point& origin) {
   DisplaySnapshot_Params params;
   params.display_id = display_index;
+  params.origin = origin;
   params.physical_size =
       gfx::Size(info->connector()->mmWidth, info->connector()->mmHeight);
   params.type = GetDisplayType(info->connector());
@@ -225,7 +227,8 @@ DisplaySnapshot_Params CreateDisplaySnapshotParams(
         static_cast<uint8_t*>(edid_blob->data),
         static_cast<uint8_t*>(edid_blob->data) + edid_blob->length);
 
-    if (!GetDisplayIdFromEDID(edid, display_index, &params.display_id))
+    if (!GetDisplayIdFromEDID(edid, display_index, &params.display_id,
+                              &params.product_id))
       params.display_id = display_index;
 
     ParseOutputDeviceData(edid, nullptr, &params.display_name, nullptr,

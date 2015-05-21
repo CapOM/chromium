@@ -242,6 +242,8 @@ component("media") {
     "video/capture/win/video_capture_device_win.h",
     "video/fake_video_encode_accelerator.cc",
     "video/fake_video_encode_accelerator.h",
+    "video/gpu_memory_buffer_video_frame_pool.cc",
+    "video/gpu_memory_buffer_video_frame_pool.h",
     "video/h264_poc.cc",
     "video/h264_poc.h",
     "video/picture.cc",
@@ -321,7 +323,6 @@ component("media") {
     ]
     deps += [
       "//media/base/android",
-      "//media/base/android:media_java",
       "//media/base/android:media_jni_headers",
       "//media/base/android:video_capture_jni_headers",
     ]
@@ -507,9 +508,6 @@ test("media_unittests") {
     "filters/decrypting_audio_decoder_unittest.cc",
     "filters/decrypting_demuxer_stream_unittest.cc",
     "filters/decrypting_video_decoder_unittest.cc",
-    "filters/fake_demuxer_stream.cc",
-    "filters/fake_demuxer_stream.h",
-    "filters/fake_demuxer_stream_unittest.cc",
     "filters/fake_video_decoder.cc",
     "filters/fake_video_decoder.h",
     "filters/fake_video_decoder_unittest.cc",
