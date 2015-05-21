@@ -38,6 +38,7 @@ void SyncPrefs::RegisterProfilePrefs(
   registry->RegisterBooleanPref(prefs::kSyncHasSetupCompleted, false);
   registry->RegisterBooleanPref(prefs::kSyncSuppressStart, false);
   registry->RegisterInt64Pref(prefs::kSyncLastSyncedTime, 0);
+  registry->RegisterInt64Pref(prefs::kSyncLastPollTime, 0);
   registry->RegisterInt64Pref(prefs::kSyncFirstSyncTime, 0);
 
   // All datatypes are on by default, but this gets set explicitly
@@ -82,6 +83,10 @@ void SyncPrefs::RegisterProfilePrefs(
   registry->RegisterIntegerPref(prefs::kSyncRemainingRollbackTries, 0);
 
   registry->RegisterBooleanPref(prefs::kSyncPassphrasePrompted, false);
+
+  registry->RegisterIntegerPref(prefs::kSyncMemoryPressureWarningCount, -1);
+
+  registry->RegisterBooleanPref(prefs::kSyncShutdownCleanly, false);
 }
 
 void SyncPrefs::AddSyncPrefObserver(SyncPrefObserver* sync_pref_observer) {
@@ -97,6 +102,7 @@ void SyncPrefs::RemoveSyncPrefObserver(SyncPrefObserver* sync_pref_observer) {
 void SyncPrefs::ClearPreferences() {
   DCHECK(CalledOnValidThread());
   pref_service_->ClearPref(prefs::kSyncLastSyncedTime);
+  pref_service_->ClearPref(prefs::kSyncLastPollTime);
   pref_service_->ClearPref(prefs::kSyncHasSetupCompleted);
   pref_service_->ClearPref(prefs::kSyncEncryptionBootstrapToken);
   pref_service_->ClearPref(prefs::kSyncKeystoreEncryptionBootstrapToken);
@@ -146,6 +152,17 @@ base::Time SyncPrefs::GetLastSyncedTime() const {
 void SyncPrefs::SetLastSyncedTime(base::Time time) {
   DCHECK(CalledOnValidThread());
   pref_service_->SetInt64(prefs::kSyncLastSyncedTime, time.ToInternalValue());
+}
+
+base::Time SyncPrefs::GetLastPollTime() const {
+  DCHECK(CalledOnValidThread());
+  return base::Time::FromInternalValue(
+      pref_service_->GetInt64(prefs::kSyncLastSyncedTime));
+}
+
+void SyncPrefs::SetLastPollTime(base::Time time) {
+  DCHECK(CalledOnValidThread());
+  pref_service_->SetInt64(prefs::kSyncLastPollTime, time.ToInternalValue());
 }
 
 bool SyncPrefs::HasKeepEverythingSynced() const {
@@ -235,9 +252,9 @@ const char* SyncPrefs::GetPrefNameForDataType(syncer::ModelType data_type) {
     case syncer::AUTOFILL:
       return prefs::kSyncAutofill;
     case syncer::AUTOFILL_PROFILE:
-      return prefs::kSyncAutofillWallet;
-    case syncer::AUTOFILL_WALLET_DATA:
       return prefs::kSyncAutofillProfile;
+    case syncer::AUTOFILL_WALLET_DATA:
+      return prefs::kSyncAutofillWallet;
     case syncer::THEMES:
       return prefs::kSyncThemes;
     case syncer::TYPED_URLS:
@@ -440,6 +457,22 @@ bool SyncPrefs::IsPassphrasePrompted() const {
 
 void SyncPrefs::SetPassphrasePrompted(bool value) {
   pref_service_->SetBoolean(prefs::kSyncPassphrasePrompted, value);
+}
+
+int SyncPrefs::GetMemoryPressureWarningCount() const {
+  return pref_service_->GetInteger(prefs::kSyncMemoryPressureWarningCount);
+}
+
+void SyncPrefs::SetMemoryPressureWarningCount(int value) {
+  pref_service_->SetInteger(prefs::kSyncMemoryPressureWarningCount, value);
+}
+
+bool SyncPrefs::DidSyncShutdownCleanly() const {
+  return pref_service_->GetBoolean(prefs::kSyncShutdownCleanly);
+}
+
+void SyncPrefs::SetCleanShutdown(bool value) {
+  pref_service_->SetBoolean(prefs::kSyncShutdownCleanly, value);
 }
 
 }  // namespace sync_driver

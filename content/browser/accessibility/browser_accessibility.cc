@@ -262,28 +262,28 @@ gfx::Rect BrowserAccessibility::GetLocalBoundsForRange(int start, int len)
     gfx::Rect child_overlap_rect;
     switch (text_direction) {
       case ui::AX_TEXT_DIRECTION_NONE:
-      case ui::AX_TEXT_DIRECTION_LR: {
+      case ui::AX_TEXT_DIRECTION_LTR: {
         int left = child_rect.x() + start_pixel_offset;
         int right = child_rect.x() + end_pixel_offset;
         child_overlap_rect = gfx::Rect(left, child_rect.y(),
                                        right - left, child_rect.height());
         break;
       }
-      case ui::AX_TEXT_DIRECTION_RL: {
+      case ui::AX_TEXT_DIRECTION_RTL: {
         int right = child_rect.right() - start_pixel_offset;
         int left = child_rect.right() - end_pixel_offset;
         child_overlap_rect = gfx::Rect(left, child_rect.y(),
                                        right - left, child_rect.height());
         break;
       }
-      case ui::AX_TEXT_DIRECTION_TB: {
+      case ui::AX_TEXT_DIRECTION_TTB: {
         int top = child_rect.y() + start_pixel_offset;
         int bottom = child_rect.y() + end_pixel_offset;
         child_overlap_rect = gfx::Rect(child_rect.x(), top,
                                        child_rect.width(), bottom - top);
         break;
       }
-      case ui::AX_TEXT_DIRECTION_BT: {
+      case ui::AX_TEXT_DIRECTION_BTT: {
         int bottom = child_rect.bottom() - start_pixel_offset;
         int top = child_rect.bottom() - end_pixel_offset;
         child_overlap_rect = gfx::Rect(child_rect.x(), top,
@@ -757,6 +757,38 @@ bool BrowserAccessibility::IsWebAreaForPresentationalIframe() const {
     return false;
 
   return grandparent->GetRole() == ui::AX_ROLE_IFRAME_PRESENTATIONAL;
+}
+
+bool BrowserAccessibility::IsControl() const {
+  switch (GetRole()) {
+    case ui::AX_ROLE_BUTTON:
+    case ui::AX_ROLE_BUTTON_DROP_DOWN:
+    case ui::AX_ROLE_CHECK_BOX:
+    case ui::AX_ROLE_COLOR_WELL:
+    case ui::AX_ROLE_COMBO_BOX:
+    case ui::AX_ROLE_DISCLOSURE_TRIANGLE:
+    case ui::AX_ROLE_LIST_BOX:
+    case ui::AX_ROLE_MENU_BAR:
+    case ui::AX_ROLE_MENU_BUTTON:
+    case ui::AX_ROLE_MENU_ITEM:
+    case ui::AX_ROLE_MENU_ITEM_CHECK_BOX:
+    case ui::AX_ROLE_MENU_ITEM_RADIO:
+    case ui::AX_ROLE_MENU:
+    case ui::AX_ROLE_POP_UP_BUTTON:
+    case ui::AX_ROLE_RADIO_BUTTON:
+    case ui::AX_ROLE_SCROLL_BAR:
+    case ui::AX_ROLE_SEARCH_BOX:
+    case ui::AX_ROLE_SLIDER:
+    case ui::AX_ROLE_SPIN_BUTTON:
+    case ui::AX_ROLE_SWITCH:
+    case ui::AX_ROLE_TAB:
+    case ui::AX_ROLE_TEXT_FIELD:
+    case ui::AX_ROLE_TOGGLE_BUTTON:
+    case ui::AX_ROLE_TREE:
+      return true;
+    default:
+      return false;
+  }
 }
 
 int BrowserAccessibility::GetStaticTextLenRecursive() const {

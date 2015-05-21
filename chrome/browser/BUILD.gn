@@ -76,8 +76,9 @@ source_set("browser") {
     "//chrome/app/resources:platform_locale_settings",
     "//chrome/app/theme:theme_resources",
     "//chrome/browser/autocomplete:in_memory_url_index_cache_proto",
-    "//chrome/browser/net:cert_logger_proto",
+    "//chrome/browser/net:encrypted_cert_logger_proto",
     "//chrome/browser/net:probe_message_proto",
+    "//chrome/browser/ssl:cert_logger_proto",
     "//chrome/browser/ui",
     "//chrome/common",
     "//chrome/common/net",
@@ -366,7 +367,7 @@ source_set("browser") {
     sources += rebase_path(gypi_values.chrome_browser_spellchecker_sources,
                            ".",
                            "//chrome")
-    deps += [ "//third_party/hunspell_new" ]
+    deps += [ "//third_party/hunspell" ]
   }
   if (enable_nacl) {
     sources +=
@@ -446,6 +447,11 @@ source_set("browser") {
                       ".",
                       "//chrome")
       deps += [ "//chrome/common/safe_browsing:proto" ]
+    } else if (safe_browsing_mode == 3) {
+      sources += rebase_path(
+              gypi_values.chrome_browser_safe_browsing_mobile_extended_sources,
+              ".",
+              "//chrome")
     }
   }
 
@@ -789,7 +795,7 @@ source_set("browser") {
     }
   }
   if (enable_media_router) {
-    defines += [ "ENABLE_MEDIA_ROUTER=1" ]
+    deps += [ "//chrome/browser/media/router" ]
   }
 }
 

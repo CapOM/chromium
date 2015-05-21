@@ -350,15 +350,6 @@ void RenderWidgetCompositor::Initialize() {
         &settings.initial_debug_state.slow_down_raster_scale_factor);
   }
 
-  if (cmd->HasSwitch(cc::switches::kMaxTilesForInterestArea)) {
-    int max_tiles_for_interest_area;
-    if (GetSwitchValueAsInt(*cmd,
-                            cc::switches::kMaxTilesForInterestArea,
-                            1, std::numeric_limits<int>::max(),
-                            &max_tiles_for_interest_area))
-      settings.max_tiles_for_interest_area = max_tiles_for_interest_area;
-  }
-
   if (cmd->HasSwitch(cc::switches::kMaxUnusedResourceMemoryUsagePercentage)) {
     int max_unused_resource_memory_percentage;
     if (GetSwitchValueAsInt(
@@ -434,10 +425,7 @@ void RenderWidgetCompositor::Initialize() {
   if (ui::IsOverlayScrollbarEnabled()) {
     settings.scrollbar_animator = cc::LayerTreeSettings::THINNING;
     settings.solid_color_scrollbar_color = SkColorSetARGB(128, 128, 128, 128);
-  } else if (cmd->HasSwitch(cc::switches::kEnablePinchVirtualViewport)) {
-    // use_pinch_zoom_scrollbars is only true on desktop when non-overlay
-    // scrollbars are in use.
-    settings.use_pinch_zoom_scrollbars = true;
+  } else if (settings.use_pinch_virtual_viewport) {
     settings.scrollbar_animator = cc::LayerTreeSettings::LINEAR_FADE;
     settings.solid_color_scrollbar_color = SkColorSetARGB(128, 128, 128, 128);
   }
@@ -975,6 +963,11 @@ void RenderWidgetCompositor::RateLimitSharedMainThreadContext() {
   if (!provider)
     return;
   provider->ContextGL()->RateLimitOffscreenContextCHROMIUM();
+}
+
+void RenderWidgetCompositor::SetSurfaceIdNamespace(
+    uint32_t surface_id_namespace) {
+  layer_tree_host_->set_surface_id_namespace(surface_id_namespace);
 }
 
 }  // namespace content

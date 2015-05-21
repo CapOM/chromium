@@ -6,17 +6,23 @@
 #define CHROME_BROWSER_UI_VIEWS_AUTOFILL_CARD_UNMASK_PROMPT_VIEWS_H_
 
 #include "chrome/browser/ui/autofill/autofill_dialog_models.h"
-#include "chrome/browser/ui/autofill/card_unmask_prompt_view.h"
+#include "components/autofill/core/browser/ui/card_unmask_prompt_view.h"
 #include "ui/gfx/animation/animation_delegate.h"
 #include "ui/gfx/animation/slide_animation.h"
 #include "ui/views/controls/combobox/combobox_listener.h"
+#include "ui/views/controls/link_listener.h"
 #include "ui/views/controls/textfield/textfield_controller.h"
 #include "ui/views/window/dialog_delegate.h"
+
+namespace content {
+class WebContents;
+}
 
 namespace views {
 class Checkbox;
 class ImageView;
 class Label;
+class Link;
 class Throbber;
 }
 
@@ -28,15 +34,15 @@ class CardUnmaskPromptViews : public CardUnmaskPromptView,
                               views::ComboboxListener,
                               views::DialogDelegateView,
                               views::TextfieldController,
+                              views::LinkListener,
                               gfx::AnimationDelegate {
  public:
-  explicit CardUnmaskPromptViews(CardUnmaskPromptController* controller);
-
+  CardUnmaskPromptViews(CardUnmaskPromptController* controller,
+                        content::WebContents* web_contents);
   ~CardUnmaskPromptViews() override;
 
-  void Show();
-
   // CardUnmaskPromptView
+  void Show() override;
   void ControllerGone() override;
   void DisableAndWaitForVerification() override;
   void GotVerificationResult(const base::string16& error_message,
@@ -65,8 +71,12 @@ class CardUnmaskPromptViews : public CardUnmaskPromptView,
   // views::TextfieldController
   void ContentsChanged(views::Textfield* sender,
                        const base::string16& new_contents) override;
+
   // views::ComboboxListener
   void OnPerformAction(views::Combobox* combobox) override;
+
+  // views::LinkListener
+  void LinkClicked(views::Link* source, int event_flags) override;
 
   // gfx::AnimationDelegate
   void AnimationProgressed(const gfx::Animation* animation) override;
@@ -106,11 +116,16 @@ class CardUnmaskPromptViews : public CardUnmaskPromptView,
   void SetRetriableErrorMessage(const base::string16& message);
   bool ExpirationDateIsValid() const;
   void SetInputsEnabled(bool enabled);
+  void ShowNewCardLink();
   void ClosePrompt();
 
   CardUnmaskPromptController* controller_;
+  content::WebContents* web_contents_;
 
   views::View* main_contents_;
+
+  // Expository language at the top of the dialog.
+  views::Label* instructions_;
 
   // The error label for permanent errors (where the user can't retry).
   views::Label* permanent_error_label_;
@@ -120,12 +135,13 @@ class CardUnmaskPromptViews : public CardUnmaskPromptView,
 
   DecoratedTextfield* cvc_input_;
 
-  // These will be null when expiration date is not required.
   views::Combobox* month_input_;
   views::Combobox* year_input_;
 
   MonthComboboxModel month_combobox_model_;
   YearComboboxModel year_combobox_model_;
+
+  views::Link* new_card_link_;
 
   // The error icon and label for most errors, which live beneath the inputs.
   views::ImageView* error_icon_;

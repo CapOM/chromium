@@ -24,8 +24,8 @@
 #include "cc/quads/picture_draw_quad.h"
 #include "cc/quads/solid_color_draw_quad.h"
 #include "cc/quads/tile_draw_quad.h"
-#include "cc/resources/tile_manager.h"
-#include "cc/resources/tiling_set_raster_queue_all.h"
+#include "cc/tiles/tile_manager.h"
+#include "cc/tiles/tiling_set_raster_queue_all.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "cc/trees/occlusion.h"
 #include "ui/gfx/geometry/quad_f.h"
@@ -211,7 +211,7 @@ void PictureLayerImpl::AppendQuads(RenderPass* render_pass,
          iter; ++iter) {
       SkColor color;
       float width;
-      if (*iter && iter->IsReadyToDraw()) {
+      if (*iter && iter->draw_info().IsReadyToDraw()) {
         TileDrawInfo::Mode mode = iter->draw_info().mode();
         if (mode == TileDrawInfo::SOLID_COLOR_MODE) {
           color = DebugColors::SolidColorTileBorderColor();
@@ -277,7 +277,7 @@ void PictureLayerImpl::AppendQuads(RenderPass* render_pass,
         visible_geometry_rect.width() * visible_geometry_rect.height();
 
     bool has_draw_quad = false;
-    if (*iter && iter->IsReadyToDraw()) {
+    if (*iter && iter->draw_info().IsReadyToDraw()) {
       const TileDrawInfo& draw_info = iter->draw_info();
       switch (draw_info.mode()) {
         case TileDrawInfo::RESOURCE_MODE: {
@@ -490,12 +490,6 @@ PictureLayerImpl* PictureLayerImpl::GetPendingOrActiveTwinLayer() const {
   return twin_layer_;
 }
 
-PictureLayerImpl* PictureLayerImpl::GetRecycledTwinLayer() const {
-  if (!twin_layer_ || twin_layer_->IsOnActiveOrPendingTree())
-    return nullptr;
-  return twin_layer_;
-}
-
 void PictureLayerImpl::UpdateRasterSource(
     scoped_refptr<RasterSource> raster_source,
     Region* new_invalidation,
@@ -628,8 +622,8 @@ ScopedTilePtr PictureLayerImpl::CreateTile(float contents_scale,
     flags = Tile::USE_PICTURE_ANALYSIS;
 
   return layer_tree_impl()->tile_manager()->CreateTile(
-      raster_source_.get(), content_rect.size(), content_rect, contents_scale,
-      id(), layer_tree_impl()->source_frame_number(), flags);
+      content_rect.size(), content_rect, contents_scale, id(),
+      layer_tree_impl()->source_frame_number(), flags);
 }
 
 const Region* PictureLayerImpl::GetPendingInvalidation() {
@@ -746,9 +740,8 @@ gfx::Size PictureLayerImpl::CalculateTileSize(
   return gfx::Size(tile_width, tile_height);
 }
 
-void PictureLayerImpl::GetContentsResourceId(
-    ResourceProvider::ResourceId* resource_id,
-    gfx::Size* resource_size) const {
+void PictureLayerImpl::GetContentsResourceId(ResourceId* resource_id,
+                                             gfx::Size* resource_size) const {
   // The bounds and the pile size may differ if the pile wasn't updated (ie.
   // PictureLayer::Update didn't happen). In that case the pile will be empty.
   DCHECK_IMPLIES(!raster_source_->GetSize().IsEmpty(),
@@ -1038,19 +1031,9 @@ void PictureLayerImpl::CleanUpTilingsOnActiveLayer(
   }
 
   PictureLayerTilingSet* twin_set = twin ? twin->tilings_.get() : nullptr;
-  // TODO(vmpstr): See if this step is required without tile sharing.
-  PictureLayerImpl* recycled_twin = GetRecycledTwinLayer();
-  PictureLayerTilingSet* recycled_twin_set =
-      recycled_twin ? recycled_twin->tilings_.get() : nullptr;
-
-  tilings_->CleanUpTilings(min_acceptable_high_res_scale,
-                           max_acceptable_high_res_scale, used_tilings,
-                           layer_tree_impl()->create_low_res_tiling(), twin_set,
-                           recycled_twin_set);
-
-  if (recycled_twin_set && recycled_twin_set->num_tilings() == 0)
-    recycled_twin->ResetRasterScale();
-
+  tilings_->CleanUpTilings(
+      min_acceptable_high_res_scale, max_acceptable_high_res_scale,
+      used_tilings, layer_tree_impl()->create_low_res_tiling(), twin_set);
   DCHECK_GT(tilings_->num_tilings(), 0u);
   SanityCheckTilingState();
 }
@@ -1118,10 +1101,6 @@ bool PictureLayerImpl::CanHaveTilings() const {
 
 void PictureLayerImpl::SanityCheckTilingState() const {
 #if DCHECK_IS_ON()
-  // Recycle tree doesn't have any restrictions.
-  if (layer_tree_impl()->IsRecycleTree())
-    return;
-
   if (!CanHaveTilings()) {
     DCHECK_EQ(0u, tilings_->num_tilings());
     return;
@@ -1147,7 +1126,7 @@ scoped_ptr<PictureLayerTilingSet>
 PictureLayerImpl::CreatePictureLayerTilingSet() {
   const LayerTreeSettings& settings = layer_tree_impl()->settings();
   return PictureLayerTilingSet::Create(
-      GetTree(), this, settings.max_tiles_for_interest_area,
+      GetTree(), this, settings.tiling_interest_area_viewport_multiplier,
       layer_tree_impl()->use_gpu_rasterization()
           ? settings.gpu_rasterization_skewport_target_time_in_seconds
           : settings.skewport_target_time_in_seconds,
@@ -1183,11 +1162,11 @@ void PictureLayerImpl::GetDebugBorderProperties(
   *width = DebugColors::TiledContentLayerBorderWidth(layer_tree_impl());
 }
 
-void PictureLayerImpl::GetAllTilesAndPrioritiesForTracing(
-    std::map<const Tile*, TilePriority>* tile_map) const {
+void PictureLayerImpl::GetAllPrioritizedTilesForTracing(
+    std::vector<PrioritizedTile>* prioritized_tiles) const {
   if (!tilings_)
     return;
-  tilings_->GetAllTilesAndPrioritiesForTracing(tile_map);
+  tilings_->GetAllPrioritizedTilesForTracing(prioritized_tiles);
 }
 
 void PictureLayerImpl::AsValueInto(

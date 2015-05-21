@@ -18,7 +18,6 @@
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/info_map.h"
-#include "extensions/browser/lazy_background_task_queue.h"
 #include "extensions/browser/notification_types.h"
 #include "extensions/browser/quota_service.h"
 #include "extensions/browser/runtime_data.h"
@@ -98,8 +97,6 @@ void ShellExtensionSystem::Shutdown() {
 void ShellExtensionSystem::InitForRegularProfile(bool extensions_enabled) {
   runtime_data_.reset(
       new RuntimeData(ExtensionRegistry::Get(browser_context_)));
-  lazy_background_task_queue_.reset(
-      new LazyBackgroundTaskQueue(browser_context_));
   event_router_.reset(
       new EventRouter(browser_context_, ExtensionPrefs::Get(browser_context_)));
   quota_service_.reset(new QuotaService);
@@ -121,11 +118,6 @@ SharedUserScriptMaster* ShellExtensionSystem::shared_user_script_master() {
   return nullptr;
 }
 
-DeclarativeUserScriptManager*
-ShellExtensionSystem::declarative_user_script_manager() {
-  return nullptr;
-}
-
 StateStore* ShellExtensionSystem::state_store() {
   return nullptr;
 }
@@ -140,16 +132,8 @@ InfoMap* ShellExtensionSystem::info_map() {
   return info_map_.get();
 }
 
-LazyBackgroundTaskQueue* ShellExtensionSystem::lazy_background_task_queue() {
-  return lazy_background_task_queue_.get();
-}
-
 EventRouter* ShellExtensionSystem::event_router() {
   return event_router_.get();
-}
-
-InstallVerifier* ShellExtensionSystem::install_verifier() {
-  return nullptr;
 }
 
 QuotaService* ShellExtensionSystem::quota_service() {

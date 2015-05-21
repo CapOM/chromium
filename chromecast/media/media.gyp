@@ -6,6 +6,8 @@
   'variables': {
     'chromium_code': 1,
     'chromecast_branding%': 'Chromium',
+    'libcast_media_gyp%': '',
+    'use_default_libcast_media%': 1,
   },
   'targets': [
     {
@@ -15,6 +17,7 @@
         '../../base/base.gyp:base',
         '../../crypto/crypto.gyp:crypto',
         '../../third_party/widevine/cdm/widevine_cdm.gyp:widevine_cdm_version_h',
+        '<(libcast_media_gyp):libcast_media_1.0',
       ],
       'sources': [
         'base/decrypt_context.cc',
@@ -192,17 +195,7 @@
         '../../base/base.gyp:base',
         '../../crypto/crypto.gyp:crypto',
         '../../media/media.gyp:media',
-      ],
-      'conditions': [
-        ['chromecast_branding=="Chrome"', {
-          'dependencies': [
-            '../internal/cast_system.gyp:openssl',
-          ],
-        }, {
-          'dependencies': [
-            '../../third_party/boringssl/boringssl.gyp:boringssl',
-          ],
-        }],
+        '../../third_party/boringssl/boringssl.gyp:boringssl',
       ],
       'sources': [
         'cma/pipeline/audio_pipeline.cc',
@@ -294,5 +287,24 @@
         'cma/test/run_all_unittests.cc',
       ],
     },
+  ], # end of targets
+  'conditions': [
+    ['use_default_libcast_media==1', {
+      'targets': [
+        {
+          'target_name': 'libcast_media_1.0',
+          'type': 'shared_library',
+          'dependencies': [
+            '../../chromecast/chromecast.gyp:cast_public_api'
+          ],
+          'include_dirs': [
+            '../..',
+          ],
+          'sources': [
+            'base/cast_media_default.cc',
+          ],
+        }
+      ]
+    }],
   ],
 }

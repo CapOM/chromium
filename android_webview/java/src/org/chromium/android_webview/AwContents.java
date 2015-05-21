@@ -77,6 +77,7 @@ import java.net.URL;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.Callable;
 
 /**
@@ -98,6 +99,9 @@ public class AwContents implements SmartClipProvider,
     // Used to avoid enabling zooming in / out if resulting zooming will
     // produce little visible difference.
     private static final float ZOOM_CONTROLS_EPSILON = 0.007f;
+
+    private static final boolean FORCE_AUXILIARY_BITMAP_RENDERING =
+            "goldfish".equals(Build.HARDWARE);
 
     /**
      * WebKit hit test related data structure. These are used to implement
@@ -207,7 +211,7 @@ public class AwContents implements SmartClipProvider,
     private final Context mContext;
     private final int mAppTargetSdkVersion;
     private ContentViewCore mContentViewCore;
-    private WindowAndroid mWindowAndroid;
+    private WindowAndroidWrapper mWindowAndroid;
     private WebContents mWebContents;
     private NavigationController mNavigationController;
     private final AwContentsClient mContentsClient;
@@ -287,16 +291,13 @@ public class AwContents implements SmartClipProvider,
 
     private static final class DestroyRunnable implements Runnable {
         private final long mNativeAwContents;
-        private final WindowAndroid mWindowAndroid;
 
-        private DestroyRunnable(long nativeAwContents, WindowAndroid windowAndroid) {
+        private DestroyRunnable(long nativeAwContents) {
             mNativeAwContents = nativeAwContents;
-            mWindowAndroid = windowAndroid;
         }
         @Override
         public void run() {
             nativeDestroy(mNativeAwContents);
-            mWindowAndroid.destroy();
         }
     }
 
@@ -848,6 +849,60 @@ public class AwContents implements SmartClipProvider,
         mContainerView.requestLayout();
     }
 
+    // This class destroys the WindowAndroid when after it is gc-ed.
+    private static class WindowAndroidWrapper {
+        private final WindowAndroid mWindowAndroid;
+        private final CleanupReference mCleanupReference;
+
+        private static final class DestroyRunnable implements Runnable {
+            private final WindowAndroid mWindowAndroid;
+            private DestroyRunnable(WindowAndroid windowAndroid) {
+                mWindowAndroid = windowAndroid;
+            }
+            @Override
+            public void run() {
+                mWindowAndroid.destroy();
+            }
+        }
+
+        public WindowAndroidWrapper(WindowAndroid windowAndroid) {
+            mWindowAndroid = windowAndroid;
+            mCleanupReference =
+                    new CleanupReference(this, new DestroyRunnable(windowAndroid));
+        }
+
+        public WindowAndroid getWindowAndroid() {
+            return mWindowAndroid;
+        }
+    }
+    private static WindowAndroidWrapper sCachedWindowAndroid;
+    private static WeakHashMap<Activity, WindowAndroidWrapper> sActivityWindowMap;
+
+    // getWindowAndroid is only called on UI thread, so there are no threading issues with lazy
+    // initialization.
+    @SuppressFBWarnings("LI_LAZY_INIT_STATIC")
+    private static WindowAndroidWrapper getWindowAndroid(Context context) {
+        // TODO(boliu): WebView does not currently initialize ApplicationStatus, crbug.com/470582.
+        Activity activity = ContentViewCore.activityFromContext(context);
+        if (activity == null) {
+            if (sCachedWindowAndroid == null) {
+                sCachedWindowAndroid = new WindowAndroidWrapper(
+                        new WindowAndroid(context.getApplicationContext()));
+            }
+            return sCachedWindowAndroid;
+        }
+
+        if (sActivityWindowMap == null) sActivityWindowMap = new WeakHashMap<>();
+        WindowAndroidWrapper activityWindowAndroid = sActivityWindowMap.get(activity);
+        if (activityWindowAndroid == null) {
+            final boolean listenToActivityState = false;
+            activityWindowAndroid = new WindowAndroidWrapper(
+                    new ActivityWindowAndroid(activity, listenToActivityState));
+            sActivityWindowMap.put(activity, activityWindowAndroid);
+        }
+        return activityWindowAndroid;
+    }
+
     /* Common initialization routine for adopting a native AwContents instance into this
      * java instance.
      *
@@ -871,15 +926,10 @@ public class AwContents implements SmartClipProvider,
 
         WebContents webContents = nativeGetWebContents(mNativeAwContents);
 
-        // WebView does not currently initialize ApplicationStatus, crbug.com/470582.
-        final boolean listenToActivityState = false;
-        Activity activity = ContentViewCore.activityFromContext(mContext);
-        mWindowAndroid = activity != null
-                ? new ActivityWindowAndroid(activity, listenToActivityState)
-                : new WindowAndroid(mContext.getApplicationContext());
-        mContentViewCore = createAndInitializeContentViewCore(
-                mContainerView, mContext, mInternalAccessAdapter, webContents,
-                new AwGestureStateListener(), mContentViewClient, mZoomControls, mWindowAndroid);
+        mWindowAndroid = getWindowAndroid(mContext);
+        mContentViewCore = createAndInitializeContentViewCore(mContainerView, mContext,
+                mInternalAccessAdapter, webContents, new AwGestureStateListener(),
+                mContentViewClient, mZoomControls, mWindowAndroid.getWindowAndroid());
         nativeSetJavaPeers(mNativeAwContents, this, mWebContentsDelegate, mContentsClientBridge,
                 mIoThreadClient, mInterceptNavigationDelegate);
         mWebContents = mContentViewCore.getWebContents();
@@ -892,7 +942,7 @@ public class AwContents implements SmartClipProvider,
         // The native side object has been bound to this java instance, so now is the time to
         // bind all the native->java relationships.
         mCleanupReference =
-                new CleanupReference(this, new DestroyRunnable(mNativeAwContents, mWindowAndroid));
+                new CleanupReference(this, new DestroyRunnable(mNativeAwContents));
     }
 
     private void installWebContentsObserver() {
@@ -1067,6 +1117,8 @@ public class AwContents implements SmartClipProvider,
 
     public static void setAwDrawSWFunctionTable(long functionTablePointer) {
         nativeSetAwDrawSWFunctionTable(functionTablePointer);
+        // Force auxiliary bitmap rendering in emulators.
+        nativeSetForceAuxiliaryBitmapRendering(FORCE_AUXILIARY_BITMAP_RENDERING);
     }
 
     public static void setAwDrawGLFunctionTable(long functionTablePointer) {
@@ -1254,8 +1306,7 @@ public class AwContents implements SmartClipProvider,
         if (url == null) {
             return;
         }
-        LoadUrlParams params = new LoadUrlParams(url);
-        loadUrl(params);
+        loadUrl(url, null);
     }
 
     /**
@@ -2452,7 +2503,7 @@ public class AwContents implements SmartClipProvider,
 
     @CalledByNative
     private void postInvalidateOnAnimation() {
-        if (!mWindowAndroid.isInsideVSync()) {
+        if (!mWindowAndroid.getWindowAndroid().isInsideVSync()) {
             mContainerView.postInvalidateOnAnimation();
         } else {
             mContainerView.invalidate();
@@ -2668,7 +2719,7 @@ public class AwContents implements SmartClipProvider,
                     mContainerView.getScrollX(), mContainerView.getScrollY(),
                     globalVisibleRect.left, globalVisibleRect.top,
                     globalVisibleRect.right, globalVisibleRect.bottom);
-            if (did_draw && canvas.isHardwareAccelerated()) {
+            if (did_draw && canvas.isHardwareAccelerated() && !FORCE_AUXILIARY_BITMAP_RENDERING) {
                 did_draw = mNativeGLDelegate.requestDrawGL(canvas, false, mContainerView);
             }
             if (!did_draw) {
@@ -2944,6 +2995,8 @@ public class AwContents implements SmartClipProvider,
 
     private static native long nativeInit(AwBrowserContext browserContext);
     private static native void nativeDestroy(long nativeAwContents);
+    private static native void nativeSetForceAuxiliaryBitmapRendering(
+            boolean forceAuxiliaryBitmapRendering);
     private static native void nativeSetAwDrawSWFunctionTable(long functionTablePointer);
     private static native void nativeSetAwDrawGLFunctionTable(long functionTablePointer);
     private static native long nativeGetAwDrawGLFunction();

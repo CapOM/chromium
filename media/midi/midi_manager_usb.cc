@@ -4,17 +4,11 @@
 
 #include "media/midi/midi_manager_usb.h"
 
-#include "base/callback.h"
 #include "base/logging.h"
-#include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "base/strings/stringprintf.h"
 #include "media/midi/midi_scheduler.h"
 #include "media/midi/usb_midi_descriptor_parser.h"
-#include "media/midi/usb_midi_device.h"
-#include "media/midi/usb_midi_input_stream.h"
-#include "media/midi/usb_midi_jack.h"
-#include "media/midi/usb_midi_output_stream.h"
 
 namespace media {
 namespace midi {
@@ -76,7 +70,7 @@ void MidiManagerUsb::ReceiveUsbMidiData(UsbMidiDevice* device,
 
 void MidiManagerUsb::OnDeviceAttached(scoped_ptr<UsbMidiDevice> device) {
   int device_id = static_cast<int>(devices_.size());
-  devices_.push_back(device.release());
+  devices_.push_back(device.Pass());
   AddPorts(devices_.back(), device_id);
 }
 

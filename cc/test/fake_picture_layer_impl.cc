@@ -5,7 +5,7 @@
 #include "cc/test/fake_picture_layer_impl.h"
 
 #include <vector>
-#include "cc/resources/tile.h"
+#include "cc/tiles/tile.h"
 #include "cc/trees/layer_tree_impl.h"
 
 namespace cc {
@@ -167,7 +167,7 @@ void FakePictureLayerImpl::SetAllTilesReadyInTiling(
 void FakePictureLayerImpl::SetTileReady(Tile* tile) {
   TileDrawInfo& draw_info = tile->draw_info();
   draw_info.SetSolidColorForTesting(true);
-  DCHECK(tile->IsReadyToDraw());
+  DCHECK(draw_info.IsReadyToDraw());
 }
 
 void FakePictureLayerImpl::DidBecomeActive() {

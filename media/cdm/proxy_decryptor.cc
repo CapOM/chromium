@@ -12,6 +12,7 @@
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "media/base/cdm_callback_promise.h"
+#include "media/base/cdm_config.h"
 #include "media/base/cdm_factory.h"
 #include "media/base/cdm_key_information.h"
 #include "media/base/key_systems.h"
@@ -37,11 +38,13 @@ ProxyDecryptor::PendingGenerateKeyRequestData::
 }
 
 ProxyDecryptor::ProxyDecryptor(MediaPermission* media_permission,
+                               bool use_hw_secure_codecs,
                                const KeyAddedCB& key_added_cb,
                                const KeyErrorCB& key_error_cb,
                                const KeyMessageCB& key_message_cb)
     : is_creating_cdm_(false),
       media_permission_(media_permission),
+      use_hw_secure_codecs_(use_hw_secure_codecs),
       key_added_cb_(key_added_cb),
       key_error_cb_(key_error_cb),
       key_message_cb_(key_message_cb),
@@ -69,15 +72,17 @@ void ProxyDecryptor::CreateCdm(CdmFactory* cdm_factory,
   // TODO(sandersd): Trigger permissions check here and use it to determine
   // distinctive identifier support, instead of always requiring the
   // permission. http://crbug.com/455271
-  bool allow_distinctive_identifier = true;
-  bool allow_persistent_state = true;
+  CdmConfig cdm_config;
+  cdm_config.allow_distinctive_identifier = true;
+  cdm_config.allow_persistent_state = true;
+  cdm_config.use_hw_secure_codecs = use_hw_secure_codecs_;
 
   is_creating_cdm_ = true;
 
   base::WeakPtr<ProxyDecryptor> weak_this = weak_ptr_factory_.GetWeakPtr();
   cdm_factory->Create(
-      key_system, allow_distinctive_identifier, allow_persistent_state,
-      security_origin, base::Bind(&ProxyDecryptor::OnSessionMessage, weak_this),
+      key_system, security_origin, cdm_config,
+      base::Bind(&ProxyDecryptor::OnSessionMessage, weak_this),
       base::Bind(&ProxyDecryptor::OnSessionClosed, weak_this),
       base::Bind(&ProxyDecryptor::OnLegacySessionError, weak_this),
       base::Bind(&ProxyDecryptor::OnSessionKeysChange, weak_this),

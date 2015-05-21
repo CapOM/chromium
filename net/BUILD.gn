@@ -839,6 +839,8 @@ if (use_v8_in_net && !is_android) {
       "proxy/mojo_proxy_resolver_factory_impl.h",
       "proxy/mojo_proxy_resolver_impl.cc",
       "proxy/mojo_proxy_resolver_impl.h",
+      "proxy/proxy_resolver_error_observer_mojo.cc",
+      "proxy/proxy_resolver_error_observer_mojo.h",
     ]
 
     deps = [
@@ -1350,10 +1352,7 @@ if (!is_android && !is_mac) {
         # sense.
         "dns/dns_config_service_posix_unittest.cc",
       ]
-      deps += [
-        ":net_javatests",  # FIXME(brettw)
-        ":net_test_jni_headers",
-      ]
+      deps += [ ":net_test_jni_headers" ]
     }
 
     if (v8_use_external_startup_data) {
@@ -1496,6 +1495,7 @@ if (!is_android && !is_mac) {
         "proxy/load_state_change_coalescer_unittest.cc",
         "proxy/mojo_proxy_resolver_factory_impl_unittest.cc",
         "proxy/mojo_proxy_resolver_impl_unittest.cc",
+        "proxy/proxy_resolver_error_observer_mojo_unittest.cc",
         "proxy/proxy_resolver_mojo_unittest.cc",
         "proxy/proxy_service_mojo_unittest.cc",
       ]
@@ -1589,8 +1589,10 @@ if (!is_android && !is_mac) {
 executable("net_perftests") {
   testonly = true
   sources = [
+    "base/mime_sniffer_perftest.cc",
     "cookies/cookie_monster_perftest.cc",
     "disk_cache/blockfile/disk_cache_perftest.cc",
+    "extras/sqlite/sqlite_persistent_cookie_store_perftest.cc",
     "proxy/proxy_resolver_perftest.cc",
     "udp/udp_socket_perftest.cc",
   ]
@@ -1603,6 +1605,7 @@ executable("net_perftests") {
     "//base/test:test_support_perf",
     "//testing/gtest",
     "//url",
+    ":extras",
     ":net",
     ":test_support",
   ]

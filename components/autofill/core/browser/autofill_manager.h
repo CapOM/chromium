@@ -123,6 +123,13 @@ class AutofillManager : public AutofillDownloadManager::Observer,
   void OnDidFillAutofillFormData(const base::TimeTicks& timestamp);
   void OnDidPreviewAutofillFormData();
 
+  // Returns true if the value/identifier is deletable. Fills out
+  // |title| and |body| with relevant user-facing text.
+  bool GetDeletionConfirmationText(const base::string16& value,
+                                   int identifier,
+                                   base::string16* title,
+                                   base::string16* body);
+
   // Remove the credit card or Autofill profile that matches |unique_id|
   // from the database. Returns true if deletion is allowed.
   bool RemoveAutofillProfileOrCreditCard(int unique_id);
@@ -355,6 +362,12 @@ class AutofillManager : public AutofillDownloadManager::Observer,
 
   // Shared code to determine if |form| should be uploaded.
   bool ShouldUploadForm(const FormStructure& form);
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  // Emits a UMA metric indicating whether the accepted Autofill suggestion is
+  // from the Mac Address Book.
+  void EmitIsFromAddressBookMetric(int unique_id);
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
 
   // Provides driver-level context to the shared code of the component. Must
   // outlive this object.

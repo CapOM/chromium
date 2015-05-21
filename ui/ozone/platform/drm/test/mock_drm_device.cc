@@ -236,6 +236,7 @@ bool MockDrmDevice::CloseBufferHandle(uint32_t handle) {
 
 bool MockDrmDevice::CommitProperties(drmModePropertySet* properties,
                                      uint32_t flags,
+                                     bool is_sync,
                                      const PageFlipCallback& callback) {
   return false;
 }
@@ -243,6 +244,10 @@ bool MockDrmDevice::CommitProperties(drmModePropertySet* properties,
 bool MockDrmDevice::SetGammaRamp(uint32_t crtc_id,
                                  const std::vector<GammaRampRGBEntry>& lut) {
   return true;
+}
+
+bool MockDrmDevice::SetCapability(uint64_t capability, uint64_t value) {
+  return false;
 }
 
 void MockDrmDevice::RunCallbacks() {

@@ -14,6 +14,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
+#include "base/metrics/sparse_histogram.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
@@ -95,12 +96,14 @@ void ProcessAlternateProtocol(
 base::Value* NetLogSSLVersionFallbackCallback(
     const GURL* url,
     int net_error,
+    SSLFailureState ssl_failure_state,
     uint16 version_before,
     uint16 version_after,
     NetLogCaptureMode /* capture_mode */) {
   base::DictionaryValue* dict = new base::DictionaryValue();
   dict->SetString("host_and_port", GetHostAndPort(*url));
   dict->SetInteger("net_error", net_error);
+  dict->SetInteger("ssl_failure_state", ssl_failure_state);
   dict->SetInteger("version_before", version_before);
   dict->SetInteger("version_after", version_after);
   return dict;
@@ -129,7 +132,9 @@ HttpNetworkTransaction::HttpNetworkTransaction(RequestPriority priority,
       request_(NULL),
       priority_(priority),
       headers_valid_(false),
+      server_ssl_failure_state_(SSL_FAILURE_NONE),
       fallback_error_code_(ERR_SSL_INAPPROPRIATE_FALLBACK),
+      fallback_failure_state_(SSL_FAILURE_NONE),
       request_headers_(),
       read_buf_len_(0),
       total_received_bytes_(0),
@@ -395,10 +400,7 @@ int64 HttpNetworkTransaction::GetTotalReceivedBytes() const {
 void HttpNetworkTransaction::DoneReading() {}
 
 const HttpResponseInfo* HttpNetworkTransaction::GetResponseInfo() const {
-  return ((headers_valid_ && response_.headers.get()) ||
-          response_.ssl_info.cert.get() || response_.cert_request_info.get())
-             ? &response_
-             : NULL;
+  return &response_;
 }
 
 LoadState HttpNetworkTransaction::GetLoadState() const {
@@ -502,12 +504,14 @@ void HttpNetworkTransaction::OnWebSocketHandshakeStreamReady(
 }
 
 void HttpNetworkTransaction::OnStreamFailed(int result,
-                                            const SSLConfig& used_ssl_config) {
+                                            const SSLConfig& used_ssl_config,
+                                            SSLFailureState ssl_failure_state) {
   DCHECK_EQ(STATE_CREATE_STREAM_COMPLETE, next_state_);
   DCHECK_NE(OK, result);
   DCHECK(stream_request_.get());
   DCHECK(!stream_.get());
   server_ssl_config_ = used_ssl_config;
+  server_ssl_failure_state_ = ssl_failure_state;
 
   OnIOComplete(result);
 }
@@ -590,7 +594,7 @@ void HttpNetworkTransaction::GetConnectionAttempts(
 }
 
 bool HttpNetworkTransaction::IsSecureRequest() const {
-  return request_->url.SchemeIsSecure();
+  return request_->url.SchemeIsCryptographic();
 }
 
 bool HttpNetworkTransaction::UsingHttpProxyWithoutTunnel() const {
@@ -736,6 +740,8 @@ int HttpNetworkTransaction::DoCreateStream() {
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "424359 HttpNetworkTransaction::DoCreateStream"));
 
+  response_.network_accessed = true;
+
   next_state_ = STATE_CREATE_STREAM_COMPLETE;
   if (ForWebSocketHandshake()) {
     stream_request_.reset(
@@ -770,9 +776,10 @@ int HttpNetworkTransaction::DoCreateStreamComplete(int result) {
   if (result != ERR_HTTPS_PROXY_TUNNEL_RESPONSE)
     CopyConnectionAttemptsFromStreamRequest();
 
+  if (request_->url.SchemeIsCryptographic())
+    RecordSSLFallbackMetrics(result);
+
   if (result == OK) {
-    if (request_->url.SchemeIsCryptographic())
-      RecordSSLFallbackMetrics();
     next_state_ = STATE_INIT_STREAM;
     DCHECK(stream_.get());
   } else if (result == ERR_SSL_CLIENT_AUTH_CERT_NEEDED) {
@@ -974,7 +981,6 @@ int HttpNetworkTransaction::DoSendRequestComplete(int result) {
   send_end_time_ = base::TimeTicks::Now();
   if (result < 0)
     return HandleIOError(result);
-  response_.network_accessed = true;
   next_state_ = STATE_READ_HEADERS;
   return OK;
 }
@@ -1351,10 +1357,11 @@ int HttpNetworkTransaction::HandleSSLHandshakeError(int error) {
   if (should_fallback) {
     net_log_.AddEvent(
         NetLog::TYPE_SSL_VERSION_FALLBACK,
-        base::Bind(&NetLogSSLVersionFallbackCallback,
-                   &request_->url, error, server_ssl_config_.version_max,
+        base::Bind(&NetLogSSLVersionFallbackCallback, &request_->url, error,
+                   server_ssl_failure_state_, server_ssl_config_.version_max,
                    version_max));
     fallback_error_code_ = error;
+    fallback_failure_state_ = server_ssl_failure_state_;
     server_ssl_config_.version_max = version_max;
     server_ssl_config_.version_fallback = true;
     ResetConnectionAndRequestForResend();
@@ -1432,11 +1439,31 @@ void HttpNetworkTransaction::ResetStateForAuthRestart() {
   establishing_tunnel_ = false;
 }
 
-void HttpNetworkTransaction::RecordSSLFallbackMetrics() {
+void HttpNetworkTransaction::RecordSSLFallbackMetrics(int result) {
+  if (result != OK && result != ERR_SSL_INAPPROPRIATE_FALLBACK)
+    return;
+
+  const std::string& host = request_->url.host();
+  bool is_google = EndsWith(host, "google.com", true) &&
+                   (host.size() == 10 || host[host.size() - 11] == '.');
+  if (is_google) {
+    // Some fraction of successful connections use the fallback, but only due to
+    // a spurious network failure. To estimate this fraction, compare handshakes
+    // to Google servers which succeed against those that fail with an
+    // inappropriate_fallback alert. Google servers are known to implement
+    // FALLBACK_SCSV, so a spurious network failure while connecting would
+    // trigger the fallback, successfully connect, but fail with this alert.
+    UMA_HISTOGRAM_BOOLEAN("Net.GoogleConnectionInappropriateFallback",
+                          result == ERR_SSL_INAPPROPRIATE_FALLBACK);
+  }
+
+  if (result != OK)
+    return;
+
   // Note: these values are used in histograms, so new values must be appended.
   enum FallbackVersion {
-    FALLBACK_NONE = 0,    // SSL version fallback did not occur.
-    FALLBACK_SSL3 = 1,    // Fell back to SSL 3.0.
+    FALLBACK_NONE = 0,  // SSL version fallback did not occur.
+    // Obsolete: FALLBACK_SSL3 = 1,
     FALLBACK_TLS1 = 2,    // Fell back to TLS 1.0.
     FALLBACK_TLS1_1 = 3,  // Fell back to TLS 1.1.
     FALLBACK_MAX,
@@ -1445,9 +1472,6 @@ void HttpNetworkTransaction::RecordSSLFallbackMetrics() {
   FallbackVersion fallback = FALLBACK_NONE;
   if (server_ssl_config_.version_fallback) {
     switch (server_ssl_config_.version_max) {
-      case SSL_PROTOCOL_VERSION_SSL3:
-        fallback = FALLBACK_SSL3;
-        break;
       case SSL_PROTOCOL_VERSION_TLS1:
         fallback = FALLBACK_TLS1;
         break;
@@ -1464,15 +1488,22 @@ void HttpNetworkTransaction::RecordSSLFallbackMetrics() {
   // Google servers are known to implement TLS 1.2 and FALLBACK_SCSV, so it
   // should be impossible to successfully connect to them with the fallback.
   // This helps estimate intolerant locally-configured SSL MITMs.
-  const std::string& host = request_->url.host();
-  if (EndsWith(host, "google.com", true) &&
-      (host.size() == 10 || host[host.size() - 11] == '.')) {
+  if (is_google) {
     UMA_HISTOGRAM_ENUMERATION("Net.GoogleConnectionUsedSSLVersionFallback2",
                               fallback, FALLBACK_MAX);
   }
 
   UMA_HISTOGRAM_BOOLEAN("Net.ConnectionUsedSSLDeprecatedCipherFallback2",
                         server_ssl_config_.enable_deprecated_cipher_suites);
+
+  if (server_ssl_config_.version_fallback) {
+    // Record the error code which triggered the fallback and the state the
+    // handshake was in.
+    UMA_HISTOGRAM_SPARSE_SLOWLY("Net.SSLFallbackErrorCode",
+                                -fallback_error_code_);
+    UMA_HISTOGRAM_ENUMERATION("Net.SSLFallbackFailureState",
+                              fallback_failure_state_, SSL_FAILURE_MAX);
+  }
 }
 
 HttpResponseHeaders* HttpNetworkTransaction::GetResponseHeaders() const {

@@ -23,7 +23,8 @@ import generate_v14_compatible_resources
 from util import build_utils
 
 # Import jinja2 from third_party/jinja2
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../../third_party'))
+sys.path.insert(1,
+    os.path.join(os.path.dirname(__file__), '../../../third_party'))
 from jinja2 import Template # pylint: disable=F0401
 
 
@@ -68,11 +69,9 @@ def ParseArgs(args):
                     help='Path to proguard.txt generated file')
 
   parser.add_option(
-      '--v14-verify-only',
-      action='store_true',
-      help='Do not generate v14 resources. Instead, just verify that the '
-      'resources are already compatible with v14, i.e. they don\'t use '
-      'attributes that cause crashes on certain devices.')
+      '--v14-skip',
+      action="store_true",
+      help='Do not generate nor verify v14 resources')
 
   parser.add_option(
       '--extra-res-packages',
@@ -319,11 +318,11 @@ def main():
 
     input_resource_dirs = build_utils.ParseGypList(options.resource_dirs)
 
-    for resource_dir in input_resource_dirs:
-      generate_v14_compatible_resources.GenerateV14Resources(
-          resource_dir,
-          v14_dir,
-          options.v14_verify_only)
+    if not options.v14_skip:
+      for resource_dir in input_resource_dirs:
+        generate_v14_compatible_resources.GenerateV14Resources(
+            resource_dir,
+            v14_dir)
 
     dep_zips = build_utils.ParseGypList(options.dependencies_res_zips)
     input_files += dep_zips

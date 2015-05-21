@@ -134,8 +134,8 @@ TEST_F(SoftwareRendererTest, SolidColorQuad) {
   gfx::Rect device_viewport_rect(outer_size);
   scoped_ptr<SkBitmap> output =
       DrawAndCopyOutput(&list, device_scale_factor, device_viewport_rect);
-  EXPECT_EQ(outer_rect.width(), output->info().fWidth);
-  EXPECT_EQ(outer_rect.height(), output->info().fHeight);
+  EXPECT_EQ(outer_rect.width(), output->info().width());
+  EXPECT_EQ(outer_rect.height(), output->info().height());
 
   EXPECT_EQ(SK_ColorYELLOW, output->getColor(0, 0));
   EXPECT_EQ(SK_ColorYELLOW,
@@ -153,14 +153,12 @@ TEST_F(SoftwareRendererTest, TileQuad) {
   gfx::Rect inner_rect(gfx::Point(1, 1), inner_size);
   InitializeRenderer(make_scoped_ptr(new SoftwareOutputDevice));
 
-  ResourceProvider::ResourceId resource_yellow =
-      resource_provider()->CreateResource(
-          outer_size, GL_CLAMP_TO_EDGE,
-          ResourceProvider::TEXTURE_HINT_IMMUTABLE, RGBA_8888);
-  ResourceProvider::ResourceId resource_cyan =
-      resource_provider()->CreateResource(
-          inner_size, GL_CLAMP_TO_EDGE,
-          ResourceProvider::TEXTURE_HINT_IMMUTABLE, RGBA_8888);
+  ResourceId resource_yellow = resource_provider()->CreateResource(
+      outer_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
+  ResourceId resource_cyan = resource_provider()->CreateResource(
+      inner_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
 
   SkBitmap yellow_tile;
   yellow_tile.allocN32Pixels(outer_size.width(), outer_size.height());
@@ -222,8 +220,8 @@ TEST_F(SoftwareRendererTest, TileQuad) {
   gfx::Rect device_viewport_rect(outer_size);
   scoped_ptr<SkBitmap> output =
       DrawAndCopyOutput(&list, device_scale_factor, device_viewport_rect);
-  EXPECT_EQ(outer_rect.width(), output->info().fWidth);
-  EXPECT_EQ(outer_rect.height(), output->info().fHeight);
+  EXPECT_EQ(outer_rect.width(), output->info().width());
+  EXPECT_EQ(outer_rect.height(), output->info().height());
 
   EXPECT_EQ(SK_ColorYELLOW, output->getColor(0, 0));
   EXPECT_EQ(SK_ColorYELLOW,
@@ -240,10 +238,9 @@ TEST_F(SoftwareRendererTest, TileQuadVisibleRect) {
   visible_rect.Inset(1, 2, 3, 4);
   InitializeRenderer(make_scoped_ptr(new SoftwareOutputDevice));
 
-  ResourceProvider::ResourceId resource_cyan =
-      resource_provider()->CreateResource(
-          tile_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
-          RGBA_8888);
+  ResourceId resource_cyan = resource_provider()->CreateResource(
+      tile_size, GL_CLAMP_TO_EDGE, ResourceProvider::TEXTURE_HINT_IMMUTABLE,
+      RGBA_8888);
 
   SkBitmap cyan_tile;  // The lowest five rows are yellow.
   cyan_tile.allocN32Pixels(tile_size.width(), tile_size.height());
@@ -292,8 +289,8 @@ TEST_F(SoftwareRendererTest, TileQuadVisibleRect) {
   gfx::Rect device_viewport_rect(tile_size);
   scoped_ptr<SkBitmap> output =
       DrawAndCopyOutput(&list, device_scale_factor, device_viewport_rect);
-  EXPECT_EQ(tile_rect.width(), output->info().fWidth);
-  EXPECT_EQ(tile_rect.height(), output->info().fHeight);
+  EXPECT_EQ(tile_rect.width(), output->info().width());
+  EXPECT_EQ(tile_rect.height(), output->info().height());
 
   // Check portion of tile not in visible rect isn't drawn.
   const unsigned int kTransparent = SK_ColorTRANSPARENT;
@@ -334,8 +331,8 @@ TEST_F(SoftwareRendererTest, ShouldClearRootRenderPass) {
 
   scoped_ptr<SkBitmap> output =
       DrawAndCopyOutput(&list, device_scale_factor, device_viewport_rect);
-  EXPECT_EQ(device_viewport_rect.width(), output->info().fWidth);
-  EXPECT_EQ(device_viewport_rect.height(), output->info().fHeight);
+  EXPECT_EQ(device_viewport_rect.width(), output->info().width());
+  EXPECT_EQ(device_viewport_rect.height(), output->info().height());
 
   EXPECT_EQ(SK_ColorGREEN, output->getColor(0, 0));
   EXPECT_EQ(SK_ColorGREEN,
@@ -356,8 +353,8 @@ TEST_F(SoftwareRendererTest, ShouldClearRootRenderPass) {
   renderer()->DecideRenderPassAllocationsForFrame(list);
 
   output = DrawAndCopyOutput(&list, device_scale_factor, device_viewport_rect);
-  EXPECT_EQ(device_viewport_rect.width(), output->info().fWidth);
-  EXPECT_EQ(device_viewport_rect.height(), output->info().fHeight);
+  EXPECT_EQ(device_viewport_rect.width(), output->info().width());
+  EXPECT_EQ(device_viewport_rect.height(), output->info().height());
 
   // If we didn't clear, the borders should still be green.
   EXPECT_EQ(SK_ColorGREEN, output->getColor(0, 0));
@@ -401,8 +398,8 @@ TEST_F(SoftwareRendererTest, RenderPassVisibleRect) {
 
   scoped_ptr<SkBitmap> output =
       DrawAndCopyOutput(&list, device_scale_factor, device_viewport_rect);
-  EXPECT_EQ(device_viewport_rect.width(), output->info().fWidth);
-  EXPECT_EQ(device_viewport_rect.height(), output->info().fHeight);
+  EXPECT_EQ(device_viewport_rect.width(), output->info().width());
+  EXPECT_EQ(device_viewport_rect.height(), output->info().height());
 
   EXPECT_EQ(SK_ColorGREEN, output->getColor(0, 0));
   EXPECT_EQ(SK_ColorGREEN,

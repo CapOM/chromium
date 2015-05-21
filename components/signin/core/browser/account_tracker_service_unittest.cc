@@ -29,7 +29,8 @@ const std::string kTokenInfoResponseFormat =
       \"hd\": \"\",           \
       \"name\": \"%s\",       \
       \"given_name\": \"%s\", \
-      \"locale\": \"%s\"      \
+      \"locale\": \"%s\",     \
+      \"picture\": \"%s\"     \
     }";
 
 const std::string kTokenInfoIncompleteResponseFormat =
@@ -38,6 +39,10 @@ const std::string kTokenInfoIncompleteResponseFormat =
       \"email\": \"%s\",      \
       \"hd\": \"\",           \
     }";
+
+const std::string kLSIDResponse = "{ lsid: \"Foo\" }";
+
+const std::string kServiceFlags = "allServices=Service1,Service2";
 
 enum TrackingEventType {
   UPDATED,
@@ -64,6 +69,10 @@ std::string AccountIdToLocale(const std::string account_id) {
   return "locale-" + account_id;
 }
 
+std::string AccountIdToPictureURL(const std::string account_id) {
+  return "picture_url-" + account_id;
+}
+
 void CheckAccountDetails(const std::string account_id,
                          const AccountTrackerService::AccountInfo& info) {
   EXPECT_EQ(account_id, info.account_id);
@@ -74,6 +83,9 @@ void CheckAccountDetails(const std::string account_id,
   EXPECT_EQ(AccountIdToFullName(account_id), info.full_name);
   EXPECT_EQ(AccountIdToGivenName(account_id), info.given_name);
   EXPECT_EQ(AccountIdToLocale(account_id), info.locale);
+  EXPECT_EQ(2U, info.service_flags.size());
+  EXPECT_EQ("Service1", info.service_flags[0]);
+  EXPECT_EQ("Service2", info.service_flags[1]);
 }
 
 class TrackingEvent {
@@ -284,7 +296,8 @@ class AccountTrackerServiceTest : public testing::Test {
         AccountIdToEmail(account_id).c_str(),
         AccountIdToFullName(account_id).c_str(),
         AccountIdToGivenName(account_id).c_str(),
-        AccountIdToLocale(account_id).c_str());
+        AccountIdToLocale(account_id).c_str(),
+        AccountIdToPictureURL(account_id).c_str());
   }
 
   std::string GenerateIncompleteTokenInfoResponse(
@@ -340,6 +353,8 @@ void AccountTrackerServiceTest::ReturnOAuthUrlFetchSuccess(
   ReturnOAuthUrlFetchResults(gaia::GaiaOAuthClient::kUrlFetcherId,
                              net::HTTP_OK,
                              GenerateValidTokenInfoResponse(account_id));
+  ReturnOAuthUrlFetchResults(0, net::HTTP_OK, kLSIDResponse);
+  ReturnOAuthUrlFetchResults(0, net::HTTP_OK, kServiceFlags);
 }
 
 void AccountTrackerServiceTest::ReturnOAuthUrlFetchSuccessIncomplete(

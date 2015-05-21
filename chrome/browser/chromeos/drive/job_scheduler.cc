@@ -4,13 +4,15 @@
 
 #include "chrome/browser/chromeos/drive/job_scheduler.h"
 
+#include <algorithm>
+
 #include "base/files/file_util.h"
-#include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram.h"
 #include "base/prefs/pref_service.h"
 #include "base/rand_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "chrome/browser/drive/event_logger.h"
 #include "chrome/common/pref_names.h"
 #include "content/public/browser/browser_thread.h"
@@ -742,7 +744,9 @@ void JobScheduler::QueueJob(JobID job_id) {
   const JobInfo& job_info = job_entry->job_info;
 
   const QueueType queue_type = GetJobQueueType(job_info.job_type);
-  queue_[queue_type]->Push(job_id, job_entry->context.type, false,
+  const bool batchable = job_info.job_type == TYPE_UPLOAD_EXISTING_FILE ||
+                         job_info.job_type == TYPE_UPLOAD_NEW_FILE;
+  queue_[queue_type]->Push(job_id, job_entry->context.type, batchable,
                            job_info.num_total_bytes);
 
   // Temporary histogram for crbug.com/229650.
@@ -787,7 +791,7 @@ void JobScheduler::DoJobLoop(QueueType queue_type) {
   // Wait when throttled.
   const base::Time now = base::Time::Now();
   if (now < wait_until_) {
-    base::MessageLoopProxy::current()->PostDelayedTask(
+    base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
         FROM_HERE,
         base::Bind(&JobScheduler::DoJobLoop,
                    weak_ptr_factory_.GetWeakPtr(),
@@ -802,25 +806,28 @@ void JobScheduler::DoJobLoop(QueueType queue_type) {
   if (job_ids.empty())
     return;
 
-  // TODO(hirono): Currently all requests are not batchable. So the queue always
-  // return just 1 job.
-  DCHECK_EQ(1u, job_ids.size());
-  JobEntry* entry = job_map_.Lookup(job_ids.front());
-  DCHECK(entry);
+  if (job_ids.size() > 1)
+    uploader_->StartBatchProcessing();
 
-  JobInfo* job_info = &entry->job_info;
-  job_info->state = STATE_RUNNING;
-  job_info->start_time = now;
-  NotifyJobUpdated(*job_info);
+  for (JobID job_id : job_ids) {
+    JobEntry* entry = job_map_.Lookup(job_id);
+    DCHECK(entry);
 
-  entry->cancel_callback = entry->task.Run();
+    JobInfo* job_info = &entry->job_info;
+    job_info->state = STATE_RUNNING;
+    job_info->start_time = now;
+    NotifyJobUpdated(*job_info);
+
+    entry->cancel_callback = entry->task.Run();
+    logger_->Log(logging::LOG_INFO, "Job started: %s - %s",
+                 job_info->ToString().c_str(),
+                 GetQueueInfo(queue_type).c_str());
+  }
+
+  if (job_ids.size() > 1)
+    uploader_->StopBatchProcessing();
 
   UpdateWait();
-
-  logger_->Log(logging::LOG_INFO,
-               "Job started: %s - %s",
-               job_info->ToString().c_str(),
-               GetQueueInfo(queue_type).c_str());
 }
 
 int JobScheduler::GetCurrentAcceptedPriority(QueueType queue_type) {
@@ -914,7 +921,8 @@ bool JobScheduler::OnJobDone(JobID job_id,
 
   // Post a task to continue the job loop.  This allows us to finish handling
   // the current job before starting the next one.
-  base::MessageLoopProxy::current()->PostTask(FROM_HERE,
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE,
       base::Bind(&JobScheduler::DoJobLoop,
                  weak_ptr_factory_.GetWeakPtr(),
                  queue_type));
@@ -1145,8 +1153,8 @@ void JobScheduler::AbortNotRunningJob(JobEntry* job,
   queue_[GetJobQueueType(job->job_info.job_type)]->Remove(job->job_info.job_id);
   NotifyJobDone(job->job_info, error);
   job_map_.Remove(job->job_info.job_id);
-  base::MessageLoopProxy::current()->PostTask(FROM_HERE,
-                                              base::Bind(callback, error));
+  base::ThreadTaskRunnerHandle::Get()->PostTask(FROM_HERE,
+                                                base::Bind(callback, error));
 }
 
 void JobScheduler::NotifyJobAdded(const JobInfo& job_info) {

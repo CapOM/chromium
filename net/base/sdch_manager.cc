@@ -103,7 +103,7 @@ void SdchManager::ClearData() {
   blacklisted_domains_.clear();
   allow_latency_experiment_.clear();
   dictionaries_.clear();
-  FOR_EACH_OBSERVER(SdchObserver, observers_, OnClearDictionaries(this));
+  FOR_EACH_OBSERVER(SdchObserver, observers_, OnClearDictionaries());
 }
 
 // static
@@ -186,7 +186,7 @@ SdchProblemCode SdchManager::IsInSupportedDomain(const GURL& url) {
   if (!g_sdch_enabled_ )
     return SDCH_DISABLED;
 
-  if (!secure_scheme_supported() && url.SchemeIsSecure())
+  if (!secure_scheme_supported() && url.SchemeIsCryptographic())
     return SDCH_SECURE_SCHEME_NOT_SUPPORTED;
 
   if (blacklisted_domains_.empty())
@@ -220,14 +220,14 @@ SdchProblemCode SdchManager::OnGetDictionary(const GURL& request_url,
 
   FOR_EACH_OBSERVER(SdchObserver,
                     observers_,
-                    OnGetDictionary(this, request_url, dictionary_url));
+                    OnGetDictionary(request_url, dictionary_url));
 
   return SDCH_OK;
 }
 
 void SdchManager::OnDictionaryUsed(const std::string& server_hash) {
   FOR_EACH_OBSERVER(SdchObserver, observers_,
-                    OnDictionaryUsed(this, server_hash));
+                    OnDictionaryUsed(server_hash));
 }
 
 SdchProblemCode SdchManager::CanFetchDictionary(
@@ -268,7 +268,7 @@ SdchManager::GetDictionarySet(const GURL& target_url) {
   int count = 0;
   scoped_ptr<SdchManager::DictionarySet> result(new DictionarySet);
   for (const auto& entry: dictionaries_) {
-    if (!secure_scheme_supported() && target_url.SchemeIsSecure())
+    if (!secure_scheme_supported() && target_url.SchemeIsCryptographic())
       continue;
     if (entry.second->data.CanUse(target_url) != SDCH_OK)
       continue;
@@ -282,6 +282,8 @@ SdchManager::GetDictionarySet(const GURL& target_url) {
     return NULL;
 
   UMA_HISTOGRAM_COUNTS("Sdch3.Advertisement_Count", count);
+  UMA_HISTOGRAM_BOOLEAN("Sdch3.AdvertisedWithSecureScheme",
+                        target_url.SchemeIsSecure());
 
   return result.Pass();
 }
@@ -299,7 +301,7 @@ SdchManager::GetDictionarySetByHash(
     return result.Pass();
 
   if (!SdchManager::secure_scheme_supported() &&
-      target_url.SchemeIsSecure()) {
+      target_url.SchemeIsCryptographic()) {
     *problem_code = SDCH_DICTIONARY_FOUND_HAS_WRONG_SCHEME;
     return result.Pass();
   }
@@ -448,6 +450,9 @@ SdchProblemCode SdchManager::AddSdchDictionary(
   if (server_hash_p)
     *server_hash_p = server_hash;
 
+  FOR_EACH_OBSERVER(SdchObserver, observers_,
+                    OnDictionaryAdded(dictionary_url, server_hash));
+
   return SDCH_OK;
 }
 
@@ -457,6 +462,9 @@ SdchProblemCode SdchManager::RemoveSdchDictionary(
     return SDCH_DICTIONARY_HASH_NOT_FOUND;
 
   dictionaries_.erase(server_hash);
+
+  FOR_EACH_OBSERVER(SdchObserver, observers_, OnDictionaryRemoved(server_hash));
+
   return SDCH_OK;
 }
 

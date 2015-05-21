@@ -319,10 +319,14 @@
         '../ui/base/ui_base_tests.gyp:ui_base_unittests',
         '../ui/display/display.gyp:display_unittests',
         '../ui/gfx/gfx_tests.gyp:gfx_unittests',
-        '../ui/gl/gl_tests.gyp:gl_unittests',
         '../url/url.gyp:url_unittests',
       ],
       'conditions': [
+        ['OS!="ios"', {
+          'dependencies': [
+            '../ui/gl/gl_tests.gyp:gl_unittests',
+          ],
+        }],
         ['OS!="ios" and OS!="mac"', {
           'dependencies': [
             '../ui/touch_selection/ui_touch_selection.gyp:ui_touch_selection_unittests',
@@ -880,11 +884,6 @@
                 '../chrome/chrome.gyp:unit_tests_apk',
               ],
             }],
-            ['enable_webrtc==1 and "<(libpeer_target_type)"=="static_library"', {
-              'dependencies': [
-                '../components/devtools_bridge.gyp:devtools_bridge_tests_apk',
-              ],
-            }],
           ],
         },
         {
@@ -896,8 +895,6 @@
             '../content/content_shell_and_tests.gyp:content_browsertests',
             '../tools/android/android_tools.gyp:android_tools',
             '../tools/android/android_tools.gyp:memconsumer',
-            # Unit test bundles packaged as an apk.
-            '../components/devtools_bridge.gyp:devtools_bridge_tests_apk',
             '../content/content_shell_and_tests.gyp:content_browsertests_apk',
           ],
         },  # target_name: android_builder_chromium_webrtc

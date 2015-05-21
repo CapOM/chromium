@@ -30,6 +30,7 @@ using cc::PictureDrawQuad;
 using cc::RenderPass;
 using cc::RenderPassId;
 using cc::RenderPassDrawQuad;
+using cc::ResourceId;
 using cc::ResourceProvider;
 using cc::SharedQuadState;
 using cc::SoftwareFrameData;
@@ -185,7 +186,7 @@ class CCMessagesTest : public testing::Test {
     EXPECT_EQ(a->vertex_opacity[1], b->vertex_opacity[1]);
     EXPECT_EQ(a->vertex_opacity[2], b->vertex_opacity[2]);
     EXPECT_EQ(a->vertex_opacity[3], b->vertex_opacity[3]);
-    EXPECT_EQ(a->flipped, b->flipped);
+    EXPECT_EQ(a->y_flipped, b->y_flipped);
     EXPECT_EQ(a->nearest_neighbor, b->nearest_neighbor);
   }
 
@@ -198,7 +199,8 @@ class CCMessagesTest : public testing::Test {
   }
 
   void Compare(const YUVVideoDrawQuad* a, const YUVVideoDrawQuad* b) {
-    EXPECT_EQ(a->tex_coord_rect, b->tex_coord_rect);
+    EXPECT_EQ(a->ya_tex_coord_rect, b->ya_tex_coord_rect);
+    EXPECT_EQ(a->uv_tex_coord_rect, b->uv_tex_coord_rect);
     EXPECT_EQ(a->ya_tex_size, b->ya_tex_size);
     EXPECT_EQ(a->uv_tex_size, b->uv_tex_size);
     EXPECT_EQ(a->y_plane_resource_id, b->y_plane_resource_id);
@@ -247,6 +249,7 @@ TEST_F(CCMessagesTest, AllQuads) {
   gfx::Size arbitrary_size2(3, 99);
   gfx::Size arbitrary_size3(75, 1281);
   gfx::RectF arbitrary_rectf1(4.2f, -922.1f, 15.6f, 29.5f);
+  gfx::RectF arbitrary_rectf2(2.1f, -411.05f, 7.8f, 14.75f);
   gfx::SizeF arbitrary_sizef1(15.2f, 104.6f);
   gfx::PointF arbitrary_pointf1(31.4f, 15.9f);
   gfx::PointF arbitrary_pointf2(26.5f, -35.8f);
@@ -270,10 +273,10 @@ TEST_F(CCMessagesTest, AllQuads) {
   SkXfermode::Mode arbitrary_blend_mode3 = SkXfermode::kOverlay_Mode;
   IOSurfaceDrawQuad::Orientation arbitrary_orientation =
       IOSurfaceDrawQuad::UNFLIPPED;
-  ResourceProvider::ResourceId arbitrary_resourceid1 = 55;
-  ResourceProvider::ResourceId arbitrary_resourceid2 = 47;
-  ResourceProvider::ResourceId arbitrary_resourceid3 = 23;
-  ResourceProvider::ResourceId arbitrary_resourceid4 = 16;
+  ResourceId arbitrary_resourceid1 = 55;
+  ResourceId arbitrary_resourceid2 = 47;
+  ResourceId arbitrary_resourceid3 = 23;
+  ResourceId arbitrary_resourceid4 = 16;
   SkScalar arbitrary_sigma = SkFloatToScalar(2.0f);
   YUVVideoDrawQuad::ColorSpace arbitrary_color_space =
       YUVVideoDrawQuad::REC_601;
@@ -446,19 +449,12 @@ TEST_F(CCMessagesTest, AllQuads) {
 
   YUVVideoDrawQuad* yuvvideo_in =
       pass_in->CreateAndAppendDrawQuad<YUVVideoDrawQuad>();
-  yuvvideo_in->SetAll(shared_state3_in,
-                      arbitrary_rect1,
-                      arbitrary_rect2_inside_rect1,
-                      arbitrary_rect1_inside_rect1,
-                      arbitrary_bool1,
-                      arbitrary_rectf1,
-                      arbitrary_size1,
-                      arbitrary_size2,
-                      arbitrary_resourceid1,
-                      arbitrary_resourceid2,
-                      arbitrary_resourceid3,
-                      arbitrary_resourceid4,
-                      arbitrary_color_space);
+  yuvvideo_in->SetAll(
+      shared_state3_in, arbitrary_rect1, arbitrary_rect2_inside_rect1,
+      arbitrary_rect1_inside_rect1, arbitrary_bool1, arbitrary_rectf1,
+      arbitrary_rectf2, arbitrary_size1, arbitrary_size2, arbitrary_resourceid1,
+      arbitrary_resourceid2, arbitrary_resourceid3, arbitrary_resourceid4,
+      arbitrary_color_space);
   pass_cmp->CopyFromAndAppendDrawQuad(yuvvideo_in,
                                       yuvvideo_in->shared_quad_state);
 

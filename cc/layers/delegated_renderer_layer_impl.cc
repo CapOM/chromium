@@ -44,11 +44,11 @@ bool DelegatedRendererLayerImpl::HasContributingDelegatedRenderPasses() const {
   return render_passes_in_draw_order_.size() > 1;
 }
 
-static ResourceProvider::ResourceId ResourceRemapHelper(
+static ResourceId ResourceRemapHelper(
     bool* invalid_frame,
     const ResourceProvider::ResourceIdMap& child_to_parent_map,
     ResourceProvider::ResourceIdSet* resources_in_frame,
-    ResourceProvider::ResourceId id) {
+    ResourceId id) {
   ResourceProvider::ResourceIdMap::const_iterator it =
       child_to_parent_map.find(id);
   if (it == child_to_parent_map.end()) {
@@ -57,7 +57,7 @@ static ResourceProvider::ResourceId ResourceRemapHelper(
   }
 
   DCHECK_EQ(it->first, id);
-  ResourceProvider::ResourceId remapped_id = it->second;
+  ResourceId remapped_id = it->second;
   resources_in_frame->insert(id);
   return remapped_id;
 }
@@ -78,6 +78,7 @@ void DelegatedRendererLayerImpl::PushPropertiesTo(LayerImpl* layer) {
   own_child_id_ = false;
 
   if (have_render_passes_to_push_) {
+    DCHECK(child_id_);
     // This passes ownership of the render passes to the active tree.
     delegated_layer->SetRenderPasses(&render_passes_in_draw_order_);
     // Once resources are on the active tree, give them to the ResourceProvider
@@ -216,6 +217,7 @@ scoped_ptr<LayerImpl> DelegatedRendererLayerImpl::CreateLayerImpl(
 void DelegatedRendererLayerImpl::ReleaseResources() {
   ClearRenderPasses();
   ClearChildId();
+  have_render_passes_to_push_ = false;
 }
 
 static inline int IndexToId(int index) { return index + 1; }

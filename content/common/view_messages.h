@@ -226,6 +226,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::PepperRendererInstanceData)
   IPC_STRUCT_TRAITS_MEMBER(render_frame_id)
   IPC_STRUCT_TRAITS_MEMBER(document_url)
   IPC_STRUCT_TRAITS_MEMBER(plugin_url)
+  IPC_STRUCT_TRAITS_MEMBER(is_potentially_secure_plugin_context)
 IPC_STRUCT_TRAITS_END()
 #endif
 
@@ -985,6 +986,11 @@ IPC_MESSAGE_ROUTED2(ViewMsg_SwapCompositorFrameAck,
 IPC_MESSAGE_ROUTED2(ViewMsg_ReclaimCompositorResources,
                     uint32 /* output_surface_id */,
                     cc::CompositorFrameAck /* ack */)
+
+// Sent by browser to give renderer compositor a new namespace ID for any
+// SurfaceSequences it has to create.
+IPC_MESSAGE_ROUTED1(ViewMsg_SetSurfaceIdNamespace,
+                    uint32_t /* surface_id_namespace */)
 
 IPC_MESSAGE_ROUTED0(ViewMsg_SelectWordAroundCaret)
 

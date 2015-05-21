@@ -6,6 +6,8 @@
 
 #include <math.h>
 
+#include "base/i18n/icu_encoding_detection.h"
+#include "base/i18n/icu_string_conversions.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
@@ -223,10 +225,22 @@ void* MapFont(struct _FPDF_SYSFONTINFO*, int weight, int italic,
   }
 
   if (i == arraysize(PDFFontSubstitutions)) {
-    // TODO(kochi): Pass the face in UTF-8. If face is not encoded in UTF-8,
-    // convert to UTF-8 before passing.
-    description.set_face(face);
+    // Convert to UTF-8 before calling set_face().
+    std::string face_utf8;
+    if (base::IsStringUTF8(face)) {
+      face_utf8 = face;
+    } else {
+      std::string encoding;
+      if (base::DetectEncoding(face, &encoding)) {
+        // ConvertToUtf8AndNormalize() clears |face_utf8| on failure.
+        base::ConvertToUtf8AndNormalize(face, encoding, &face_utf8);
+      }
+    }
 
+    if (face_utf8.empty())
+      return nullptr;
+
+    description.set_face(face_utf8);
     description.set_weight(WeightToBrowserFontTrustedWeight(weight));
     description.set_italic(italic > 0);
   }
@@ -661,17 +675,11 @@ PDFiumEngine::~PDFiumEngine() {
     pages_[i]->Unload();
 
   if (doc_) {
-    if (form_) {
-      FORM_DoDocumentAAction(form_, FPDFDOC_AACTION_WC);
-    }
+    FORM_DoDocumentAAction(form_, FPDFDOC_AACTION_WC);
     FPDF_CloseDocument(doc_);
-    if (form_) {
-      FPDFDOC_ExitFormFillEnvironment(form_);
-    }
+    FPDFDOC_ExitFormFillEnvironment(form_);
   }
-
-  if (fpdf_availability_)
-    FPDFAvail_Destroy(fpdf_availability_);
+  FPDFAvail_Destroy(fpdf_availability_);
 
   STLDeleteElements(&pages_);
 }
@@ -970,8 +978,8 @@ int PDFiumEngine::GetBlock(void* param, unsigned long position,
   return loader->GetBlock(position, size, buffer);
 }
 
-bool PDFiumEngine::IsDataAvail(FX_FILEAVAIL* param,
-                               size_t offset, size_t size) {
+FPDF_BOOL PDFiumEngine::IsDataAvail(FX_FILEAVAIL* param,
+                                    size_t offset, size_t size) {
   PDFiumEngine::FileAvail* file_avail =
       static_cast<PDFiumEngine::FileAvail*>(param);
   return file_avail->loader->IsDataAvailable(offset, size);
@@ -2440,7 +2448,7 @@ std::string PDFiumEngine::GetPageAsJSON(int index) {
   scoped_ptr<base::Value> node(
       pages_[index]->GetAccessibleContentAsValue(current_rotation_));
   std::string page_json;
-  base::JSONWriter::Write(node.get(), &page_json);
+  base::JSONWriter::Write(*node, &page_json);
   return page_json;
 }
 

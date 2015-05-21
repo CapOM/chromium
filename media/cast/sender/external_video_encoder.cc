@@ -15,7 +15,6 @@
 #include "media/cast/cast_defines.h"
 #include "media/cast/logging/logging_defines.h"
 #include "media/cast/net/cast_transport_config.h"
-#include "media/video/video_encode_accelerator.h"
 
 namespace {
 
@@ -269,7 +268,7 @@ class ExternalVideoEncoder::VEAClientImpl
   void OnReceivedSharedMemory(scoped_ptr<base::SharedMemory> memory) {
     DCHECK(task_runner_->RunsTasksOnCurrentThread());
 
-    output_buffers_.push_back(memory.release());
+    output_buffers_.push_back(memory.Pass());
 
     // Wait until all requested buffers are received.
     if (output_buffers_.size() < kOutputBufferCount)

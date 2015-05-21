@@ -4,7 +4,6 @@
 
 #include "media/base/key_systems.h"
 
-#include <string>
 
 #include "base/containers/hash_tables.h"
 #include "base/lazy_instance.h"
@@ -12,7 +11,6 @@
 #include "base/strings/string_util.h"
 #include "base/threading/thread_checker.h"
 #include "base/time/time.h"
-#include "media/base/eme_constants.h"
 #include "media/base/key_system_info.h"
 #include "media/base/key_systems_support_uma.h"
 #include "media/base/media_client.h"
@@ -722,10 +720,10 @@ EmeConfigRule KeySystemsImpl::GetContentTypeConfigRule(
     //
     // Because the check for regular codec support is early-exit, we don't have
     // to consider codecs that are only supported in hardware-secure mode. We
-    // could do so, and make use of SECURE_CODECS_REQUIRED, if it turns out that
-    // hardware-secure-only codecs actually exist and are useful.
+    // could do so, and make use of HW_SECURE_CODECS_REQUIRED, if it turns out
+    // that hardware-secure-only codecs actually exist and are useful.
     if ((codec & key_system_secure_codec_mask) == 0)
-      support = EmeConfigRule::SECURE_CODECS_NOT_ALLOWED;
+      support = EmeConfigRule::HW_SECURE_CODECS_NOT_ALLOWED;
 #endif  // defined(OS_ANDROID)
   }
 
@@ -788,7 +786,7 @@ EmeConfigRule KeySystemsImpl::GetRobustnessConfigRule(
     }
 #elif defined(OS_ANDROID)
     if (robustness > EmeRobustness::SW_SECURE_CRYPTO)
-      return EmeConfigRule::SECURE_CODECS_REQUIRED;
+      return EmeConfigRule::HW_SECURE_CODECS_REQUIRED;
 #endif  // defined(OS_CHROMEOS)
   }
 

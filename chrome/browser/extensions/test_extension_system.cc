@@ -14,7 +14,6 @@
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/chrome_switches.h"
 #include "content/public/browser/browser_thread.h"
-#include "extensions/browser/declarative_user_script_manager.h"
 #include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_pref_value_map.h"
 #include "extensions/browser/extension_pref_value_map_factory.h"
@@ -49,10 +48,6 @@ void TestExtensionSystem::Shutdown() {
     extension_service_->Shutdown();
 }
 
-void TestExtensionSystem::CreateLazyBackgroundTaskQueue() {
-  lazy_background_task_queue_.reset(new LazyBackgroundTaskQueue(profile_));
-}
-
 ExtensionPrefs* TestExtensionSystem::CreateExtensionPrefs(
     const base::CommandLine* command_line,
     const base::FilePath& install_directory) {
@@ -83,15 +78,11 @@ ExtensionService* TestExtensionSystem::CreateExtensionService(
     bool autoupdate_enabled) {
   if (!ExtensionPrefs::Get(profile_))
     CreateExtensionPrefs(command_line, install_directory);
-  install_verifier_.reset(
-      new InstallVerifier(ExtensionPrefs::Get(profile_), profile_));
   // The ownership of |value_store_| is immediately transferred to state_store_,
   // but we keep a naked pointer to the TestingValueStore.
   scoped_ptr<TestingValueStore> value_store(new TestingValueStore());
   value_store_ = value_store.get();
   state_store_.reset(new StateStore(profile_, value_store.Pass()));
-  declarative_user_script_manager_.reset(
-      new DeclarativeUserScriptManager(profile_));
   management_policy_.reset(new ManagementPolicy());
   management_policy_->RegisterProviders(
       ExtensionManagementFactory::GetForBrowserContext(profile_)
@@ -129,11 +120,6 @@ SharedUserScriptMaster* TestExtensionSystem::shared_user_script_master() {
   return NULL;
 }
 
-DeclarativeUserScriptManager*
-TestExtensionSystem::declarative_user_script_manager() {
-  return declarative_user_script_manager_.get();
-}
-
 StateStore* TestExtensionSystem::state_store() {
   return state_store_.get();
 }
@@ -144,20 +130,11 @@ StateStore* TestExtensionSystem::rules_store() {
 
 InfoMap* TestExtensionSystem::info_map() { return info_map_.get(); }
 
-LazyBackgroundTaskQueue*
-TestExtensionSystem::lazy_background_task_queue() {
-  return lazy_background_task_queue_.get();
-}
-
 void TestExtensionSystem::SetEventRouter(scoped_ptr<EventRouter> event_router) {
   event_router_.reset(event_router.release());
 }
 
 EventRouter* TestExtensionSystem::event_router() { return event_router_.get(); }
-
-InstallVerifier* TestExtensionSystem::install_verifier() {
-  return install_verifier_.get();
-}
 
 QuotaService* TestExtensionSystem::quota_service() {
   return quota_service_.get();

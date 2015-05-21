@@ -18,15 +18,16 @@
 #import "ui/gfx/mac/coordinate_conversion.h"
 #import "ui/gfx/mac/nswindow_frame_controls.h"
 #include "ui/gfx/screen.h"
-#import "ui/views/cocoa/cocoa_mouse_capture.h"
 #import "ui/views/cocoa/bridged_content_view.h"
+#import "ui/views/cocoa/cocoa_mouse_capture.h"
+#include "ui/views/cocoa/tooltip_manager_mac.h"
 #import "ui/views/cocoa/views_nswindow_delegate.h"
 #import "ui/views/cocoa/widget_owner_nswindow_adapter.h"
-#include "ui/views/widget/native_widget_mac.h"
 #include "ui/views/ime/input_method_bridge.h"
 #include "ui/views/ime/null_input_method.h"
 #include "ui/views/view.h"
 #include "ui/views/views_delegate.h"
+#include "ui/views/widget/native_widget_mac.h"
 #include "ui/views/widget/widget.h"
 #include "ui/views/widget/widget_aura_utils.h"
 #include "ui/views/widget/widget_delegate.h"
@@ -196,6 +197,11 @@ void BridgedNativeWidget::Init(base::scoped_nsobject<NSWindow> window,
   // Widgets for UI controls (usually layered above web contents) start visible.
   if (params.type == Widget::InitParams::TYPE_CONTROL)
     SetVisibilityState(SHOW_INACTIVE);
+
+  // Tooltip Widgets shouldn't have their own tooltip manager, but tooltips are
+  // native on Mac, so nothing should ever want one in Widget form.
+  DCHECK_NE(params.type, Widget::InitParams::TYPE_TOOLTIP);
+  tooltip_manager_.reset(new TooltipManagerMac(this));
 }
 
 void BridgedNativeWidget::SetFocusManager(FocusManager* focus_manager) {
@@ -388,8 +394,12 @@ void BridgedNativeWidget::OnFullscreenTransitionStart(
 void BridgedNativeWidget::OnFullscreenTransitionComplete(
     bool actual_fullscreen_state) {
   in_fullscreen_transition_ = false;
-  if (target_fullscreen_state_ == actual_fullscreen_state)
+
+  if (target_fullscreen_state_ == actual_fullscreen_state) {
+    // Ensure constraints are re-applied when completing a transition.
+    OnSizeConstraintsChanged();
     return;
+  }
 
   // First update to reflect reality so that OnTargetFullscreenStateChanged()
   // expects the change.
@@ -432,13 +442,13 @@ void BridgedNativeWidget::ToggleDesiredFullscreenState() {
     return;  // TODO(tapted): Implement this for Snow Leopard.
   }
 
-  // Since fullscreen requests are ignored if the collection behavior does not
-  // allow it, save the collection behavior and restore it after.
-  NSWindowCollectionBehavior behavior = [window_ collectionBehavior];
-  [window_ setCollectionBehavior:behavior |
-                                 NSWindowCollectionBehaviorFullScreenPrimary];
+  // Enable fullscreen collection behavior because:
+  // 1: -[NSWindow toggleFullscreen:] would otherwise be ignored,
+  // 2: the fullscreen button must be enabled so the user can leave fullscreen.
+  // This will be reset when a transition out of fullscreen completes.
+  gfx::SetNSWindowCanFullscreen(window_, true);
+
   [window_ toggleFullScreen:nil];
-  [window_ setCollectionBehavior:behavior];
 }
 
 void BridgedNativeWidget::OnSizeChanged() {
@@ -523,7 +533,12 @@ void BridgedNativeWidget::OnWindowKeyStatusChangedTo(bool is_key) {
 }
 
 void BridgedNativeWidget::OnSizeConstraintsChanged() {
-  NSWindow* window = ns_window();
+  // Don't modify the size constraints or fullscreen collection behavior while
+  // in fullscreen or during a transition. OnFullscreenTransitionComplete will
+  // reset these after leaving fullscreen.
+  if (target_fullscreen_state_ || in_fullscreen_transition_)
+    return;
+
   Widget* widget = native_widget_mac()->GetWidget();
   gfx::Size min_size = widget->GetMinimumSize();
   gfx::Size max_size = widget->GetMaximumSize();
@@ -533,7 +548,7 @@ void BridgedNativeWidget::OnSizeConstraintsChanged() {
   bool shows_fullscreen_controls =
       is_resizable && widget->widget_delegate()->CanMaximize();
 
-  gfx::ApplyNSWindowSizeConstraints(window, min_size, max_size,
+  gfx::ApplyNSWindowSizeConstraints(window_, min_size, max_size,
                                     shows_resize_controls,
                                     shows_fullscreen_controls);
 }

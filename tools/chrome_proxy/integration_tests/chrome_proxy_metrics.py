@@ -225,33 +225,52 @@ class ChromeProxyMetric(network_metrics.NetworkMetric):
         results.current_page, 'bypass', 'count', bypass_count))
 
   def AddResultsForLoFi(self, tab, results):
-    lo_fi_count = 0
+    lo_fi_request_count = 0
+    lo_fi_response_count = 0
 
     for resp in self.IterResponses(tab):
-      if resp.HasChromeProxyLoFi():
-        lo_fi_count += 1
+      if resp.HasChromeProxyLoFiRequest():
+        lo_fi_request_count += 1
       else:
         raise ChromeProxyMetricException, (
             '%s: LoFi not in request header.' % (resp.response.url))
+
+      if resp.HasChromeProxyLoFiResponse():
+        lo_fi_response_count += 1
+      else:
+        raise ChromeProxyMetricException, (
+            '%s: LoFi not in response header.' % (resp.response.url))
 
       if resp.content_length > 100:
         raise ChromeProxyMetricException, (
             'Image %s is %d bytes. Expecting less than 100 bytes.' %
             (resp.response.url, resp.content_length))
 
-    if lo_fi_count == 0:
+    if lo_fi_request_count == 0:
+      raise ChromeProxyMetricException, (
+          'Expected at least one LoFi request, but zero such requests were '
+          'sent.')
+    if lo_fi_response_count == 0:
       raise ChromeProxyMetricException, (
           'Expected at least one LoFi response, but zero such responses were '
           'received.')
 
     results.AddValue(scalar.ScalarValue(
-        results.current_page, 'lo_fi', 'count', lo_fi_count))
+        results.current_page, 'lo_fi_request', 'count', lo_fi_request_count))
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'lo_fi_response', 'count', lo_fi_response_count))
     super(ChromeProxyMetric, self).AddResults(tab, results)
 
-  def AddResultsForBypass(self, tab, results):
+  def AddResultsForBypass(self, tab, results, url_pattern=""):
     bypass_count = 0
+    skipped_count = 0
 
     for resp in self.IterResponses(tab):
+      # Only check the url's that contain the specified pattern.
+      if url_pattern and url_pattern not in resp.response.url:
+        skipped_count += 1
+        continue
+
       if resp.HasChromeProxyViaHeader():
         r = resp.response
         raise ChromeProxyMetricException, (
@@ -263,8 +282,11 @@ class ChromeProxyMetric(network_metrics.NetworkMetric):
       raise ChromeProxyMetricException, (
           'Expected at least one response to be bypassed, but zero such '
           'responses were received.')
+
     results.AddValue(scalar.ScalarValue(
         results.current_page, 'bypass', 'count', bypass_count))
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'skipped', 'count', skipped_count))
 
   def AddResultsForCorsBypass(self, tab, results):
     eligible_response_count = 0

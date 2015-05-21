@@ -32,8 +32,9 @@ source_set("shell") {
 
   public_deps = [
     "//base",
+    "//mojo/application/public/interfaces",
     "//mojo/common",
-    "//third_party/mojo/src/mojo/public/interfaces/application:application",
+    "//third_party/mojo/src/mojo/public/cpp/bindings",
     "//mojo/services/network/public/interfaces",
     "//url",
   ]
@@ -44,8 +45,6 @@ source_set("shell") {
     "//third_party/mojo/src/mojo/edk/system",
     "//mojo/environment:chromium",
     "//mojo/util:filename_util",
-    "//third_party/mojo_services/src/content_handler/public/interfaces",
-    "//mojo/runner:native_application_support",
   ]
 }
 
@@ -60,12 +59,8 @@ test("tests") {
     ":shell",
     ":test_bindings",
     "//base",
-    "//mojo/application",
-    "//mojo/common",
+    "//mojo/application/public/cpp",
     "//third_party/mojo/src/mojo/edk/test:run_all_unittests",
-    "//mojo/environment:chromium",
-    "//third_party/mojo/src/mojo/public/cpp/application",
-    "//third_party/mojo/src/mojo/public/cpp/bindings",
     "//testing/gtest",
     "//url",
   ]

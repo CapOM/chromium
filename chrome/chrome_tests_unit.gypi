@@ -142,7 +142,6 @@
       'browser/metrics/variations/variations_service_unittest.cc',
       'browser/mod_pagespeed/mod_pagespeed_metrics_unittest.cc',
       'browser/net/certificate_error_reporter_unittest.cc',
-      'browser/net/chrome_fraudulent_certificate_reporter_unittest.cc',
       'browser/net/chrome_network_delegate_unittest.cc',
       'browser/net/dns_probe_runner_unittest.cc',
       'browser/net/dns_probe_service_unittest.cc',
@@ -248,6 +247,8 @@
       'browser/signin/signin_manager_unittest.cc',
       'browser/signin/signin_tracker_unittest.cc',
       'browser/signin/test_signin_client_builder.cc',
+      'browser/ssl/certificate_error_report_unittest.cc',
+      'browser/ssl/chrome_fraudulent_certificate_reporter_unittest.cc',
       'browser/ssl/ssl_error_classification_unittest.cc',
       'browser/ssl/ssl_error_handler_unittest.cc',
       'browser/status_icons/status_icon_menu_model_unittest.cc',
@@ -521,7 +522,6 @@
       'browser/ui/passwords/manage_passwords_icon_mock.cc',
       'browser/ui/passwords/manage_passwords_state_unittest.cc',
       'browser/ui/passwords/manage_passwords_ui_controller_unittest.cc',
-      'browser/ui/passwords/manage_passwords_view_utils_unittest.cc',
       'browser/ui/passwords/password_bubble_experiment_unittest.cc',
       'browser/ui/passwords/password_manager_presenter_unittest.cc',
       'browser/ui/search_engines/keyword_editor_controller_unittest.cc',
@@ -969,6 +969,7 @@
     'chrome_unit_tests_configuration_policy_sources': [
       'browser/net/proxy_policy_handler_unittest.cc',
       'browser/policy/cloud/cloud_policy_invalidator_unittest.cc',
+      'browser/policy/cloud/remote_commands_invalidator_unittest.cc',
       'browser/policy/cloud/user_policy_signin_service_unittest.cc',
       'browser/policy/file_selection_dialogs_policy_handler_unittest.cc',
       'browser/policy/javascript_policy_handler_unittest.cc',
@@ -1001,7 +1002,6 @@
       'browser/safe_browsing/chunk_range_unittest.cc',
       'browser/safe_browsing/client_side_detection_host_unittest.cc',
       'browser/safe_browsing/client_side_detection_service_unittest.cc',
-      'browser/safe_browsing/database_manager_unittest.cc',
       'browser/safe_browsing/download_feedback_service_unittest.cc',
       'browser/safe_browsing/download_feedback_unittest.cc',
       'browser/safe_browsing/download_protection_service_unittest.cc',
@@ -1025,6 +1025,7 @@
       'browser/safe_browsing/incident_reporting/resource_request_detector_unittest.cc',
       'browser/safe_browsing/incident_reporting/tracked_preference_incident_unittest.cc',
       'browser/safe_browsing/incident_reporting/variations_seed_signature_incident_unittest.cc',
+      'browser/safe_browsing/local_database_manager_unittest.cc',
       'browser/safe_browsing/local_two_phase_testserver.cc',
       'browser/safe_browsing/malware_details_unittest.cc',
       'browser/safe_browsing/path_sanitizer_unittest.cc',
@@ -1038,6 +1039,8 @@
       'browser/safe_browsing/safe_browsing_store_unittest.cc',
       'browser/safe_browsing/safe_browsing_util_unittest.cc',
       'browser/safe_browsing/sandboxed_zip_analyzer_unittest.cc',
+      'browser/safe_browsing/test_database_manager.cc',
+      'browser/safe_browsing/test_database_manager.h',
       'browser/safe_browsing/two_phase_uploader_unittest.cc',
       'common/safe_browsing/binary_feature_extractor_unittest.cc',
       'common/safe_browsing/binary_feature_extractor_win_unittest.cc',
@@ -1056,7 +1059,6 @@
       'browser/ui/autofill/account_chooser_model_unittest.cc',
       'browser/ui/autofill/autofill_dialog_controller_unittest.cc',
       'browser/ui/autofill/autofill_dialog_i18n_input_unittest.cc',
-      'browser/ui/autofill/card_unmask_prompt_controller_impl_unittest.cc',
       'browser/ui/autofill/country_combobox_model_unittest.cc',
       'browser/ui/autofill/data_model_wrapper_unittest.cc',
       'browser/ui/autofill/mock_address_validator.cc',
@@ -1416,6 +1418,21 @@
       'browser/supervised_user/supervised_user_url_filter_unittest.cc',
       'browser/supervised_user/supervised_user_whitelist_service_unittest.cc',
     ],
+    'chrome_unit_tests_media_router_sources': [
+      'browser/media/router/issue_manager_unittest.cc',
+      'browser/media/router/issue_unittest.cc',
+      'browser/media/router/media_router_type_converters_unittest.cc',
+      'browser/media/router/media_route_unittest.cc',
+      'browser/media/router/media_sink_unittest.cc',
+      'browser/media/router/media_source_helper_unittest.cc',
+      'browser/media/router/media_source_unittest.cc',
+      'browser/media/router/presentation_media_sinks_observer_unittest.cc',
+      'browser/ui/webui/media_router/media_cast_mode_unittest.cc',
+      'browser/ui/webui/media_router/media_router_dialog_controller_unittest.cc',
+      'browser/ui/webui/media_router/media_router_test.cc',
+      'browser/ui/webui/media_router/media_router_test.h',
+      'browser/ui/webui/media_router/query_result_manager_unittest.cc',
+    ],
     # Everything but Android and iOS (iOS is handled separately).
     'chrome_unit_tests_non_android_sources': [
       # Bookmark export/import are handled via the BookmarkColumns
@@ -1520,7 +1537,6 @@
       'browser/ui/website_settings/permission_menu_model_unittest.cc',
       'browser/ui/webui/help/version_updater_chromeos_unittest.cc',
       'browser/ui/webui/ntp/ntp_user_data_logger_unittest.cc',
-      'browser/ui/webui/ntp/suggestions_combiner_unittest.cc',
       'browser/ui/webui/options/autofill_options_handler_unittest.cc',
       'browser/ui/webui/options/language_options_handler_unittest.cc',
       'browser/ui/webui/options/pepper_flash_content_settings_utils_unittest.cc',
@@ -1546,6 +1562,7 @@
     ],
     # Everything but Android, ChromeOS and iOS (iOS is handled separately).
     'chrome_unit_tests_non_android_or_chromeos_sources': [
+      'browser/signin/cross_device_promo_unittest.cc',
       'browser/sync/sync_global_error_unittest.cc',
       'browser/upgrade_detector_impl_unittest.cc',
     ],
@@ -2069,6 +2086,13 @@
         'browser/sync/glue/session_sync_test_helper.h',
         'test/base/run_all_unittests.cc',
       ],
+      'conditions': [
+        ['enable_media_router==1', {
+          'dependencies': [
+            'browser/media/router/media_router.gyp:media_router_test_support',
+          ],
+        }],         
+      ],
     },
     {
       # GN version: //chrome/test:unit_tests
@@ -2182,7 +2206,7 @@
           'sources': [ '<@(chrome_unit_tests_spellchecker_sources)' ],
           'conditions': [
             ['OS!="mac" and OS!="ios"', {
-              'dependencies': [ '../third_party/hunspell_new/hunspell.gyp:hunspell' ],
+              'dependencies': [ '../third_party/hunspell/hunspell.gyp:hunspell' ],
             }],
           ],
         }],
@@ -2196,6 +2220,7 @@
           'sources': [ '<@(chrome_unit_tests_extensions_sources)' ],
           'dependencies': [
             'common/extensions/api/api.gyp:chrome_api',
+            '../device/usb/usb.gyp:device_usb_mocks',
             '../components/components.gyp:audio_modem_test_support',
             '../extensions/extensions_resources.gyp:extensions_resources',
             '../extensions/extensions_strings.gyp:extensions_strings',
@@ -2336,9 +2361,8 @@
           'sources': [ '<@(chrome_unit_tests_print_preview_sources)' ],
         }],
         ['enable_media_router==1', {
-          'includes': [
-            'browser/media/router/media_router_tests.gypi',
-          ],
+          'sources': [ '<@(chrome_unit_tests_media_router_sources)' ],
+          'dependencies': [ 'browser/media/router/media_router.gyp:media_router_test_support' ],
         }],
         ['enable_captive_portal_detection==1', {
           'sources': [ '<@(chrome_unit_tests_captive_portal_sources)' ],
@@ -2451,7 +2475,7 @@
         }],
         ['OS!="mac" and OS!="ios"', {
           'dependencies': [
-            '../third_party/hunspell_new/hunspell.gyp:hunspell',
+            '../third_party/hunspell/hunspell.gyp:hunspell',
             'chrome_resources.gyp:packed_extra_resources',
             'chrome_resources.gyp:packed_resources',
             'tools/convert_dict/convert_dict.gyp:convert_dict_lib',

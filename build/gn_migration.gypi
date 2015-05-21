@@ -108,7 +108,7 @@
         '../media/cast/cast.gyp:generate_barcode_video',
         '../media/cast/cast.gyp:generate_timecode_audio',
         '../mojo/mojo.gyp:mojo',
-        '../mojo/mojo_base.gyp:mojo_application_chromium',
+        '../mojo/mojo_base.gyp:mojo_application_base',
         '../mojo/mojo_base.gyp:mojo_common_unittests',
         '../net/net.gyp:crash_cache',
         '../net/net.gyp:crl_set_dump',
@@ -168,12 +168,14 @@
         '../skia/skia.gyp:image_operations_bench',
         '../sql/sql.gyp:sql_unittests',
         '../sync/sync.gyp:run_sync_testserver',
-        '../sync/sync.gyp:sync_endtoend_tests',
         '../sync/sync.gyp:sync_unit_tests',
         '../sync/tools/sync_tools.gyp:sync_client',
         '../sync/tools/sync_tools.gyp:sync_listen_notifications',
         '../testing/gmock.gyp:gmock_main',
-        '../third_party/WebKit/public/all.gyp:blink_tests',
+        '../third_party/WebKit/Source/platform/blink_platform_tests.gyp:blink_heap_unittests',
+        '../third_party/WebKit/Source/platform/blink_platform_tests.gyp:blink_platform_unittests',
+        '../third_party/WebKit/Source/web/web_tests.gyp:webkit_unit_tests',
+        '../third_party/WebKit/Source/wtf/wtf_tests.gyp:wtf_unittests',
         '../third_party/cacheinvalidation/cacheinvalidation.gyp:cacheinvalidation_unittests',
         '../third_party/codesighs/codesighs.gyp:codesighs',
         '../third_party/codesighs/codesighs.gyp:maptsvdifftool',
@@ -238,7 +240,7 @@
             '../remoting/remoting_all.gyp:remoting_all',
           ],
         }],
-        ['remoting==1 and chromeos==0', {
+        ['remoting==1 and chromeos==0 and use_x11==1', {
           'dependencies': [
             '../remoting/remoting.gyp:remoting_me2me_host',
             '../remoting/remoting.gyp:remoting_me2me_native_messaging_host',
@@ -276,8 +278,6 @@
             '../ui/ozone/ozone.gyp:ozone',
           ],
         }],
-
-
         ['use_x11==1', {
           'dependencies': [
             '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
@@ -313,6 +313,10 @@
 
             '../content/content_shell_and_tests.gyp:content_shell_apk',
 
+            '../third_party/WebKit/Source/platform/blink_platform_tests.gyp:blink_heap_unittests_apk',
+            '../third_party/WebKit/Source/platform/blink_platform_tests.gyp:blink_platform_unittests_apk',
+            '../third_party/WebKit/Source/web/web_tests.gyp:webkit_unit_tests_apk',
+            '../third_party/WebKit/Source/wtf/wtf_tests.gyp:wtf_unittests_apk',
             # TODO(GYP): Are these needed, or will they be pulled in automatically?
             #"//third_party/android_tools:android_gcm_java",
             #"//third_party/android_tools:uiautomator_java",

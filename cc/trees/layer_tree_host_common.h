@@ -102,9 +102,6 @@ class CC_EXPORT LayerTreeHostCommon {
         LayerType* root_layer,
         const gfx::Size& device_viewport_size,
         RenderSurfaceLayerListType* render_surface_layer_list);
-
-   private:
-    PropertyTrees temporary_property_trees;
   };
 
   typedef CalcDrawPropsInputs<Layer, RenderSurfaceLayerList>
@@ -121,6 +118,7 @@ class CC_EXPORT LayerTreeHostCommon {
                                   bool* animation_preserves_axis_alignment);
   static void CalculateDrawProperties(CalcDrawPropsMainInputs* inputs);
   static void PreCalculateMetaInformation(Layer* root_layer);
+  static void PreCalculateMetaInformationForTesting(LayerImpl* root_layer);
 
   typedef CalcDrawPropsInputs<LayerImpl, LayerImplList> CalcDrawPropsImplInputs;
   typedef CalcDrawPropsInputsForTesting<LayerImpl, LayerImplList>
@@ -235,10 +233,8 @@ void LayerTreeHostCommon::CallFunctionForSubtree(LayerType* layer,
   }
 }
 
-CC_EXPORT PropertyTrees* GetPropertyTrees(Layer* layer,
-                                          PropertyTrees* trees_from_inputs);
-CC_EXPORT PropertyTrees* GetPropertyTrees(LayerImpl* layer,
-                                          PropertyTrees* trees_from_inputs);
+CC_EXPORT PropertyTrees* GetPropertyTrees(Layer* layer);
+CC_EXPORT PropertyTrees* GetPropertyTrees(LayerImpl* layer);
 
 template <typename LayerType, typename RenderSurfaceLayerListType>
 LayerTreeHostCommon::CalcDrawPropsInputsForTesting<LayerType,
@@ -262,10 +258,10 @@ LayerTreeHostCommon::CalcDrawPropsInputsForTesting<LayerType,
           false,
           true,
           false,
-          true,
+          false,
           render_surface_layer_list,
           0,
-          GetPropertyTrees(root_layer, &temporary_property_trees)) {
+          GetPropertyTrees(root_layer)) {
   DCHECK(root_layer);
   DCHECK(render_surface_layer_list);
 }
@@ -291,10 +287,10 @@ LayerTreeHostCommon::CalcDrawPropsInputsForTesting<LayerType,
           false,
           true,
           false,
-          true,
+          false,
           render_surface_layer_list,
           0,
-          GetPropertyTrees(root_layer, &temporary_property_trees)) {
+          GetPropertyTrees(root_layer)) {
   DCHECK(root_layer);
   DCHECK(render_surface_layer_list);
 }

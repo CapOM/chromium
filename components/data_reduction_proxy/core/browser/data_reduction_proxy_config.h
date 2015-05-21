@@ -70,8 +70,29 @@ enum SecureProxyCheckFetchResult {
   // The secure proxy check succeeded, but the proxy was already restricted.
   SUCCEEDED_PROXY_ALREADY_ENABLED,
 
+  // The secure proxy has been disabled on a network change until the check
+  // succeeds.
+  PROXY_DISABLED_BEFORE_CHECK,
+
   // This must always be last.
   SECURE_PROXY_CHECK_FETCH_RESULT_COUNT
+};
+
+// Auto LoFi current status.
+enum AutoLoFiStatus {
+  // Auto LoFi is either off or the current network conditions are not worse
+  // than the ones specified in Auto LoFi field trial parameters.
+  AUTO_LOFI_STATUS_DISABLED = 0,
+
+  // Auto LoFi is off but the current network conditions are worse than the
+  // ones specified in Auto LoFi field trial parameters.
+  AUTO_LOFI_STATUS_OFF,
+
+  // Auto LoFi is on and but the current network conditions are worse than the
+  // ones specified in Auto LoFi field trial parameters.
+  AUTO_LOFI_STATUS_ON,
+
+  AUTO_LOFI_STATUS_LAST = AUTO_LOFI_STATUS_ON
 };
 
 // Central point for holding the Data Reduction Proxy configuration.
@@ -117,10 +138,10 @@ class DataReductionProxyConfig
   void ReloadConfig();
 
   // Returns true if a Data Reduction Proxy was used for the given |request|.
-  // If true, |proxy_info.proxy_servers.first| will contain the name of the
-  // proxy that was used. |proxy_info.proxy_servers.second| will contain the
-  // name of the data reduction proxy server that would be used if
-  // |proxy_info.proxy_server.first| is bypassed, if one exists. In addition,
+  // If true, |proxy_info.proxy_servers.front()| will contain the name of the
+  // proxy that was used. Subsequent entries in |proxy_info.proxy_servers| will
+  // contain the names of the Data Reduction Proxy servers that would be used if
+  // |proxy_info.proxy_servers.front()| is bypassed, if any exist. In addition,
   // |proxy_info| will note if the proxy used was a fallback, an alternative,
   // or a proxy for ssl; these are not mutually exclusive. |proxy_info| can be
   // NULL if the caller isn't interested in its values.
@@ -129,13 +150,14 @@ class DataReductionProxyConfig
       DataReductionProxyTypeInfo* proxy_info) const;
 
   // Returns true if the specified |host_port_pair| matches a Data Reduction
-  // Proxy. If true, |proxy_info.proxy_servers.first| will contain the name of
-  // the proxy that matches. |proxy_info.proxy_servers.second| will contain the
-  // name of the data reduction proxy server that would be used if
-  // |proxy_info.proxy_server.first| is bypassed, if one exists. In addition,
-  // |proxy_info| will note if the proxy was a fallback, an alternative, or a
-  // proxy for ssl; these are not mutually exclusive. |proxy_info| can be NULL
-  // if the caller isn't interested in its values. Virtual for testing.
+  // Proxy. If true, |proxy_info.proxy_servers.front()| will contain the name of
+  // the proxy that matches. Subsequent entries in |proxy_info.proxy_servers|
+  // will contain the name of the Data Reduction Proxy servers that would be
+  // used if |proxy_info.proxy_servers.front()| is bypassed, if any exist. In
+  // addition, |proxy_info| will note if the proxy was a fallback, an
+  // alternative, or a proxy for ssl; these are not mutually exclusive.
+  // |proxy_info| can be NULL if the caller isn't interested in its values.
+  // Virtual for testing.
   virtual bool IsDataReductionProxy(
       const net::HostPortPair& host_port_pair,
       DataReductionProxyTypeInfo* proxy_info) const;
@@ -186,6 +208,10 @@ class DataReductionProxyConfig
   // tied to whether the Data Reduction Proxy is enabled.
   bool promo_allowed() const;
 
+  // Returns the Auto LoFi status. Enabling LoFi from command line switch has
+  // no effect on Auto LoFi.
+  AutoLoFiStatus GetAutoLoFiStatus() const;
+
  protected:
   // Writes a warning to the log that is used in backend processing of
   // customer feedback. Virtual so tests can mock it for verification.
@@ -210,11 +236,17 @@ class DataReductionProxyConfig
   FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
                            TestOnIPAddressChanged);
   FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
+                           TestOnIPAddressChanged_SecureProxyDisabledByDefault);
+  FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
                            TestSetProxyConfigsHoldback);
   FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
                            AreProxiesBypassed);
   FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
                            AreProxiesBypassedRetryDelay);
+  FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
+                           TestMaybeDisableIfVPNTrialDisabled);
+  FRIEND_TEST_ALL_PREFIXES(DataReductionProxyConfigTest,
+                           TestMaybeDisableIfVPNTrialEnabled);
 
   // NetworkChangeNotifier::IPAddressObserver:
   void OnIPAddressChanged() override;
@@ -240,9 +272,10 @@ class DataReductionProxyConfig
   // Adds the default proxy bypass rules for the Data Reduction Proxy.
   void AddDefaultProxyBypassRules();
 
-  // Disables use of the Data Reduction Proxy on VPNs. Returns true if the
-  // Data Reduction Proxy has been disabled.
-  bool DisableIfVPN();
+  // Disables use of the Data Reduction Proxy on VPNs if client is not in the
+  // DataReductionProxyUseDataSaverOnVPN field trial and a TUN network interface
+  // is being used. Returns true if the Data Reduction Proxy has been disabled.
+  bool MaybeDisableIfVPN();
 
   // Checks if all configured data reduction proxies are in the retry map.
   // Returns true if the request is bypassed by all configured data reduction
@@ -257,9 +290,24 @@ class DataReductionProxyConfig
       bool is_https,
       base::TimeDelta* min_retry_delay) const;
 
+  // Returns true if this client is part of LoFi enabled field trial.
+  // Virtualized for mocking.
+  virtual bool IsIncludedInLoFiEnabledFieldTrial() const;
+
+  // Returns true if this client is part of LoFi control field trial.
+  // Virtualized for mocking.
+  virtual bool IsIncludedInLoFiControlFieldTrial() const;
+
+  // Returns true if current network conditions are worse than the ones
+  // specified in the enabled or control field trial group parameters.
+  // Virtualized for mocking.
+  virtual bool IsNetworkBad() const;
+
   scoped_ptr<SecureProxyChecker> secure_proxy_checker_;
 
-  bool restricted_by_carrier_;
+  // Indicates if the secure Data Reduction Proxy can be used or not.
+  bool secure_proxy_allowed_;
+
   bool disabled_on_vpn_;
   bool unreachable_;
   bool enabled_by_user_;

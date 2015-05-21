@@ -31,12 +31,12 @@ URLResponsePtr MakeURLResponse(const net::URLRequest* url_request) {
     response->status_code = headers->response_code();
     response->status_line = headers->GetStatusLine();
 
-    response->headers = Array<HTTPHeaderPtr>::New(0);
+    response->headers = Array<HttpHeaderPtr>::New(0);
     std::vector<String> header_lines;
     void* iter = nullptr;
     std::string name, value;
     while (headers->EnumerateHeaderLines(&iter, &name, &value)) {
-      HTTPHeaderPtr header = HTTPHeader::New();
+      HttpHeaderPtr header = HttpHeader::New();
       header->name = name;
       header->value = value;
       response->headers.push_back(header.Pass());
@@ -96,12 +96,14 @@ class UploadDataPipeElementReader : public net::UploadElementReader {
 }  // namespace
 
 URLLoaderImpl::URLLoaderImpl(NetworkContext* context,
-                             InterfaceRequest<URLLoader> request)
+                             InterfaceRequest<URLLoader> request,
+                             scoped_ptr<mojo::AppRefCount> app_refcount)
     : context_(context),
       response_body_buffer_size_(0),
       auto_follow_redirects_(true),
       connected_(true),
       binding_(this, request.Pass()),
+      app_refcount_(app_refcount.Pass()),
       weak_ptr_factory_(this) {
   binding_.set_error_handler(this);
   context_->RegisterURLLoader(this);

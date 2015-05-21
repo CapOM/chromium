@@ -15,11 +15,8 @@ mojo_native_application("view_manager") {
     ":view_manager_lib",
     "//base",
     "//components/view_manager/public/interfaces",
-    "//components/window_manager/public/interfaces",
-    "//mojo/application",
+    "//mojo/application/public/cpp",
     "//mojo/converters/geometry",
-    "//mojo/environment:chromium",
-    "//third_party/mojo/src/mojo/public/cpp/bindings:bindings",
   ]
 }
 
@@ -76,33 +73,23 @@ source_set("view_manager_lib") {
     "//base",
     "//cc/surfaces",
     "//cc/surfaces:surface_id",
-    "//components/native_viewport/public/interfaces",
     "//components/surfaces/public/interfaces",
     "//components/view_manager/public/cpp:common",
     "//components/view_manager/public/interfaces",
-    "//components/window_manager/public/interfaces",
-    "//mojo/application",
-    "//mojo/common",
+    "//components/view_manager/native_viewport",
+    "//mojo/application/public/cpp",
     "//mojo/common:tracing_impl",
     "//mojo/converters/geometry",
     "//mojo/converters/input_events",
     "//mojo/converters/surfaces",
-    "//third_party/mojo/src/mojo/public/cpp/bindings:bindings",
     "//third_party/mojo/src/mojo/public/cpp/bindings:callback",
-    "//third_party/mojo/src/mojo/public/interfaces/application",
     "//ui/mojo/geometry:interfaces",
     "//ui/mojo/events:interfaces",
     "//ui/gfx",
     "//ui/gfx/geometry",
   ]
 
-  data_deps = [
-    "//components/native_viewport",
-    "//components/surfaces",
-
-    # TODO(msw|sky): VM and WM connect to each other; avoid circular dependency.
-    #"//components/window_manager:lib",
-  ]
+  data_deps = [ "//components/surfaces" ]
 }
 
 source_set("test_support") {
@@ -124,8 +111,16 @@ source_set("test_support") {
   ]
 }
 
-test("tests") {
-  output_name = "view_manager_unittests"
+group("tests") {
+  testonly = true
+  deps = [
+    ":apptests",
+    ":view_manager_unittests",
+    "//components/view_manager/public/cpp/tests:mojo_view_manager_lib_unittests",
+  ]
+}
+
+test("view_manager_unittests") {
   sources = [
     "animation_runner_unittest.cc",
     "focus_controller_unittest.cc",
@@ -143,16 +138,14 @@ test("tests") {
     ":view_manager_lib",
     "//base",
     "//base/test:test_config",
-    "//components/native_viewport/public/cpp:args",
     "//components/view_manager/public/cpp:common",
     "//components/view_manager/public/interfaces",
-    "//components/window_manager/public/interfaces",
+    "//mojo/application/public/interfaces",
     "//mojo/converters/geometry",
     "//mojo/converters/input_events",
     "//mojo/environment:chromium",
     "//third_party/mojo/src/mojo/edk/test:run_all_unittests",
     "//third_party/mojo/src/mojo/public/cpp/bindings:bindings",
-    "//third_party/mojo/src/mojo/public/interfaces/application",
     "//ui/mojo/geometry:interfaces",
     "//ui/mojo/events:interfaces",
     "//testing/gtest",
@@ -181,12 +174,10 @@ mojo_native_application("apptests") {
     "//base/test:test_config",
     "//components/view_manager/public/cpp",
     "//components/view_manager/public/interfaces",
-    "//components/window_manager/public/interfaces",
-    "//mojo/application",
-    "//mojo/application:test_support",
-    "//mojo/common",
-    "//third_party/mojo/src/mojo/public/cpp/bindings:bindings",
+    "//mojo/application/public/cpp:test_support",
     "//ui/mojo/geometry:interfaces",
     "//ui/mojo/geometry:util",
   ]
+
+  data_deps = [ ":view_manager" ]
 }

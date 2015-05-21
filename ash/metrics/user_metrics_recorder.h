@@ -6,6 +6,7 @@
 #define ASH_METRICS_USER_METRICS_RECORDER_H_
 
 #include "ash/ash_export.h"
+#include "ash/metrics/task_switch_metrics_recorder.h"
 #include "base/timer/timer.h"
 
 namespace ash {
@@ -120,6 +121,10 @@ enum UserMetricsAction {
   // Thumbnail sized overview of windows triggered by pressing the overview key.
   UMA_WINDOW_OVERVIEW,
 
+  // User selected a window in overview mode different from the
+  // previously-active window.
+  UMA_WINDOW_OVERVIEW_ACTIVE_WINDOW_CHANGED,
+
   // Selecting a window in overview mode by pressing the enter key.
   UMA_WINDOW_OVERVIEW_ENTER_KEY,
 
@@ -144,6 +149,10 @@ class ASH_EXPORT UserMetricsRecorder {
   // Records an Ash owned user action.
   void RecordUserMetricsAction(ash::UserMetricsAction action);
 
+  TaskSwitchMetricsRecorder& task_switch_metrics_recorder() {
+    return task_switch_metrics_recorder_;
+  }
+
  private:
   friend class test::UserMetricsRecorderTestAPI;
 
@@ -167,6 +176,8 @@ class ASH_EXPORT UserMetricsRecorder {
 
   // The periodic timer that triggers metrics to be recorded.
   base::RepeatingTimer<UserMetricsRecorder> timer_;
+
+  TaskSwitchMetricsRecorder task_switch_metrics_recorder_;
 
   DISALLOW_COPY_AND_ASSIGN(UserMetricsRecorder);
 };

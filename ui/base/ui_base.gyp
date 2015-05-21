@@ -119,6 +119,8 @@
         'cocoa/remote_layer_api.mm',
         'cocoa/three_part_image.h',
         'cocoa/three_part_image.mm',
+        'cocoa/tool_tip_base_view.h',
+        'cocoa/tool_tip_base_view.mm',
         'cocoa/tracking_area.h',
         'cocoa/tracking_area.mm',
         'cocoa/underlay_opengl_hosting_window.h',
@@ -667,6 +669,8 @@
             'ime/dummy_input_method.h',
             'ime/dummy_text_input_client.cc',
             'ime/dummy_text_input_client.h',
+            'test/nswindow_fullscreen_notification_waiter.h',
+            'test/nswindow_fullscreen_notification_waiter.mm',
           ],
         }],
         ['use_aura==1', {

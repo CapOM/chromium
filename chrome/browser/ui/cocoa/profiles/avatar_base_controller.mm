@@ -7,13 +7,13 @@
 #include "base/mac/foundation_util.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/profiles/profile_info_cache_observer.h"
 #include "chrome/browser/profiles/profile_avatar_icon_util.h"
+#include "chrome/browser/profiles/profile_info_cache_observer.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profile_metrics.h"
-#include "chrome/browser/signin/signin_header_helper.h"
-#include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/profiles/profile_window.h"
+#include "chrome/browser/profiles/profiles_state.h"
+#include "chrome/browser/signin/signin_header_helper.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_commands.h"
 #include "chrome/browser/ui/browser_window.h"
@@ -192,7 +192,7 @@ class ProfileInfoUpdateObserver : public ProfileInfoCacheObserver,
     // It has to happen here to prevent the view system from creating an empty
     // container.
     if (viewMode == profiles::BUBBLE_VIEW_MODE_FAST_PROFILE_CHOOSER &&
-        profiles::HasProfileSwitchTargets(browser_->profile())) {
+        !profiles::HasProfileSwitchTargets(browser_->profile())) {
       return;
     }
 
@@ -216,6 +216,10 @@ class ProfileInfoUpdateObserver : public ProfileInfoCacheObserver,
   [menuController_ showWindow:self];
 
   ProfileMetrics::LogProfileOpenMethod(ProfileMetrics::ICON_AVATAR_BUBBLE);
+}
+
+- (void)closeAvatarBubble {
+  [menuController_ close];
 }
 
 - (IBAction)buttonClicked:(id)sender {

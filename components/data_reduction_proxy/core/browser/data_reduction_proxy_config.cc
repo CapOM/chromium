@@ -5,6 +5,7 @@
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_config.h"
 
 #include <string>
+#include <vector>
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
@@ -15,6 +16,7 @@
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_config_values.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_creator.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params.h"
+#include "net/base/host_port_pair.h"
 #include "net/base/load_flags.h"
 #include "net/proxy/proxy_server.h"
 #include "net/url_request/url_fetcher.h"
@@ -40,10 +42,30 @@ const char kUMAProxyProbeURL[] = "DataReductionProxy.ProbeURL";
 // Key of the UMA DataReductionProxy.ProbeURLNetError histogram.
 const char kUMAProxyProbeURLNetError[] = "DataReductionProxy.ProbeURLNetError";
 
+// Key of the UMA DataReductionProxy.SecureProxyCheck.Latency histogram.
+const char kUMAProxySecureProxyCheckLatency[] =
+    "DataReductionProxy.SecureProxyCheck.Latency";
+
 // Record a network change event.
 void RecordNetworkChangeEvent(DataReductionProxyNetworkChangeEvent event) {
   UMA_HISTOGRAM_ENUMERATION("DataReductionProxy.NetworkChangeEvents", event,
                             CHANGE_EVENT_COUNT);
+}
+
+// Looks for an instance of |host_port_pair| in |proxy_list|, and returns true
+// if found. Also sets |index| to the index at which the matching address was
+// found.
+bool FindProxyInList(const std::vector<net::ProxyServer>& proxy_list,
+                     const net::HostPortPair& host_port_pair,
+                     int* index) {
+  for (size_t proxy_index = 0; proxy_index < proxy_list.size(); ++proxy_index) {
+    const net::ProxyServer& proxy = proxy_list[proxy_index];
+    if (proxy.is_valid() && proxy.host_port_pair().Equals(host_port_pair)) {
+      *index = proxy_index;
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace
@@ -63,6 +85,13 @@ class SecureProxyChecker : public net::URLFetcherDelegate {
 
     std::string response;
     source->GetResponseAsString(&response);
+
+    base::TimeDelta secure_proxy_check_latency =
+        base::Time::Now() - secure_proxy_check_start_time_;
+    if (secure_proxy_check_latency >= base::TimeDelta()) {
+      UMA_HISTOGRAM_MEDIUM_TIMES(kUMAProxySecureProxyCheckLatency,
+                                 secure_proxy_check_latency);
+    }
 
     fetcher_callback_.Run(response, status, source->GetResponseCode());
   }
@@ -85,6 +114,7 @@ class SecureProxyChecker : public net::URLFetcherDelegate {
 
     fetcher_callback_ = fetcher_callback;
 
+    secure_proxy_check_start_time_ = base::Time::Now();
     fetcher_->Start();
   }
 
@@ -97,6 +127,10 @@ class SecureProxyChecker : public net::URLFetcherDelegate {
   scoped_ptr<net::URLFetcher> fetcher_;
   FetcherResponseCallback fetcher_callback_;
 
+  // Used to determine the latency in performing the Data Reduction Proxy secure
+  // proxy check.
+  base::Time secure_proxy_check_start_time_;
+
   DISALLOW_COPY_AND_ASSIGN(SecureProxyChecker);
 };
 
@@ -105,7 +139,8 @@ DataReductionProxyConfig::DataReductionProxyConfig(
     scoped_ptr<DataReductionProxyConfigValues> config_values,
     DataReductionProxyConfigurator* configurator,
     DataReductionProxyEventCreator* event_creator)
-    : restricted_by_carrier_(false),
+    : secure_proxy_allowed_(
+          DataReductionProxyParams::ShouldUseSecureProxyByDefault()),
       disabled_on_vpn_(false),
       unreachable_(false),
       enabled_by_user_(false),
@@ -139,7 +174,7 @@ void DataReductionProxyConfig::InitializeOnIOThread(const scoped_refptr<
 void DataReductionProxyConfig::ReloadConfig() {
   DCHECK(thread_checker_.CalledOnValidThread());
   UpdateConfigurator(enabled_by_user_, alternative_enabled_by_user_,
-                     restricted_by_carrier_, false /* at_startup */);
+                     secure_proxy_allowed_, false /* at_startup */);
 }
 
 bool DataReductionProxyConfig::WasDataReductionProxyUsed(
@@ -154,7 +189,61 @@ bool DataReductionProxyConfig::IsDataReductionProxy(
     const net::HostPortPair& host_port_pair,
     DataReductionProxyTypeInfo* proxy_info) const {
   DCHECK(thread_checker_.CalledOnValidThread());
-  return config_values_->IsDataReductionProxy(host_port_pair, proxy_info);
+
+  int proxy_index = 0;
+  if (FindProxyInList(config_values_->proxies_for_http(false), host_port_pair,
+                      &proxy_index)) {
+    if (proxy_info) {
+      const std::vector<net::ProxyServer>& proxy_list =
+          config_values_->proxies_for_http(false);
+      proxy_info->proxy_servers = std::vector<net::ProxyServer>(
+          proxy_list.begin() + proxy_index, proxy_list.end());
+      proxy_info->is_fallback = (proxy_index != 0);
+    }
+    return true;
+  }
+
+  if (FindProxyInList(config_values_->proxies_for_http(true), host_port_pair,
+                      &proxy_index)) {
+    if (proxy_info) {
+      const std::vector<net::ProxyServer>& proxy_list =
+          config_values_->proxies_for_http(true);
+      proxy_info->proxy_servers = std::vector<net::ProxyServer>(
+          proxy_list.begin() + proxy_index, proxy_list.end());
+      proxy_info->is_fallback = (proxy_index != 0);
+      proxy_info->is_alternative = true;
+    }
+    return true;
+  }
+
+  if (FindProxyInList(config_values_->proxies_for_https(false), host_port_pair,
+                      &proxy_index)) {
+    if (proxy_info) {
+      const std::vector<net::ProxyServer>& proxy_list =
+          config_values_->proxies_for_https(false);
+      proxy_info->proxy_servers = std::vector<net::ProxyServer>(
+          proxy_list.begin() + proxy_index, proxy_list.end());
+      proxy_info->is_fallback = (proxy_index != 0);
+      proxy_info->is_ssl = true;
+    }
+    return true;
+  }
+
+  if (FindProxyInList(config_values_->proxies_for_https(true), host_port_pair,
+                      &proxy_index)) {
+    if (proxy_info) {
+      const std::vector<net::ProxyServer>& proxy_list =
+          config_values_->proxies_for_https(true);
+      proxy_info->proxy_servers = std::vector<net::ProxyServer>(
+          proxy_list.begin() + proxy_index, proxy_list.end());
+      proxy_info->is_fallback = (proxy_index != 0);
+      proxy_info->is_alternative = true;
+      proxy_info->is_ssl = true;
+    }
+    return true;
+  }
+
+  return false;
 }
 
 bool DataReductionProxyConfig::IsBypassedByDataReductionProxyLocalRules(
@@ -227,6 +316,36 @@ bool DataReductionProxyConfig::AreProxiesBypassed(
     *min_retry_delay = min_delay;
 
   return bypassed;
+}
+
+bool DataReductionProxyConfig::IsNetworkBad() const {
+  // TODO(tbansal): This must return the network quality based on
+  // network quality estimated by NQE.
+  DCHECK(thread_checker_.CalledOnValidThread());
+  return false;
+}
+
+bool DataReductionProxyConfig::IsIncludedInLoFiEnabledFieldTrial() const {
+  // TODO(tbansal): This must return if the current session is in the LoFi
+  // enabled field trial group.
+  DCHECK(thread_checker_.CalledOnValidThread());
+  return false;
+}
+
+bool DataReductionProxyConfig::IsIncludedInLoFiControlFieldTrial() const {
+  // TODO(tbansal): This must return if the current session is in the LoFi
+  // control field trial group.
+  DCHECK(thread_checker_.CalledOnValidThread());
+  return false;
+}
+
+AutoLoFiStatus DataReductionProxyConfig::GetAutoLoFiStatus() const {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  if (IsIncludedInLoFiControlFieldTrial() && IsNetworkBad())
+    return AUTO_LOFI_STATUS_OFF;
+  if (IsIncludedInLoFiEnabledFieldTrial() && IsNetworkBad())
+    return AUTO_LOFI_STATUS_ON;
+  return AUTO_LOFI_STATUS_DISABLED;
 }
 
 bool DataReductionProxyConfig::IsProxyBypassed(
@@ -303,7 +422,7 @@ void DataReductionProxyConfig::SetProxyConfig(
   enabled_by_user_ = enabled;
   alternative_enabled_by_user_ = alternative_enabled;
   UpdateConfigurator(enabled_by_user_, alternative_enabled_by_user_,
-                     restricted_by_carrier_, at_startup);
+                     secure_proxy_allowed_, at_startup);
 
   // Check if the proxy has been restricted explicitly by the carrier.
   if (enabled &&
@@ -321,47 +440,26 @@ void DataReductionProxyConfig::SetProxyConfig(
 
 void DataReductionProxyConfig::UpdateConfigurator(bool enabled,
                                                   bool alternative_enabled,
-                                                  bool restricted,
+                                                  bool secure_proxy_allowed,
                                                   bool at_startup) {
   DCHECK(configurator_);
-  LogProxyState(enabled, restricted, at_startup);
-  // The alternative is only configured if the standard configuration is
-  // is enabled.
-  std::string origin;
-  std::string fallback_origin;
-  std::string ssl_origin;
-  bool fallback_allowed = false;
-  if (enabled && !disabled_on_vpn_ && !config_values_->holdback()) {
-    if (alternative_enabled) {
-      fallback_allowed = config_values_->alternative_fallback_allowed();
-      if (config_values_->alt_origin().is_valid())
-        origin = config_values_->alt_origin().ToURI();
-      if (config_values_->ssl_origin().is_valid())
-        ssl_origin = config_values_->ssl_origin().ToURI();
-    } else {
-      fallback_allowed = config_values_->fallback_allowed();
-      if (config_values_->origin().is_valid())
-        origin = config_values_->origin().ToURI();
-      if (config_values_->fallback_origin().is_valid())
-        fallback_origin = config_values_->fallback_origin().ToURI();
-    }
-  }
-
-  // TODO(jeremyim): Enable should take std::vector<net::ProxyServer> as its
-  // parameters.
-  if (!origin.empty() || !fallback_origin.empty() || !ssl_origin.empty()) {
-    configurator_->Enable(restricted, !fallback_allowed, origin,
-                          fallback_origin, ssl_origin);
+  LogProxyState(enabled, secure_proxy_allowed, at_startup);
+  std::vector<net::ProxyServer> proxies_for_http =
+      config_values_->proxies_for_http(alternative_enabled);
+  std::vector<net::ProxyServer> proxies_for_https =
+      config_values_->proxies_for_https(alternative_enabled);
+  if (enabled && !disabled_on_vpn_ && !config_values_->holdback() &&
+      (!proxies_for_http.empty() || !proxies_for_https.empty())) {
+    configurator_->Enable(!secure_proxy_allowed, proxies_for_http,
+                          proxies_for_https);
   } else {
     configurator_->Disable();
   }
 }
 
 void DataReductionProxyConfig::LogProxyState(bool enabled,
-                                             bool restricted,
+                                             bool secure_proxy_allowed,
                                              bool at_startup) {
-  // This must stay a LOG(WARNING); the output is used in processing customer
-  // feedback.
   const char kAtStartup[] = "at startup";
   const char kByUser[] = "by user action";
   const char kOn[] = "ON";
@@ -370,8 +468,11 @@ void DataReductionProxyConfig::LogProxyState(bool enabled,
   const char kUnrestricted[] = "(Unrestricted)";
 
   std::string annotated_on =
-      kOn + std::string(" ") + (restricted ? kRestricted : kUnrestricted);
+      kOn + std::string(" ") +
+      (secure_proxy_allowed ? kUnrestricted : kRestricted);
 
+  // This must stay a LOG(WARNING); the output is used in processing customer
+  // feedback.
   LOG(WARNING) << "SPDY proxy " << (enabled ? annotated_on : kOff) << " "
                << (at_startup ? kAtStartup : kByUser);
 }
@@ -401,45 +502,53 @@ void DataReductionProxyConfig::HandleSecureProxyCheckResponse(
     DVLOG(1) << "The data reduction proxy is unrestricted.";
 
     if (enabled_by_user_) {
-      if (restricted_by_carrier_) {
+      if (!secure_proxy_allowed_) {
+        secure_proxy_allowed_ = true;
         // The user enabled the proxy, but sometime previously in the session,
         // the network operator had blocked the secure proxy check and
         // restricted the user. The current network doesn't block the secure
         // proxy check, so don't restrict the proxy configurations.
-        UpdateConfigurator(true /* enabled */, false /* alternative_enabled */,
-                           false /* restricted */, false /* at_startup */);
+        ReloadConfig();
         RecordSecureProxyCheckFetchResult(SUCCEEDED_PROXY_ENABLED);
       } else {
         RecordSecureProxyCheckFetchResult(SUCCEEDED_PROXY_ALREADY_ENABLED);
       }
     }
-    restricted_by_carrier_ = false;
+    secure_proxy_allowed_ = true;
     return;
   }
   DVLOG(1) << "The data reduction proxy is restricted to the configured "
            << "fallback proxy.";
   if (enabled_by_user_) {
-    if (!restricted_by_carrier_) {
+    if (secure_proxy_allowed_) {
       // Restrict the proxy.
-      UpdateConfigurator(true /* enabled */, false /* alternative_enabled */,
-                         true /* restricted */, false /* at_startup */);
+      secure_proxy_allowed_ = false;
+      ReloadConfig();
       RecordSecureProxyCheckFetchResult(FAILED_PROXY_DISABLED);
     } else {
       RecordSecureProxyCheckFetchResult(FAILED_PROXY_ALREADY_DISABLED);
     }
   }
-  restricted_by_carrier_ = true;
+  secure_proxy_allowed_ = false;
 }
 
 void DataReductionProxyConfig::OnIPAddressChanged() {
   if (enabled_by_user_) {
     DCHECK(config_values_->allowed());
     RecordNetworkChangeEvent(IP_CHANGED);
-    if (DisableIfVPN())
+    if (MaybeDisableIfVPN())
       return;
     if (alternative_enabled_by_user_ &&
         !config_values_->alternative_fallback_allowed()) {
       return;
+    }
+
+    bool should_use_secure_proxy =
+        DataReductionProxyParams::ShouldUseSecureProxyByDefault();
+    if (!should_use_secure_proxy && secure_proxy_allowed_) {
+      secure_proxy_allowed_ = false;
+      RecordSecureProxyCheckFetchResult(PROXY_DISABLED_BEFORE_CHECK);
+      ReloadConfig();
     }
 
     // It is safe to use base::Unretained here, since it gets executed
@@ -504,12 +613,15 @@ void DataReductionProxyConfig::GetNetworkList(
   net::GetNetworkList(interfaces, policy);
 }
 
-bool DataReductionProxyConfig::DisableIfVPN() {
+bool DataReductionProxyConfig::MaybeDisableIfVPN() {
+  if (DataReductionProxyParams::IsIncludedInUseDataSaverOnVPNFieldTrial()) {
+    return false;
+  }
   net::NetworkInterfaceList network_interfaces;
   GetNetworkList(&network_interfaces, 0);
   // VPNs use a "tun" interface, so the presence of a "tun" interface indicates
-  // a VPN is in use.
-  // TODO(kundaji): Verify this works on Windows.
+  // a VPN is in use. This logic only works on Android and Linux platforms.
+  // Data Saver will not be disabled on any other platform on VPN.
   const std::string vpn_interface_name_prefix = "tun";
   for (size_t i = 0; i < network_interfaces.size(); ++i) {
     std::string interface_name = network_interfaces[i].name;
@@ -518,16 +630,14 @@ bool DataReductionProxyConfig::DisableIfVPN() {
             interface_name.begin() + vpn_interface_name_prefix.size(),
             vpn_interface_name_prefix.c_str())) {
       disabled_on_vpn_ = true;
-      UpdateConfigurator(enabled_by_user_, alternative_enabled_by_user_,
-                         restricted_by_carrier_, false);
+      ReloadConfig();
       RecordNetworkChangeEvent(DISABLED_ON_VPN);
       return true;
     }
   }
   if (disabled_on_vpn_) {
     disabled_on_vpn_ = false;
-    UpdateConfigurator(enabled_by_user_, alternative_enabled_by_user_,
-                       restricted_by_carrier_, false);
+    ReloadConfig();
   }
   return false;
 }

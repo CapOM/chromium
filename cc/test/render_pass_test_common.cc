@@ -34,38 +34,38 @@ void TestRenderPass::AppendOneOfEveryQuadType(
   gfx::Rect visible_rect(0, 0, 100, 100);
   const float vertex_opacity[] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-  ResourceProvider::ResourceId resource1 = resource_provider->CreateResource(
+  ResourceId resource1 = resource_provider->CreateResource(
       gfx::Size(45, 5), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
   resource_provider->AllocateForTesting(resource1);
-  ResourceProvider::ResourceId resource2 = resource_provider->CreateResource(
+  ResourceId resource2 = resource_provider->CreateResource(
       gfx::Size(346, 61), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
   resource_provider->AllocateForTesting(resource2);
-  ResourceProvider::ResourceId resource3 = resource_provider->CreateResource(
+  ResourceId resource3 = resource_provider->CreateResource(
       gfx::Size(12, 134), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
   resource_provider->AllocateForTesting(resource3);
-  ResourceProvider::ResourceId resource4 = resource_provider->CreateResource(
+  ResourceId resource4 = resource_provider->CreateResource(
       gfx::Size(56, 12), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
   resource_provider->AllocateForTesting(resource4);
   gfx::Size resource5_size(73, 26);
-  ResourceProvider::ResourceId resource5 = resource_provider->CreateResource(
+  ResourceId resource5 = resource_provider->CreateResource(
       resource5_size, GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
   resource_provider->AllocateForTesting(resource5);
-  ResourceProvider::ResourceId resource6 = resource_provider->CreateResource(
+  ResourceId resource6 = resource_provider->CreateResource(
       gfx::Size(64, 92), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
   resource_provider->AllocateForTesting(resource6);
-  ResourceProvider::ResourceId resource7 = resource_provider->CreateResource(
+  ResourceId resource7 = resource_provider->CreateResource(
       gfx::Size(9, 14), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider->best_texture_format());
@@ -77,9 +77,8 @@ void TestRenderPass::AppendOneOfEveryQuadType(
   scoped_ptr<SingleReleaseCallbackImpl> callback =
       SingleReleaseCallbackImpl::Create(base::Bind(&EmptyReleaseCallback));
   TextureMailbox mailbox(gpu_mailbox, target, kSyncPointForMailboxTextureQuad);
-  ResourceProvider::ResourceId resource8 =
-      resource_provider->CreateResourceFromTextureMailbox(mailbox,
-                                                          callback.Pass());
+  ResourceId resource8 = resource_provider->CreateResourceFromTextureMailbox(
+      mailbox, callback.Pass());
   resource_provider->AllocateForTesting(resource8);
 
   SharedQuadState* shared_state = this->CreateAndAppendSharedQuadState();
@@ -233,7 +232,7 @@ void TestRenderPass::AppendOneOfEveryQuadType(
                     false,
                     false);
 
-  ResourceProvider::ResourceId plane_resources[4];
+  ResourceId plane_resources[4];
   for (int i = 0; i < 4; ++i) {
     plane_resources[i] = resource_provider->CreateResource(
         gfx::Size(20, 12), GL_CLAMP_TO_EDGE,
@@ -245,7 +244,8 @@ void TestRenderPass::AppendOneOfEveryQuadType(
   YUVVideoDrawQuad* yuv_quad =
       this->CreateAndAppendDrawQuad<YUVVideoDrawQuad>();
   yuv_quad->SetNew(shared_state2, rect, opaque_rect, visible_rect,
-                   gfx::RectF(0, 0, 100, 100), gfx::Size(100, 100),
+                   gfx::RectF(.0f, .0f, 100.0f, 100.0f),
+                   gfx::RectF(.0f, .0f, 50.0f, 50.0f), gfx::Size(100, 100),
                    gfx::Size(50, 50), plane_resources[0], plane_resources[1],
                    plane_resources[2], plane_resources[3], color_space);
 }

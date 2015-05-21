@@ -109,6 +109,11 @@ void UserImageScreen::OnCameraPresenceCheckDone(bool is_camera_present) {
 }
 
 void UserImageScreen::HideCurtain() {
+  // Skip user image selection for ephemeral users.
+  if (user_manager::UserManager::Get()->IsUserNonCryptohomeDataEphemeral(
+          GetUser()->GetUserID())) {
+    ExitScreen();
+  }
   if (view_)
     view_->HideCurtain();
 }
@@ -125,6 +130,7 @@ void UserImageScreen::OnDecodeImageFailed() {
 
 void UserImageScreen::OnInitialSync(bool local_image_updated) {
   DCHECK(sync_timer_);
+  ReportSyncResult(SyncResult::SUCCEEDED);
   if (!local_image_updated) {
     sync_timer_.reset();
     GetSyncObserver()->RemoveObserver(this);
@@ -136,6 +142,7 @@ void UserImageScreen::OnInitialSync(bool local_image_updated) {
 }
 
 void UserImageScreen::OnSyncTimeout() {
+  ReportSyncResult(SyncResult::TIMED_OUT);
   sync_timer_.reset();
   GetSyncObserver()->RemoveObserver(this);
   if (is_screen_ready_)
@@ -261,8 +268,10 @@ void UserImageScreen::Show() {
 
   if (GetUser()->CanSyncImage()) {
     if (UserImageSyncObserver* sync_observer = GetSyncObserver()) {
+      sync_waiting_start_time_ = base::Time::Now();
       // We have synced image already.
       if (sync_observer->is_synced()) {
+        ReportSyncResult(SyncResult::SUCCEEDED);
         ExitScreen();
         return;
       }
@@ -340,6 +349,14 @@ void UserImageScreen::ExitScreen() {
   if (UserImageSyncObserver* sync_observer = GetSyncObserver())
     sync_observer->RemoveObserver(this);
   Finish(BaseScreenDelegate::USER_IMAGE_SELECTED);
+}
+
+void UserImageScreen::ReportSyncResult(SyncResult timed_out) const {
+  base::TimeDelta duration = base::Time::Now() - sync_waiting_start_time_;
+  UMA_HISTOGRAM_TIMES("Login.NewUserPriorityPrefsSyncTime", duration);
+  UMA_HISTOGRAM_ENUMERATION("Login.NewUserPriorityPrefsSyncResult",
+                            static_cast<int>(timed_out),
+                            static_cast<int>(SyncResult::COUNT));
 }
 
 }  // namespace chromeos

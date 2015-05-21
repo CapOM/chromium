@@ -77,9 +77,6 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
   // Web Notification API and the Push API are not supported (crbug.com/434712)
   cl->AppendSwitch(switches::kDisableNotifications);
 
-  // TODO(ddorwin): Enable unprefixed EME. See http://crbug.com/394931.
-  cl->AppendSwitch(switches::kDisableEncryptedMedia);
-
   // WebRTC hardware decoding is not supported, internal bug 15075307
   cl->AppendSwitch(switches::kDisableWebRtcHWDecoding);
   cl->AppendSwitch(switches::kDisableAcceleratedVideoDecode);
@@ -89,6 +86,9 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
 
   // WebView does not yet support screen orientation locking.
   cl->AppendSwitch(switches::kDisableScreenOrientationLock);
+
+  // WebView does not currently support Web Speech API (crbug.com/487255)
+  cl->AppendSwitch(switches::kDisableSpeechAPI);
 
   // WebView does not (yet) save Chromium data during shutdown, so add setting
   // for Chrome to aggressively persist DOM Storage to minimize data loss.

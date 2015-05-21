@@ -8,8 +8,7 @@
 #include <set>
 
 #include "base/basictypes.h"
-#include "components/native_viewport/public/interfaces/native_viewport.mojom.h"
-#include "components/window_manager/public/interfaces/window_manager_internal.mojom.h"
+#include "components/view_manager/public/interfaces/native_viewport.mojom.h"
 
 namespace view_manager {
 

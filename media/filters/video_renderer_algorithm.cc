@@ -11,7 +11,7 @@ namespace media {
 
 // The number of frames to store for moving average calculations.  Value picked
 // after experimenting with playback of various local media and YouTube clips.
-const int kMovingAverageSamples = 25;
+const int kMovingAverageSamples = 32;
 
 VideoRendererAlgorithm::ReadyFrame::ReadyFrame(
     const scoped_refptr<VideoFrame>& ready_frame)
@@ -95,8 +95,9 @@ scoped_refptr<VideoFrame> VideoRendererAlgorithm::Render(
 
   // Step 4: Attempt to find the best frame by cadence.
   int cadence_overage = 0;
-  int frame_to_render =
+  const int cadence_frame =
       FindBestFrameByCadence(first_frame_ ? nullptr : &cadence_overage);
+  int frame_to_render = cadence_frame;
   if (frame_to_render >= 0) {
     selected_frame_drift =
         CalculateAbsoluteDriftForFrame(deadline_min, frame_to_render);
@@ -121,7 +122,6 @@ scoped_refptr<VideoFrame> VideoRendererAlgorithm::Render(
     }
 
     if (frame_to_render >= 0) {
-      cadence_overage = 0;
       selected_frame_drift =
           CalculateAbsoluteDriftForFrame(deadline_min, frame_to_render);
     }
@@ -131,9 +131,14 @@ scoped_refptr<VideoFrame> VideoRendererAlgorithm::Render(
   // least crappy option based on the drift from the deadline. If we're here the
   // selection is going to be bad because it means no suitable frame has any
   // coverage of the deadline interval.
-  if (frame_to_render < 0 || selected_frame_drift > max_acceptable_drift_) {
-    cadence_overage = 0;
+  if (frame_to_render < 0 || selected_frame_drift > max_acceptable_drift_)
     frame_to_render = FindBestFrameByDrift(deadline_min, &selected_frame_drift);
+
+  const bool ignored_cadence_frame =
+      cadence_frame >= 0 && frame_to_render != cadence_frame;
+  if (ignored_cadence_frame) {
+    cadence_overage = 0;
+    DVLOG(2) << "Cadence frame overridden by drift: " << selected_frame_drift;
   }
 
   last_render_had_glitch_ = selected_frame_drift > max_acceptable_drift_;
@@ -189,11 +194,14 @@ scoped_refptr<VideoFrame> VideoRendererAlgorithm::Render(
       }
     }
 
+    // Increment the frame counter for all frames removed after the last
+    // rendered frame.
+    cadence_frame_counter_ += frame_to_render - last_frame_index_;
     frame_queue_.erase(frame_queue_.begin(),
                        frame_queue_.begin() + frame_to_render);
   }
 
-  if (last_render_had_glitch_) {
+  if (last_render_had_glitch_ && !first_frame_) {
     DVLOG(2) << "Deadline: [" << deadline_min.ToInternalValue() << ", "
              << deadline_max.ToInternalValue()
              << "], Interval: " << render_interval_.InMicroseconds()
@@ -213,8 +221,22 @@ scoped_refptr<VideoFrame> VideoRendererAlgorithm::Render(
   // start time is at most |render_interval_| / 2 before |deadline_min|.
   if (!first_frame_ ||
       deadline_min >= frame_queue_.front().start_time - render_interval_ / 2) {
+    // Ignore one frame of overage if the last call to Render() ignored the
+    // frame selected by cadence due to drift.
+    if (last_render_ignored_cadence_frame_ && cadence_overage > 0)
+      cadence_overage -= 1;
+
+    last_render_ignored_cadence_frame_ = ignored_cadence_frame;
     frame_queue_.front().render_count += cadence_overage + 1;
     frame_queue_.front().drop_count += cadence_overage;
+
+    // Once we reach a glitch in our cadence sequence, reset the base frame
+    // number used for defining the cadence sequence.
+    if (ignored_cadence_frame) {
+      cadence_frame_counter_ = 0;
+      UpdateCadenceForFrames();
+    }
+
     first_frame_ = false;
   }
 
@@ -235,8 +257,9 @@ size_t VideoRendererAlgorithm::RemoveExpiredFrames(base::TimeTicks deadline) {
 
   // Finds and removes all frames which are too old to be used; I.e., the end of
   // their render interval is further than |max_acceptable_drift_| from the
-  // given |deadline|.
-  size_t frames_to_expire = 0;
+  // given |deadline|.  We also always expire anything inserted before the last
+  // rendered frame.
+  size_t frames_to_expire = last_frame_index_;
   const base::TimeTicks minimum_start_time =
       deadline - max_acceptable_drift_ - average_frame_duration_;
   for (; frames_to_expire < frame_queue_.size() - 1; ++frames_to_expire) {
@@ -247,6 +270,7 @@ size_t VideoRendererAlgorithm::RemoveExpiredFrames(base::TimeTicks deadline) {
   if (!frames_to_expire)
     return 0;
 
+  cadence_frame_counter_ += frames_to_expire - last_frame_index_;
   frame_queue_.erase(frame_queue_.begin(),
                      frame_queue_.begin() + frames_to_expire);
 
@@ -282,6 +306,8 @@ void VideoRendererAlgorithm::Reset() {
   cadence_estimator_.Reset();
   frame_duration_calculator_.Reset();
   first_frame_ = true;
+  cadence_frame_counter_ = 0;
+  last_render_ignored_cadence_frame_ = false;
 
   // Default to ATSC IS/191 recommendations for maximum acceptable drift before
   // we have enough frames to base the maximum on frame duration.
@@ -337,25 +363,30 @@ void VideoRendererAlgorithm::EnqueueFrame(
                                                     frame_queue_.end(), frame);
   DCHECK_GE(it - frame_queue_.begin(), 0);
 
-  // If a frame was inserted before the first frame, update the index. On the
-  // next call to Render() it will be dropped.
+  // Drop any frames inserted before or at the last rendered frame if we've
+  // already rendered any frames.
   const size_t new_frame_index = it - frame_queue_.begin();
   if (new_frame_index <= last_frame_index_ && have_rendered_frames_) {
-    if (new_frame_index == last_frame_index_ &&
-        frame->timestamp() ==
-            frame_queue_[last_frame_index_].frame->timestamp()) {
-      DVLOG(2) << "Ignoring frame with the same timestamp as the most recently "
-                  "rendered frame.";
-      ++frames_dropped_during_enqueue_;
-      return;
-    }
-    ++last_frame_index_;
-  } else if (new_frame_index < frame_queue_.size() &&
-             frame->timestamp() ==
-                 frame_queue_[new_frame_index].frame->timestamp()) {
-    DVLOG(2) << "Replacing existing frame with the same timestamp with most "
-             << "recently received frame.";
-    frame_queue_[new_frame_index].frame = frame;
+    DVLOG(2) << "Dropping frame inserted before the last rendered frame.";
+    ++frames_dropped_during_enqueue_;
+    return;
+  }
+
+  // Drop any frames which are less than a millisecond apart in media time (even
+  // those with timestamps matching an already enqueued frame), there's no way
+  // we can reasonably render these frames; it's effectively a 1000fps limit.
+  const base::TimeDelta delta =
+      std::min(new_frame_index < frame_queue_.size()
+                   ? frame_queue_[new_frame_index].frame->timestamp() -
+                         frame->timestamp()
+                   : base::TimeDelta::Max(),
+               new_frame_index > 0
+                   ? frame->timestamp() -
+                         frame_queue_[new_frame_index - 1].frame->timestamp()
+                   : base::TimeDelta::Max());
+  if (delta < base::TimeDelta::FromMilliseconds(1)) {
+    DVLOG(2) << "Dropping frame too close to an already enqueued frame: "
+             << delta.InMicroseconds() << " us";
     ++frames_dropped_during_enqueue_;
     return;
   }
@@ -407,8 +438,8 @@ void VideoRendererAlgorithm::AccountForMissedIntervals(
   // If the frame was never really rendered since it was dropped each attempt,
   // we need to increase the drop count as well to match the new render count.
   // Otherwise we won't properly count the frame as dropped when it's discarded.
-  // We always update the render count so FindBestFrameByCadenceInternal() can
-  // properly account for potentially over-rendered frames.
+  // We always update the render count so FindBestFrameByCadence() can properly
+  // account for potentially over-rendered frames.
   if (ready_frame.render_count == ready_frame.drop_count)
     ready_frame.drop_count += render_cycle_count;
   ready_frame.render_count += render_cycle_count;
@@ -456,10 +487,11 @@ bool VideoRendererAlgorithm::UpdateFrameStatistics() {
   // duration; there are other asymmetric, more lenient measures, that we're
   // forgoing in favor of simplicity.
   //
-  // We'll always allow at least 8.33ms of drift since literature suggests it's
-  // well below the floor of detection.
+  // We'll always allow at least 16.66ms of drift since literature suggests it's
+  // well below the floor of detection and is high enough to ensure stability
+  // for 60fps content.
   max_acceptable_drift_ = std::max(average_frame_duration_ / 2,
-                                   base::TimeDelta::FromSecondsD(1.0 / 120));
+                                   base::TimeDelta::FromSecondsD(1.0 / 60));
 
   // If we were called via RemoveExpiredFrames() and Render() was never called,
   // we may not have a render interval yet.
@@ -474,6 +506,7 @@ bool VideoRendererAlgorithm::UpdateFrameStatistics() {
   if (!cadence_changed)
     return true;
 
+  cadence_frame_counter_ = 0;
   UpdateCadenceForFrames();
 
   // Thus far there appears to be no need for special 3:2 considerations, the
@@ -489,7 +522,8 @@ void VideoRendererAlgorithm::UpdateCadenceForFrames() {
     // cadence selection.
     frame_queue_[i].ideal_render_count =
         cadence_estimator_.has_cadence()
-            ? cadence_estimator_.GetCadenceForFrame(i - last_frame_index_)
+            ? cadence_estimator_.GetCadenceForFrame(cadence_frame_counter_ +
+                                                    (i - last_frame_index_))
             : 0;
   }
 }

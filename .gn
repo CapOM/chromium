@@ -45,6 +45,8 @@ check_targets = [
   "//google_update/*",
 
   #"//gpu/*",  # Lots of errors.
+  "//gpu:*",
+
   #"//ios/*",
   "//ipc/*",
 
@@ -101,6 +103,7 @@ exec_script_whitelist = [
   "//chrome/browser/BUILD.gn",
   "//chrome/browser/chromeos/BUILD.gn",
   "//chrome/browser/extensions/BUILD.gn",
+  "//chrome/browser/media/router/BUILD.gn",
   "//chrome/browser/ui/BUILD.gn",
   "//chrome/chrome_tests.gni",
   "//chrome/common/BUILD.gn",
@@ -125,6 +128,7 @@ exec_script_whitelist = [
   "//content/public/android/BUILD.gn",
   "//content/renderer/renderer.gni",
   "//content/test/BUILD.gn",
+  "//content/utility/utility.gni",
   "//extensions/common/api/schemas.gni",
   "//extensions/extensions.gni",
   "//extensions/shell/app_shell.gni",

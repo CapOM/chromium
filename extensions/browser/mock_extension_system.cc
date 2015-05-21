@@ -34,11 +34,6 @@ SharedUserScriptMaster* MockExtensionSystem::shared_user_script_master() {
   return nullptr;
 }
 
-DeclarativeUserScriptManager*
-MockExtensionSystem::declarative_user_script_manager() {
-  return nullptr;
-}
-
 StateStore* MockExtensionSystem::state_store() {
   return nullptr;
 }
@@ -51,16 +46,8 @@ InfoMap* MockExtensionSystem::info_map() {
   return nullptr;
 }
 
-LazyBackgroundTaskQueue* MockExtensionSystem::lazy_background_task_queue() {
-  return nullptr;
-}
-
 EventRouter* MockExtensionSystem::event_router() {
   return event_router_;
-}
-
-InstallVerifier* MockExtensionSystem::install_verifier() {
-  return nullptr;
 }
 
 QuotaService* MockExtensionSystem::quota_service() {

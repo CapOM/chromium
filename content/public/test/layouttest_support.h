@@ -26,6 +26,10 @@ class WebView;
 class WebURLResponse;
 }
 
+namespace device {
+class BluetoothAdapter;
+}
+
 namespace content {
 
 class PageState;
@@ -93,8 +97,9 @@ void SetDeviceScaleFactor(RenderView* render_view, float factor);
 // Set the device color profile associated with the profile |name|.
 void SetDeviceColorProfile(RenderView* render_view, const std::string& name);
 
-// Change the bluetooth test data while running a layout test.
-void SetBluetoothMockDataSetForTesting(const std::string& name);
+// Change the bluetooth test adapter while running a layout test.
+void SetBluetoothAdapter(int render_process_id,
+                         scoped_refptr<device::BluetoothAdapter> adapter);
 
 // Enables mock geofencing service while running a layout test.
 // |service_available| indicates if the mock service should mock geofencing

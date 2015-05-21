@@ -8,6 +8,8 @@
 // Errors are described at:
 // http://www.chromium.org/developers/blink-gc-plugin-errors
 
+#include <algorithm>
+
 #include "Config.h"
 #include "JsonWriter.h"
 #include "RecordInfo.h"
@@ -17,6 +19,7 @@
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
+#include "clang/Sema/Sema.h"
 
 using namespace clang;
 using std::string;
@@ -143,6 +146,23 @@ const char kBaseClassMustDeclareVirtualTrace[] =
 const char kClassMustDeclareGCMixinTraceMethod[] =
     "[blink-gc] Class %0 which inherits from GarbageCollectedMixin must"
     " locally declare and override trace(Visitor*)";
+
+// Use a local RAV implementation to simply collect all FunctionDecls marked for
+// late template parsing. This happens with the flag -fdelayed-template-parsing,
+// which is on by default in MSVC-compatible mode.
+std::set<FunctionDecl*> GetLateParsedFunctionDecls(TranslationUnitDecl* decl) {
+  struct Visitor : public RecursiveASTVisitor<Visitor> {
+    bool VisitFunctionDecl(FunctionDecl* function_decl) {
+      if (function_decl->isLateTemplateParsed())
+        late_parsed_decls.insert(function_decl);
+      return true;
+    }
+
+    std::set<FunctionDecl*> late_parsed_decls;
+  } v;
+  v.TraverseDecl(decl);
+  return v.late_parsed_decls;
+}
 
 struct BlinkGCPluginOptions {
   BlinkGCPluginOptions()
@@ -1017,6 +1037,8 @@ class BlinkGCPluginConsumer : public ASTConsumer {
     if (diagnostic_.hasErrorOccurred())
       return;
 
+    ParseFunctionTemplates(context.getTranslationUnitDecl());
+
     CollectVisitor visitor;
     visitor.TraverseDecl(context.getTranslationUnitDecl());
 
@@ -1060,6 +1082,31 @@ class BlinkGCPluginConsumer : public ASTConsumer {
       json_->CloseList();
       delete json_;
       json_ = 0;
+    }
+  }
+
+  void ParseFunctionTemplates(TranslationUnitDecl* decl) {
+    if (!instance_.getLangOpts().DelayedTemplateParsing)
+      return;  // Nothing to do.
+
+    std::set<FunctionDecl*> late_parsed_decls =
+        GetLateParsedFunctionDecls(decl);
+    clang::Sema& sema = instance_.getSema();
+
+    for (const FunctionDecl* fd : late_parsed_decls) {
+      assert(fd->isLateTemplateParsed());
+
+      if (!Config::IsTraceMethod(fd))
+        continue;
+
+      if (instance_.getSourceManager().isInSystemHeader(
+              instance_.getSourceManager().getSpellingLoc(fd->getLocation())))
+        continue;
+
+      // Force parsing and AST building of the yet-uninstantiated function
+      // template trace method bodies.
+      clang::LateParsedTemplate* lpt = sema.LateParsedTemplateMap[fd];
+      sema.LateTemplateParser(sema.OpaqueParser, *lpt);
     }
   }
 
@@ -1610,6 +1657,9 @@ class BlinkGCPluginConsumer : public ASTConsumer {
     string filename;
     if (!GetFilename(info->record()->getLocStart(), &filename))
       return false;  // TODO: should we ignore non-existing file locations?
+#if defined(LLVM_ON_WIN32)
+    std::replace(filename.begin(), filename.end(), '\\', '/');
+#endif
     std::vector<string>::iterator it = options_.ignored_directories.begin();
     for (; it != options_.ignored_directories.end(); ++it)
       if (filename.find(*it) != string::npos)

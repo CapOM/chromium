@@ -173,6 +173,14 @@ static gfx::OverlayTransform GetGFXOverlayTransform(GLenum plane_transform) {
   }
 }
 
+struct Vec4f {
+  explicit Vec4f(const Vec4& data) {
+    data.GetValues(v);
+  }
+
+  GLfloat v[4];
+};
+
 }  // namespace
 
 class GLES2DecoderImpl;
@@ -1472,8 +1480,12 @@ class GLES2DecoderImpl : public GLES2Decoder,
   void InitTextureMaxAnisotropyIfNeeded(GLenum target, GLenum pname);
 
   // Wrappers for glGetVertexAttrib.
-  void DoGetVertexAttribfv(GLuint index, GLenum pname, GLfloat *params);
-  void DoGetVertexAttribiv(GLuint index, GLenum pname, GLint *params);
+  template <typename T>
+  void DoGetVertexAttribImpl(GLuint index, GLenum pname, T* params);
+  void DoGetVertexAttribfv(GLuint index, GLenum pname, GLfloat* params);
+  void DoGetVertexAttribiv(GLuint index, GLenum pname, GLint* params);
+  void DoGetVertexAttribIiv(GLuint index, GLenum pname, GLint* params);
+  void DoGetVertexAttribIuiv(GLuint index, GLenum pname, GLuint* params);
 
   // Wrappers for glIsXXX functions.
   bool DoIsEnabled(GLenum cap);
@@ -1554,8 +1566,9 @@ class GLES2DecoderImpl : public GLES2Decoder,
       GLint fake_location, GLsizei count, GLboolean transpose,
       const GLfloat* value);
 
+  template <typename T>
   bool SetVertexAttribValue(
-    const char* function_name, GLuint index, const GLfloat* value);
+    const char* function_name, GLuint index, const T* value);
 
   // Wrappers for glVertexAttrib??
   void DoVertexAttrib1f(GLuint index, GLfloat v0);
@@ -1563,10 +1576,15 @@ class GLES2DecoderImpl : public GLES2Decoder,
   void DoVertexAttrib3f(GLuint index, GLfloat v0, GLfloat v1, GLfloat v2);
   void DoVertexAttrib4f(
       GLuint index, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3);
-  void DoVertexAttrib1fv(GLuint index, const GLfloat *v);
-  void DoVertexAttrib2fv(GLuint index, const GLfloat *v);
-  void DoVertexAttrib3fv(GLuint index, const GLfloat *v);
-  void DoVertexAttrib4fv(GLuint index, const GLfloat *v);
+  void DoVertexAttrib1fv(GLuint index, const GLfloat* v);
+  void DoVertexAttrib2fv(GLuint index, const GLfloat* v);
+  void DoVertexAttrib3fv(GLuint index, const GLfloat* v);
+  void DoVertexAttrib4fv(GLuint index, const GLfloat* v);
+  void DoVertexAttribI4i(GLuint index, GLint v0, GLint v1, GLint v2, GLint v3);
+  void DoVertexAttribI4iv(GLuint index, const GLint* v);
+  void DoVertexAttribI4ui(
+      GLuint index, GLuint v0, GLuint v1, GLuint v2, GLuint v3);
+  void DoVertexAttribI4uiv(GLuint index, const GLuint* v);
 
   // Wrapper for glViewport
   void DoViewport(GLint x, GLint y, GLsizei width, GLsizei height);
@@ -2466,11 +2484,6 @@ GLES2DecoderImpl::GLES2DecoderImpl(ContextGroup* group)
       validation_fbo_(0) {
   DCHECK(group);
 
-  attrib_0_value_.v[0] = 0.0f;
-  attrib_0_value_.v[1] = 0.0f;
-  attrib_0_value_.v[2] = 0.0f;
-  attrib_0_value_.v[3] = 1.0f;
-
   // The shader translator is used for WebGL even when running on EGL
   // because additional restrictions are needed (like only enabling
   // GL_OES_standard_derivatives on demand).  It is used for the unit
@@ -2956,14 +2969,14 @@ Capabilities GLES2DecoderImpl::GetCapabilities() {
     DoGetIntegerv(GL_MAX_3D_TEXTURE_SIZE, &caps.max_3d_texture_size);
     DoGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &caps.max_array_texture_layers);
     DoGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &caps.max_color_attachments);
-    DoGetIntegerv(GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS,
-                  &caps.max_combined_fragment_uniform_components);
+    DoGetInteger64v(GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS,
+                    &caps.max_combined_fragment_uniform_components);
     DoGetIntegerv(GL_MAX_COMBINED_UNIFORM_BLOCKS,
                   &caps.max_combined_uniform_blocks);
-    DoGetIntegerv(GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS,
-                  &caps.max_combined_vertex_uniform_components);
+    DoGetInteger64v(GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS,
+                    &caps.max_combined_vertex_uniform_components);
     DoGetIntegerv(GL_MAX_DRAW_BUFFERS, &caps.max_draw_buffers);
-    DoGetIntegerv(GL_MAX_ELEMENT_INDEX, &caps.max_element_index);
+    DoGetInteger64v(GL_MAX_ELEMENT_INDEX, &caps.max_element_index);
     DoGetIntegerv(GL_MAX_ELEMENTS_INDICES, &caps.max_elements_indices);
     DoGetIntegerv(GL_MAX_ELEMENTS_VERTICES, &caps.max_elements_vertices);
     DoGetIntegerv(GL_MAX_FRAGMENT_INPUT_COMPONENTS,
@@ -2974,14 +2987,19 @@ Capabilities GLES2DecoderImpl::GetCapabilities() {
                   &caps.max_fragment_uniform_components);
     DoGetIntegerv(GL_MAX_PROGRAM_TEXEL_OFFSET,
                   &caps.max_program_texel_offset);
-    DoGetIntegerv(GL_MAX_SERVER_WAIT_TIMEOUT, &caps.max_server_wait_timeout);
+    DoGetInteger64v(GL_MAX_SERVER_WAIT_TIMEOUT, &caps.max_server_wait_timeout);
+    // Work around Linux NVIDIA driver bug where GL_TIMEOUT_IGNORED is
+    // returned.
+    if (caps.max_server_wait_timeout < 0)
+      caps.max_server_wait_timeout = 0;
+    DoGetFloatv(GL_MAX_TEXTURE_LOD_BIAS, &caps.max_texture_lod_bias);
     DoGetIntegerv(GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS,
                   &caps.max_transform_feedback_interleaved_components);
     DoGetIntegerv(GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS,
                   &caps.max_transform_feedback_separate_attribs);
     DoGetIntegerv(GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_COMPONENTS,
                   &caps.max_transform_feedback_separate_components);
-    DoGetIntegerv(GL_MAX_UNIFORM_BLOCK_SIZE, &caps.max_uniform_block_size);
+    DoGetInteger64v(GL_MAX_UNIFORM_BLOCK_SIZE, &caps.max_uniform_block_size);
     DoGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS,
                   &caps.max_uniform_buffer_bindings);
     DoGetIntegerv(GL_MAX_VARYING_COMPONENTS, &caps.max_varying_components);
@@ -6852,7 +6870,7 @@ bool GLES2DecoderImpl::SimulateAttrib0(
   uint32 size_needed = 0;
 
   if (num_vertices == 0 ||
-      !SafeMultiplyUint32(num_vertices, sizeof(Vec4), &size_needed) ||
+      !SafeMultiplyUint32(num_vertices, sizeof(Vec4f), &size_needed) ||
       size_needed > 0x7FFFFFFFU) {
     LOCAL_SET_GL_ERROR(GL_OUT_OF_MEMORY, function_name, "Simulating attrib 0");
     return false;
@@ -6878,12 +6896,12 @@ bool GLES2DecoderImpl::SimulateAttrib0(
   const Vec4& value = state_.attrib_values[0];
   if (new_buffer ||
       (attrib_0_used &&
-       (!attrib_0_buffer_matches_value_ ||
-        (value.v[0] != attrib_0_value_.v[0] ||
-         value.v[1] != attrib_0_value_.v[1] ||
-         value.v[2] != attrib_0_value_.v[2] ||
-         value.v[3] != attrib_0_value_.v[3])))) {
-    std::vector<Vec4> temp(num_vertices, value);
+       (!attrib_0_buffer_matches_value_ || !value.Equal(attrib_0_value_)))){
+    // TODO(zmo): This is not 100% correct because we might lose data when
+    // casting to float type, but it is a corner case and once we migrate to
+    // core profiles on desktop GL, it is no longer relevant.
+    Vec4f fvalue(value);
+    std::vector<Vec4f> temp(num_vertices, fvalue);
     glBufferSubData(GL_ARRAY_BUFFER, 0, size_needed, &temp[0].v[0]);
     attrib_0_buffer_matches_value_ = true;
     attrib_0_value_ = value;
@@ -7596,7 +7614,8 @@ void GLES2DecoderImpl::DoValidateProgram(GLuint program_client_id) {
 void GLES2DecoderImpl::GetVertexAttribHelper(
     const VertexAttrib* attrib, GLenum pname, GLint* params) {
   switch (pname) {
-    case GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING: {
+    case GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING:
+      {
         Buffer* buffer = attrib->buffer();
         if (buffer && !buffer->IsDeleted()) {
           GLuint client_id;
@@ -7620,8 +7639,11 @@ void GLES2DecoderImpl::GetVertexAttribHelper(
     case GL_VERTEX_ATTRIB_ARRAY_NORMALIZED:
       *params = attrib->normalized();
       break;
-    case GL_VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE:
+    case GL_VERTEX_ATTRIB_ARRAY_DIVISOR:
       *params = attrib->divisor();
+      break;
+    case GL_VERTEX_ATTRIB_ARRAY_INTEGER:
+      *params = attrib->integer();
       break;
     default:
       NOTREACHED();
@@ -7662,66 +7684,56 @@ void GLES2DecoderImpl::InitTextureMaxAnisotropyIfNeeded(
   texture->InitTextureMaxAnisotropyIfNeeded(target);
 }
 
-void GLES2DecoderImpl::DoGetVertexAttribfv(
-    GLuint index, GLenum pname, GLfloat* params) {
+template <typename T>
+void GLES2DecoderImpl::DoGetVertexAttribImpl(
+    GLuint index, GLenum pname, T* params) {
   VertexAttrib* attrib = state_.vertex_attrib_manager->GetVertexAttrib(index);
   if (!attrib) {
     LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glGetVertexAttribfv", "index out of range");
+        GL_INVALID_VALUE, "glGetVertexAttrib", "index out of range");
     return;
   }
   switch (pname) {
-    case GL_CURRENT_VERTEX_ATTRIB: {
-      const Vec4& value = state_.attrib_values[index];
-      params[0] = value.v[0];
-      params[1] = value.v[1];
-      params[2] = value.v[2];
-      params[3] = value.v[3];
+    case GL_CURRENT_VERTEX_ATTRIB:
+      state_.attrib_values[index].GetValues(params);
       break;
-    }
     default: {
       GLint value = 0;
       GetVertexAttribHelper(attrib, pname, &value);
-      *params = static_cast<GLfloat>(value);
+      *params = static_cast<T>(value);
       break;
     }
   }
+}
+
+void GLES2DecoderImpl::DoGetVertexAttribfv(
+    GLuint index, GLenum pname, GLfloat* params) {
+  DoGetVertexAttribImpl<GLfloat>(index, pname, params);
 }
 
 void GLES2DecoderImpl::DoGetVertexAttribiv(
     GLuint index, GLenum pname, GLint* params) {
-  VertexAttrib* attrib = state_.vertex_attrib_manager->GetVertexAttrib(index);
-  if (!attrib) {
-    LOCAL_SET_GL_ERROR(
-        GL_INVALID_VALUE, "glGetVertexAttribiv", "index out of range");
-    return;
-  }
-  switch (pname) {
-    case GL_CURRENT_VERTEX_ATTRIB: {
-      const Vec4& value = state_.attrib_values[index];
-      params[0] = static_cast<GLint>(value.v[0]);
-      params[1] = static_cast<GLint>(value.v[1]);
-      params[2] = static_cast<GLint>(value.v[2]);
-      params[3] = static_cast<GLint>(value.v[3]);
-      break;
-    }
-    default:
-      GetVertexAttribHelper(attrib, pname, params);
-      break;
-  }
+  DoGetVertexAttribImpl<GLint>(index, pname, params);
 }
 
+void GLES2DecoderImpl::DoGetVertexAttribIiv(
+    GLuint index, GLenum pname, GLint* params) {
+  DoGetVertexAttribImpl<GLint>(index, pname, params);
+}
+
+void GLES2DecoderImpl::DoGetVertexAttribIuiv(
+    GLuint index, GLenum pname, GLuint* params) {
+  DoGetVertexAttribImpl<GLuint>(index, pname, params);
+}
+
+template <typename T>
 bool GLES2DecoderImpl::SetVertexAttribValue(
-    const char* function_name, GLuint index, const GLfloat* value) {
+    const char* function_name, GLuint index, const T* value) {
   if (index >= state_.attrib_values.size()) {
     LOCAL_SET_GL_ERROR(GL_INVALID_VALUE, function_name, "index out of range");
     return false;
   }
-  Vec4& v = state_.attrib_values[index];
-  v.v[0] = value[0];
-  v.v[1] = value[1];
-  v.v[2] = value[2];
-  v.v[3] = value[3];
+  state_.attrib_values[index].SetValues(value);
   return true;
 }
 
@@ -7779,6 +7791,34 @@ void GLES2DecoderImpl::DoVertexAttrib3fv(GLuint index, const GLfloat* v) {
 void GLES2DecoderImpl::DoVertexAttrib4fv(GLuint index, const GLfloat* v) {
   if (SetVertexAttribValue("glVertexAttrib4fv", index, v)) {
     glVertexAttrib4fv(index, v);
+  }
+}
+
+void GLES2DecoderImpl::DoVertexAttribI4i(
+    GLuint index, GLint v0, GLint v1, GLint v2, GLint v3) {
+  GLint v[4] = { v0, v1, v2, v3 };
+  if (SetVertexAttribValue("glVertexAttribI4i", index, v)) {
+    glVertexAttribI4i(index, v0, v1, v2, v3);
+  }
+}
+
+void GLES2DecoderImpl::DoVertexAttribI4iv(GLuint index, const GLint* v) {
+  if (SetVertexAttribValue("glVertexAttribI4iv", index, v)) {
+    glVertexAttribI4iv(index, v);
+  }
+}
+
+void GLES2DecoderImpl::DoVertexAttribI4ui(
+    GLuint index, GLuint v0, GLuint v1, GLuint v2, GLuint v3) {
+  GLuint v[4] = { v0, v1, v2, v3 };
+  if (SetVertexAttribValue("glVertexAttribI4ui", index, v)) {
+    glVertexAttribI4ui(index, v0, v1, v2, v3);
+  }
+}
+
+void GLES2DecoderImpl::DoVertexAttribI4uiv(GLuint index, const GLuint* v) {
+  if (SetVertexAttribValue("glVertexAttribI4uiv", index, v)) {
+    glVertexAttribI4uiv(index, v);
   }
 }
 
@@ -7864,7 +7904,8 @@ error::Error GLES2DecoderImpl::HandleVertexAttribIPointer(
                       GL_FALSE,
                       stride,
                       stride != 0 ? stride : component_size * size,
-                      offset);
+                      offset,
+                      GL_TRUE);
   glVertexAttribIPointer(indx, size, type, stride, ptr);
   return error::kNoError;
 }
@@ -7950,7 +7991,8 @@ error::Error GLES2DecoderImpl::HandleVertexAttribPointer(
                       normalized,
                       stride,
                       stride != 0 ? stride : component_size * size,
-                      offset);
+                      offset,
+                      GL_FALSE);
   // We support GL_FIXED natively on EGL/GLES2 implementations
   if (type != GL_FIXED || feature_info_->gl_version_info().is_es) {
     glVertexAttribPointer(indx, size, type, normalized, stride, ptr);
@@ -12463,8 +12505,9 @@ void GLES2DecoderImpl::DoBindTexImage2DCHROMIUM(
 
   gfx::Size size = gl_image->GetSize();
   texture_manager()->SetLevelInfo(
-      texture_ref, target, 0, GL_RGBA, size.width(), size.height(), 1, 0,
-      GL_RGBA, GL_UNSIGNED_BYTE, true);
+      texture_ref, target, 0, gl_image->GetInternalFormat(),
+      size.width(), size.height(), 1, 0,
+      gl_image->GetInternalFormat(), GL_UNSIGNED_BYTE, true);
   texture_manager()->SetLevelImage(texture_ref, target, 0, gl_image);
 }
 
@@ -12502,8 +12545,8 @@ void GLES2DecoderImpl::DoReleaseTexImage2DCHROMIUM(
   }
 
   texture_manager()->SetLevelInfo(
-      texture_ref, target, 0, GL_RGBA, 0, 0, 1, 0,
-      GL_RGBA, GL_UNSIGNED_BYTE, false);
+      texture_ref, target, 0, gl_image->GetInternalFormat(), 0, 0, 1, 0,
+      gl_image->GetInternalFormat(), GL_UNSIGNED_BYTE, false);
 }
 
 error::Error GLES2DecoderImpl::HandleTraceBeginCHROMIUM(

@@ -6,7 +6,7 @@
 
 #include "base/bind.h"
 #include "base/location.h"
-#include "base/message_loop/message_loop_proxy.h"
+#include "base/single_thread_task_runner.h"
 #include "chromecast/browser/media/cma_message_loop.h"
 #include "chromecast/media/cdm/browser_cdm_cast.h"
 #include "media/base/bind_to_current_loop.h"
@@ -17,13 +17,14 @@ namespace media {
 
 scoped_ptr<::media::BrowserCdm> CastBrowserCdmFactory::CreateBrowserCdm(
     const std::string& key_system_name,
-    bool use_secure_surface,
+    bool use_hw_secure_codecs,
     const ::media::SessionMessageCB& session_message_cb,
     const ::media::SessionClosedCB& session_closed_cb,
     const ::media::LegacySessionErrorCB& legacy_session_error_cb,
     const ::media::SessionKeysChangeCB& session_keys_change_cb,
     const ::media::SessionExpirationUpdateCB& session_expiration_update_cb) {
-  DCHECK(!use_secure_surface) << "Chromecast does not use |use_secure_surface|";
+  DCHECK(!use_hw_secure_codecs)
+      << "Chromecast does not use |use_hw_secure_codecs|";
 
   CastKeySystem key_system(GetKeySystemByName(key_system_name));
 
@@ -35,7 +36,7 @@ scoped_ptr<::media::BrowserCdm> CastBrowserCdmFactory::CreateBrowserCdm(
   }
 
   if (browser_cdm) {
-    CmaMessageLoop::GetMessageLoopProxy()->PostTask(
+    CmaMessageLoop::GetTaskRunner()->PostTask(
         FROM_HERE,
         base::Bind(&BrowserCdmCast::Initialize,
                    base::Unretained(browser_cdm.get()),
@@ -44,9 +45,8 @@ scoped_ptr<::media::BrowserCdm> CastBrowserCdmFactory::CreateBrowserCdm(
                    ::media::BindToCurrentLoop(legacy_session_error_cb),
                    ::media::BindToCurrentLoop(session_keys_change_cb),
                    ::media::BindToCurrentLoop(session_expiration_update_cb)));
-    return make_scoped_ptr(
-        new BrowserCdmCastUi(browser_cdm.Pass(),
-                             CmaMessageLoop::GetMessageLoopProxy()));
+    return make_scoped_ptr(new BrowserCdmCastUi(
+        browser_cdm.Pass(), CmaMessageLoop::GetTaskRunner()));
   }
 
   LOG(INFO) << "No matching key system found.";

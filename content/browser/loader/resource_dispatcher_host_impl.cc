@@ -19,11 +19,12 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/shared_memory.h"
 #include "base/message_loop/message_loop.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/stl_util.h"
 #include "base/third_party/dynamic_annotations/dynamic_annotations.h"
+#include "base/time/time.h"
 #include "content/browser/appcache/appcache_interceptor.h"
 #include "content/browser/appcache/chrome_appcache_service.h"
 #include "content/browser/cert_store_impl.h"
@@ -485,17 +486,6 @@ void ResourceDispatcherHostImpl::RemoveResourceContext(
   active_resource_contexts_.erase(context);
 }
 
-void ResourceDispatcherHostImpl::ResumeResponseDeferredAtStart(
-    const GlobalRequestID& id) {
-  ResourceLoader* loader = GetLoader(id);
-  if (loader) {
-    // The response we were meant to resume could have already been canceled.
-    ResourceRequestInfoImpl* info = loader->GetRequestInfo();
-    if (info->cross_site_handler())
-      info->cross_site_handler()->ResumeResponseDeferredAtStart(id.request_id);
-  }
-}
-
 void ResourceDispatcherHostImpl::CancelRequestsForContext(
     ResourceContext* context) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
@@ -861,6 +851,45 @@ void ResourceDispatcherHostImpl::DidFinishLoading(ResourceLoader* loader) {
     UMA_HISTOGRAM_SPARSE_SLOWLY(
         "Net.ErrorCodesForMainFrame3",
         -loader->request()->status().error());
+
+    // Record time to success and error for the most common errors, and for
+    // the aggregate remainder errors.
+    base::TimeDelta request_loading_time(
+        base::Time::Now() - loader->request()->request_time());
+    switch (loader->request()->status().error()) {
+      case net::OK:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.Success", request_loading_time);
+        break;
+      case net::ERR_ABORTED:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.ErrAborted", request_loading_time);
+        break;
+      case net::ERR_CONNECTION_RESET:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.ErrConnectionReset", request_loading_time);
+        break;
+      case net::ERR_CONNECTION_TIMED_OUT:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.ErrConnectionTimedOut", request_loading_time);
+        break;
+      case net::ERR_INTERNET_DISCONNECTED:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.ErrInternetDisconnected", request_loading_time);
+        break;
+      case net::ERR_NAME_NOT_RESOLVED:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.ErrNameNotResolved", request_loading_time);
+        break;
+      case net::ERR_TIMED_OUT:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.ErrTimedOut", request_loading_time);
+        break;
+      default:
+        UMA_HISTOGRAM_LONG_TIMES(
+            "Net.RequestTime.MiscError", request_loading_time);
+        break;
+    }
 
     if (loader->request()->url().SchemeIsCryptographic()) {
       if (loader->request()->url().host() == "www.google.com") {
@@ -1888,11 +1917,8 @@ void ResourceDispatcherHostImpl::BeginNavigationRequest(
 
   int load_flags = info.begin_params.load_flags;
   load_flags |= net::LOAD_VERIFY_EV_CERT;
-  if (info.is_main_frame) {
+  if (info.is_main_frame)
     load_flags |= net::LOAD_MAIN_FRAME;
-  } else {
-    load_flags |= net::LOAD_SUB_FRAME;
-  }
   // Add a flag to selectively bypass the data reduction proxy if the resource
   // type is not an image.
   load_flags |= net::LOAD_BYPASS_DATA_REDUCTION_PROXY;
@@ -2318,8 +2344,6 @@ int ResourceDispatcherHostImpl::BuildLoadFlagsForRequest(
   load_flags |= net::LOAD_VERIFY_EV_CERT;
   if (request_data.resource_type == RESOURCE_TYPE_MAIN_FRAME) {
     load_flags |= net::LOAD_MAIN_FRAME;
-  } else if (request_data.resource_type == RESOURCE_TYPE_SUB_FRAME) {
-    load_flags |= net::LOAD_SUB_FRAME;
   } else if (request_data.resource_type == RESOURCE_TYPE_PREFETCH) {
     load_flags |= net::LOAD_PREFETCH;
   }

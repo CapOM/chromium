@@ -76,8 +76,6 @@ const char kChromeUISettingsURL[] = "chrome://settings/";
 const char kChromeUIContentSettingsURL[] = "chrome://settings/content";
 const char kChromeUISettingsFrameURL[] = "chrome://settings-frame/";
 const char kChromeUISuggestionsURL[] = "chrome://suggestions/";
-const char kChromeUISuggestionsInternalsURL[] =
-    "chrome://suggestions-internals/";
 const char kChromeUISupervisedUserPassphrasePageURL[] =
     "chrome://managed-user-passphrase/";
 const char kChromeUITermsURL[] = "chrome://terms/";
@@ -229,7 +227,6 @@ const char kChromeUISettingsFrameHost[] = "settings-frame";
 const char kChromeUIShorthangHost[] = "shorthang";
 const char kChromeUISignInInternalsHost[] = "signin-internals";
 const char kChromeUISuggestionsHost[] = "suggestions";
-const char kChromeUISuggestionsInternalsHost[] = "suggestions-internals";
 const char kChromeUISupervisedUserPassphrasePageHost[] =
     "managed-user-passphrase";
 const char kChromeUISyncHost[] = "sync";
@@ -573,8 +570,7 @@ const char kLearnMoreEnterpriseURL[] =
 #endif
 
 const char kRemoveNonCWSExtensionURL[] =
-    "https://support.google.com/chrome/answer/2811969?"
-    "p=ui_remove_non_cws_extensions&rd=1";
+    "https://support.google.com/chrome/?p=ui_remove_non_cws_extensions";
 
 #if defined(OS_WIN)
 const char kNotificationsHelpURL[] =

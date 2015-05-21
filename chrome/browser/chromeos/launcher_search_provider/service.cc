@@ -28,9 +28,11 @@ Service::Service(Profile* profile,
       provider_(nullptr),
       query_id_(0),
       is_query_running_(false) {
+  extension_registry_->AddObserver(this);
 }
 
 Service::~Service() {
+  extension_registry_->RemoveObserver(this);
 }
 
 // static
@@ -50,17 +52,16 @@ void Service::OnQueryStarted(app_list::LauncherSearchProvider* provider,
   extensions::EventRouter* event_router =
       extensions::EventRouter::Get(profile_);
 
-  std::set<ExtensionId> extension_ids = GetListenerExtensionIds();
-  for (const ExtensionId extension_id : extension_ids) {
+  CacheListenerExtensionIds();
+  for (const ExtensionId extension_id : *cached_listener_extension_ids_.get()) {
     // Convert query_id_ to string here since queryId is defined as string in
     // javascript side API while we use uint32 internally to generate it.
-    // TODO(yawano): Consider if we can change it to integer at javascript side.
     event_router->DispatchEventToExtension(
         extension_id,
         make_scoped_ptr(new extensions::Event(
             api_launcher_search_provider::OnQueryStarted::kEventName,
             api_launcher_search_provider::OnQueryStarted::Create(
-                std::to_string(query_id_), query, max_result))));
+                query_id_, query, max_result))));
   }
 }
 
@@ -71,14 +72,13 @@ void Service::OnQueryEnded() {
   extensions::EventRouter* event_router =
       extensions::EventRouter::Get(profile_);
 
-  std::set<ExtensionId> extension_ids = GetListenerExtensionIds();
-  for (const ExtensionId extension_id : extension_ids) {
+  CacheListenerExtensionIds();
+  for (const ExtensionId extension_id : *cached_listener_extension_ids_.get()) {
     event_router->DispatchEventToExtension(
         extension_id,
         make_scoped_ptr(new extensions::Event(
             api_launcher_search_provider::OnQueryEnded::kEventName,
-            api_launcher_search_provider::OnQueryEnded::Create(
-                std::to_string(query_id_)))));
+            api_launcher_search_provider::OnQueryEnded::Create(query_id_))));
   }
 
   is_query_running_ = false;
@@ -86,7 +86,8 @@ void Service::OnQueryEnded() {
 
 void Service::OnOpenResult(const ExtensionId& extension_id,
                            const std::string& item_id) {
-  CHECK(ContainsValue(GetListenerExtensionIds(), extension_id));
+  CacheListenerExtensionIds();
+  CHECK(ContainsValue(*cached_listener_extension_ids_.get(), extension_id));
 
   extensions::EventRouter* event_router =
       extensions::EventRouter::Get(profile_);
@@ -100,16 +101,17 @@ void Service::OnOpenResult(const ExtensionId& extension_id,
 void Service::SetSearchResults(
     const extensions::Extension* extension,
     scoped_ptr<ErrorReporter> error_reporter,
-    const std::string& query_id,
+    const int query_id,
     const std::vector<linked_ptr<
         extensions::api::launcher_search_provider::SearchResult>>& results) {
   // If query is not running or query_id is different from current query id,
   // discard the results.
-  if (!is_query_running_ || query_id != std::to_string(query_id_))
+  if (!is_query_running_ || query_id != query_id_)
     return;
 
   // If |extension| is not in the listener extensions list, ignore it.
-  if (!ContainsValue(GetListenerExtensionIds(), extension->id()))
+  CacheListenerExtensionIds();
+  if (!ContainsValue(*cached_listener_extension_ids_.get(), extension->id()))
     return;
 
   // Set search results to provider.
@@ -135,9 +137,26 @@ bool Service::IsQueryRunning() const {
   return is_query_running_;
 }
 
-std::set<ExtensionId> Service::GetListenerExtensionIds() {
-  // TODO(yawano): Cache this result for optimization (crbug.com/440649).
-  std::set<ExtensionId> extension_ids;
+void Service::OnExtensionLoaded(content::BrowserContext* browser_context,
+                                const extensions::Extension* extension) {
+  // Invalidate cache.
+  cached_listener_extension_ids_.reset();
+}
+
+void Service::OnExtensionUnloaded(
+    content::BrowserContext* browser_context,
+    const extensions::Extension* extension,
+    extensions::UnloadedExtensionInfo::Reason reason) {
+  // Invalidate cache.
+  cached_listener_extension_ids_.reset();
+}
+
+void Service::CacheListenerExtensionIds() {
+  // If it's already cached, do nothing.
+  if (cached_listener_extension_ids_)
+    return;
+
+  cached_listener_extension_ids_.reset(new std::set<ExtensionId>());
 
   const ExtensionSet& extension_set = extension_registry_->enabled_extensions();
   for (scoped_refptr<const extensions::Extension> extension : extension_set) {
@@ -146,10 +165,8 @@ std::set<ExtensionId> Service::GetListenerExtensionIds() {
     const bool has_permission = permission_data->HasAPIPermission(
         extensions::APIPermission::kLauncherSearchProvider);
     if (has_permission)
-      extension_ids.insert(extension->id());
+      cached_listener_extension_ids_->insert(extension->id());
   }
-
-  return extension_ids;
 }
 
 }  // namespace launcher_search_provider

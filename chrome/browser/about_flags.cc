@@ -215,18 +215,6 @@ const Experiment::Choice kMarkNonSecureAsChoices[] = {
         switches::kMarkNonSecureAs, switches::kMarkNonSecureAsDubious}
 };
 
-const Experiment::Choice kMaxTilesForInterestAreaChoices[] = {
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_SHORT,
-    cc::switches::kMaxTilesForInterestArea, "64"},
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_TALL,
-    cc::switches::kMaxTilesForInterestArea, "128"},
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_GRANDE,
-    cc::switches::kMaxTilesForInterestArea, "256"},
-  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_VENTI,
-    cc::switches::kMaxTilesForInterestArea, "512"}
-};
-
 const Experiment::Choice kShowSavedCopyChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
   { IDS_FLAGS_ENABLE_SHOW_SAVED_COPY_PRIMARY,
@@ -420,8 +408,6 @@ const Experiment::Choice kAutofillSyncCredentialChoices[] = {
 
 const Experiment::Choice kSSLVersionMinChoices[] = {
   { IDS_FLAGS_SSL_VERSION_DEFAULT, "", "" },
-  { IDS_FLAGS_SSL_VERSION_SSLV3, switches::kSSLVersionMin,
-    switches::kSSLVersionSSLv3 },
   { IDS_FLAGS_SSL_VERSION_TLSV1, switches::kSSLVersionMin,
     switches::kSSLVersionTLSv1 },
   { IDS_FLAGS_SSL_VERSION_TLSV11, switches::kSSLVersionMin,
@@ -569,14 +555,6 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_DISABLE_DIRECT_WRITE_DESCRIPTION,
     kOsWin,
     SINGLE_VALUE_TYPE(switches::kDisableDirectWrite)
-  },
-  {
-    "enable-win32k-renderer-lockdown",
-    IDS_FLAGS_ENABLE_WIN32K_RENDERER_LOCKDOWN_NAME,
-    IDS_FLAGS_ENABLE_WIN32K_RENDERER_LOCKDOWN_DESCRIPTION,
-    kOsWin,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableWin32kRendererLockDown,
-                              switches::kDisableWin32kRendererLockDown)
   },
 #endif
   {
@@ -882,13 +860,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableExperimentalWebPlatformFeatures)
   },
   {
-    "disable-ntp-other-sessions-menu",
-    IDS_FLAGS_NTP_OTHER_SESSIONS_MENU_NAME,
-    IDS_FLAGS_NTP_OTHER_SESSIONS_MENU_DESCRIPTION,
-    kOsDesktop,
-    SINGLE_VALUE_TYPE(switches::kDisableNTPOtherSessionsMenu)
-  },
-  {
     "enable-devtools-experiments",
     IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_NAME,
     IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_DESCRIPTION,
@@ -1175,6 +1146,14 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kDisablePasswordManagerReauthentication)
   },
   {
+    "enable-password-force-saving",
+    IDS_FLAGS_ENABLE_PASSWORD_FORCE_SAVING_NAME,
+    IDS_FLAGS_ENABLE_PASSWORD_FORCE_SAVING_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(
+        password_manager::switches::kEnablePasswordForceSaving)
+  },
+  {
     "enable-password-link",
     IDS_FLAGS_PASSWORD_MANAGER_LINK_NAME,
     IDS_FLAGS_PASSWORD_MANAGER_LINK_DESCRIPTION,
@@ -1326,13 +1305,6 @@ const Experiment kExperiments[] = {
   },
 #endif
   {
-    "max-tiles-for-interest-area",
-    IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_NAME,
-    IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_DESCRIPTION,
-    kOsAll,
-    MULTI_VALUE_TYPE(kMaxTilesForInterestAreaChoices)
-  },
-  {
     "enable-offer-store-unmasked-wallet-cards",
     IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS,
     IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS_DESCRIPTION,
@@ -1420,11 +1392,11 @@ const Experiment kExperiments[] = {
                               keyboard::switches::kDisableInputView)
   },
   {
-    "enable-new-korean-ime",
-    IDS_FLAGS_ENABLE_NEW_KOREAN_IME_NAME,
-    IDS_FLAGS_ENABLE_NEW_KOREAN_IME_DESCRIPTION,
+    "disable-new-korean-ime",
+    IDS_FLAGS_DISABLE_NEW_KOREAN_IME_NAME,
+    IDS_FLAGS_DISABLE_NEW_KOREAN_IME_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kEnableNewKoreanIme)
+    SINGLE_VALUE_TYPE(chromeos::switches::kDisableNewKoreanIme)
   },
   {
     "disable-new-md-input-view",
@@ -1581,21 +1553,6 @@ const Experiment kExperiments[] = {
     kOsAndroid | kOsMac | kOsWin | kOsLinux | kOsCrOS,
     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableAccountConsistency,
                               switches::kDisableAccountConsistency)
-  },
-  {
-    "enable-fast-user-switching",
-    IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_NAME,
-    IDS_FLAGS_ENABLE_FAST_USER_SWITCHING_DESCRIPTION,
-    kOsMac | kOsWin | kOsLinux,
-    SINGLE_VALUE_TYPE(switches::kFastUserSwitching)
-  },
-  {
-    "enable-new-avatar-menu",
-    IDS_FLAGS_ENABLE_NEW_AVATAR_MENU_NAME,
-    IDS_FLAGS_ENABLE_NEW_AVATAR_MENU_DESCRIPTION,
-    kOsMac | kOsWin | kOsLinux,
-    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableNewAvatarMenu,
-                              switches::kDisableNewAvatarMenu)
   },
   {
     "enable-iframe-based-signin",
@@ -1912,6 +1869,14 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_CENTERED_APP_LIST_DESCRIPTION,
     kOsWin | kOsLinux | kOsCrOS,
     SINGLE_VALUE_TYPE(app_list::switches::kEnableCenteredAppList)
+  },
+  {
+    "enable-new-app-list-mixer",
+    IDS_FLAGS_ENABLE_NEW_APP_LIST_MIXER_NAME,
+    IDS_FLAGS_ENABLE_NEW_APP_LIST_MIXER_DESCRIPTION,
+    kOsWin | kOsLinux | kOsCrOS | kOsMac,
+    ENABLE_DISABLE_VALUE_TYPE(app_list::switches::kEnableNewAppListMixer,
+                              app_list::switches::kDisableNewAppListMixer)
   },
 #endif
   {
@@ -2362,17 +2327,9 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_V8_PAC_MOJO_OUT_OF_PROCESS_NAME,
     IDS_FLAGS_V8_PAC_MOJO_OUT_OF_PROCESS_DESCRIPTION,
     kOsDesktop,
-    SINGLE_VALUE_TYPE(switches::kV8PacMojoOutOfProcess),
+    ENABLE_DISABLE_VALUE_TYPE(switches::kV8PacMojoOutOfProcess,
+                              switches::kDisableOutOfProcessPac)
   },
-#if defined(OS_CHROMEOS)
-  {
-    "enable-firewall-hole-punching",
-    IDS_FLAGS_ENABLE_FIREWALL_HOLE_PUNCHING_NAME,
-    IDS_FLAGS_ENABLE_FIREWALL_HOLE_PUNCHING_DESCRIPTION,
-    kOsCrOS,
-    SINGLE_VALUE_TYPE(chromeos::switches::kEnableFirewallHolePunching)
-  },
-#endif  // defined(OS_CHROMEOS)
 #if defined(ENABLE_MEDIA_ROUTER)
   {
     "enable-media-router",
@@ -2434,6 +2391,15 @@ const Experiment kExperiments[] = {
     kOsAll,
     SINGLE_VALUE_TYPE(switches::kDisableNewVideoRenderer)
   },
+#if defined(OS_CHROMEOS)
+  {
+    "enable-printer-app-search",
+    IDS_FLAGS_PRINTER_PROVIDER_SEARCH_APP_NAME,
+    IDS_FLAGS_PRINTER_PROVIDER_SEARCH_APP_DESCRIPTION,
+    kOsCrOS,
+    SINGLE_VALUE_TYPE(chromeos::switches::kEnablePrinterAppSearch)
+  },
+#endif  // OS_CHROMEOS
   // Temporary flag to ease the transition to standard-compliant scrollTop
   // behavior.  Will be removed shortly after http://crbug.com/157855 ships.
   {
@@ -2444,7 +2410,16 @@ const Experiment kExperiments[] = {
     ENABLE_DISABLE_VALUE_TYPE_AND_VALUE(
         switches::kEnableBlinkFeatures, "ScrollTopLeftInterop",
         switches::kDisableBlinkFeatures, "ScrollTopLeftInterop")
-  }
+  },
+#if defined(OS_WIN)
+  {
+    "try-supported-channel-layouts",
+    IDS_FLAGS_TRY_SUPPORTED_CHANNEL_LAYOUTS_NAME,
+    IDS_FLAGS_TRY_SUPPORTED_CHANNEL_LAYOUTS_DESCRIPTION,
+    kOsWin,
+    SINGLE_VALUE_TYPE(switches::kTrySupportedChannelLayouts)
+  },
+#endif
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in
   // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.

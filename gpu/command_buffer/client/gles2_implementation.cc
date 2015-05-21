@@ -786,19 +786,21 @@ bool GLES2Implementation::GetHelper(GLenum pname, GLint* params) {
       *params = capabilities_.max_color_attachments;
       return true;
     case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS:
-      *params = capabilities_.max_combined_fragment_uniform_components;
+      *params = static_cast<GLint>(
+          capabilities_.max_combined_fragment_uniform_components);
       return true;
     case GL_MAX_COMBINED_UNIFORM_BLOCKS:
       *params = capabilities_.max_combined_uniform_blocks;
       return true;
     case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
-      *params = capabilities_.max_combined_vertex_uniform_components;
+      *params = static_cast<GLint>(
+          capabilities_.max_combined_vertex_uniform_components);
       return true;
     case GL_MAX_DRAW_BUFFERS:
       *params = capabilities_.max_draw_buffers;
       return true;
     case GL_MAX_ELEMENT_INDEX:
-      *params = capabilities_.max_element_index;
+      *params = static_cast<GLint>(capabilities_.max_element_index);
       return true;
     case GL_MAX_ELEMENTS_INDICES:
       *params = capabilities_.max_elements_indices;
@@ -822,7 +824,10 @@ bool GLES2Implementation::GetHelper(GLenum pname, GLint* params) {
       *params = capabilities_.max_samples;
       return true;
     case GL_MAX_SERVER_WAIT_TIMEOUT:
-      *params = capabilities_.max_server_wait_timeout;
+      *params = static_cast<GLint>(capabilities_.max_server_wait_timeout);
+      return true;
+    case GL_MAX_TEXTURE_LOD_BIAS:
+      *params = static_cast<GLint>(capabilities_.max_texture_lod_bias);
       return true;
     case GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS:
       *params = capabilities_.max_transform_feedback_interleaved_components;
@@ -834,7 +839,7 @@ bool GLES2Implementation::GetHelper(GLenum pname, GLint* params) {
       *params = capabilities_.max_transform_feedback_separate_components;
       return true;
     case GL_MAX_UNIFORM_BLOCK_SIZE:
-      *params = capabilities_.max_uniform_block_size;
+      *params = static_cast<GLint>(capabilities_.max_uniform_block_size);
       return true;
     case GL_MAX_UNIFORM_BUFFER_BINDINGS:
       *params = capabilities_.max_uniform_buffer_bindings;
@@ -888,7 +893,6 @@ bool GLES2Implementation::GetHelper(GLenum pname, GLint* params) {
     case GL_DRAW_BUFFER15:
     case GL_DRAW_FRAMEBUFFER_BINDING:
     case GL_FRAGMENT_SHADER_DERIVATIVE_HINT:
-    case GL_MAX_TEXTURE_LOD_BIAS:
     case GL_PACK_ROW_LENGTH:
     case GL_PACK_SKIP_PIXELS:
     case GL_PACK_SKIP_ROWS:
@@ -935,6 +939,13 @@ bool GLES2Implementation::GetBooleanvHelper(GLenum pname, GLboolean* params) {
 
 bool GLES2Implementation::GetFloatvHelper(GLenum pname, GLfloat* params) {
   // TODO(gman): Make this handle pnames that return more than 1 value.
+  switch (pname) {
+    case GL_MAX_TEXTURE_LOD_BIAS:
+      *params = capabilities_.max_texture_lod_bias;
+      return true;
+    default:
+      break;
+  }
   GLint value;
   if (!GetHelper(pname, &value)) {
     return false;
@@ -944,12 +955,30 @@ bool GLES2Implementation::GetFloatvHelper(GLenum pname, GLfloat* params) {
 }
 
 bool GLES2Implementation::GetInteger64vHelper(GLenum pname, GLint64* params) {
-  // TODO(zmo): we limit values to 32-bit, which is OK for now.
+  switch (pname) {
+    case GL_MAX_COMBINED_FRAGMENT_UNIFORM_COMPONENTS:
+      *params = capabilities_.max_combined_fragment_uniform_components;
+      return true;
+    case GL_MAX_COMBINED_VERTEX_UNIFORM_COMPONENTS:
+      *params = capabilities_.max_combined_vertex_uniform_components;
+      return true;
+    case GL_MAX_ELEMENT_INDEX:
+      *params = capabilities_.max_element_index;
+      return true;
+    case GL_MAX_SERVER_WAIT_TIMEOUT:
+      *params = capabilities_.max_server_wait_timeout;
+      return true;
+    case GL_MAX_UNIFORM_BLOCK_SIZE:
+      *params = capabilities_.max_uniform_block_size;
+      return true;
+    default:
+      break;
+  }
   GLint value;
   if (!GetHelper(pname, &value)) {
     return false;
   }
-  *params = value;
+  *params = static_cast<GLint64>(value);
   return true;
 }
 
@@ -1558,8 +1587,14 @@ void GLES2Implementation::VertexAttribIPointer(
       << stride << ", "
       << ptr << ")");
   // Record the info on the client side.
-  if (!vertex_array_object_manager_->SetAttribPointer(
-      bound_array_buffer_id_, index, size, type, GL_FALSE, stride, ptr)) {
+  if (!vertex_array_object_manager_->SetAttribPointer(bound_array_buffer_id_,
+                                                      index,
+                                                      size,
+                                                      type,
+                                                      GL_FALSE,
+                                                      stride,
+                                                      ptr,
+                                                      GL_TRUE)) {
     SetGLError(GL_INVALID_OPERATION, "glVertexAttribIPointer",
                "client side arrays are not allowed in vertex array objects.");
     return;
@@ -1587,8 +1622,14 @@ void GLES2Implementation::VertexAttribPointer(
       << stride << ", "
       << ptr << ")");
   // Record the info on the client side.
-  if (!vertex_array_object_manager_->SetAttribPointer(
-      bound_array_buffer_id_, index, size, type, normalized, stride, ptr)) {
+  if (!vertex_array_object_manager_->SetAttribPointer(bound_array_buffer_id_,
+                                                      index,
+                                                      size,
+                                                      type,
+                                                      normalized,
+                                                      stride,
+                                                      ptr,
+                                                      GL_FALSE)) {
     SetGLError(GL_INVALID_OPERATION, "glVertexAttribPointer",
                "client side arrays are not allowed in vertex array objects.");
     return;
@@ -3875,7 +3916,7 @@ void GLES2Implementation::GetVertexAttribfv(
       << static_cast<const void*>(params) << ")");
   uint32 value = 0;
   if (vertex_array_object_manager_->GetVertexAttrib(index, pname, &value)) {
-    *params = static_cast<float>(value);
+    *params = static_cast<GLfloat>(value);
     return;
   }
   TRACE_EVENT0("gpu", "GLES2::GetVertexAttribfv");
@@ -3906,7 +3947,7 @@ void GLES2Implementation::GetVertexAttribiv(
       << static_cast<const void*>(params) << ")");
   uint32 value = 0;
   if (vertex_array_object_manager_->GetVertexAttrib(index, pname, &value)) {
-    *params = value;
+    *params = static_cast<GLint>(value);
     return;
   }
   TRACE_EVENT0("gpu", "GLES2::GetVertexAttribiv");
@@ -3917,6 +3958,68 @@ void GLES2Implementation::GetVertexAttribiv(
   }
   result->SetNumResults(0);
   helper_->GetVertexAttribiv(
+      index, pname, GetResultShmId(), GetResultShmOffset());
+  WaitForCmd();
+  result->CopyResult(params);
+  GPU_CLIENT_LOG_CODE_BLOCK({
+    for (int32 i = 0; i < result->GetNumResults(); ++i) {
+      GPU_CLIENT_LOG("  " << i << ": " << result->GetData()[i]);
+    }
+  });
+  CheckGLError();
+}
+
+void GLES2Implementation::GetVertexAttribIiv(
+    GLuint index, GLenum pname, GLint* params) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glGetVertexAttribIiv("
+      << index << ", "
+      << GLES2Util::GetStringVertexAttribute(pname) << ", "
+      << static_cast<const void*>(params) << ")");
+  uint32 value = 0;
+  if (vertex_array_object_manager_->GetVertexAttrib(index, pname, &value)) {
+    *params = static_cast<GLint>(value);
+    return;
+  }
+  TRACE_EVENT0("gpu", "GLES2::GetVertexAttribIiv");
+  typedef cmds::GetVertexAttribiv::Result Result;
+  Result* result = GetResultAs<Result*>();
+  if (!result) {
+    return;
+  }
+  result->SetNumResults(0);
+  helper_->GetVertexAttribIiv(
+      index, pname, GetResultShmId(), GetResultShmOffset());
+  WaitForCmd();
+  result->CopyResult(params);
+  GPU_CLIENT_LOG_CODE_BLOCK({
+    for (int32 i = 0; i < result->GetNumResults(); ++i) {
+      GPU_CLIENT_LOG("  " << i << ": " << result->GetData()[i]);
+    }
+  });
+  CheckGLError();
+}
+
+void GLES2Implementation::GetVertexAttribIuiv(
+    GLuint index, GLenum pname, GLuint* params) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glGetVertexAttribIuiv("
+      << index << ", "
+      << GLES2Util::GetStringVertexAttribute(pname) << ", "
+      << static_cast<const void*>(params) << ")");
+  uint32 value = 0;
+  if (vertex_array_object_manager_->GetVertexAttrib(index, pname, &value)) {
+    *params = static_cast<GLuint>(value);
+    return;
+  }
+  TRACE_EVENT0("gpu", "GLES2::GetVertexAttribIuiv");
+  typedef cmds::GetVertexAttribiv::Result Result;
+  Result* result = GetResultAs<Result*>();
+  if (!result) {
+    return;
+  }
+  result->SetNumResults(0);
+  helper_->GetVertexAttribIuiv(
       index, pname, GetResultShmId(), GetResultShmOffset());
   WaitForCmd();
   result->CopyResult(params);
@@ -5198,8 +5301,18 @@ void GLES2Implementation::RetireSyncPointCHROMIUM(GLuint sync_point) {
 
 namespace {
 
-bool ValidImageFormat(GLenum internalformat) {
+bool ValidImageFormat(GLenum internalformat,
+                      const Capabilities& capabilities) {
   switch (internalformat) {
+    case GL_ATC_RGB_AMD:
+    case GL_ATC_RGBA_INTERPOLATED_ALPHA_AMD:
+      return capabilities.texture_format_atc;
+    case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
+      return capabilities.texture_format_dxt1;
+    case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+      return capabilities.texture_format_dxt5;
+    case GL_ETC1_RGB8_OES:
+      return capabilities.texture_format_etc1;
     case GL_R8:
     case GL_RGB:
     case GL_RGBA:
@@ -5236,7 +5349,7 @@ GLuint GLES2Implementation::CreateImageCHROMIUMHelper(ClientBuffer buffer,
     return 0;
   }
 
-  if (!ValidImageFormat(internalformat)) {
+  if (!ValidImageFormat(internalformat, capabilities_)) {
     SetGLError(GL_INVALID_VALUE, "glCreateImageCHROMIUM", "invalid format");
     return 0;
   }
@@ -5298,7 +5411,7 @@ GLuint GLES2Implementation::CreateGpuMemoryBufferImageCHROMIUMHelper(
     return 0;
   }
 
-  if (!ValidImageFormat(internalformat)) {
+  if (!ValidImageFormat(internalformat, capabilities_)) {
     SetGLError(GL_INVALID_VALUE,
                "glCreateGpuMemoryBufferImageCHROMIUM",
                "invalid format");

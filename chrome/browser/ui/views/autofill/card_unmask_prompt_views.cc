@@ -7,10 +7,11 @@
 #include "base/basictypes.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/ui/autofill/autofill_dialog_types.h"
-#include "chrome/browser/ui/autofill/card_unmask_prompt_controller.h"
+#include "chrome/browser/ui/autofill/create_card_unmask_prompt_view.h"
 #include "chrome/browser/ui/views/autofill/decorated_textfield.h"
 #include "chrome/browser/ui/views/autofill/tooltip_icon.h"
 #include "chrome/grit/generated_resources.h"
+#include "components/autofill/core/browser/ui/card_unmask_prompt_controller.h"
 #include "components/constrained_window/constrained_window_views.h"
 #include "components/web_modal/web_contents_modal_dialog_host.h"
 #include "components/web_modal/web_contents_modal_dialog_manager.h"
@@ -27,6 +28,7 @@
 #include "ui/views/controls/combobox/combobox.h"
 #include "ui/views/controls/image_view.h"
 #include "ui/views/controls/label.h"
+#include "ui/views/controls/link.h"
 #include "ui/views/controls/throbber.h"
 #include "ui/views/layout/box_layout.h"
 #include "ui/views/widget/widget.h"
@@ -40,23 +42,25 @@ const int kEdgePadding = 19;
 
 SkColor kGreyTextColor = SkColorSetRGB(0x64, 0x64, 0x64);
 
-// static
-CardUnmaskPromptView* CardUnmaskPromptView::CreateAndShow(
-    CardUnmaskPromptController* controller) {
-  CardUnmaskPromptViews* view = new CardUnmaskPromptViews(controller);
-  view->Show();
-  return view;
+CardUnmaskPromptView* CreateCardUnmaskPromptView(
+    CardUnmaskPromptController* controller,
+    content::WebContents* web_contents) {
+  return new CardUnmaskPromptViews(controller, web_contents);
 }
 
 CardUnmaskPromptViews::CardUnmaskPromptViews(
-    CardUnmaskPromptController* controller)
+    CardUnmaskPromptController* controller,
+    content::WebContents* web_contents)
     : controller_(controller),
+      web_contents_(web_contents),
       main_contents_(nullptr),
+      instructions_(nullptr),
       permanent_error_label_(nullptr),
       input_row_(nullptr),
       cvc_input_(nullptr),
       month_input_(nullptr),
       year_input_(nullptr),
+      new_card_link_(nullptr),
       error_icon_(nullptr),
       error_label_(nullptr),
       storage_row_(nullptr),
@@ -74,8 +78,7 @@ CardUnmaskPromptViews::~CardUnmaskPromptViews() {
 }
 
 void CardUnmaskPromptViews::Show() {
-  constrained_window::ShowWebModalDialogViews(this,
-                                              controller_->GetWebContents());
+  constrained_window::ShowWebModalDialogViews(this, web_contents_);
 }
 
 void CardUnmaskPromptViews::ControllerGone() {
@@ -116,10 +119,15 @@ void CardUnmaskPromptViews::GotVerificationResult(
     if (allow_retry) {
       SetInputsEnabled(true);
 
-      // If there is more than one input showing, don't mark anything as
-      // invalid since we don't know the location of the problem.
-      if (!controller_->ShouldRequestExpirationDate())
+      if (!controller_->ShouldRequestExpirationDate()) {
+        // If there is more than one input showing, don't mark anything as
+        // invalid since we don't know the location of the problem.
         cvc_input_->SetInvalid(true);
+
+        // Show a "New card?" link, which when clicked will cause us to ask
+        // for expiration date.
+        ShowNewCardLink();
+      }
 
       // TODO(estade): When do we hide |error_label_|?
       SetRetriableErrorMessage(error_message);
@@ -132,6 +140,22 @@ void CardUnmaskPromptViews::GotVerificationResult(
   }
 
   Layout();
+}
+
+void CardUnmaskPromptViews::LinkClicked(views::Link* source, int event_flags) {
+  DCHECK_EQ(source, new_card_link_);
+  controller_->NewCardLinkClicked();
+  for (int i = 0; i < input_row_->child_count(); ++i)
+    input_row_->child_at(i)->SetVisible(true);
+
+  new_card_link_->SetVisible(false);
+  input_row_->InvalidateLayout();
+  cvc_input_->SetInvalid(false);
+  cvc_input_->SetText(base::string16());
+  GetDialogClientView()->UpdateDialogButtons();
+  GetWidget()->UpdateWindowTitle();
+  instructions_->SetText(controller_->GetInstructionsMessage());
+  SetRetriableErrorMessage(base::string16());
 }
 
 void CardUnmaskPromptViews::SetRetriableErrorMessage(
@@ -147,12 +171,12 @@ void CardUnmaskPromptViews::SetRetriableErrorMessage(
   }
 
   // Update the dialog's size.
-  if (GetWidget() && controller_->GetWebContents()) {
+  if (GetWidget() && web_contents_) {
     constrained_window::UpdateWebContentsModalDialogPosition(
-        GetWidget(), web_modal::WebContentsModalDialogManager::FromWebContents(
-                         controller_->GetWebContents())
-                         ->delegate()
-                         ->GetWebContentsModalDialogHost());
+        GetWidget(),
+        web_modal::WebContentsModalDialogManager::FromWebContents(web_contents_)
+            ->delegate()
+            ->GetWebContentsModalDialogHost());
   }
 
   Layout();
@@ -162,10 +186,20 @@ void CardUnmaskPromptViews::SetInputsEnabled(bool enabled) {
   cvc_input_->SetEnabled(enabled);
   if (storage_checkbox_)
     storage_checkbox_->SetEnabled(enabled);
-  if (month_input_)
-    month_input_->SetEnabled(enabled);
-  if (year_input_)
-    year_input_->SetEnabled(enabled);
+  month_input_->SetEnabled(enabled);
+  year_input_->SetEnabled(enabled);
+}
+
+void CardUnmaskPromptViews::ShowNewCardLink() {
+  if (new_card_link_)
+    return;
+
+  new_card_link_ = new views::Link(
+      l10n_util::GetStringUTF16(IDS_AUTOFILL_CARD_UNMASK_NEW_CARD_LINK));
+  new_card_link_->SetBorder(views::Border::CreateEmptyBorder(0, 7, 0, 0));
+  new_card_link_->SetUnderline(false);
+  new_card_link_->set_listener(this);
+  input_row_->AddChildView(new_card_link_);
 }
 
 views::View* CardUnmaskPromptViews::GetContentsView() {
@@ -290,10 +324,12 @@ bool CardUnmaskPromptViews::Accept() {
 
   controller_->OnUnmaskResponse(
       cvc_input_->text(),
-      month_input_ ? month_input_->GetTextForRow(month_input_->selected_index())
-                   : base::string16(),
-      year_input_ ? year_input_->GetTextForRow(year_input_->selected_index())
-                  : base::string16(),
+      month_input_->visible()
+          ? month_input_->GetTextForRow(month_input_->selected_index())
+          : base::string16(),
+      year_input_->visible()
+          ? year_input_->GetTextForRow(year_input_->selected_index())
+          : base::string16(),
       storage_checkbox_ ? storage_checkbox_->checked() : false);
   return false;
 }
@@ -364,31 +400,33 @@ void CardUnmaskPromptViews::InitIfNecessary() {
       new views::BoxLayout(views::BoxLayout::kVertical, kEdgePadding, 0, 0));
   main_contents_->AddChildView(controls_container);
 
-  views::Label* instructions =
-      new views::Label(controller_->GetInstructionsMessage());
-  instructions->SetEnabledColor(kGreyTextColor);
-  instructions->SetMultiLine(true);
-  instructions->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  instructions->SetBorder(views::Border::CreateEmptyBorder(0, 0, 16, 0));
-  controls_container->AddChildView(instructions);
+  instructions_ = new views::Label(controller_->GetInstructionsMessage());
+  instructions_->SetEnabledColor(kGreyTextColor);
+  instructions_->SetMultiLine(true);
+  instructions_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  instructions_->SetBorder(views::Border::CreateEmptyBorder(0, 0, 16, 0));
+  controls_container->AddChildView(instructions_);
 
   input_row_ = new views::View();
   input_row_->SetLayoutManager(
       new views::BoxLayout(views::BoxLayout::kHorizontal, 0, 0, 5));
   controls_container->AddChildView(input_row_);
 
-  if (controller_->ShouldRequestExpirationDate()) {
-    month_input_ = new views::Combobox(&month_combobox_model_);
-    month_input_->set_listener(this);
-    input_row_->AddChildView(month_input_);
-    views::Label* separator = new views::Label(l10n_util::GetStringUTF16(
-        IDS_AUTOFILL_CARD_UNMASK_EXPIRATION_DATE_SEPARATOR));
-    separator->SetEnabledColor(kGreyTextColor);
-    input_row_->AddChildView(separator);
-    year_input_ = new views::Combobox(&year_combobox_model_);
-    year_input_->set_listener(this);
-    input_row_->AddChildView(year_input_);
-    input_row_->AddChildView(new views::Label(base::ASCIIToUTF16("  ")));
+  month_input_ = new views::Combobox(&month_combobox_model_);
+  month_input_->set_listener(this);
+  input_row_->AddChildView(month_input_);
+  views::Label* separator = new views::Label(l10n_util::GetStringUTF16(
+      IDS_AUTOFILL_CARD_UNMASK_EXPIRATION_DATE_SEPARATOR));
+  separator->SetEnabledColor(kGreyTextColor);
+  input_row_->AddChildView(separator);
+  year_input_ = new views::Combobox(&year_combobox_model_);
+  year_input_->set_listener(this);
+  input_row_->AddChildView(year_input_);
+  input_row_->AddChildView(new views::Label(base::ASCIIToUTF16("  ")));
+  // Hide all of the above as appropriate.
+  if (!controller_->ShouldRequestExpirationDate()) {
+    for (int i = 0; i < input_row_->child_count(); ++i)
+      input_row_->child_at(i)->SetVisible(false);
   }
 
   cvc_input_ = new DecoratedTextfield(

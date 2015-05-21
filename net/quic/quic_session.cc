@@ -103,7 +103,6 @@ QuicSession::QuicSession(QuicConnection* connection, const QuicConfig& config)
       config_(config),
       max_open_streams_(config_.MaxStreamsPerConnection()),
       next_stream_id_(perspective() == Perspective::IS_SERVER ? 2 : 5),
-      write_blocked_streams_(true),
       largest_peer_created_stream_id_(0),
       error_(QUIC_NO_ERROR),
       flow_controller_(connection_.get(),
@@ -134,7 +133,7 @@ QuicSession::~QuicSession() {
 }
 
 void QuicSession::OnStreamFrames(const vector<QuicStreamFrame>& frames) {
-  for (size_t i = 0; i < frames.size(); ++i) {
+  for (size_t i = 0; i < frames.size() && connection_->connected(); ++i) {
     // TODO(rch) deal with the error case of stream id 0.
     const QuicStreamFrame& frame = frames[i];
     QuicStreamId stream_id = frame.stream_id;
@@ -153,6 +152,9 @@ void QuicSession::OnStreamFrames(const vector<QuicStreamFrame>& frames) {
       continue;
     }
     stream->OnStreamFrame(frames[i]);
+    if (!connection_->connected()) {
+      return;
+    }
   }
 }
 

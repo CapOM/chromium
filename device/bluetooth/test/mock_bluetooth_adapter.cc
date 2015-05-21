@@ -4,6 +4,8 @@
 
 #include "device/bluetooth/test/mock_bluetooth_adapter.h"
 
+#include "device/bluetooth/test/mock_bluetooth_advertisement.h"
+
 namespace device {
 
 MockBluetoothAdapter::Observer::Observer() {}
@@ -46,10 +48,32 @@ void MockBluetoothAdapter::StartDiscoverySessionWithFilter(
                                      error_callback);
 }
 
+void MockBluetoothAdapter::AddMockDevice(
+    scoped_ptr<MockBluetoothDevice> mock_device) {
+  mock_devices_.push_back(mock_device.Pass());
+}
+
+BluetoothAdapter::ConstDeviceList MockBluetoothAdapter::GetConstMockDevices() {
+  BluetoothAdapter::ConstDeviceList devices;
+  for (auto& it : mock_devices_) {
+    devices.push_back(it);
+  }
+  return devices;
+}
+
+BluetoothAdapter::DeviceList MockBluetoothAdapter::GetMockDevices() {
+  BluetoothAdapter::DeviceList devices;
+  for (auto& it : mock_devices_) {
+    devices.push_back(it);
+  }
+  return devices;
+}
+
 void MockBluetoothAdapter::RegisterAdvertisement(
     scoped_ptr<BluetoothAdvertisement::Data> advertisement_data,
     const CreateAdvertisementCallback& callback,
     const CreateAdvertisementErrorCallback& error_callback) {
+  callback.Run(new MockBluetoothAdvertisement);
 }
 
 }  // namespace device

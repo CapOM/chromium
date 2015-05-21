@@ -13,6 +13,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
+#include "build/build_config.h"
 #include "cc/base/switches.h"
 #include "components/mime_util/mime_util.h"
 #include "content/browser/bad_message.h"
@@ -40,8 +41,8 @@
 #include "content/public/common/content_client.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
+#include "media/base/mime_util.h"
 #include "net/base/escape.h"
-#include "net/base/mime_util.h"
 #include "net/base/net_util.h"
 #include "skia/ext/platform_canvas.h"
 #include "url/url_constants.h"
@@ -496,7 +497,7 @@ bool NavigationControllerImpl::CanViewSource() const {
   const std::string& mime_type = delegate_->GetContentsMimeType();
   bool is_viewable_mime_type =
       mime_util::IsSupportedNonImageMimeType(mime_type) &&
-      !net::IsSupportedMediaMimeType(mime_type);
+      !media::IsSupportedMediaMimeType(mime_type);
   NavigationEntry* visible_entry = GetVisibleEntry();
   return visible_entry && !visible_entry->IsViewSourceMode() &&
       is_viewable_mime_type && !delegate_->GetInterstitialPage();
@@ -1461,8 +1462,11 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
     // We can't check the path since that may change (https://crbug.com/373041).
     if (GetLastCommittedEntry()->GetURL().GetOrigin() !=
         GetEntryAtIndex(entry_index)->GetURL().GetOrigin()) {
-      bad_message::ReceivedBadMessage(rfh->GetProcess(),
-                                      bad_message::NC_AUTO_SUBFRAME);
+      // TODO(creis): This is unexpectedly being encountered in practice.  If
+      // you encounter this in practice, please post details to
+      // https://crbug.com/486916.  Once that's resolved, we'll change this to
+      // kill the renderer process with bad_message::NC_AUTO_SUBFRAME.
+      NOTREACHED() << "Unexpected main frame origin change on AUTO_SUBFRAME.";
     }
     last_committed_entry_index_ = entry_index;
     DiscardNonCommittedEntriesInternal();
@@ -1473,11 +1477,9 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
           switches::kSitePerProcess)) {
     // This may be a "new auto" case where we add a new FrameNavigationEntry, or
     // it may be a "history auto" case where we update an existing one.
-    int frame_tree_node_id = rfh->frame_tree_node()->frame_tree_node_id();
     NavigationEntryImpl* last_committed = GetLastCommittedEntry();
-    last_committed->AddOrUpdateFrameEntry(frame_tree_node_id,
-                                          rfh->GetSiteInstance(),
-                                          params.url,
+    last_committed->AddOrUpdateFrameEntry(rfh->frame_tree_node(),
+                                          rfh->GetSiteInstance(), params.url,
                                           params.referrer);
   }
 
@@ -1908,11 +1910,12 @@ void NavigationControllerImpl::LoadIfNecessary() {
   NavigateToPendingEntry(NO_RELOAD);
 }
 
-void NavigationControllerImpl::NotifyEntryChanged(const NavigationEntry* entry,
-                                                  int index) {
+void NavigationControllerImpl::NotifyEntryChanged(
+    const NavigationEntry* entry) {
   EntryChangedDetails det;
   det.changed_entry = entry;
-  det.index = index;
+  det.index = GetIndexOfEntry(
+      NavigationEntryImpl::FromNavigationEntry(entry));
   NotificationService::current()->Notify(
       NOTIFICATION_NAV_ENTRY_CHANGED,
       Source<NavigationController>(this),

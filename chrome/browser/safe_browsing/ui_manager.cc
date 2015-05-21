@@ -117,13 +117,9 @@ void SafeBrowsingUIManager::DisplayBlockingPage(
     }
   }
 
-  // For M40, the UwS warning may be gated to not show any UI.
-  const bool ping_only = resource.threat_type == SB_THREAT_TYPE_URL_UNWANTED
-    && safe_browsing_util::GetUnwantedTrialGroup() < safe_browsing_util::UWS_ON;
-
   // Indicate to interested observers that the resource in question matched the
-  // SB filters, unless the UwS interstitial is in ping-only mode.
-  if (resource.threat_type != SB_THREAT_TYPE_SAFE && !ping_only) {
+  // SB filters.
+  if (resource.threat_type != SB_THREAT_TYPE_SAFE) {
     FOR_EACH_OBSERVER(Observer, observer_list_, OnSafeBrowsingMatch(resource));
   }
 
@@ -179,15 +175,6 @@ void SafeBrowsingUIManager::DisplayBlockingPage(
                           std::string() /* post_data */);
   }
 
-  // If UwS interstitials are turned off, return here before showing UI.
-  if (ping_only) {
-    if (!resource.callback.is_null()) {
-      BrowserThread::PostTask(
-          BrowserThread::IO, FROM_HERE, base::Bind(resource.callback, true));
-    }
-    return;
-  }
-
   if (resource.threat_type != SB_THREAT_TYPE_SAFE) {
     FOR_EACH_OBSERVER(Observer, observer_list_, OnSafeBrowsingHit(resource));
   }
@@ -215,15 +202,14 @@ void SafeBrowsingUIManager::ReportSafeBrowsingHit(
 }
 
 void SafeBrowsingUIManager::ReportInvalidCertificateChain(
-    const std::string& hostname,
-    const net::SSLInfo& ssl_info,
+    const std::string& serialized_report,
     const base::Closure& callback) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   BrowserThread::PostTaskAndReply(
       BrowserThread::IO, FROM_HERE,
       base::Bind(
           &SafeBrowsingUIManager::ReportInvalidCertificateChainOnIOThread, this,
-          hostname, ssl_info),
+          serialized_report),
       callback);
 }
 
@@ -261,8 +247,7 @@ void SafeBrowsingUIManager::ReportSafeBrowsingHitOnIOThread(
 }
 
 void SafeBrowsingUIManager::ReportInvalidCertificateChainOnIOThread(
-    const std::string& hostname,
-    const net::SSLInfo& ssl_info) {
+    const std::string& serialized_report) {
   DCHECK_CURRENTLY_ON(BrowserThread::IO);
 
   // The service may delete the ping manager (i.e. when user disabling service,
@@ -270,8 +255,7 @@ void SafeBrowsingUIManager::ReportInvalidCertificateChainOnIOThread(
   if (!sb_service_ || !sb_service_->ping_manager())
     return;
 
-  sb_service_->ping_manager()->ReportInvalidCertificateChain(hostname,
-                                                             ssl_info);
+  sb_service_->ping_manager()->ReportInvalidCertificateChain(serialized_report);
 }
 
 // If the user had opted-in to send MalwareDetails, this gets called

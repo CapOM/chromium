@@ -58,7 +58,8 @@ TransformNodeData::TransformNodeData()
       node_and_ancestors_are_flat(true),
       scrolls(false),
       needs_sublayer_scale(false),
-      layer_scale_factor(1.0f) {
+      layer_scale_factor(1.0f),
+      post_local_scale_factor(1.0f) {
 }
 
 TransformNodeData::~TransformNodeData() {
@@ -382,7 +383,7 @@ void TransformTree::UpdateSnapping(TransformNode* node) {
   node->data.scroll_snap = translation;
 }
 
-PropertyTrees::PropertyTrees() : needs_rebuild(true) {
+PropertyTrees::PropertyTrees() : needs_rebuild(true), sequence_number(0) {
 }
 
 }  // namespace cc

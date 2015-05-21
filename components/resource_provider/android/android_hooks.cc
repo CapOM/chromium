@@ -24,7 +24,8 @@ bool Init() {
 JNI_EXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   std::vector<base::android::RegisterCallback> register_callbacks;
   register_callbacks.push_back(base::Bind(&RegisterJNI));
-  register_callbacks.push_back(base::Bind(&RegisterNativesImpl));
+  register_callbacks.push_back(
+      base::Bind(&resource_provider::RegisterNativesImpl));
 
   std::vector<base::android::InitCallback> init_callbacks;
   init_callbacks.push_back(base::Bind(&Init));
@@ -35,7 +36,7 @@ JNI_EXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved) {
   }
 
   // There cannot be two AtExitManagers at the same time. Remove the one from
-  // LibraryLoader as ApplicationRunnerChromium also uses one.
+  // LibraryLoader as ApplicationRunner also uses one.
   base::android::LibraryLoaderExitHook();
 
   return JNI_VERSION_1_4;
@@ -45,5 +46,6 @@ extern "C" JNI_EXPORT void InitApplicationContext(
     const base::android::JavaRef<jobject>& context) {
   JNIEnv* env = base::android::AttachCurrentThread();
   base::android::InitApplicationContext(env, context);
-  Java_Main_init(env, base::android::GetApplicationContext());
+  resource_provider::Java_Main_init(
+      env, base::android::GetApplicationContext());
 }

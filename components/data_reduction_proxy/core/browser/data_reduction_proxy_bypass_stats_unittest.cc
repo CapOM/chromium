@@ -70,16 +70,7 @@ class DataReductionProxyBypassStatsTest : public testing::Test {
     context_.set_job_factory(&test_job_factory_);
 
     test_context_ =
-        DataReductionProxyTestContext::Builder()
-            .WithParamsFlags(DataReductionProxyParams::kAllowed |
-                             DataReductionProxyParams::kFallbackAllowed |
-                             DataReductionProxyParams::kPromoAllowed)
-            .WithParamsDefinitions(
-                TestDataReductionProxyParams::HAS_EVERYTHING &
-                    ~TestDataReductionProxyParams::HAS_DEV_ORIGIN &
-                    ~TestDataReductionProxyParams::HAS_DEV_FALLBACK_ORIGIN)
-            .WithMockConfig()
-            .Build();
+        DataReductionProxyTestContext::Builder().WithMockConfig().Build();
     mock_url_request_ = context_.CreateRequest(GURL(), net::IDLE, &delegate_);
   }
 
@@ -565,10 +556,6 @@ class DataReductionProxyBypassStatsEndToEndTest : public testing::Test {
     drp_test_context_ =
         DataReductionProxyTestContext::Builder()
             .WithParamsFlags(DataReductionProxyParams::kAllowed)
-            .WithParamsDefinitions(
-                 TestDataReductionProxyParams::HAS_EVERYTHING &
-                 ~TestDataReductionProxyParams::HAS_DEV_ORIGIN &
-                 ~TestDataReductionProxyParams::HAS_DEV_FALLBACK_ORIGIN)
             .WithURLRequestContext(&context_)
             .WithMockClientSocketFactory(&mock_socket_factory_)
             .Build();
@@ -919,9 +906,10 @@ TEST_F(DataReductionProxyBypassStatsEndToEndTest,
 
 TEST_F(DataReductionProxyBypassStatsEndToEndTest, BypassedBytesNetErrorOther) {
   // Make the data reduction proxy host fail to resolve.
+  net::ProxyServer origin =
+      config()->test_params()->proxies_for_http(false).front();
   scoped_ptr<net::MockHostResolver> host_resolver(new net::MockHostResolver());
-  host_resolver->rules()->AddSimulatedFailure(
-      config()->test_params()->origin().host_port_pair().host());
+  host_resolver->rules()->AddSimulatedFailure(origin.host_port_pair().host());
   set_host_resolver(host_resolver.get());
   InitializeContext();
 

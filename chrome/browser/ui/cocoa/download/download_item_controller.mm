@@ -1,4 +1,4 @@
-// Copyright (c) 2012 The Chromium Authors. All rights reserved.
+// Copyright 2012 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -29,9 +29,9 @@
 #include "third_party/google_toolbox_for_mac/src/AppKit/GTMUILocalizerAndLayoutTweaker.h"
 #include "ui/base/l10n/l10n_util_mac.h"
 #include "ui/base/resource/resource_bundle.h"
-#include "ui/gfx/text_elider.h"
 #include "ui/gfx/font.h"
 #include "ui/gfx/image/image.h"
+#include "ui/gfx/text_elider.h"
 
 using content::DownloadItem;
 using extensions::ExperienceSamplingEvent;
@@ -370,13 +370,7 @@ class DownloadShelfContextMenuMac : public DownloadShelfContextMenu {
 }
 
 - (IBAction)showContextMenu:(id)sender {
-  base::scoped_nsobject<DownloadShelfContextMenuController> menuController(
-      [[DownloadShelfContextMenuController alloc]
-        initWithItemController:self
-                  withDelegate:nil]);
-  [NSMenu popUpContextMenu:[menuController menu]
-                 withEvent:[NSApp currentEvent]
-                   forView:[self view]];
+  [progressView_ showContextMenu];
 }
 
 @end

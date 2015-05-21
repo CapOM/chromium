@@ -24,7 +24,6 @@
 #include "ui/ozone/platform/drm/gpu/gbm_buffer.h"
 #include "ui/ozone/platform/drm/gpu/gbm_device.h"
 #include "ui/ozone/platform/drm/gpu/gbm_surface.h"
-#include "ui/ozone/platform/drm/gpu/gpu_lock.h"
 #include "ui/ozone/platform/drm/gpu/scanout_buffer.h"
 #include "ui/ozone/platform/drm/gpu/screen_manager.h"
 #include "ui/ozone/platform/drm/host/drm_cursor.h"
@@ -89,20 +88,22 @@ class GbmBufferGenerator : public ScanoutBufferGenerator {
 
 class GbmDeviceGenerator : public DrmDeviceGenerator {
  public:
-  GbmDeviceGenerator() {}
+  GbmDeviceGenerator(bool use_atomic) : use_atomic_(use_atomic) {}
   ~GbmDeviceGenerator() override {}
 
   // DrmDeviceGenerator:
   scoped_refptr<DrmDevice> CreateDevice(const base::FilePath& path,
                                         base::File file) override {
     scoped_refptr<DrmDevice> drm = new GbmDevice(path, file.Pass());
-    if (drm->Initialize())
+    if (drm->Initialize(use_atomic_))
       return drm;
 
     return nullptr;
   }
 
  private:
+  bool use_atomic_;
+
   DISALLOW_COPY_AND_ASSIGN(GbmDeviceGenerator);
 };
 
@@ -170,12 +171,10 @@ class OzonePlatformGbm : public OzonePlatform {
   }
 
   void InitializeGPU() override {
-#if defined(OS_CHROMEOS)
-    gpu_lock_.reset(new GpuLock());
-#endif
+    bool use_atomic = false;
     gl_api_loader_.reset(new GlApiLoader());
     drm_device_manager_.reset(new DrmDeviceManager(
-        scoped_ptr<DrmDeviceGenerator>(new GbmDeviceGenerator())));
+        scoped_ptr<DrmDeviceGenerator>(new GbmDeviceGenerator(use_atomic))));
     buffer_generator_.reset(new GbmBufferGenerator());
     screen_manager_.reset(new ScreenManager(buffer_generator_.get()));
     if (!surface_factory_ozone_)
@@ -195,7 +194,6 @@ class OzonePlatformGbm : public OzonePlatform {
   scoped_ptr<GbmSurfaceFactory> surface_factory_ozone_;
 
   // Objects in the GPU process.
-  scoped_ptr<GpuLock> gpu_lock_;
   scoped_ptr<GlApiLoader> gl_api_loader_;
   scoped_ptr<DrmDeviceManager> drm_device_manager_;
   scoped_ptr<GbmBufferGenerator> buffer_generator_;

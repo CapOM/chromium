@@ -742,7 +742,7 @@ bool ExtensionService::UninstallExtension(
         extension.get(), is_ready());
   }
 
-  system_->install_verifier()->Remove(extension->id());
+  InstallVerifier::Get(GetBrowserContext())->Remove(extension->id());
 
   UMA_HISTOGRAM_ENUMERATION("Extensions.UninstallType",
                             extension->GetType(), 100);
@@ -867,14 +867,13 @@ void ExtensionService::EnableExtension(const std::string& extension_id) {
     extension_sync_service_->SyncEnableExtension(*extension);
 }
 
-void ExtensionService::DisableExtension(
-    const std::string& extension_id,
-    Extension::DisableReason disable_reason) {
+void ExtensionService::DisableExtension(const std::string& extension_id,
+                                        int disable_reasons) {
   CHECK(BrowserThread::CurrentlyOn(BrowserThread::UI));
 
   // The extension may have been disabled already. Just add a disable reason.
   if (!IsExtensionEnabled(extension_id)) {
-    extension_prefs_->AddDisableReason(extension_id, disable_reason);
+    extension_prefs_->AddDisableReasons(extension_id, disable_reasons);
     return;
   }
 
@@ -885,15 +884,15 @@ void ExtensionService::DisableExtension(
   // can be uninstalled by the browser if the user sets extension-specific
   // preferences.
   if (extension &&
-      disable_reason != Extension::DISABLE_RELOAD &&
-      disable_reason != Extension::DISABLE_UPDATE_REQUIRED_BY_POLICY &&
+      !(disable_reasons & Extension::DISABLE_RELOAD) &&
+      !(disable_reasons & Extension::DISABLE_UPDATE_REQUIRED_BY_POLICY) &&
       !system_->management_policy()->UserMayModifySettings(extension, NULL) &&
       extension->location() != Manifest::EXTERNAL_COMPONENT) {
     return;
   }
 
   extension_prefs_->SetExtensionState(extension_id, Extension::DISABLED);
-  extension_prefs_->AddDisableReason(extension_id, disable_reason);
+  extension_prefs_->AddDisableReasons(extension_id, disable_reasons);
 
   int include_mask =
       ExtensionRegistry::EVERYTHING & ~ExtensionRegistry::DISABLED;
@@ -1913,7 +1912,7 @@ void ExtensionService::AddNewOrUpdatedExtension(
       extension, initial_state, page_ordinal, install_flags, install_parameter);
   delayed_installs_.Remove(extension->id());
   if (InstallVerifier::NeedsVerification(*extension))
-    system_->install_verifier()->VerifyExtension(extension->id());
+    InstallVerifier::Get(GetBrowserContext())->VerifyExtension(extension->id());
 
   const Extension* old = GetInstalledExtension(extension->id());
   if (extensions::AppDataMigrator::NeedsMigration(old, extension)) {

@@ -367,7 +367,7 @@ scoped_ptr<base::DictionaryValue> AutofillWalletSpecificsToValue(
     value->Set("masked_card",
                WalletMaskedCreditCardToValue(proto.masked_card()));
   } else if (proto.type() == sync_pb::AutofillWalletSpecifics::POSTAL_ADDRESS) {
-    value->Set("masked_card",
+    value->Set("address",
                WalletPostalAddressToValue(proto.address()));
   }
   return value;
@@ -456,10 +456,11 @@ scoped_ptr<base::DictionaryValue> ExtensionSpecificsToValue(
   SET_STR(update_url);
   SET_BOOL(enabled);
   SET_BOOL(incognito_enabled);
+  SET_STR(name);
   SET_BOOL(remote_install);
   SET_BOOL(installed_by_custodian);
   SET_BOOL(all_urls_enabled);
-  SET_STR(name);
+  SET_INT32(disable_reasons);
   return value;
 }
 

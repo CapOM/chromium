@@ -142,13 +142,6 @@ class PageTest(object):
     """Sets the BrowserFinderOptions instance to use."""
     self.options = options
 
-  def DidRunTest(self, browser, results): # pylint: disable=W0613
-    """Override to do operations after all page set(s) are completed.
-
-    This will occur before the browser is torn down.
-    """
-    self.options = None
-
   def WillNavigateToPage(self, page, tab):
     """Override to do operations before the page is navigated, notably Telemetry
     will already have performed the following operations on the browser before
@@ -199,13 +192,7 @@ class PageTest(object):
     """
     raise NotImplementedError
 
-  def RunPage(self, page, tab, results):
-    # Run actions.
-    action_runner = action_runner_module.ActionRunner(
-        tab, skip_waits=page.skip_waits)
-    page.RunPageInteractions(action_runner)
-    self.ValidateAndMeasurePage(page, tab, results)
-
+  # Deprecated: do not use this hook. (crbug.com/470147)
   def RunNavigateSteps(self, page, tab):
     """Navigates the tab to the page URL attribute.
 

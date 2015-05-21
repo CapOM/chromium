@@ -82,8 +82,8 @@ void ReportMetrics(bool password_manager_enabled,
   // May be null in tests.
   if (store) {
     store->ReportMetrics(client->GetSyncUsername(),
-                         client->IsPasswordSyncEnabled(
-                             password_manager::ONLY_CUSTOM_PASSPHRASE));
+                         client->GetPasswordSyncState() ==
+                             password_manager::SYNCING_WITH_CUSTOM_PASSPHRASE);
   }
   UMA_HISTOGRAM_BOOLEAN("PasswordManager.Enabled", password_manager_enabled);
 }
@@ -305,20 +305,11 @@ ChromePasswordManagerClient::GetPasswordStore() const {
              profile_, ServiceAccessType::EXPLICIT_ACCESS).get();
 }
 
-bool ChromePasswordManagerClient::IsPasswordSyncEnabled(
-    password_manager::CustomPassphraseState state) const {
-  ProfileSyncService* sync_service =
+password_manager::PasswordSyncState
+ChromePasswordManagerClient::GetPasswordSyncState() const {
+  const ProfileSyncService* sync_service =
       ProfileSyncServiceFactory::GetForProfile(profile_);
-  if (sync_service && sync_service->HasSyncSetupCompleted() &&
-      sync_service->SyncActive() &&
-      sync_service->GetActiveDataTypes().Has(syncer::PASSWORDS)) {
-    if (sync_service->IsUsingSecondaryPassphrase()) {
-      return state == password_manager::ONLY_CUSTOM_PASSPHRASE;
-    } else {
-      return state == password_manager::WITHOUT_CUSTOM_PASSPHRASE;
-    }
-  }
-  return false;
+  return password_manager_util::GetPasswordSyncState(sync_service);
 }
 
 void ChromePasswordManagerClient::OnLogRouterAvailabilityChanged(

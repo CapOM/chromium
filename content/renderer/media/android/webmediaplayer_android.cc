@@ -687,7 +687,7 @@ bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
   // flip_y==false means to keep the intrinsic orientation.
   web_graphics_context->pixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, flip_y);
   web_graphics_context->copyTextureCHROMIUM(GL_TEXTURE_2D, src_texture, texture,
-                                            0, internal_format, type);
+                                            internal_format, type);
   web_graphics_context->pixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, false);
   web_graphics_context->pixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM,
                                     false);
@@ -1211,7 +1211,7 @@ void WebMediaPlayerAndroid::DrawRemotePlaybackText(
                                           remote_playback_texture_id)),
       canvas_size /* coded_size */, gfx::Rect(canvas_size) /* visible_rect */,
       canvas_size /* natural_size */, base::TimeDelta() /* timestamp */,
-      false /* allow overlay */);
+      false /* allow overlay */, true /* has_alpha */);
   SetCurrentFrameInternal(new_frame);
 }
 
@@ -1247,7 +1247,7 @@ void WebMediaPlayerAndroid::ReallocateVideoFrame() {
         media::BindToCurrentLoop(base::Bind(
             &OnReleaseTexture, stream_texture_factory_, texture_id_ref)),
         natural_size_, gfx::Rect(natural_size_), natural_size_,
-        base::TimeDelta(), false);
+        base::TimeDelta(), false /* allow_overlay */, true /* has_alpha */);
     SetCurrentFrameInternal(new_frame);
   }
 }
@@ -1278,6 +1278,11 @@ bool WebMediaPlayerAndroid::UpdateCurrentFrame(base::TimeTicks deadline_min,
                                                base::TimeTicks deadline_max) {
   NOTIMPLEMENTED();
   return false;
+}
+
+bool WebMediaPlayerAndroid::HasCurrentFrame() {
+  base::AutoLock auto_lock(current_frame_lock_);
+  return current_frame_;
 }
 
 scoped_refptr<media::VideoFrame> WebMediaPlayerAndroid::GetCurrentFrame() {
@@ -1537,8 +1542,10 @@ WebMediaPlayerAndroid::GenerateKeyRequestInternal(
   if (!proxy_decryptor_) {
     DCHECK(current_key_system_.empty());
     proxy_decryptor_.reset(new media::ProxyDecryptor(
-        media_permission_, base::Bind(&WebMediaPlayerAndroid::OnKeyAdded,
-                                      weak_factory_.GetWeakPtr()),
+        media_permission_,
+        player_manager_->ShouldUseVideoOverlayForEmbeddedEncryptedVideo(),
+        base::Bind(&WebMediaPlayerAndroid::OnKeyAdded,
+                   weak_factory_.GetWeakPtr()),
         base::Bind(&WebMediaPlayerAndroid::OnKeyError,
                    weak_factory_.GetWeakPtr()),
         base::Bind(&WebMediaPlayerAndroid::OnKeyMessage,

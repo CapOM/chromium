@@ -33,13 +33,10 @@ class MockExtensionSystem : public ExtensionSystem {
   RuntimeData* runtime_data() override;
   ManagementPolicy* management_policy() override;
   SharedUserScriptMaster* shared_user_script_master() override;
-  DeclarativeUserScriptManager* declarative_user_script_manager() override;
   StateStore* state_store() override;
   StateStore* rules_store() override;
   InfoMap* info_map() override;
-  LazyBackgroundTaskQueue* lazy_background_task_queue() override;
   EventRouter* event_router() override;
-  InstallVerifier* install_verifier() override;
   QuotaService* quota_service() override;
   const OneShotEvent& ready() const override;
   ContentVerifier* content_verifier() override;

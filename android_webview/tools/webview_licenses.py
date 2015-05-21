@@ -16,7 +16,6 @@ which whitelists indicidual files which contain third-party code but which
 aren't in a third-party directory with a README.chromium file.
 """
 
-import glob
 import imp
 import json
 import multiprocessing
@@ -56,58 +55,6 @@ class InputApi(object):
 class InputApiChange(object):
   def __init__(self):
     self.RepositoryRoot = lambda: REPOSITORY_ROOT
-
-
-def GetIncompatibleDirectories():
-  """Gets a list of third-party directories which use licenses incompatible
-  with Android. This is used by the snapshot tool.
-  Returns:
-    A list of directories.
-  """
-
-  result = []
-  for directory in _FindThirdPartyDirs():
-    if directory in known_issues.KNOWN_ISSUES:
-      result.append(directory)
-      continue
-    try:
-      metadata = licenses.ParseDir(directory, REPOSITORY_ROOT,
-                                   require_license_file=False,
-                                   optional_keys=['License Android Compatible'])
-    except licenses.LicenseError as e:
-      print 'Got LicenseError while scanning ' + directory
-      raise
-    if metadata.get('License Android Compatible', 'no').upper() == 'YES':
-      continue
-    license = re.split(' [Ll]icenses?$', metadata['License'])[0]
-    if not third_party.LicenseIsCompatibleWithAndroid(InputApi(), license):
-      result.append(directory)
-  return result
-
-def GetUnknownIncompatibleDirectories():
-  """Gets a list of third-party directories which use licenses incompatible
-  with Android which are not present in the known_issues.py file.
-  This is used by the AOSP bot.
-  Returns:
-    A list of directories.
-  """
-  incompatible_directories = frozenset(GetIncompatibleDirectories())
-  known_incompatible = []
-  input_api = InputApi()
-  for path, exclude_list in known_issues.KNOWN_INCOMPATIBLE.iteritems():
-    path = copyright_scanner.ForwardSlashesToOsPathSeps(input_api, path)
-    for exclude in exclude_list:
-      exclude = copyright_scanner.ForwardSlashesToOsPathSeps(input_api, exclude)
-      if glob.has_magic(exclude):
-        exclude_dirname = os.path.dirname(exclude)
-        if glob.has_magic(exclude_dirname):
-          print ('Exclude path %s contains an unexpected glob expression,' \
-                 ' skipping.' % exclude)
-        exclude = exclude_dirname
-      known_incompatible.append(os.path.normpath(os.path.join(path, exclude)))
-  known_incompatible = frozenset(known_incompatible)
-  return incompatible_directories.difference(known_incompatible)
-
 
 class ScanResult(object):
   Ok, Warnings, Errors = range(3)
@@ -184,17 +131,6 @@ def _ReadFile(full_path, mode='rU'):
     return f.read()
 
 
-def _ReadLocalFile(path, mode='rb'):
-  """Reads a file from disk.
-  Args:
-    path: The path of the file to read, relative to the root of the repository.
-  Returns:
-    The contents of the file as a string.
-  """
-
-  return _ReadFile(os.path.join(REPOSITORY_ROOT, path), mode)
-
-
 def _FindThirdPartyDirs():
   """Gets the list of third-party directories.
   Returns:
@@ -204,32 +140,19 @@ def _FindThirdPartyDirs():
   # Please don't add here paths that have problems with license files,
   # as they will end up included in Android WebView snapshot.
   # Instead, add them into known_issues.py.
-  prune_paths = [
-    # Temporary until we figure out how not to check out quickoffice on the
-    # Android license check bot. Tracked in crbug.com/350472.
-    os.path.join('chrome', 'browser', 'resources', 'chromeos', 'quickoffice'),
-    # Placeholder directory, no third-party code.
-    os.path.join('third_party', 'adobe'),
+  prune_paths = set([
     # Apache 2.0 license. See
     # https://code.google.com/p/chromium/issues/detail?id=140478.
     os.path.join('third_party', 'bidichecker'),
-    # Isn't checked out on clients
-    os.path.join('third_party', 'gles2_conform'),
-    # The llvm-build doesn't exist for non-clang builder
-    os.path.join('third_party', 'llvm-build'),
-    # Binaries doesn't apply to android
-    os.path.join('third_party', 'widevine'),
-    # third_party directories in this tree aren't actually third party, but
-    # provide a way to shadow experimental buildfiles into those directories.
-    os.path.join('build', 'secondary'),
-    # Not shipped, Chromium code
-    os.path.join('tools', 'swarming_client'),
     # Not shipped, only relates to Chrome for Android, but not to WebView
     os.path.join('clank'),
-    # Bots only, is not a part of the build
-    os.path.join('isolate_deps_dir'),
-  ]
-  third_party_dirs = licenses.FindThirdPartyDirs(prune_paths, REPOSITORY_ROOT)
+    # Not checked out on clients, but present on the release bot.
+    # See crbug.com/350472.
+    os.path.join('chrome', 'browser', 'resources', 'chromeos', 'quickoffice'),
+    os.path.join('third_party', 'gles2_conform'),
+  ])
+  third_party_dirs = licenses.FindThirdPartyDirs(
+    prune_paths | licenses.PRUNE_PATHS, REPOSITORY_ROOT)
   return licenses.FilterDirsWithFiles(third_party_dirs, REPOSITORY_ROOT)
 
 
@@ -345,13 +268,6 @@ def GenerateNoticeFile(generate_licenses_file_list_only=False):
     return template.render({ 'entries': entries }).encode('utf8')
 
 
-def _ProcessIncompatibleResult(incompatible_directories):
-  if incompatible_directories:
-    print ("Incompatibly licensed directories found:\n" +
-           "\n".join(sorted(incompatible_directories)))
-    return ScanResult.Errors
-  return ScanResult.Ok
-
 def main():
   class FormatterWithNewLines(optparse.IndentedHelpFormatter):
     def format_description(self, description):
@@ -369,11 +285,6 @@ def main():
                         'Android NOTICE file.\n'
                         '  notice [file] Generate Android NOTICE file on '
                         'stdout or into |file|.\n'
-                        '  incompatible_directories Scan for incompatibly'
-                        ' licensed directories.\n'
-                        '  all_incompatible_directories Scan for incompatibly'
-                        ' licensed directories (even those in'
-                        ' known_issues.py).\n'
                         '  display_copyrights Display autorship on the files'
                         ' using names provided via stdin.\n')
   (options, args) = parser.parse_args()
@@ -402,10 +313,6 @@ def main():
       with open(args[1], 'w') as output_file:
         output_file.write(notice_file_contents)
     return ScanResult.Ok
-  elif args[0] == 'incompatible_directories':
-    return _ProcessIncompatibleResult(GetUnknownIncompatibleDirectories())
-  elif args[0] == 'all_incompatible_directories':
-    return _ProcessIncompatibleResult(GetIncompatibleDirectories())
   elif args[0] == 'display_copyrights':
     files = sys.stdin.read().splitlines()
     for f, c in \
