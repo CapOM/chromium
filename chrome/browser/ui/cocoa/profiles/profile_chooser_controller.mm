@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#import <Cocoa/Cocoa.h>
-#import <Carbon/Carbon.h>  // kVK_Return.
-
 #import "chrome/browser/ui/cocoa/profiles/profile_chooser_controller.h"
+
+#import <Carbon/Carbon.h>  // kVK_Return.
+#import <Cocoa/Cocoa.h>
 
 #include "base/mac/bundle_locations.h"
 #include "base/prefs/pref_service.h"
@@ -875,8 +875,27 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 @end
 
 @interface ProfileChooserController ()
+// Adds an horizontal separator to |container| at |yOffset| and returns the
+// yOffset corresponding to after the separator.
+- (CGFloat)addSeparatorToContainer:(NSView*)container
+                         atYOffset:(CGFloat)yOffset;
+
+// Builds the right-click profile switcher.
+- (void)buildFastUserSwitcherViewWithProfiles:(NSMutableArray*)otherProfiles
+                                    atYOffset:(CGFloat)yOffset
+                                  inContainer:(NSView*)container;
+
+// Builds the regular profile chooser view.
+- (void)buildProfileChooserViewWithProfileView:(NSView*)currentProfileView
+                                  tutorialView:(NSView*)tutorialView
+                                     atYOffset:(CGFloat)yOffset
+                                   inContainer:(NSView*)container
+                                   displayLock:(bool)displayLock;
+
 // Builds the profile chooser view.
 - (NSView*)buildProfileChooserView;
+
+- (NSView*)buildTutorialViewIfNeededForItem:(const AvatarMenu::Item&)item;
 
 // Builds a tutorial card with a title label using |titleMessage|, a content
 // label using |contentMessage|, a link using |linkMessage|, and a button using
@@ -897,7 +916,11 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
 // Builds a tutorial card to introduce an upgrade user to the new avatar menu if
 // needed. |tutorial_shown| indicates if the tutorial has already been shown in
 // the previous active view. |avatar_item| refers to the current profile.
-- (NSView*)buildWelcomeUpgradeTutorialViewIfNeeded;
+- (NSView*)buildWelcomeUpgradeTutorialView:(const AvatarMenu::Item&)item;
+
+// Builds a tutorial card to inform the user about right-click user switching if
+// needed.
+- (NSView*)buildRightClickTutorialView;
 
 // Builds a tutorial card to have the user confirm the last Chrome signin,
 // Chrome sync will be delayed until the user either dismisses the tutorial, or
@@ -1129,6 +1152,12 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
         signin_ui_util::kUpgradeWelcomeTutorialShowMax + 1);
   }
 
+  if(tutorialMode_ == profiles::TUTORIAL_MODE_RIGHT_CLICK_SWITCHING) {
+    PrefService* localState = g_browser_process->local_state();
+    localState->SetBoolean(
+        prefs::kProfileAvatarRightClickTutorialDismissed, true);
+  }
+
   tutorialMode_ = profiles::TUTORIAL_MODE_NONE;
   [self initMenuContentsWithView:profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER];
 }
@@ -1245,6 +1274,15 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
   if (viewMode_ != profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER)
     tutorialMode_ = profiles::TUTORIAL_MODE_NONE;
 
+  if (viewMode_ == profiles::BUBBLE_VIEW_MODE_GAIA_SIGNIN ||
+      viewMode_ == profiles::BUBBLE_VIEW_MODE_GAIA_ADD_ACCOUNT ||
+      viewMode_ == profiles::BUBBLE_VIEW_MODE_GAIA_REAUTH ||
+      tutorialMode_ == profiles::TUTORIAL_MODE_CONFIRM_SIGNIN) {
+    [self setShouldCloseOnResignKey:NO];
+  } else {
+    [self setShouldCloseOnResignKey:YES];
+  }
+
   // Add a dummy, empty element so that we don't initially display any
   // focus rings.
   NSButton* dummyFocusButton =
@@ -1256,6 +1294,90 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
   [contentView addSubview:dummyFocusButton];
   SetWindowSize([self window],
       NSMakeSize(NSWidth([subView frame]), NSHeight([subView frame])));
+}
+
+- (CGFloat)addSeparatorToContainer:(NSView*)container
+                         atYOffset:(CGFloat)yOffset {
+  NSBox* separator = [self horizontalSeparatorWithFrame:NSMakeRect(
+      0, yOffset, kFixedMenuWidth, 0)];
+  [container addSubview:separator];
+  return NSMaxY([separator frame]);
+}
+
+// Builds the fast user switcher view in |container| at |yOffset| and populates
+// it with the entries for every profile in |otherProfiles|. Returns the new
+// yOffset after adding the elements.
+- (void)buildFastUserSwitcherViewWithProfiles:(NSMutableArray*)otherProfiles
+                                    atYOffset:(CGFloat)yOffset
+                                  inContainer:(NSView*)container {
+  // Other profiles switcher. The profiles have already been sorted
+  // by their y-coordinate, so they can be added in the existing order.
+  for (NSView* otherProfileView in otherProfiles) {
+   [otherProfileView setFrameOrigin:NSMakePoint(0, yOffset)];
+   [container addSubview:otherProfileView];
+   yOffset = NSMaxY([otherProfileView frame]);
+
+   yOffset = [self addSeparatorToContainer:container atYOffset: yOffset];
+  }
+
+  [container setFrameSize:NSMakeSize(kFixedMenuWidth, yOffset)];
+}
+
+- (void)buildProfileChooserViewWithProfileView:(NSView*)currentProfileView
+                                  tutorialView:(NSView*)tutorialView
+                                     atYOffset:(CGFloat)yOffset
+                                   inContainer:(NSView*)container
+                                   displayLock:(bool)displayLock {
+  // Option buttons.
+  NSRect rect = NSMakeRect(0, yOffset, kFixedMenuWidth, 0);
+  NSView* optionsView = [self createOptionsViewWithRect:rect
+                                            displayLock:displayLock];
+  [container addSubview:optionsView];
+  rect.origin.y = NSMaxY([optionsView frame]);
+
+  NSBox* separator = [self horizontalSeparatorWithFrame:rect];
+  [container addSubview:separator];
+  yOffset = NSMaxY([separator frame]);
+
+  // For supervised users, add the disclaimer text.
+  if (browser_->profile()->IsSupervised()) {
+    yOffset += kSmallVerticalSpacing;
+    NSView* disclaimerContainer = [self createSupervisedUserDisclaimerView];
+    [disclaimerContainer setFrameOrigin:NSMakePoint(0, yOffset)];
+    [container addSubview:disclaimerContainer];
+    yOffset = NSMaxY([disclaimerContainer frame]);
+    yOffset += kSmallVerticalSpacing;
+
+    yOffset = [self addSeparatorToContainer:container atYOffset: yOffset];
+  }
+
+  if (viewMode_ == profiles::BUBBLE_VIEW_MODE_ACCOUNT_MANAGEMENT) {
+    NSView* currentProfileAccountsView = [self createCurrentProfileAccountsView:
+        NSMakeRect(0, yOffset, kFixedMenuWidth, 0)];
+    [container addSubview:currentProfileAccountsView];
+    yOffset = NSMaxY([currentProfileAccountsView frame]);
+
+    yOffset = [self addSeparatorToContainer:container atYOffset: yOffset];
+  }
+
+  // Active profile card.
+  if (currentProfileView) {
+    yOffset += kVerticalSpacing;
+    [currentProfileView setFrameOrigin:NSMakePoint(0, yOffset)];
+    [container addSubview:currentProfileView];
+    yOffset = NSMaxY([currentProfileView frame]) + kVerticalSpacing;
+  }
+
+  if (tutorialView) {
+    [tutorialView setFrameOrigin:NSMakePoint(0, yOffset)];
+    [container addSubview:tutorialView];
+    yOffset = NSMaxY([tutorialView frame]);
+    //TODO(mlerman): update UMA stats for the new tutorials.
+  } else {
+    tutorialMode_ = profiles::TUTORIAL_MODE_NONE;
+  }
+
+  [container setFrameSize:NSMakeSize(kFixedMenuWidth, yOffset)];
 }
 
 - (NSView*)buildProfileChooserView {
@@ -1270,6 +1392,12 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
   bool displayLock = false;
   bool isFastProfileChooser =
       viewMode_ == profiles::BUBBLE_VIEW_MODE_FAST_PROFILE_CHOOSER;
+  if (isFastProfileChooser) {
+    // The user is using right-click switching, no need to tell them about it.
+    PrefService* localState = g_browser_process->local_state();
+    localState->SetBoolean(
+        prefs::kProfileAvatarRightClickTutorialDismissed, true);
+  }
 
   // Loop over the profiles in reverse, so that they are sorted by their
   // y-coordinate, and separate them into active and "other" profiles.
@@ -1277,18 +1405,7 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
     const AvatarMenu::Item& item = avatarMenu_->GetItemAt(i);
     if (item.active) {
       if (viewMode_ == profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER) {
-        switch (tutorialMode_) {
-          case profiles::TUTORIAL_MODE_NONE:
-          case profiles::TUTORIAL_MODE_WELCOME_UPGRADE:
-            tutorialView =
-                [self buildWelcomeUpgradeTutorialViewIfNeeded];
-            break;
-          case profiles::TUTORIAL_MODE_CONFIRM_SIGNIN:
-            tutorialView = [self buildSigninConfirmationView];
-            break;
-          case profiles::TUTORIAL_MODE_SHOW_ERROR:
-            tutorialView = [self buildSigninErrorView];
-        }
+        tutorialView = [self buildTutorialViewIfNeededForItem:item];
       }
       currentProfileView = [self createCurrentProfileView:item];
       displayLock = item.signed_in &&
@@ -1305,80 +1422,18 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
   // overlap the bubble's rounded corners.
   CGFloat yOffset = 1;
 
-  if (!isFastProfileChooser) {
-    // Option buttons.
-    NSRect rect = NSMakeRect(0, yOffset, kFixedMenuWidth, 0);
-    NSView* optionsView = [self createOptionsViewWithRect:rect
-                                              displayLock:displayLock];
-    [container addSubview:optionsView];
-    rect.origin.y = NSMaxY([optionsView frame]);
-
-    NSBox* separator = [self horizontalSeparatorWithFrame:rect];
-    [container addSubview:separator];
-    yOffset = NSMaxY([separator frame]);
-  }
-
-  if ((viewMode_ == profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER &&
-       switches::IsFastUserSwitching()) || isFastProfileChooser) {
-    // Other profiles switcher. The profiles have already been sorted
-    // by their y-coordinate, so they can be added in the existing order.
-    for (NSView *otherProfileView in otherProfiles.get()) {
-      [otherProfileView setFrameOrigin:NSMakePoint(0, yOffset)];
-      [container addSubview:otherProfileView];
-      yOffset = NSMaxY([otherProfileView frame]);
-
-      NSBox* separator = [self horizontalSeparatorWithFrame:NSMakeRect(
-          0, yOffset, kFixedMenuWidth, 0)];
-      [container addSubview:separator];
-      yOffset = NSMaxY([separator frame]);
-    }
-  }
-
-  // For supervised users, add the disclaimer text.
-  if (browser_->profile()->IsSupervised()) {
-    yOffset += kSmallVerticalSpacing;
-    NSView* disclaimerContainer = [self createSupervisedUserDisclaimerView];
-    [disclaimerContainer setFrameOrigin:NSMakePoint(0, yOffset)];
-    [container addSubview:disclaimerContainer];
-    yOffset = NSMaxY([disclaimerContainer frame]);
-    yOffset += kSmallVerticalSpacing;
-
-    NSBox* separator = [self horizontalSeparatorWithFrame:NSMakeRect(
-        0, yOffset, kFixedMenuWidth, 0)];
-    [container addSubview:separator];
-    yOffset = NSMaxY([separator frame]);
-  }
-
-  if (viewMode_ == profiles::BUBBLE_VIEW_MODE_ACCOUNT_MANAGEMENT) {
-    NSView* currentProfileAccountsView = [self createCurrentProfileAccountsView:
-        NSMakeRect(0, yOffset, kFixedMenuWidth, 0)];
-    [container addSubview:currentProfileAccountsView];
-    yOffset = NSMaxY([currentProfileAccountsView frame]);
-
-    NSBox* accountsSeparator = [self horizontalSeparatorWithFrame:
-        NSMakeRect(0, yOffset, kFixedMenuWidth, 0)];
-    [container addSubview:accountsSeparator];
-    yOffset = NSMaxY([accountsSeparator frame]);
-  }
-
-  // Active profile card.
-  if (!isFastProfileChooser && currentProfileView) {
-    yOffset += kVerticalSpacing;
-    [currentProfileView setFrameOrigin:NSMakePoint(0, yOffset)];
-    [container addSubview:currentProfileView];
-    yOffset = NSMaxY([currentProfileView frame]) + kVerticalSpacing;
-  }
-
-  if (!isFastProfileChooser && tutorialView) {
-    [tutorialView setFrameOrigin:NSMakePoint(0, yOffset)];
-    [container addSubview:tutorialView];
-    yOffset = NSMaxY([tutorialView frame]);
-    //TODO(mlerman): update UMA stats for the new tutorials.
+  if (isFastProfileChooser) {
+    [self buildFastUserSwitcherViewWithProfiles:otherProfiles.get()
+                                      atYOffset:yOffset
+                                    inContainer:container.get()];
   } else {
-    tutorialMode_ = profiles::TUTORIAL_MODE_NONE;
+    [self buildProfileChooserViewWithProfileView:currentProfileView
+                                    tutorialView:tutorialView
+                                       atYOffset:yOffset
+                                     inContainer:container.get()
+                                     displayLock:displayLock];
   }
 
-  [container setFrameSize:NSMakeSize(kFixedMenuWidth, yOffset)];
   return container.autorelease();
 }
 
@@ -1425,24 +1480,7 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
                        buttonAction:nil];
 }
 
-- (NSView*)buildWelcomeUpgradeTutorialViewIfNeeded {
-  Profile* profile = browser_->profile();
-  const AvatarMenu::Item& avatarItem =
-      avatarMenu_->GetItemAt(avatarMenu_->GetActiveProfileIndex());
-
-  const int showCount = profile->GetPrefs()->GetInteger(
-      prefs::kProfileAvatarTutorialShown);
-  // Do not show the tutorial if user has dismissed it.
-  if (showCount > signin_ui_util::kUpgradeWelcomeTutorialShowMax)
-    return nil;
-
-  if (tutorialMode_ != profiles::TUTORIAL_MODE_WELCOME_UPGRADE) {
-    if (showCount == signin_ui_util::kUpgradeWelcomeTutorialShowMax)
-      return nil;
-    profile->GetPrefs()->SetInteger(
-        prefs::kProfileAvatarTutorialShown, showCount + 1);
-  }
-
+- (NSView*)buildWelcomeUpgradeTutorialView:(const AvatarMenu::Item&)item {
   ProfileMetrics::LogProfileNewAvatarMenuUpgrade(
       ProfileMetrics::PROFILE_AVATAR_MENU_UPGRADE_VIEW);
 
@@ -1451,9 +1489,9 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
   NSString* contentMessage = l10n_util::GetNSString(
       IDS_PROFILES_WELCOME_UPGRADE_TUTORIAL_CONTENT_TEXT);
   // For local profiles, the "Not you" link doesn't make sense.
-  NSString* linkMessage = avatarItem.signed_in ?
+  NSString* linkMessage = item.signed_in ?
       ElideMessage(
-          l10n_util::GetStringFUTF16(IDS_PROFILES_NOT_YOU, avatarItem.name),
+          l10n_util::GetStringFUTF16(IDS_PROFILES_NOT_YOU, item.name),
           kFixedMenuWidth - 2 * kHorizontalSpacing) :
       nil;
   NSString* buttonMessage = l10n_util::GetNSString(
@@ -1467,6 +1505,52 @@ class ActiveProfileObserverBridge : public AvatarMenuObserver,
                      hasCloseButton:YES
                          linkAction:@selector(showSwitchUserView:)
                        buttonAction:@selector(seeWhatsNew:)];
+}
+
+- (NSView*)buildRightClickTutorialView {
+  NSString* titleMessage = l10n_util::GetNSString(
+      IDS_PROFILES_RIGHT_CLICK_TUTORIAL_TITLE);
+  NSString* contentMessage = l10n_util::GetNSString(
+      IDS_PROFILES_RIGHT_CLICK_TUTORIAL_CONTENT_TEXT);
+  NSString* buttonMessage = l10n_util::GetNSString(
+      IDS_PROFILES_TUTORIAL_OK_BUTTON);
+
+  return
+      [self tutorialViewWithMode:profiles::TUTORIAL_MODE_RIGHT_CLICK_SWITCHING
+                             titleMessage:titleMessage
+                           contentMessage:contentMessage
+                              linkMessage:nil
+                            buttonMessage:buttonMessage
+                              stackButton:NO
+                           hasCloseButton:NO
+                               linkAction:nil
+                             buttonAction:@selector(dismissTutorial:)];
+}
+
+- (NSView*)buildTutorialViewIfNeededForItem:(const AvatarMenu::Item&)item {
+  if (tutorialMode_ == profiles::TUTORIAL_MODE_CONFIRM_SIGNIN)
+    return [self buildSigninConfirmationView];
+
+  if (tutorialMode_ == profiles::TUTORIAL_MODE_SHOW_ERROR)
+    return [self buildSigninErrorView];
+
+  if (profiles::ShouldShowWelcomeUpgradeTutorial(
+      browser_->profile(), tutorialMode_)) {
+    if (tutorialMode_ != profiles::TUTORIAL_MODE_WELCOME_UPGRADE) {
+      Profile* profile = browser_->profile();
+      const int showCount = profile->GetPrefs()->GetInteger(
+          prefs::kProfileAvatarTutorialShown);
+      profile->GetPrefs()->SetInteger(
+          prefs::kProfileAvatarTutorialShown, showCount + 1);
+    }
+
+    return [self buildWelcomeUpgradeTutorialView:item];
+  }
+
+  if (profiles::ShouldShowRightClickTutorial(browser_->profile()))
+    return [self buildRightClickTutorialView];
+
+  return nil;
 }
 
 - (NSView*)tutorialViewWithMode:(profiles::TutorialMode)mode

@@ -582,8 +582,9 @@ class DomSerializerTests : public ContentBrowserTest,
       '%', 0x2285, 0x00b9, '\'', 0
     };
     WebString value = body_element.getAttribute("title");
+    WebString content = doc.contentAsTextForTesting();
     ASSERT_TRUE(base::UTF16ToWide(value) == parsed_value);
-    ASSERT_TRUE(base::UTF16ToWide(body_element.innerText()) == parsed_value);
+    ASSERT_TRUE(base::UTF16ToWide(content) == parsed_value);
 
     // Do serialization.
     SerializeDomForURL(file_url, false);
@@ -778,7 +779,15 @@ class DomSerializerTests : public ContentBrowserTest,
 
 // If original contents have document type, the serialized contents also have
 // document type.
-IN_PROC_BROWSER_TEST_F(DomSerializerTests, SerializeHTMLDOMWithDocType) {
+// Disabled by ellyjones@ on 2015-05-18, see https://crbug.com/488495.
+#if defined(OS_MACOSX)
+#define MAYBE_SerializeHTMLDOMWithDocType DISABLED_SerializeHTMLDOMWithDocType
+#else
+#define MAYBE_SerializeHTMLDOMWithDocType SerializeHTMLDOMWithDocType
+#endif
+
+IN_PROC_BROWSER_TEST_F(DomSerializerTests,
+                       MAYBE_SerializeHTMLDOMWithDocType) {
   base::FilePath page_file_path =
       GetTestFilePath("dom_serializer", "youtube_1.htm");
   GURL file_url = net::FilePathToFileURL(page_file_path);

@@ -422,7 +422,6 @@ bool DesktopWindowTreeHostWin::IsFullscreen() const {
 }
 
 void DesktopWindowTreeHostWin::SetOpacity(unsigned char opacity) {
-  message_handler_->SetOpacity(static_cast<BYTE>(opacity));
   content_window_->layer()->SetOpacity(opacity / 255.0);
 }
 
@@ -821,16 +820,10 @@ void DesktopWindowTreeHostWin::HandleFrameChanged() {
 
 void DesktopWindowTreeHostWin::HandleNativeFocus(HWND last_focused_window) {
   // TODO(beng): inform the native_widget_delegate_.
-  InputMethod* input_method = GetInputMethod();
-  if (input_method)
-    input_method->OnFocus();
 }
 
 void DesktopWindowTreeHostWin::HandleNativeBlur(HWND focused_window) {
   // TODO(beng): inform the native_widget_delegate_.
-  InputMethod* input_method = GetInputMethod();
-  if (input_method)
-    input_method->OnBlur();
 }
 
 bool DesktopWindowTreeHostWin::HandleMouseEvent(const ui::MouseEvent& event) {

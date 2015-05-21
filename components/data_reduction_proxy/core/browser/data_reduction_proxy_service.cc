@@ -6,6 +6,7 @@
 
 #include "base/bind.h"
 #include "base/location.h"
+#include "base/prefs/pref_service.h"
 #include "base/sequenced_task_runner.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_compression_stats.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_io_data.h"
@@ -18,10 +19,12 @@ namespace data_reduction_proxy {
 DataReductionProxyService::DataReductionProxyService(
     scoped_ptr<DataReductionProxyCompressionStats> compression_stats,
     DataReductionProxySettings* settings,
+    PrefService* prefs,
     net::URLRequestContextGetter* request_context_getter,
     scoped_refptr<base::SingleThreadTaskRunner> io_task_runner)
     : url_request_context_getter_(request_context_getter),
       settings_(settings),
+      prefs_(prefs),
       io_task_runner_(io_task_runner),
       initialized_(false),
       weak_factory_(this) {
@@ -53,8 +56,10 @@ void DataReductionProxyService::EnableCompressionStatisticsLogging(
     const base::TimeDelta& commit_delay) {
   DCHECK(CalledOnValidThread());
   DCHECK(!compression_stats_);
+  DCHECK(!prefs_);
+  prefs_ = prefs;
   compression_stats_.reset(new DataReductionProxyCompressionStats(
-      prefs, ui_task_runner, commit_delay));
+      prefs_, ui_task_runner, commit_delay));
 }
 
 void DataReductionProxyService::UpdateContentLengths(
@@ -100,10 +105,20 @@ void DataReductionProxyService::SetUnreachable(bool unreachable) {
   settings_->SetUnreachable(unreachable);
 }
 
+void DataReductionProxyService::SetInt64Pref(const std::string& pref_path,
+                                             int64 value) {
+  if (prefs_)
+    prefs_->SetInt64(pref_path, value);
+}
+
 void DataReductionProxyService::SetProxyPrefs(bool enabled,
                                               bool alternative_enabled,
                                               bool at_startup) {
   DCHECK(CalledOnValidThread());
+  if (io_task_runner_->BelongsToCurrentThread()) {
+    io_data_->SetProxyPrefs(enabled, alternative_enabled, at_startup);
+    return;
+  }
   io_task_runner_->PostTask(
       FROM_HERE,
       base::Bind(&DataReductionProxyIOData::SetProxyPrefs,
@@ -112,6 +127,10 @@ void DataReductionProxyService::SetProxyPrefs(bool enabled,
 
 void DataReductionProxyService::RetrieveConfig() {
   DCHECK(CalledOnValidThread());
+  if (io_task_runner_->BelongsToCurrentThread()) {
+    io_data_->RetrieveConfig();
+    return;
+  }
   io_task_runner_->PostTask(
       FROM_HERE,
       base::Bind(&DataReductionProxyIOData::RetrieveConfig, io_data_));

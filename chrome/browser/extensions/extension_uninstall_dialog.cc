@@ -7,7 +7,6 @@
 #include "base/bind.h"
 #include "base/logging.h"
 #include "base/message_loop/message_loop.h"
-#include "base/metrics/field_trial.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/extension_util.h"
@@ -49,8 +48,6 @@ ExtensionUninstallDialog::ExtensionUninstallDialog(
     ExtensionUninstallDialog::Delegate* delegate)
     : profile_(profile),
       delegate_(delegate),
-      extension_(NULL),
-      triggering_extension_(NULL),
       ui_loop_(base::MessageLoop::current()) {
 }
 
@@ -72,7 +69,7 @@ void ExtensionUninstallDialog::ConfirmUninstall(const Extension* extension) {
                             ? extension_misc::EXTENSION_ICON_SMALL * 2
                             : extension_misc::EXTENSION_ICON_LARGE;
   ExtensionResource image = IconsInfo::GetIconResource(
-      extension_, icon_size, ExtensionIconSet::MATCH_BIGGER);
+      extension_.get(), icon_size, ExtensionIconSet::MATCH_BIGGER);
 
   // Load the image asynchronously. The response will be sent to OnImageLoaded.
   ImageLoader* loader = ImageLoader::Get(profile_);
@@ -84,7 +81,7 @@ void ExtensionUninstallDialog::ConfirmUninstall(const Extension* extension) {
       ImageLoader::ImageRepresentation::NEVER_RESIZE,
       gfx::Size(),
       ui::SCALE_FACTOR_100P));
-  loader->LoadImagesAsync(extension_,
+  loader->LoadImagesAsync(extension_.get(),
                           images_list,
                           base::Bind(&ExtensionUninstallDialog::OnImageLoaded,
                                      AsWeakPtr(),
@@ -131,9 +128,7 @@ std::string ExtensionUninstallDialog::GetHeadingText() {
 }
 
 bool ExtensionUninstallDialog::ShouldShowReportAbuseCheckbox() const {
-  return ManifestURL::UpdatesFromGallery(extension_) &&
-      base::FieldTrialList::FindFullName("ExtensionUninstall.ReportAbuse") ==
-          "ShowCheckbox";
+  return ManifestURL::UpdatesFromGallery(extension_.get());
 }
 
 void ExtensionUninstallDialog::OnDialogClosed(CloseAction action) {

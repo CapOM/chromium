@@ -12,6 +12,7 @@
 #include "components/keyed_service/core/keyed_service.h"
 #include "content/public/browser/browser_context.h"
 #include "extensions/browser/event_router.h"
+#include "extensions/browser/extension_registry_observer.h"
 #include "extensions/common/extension.h"
 
 namespace app_list {
@@ -31,7 +32,8 @@ const int kMaxSearchResultScore = 4;
 // This service provides access control for it.
 //
 // TODO(yawano): Implement opt-in control (crbug.com/440649).
-class Service : public KeyedService {
+class Service : public KeyedService,
+                public extensions::ExtensionRegistryObserver {
  public:
   Service(Profile* profile, extensions::ExtensionRegistry* extension_registry);
   ~Service() override;
@@ -53,22 +55,32 @@ class Service : public KeyedService {
   void SetSearchResults(
       const extensions::Extension* extension,
       scoped_ptr<ErrorReporter> error_reporter,
-      const std::string& query_id,
+      const int query_id,
       const std::vector<linked_ptr<
           extensions::api::launcher_search_provider::SearchResult>>& results);
 
   // Returns true if there is a running query.
   bool IsQueryRunning() const;
 
+  // extensions::ExtensionRegistryObserver override.
+  void OnExtensionLoaded(content::BrowserContext* browser_context,
+                         const extensions::Extension* extension) override;
+  void OnExtensionUnloaded(
+      content::BrowserContext* browser_context,
+      const extensions::Extension* extension,
+      extensions::UnloadedExtensionInfo::Reason reason) override;
+
  private:
-  // Returns extension ids of listener extensions.
-  std::set<extensions::ExtensionId> GetListenerExtensionIds();
+  // Cache listener extension ids and set them to
+  // |cached_listener_extension_ids_|.
+  void CacheListenerExtensionIds();
 
   Profile* const profile_;
   extensions::ExtensionRegistry* extension_registry_;
   app_list::LauncherSearchProvider* provider_;
-  uint32 query_id_;
+  int query_id_;
   bool is_query_running_;
+  scoped_ptr<std::set<extensions::ExtensionId>> cached_listener_extension_ids_;
 
   DISALLOW_COPY_AND_ASSIGN(Service);
 };

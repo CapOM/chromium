@@ -12,10 +12,10 @@
 #include "cc/base/cc_export.h"
 #include "cc/base/scoped_ptr_vector.h"
 #include "cc/layers/layer_impl.h"
-#include "cc/resources/picture_layer_tiling.h"
-#include "cc/resources/picture_layer_tiling_set.h"
-#include "cc/resources/picture_pile_impl.h"
-#include "cc/resources/tiling_set_eviction_queue.h"
+#include "cc/playback/picture_pile_impl.h"
+#include "cc/tiles/picture_layer_tiling.h"
+#include "cc/tiles/picture_layer_tiling_set.h"
+#include "cc/tiles/tiling_set_eviction_queue.h"
 #include "skia/ext/refptr.h"
 #include "third_party/skia/include/core/SkPicture.h"
 
@@ -77,7 +77,7 @@ class CC_EXPORT PictureLayerImpl
   WhichTree GetTree() const;
 
   // Mask-related functions.
-  void GetContentsResourceId(ResourceProvider::ResourceId* resource_id,
+  void GetContentsResourceId(ResourceId* resource_id,
                              gfx::Size* resource_size) const override;
 
   void SetNearestNeighbor(bool nearest_neighbor);
@@ -124,8 +124,8 @@ class CC_EXPORT PictureLayerImpl
   bool ShouldAdjustRasterScaleDuringScaleAnimations() const;
 
   void GetDebugBorderProperties(SkColor* color, float* width) const override;
-  void GetAllTilesAndPrioritiesForTracing(
-      std::map<const Tile*, TilePriority>* tile_map) const override;
+  void GetAllPrioritizedTilesForTracing(
+      std::vector<PrioritizedTile>* prioritized_tiles) const override;
   void AsValueInto(base::trace_event::TracedValue* dict) const override;
 
   virtual void UpdateIdealScales();

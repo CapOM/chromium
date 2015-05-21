@@ -423,6 +423,12 @@ void UserSessionManager::StartSession(
   // TODO(nkostylev): Notify UserLoggedIn() after profile is actually
   // ready to be used (http://crbug.com/361528).
   NotifyUserLoggedIn();
+
+  if (!user_context.GetDeviceId().empty()) {
+    user_manager::UserManager::Get()->SetKnownUserDeviceId(
+        user_context.GetUserID(), user_context.GetDeviceId());
+  }
+
   PrepareProfile();
 }
 
@@ -610,8 +616,9 @@ bool UserSessionManager::RespectLocalePreference(
   // So input methods should be enabled somewhere.
   const bool enable_layouts =
       user_manager::UserManager::Get()->IsLoggedInAsGuest();
-  locale_util::SwitchLanguage(
-      pref_locale, enable_layouts, false /* login_layouts_only */, callback);
+  locale_util::SwitchLanguage(pref_locale, enable_layouts,
+                              false /* login_layouts_only */, callback,
+                              profile);
 
   return true;
 }
@@ -761,8 +768,7 @@ void UserSessionManager::OnConnectionTypeChanged(
         pending_signin_restore_sessions_.end();
     OAuth2LoginManager* login_manager =
         OAuth2LoginManagerFactory::GetInstance()->GetForProfile(user_profile);
-    if (login_manager->state() ==
-            OAuth2LoginManager::SESSION_RESTORE_IN_PROGRESS) {
+    if (login_manager->SessionRestoreIsRunning()) {
       // If we come online for the first time after successful offline login,
       // we need to kick off OAuth token verification process again.
       login_manager->ContinueSessionRestore();
@@ -894,20 +900,6 @@ void UserSessionManager::InitProfilePreferences(
   if (user->GetType() == user_manager::USER_TYPE_KIOSK_APP &&
       profile->IsNewProfile()) {
     ChromeUserManager::Get()->SetIsCurrentUserNew(true);
-  }
-
-  std::string device_id = profile->GetPrefs()->GetString(
-      prefs::kGoogleServicesSigninScopedDeviceId);
-  if (device_id.empty()) {
-    device_id = user_context.GetDeviceId();
-    if (!device_id.empty()) {
-      profile->GetPrefs()->SetString(prefs::kGoogleServicesSigninScopedDeviceId,
-                                     device_id);
-    }
-  }
-  if (!device_id.empty()) {
-    user_manager::UserManager::Get()->SetKnownUserDeviceId(user->GetUserID(),
-                                                           device_id);
   }
 
   if (user->is_active()) {
@@ -1121,10 +1113,8 @@ void UserSessionManager::InitializeStartUrls() const {
 
   user_manager::UserManager* user_manager = user_manager::UserManager::Get();
 
-  bool can_show_getstarted_guide =
-      user_manager->GetActiveUser()->GetType() ==
-          user_manager::USER_TYPE_REGULAR &&
-      !user_manager->IsCurrentUserNonCryptohomeDataEphemeral();
+  bool can_show_getstarted_guide = user_manager->GetActiveUser()->GetType() ==
+                                   user_manager::USER_TYPE_REGULAR;
 
   // Skip the default first-run behavior for public accounts.
   if (!user_manager->IsLoggedInAsPublicAccount()) {
@@ -1670,6 +1660,45 @@ void UserSessionManager::SendUserPodsMetrics() {
   }
   UMA_HISTOGRAM_ENUMERATION("UserSessionManager.UserPodsDisplay", display,
                             NUM_USER_PODS_DISPLAY);
+}
+
+void UserSessionManager::OnOAuth2TokensFetched(UserContext context) {
+  if (StartupUtils::IsWebviewSigninEnabled() && TokenHandlesEnabled()) {
+    if (!token_handle_util_.get()) {
+      token_handle_util_.reset(
+          new TokenHandleUtil(user_manager::UserManager::Get()));
+    }
+    if (token_handle_util_->ShouldObtainHandle(context.GetUserID())) {
+      token_handle_util_->GetTokenHandle(
+          context.GetUserID(), context.GetAccessToken(),
+          base::Bind(&UserSessionManager::OnTokenHandleObtained,
+                     weak_factory_.GetWeakPtr()));
+    }
+  }
+}
+
+void UserSessionManager::OnTokenHandleObtained(
+    const user_manager::UserID& id,
+    TokenHandleUtil::TokenHandleStatus status) {
+  if (status != TokenHandleUtil::VALID) {
+    LOG(ERROR) << "OAuth2 token handle fetch failed.";
+    return;
+  }
+}
+
+bool UserSessionManager::TokenHandlesEnabled() {
+  bool ephemeral_users_enabled = false;
+  bool show_names_on_signin = true;
+  auto cros_settings = CrosSettings::Get();
+  cros_settings->GetBoolean(kAccountsPrefEphemeralUsersEnabled,
+                            &ephemeral_users_enabled);
+  cros_settings->GetBoolean(kAccountsPrefShowUserNamesOnSignIn,
+                            &show_names_on_signin);
+  return show_names_on_signin && !ephemeral_users_enabled;
+}
+
+void UserSessionManager::Shutdown() {
+  token_handle_util_.reset();
 }
 
 }  // namespace chromeos

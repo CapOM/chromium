@@ -19,11 +19,11 @@
 #include "components/view_manager/public/cpp/view.h"
 #include "components/view_manager/public/cpp/view_manager.h"
 #include "mandoline/ui/aura/window_tree_host_mojo.h"
+#include "mojo/application/public/cpp/connect.h"
+#include "mojo/application/public/interfaces/shell.mojom.h"
 #include "mojo/cc/context_provider_mojo.h"
 #include "mojo/converters/geometry/geometry_type_converters.h"
 #include "mojo/converters/surfaces/surfaces_type_converters.h"
-#include "mojo/public/cpp/application/connect.h"
-#include "mojo/public/interfaces/application/shell.mojom.h"
 
 namespace mandoline {
 namespace {
@@ -174,7 +174,7 @@ SurfaceBinding::PerViewManagerState::CreateOutputSurface(mojo::View* view) {
   mojo::CommandBufferPtr cb;
   gpu_->CreateOffscreenGLES2Context(GetProxy(&cb));
   scoped_refptr<cc::ContextProvider> context_provider(
-      new mojo::ContextProviderMojo(cb.PassMessagePipe()));
+      new mojo::ContextProviderMojo(cb.PassInterface().PassHandle()));
   return make_scoped_ptr(new OutputSurfaceImpl(
       view, context_provider, surface_.get(), id_namespace_, &next_local_id_));
 }

@@ -208,6 +208,21 @@ void LayerImpl::SetClipChildren(std::set<LayerImpl*>* children) {
   SetNeedsPushProperties();
 }
 
+void LayerImpl::SetTransformTreeIndex(int index) {
+  transform_tree_index_ = index;
+  SetNeedsPushProperties();
+}
+
+void LayerImpl::SetClipTreeIndex(int index) {
+  clip_tree_index_ = index;
+  SetNeedsPushProperties();
+}
+
+void LayerImpl::SetOpacityTreeIndex(int index) {
+  opacity_tree_index_ = index;
+  SetNeedsPushProperties();
+}
+
 void LayerImpl::PassCopyRequests(ScopedPtrVector<CopyOutputRequest>* requests) {
   if (requests->empty())
     return;
@@ -379,7 +394,7 @@ RenderPassId LayerImpl::NextContributingRenderPassId(RenderPassId id) const {
   return RenderPassId(0, 0);
 }
 
-void LayerImpl::GetContentsResourceId(ResourceProvider::ResourceId* resource_id,
+void LayerImpl::GetContentsResourceId(ResourceId* resource_id,
                                       gfx::Size* resource_size) const {
   NOTREACHED();
   *resource_id = 0;
@@ -552,9 +567,9 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
   layer->Set3dSortingContextId(sorting_context_id_);
   layer->SetNumDescendantsThatDrawContent(num_descendants_that_draw_content_);
 
-  layer->set_transform_tree_index(transform_tree_index_);
-  layer->set_opacity_tree_index(opacity_tree_index_);
-  layer->set_clip_tree_index(clip_tree_index_);
+  layer->SetTransformTreeIndex(transform_tree_index_);
+  layer->SetClipTreeIndex(clip_tree_index_);
+  layer->SetOpacityTreeIndex(opacity_tree_index_);
   layer->set_offset_to_transform_parent(offset_to_transform_parent_);
 
   LayerImpl* scroll_parent = nullptr;
@@ -656,6 +671,7 @@ gfx::Vector2dF LayerImpl::FixedContainerSizeDelta() const {
 
 base::DictionaryValue* LayerImpl::LayerTreeAsJson() const {
   base::DictionaryValue* result = new base::DictionaryValue;
+  result->SetInteger("LayerId", id());
   result->SetString("LayerType", LayerTypeAsString());
 
   base::ListValue* list = new base::ListValue;
@@ -748,9 +764,8 @@ void LayerImpl::NoteLayerPropertyChangedForDescendants() {
 
 #if DCHECK_IS_ON()
 // Verify that the resource id is valid.
-static ResourceProvider::ResourceId ValidateResource(
-    const ResourceProvider* provider,
-    ResourceProvider::ResourceId id) {
+static ResourceId ValidateResource(const ResourceProvider* provider,
+                                   ResourceId id) {
   provider->ValidateResource(id);
   return id;
 }
@@ -1217,15 +1232,29 @@ void LayerImpl::PushScrollOffset(const gfx::ScrollOffset* scroll_offset) {
 }
 
 void LayerImpl::DidUpdateScrollOffset(bool is_from_root_delegate) {
+  DCHECK(scroll_offset_);
+
   if (!is_from_root_delegate)
     layer_tree_impl()->DidUpdateScrollOffset(id());
   NoteLayerPropertyChangedForSubtree();
   ScrollbarParametersDidChange(false);
+
+  // TODO(enne): in the future, scrolling should update the scroll tree
+  // directly instead of going through layers.
+  if (transform_tree_index_ != -1) {
+    TransformTree& transform_tree =
+        layer_tree_impl()->property_trees()->transform_tree;
+    TransformNode* node = transform_tree.Node(transform_tree_index_);
+    node->data.scroll_offset = scroll_offset_->Current(IsActive());
+    node->data.needs_local_transform_update = true;
+    transform_tree.set_needs_update(true);
+  }
+
   // Inform the pending twin that a property changed.
   if (layer_tree_impl()->IsActiveTree()) {
     LayerImpl* pending_twin = layer_tree_impl()->FindPendingTreeLayerById(id());
     if (pending_twin)
-      pending_twin->NoteLayerPropertyChangedForSubtree();
+      pending_twin->DidUpdateScrollOffset(is_from_root_delegate);
   }
 }
 
@@ -1462,8 +1491,8 @@ void LayerImpl::RemoveDependentNeedsPushProperties() {
       parent_->RemoveDependentNeedsPushProperties();
 }
 
-void LayerImpl::GetAllTilesAndPrioritiesForTracing(
-    std::map<const Tile*, TilePriority>* tile_map) const {
+void LayerImpl::GetAllPrioritizedTilesForTracing(
+    std::vector<PrioritizedTile>* prioritized_tiles) const {
 }
 
 void LayerImpl::AsValueInto(base::trace_event::TracedValue* state) const {

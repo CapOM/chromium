@@ -131,6 +131,10 @@ class ProfileStoreImpl : public ProfileStore {
     return profile_manager_->user_data_dir();
   }
 
+  std::string GetLastUsedProfileName() override {
+    return profile_manager_->GetLastUsedProfileName();
+  }
+
   bool IsProfileSupervised(const base::FilePath& profile_path) override {
     ProfileInfoCache& profile_info =
         g_browser_process->profile_manager()->GetProfileInfoCache();
@@ -204,6 +208,16 @@ void RecordAppListDiscoverability(PrefService* local_state,
   UMA_HISTOGRAM_ENUMERATION("Apps.AppListHowEnabled",
                             enable_source,
                             AppListService::ENABLE_NUM_ENABLE_SOURCES);
+}
+
+// Checks whether a profile name is valid for the app list. Returns false if the
+// name is empty, or represents a guest profile.
+bool IsValidProfileName(const std::string& profile_name) {
+  if (profile_name.empty())
+    return false;
+
+  return profile_name !=
+         base::FilePath(chrome::kGuestProfileDir).AsUTF8Unsafe();
 }
 
 }  // namespace
@@ -285,22 +299,7 @@ void AppListServiceImpl::Init(Profile* initial_profile) {}
 
 base::FilePath AppListServiceImpl::GetProfilePath(
     const base::FilePath& user_data_dir) {
-  std::string app_list_profile;
-  if (local_state_->HasPrefPath(prefs::kAppListProfile))
-    app_list_profile = local_state_->GetString(prefs::kAppListProfile);
-
-  // If the user has no profile preference for the app launcher, default to the
-  // last browser profile used.
-  if (app_list_profile.empty() &&
-      local_state_->HasPrefPath(prefs::kProfileLastUsed)) {
-    app_list_profile = local_state_->GetString(prefs::kProfileLastUsed);
-  }
-
-  // If there is no last used profile recorded, use the initial profile.
-  if (app_list_profile.empty())
-    app_list_profile = chrome::kInitialProfile;
-
-  return user_data_dir.AppendASCII(app_list_profile);
+  return user_data_dir.AppendASCII(GetProfileName());
 }
 
 void AppListServiceImpl::SetProfilePath(const base::FilePath& profile_path) {
@@ -310,6 +309,23 @@ void AppListServiceImpl::SetProfilePath(const base::FilePath& profile_path) {
 }
 
 void AppListServiceImpl::CreateShortcut() {}
+
+std::string AppListServiceImpl::GetProfileName() {
+  std::string app_list_profile =
+      local_state_->GetString(prefs::kAppListProfile);
+  if (IsValidProfileName(app_list_profile))
+    return app_list_profile;
+
+  // If the user has no profile preference for the app launcher, default to the
+  // last browser profile used.
+  app_list_profile = profile_store_->GetLastUsedProfileName();
+  if (IsValidProfileName(app_list_profile))
+    return app_list_profile;
+
+  // If the last profile used was invalid (ie, guest profile), use the initial
+  // profile.
+  return chrome::kInitialProfile;
+}
 
 void AppListServiceImpl::OnProfileWillBeRemoved(
     const base::FilePath& profile_path) {

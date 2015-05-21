@@ -78,9 +78,9 @@ extern const char kDisableRendererAccessibility[];
 CONTENT_EXPORT extern const char kDisableSeccompFilterSandbox[];
 CONTENT_EXPORT extern const char kDisableSetuidSandbox[];
 CONTENT_EXPORT extern const char kDisableSharedWorkers[];
-CONTENT_EXPORT extern const char kDisableSingleThreadProxyScheduler[];
 CONTENT_EXPORT extern const char kDisableSmoothScrolling[];
 CONTENT_EXPORT extern const char kDisableSoftwareRasterizer[];
+CONTENT_EXPORT extern const char kDisableSpeechAPI[];
 CONTENT_EXPORT extern const char kDisableSVG1DOM[];
 CONTENT_EXPORT extern const char kDisableTextBlobs[];
 CONTENT_EXPORT extern const char kDisableThreadedCompositing[];
@@ -121,7 +121,6 @@ CONTENT_EXPORT extern const char kEnablePinch[];
 CONTENT_EXPORT extern const char kEnablePluginPlaceholderTesting[];
 CONTENT_EXPORT extern const char kEnablePreciseMemoryInfo[];
 CONTENT_EXPORT extern const char kEnablePushMessagePayload[];
-CONTENT_EXPORT extern const char kEnablePushMessagingHasPermission[];
 CONTENT_EXPORT extern const char kEnableRegionBasedColumns[];
 CONTENT_EXPORT extern const char kEnableSandboxLogging[];
 CONTENT_EXPORT extern const char kEnableSeccompFilterSandbox[];
@@ -183,6 +182,7 @@ CONTENT_EXPORT extern const char kNoReferrers[];
 CONTENT_EXPORT extern const char kNoSandbox[];
 CONTENT_EXPORT extern const char kDisableAppContainer[];
 CONTENT_EXPORT extern const char kNumRasterThreads[];
+CONTENT_EXPORT extern const char kOverridePluginPowerSaverForTesting[];
 CONTENT_EXPORT extern const char kOverscrollHistoryNavigation[];
 extern const char kPluginLauncher[];
 CONTENT_EXPORT extern const char kPluginPath[];
@@ -290,10 +290,7 @@ extern const char kDisableThreadedEventHandlingMac[];
 // like renderers, etc.
 CONTENT_EXPORT extern const char kDeviceScaleFactor[];
 CONTENT_EXPORT extern const char kDisableLegacyIntermediateWindow[];
-// This switch will be removed when we enable the win32K lockdown process
-// mitigation.
 CONTENT_EXPORT extern const char kDisableWin32kRendererLockDown[];
-CONTENT_EXPORT extern const char kEnableWin32kRendererLockDown[];
 CONTENT_EXPORT extern const char kMemoryPressureThresholdsMb[];
 // Switch to pass the font cache shared memory handle to the renderer.
 CONTENT_EXPORT extern const char kFontCacheSharedHandle[];

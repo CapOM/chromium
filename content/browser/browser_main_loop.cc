@@ -7,6 +7,7 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/logging.h"
+#include "base/memory/memory_pressure_monitor.h"
 #include "base/message_loop/message_loop.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
@@ -49,7 +50,6 @@
 #include "content/common/host_discardable_shared_memory_manager.h"
 #include "content/common/host_shared_bitmap_manager.h"
 #include "content/public/browser/browser_main_parts.h"
-#include "content/public/browser/browser_shutdown.h"
 #include "content/public/browser/content_browser_client.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/tracing_controller.h"
@@ -91,7 +91,7 @@
 #endif
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
-#include "base/mac/memory_pressure_monitor_mac.h"
+#include "base/mac/memory_pressure_monitor.h"
 #include "content/browser/bootstrap_sandbox_mac.h"
 #include "content/browser/cocoa/system_hotkey_helper_mac.h"
 #include "content/browser/compositor/browser_compositor_view_mac.h"
@@ -111,7 +111,7 @@
 #endif
 
 #if defined(OS_CHROMEOS)
-#include "base/chromeos/memory_pressure_monitor_chromeos.h"
+#include "base/chromeos/memory_pressure_monitor.h"
 #include "chromeos/chromeos_switches.h"
 #endif
 
@@ -334,30 +334,6 @@ base::win::MemoryPressureMonitor* CreateWinMemoryPressureMonitor(
 
 // The currently-running BrowserMainLoop.  There can be one or zero.
 BrowserMainLoop* g_current_browser_main_loop = NULL;
-
-// This is just to be able to keep ShutdownThreadsAndCleanUp out of
-// the public interface of BrowserMainLoop.
-class BrowserShutdownImpl {
- public:
-  static void ImmediateShutdownAndExitProcess() {
-    DCHECK(g_current_browser_main_loop);
-    g_current_browser_main_loop->ShutdownThreadsAndCleanUp();
-
-#if defined(OS_WIN)
-    // At this point the message loop is still running yet we've shut everything
-    // down. If any messages are processed we'll likely crash. Exit now.
-    ExitProcess(RESULT_CODE_NORMAL_EXIT);
-#elif defined(OS_POSIX) && !defined(OS_MACOSX)
-    _exit(RESULT_CODE_NORMAL_EXIT);
-#else
-    NOTIMPLEMENTED();
-#endif
-  }
-};
-
-void ImmediateShutdownAndExitProcess() {
-  BrowserShutdownImpl::ImmediateShutdownAndExitProcess();
-}
 
 // For measuring memory usage after each task. Behind a command line flag.
 class BrowserMainLoop::MemoryObserver : public base::MessageLoop::TaskObserver {
@@ -595,7 +571,7 @@ void BrowserMainLoop::MainMessageLoopStart() {
 #if defined(OS_ANDROID)
   {
     TRACE_EVENT0("startup", "BrowserMainLoop::Subsystem:SurfaceTextureManager");
-    SurfaceTextureManager::InitInstance(new BrowserSurfaceTextureManager);
+    SurfaceTextureManager::SetInstance(new BrowserSurfaceTextureManager);
   }
 
   if (!parsed_command_line_.HasSwitch(
@@ -644,13 +620,15 @@ int BrowserMainLoop::PreCreateThreads() {
     result_code_ = parts_->PreCreateThreads();
   }
 
+  // TODO(chrisha): Abstract away this construction mess to a helper function,
+  // once MemoryPressureMonitor is made a concrete class.
 #if defined(OS_CHROMEOS)
   if (chromeos::switches::MemoryPressureHandlingEnabled()) {
-    memory_pressure_monitor_.reset(new base::MemoryPressureMonitorChromeOS(
+    memory_pressure_monitor_.reset(new base::chromeos::MemoryPressureMonitor(
         chromeos::switches::GetMemoryPressureThresholds()));
   }
 #elif defined(OS_MACOSX) && !defined(OS_IOS)
-  memory_pressure_monitor_.reset(new base::MemoryPressureMonitorMac());
+  memory_pressure_monitor_.reset(new base::mac::MemoryPressureMonitor());
 #elif defined(OS_WIN)
   memory_pressure_monitor_.reset(CreateWinMemoryPressureMonitor(
       parsed_command_line_));
@@ -917,9 +895,7 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
     resource_dispatcher_host_.get()->Shutdown();
   }
 
-#if defined(OS_CHROMEOS) || defined(OS_MACOSX)
   memory_pressure_monitor_.reset();
-#endif
 
 #if defined(OS_MACOSX)
   BrowserCompositorMac::DisableRecyclingForShutdown();

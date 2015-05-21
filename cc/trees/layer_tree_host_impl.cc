@@ -47,26 +47,26 @@
 #include "cc/output/delegating_renderer.h"
 #include "cc/output/gl_renderer.h"
 #include "cc/output/software_renderer.h"
+#include "cc/output/texture_mailbox_deleter.h"
 #include "cc/quads/render_pass_draw_quad.h"
 #include "cc/quads/shared_quad_state.h"
 #include "cc/quads/solid_color_draw_quad.h"
 #include "cc/quads/texture_draw_quad.h"
-#include "cc/resources/bitmap_tile_task_worker_pool.h"
-#include "cc/resources/eviction_tile_priority_queue.h"
-#include "cc/resources/gpu_rasterizer.h"
-#include "cc/resources/gpu_tile_task_worker_pool.h"
+#include "cc/raster/bitmap_tile_task_worker_pool.h"
+#include "cc/raster/gpu_rasterizer.h"
+#include "cc/raster/gpu_tile_task_worker_pool.h"
+#include "cc/raster/one_copy_tile_task_worker_pool.h"
+#include "cc/raster/pixel_buffer_tile_task_worker_pool.h"
+#include "cc/raster/tile_task_worker_pool.h"
+#include "cc/raster/zero_copy_tile_task_worker_pool.h"
 #include "cc/resources/memory_history.h"
-#include "cc/resources/one_copy_tile_task_worker_pool.h"
-#include "cc/resources/picture_layer_tiling.h"
-#include "cc/resources/pixel_buffer_tile_task_worker_pool.h"
 #include "cc/resources/prioritized_resource_manager.h"
-#include "cc/resources/raster_tile_priority_queue.h"
 #include "cc/resources/resource_pool.h"
-#include "cc/resources/texture_mailbox_deleter.h"
-#include "cc/resources/tile_task_worker_pool.h"
 #include "cc/resources/ui_resource_bitmap.h"
-#include "cc/resources/zero_copy_tile_task_worker_pool.h"
 #include "cc/scheduler/delay_based_time_source.h"
+#include "cc/tiles/eviction_tile_priority_queue.h"
+#include "cc/tiles/picture_layer_tiling.h"
+#include "cc/tiles/raster_tile_priority_queue.h"
 #include "cc/trees/damage_tracker.h"
 #include "cc/trees/latency_info_swap_promise_monitor.h"
 #include "cc/trees/layer_tree_host.h"
@@ -195,6 +195,7 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       use_gpu_rasterization_(false),
       use_msaa_(false),
       gpu_rasterization_status_(GpuRasterizationStatus::OFF_DEVICE),
+      tree_resources_for_gpu_rasterization_dirty_(false),
       input_handler_client_(NULL),
       did_lock_scrolling_layer_(false),
       should_bubble_scrolls_(false),
@@ -296,9 +297,12 @@ void LayerTreeHostImpl::BeginCommit() {
   TRACE_EVENT0("cc", "LayerTreeHostImpl::BeginCommit");
 
   // Ensure all textures are returned so partial texture updates can happen
-  // during the commit. Impl-side-painting doesn't upload during commits, so
-  // is unaffected.
-  if (!settings_.impl_side_painting && output_surface_)
+  // during the commit.
+  // TODO(ericrk): We should not need to ForceReclaimResources when using
+  // Impl-side-painting as it doesn't upload during commits. However,
+  // Display::Draw currently relies on resource being reclaimed to block drawing
+  // between BeginCommit / Swap. See crbug.com/489515.
+  if (output_surface_)
     output_surface_->ForceReclaimResources();
 
   if (settings_.impl_side_painting && !proxy_->CommitToActiveTree())
@@ -308,7 +312,9 @@ void LayerTreeHostImpl::BeginCommit() {
 void LayerTreeHostImpl::CommitComplete() {
   TRACE_EVENT0("cc", "LayerTreeHostImpl::CommitComplete");
 
-  UpdateGpuRasterizationStatus();
+  // LayerTreeHost may have changed the GPU rasterization flags state, which
+  // may require an update of the tree resources.
+  UpdateTreeResourcesForGpuRasterizationIfNeeded();
   sync_tree()->set_needs_update_draw_properties();
 
   if (settings_.impl_side_painting) {
@@ -1584,6 +1590,20 @@ void LayerTreeHostImpl::FinishAllRendering() {
     renderer_->Finish();
 }
 
+bool LayerTreeHostImpl::CanUseGpuRasterization() {
+  if (!(output_surface_ && output_surface_->context_provider() &&
+        output_surface_->worker_context_provider()))
+    return false;
+
+  ContextProvider* context_provider =
+      output_surface_->worker_context_provider();
+  base::AutoLock context_lock(*context_provider->GetLock());
+  if (!context_provider->GrContext())
+    return false;
+
+  return true;
+}
+
 void LayerTreeHostImpl::UpdateGpuRasterizationStatus() {
   bool use_gpu = false;
   bool use_msaa = false;
@@ -1613,6 +1633,17 @@ void LayerTreeHostImpl::UpdateGpuRasterizationStatus() {
     gpu_rasterization_status_ = GpuRasterizationStatus::OFF_CONTENT;
   }
 
+  if (use_gpu && !use_gpu_rasterization_) {
+    if (!CanUseGpuRasterization()) {
+      // If GPU rasterization is unusable, e.g. if GlContext could not
+      // be created due to losing the GL context, force use of software
+      // raster.
+      use_gpu = false;
+      use_msaa = false;
+      gpu_rasterization_status_ = GpuRasterizationStatus::OFF_DEVICE;
+    }
+  }
+
   if (use_gpu == use_gpu_rasterization_ && use_msaa == use_msaa_)
     return;
 
@@ -1620,6 +1651,13 @@ void LayerTreeHostImpl::UpdateGpuRasterizationStatus() {
   // query the new state of |use_gpu_rasterization_|.
   use_gpu_rasterization_ = use_gpu;
   use_msaa_ = use_msaa;
+
+  tree_resources_for_gpu_rasterization_dirty_ = true;
+}
+
+void LayerTreeHostImpl::UpdateTreeResourcesForGpuRasterizationIfNeeded() {
+  if (!tree_resources_for_gpu_rasterization_dirty_)
+    return;
 
   // Clean up and replace existing tile manager with another one that uses
   // appropriate rasterizer.
@@ -1634,6 +1672,8 @@ void LayerTreeHostImpl::UpdateGpuRasterizationStatus() {
   // We would not have any content to draw until the pending tree is activated.
   // Prevent the active tree from drawing until activation.
   SetRequiresHighResToDraw();
+
+  tree_resources_for_gpu_rasterization_dirty_ = false;
 }
 
 const RendererCapabilitiesImpl&
@@ -1990,8 +2030,6 @@ void LayerTreeHostImpl::CreateAndSetRenderer() {
   }
   DCHECK(renderer_);
 
-  // Since the new renderer may be capable of MSAA, update status here.
-  UpdateGpuRasterizationStatus();
   renderer_->SetVisible(visible_);
   SetFullRootLayerDamage();
 
@@ -2038,16 +2076,6 @@ void LayerTreeHostImpl::CreateResourceAndTileTaskWorkerPool(
                               : proxy_->MainThreadTaskRunner();
   DCHECK(task_runner);
 
-  ContextProvider* context_provider = output_surface_->context_provider();
-  if (!context_provider) {
-    *resource_pool =
-        ResourcePool::Create(resource_provider_.get(), GL_TEXTURE_2D);
-
-    *tile_task_worker_pool = BitmapTileTaskWorkerPool::Create(
-        task_runner, task_graph_runner_, resource_provider_.get());
-    return;
-  }
-
   // Pass the single-threaded synchronous task graph runner to the worker pool
   // if we're in synchronous single-threaded mode.
   TaskGraphRunner* task_graph_runner = task_graph_runner_;
@@ -2055,6 +2083,16 @@ void LayerTreeHostImpl::CreateResourceAndTileTaskWorkerPool(
     DCHECK(!single_thread_synchronous_task_graph_runner_);
     single_thread_synchronous_task_graph_runner_.reset(new TaskGraphRunner);
     task_graph_runner = single_thread_synchronous_task_graph_runner_.get();
+  }
+
+  ContextProvider* context_provider = output_surface_->context_provider();
+  if (!context_provider) {
+    *resource_pool =
+        ResourcePool::Create(resource_provider_.get(), GL_TEXTURE_2D);
+
+    *tile_task_worker_pool = BitmapTileTaskWorkerPool::Create(
+        task_runner, task_graph_runner, resource_provider_.get());
+    return;
   }
 
   if (use_gpu_rasterization_) {
@@ -2175,6 +2213,9 @@ bool LayerTreeHostImpl::InitializeRenderer(
       settings_.renderer_settings.texture_id_allocation_chunk_size);
 
   CreateAndSetRenderer();
+
+  // Since the new renderer may be capable of MSAA, update status here.
+  UpdateGpuRasterizationStatus();
 
   if (settings_.impl_side_painting && settings_.raster_enabled)
     CreateAndSetTileManager();
@@ -2546,7 +2587,10 @@ static gfx::Vector2dF ScrollLayerWithLocalDelta(
   layer_impl->ScrollBy(delta);
   gfx::ScrollOffset scrolled =
       layer_impl->CurrentScrollOffset() - previous_offset;
-  return gfx::Vector2dF(scrolled.x(), scrolled.y());
+  gfx::Vector2dF consumed_scroll(scrolled.x(), scrolled.y());
+  consumed_scroll.Scale(page_scale_factor);
+
+  return consumed_scroll;
 }
 
 gfx::Vector2dF LayerTreeHostImpl::ScrollLayer(LayerImpl* layer_impl,
@@ -3086,7 +3130,7 @@ std::string LayerTreeHostImpl::LayerTreeAsJson() const {
   if (active_tree_->root_layer()) {
     scoped_ptr<base::Value> json(active_tree_->root_layer()->LayerTreeAsJson());
     base::JSONWriter::WriteWithOptions(
-        json.get(), base::JSONWriter::OPTIONS_PRETTY_PRINT, &str);
+        *json, base::JSONWriter::OPTIONS_PRETTY_PRINT, &str);
   }
   return str;
 }
@@ -3177,18 +3221,15 @@ void LayerTreeHostImpl::AsValueWithFrameInto(
   MathUtil::AddToTracedValue("device_viewport_size", device_viewport_size_,
                              state);
 
-  std::map<const Tile*, TilePriority> tile_map;
-  active_tree_->GetAllTilesAndPrioritiesForTracing(&tile_map);
+  std::vector<PrioritizedTile> prioritized_tiles;
+  active_tree_->GetAllPrioritizedTilesForTracing(&prioritized_tiles);
   if (pending_tree_)
-    pending_tree_->GetAllTilesAndPrioritiesForTracing(&tile_map);
+    pending_tree_->GetAllPrioritizedTilesForTracing(&prioritized_tiles);
 
   state->BeginArray("active_tiles");
-  for (const auto& pair : tile_map) {
-    const Tile* tile = pair.first;
-    const TilePriority& priority = pair.second;
-
+  for (const auto& prioritized_tile : prioritized_tiles) {
     state->BeginDictionary();
-    tile->AsValueWithPriorityInto(priority, state);
+    prioritized_tile.AsValueInto(state);
     state->EndDictionary();
   }
   state->EndArray();
@@ -3251,7 +3292,7 @@ void LayerTreeHostImpl::CreateUIResource(UIResourceId uid,
 
   // Allow for multiple creation requests with the same UIResourceId.  The
   // previous resource is simply deleted.
-  ResourceProvider::ResourceId id = ResourceIdForUIResource(uid);
+  ResourceId id = ResourceIdForUIResource(uid);
   if (id)
     DeleteUIResource(uid);
 
@@ -3284,7 +3325,7 @@ void LayerTreeHostImpl::CreateUIResource(UIResourceId uid,
 }
 
 void LayerTreeHostImpl::DeleteUIResource(UIResourceId uid) {
-  ResourceProvider::ResourceId id = ResourceIdForUIResource(uid);
+  ResourceId id = ResourceIdForUIResource(uid);
   if (id) {
     resource_provider_->DeleteResource(id);
     ui_resource_map_.erase(uid);
@@ -3309,8 +3350,7 @@ void LayerTreeHostImpl::EvictAllUIResources() {
   client_->RenewTreePriority();
 }
 
-ResourceProvider::ResourceId LayerTreeHostImpl::ResourceIdForUIResource(
-    UIResourceId uid) const {
+ResourceId LayerTreeHostImpl::ResourceIdForUIResource(UIResourceId uid) const {
   UIResourceMap::const_iterator iter = ui_resource_map_.find(uid);
   if (iter != ui_resource_map_.end())
     return iter->second.resource_id;

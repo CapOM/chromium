@@ -53,6 +53,7 @@ Layer::Layer()
       transform_tree_index_(-1),
       opacity_tree_index_(-1),
       clip_tree_index_(-1),
+      property_tree_sequence_number_(-1),
       num_layer_or_descendants_with_copy_request_(0),
       num_layer_or_descendants_with_input_handler_(0),
       should_flatten_transform_from_property_tree_(false),
@@ -256,6 +257,9 @@ void Layer::SetParent(Layer* layer) {
 
   if (!layer_tree_host_)
     return;
+
+  layer_tree_host_->property_trees()->needs_rebuild = true;
+
   const LayerTreeSettings& settings = layer_tree_host_->settings();
   if (!settings.layer_transforms_should_scale_layer_contents)
     return;
@@ -811,8 +815,7 @@ void Layer::SetScrollOffset(const gfx::ScrollOffset& scroll_offset) {
           layer_tree_host_->property_trees()->transform_tree.Node(
               transform_tree_index())) {
     if (transform_node->owner_id == id()) {
-      transform_node->data.scroll_offset =
-          gfx::ScrollOffsetToVector2dF(CurrentScrollOffset());
+      transform_node->data.scroll_offset = CurrentScrollOffset();
       transform_node->data.needs_local_transform_update = true;
       layer_tree_host_->property_trees()->transform_tree.set_needs_update(true);
       SetNeedsCommitNoRebuild();
@@ -851,8 +854,7 @@ void Layer::SetScrollOffsetFromImplSide(
           layer_tree_host_->property_trees()->transform_tree.Node(
               transform_tree_index())) {
     if (transform_node->owner_id == id()) {
-      transform_node->data.scroll_offset =
-          gfx::ScrollOffsetToVector2dF(CurrentScrollOffset());
+      transform_node->data.scroll_offset = CurrentScrollOffset();
       transform_node->data.needs_local_transform_update = true;
       layer_tree_host_->property_trees()->transform_tree.set_needs_update(true);
       needs_rebuild = false;
@@ -982,6 +984,57 @@ void Layer::Set3dSortingContextId(int id) {
     return;
   sorting_context_id_ = id;
   SetNeedsCommit();
+}
+
+void Layer::SetTransformTreeIndex(int index) {
+  DCHECK(IsPropertyChangeAllowed());
+  if (transform_tree_index_ == index)
+    return;
+  transform_tree_index_ = index;
+  SetNeedsPushProperties();
+}
+
+int Layer::transform_tree_index() const {
+  if (!layer_tree_host_ ||
+      layer_tree_host_->property_trees()->sequence_number !=
+          property_tree_sequence_number_) {
+    return -1;
+  }
+  return transform_tree_index_;
+}
+
+void Layer::SetClipTreeIndex(int index) {
+  DCHECK(IsPropertyChangeAllowed());
+  if (clip_tree_index_ == index)
+    return;
+  clip_tree_index_ = index;
+  SetNeedsPushProperties();
+}
+
+int Layer::clip_tree_index() const {
+  if (!layer_tree_host_ ||
+      layer_tree_host_->property_trees()->sequence_number !=
+          property_tree_sequence_number_) {
+    return -1;
+  }
+  return clip_tree_index_;
+}
+
+void Layer::SetOpacityTreeIndex(int index) {
+  DCHECK(IsPropertyChangeAllowed());
+  if (opacity_tree_index_ == index)
+    return;
+  opacity_tree_index_ = index;
+  SetNeedsPushProperties();
+}
+
+int Layer::opacity_tree_index() const {
+  if (!layer_tree_host_ ||
+      layer_tree_host_->property_trees()->sequence_number !=
+          property_tree_sequence_number_) {
+    return -1;
+  }
+  return opacity_tree_index_;
 }
 
 void Layer::SetShouldFlattenTransform(bool should_flatten) {
@@ -1128,9 +1181,9 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   DCHECK(!(TransformIsAnimating() && layer->TransformIsAnimatingOnImplOnly()));
   layer->Set3dSortingContextId(sorting_context_id_);
   layer->SetNumDescendantsThatDrawContent(num_descendants_that_draw_content_);
-  layer->set_transform_tree_index(transform_tree_index_);
-  layer->set_opacity_tree_index(opacity_tree_index_);
-  layer->set_clip_tree_index(clip_tree_index_);
+  layer->SetTransformTreeIndex(transform_tree_index());
+  layer->SetOpacityTreeIndex(opacity_tree_index());
+  layer->SetClipTreeIndex(clip_tree_index());
   layer->set_offset_to_transform_parent(offset_to_transform_parent_);
 
   layer->SetScrollClipLayer(scroll_clip_layer_id_);
@@ -1355,7 +1408,7 @@ void Layer::OnOpacityAnimated(float opacity) {
   if (layer_tree_host_) {
     if (OpacityNode* node =
             layer_tree_host_->property_trees()->opacity_tree.Node(
-                opacity_tree_index_)) {
+                opacity_tree_index())) {
       if (node->owner_id == id())
         node->data = opacity;
     }
@@ -1370,7 +1423,7 @@ void Layer::OnTransformAnimated(const gfx::Transform& transform) {
   if (layer_tree_host_) {
     if (TransformNode* node =
             layer_tree_host_->property_trees()->transform_tree.Node(
-                transform_tree_index_)) {
+                transform_tree_index())) {
       if (node->owner_id == id()) {
         node->data.local = transform;
         node->data.needs_local_transform_update = true;

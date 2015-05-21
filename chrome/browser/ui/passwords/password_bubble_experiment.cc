@@ -5,13 +5,13 @@
 #include "chrome/browser/ui/passwords/password_bubble_experiment.h"
 
 #include "base/metrics/field_trial.h"
-#include "chrome/browser/signin/signin_manager_factory.h"
-#include "components/signin/core/browser/signin_manager.h"
+#include "base/prefs/pref_service.h"
+#include "chrome/browser/password_manager/password_manager_util.h"
 
 namespace password_bubble_experiment {
 namespace {
 
-const char kBrandingExperimentName[] = "PasswordBubbleBranding";
+const char kBrandingExperimentName[] = "PasswordBranding";
 const char kSmartLockBrandingGroupName[] = "SmartLockBranding";
 
 } // namespace
@@ -22,12 +22,11 @@ void RecordBubbleClosed(
   // TODO(vasilii): store the statistics.
 }
 
-bool IsEnabledSmartLockBranding(Profile* profile) {
-  SigninManagerBase* signin = SigninManagerFactory::GetForProfile(profile);
-  return (signin && signin->IsAuthenticated() &&
-          base::FieldTrialList::FindFullName(kBrandingExperimentName) ==
-              kSmartLockBrandingGroupName);
+bool IsSmartLockBrandingEnabled(const sync_driver::SyncService* sync_service) {
+  return password_manager_util::GetPasswordSyncState(sync_service) ==
+             password_manager::SYNCING_NORMAL_ENCRYPTION &&
+         base::FieldTrialList::FindFullName(kBrandingExperimentName) ==
+             kSmartLockBrandingGroupName;
 }
-
 
 }  // namespace password_bubble_experiment

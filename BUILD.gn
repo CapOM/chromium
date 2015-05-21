@@ -92,7 +92,7 @@ group("both_gn_and_gyp") {
     "//media/cast:cast_unittests",
     "//media/midi:midi_unittests",
     "//mojo",
-    "//mojo/application",
+    "//mojo/application/public/cpp",
     "//mojo/common:mojo_common_unittests",
     "//net:hpack_example_generator",
     "//net:hpack_fuzz_mutator",
@@ -169,10 +169,7 @@ group("both_gn_and_gyp") {
   }
 
   if (enable_media_router) {
-    deps += [
-      "//chrome/browser/media/router/",
-      "//chrome/browser/media/router:unit_tests",
-    ]
+    deps += [ "//chrome/browser/media/router" ]
   }
 
   if (enable_remoting) {
@@ -393,7 +390,6 @@ group("both_gn_and_gyp") {
       "//ppapi:pepper_hash_for_uma",
       "//ppapi:ppapi_perftests",
       "//sync:run_sync_testserver",
-      "//sync:sync_endtoend_tests",
       "//third_party/codesighs:maptsvdifftool",
       "//third_party/leveldatabase:env_chromium_unittests",
       "//third_party/libaddressinput:libaddressinput_unittests",
@@ -448,7 +444,7 @@ group("both_gn_and_gyp") {
       "//gpu/khronos_glcts_support:khronos_glcts_test",  # TODO(GYP) crbug.com/471903 to make this complete.
       "//media/cast:cast_benchmarks",
       "//media/cast:tap_proxy",
-      "//mojo/application",
+      "//mojo/application/public/cpp",
       "//skia:filter_fuzz_stub",
       "//skia:image_operations_bench",
       "//sync/tools:sync_client",
@@ -518,7 +514,7 @@ group("both_gn_and_gyp") {
       "//storage/browser",
       "//third_party/brotli",
       "//third_party/flac",
-      "//third_party/hunspell_new",
+      "//third_party/hunspell",
       "//third_party/iccjpeg",
       "//third_party/libphonenumber",
       "//third_party/ots",
@@ -690,7 +686,6 @@ group("gn_mojo_targets") {
     # and figure out how cross-platform they are
     deps = [
       "//chrome/browser/ui/webui/omnibox:mojo_bindings_python",
-      "//components/window_manager/public/interfaces:interfaces_python",
       "//content/public/common:mojo_bindings_python",
       "//content/common:mojo_bindings_python",
       "//content/test:web_ui_test_mojo_bindings_python",
@@ -707,7 +702,6 @@ group("gn_mojo_targets") {
       "//third_party/mojo/src/mojo/edk/js/tests:js_to_cpp_bindings_python",
       "//third_party/mojo/src/mojo/public/python:packaged_application",
       "//third_party/mojo/src/mojo/public/python:packaged_bindings",
-      "//third_party/mojo/src/mojo/public/cpp/application:test_support_standalone",
       "//third_party/mojo_services/src/accessibility/public/interfaces:interfaces_python",
     ]
   }
@@ -752,8 +746,8 @@ if (!is_ios) {
 
     if (is_win) {
       deps += [
-        #'../content/content_shell_and_tests.gyp:content_shell_crash_service', TODO(GYP)
-        #'../content/content_shell_and_tests.gyp:layout_test_helper', TODO(GYP)
+        "//content/shell:crash_service",
+        "//content/shell:layout_test_helper",
       ]
     }
 
@@ -764,7 +758,7 @@ if (!is_ios) {
     if (is_mac) {
       deps += [
         "//breakpad:dump_syms($host_toolchain)",
-        #'../content/content_shell_and_tests.gyp:layout_test_helper', TODO(GYP)
+        "//content/shell:layout_test_helper",
       ]
     }
 

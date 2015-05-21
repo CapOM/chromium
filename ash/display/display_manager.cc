@@ -141,7 +141,7 @@ DisplayManager::DisplayManager()
     DisplayInfo::SetUse125DSFForUIScaling(true);
 
   if (switches::UnifiedDesktopEnabled())
-    multi_display_mode_ = default_multi_display_mode_ = UNIFIED;
+    default_multi_display_mode_ = UNIFIED;
 
   change_display_upon_host_resize_ = !base::SysInfo::IsRunningOnChromeOS();
 #endif
@@ -673,12 +673,16 @@ void DisplayManager::UpdateDisplays(
   std::sort(new_display_info_list.begin(),
             new_display_info_list.end(),
             DisplayInfoSortFunctor());
+
+  if (multi_display_mode_ != MIRRORING)
+    multi_display_mode_ = default_multi_display_mode_;
+
+  CreateSoftwareMirroringDisplayInfo(&new_display_info_list);
+
   // Close the mirroring window if any here to avoid creating two compositor on
   // one display.
   if (delegate_)
-    delegate_->CloseMirroringDisplay();
-
-  CreateSoftwareMirroringDisplay(&new_display_info_list);
+    delegate_->CloseMirroringDisplayIfNotNecessary();
 
   DisplayList new_displays;
   DisplayList removed_displays;
@@ -794,21 +798,19 @@ void DisplayManager::UpdateDisplays(
   RefreshFontParams();
   base::AutoReset<bool> resetter(&change_display_upon_host_resize_, false);
 
+  int active_display_list_size = active_display_list_.size();
   // Temporarily add displays to be removed because display object
   // being removed are accessed during shutting down the root.
   active_display_list_.insert(active_display_list_.end(),
                               removed_displays.begin(), removed_displays.end());
 
-  for (DisplayList::const_reverse_iterator iter = removed_displays.rbegin();
-       iter != removed_displays.rend(); ++iter) {
-    screen_->NotifyDisplayRemoved(active_display_list_.back());
-    active_display_list_.pop_back();
-  }
+  for (const auto& display : removed_displays)
+    screen_->NotifyDisplayRemoved(display);
 
-  for (std::vector<size_t>::iterator iter = added_display_indices.begin();
-       iter != added_display_indices.end(); ++iter) {
-    screen_->NotifyDisplayAdded(active_display_list_[*iter]);
-  }
+  for (size_t index : added_display_indices)
+    screen_->NotifyDisplayAdded(active_display_list_[index]);
+
+  active_display_list_.resize(active_display_list_size);
 
   bool notify_primary_change =
       delegate_ ? old_primary.id() != screen_->GetPrimaryDisplay().id() : false;
@@ -952,9 +954,8 @@ void DisplayManager::SetMirrorMode(bool mirror) {
        ++iter) {
     display_info_list.push_back(GetDisplayInfo(iter->id()));
   }
-
-  SetSoftwareMirroring(mirror);
-  UpdateDisplays(display_info_list);
+  multi_display_mode_ = mirror ? MIRRORING : default_multi_display_mode_;
+  ReconfigureDisplays();
   if (Shell::GetInstance()->display_configurator_animation()) {
     Shell::GetInstance()->display_configurator_animation()->
         StartFadeInAnimation();
@@ -1018,10 +1019,28 @@ void DisplayManager::SetMultiDisplayMode(MultiDisplayMode mode) {
 }
 
 void DisplayManager::SetDefaultMultiDisplayMode(MultiDisplayMode mode) {
-  // TODO(oshima): Remove this constrain.
-  DCHECK_EQ(default_multi_display_mode_, EXTENDED);
-  DCHECK_EQ(mode, UNIFIED);
+  DCHECK_NE(mode, MIRRORING);
   default_multi_display_mode_ = mode;
+}
+
+void DisplayManager::ReconfigureDisplays() {
+  DisplayInfoList display_info_list;
+  for (DisplayList::const_iterator iter = active_display_list_.begin();
+       (display_info_list.size() < 2 && iter != active_display_list_.end());
+       ++iter) {
+    if (iter->id() == kUnifiedDisplayId)
+      continue;
+    display_info_list.push_back(GetDisplayInfo(iter->id()));
+  }
+  for (auto iter = software_mirroring_display_list_.begin();
+       (display_info_list.size() < 2 &&
+        iter != software_mirroring_display_list_.end());
+       ++iter) {
+    display_info_list.push_back(GetDisplayInfo(iter->id()));
+  }
+  mirroring_display_id_ = gfx::Display::kInvalidDisplayID;
+  software_mirroring_display_list_.clear();
+  UpdateDisplays(display_info_list);
 }
 
 bool DisplayManager::UpdateDisplayBounds(int64 display_id,
@@ -1083,7 +1102,7 @@ void DisplayManager::UpdateInternalDisplayModeListForTest() {
   SetInternalDisplayModeList(info);
 }
 
-void DisplayManager::CreateSoftwareMirroringDisplay(
+void DisplayManager::CreateSoftwareMirroringDisplayInfo(
     DisplayInfoList* display_info_list) {
   // Use the internal display or 1st as the mirror source, then scale
   // the root window so that it matches the external display's

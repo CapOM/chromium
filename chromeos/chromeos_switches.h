@@ -5,7 +5,7 @@
 #ifndef CHROMEOS_CHROMEOS_SWITCHES_H_
 #define CHROMEOS_CHROMEOS_SWITCHES_H_
 
-#include "base/chromeos/memory_pressure_monitor_chromeos.h"
+#include "base/chromeos/memory_pressure_monitor.h"
 #include "chromeos/chromeos_export.h"
 
 namespace chromeos {
@@ -57,11 +57,10 @@ CHROMEOS_EXPORT extern const char kEafeUrl[];
 CHROMEOS_EXPORT extern const char kEafePath[];
 CHROMEOS_EXPORT extern const char kEnableConsumerManagement[];
 CHROMEOS_EXPORT extern const char kEnableExtensionAssetsSharing[];
-CHROMEOS_EXPORT extern const char kEnableFirewallHolePunching[];
 CHROMEOS_EXPORT extern const char kEnableFirstRunUITransitions[];
 CHROMEOS_EXPORT extern const char kEnableKioskMode[];
 CHROMEOS_EXPORT extern const char kEnableNetworkPortalNotification[];
-CHROMEOS_EXPORT extern const char kEnableNewKoreanIme[];
+CHROMEOS_EXPORT extern const char kDisableNewKoreanIme[];
 CHROMEOS_EXPORT extern const char kEnablePhysicalKeyboardAutocorrect[];
 CHROMEOS_EXPORT extern const char kEnablePrinterAppSearch[];
 CHROMEOS_EXPORT extern const char kEnableRequestTabletSite[];
@@ -115,7 +114,7 @@ CHROMEOS_EXPORT extern const char kDataSaverPromptDemoMode[];
 CHROMEOS_EXPORT bool WakeOnWifiEnabled();
 
 CHROMEOS_EXPORT bool MemoryPressureHandlingEnabled();
-CHROMEOS_EXPORT base::MemoryPressureMonitorChromeOS::MemoryPressureThresholds
+CHROMEOS_EXPORT base::chromeos::MemoryPressureMonitor::MemoryPressureThresholds
 GetMemoryPressureThresholds();
 
 }  // namespace switches

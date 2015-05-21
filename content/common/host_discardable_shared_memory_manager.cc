@@ -15,6 +15,7 @@
 #include "base/numerics/safe_math.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/sys_info.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/trace_event/trace_event.h"
 
 namespace content {
@@ -67,7 +68,12 @@ class DiscardableMemoryImpl : public base::DiscardableMemory {
 base::LazyInstance<HostDiscardableSharedMemoryManager>
     g_discardable_shared_memory_manager = LAZY_INSTANCE_INITIALIZER;
 
+#if defined(OS_ANDROID)
+// Limits the number of FDs used to 32, assuming a 4MB allocation size.
+const int64_t kMaxDefaultMemoryLimit = 128 * 1024 * 1024;
+#else
 const int64_t kMaxDefaultMemoryLimit = 512 * 1024 * 1024;
+#endif
 
 const int kEnforceMemoryPolicyDelayMs = 1000;
 
@@ -88,7 +94,11 @@ HostDiscardableSharedMemoryManager::HostDiscardableSharedMemoryManager()
     : memory_limit_(
           // Allow 25% of physical memory to be used for discardable memory.
           std::min(base::SysInfo::AmountOfPhysicalMemory() / 4,
-                   kMaxDefaultMemoryLimit)),
+                   base::SysInfo::IsLowEndDevice()
+                       ?
+                       // Use 1/8th of discardable memory on low-end devices.
+                       kMaxDefaultMemoryLimit / 8
+                       : kMaxDefaultMemoryLimit)),
       bytes_allocated_(0),
       memory_pressure_listener_(new base::MemoryPressureListener(
           base::Bind(&HostDiscardableSharedMemoryManager::OnMemoryPressure,
@@ -122,6 +132,8 @@ HostDiscardableSharedMemoryManager::AllocateLockedDiscardableMemory(
   scoped_ptr<base::DiscardableSharedMemory> memory(
       new base::DiscardableSharedMemory(handle));
   CHECK(memory->Map(size));
+  // Close file descriptor to avoid running out.
+  memory->Close();
   return make_scoped_ptr(new DiscardableMemoryImpl(
       memory.Pass(),
       base::Bind(
@@ -235,6 +247,11 @@ void HostDiscardableSharedMemoryManager::AllocateLockedDiscardableSharedMemory(
 
   bytes_allocated_ = checked_bytes_allocated.ValueOrDie();
   BytesAllocatedChanged(bytes_allocated_);
+
+#if !defined(DISCARDABLE_SHARED_MEMORY_SHRINKING)
+  // Close file descriptor to avoid running out.
+  memory->Close();
+#endif
 
   scoped_refptr<MemorySegment> segment(new MemorySegment(memory.Pass()));
   process_segments[id] = segment.get();
@@ -364,6 +381,7 @@ void HostDiscardableSharedMemoryManager::ReleaseMemory(
   // Note: We intentionally leave the segment in the |segments| vector to
   // avoid reconstructing the heap. The element will be removed from the heap
   // when its last usage time is older than all other segments.
+  memory->Unmap();
   memory->Close();
 }
 
@@ -389,7 +407,7 @@ void HostDiscardableSharedMemoryManager::ScheduleEnforceMemoryPolicy() {
     return;
 
   enforce_memory_policy_pending_ = true;
-  base::MessageLoop::current()->PostDelayedTask(
+  base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
       FROM_HERE,
       base::Bind(&HostDiscardableSharedMemoryManager::EnforceMemoryPolicy,
                  weak_ptr_factory_.GetWeakPtr()),

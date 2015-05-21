@@ -57,7 +57,7 @@ source_set("mojo_runner_lib") {
 
     deps += [
       ":jni_headers",
-      "//components/native_viewport:lib",
+      "//components/view_manager/native_viewport:lib",
       "//mojo/shell",
       "//ui/gl",
     ]
@@ -78,6 +78,8 @@ executable("mojo_runner") {
     # It means dynamic symbols must be preserved and exported.
     ldflags = [ "-Wl,--export-dynamic" ]
   }
+
+  deps += [ "//build/config/sanitizers:deps" ]
 }
 
 source_set("in_process_native_runner") {
@@ -121,13 +123,10 @@ source_set("lib") {
     "//base",
     "//base/third_party/dynamic_annotations",
     "//base:base_static",
-    "//mojo/application",
-    "//mojo/common",
+    "//mojo/application/public/cpp",
     "//mojo/common:tracing_impl",
     "//mojo/util:filename_util",
     "//third_party/mojo/src/mojo/edk/system",
-    "//third_party/mojo/src/mojo/public/cpp/bindings",
-    "//third_party/mojo/src/mojo/public/interfaces/application",
     "//mojo/services/network/public/interfaces",
     "//mojo/shell",
     "//mojo/services/tracing:bindings",
@@ -159,8 +158,8 @@ source_set("lib") {
       ":jni_headers",
       ":run_android_application_function",
       "//components/gles2",
-      "//components/native_viewport:lib",
-      "//mojo/application:content_handler",
+      "//components/view_manager/native_viewport:lib",
+      "//mojo/application/public/cpp:content_handler",
     ]
   }
 
@@ -188,6 +187,7 @@ source_set("native_application_support") {
     "//base",
     "//mojo/gles2",
     "//mojo/platform_handle:defs",
+    "//mojo/shell",
   ]
 
   # This target has to include the public thunk headers, which generally
@@ -329,7 +329,7 @@ if (is_android) {
       ":java",
       ":resources",
       "//base:base_java",
-      "//components/native_viewport:native_viewport_java",
+      "//components/view_manager/native_viewport:native_viewport_java",
       "//third_party/android_tools:google_play_services_default_resources",
     ]
   }
@@ -358,7 +358,7 @@ mojom("child_process_bindings") {
   ]
 
   deps = [
-    "//third_party/mojo/src/mojo/public/interfaces/application",
+    "//mojo/application/public/interfaces",
   ]
 }
 
@@ -425,19 +425,9 @@ mojo_native_application("apptests") {
 
   deps = [
     "//base",
-    "//mojo/application",
-    "//mojo/application:test_support",
-    "//mojo/common:common",
+    "//mojo/application/public/cpp:test_support",
     "//mojo/runner/test:bindings",
-
-    #"//mojo/services/http_server/public/cpp",
-    #"//mojo/services/http_server/public/interfaces",
     "//mojo/services/network/public/interfaces",
-
     "//third_party/mojo/src/mojo/public/cpp/bindings:callback",
-    "//third_party/mojo/src/mojo/public/cpp/environment",
-    "//third_party/mojo/src/mojo/public/cpp/system:system",
   ]
-
-  #data_deps = [ "//services/http_server:http_server($default_toolchain)" ]
 }

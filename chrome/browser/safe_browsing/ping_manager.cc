@@ -27,8 +27,9 @@ namespace {
 // URLs to upload invalid certificate chain reports. The HTTP URL is
 // preferred since a client seeing an invalid cert might not be able to
 // make an HTTPS connection to report it.
-// TODO(estark): insert the production HTTP URL when it's ready
-const char kExtendedReportingUploadUrlInsecure[] = "";
+const char kExtendedReportingUploadUrlInsecure[] =
+    "http://safebrowsing.googleusercontent.com/safebrowsing/clientreport/"
+    "chrome-certs";
 const char kExtendedReportingUploadUrlSecure[] =
     "https://sb-ssl.google.com/safebrowsing/clientreport/chrome-certs";
 }  // namespace
@@ -55,8 +56,7 @@ SafeBrowsingPingManager::SafeBrowsingPingManager(
     // Set the upload URL and whether or not to send cookies with
     // certificate reports sent to Safe Browsing servers.
     bool use_insecure_certificate_upload_url =
-        CertificateErrorReporter::IsHttpUploadUrlSupported() &&
-        strlen(kExtendedReportingUploadUrlInsecure) > 0;
+        CertificateErrorReporter::IsHttpUploadUrlSupported();
 
     CertificateErrorReporter::CookiesPreference cookies_preference;
     GURL certificate_upload_url;
@@ -134,12 +134,11 @@ void SafeBrowsingPingManager::ReportMalwareDetails(
 }
 
 void SafeBrowsingPingManager::ReportInvalidCertificateChain(
-    const std::string& hostname,
-    const net::SSLInfo& ssl_info) {
+    const std::string& serialized_report) {
   DCHECK(certificate_error_reporter_);
   certificate_error_reporter_->SendReport(
-      CertificateErrorReporter::REPORT_TYPE_EXTENDED_REPORTING, hostname,
-      ssl_info);
+      CertificateErrorReporter::REPORT_TYPE_EXTENDED_REPORTING,
+      serialized_report);
 }
 
 void SafeBrowsingPingManager::SetCertificateErrorReporterForTesting(

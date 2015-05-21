@@ -172,7 +172,7 @@
       {
         "id": "FileSystemProviderSource",
         "type": "string",
-        "description": "For <code>file</code> the source is a file passed via <code>onLaunched</code> event. For <code>device</code> contents are fetched from an external device (eg. plugged via USB), without using <code>file_handlers</code>. Finally, for <code>device</code> source, contents should be fetched via network.",
+        "description": "For <code>\"file\"</code> the source is a file passed via <code>onLaunched</code> event. For <code>\"device\"</code> contents are fetched from an external device (eg. plugged via USB), without using <code>file_handlers</code>. Finally, for <code>\"network\"</code> source, contents should be fetched via network.",
         "enum": ["file", "device", "network"]
       },
       {
@@ -183,11 +183,13 @@
         "properties": {
           "configurable": {
             "type": "boolean",
-            "description": "Whether configuring via <code>onConfigureRequested</code> is supported."
+            "optional": true,
+            "description": "Whether configuring via <code>onConfigureRequested</code> is supported. By default: <code>false</code>."
           },
           "multiple_mounts": {
             "type": "boolean",
-            "description": "Whether multiple (more than one) mounted file systems are supported."
+            "optional": true,
+            "description": "Whether multiple (more than one) mounted file systems are supported. By default: <code>false</code>."
           },
           "source": {
             "$ref": "FileSystemProviderSource",

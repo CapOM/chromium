@@ -26,13 +26,6 @@
 //   mode: (optional string) "force-https" iff covered names should require
 //       HTTPS
 //   pins: (optional string) the |name| member of an object in |pinsets|
-//   snionly: (optional bool) if true then this entry is only enforced if TLS is
-//       enabled because the site in question only serves the correct
-//       certificate if SNI is sent. Note that this only covers the case where
-//       TLS has been disabled by explicit configuration. If TLS was disabled
-//       because of SSLv3 fallback, then the entry is still in force and a
-//       fatal certificate error will result. Spurious certificate errors are
-//       an unfortunate result of SSLv3 fallback.
 
 {
   "pinsets": [
@@ -216,6 +209,8 @@
     { "name": "login.corp.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "play.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "passwords.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
+    { "name": "myaccount.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
+    { "name": "contributor.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
 
     // Other Google-related domains that must use HTTPS.
     { "name": "gmail.com", "mode": "force-https", "pins": "google" },
@@ -2159,7 +2154,6 @@
     { "name": "securedrop.org", "include_subdomains": true, "mode": "force-https" },
     { "name": "sigterm.sh", "include_subdomains": true, "mode": "force-https" },
     { "name": "sleio.com", "include_subdomains": true, "mode": "force-https" },
-    { "name": "snowflake.ch", "include_subdomains": true, "mode": "force-https" },
     { "name": "souki.cz", "include_subdomains": true, "mode": "force-https" },
     { "name": "speedcounter.net", "include_subdomains": true, "mode": "force-https" },
     { "name": "stesti.cz", "include_subdomains": true, "mode": "force-https" },

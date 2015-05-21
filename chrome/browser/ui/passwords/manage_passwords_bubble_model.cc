@@ -9,10 +9,13 @@
 #include "chrome/browser/password_manager/password_store_factory.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/signin/signin_manager_factory.h"
+#include "chrome/browser/sync/profile_sync_service.h"
+#include "chrome/browser/sync/profile_sync_service_factory.h"
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/passwords/manage_passwords_ui_controller.h"
 #include "chrome/browser/ui/passwords/password_bubble_experiment.h"
+#include "chrome/common/url_constants.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/feedback/feedback_data.h"
@@ -71,6 +74,14 @@ ScopedVector<const autofill::PasswordForm> DeepCopyForms(
   return result.Pass();
 }
 
+// A wrapper around password_bubble_experiment::IsSmartLockBrandingEnabled
+// extracting the sync_service from the profile.
+bool IsSmartLockBrandingEnabled(Profile* profile) {
+  const ProfileSyncService* sync_service =
+      ProfileSyncServiceFactory::GetForProfile(profile);
+  return password_bubble_experiment::IsSmartLockBrandingEnabled(sync_service);
+}
+
 }  // namespace
 
 ManagePasswordsBubbleModel::ManagePasswordsBubbleModel(
@@ -118,11 +129,20 @@ ManagePasswordsBubbleModel::ManagePasswordsBubbleModel(
 
   if (state_ == password_manager::ui::CONFIRMATION_STATE) {
     base::string16 save_confirmation_link =
-        l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_LINK);
+        l10n_util::GetStringUTF16(IDS_MANAGE_PASSWORDS_LINK);
+    int confirmation_text_id = IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_TEXT;
+    if (IsSmartLockBrandingEnabled(GetProfile())) {
+      std::string management_hostname =
+          GURL(chrome::kPasswordManagerAccountDashboardURL).host();
+      save_confirmation_link = base::UTF8ToUTF16(management_hostname);
+      confirmation_text_id =
+          IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_SMART_LOCK_TEXT;
+    }
+
     size_t offset;
     save_confirmation_text_ =
-        l10n_util::GetStringFUTF16(IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_TEXT,
-                                   save_confirmation_link, &offset);
+        l10n_util::GetStringFUTF16(
+            confirmation_text_id, save_confirmation_link, &offset);
     save_confirmation_link_range_ =
         gfx::Range(offset, offset + save_confirmation_link.length());
   }
@@ -239,8 +259,13 @@ void ManagePasswordsBubbleModel::OnOKClicked() {
 
 void ManagePasswordsBubbleModel::OnManageLinkClicked() {
   dismissal_reason_ = metrics_util::CLICKED_MANAGE;
-  ManagePasswordsUIController::FromWebContents(web_contents())
-      ->NavigateToPasswordManagerSettingsPage();
+  if (IsSmartLockBrandingEnabled(GetProfile())) {
+    ManagePasswordsUIController::FromWebContents(web_contents())
+        ->NavigateToExternalPasswordManager();
+  } else {
+    ManagePasswordsUIController::FromWebContents(web_contents())
+        ->NavigateToPasswordManagerSettingsPage();
+  }
 }
 
 void ManagePasswordsBubbleModel::OnBrandLinkClicked() {
@@ -313,8 +338,7 @@ void ManagePasswordsBubbleModel::UpdatePendingStateTitle() {
   if (never_save_passwords_) {
     title_ = l10n_util::GetStringUTF16(
         IDS_MANAGE_PASSWORDS_BLACKLIST_CONFIRMATION_TITLE);
-  } else if (password_bubble_experiment::IsEnabledSmartLockBranding(
-                 GetProfile())) {
+  } else if (IsSmartLockBrandingEnabled(GetProfile())) {
     // "Google Smart Lock" should be a hyperlink.
     base::string16 brand_link =
         l10n_util::GetStringUTF16(IDS_PASSWORD_MANAGER_SMART_LOCK);

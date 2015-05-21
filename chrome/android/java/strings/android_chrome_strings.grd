@@ -235,7 +235,10 @@
       <message name="IDS_PREFS_SAVED_PASSWORDS" desc="Title for the Saved Passwords preferences. [CHAR-LIMIT=32]">
         Save passwords
       </message>
-     <message name="IDS_PASSWORDS_AUTO_SIGNIN_TITLE" desc="Title for checkbox to enable automatically signing the user in to websites">
+      <message name="IDS_PREFS_SMART_LOCK_FOR_PASSWORDS" desc="The brand name of the password manager to be displayed in preferences instead of the title 'Save Passwords' when a user is signed in. [CHAR-LIMIT=32]">
+        Smart Lock for Passwords
+      </message>
+      <message name="IDS_PASSWORDS_AUTO_SIGNIN_TITLE" desc="Title for checkbox to enable automatically signing the user in to websites">
         Auto Sign-in
       </message>
       <message name="IDS_PASSWORDS_AUTO_SIGNIN_DESCRIPTION" desc="Text under 'Auto sign-in' checkbox">
@@ -248,7 +251,7 @@
         Never saved
       </message>
       <message name="IDS_MANAGE_PASSWORDS_TEXT" desc="Text for link to manage passwords on Account Central.">
-        Manage saved passwords in your <ph name="BEGIN_LINK">&lt;link&gt;</ph>Google Account<ph name="END_LINK">&lt;/link&gt;</ph>
+        View and manage saved passwords at <ph name="BEGIN_LINK">&lt;link&gt;</ph>passwords.google.com<ph name="END_LINK">&lt;/link&gt;</ph>
       </message>
       <message name="IDS_SAVED_PASSWORDS_NONE_TEXT" desc="Text when there are no saved passwords/exceptions.">
         Saved passwords will appear here.
@@ -1146,6 +1149,9 @@ You are signing in with a managed account and giving its administrator control o
       </message>
       <message name="IDS_CONTEXTMENU_OPEN_ORIGINAL_IMAGE_IN_NEW_TAB" desc="Context sensitive menu item for opening/viewing the original version of the selected image in a new tab. [CHAR-LIMIT=30]">
         Open original image in new tab
+      </message>
+      <message name="IDS_CONTEXTMENU_SHOW_ORIGINAL_IMAGE" desc="Context sensitive menu item for Data Saver low fidelity placeholder images that shows the original version in place. [CHAR-LIMIT=30]">
+        Show image
       </message>
       <message name="IDS_CONTEXTMENU_SEARCH_WEB_FOR_IMAGE" desc="Context sensitive menu item for search-for-Image command in a new tab. [CHAR-LIMIT=30]">
         Search <ph name="SEARCH_ENGINE">%1$s<ex>Google</ex></ph> for this image

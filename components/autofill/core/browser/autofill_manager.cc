@@ -17,6 +17,7 @@
 #include "base/logging.h"
 #include "base/message_loop/message_loop.h"
 #include "base/metrics/field_trial.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_service.h"
 #include "base/strings/string16.h"
 #include "base/strings/string_util.h"
@@ -551,6 +552,12 @@ bool AutofillManager::WillFillCreditCardNumber(const FormData& form,
   if (autofill_field->Type().GetStorableType() == CREDIT_CARD_NUMBER)
     return true;
 
+#if defined(OS_IOS)
+  // On iOS, we only fill out one field at a time. So we only need to check the
+  // current field.
+  return false;
+#endif
+
   // If the relevant section is already autofilled, the new fill operation will
   // only fill |autofill_field|.
   if (SectionIsAutofilled(*form_structure, form, autofill_field->section()))
@@ -616,6 +623,10 @@ void AutofillManager::FillOrPreviewForm(
     const FormData& form,
     const FormFieldData& field,
     int unique_id) {
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  EmitIsFromAddressBookMetric(unique_id);
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
+
   if (!IsValidFormData(form) || !IsValidFormFieldData(field))
     return;
 
@@ -698,6 +709,62 @@ void AutofillManager::OnHidePopup() {
 
   autocomplete_history_manager_->CancelPendingQuery();
   client_->HideAutofillPopup();
+}
+
+bool AutofillManager::GetDeletionConfirmationText(const base::string16& value,
+                                                  int identifier,
+                                                  base::string16* title,
+                                                  base::string16* body) {
+  if (identifier == POPUP_ITEM_ID_AUTOCOMPLETE_ENTRY) {
+    if (title)
+      title->assign(value);
+    if (body) {
+      body->assign(l10n_util::GetStringUTF16(
+          IDS_AUTOFILL_DELETE_AUTOCOMPLETE_SUGGESTION_CONFIRMATION_BODY));
+    }
+
+    return true;
+  }
+
+  if (identifier < 0)
+    return false;
+
+  size_t variant = 0;
+  const CreditCard* credit_card = nullptr;
+  const AutofillProfile* profile = nullptr;
+  if (GetCreditCard(identifier, &credit_card)) {
+    if (credit_card->record_type() != CreditCard::LOCAL_CARD)
+      return false;
+
+    if (title)
+      title->assign(credit_card->TypeAndLastFourDigits());
+    if (body) {
+      body->assign(l10n_util::GetStringUTF16(
+          IDS_AUTOFILL_DELETE_CREDIT_CARD_SUGGESTION_CONFIRMATION_BODY));
+    }
+
+    return true;
+  } else if (GetProfile(identifier, &profile, &variant)) {
+    if (profile->record_type() != AutofillProfile::LOCAL_PROFILE)
+      return false;
+
+    if (title) {
+      base::string16 street_address = profile->GetRawInfo(ADDRESS_HOME_CITY);
+      if (!street_address.empty())
+        title->swap(street_address);
+      else
+        title->assign(value);
+    }
+    if (body) {
+      body->assign(l10n_util::GetStringUTF16(
+          IDS_AUTOFILL_DELETE_PROFILE_SUGGESTION_CONFIRMATION_BODY));
+    }
+
+    return true;
+  }
+
+  NOTREACHED();
+  return false;
 }
 
 bool AutofillManager::RemoveAutofillProfileOrCreditCard(int unique_id) {
@@ -1516,5 +1583,21 @@ bool AutofillManager::ShouldUploadForm(const FormStructure& form) {
 
   return true;
 }
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+void AutofillManager::EmitIsFromAddressBookMetric(int unique_id) {
+  size_t variant = 0;
+  const AutofillProfile* profile = nullptr;
+  bool result = GetProfile(unique_id, &profile, &variant);
+  if (!result)
+    return;
+
+  bool is_from_address_book =
+      profile->record_type() == AutofillProfile::AUXILIARY_PROFILE;
+  UMA_HISTOGRAM_BOOLEAN(
+      "Autofill.MacAddressBook.AcceptedSuggestionIsFromAddressBook",
+      is_from_address_book);
+}
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
 
 }  // namespace autofill

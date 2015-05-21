@@ -257,7 +257,7 @@ if (!is_android) {
       "//sync",
       "//testing/gmock",
       "//testing/gtest",
-      "//third_party/hunspell_new",
+      "//third_party/hunspell",
       "//third_party/icu",
       "//third_party/libpng",
       "//third_party/npapi",
@@ -667,6 +667,7 @@ if (!is_android) {
       "//third_party/safe_browsing:test_support",
       "//third_party/widevine/cdm:version_h",
       "//ui/accessibility:test_support",
+      "//ui/base:test_support",
       "//ui/compositor:test_support",
       "//ui/resources",
       "//ui/web_dialogs:test_support",
@@ -854,9 +855,10 @@ if (!is_android) {
     }
     if (enable_media_router) {
       sources += rebase_path(
-              chrome_tests_gypi_values.chrome_browser_tests_media_router_webui_sources,
+              chrome_tests_gypi_values.chrome_browser_tests_media_router_sources,
               ".",
               "//chrome")
+      deps += [ "//chrome/browser/media/router:test_support" ]
     }
     if (is_win) {
       deps += [
@@ -1283,7 +1285,6 @@ if (!is_android) {
                       ".",
                       "//chrome")
     }
-
     if (is_ios || is_chromeos) {
       sources -=
           [ "../browser/metrics/signin_status_metrics_provider_unittest.cc" ]
@@ -1300,7 +1301,7 @@ if (!is_android) {
                       ".",
                       "//chrome")
       if (is_mac && !is_ios) {
-        deps += [ "//third_party/hunspell_new" ]
+        deps += [ "//third_party/hunspell" ]
       }
     }
 
@@ -1318,6 +1319,7 @@ if (!is_android) {
                       "//chrome")
       deps += [
         "//chrome/common/extensions/api",
+        "//device/usb:mocks",
         "//extensions:extensions_resources",
         "//extensions/strings",
       ]
@@ -1489,13 +1491,17 @@ if (!is_android) {
               ".",
               "//chrome")
     }
+    if (enable_media_router) {
+      sources +=
+          rebase_path(unit_gypi_values.chrome_unit_tests_media_router_sources,
+                      ".",
+                      "//chrome")
+      deps += [ "//chrome/browser/media/router:test_support" ]
+    }
     if (enable_webrtc) {
       sources += rebase_path(unit_gypi_values.chrome_unit_tests_webrtc_sources,
                              ".",
                              "//chrome")
-    }
-    if (enable_media_router) {
-      deps += [ "//chrome/browser/media/router:unit_tests" ]
     }
     if (is_chromeos) {
       sources +=
@@ -1577,10 +1583,10 @@ if (!is_android) {
     }
     if (!is_mac && !is_ios) {
       deps += [
-        "//third_party/hunspell_new",
+        "//chrome/tools/convert_dict:lib",
         "//chrome:packed_extra_resources",
         "//chrome:packed_resources",
-        "//chrome/tools/convert_dict:lib",
+        "//third_party/hunspell",
       ]
     }
     if (is_win || is_mac) {
@@ -1738,6 +1744,7 @@ if (!is_android) {
         "//chrome/browser",
         "//chrome/renderer",
         "//media/cast:test_support",
+        "//testing/gmock",
         "//testing/gtest",
         "//testing/perf",
       ]

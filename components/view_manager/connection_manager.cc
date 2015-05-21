@@ -13,9 +13,9 @@
 #include "components/view_manager/server_view.h"
 #include "components/view_manager/view_coordinate_conversions.h"
 #include "components/view_manager/view_manager_service_impl.h"
+#include "mojo/application/public/interfaces/service_provider.mojom.h"
 #include "mojo/converters/geometry/geometry_type_converters.h"
 #include "mojo/converters/input_events/input_events_type_converters.h"
-#include "third_party/mojo/src/mojo/public/interfaces/application/service_provider.mojom.h"
 
 using mojo::ConnectionSpecificId;
 
@@ -111,14 +111,12 @@ ConnectionManager::ScopedChange::~ScopedChange() {
 }
 
 ConnectionManager::ConnectionManager(ConnectionManagerDelegate* delegate,
-                                     scoped_ptr<DisplayManager> display_manager,
-                                     mojo::WindowManagerInternal* wm_internal)
+                                     scoped_ptr<DisplayManager> display_manager)
     : delegate_(delegate),
       window_manager_client_connection_(nullptr),
       next_connection_id_(1),
       display_manager_(display_manager.Pass()),
       root_(CreateServerView(RootViewId())),
-      wm_internal_(wm_internal),
       current_change_(nullptr),
       in_destructor_(false),
       animation_runner_(base::TimeTicks::Now()),
@@ -525,22 +523,13 @@ void ConnectionManager::OnViewSharedPropertyChanged(
   }
 }
 
-void ConnectionManager::SetViewportSize(mojo::SizePtr size) {
-  display_manager_->SetViewportSize(size.To<gfx::Size>());
+void ConnectionManager::SetViewManagerRootClient(
+    mojo::ViewManagerRootClientPtr client) {
+  view_manager_root_client_ = client.Pass();
 }
 
-void ConnectionManager::DispatchInputEventToViewDEPRECATED(
-    mojo::Id transport_view_id,
-    mojo::EventPtr event) {
-  const ViewId view_id(ViewIdFromTransportId(transport_view_id));
-
-  ViewManagerServiceImpl* connection = GetConnectionWithRoot(view_id);
-  if (!connection)
-    connection = GetConnection(view_id.connection_id);
-  if (connection) {
-    connection->client()->OnViewInputEvent(
-        transport_view_id, event.Pass(), base::Bind(&base::DoNothing));
-  }
+void ConnectionManager::SetViewportSize(mojo::SizePtr size) {
+  display_manager_->SetViewportSize(size.To<gfx::Size>());
 }
 
 void ConnectionManager::CloneAndAnimate(mojo::Id transport_view_id) {

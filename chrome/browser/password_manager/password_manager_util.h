@@ -7,7 +7,12 @@
 
 #include "base/basictypes.h"
 #include "base/callback.h"
+#include "components/password_manager/core/browser/password_manager_client.h"
 #include "ui/gfx/native_widget_types.h"
+
+namespace sync_driver {
+class SyncService;
+}
 
 namespace password_manager_util {
 
@@ -33,6 +38,11 @@ bool AuthenticateUser(gfx::NativeWindow window);
 // password set on their OS account.  It should be called on UI thread. |reply|
 // is invoked on UI thread with result.
 void GetOsPasswordStatus(const base::Callback<void(OsPasswordStatus)>& reply);
+
+// Reports whether and how passwords are currently synced. In particular, for a
+// null |sync_service| returns NOT_SYNCING_PASSWORDS.
+password_manager::PasswordSyncState GetPasswordSyncState(
+    const sync_driver::SyncService* sync_service);
 
 }  // namespace password_manager_util
 

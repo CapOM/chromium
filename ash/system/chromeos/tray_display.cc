@@ -92,7 +92,8 @@ base::string16 GetAllDisplayInfo() {
   std::vector<base::string16> lines;
   int64 internal_id = gfx::Display::kInvalidDisplayID;
   // Make sure to show the internal display first.
-  if (gfx::Display::HasInternalDisplay() &&
+  if (!display_manager->IsInUnifiedMode() &&
+      gfx::Display::HasInternalDisplay() &&
       gfx::Display::InternalDisplayId() ==
           display_manager->first_display_id()) {
     internal_id = display_manager->first_display_id();
@@ -245,6 +246,9 @@ class DisplayView : public ActionableView {
       return l10n_util::GetStringUTF16(
           IDS_ASH_STATUS_TRAY_DISPLAY_MIRRORING_NO_INTERNAL);
     }
+
+    if (display_manager->IsInUnifiedMode())
+      return l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_DISPLAY_UNIFIED);
 
     int64 primary_id = Shell::GetScreen()->GetPrimaryDisplay().id();
     if (gfx::Display::HasInternalDisplay() &&

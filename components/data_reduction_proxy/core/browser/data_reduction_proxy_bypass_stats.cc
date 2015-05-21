@@ -223,6 +223,21 @@ void DataReductionProxyBypassStats::OnConnectComplete(
   }
 }
 
+void DataReductionProxyBypassStats::ClearRequestCounts() {
+  successful_requests_through_proxy_count_ = 0;
+  proxy_net_errors_count_ = 0;
+}
+
+void DataReductionProxyBypassStats::NotifyUnavailabilityIfChanged() {
+  bool prev_unavailable = unavailable_;
+  unavailable_ =
+      (proxy_net_errors_count_ >= kMinFailedRequestsWhenUnavailable &&
+       successful_requests_through_proxy_count_ <=
+           kMaxSuccessfulRequestsWhenUnavailable);
+  if (prev_unavailable != unavailable_)
+    unreachable_callback_.Run(unavailable_);
+}
+
 void DataReductionProxyBypassStats::RecordBypassedBytesHistograms(
     const net::URLRequest& request,
     bool data_reduction_proxy_enabled,
@@ -245,13 +260,16 @@ void DataReductionProxyBypassStats::RecordBypassedBytesHistograms(
                         DataReductionProxyBypassStats::NOT_BYPASSED,
                         content_length);
 
-    // If non-empty, |proxy_server.first| is the proxy that this request used.
-    const net::ProxyServer& first =
-        data_reduction_proxy_type_info.proxy_servers.first;
-    if (first.is_valid() && !first.host_port_pair().IsEmpty()) {
+    if (data_reduction_proxy_type_info.proxy_servers.empty())
+      return;
+
+    // Obtain the proxy that this request used.
+    const net::ProxyServer& proxy =
+        data_reduction_proxy_type_info.proxy_servers.front();
+    if (proxy.is_valid() && !proxy.host_port_pair().IsEmpty()) {
       DataReductionProxyTamperDetection::DetectAndReport(
           request.response_info().headers.get(),
-          first.is_https() || first.is_quic(), content_length);
+          proxy.is_https() || proxy.is_quic(), content_length);
     }
     return;
   }
@@ -266,7 +284,7 @@ void DataReductionProxyBypassStats::RecordBypassedBytesHistograms(
   // Now that the data reduction proxy is a best effort proxy, if the effective
   // proxy configuration resolves to anything other than direct:// for a URL,
   // the data reduction proxy will not be used.
-  DCHECK(!data_reduction_proxy_type_info.proxy_servers.first.is_valid());
+  DCHECK(data_reduction_proxy_type_info.proxy_servers.empty());
   if (!request.proxy_server().IsEmpty()) {
     RecordBypassedBytes(last_bypass_type_,
                         DataReductionProxyBypassStats::PROXY_OVERRIDDEN,
@@ -363,21 +381,6 @@ void DataReductionProxyBypassStats::RecordMissingViaHeaderBytes(
 void DataReductionProxyBypassStats::OnNetworkChanged(
     NetworkChangeNotifier::ConnectionType type) {
   ClearRequestCounts();
-}
-
-void DataReductionProxyBypassStats::ClearRequestCounts() {
-  successful_requests_through_proxy_count_ = 0;
-  proxy_net_errors_count_ = 0;
-}
-
-void DataReductionProxyBypassStats::NotifyUnavailabilityIfChanged() {
-  bool prev_unavailable = unavailable_;
-  unavailable_ =
-      (proxy_net_errors_count_ >= kMinFailedRequestsWhenUnavailable &&
-       successful_requests_through_proxy_count_ <=
-           kMaxSuccessfulRequestsWhenUnavailable);
-  if (prev_unavailable != unavailable_)
-    unreachable_callback_.Run(unavailable_);
 }
 
 void DataReductionProxyBypassStats::RecordBypassedBytes(

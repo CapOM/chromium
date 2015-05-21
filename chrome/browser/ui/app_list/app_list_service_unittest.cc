@@ -56,6 +56,7 @@ class TestingAppListServiceImpl : public AppListServiceImpl {
   }
 
   void ShowForCustomLauncherPage(Profile* profile) override {}
+  void HideCustomLauncherPage() override {}
 
   void DismissAppList() override { showing_for_profile_ = NULL; }
 
@@ -99,7 +100,7 @@ class AppListServiceUnitTest : public testing::Test {
     factory.set_user_prefs(make_scoped_refptr(new TestingPrefStore));
     local_state_ = factory.Create(pref_registry).Pass();
 
-    profile_store_ = new FakeProfileStore(user_data_dir_);
+    profile_store_ = new FakeProfileStore(user_data_dir_, local_state_.get());
     service_.reset(new TestingAppListServiceImpl(
         command_line,
         local_state_.get(),
@@ -140,6 +141,10 @@ TEST_F(AppListServiceUnitTest, ShowingForProfileLoadsAProfile) {
 TEST_F(AppListServiceUnitTest, RemovedProfileResetsToInitialProfile) {
   EnableAppList();
   profile_store_->RemoveProfile(profile1_.get());
+
+  // kAppListProfile should have been cleared, and therefore GetProfilePath
+  // should return the initial profile.
+  EXPECT_EQ("", local_state_->GetString(prefs::kAppListProfile));
   base::FilePath initial_profile_path =
       user_data_dir_.AppendASCII(chrome::kInitialProfile);
   EXPECT_EQ(initial_profile_path,
@@ -152,6 +157,8 @@ TEST_F(AppListServiceUnitTest,
   EnableAppList();
   profile_store_->RemoveProfile(profile1_.get());
 
+  // kAppListProfile should have been set to kProfileLastUsed.
+  EXPECT_EQ("last-used", local_state_->GetString(prefs::kAppListProfile));
   base::FilePath last_used_profile_path =
       user_data_dir_.AppendASCII("last-used");
   EXPECT_EQ(last_used_profile_path,
@@ -160,6 +167,31 @@ TEST_F(AppListServiceUnitTest,
   // For this test, the AppListViewDelegate is not created because the
   // app list is never shown, so there is nothing to destroy.
   EXPECT_EQ(0, service_->destroy_app_list_call_count());
+}
+
+TEST_F(AppListServiceUnitTest, RefusesToLoadGuestAppListProfile) {
+  // Unlikely, but if somehow the user's app_list.profile pref was set to the
+  // guest profile, make sure we refuse to load it (or it would crash).
+  local_state_->SetString(
+      prefs::kAppListProfile,
+      base::FilePath(chrome::kGuestProfileDir).MaybeAsASCII());
+  local_state_->SetString(prefs::kProfileLastUsed, "last-used");
+  base::FilePath last_used_profile_path =
+      user_data_dir_.AppendASCII("last-used");
+  EXPECT_EQ(last_used_profile_path,
+            service_->GetProfilePath(profile_store_->GetUserDataDir()));
+}
+
+TEST_F(AppListServiceUnitTest, RefusesToLoadGuestLastUsedProfile) {
+  // If the user's most recent browser session was a guest session, make sure we
+  // do not open a guest profile in the launcher (which would crash).
+  local_state_->SetString(
+      prefs::kProfileLastUsed,
+      base::FilePath(chrome::kGuestProfileDir).MaybeAsASCII());
+  base::FilePath initial_profile_path =
+      user_data_dir_.AppendASCII(chrome::kInitialProfile);
+  EXPECT_EQ(initial_profile_path,
+            service_->GetProfilePath(profile_store_->GetUserDataDir()));
 }
 
 TEST_F(AppListServiceUnitTest, SwitchingProfilesPersists) {

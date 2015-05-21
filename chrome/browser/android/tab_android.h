@@ -117,6 +117,8 @@ class TabAndroid : public CoreTabHelperDelegate,
       chrome::NavigateParams* params,
       content::NavigationController::LoadURLParams* load_url_params);
 
+  SkBitmap GetFaviconBitmap();
+
   // CoreTabHelperDelegate ----------------------------------------------------
 
   void SwapTabContents(content::WebContents* old_contents,
@@ -188,6 +190,8 @@ class TabAndroid : public CoreTabHelperDelegate,
                               jint constraints,
                               jint current,
                               jboolean animate);
+
+  void ShowOriginalImage(JNIEnv* env, jobject obj);
 
   void SearchByImageInNewTabAsync(JNIEnv* env, jobject obj);
 

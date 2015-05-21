@@ -155,14 +155,9 @@ void NewTabPageHandler::HandleLogTimeToClick(const base::ListValue* args) {
 
   if (histogram_name == "NewTabPage.TimeToClickMostVisited") {
     UMA_HISTOGRAM_LONG_TIMES("NewTabPage.TimeToClickMostVisited", delta);
-  } else if (histogram_name == "NewTabPage.TimeToClickRecentlyClosed") {
-    UMA_HISTOGRAM_LONG_TIMES("NewTabPage.TimeToClickRecentlyClosed", delta);
   } else if (histogram_name == "ExtendedNewTabPage.TimeToClickMostVisited") {
     UMA_HISTOGRAM_LONG_TIMES(
         "ExtendedNewTabPage.TimeToClickMostVisited", delta);
-  } else if (histogram_name == "ExtendedNewTabPage.TimeToClickRecentlyClosed") {
-    UMA_HISTOGRAM_LONG_TIMES(
-        "ExtendedNewTabPage.TimeToClickRecentlyClosed", delta);
   } else {
     NOTREACHED();
   }
@@ -180,7 +175,6 @@ void NewTabPageHandler::GetLocalizedValues(Profile* profile,
                                            base::DictionaryValue* values) {
   values->SetInteger("most_visited_page_id", MOST_VISITED_PAGE_ID);
   values->SetInteger("apps_page_id", APPS_PAGE_ID);
-  values->SetInteger("suggestions_page_id", SUGGESTIONS_PAGE_ID);
 
   PrefService* prefs = profile->GetPrefs();
   int shown_page = prefs->GetInteger(prefs::kNtpShownPage);

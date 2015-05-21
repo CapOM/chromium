@@ -748,6 +748,7 @@ bool RenderWidget::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_SetTextDirection, OnSetTextDirection)
     IPC_MESSAGE_HANDLER(ViewMsg_Move_ACK, OnRequestMoveAck)
     IPC_MESSAGE_HANDLER(ViewMsg_UpdateScreenRects, OnUpdateScreenRects)
+    IPC_MESSAGE_HANDLER(ViewMsg_SetSurfaceIdNamespace, OnSetSurfaceIdNamespace)
 #if defined(OS_ANDROID)
     IPC_MESSAGE_HANDLER(ViewMsg_ShowImeIfNeeded, OnShowImeIfNeeded)
     IPC_MESSAGE_HANDLER(ViewMsg_ImeEventAck, OnImeEventAck)
@@ -1238,11 +1239,10 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
   // by reentrant calls for events after the paused one.
   bool no_ack = ignore_ack_for_mouse_move_from_debugger_ &&
       input_event->type == WebInputEvent::MouseMove;
-  if (!WebInputEventTraits::IgnoresAckDisposition(*input_event) && !no_ack) {
-    InputHostMsg_HandleInputEvent_ACK_Params ack;
-    ack.type = input_event->type;
-    ack.state = ack_result;
-    ack.latency = swap_latency_info;
+  if (WebInputEventTraits::WillReceiveAckFromRenderer(*input_event) &&
+      !no_ack) {
+    InputEventAck ack(input_event->type, ack_result, swap_latency_info,
+                      WebInputEventTraits::GetUniqueTouchEventId(*input_event));
     scoped_ptr<IPC::Message> response(
         new InputHostMsg_HandleInputEvent_ACK(routing_id_, ack));
     if (rate_limiting_wanted && frame_pending && !is_hidden_) {
@@ -1748,6 +1748,11 @@ void RenderWidget::OnUpdateScreenRects(const gfx::Rect& view_screen_rect,
   Send(new ViewHostMsg_UpdateScreenRects_ACK(routing_id()));
 }
 
+void RenderWidget::OnSetSurfaceIdNamespace(uint32_t surface_id_namespace) {
+  if (compositor_)
+    compositor_->SetSurfaceIdNamespace(surface_id_namespace);
+}
+
 void RenderWidget::showImeIfNeeded() {
   OnShowImeIfNeeded();
 }
@@ -1788,9 +1793,7 @@ bool RenderWidget::SendAckForMouseMoveFromDebugger() {
     // If we pause multiple times during a single mouse move event, we should
     // only send ACK once.
     if (!ignore_ack_for_mouse_move_from_debugger_) {
-      InputHostMsg_HandleInputEvent_ACK_Params ack;
-      ack.type = handling_event_type_;
-      ack.state = INPUT_EVENT_ACK_STATE_CONSUMED;
+      InputEventAck ack(handling_event_type_, INPUT_EVENT_ACK_STATE_CONSUMED);
       Send(new InputHostMsg_HandleInputEvent_ACK(routing_id_, ack));
       return true;
     }
@@ -2336,10 +2339,6 @@ void RenderWidget::setTouchAction(
   if (handling_event_type_ != WebInputEvent::TouchStart)
     return;
 
-// TODO(dtapuska): A dependant change needs to land in blink to change
-// the blink::WebTouchAction enum; in the meantime don't do
-// a static cast between the values. (http://crbug.com/476556)
-#if 0
   // Verify the same values are used by the types so we can cast between them.
    STATIC_ASSERT_WTI_ENUM_MATCH(Auto,      AUTO);
    STATIC_ASSERT_WTI_ENUM_MATCH(None,      NONE);
@@ -2353,18 +2352,6 @@ void RenderWidget::setTouchAction(
 
    content::TouchAction content_touch_action =
        static_cast<content::TouchAction>(web_touch_action);
-#else
-  content::TouchAction content_touch_action = TOUCH_ACTION_AUTO;
-  if (web_touch_action & blink::WebTouchActionNone)
-    content_touch_action |= TOUCH_ACTION_NONE;
-  if (web_touch_action & blink::WebTouchActionPanX)
-    content_touch_action |= TOUCH_ACTION_PAN_X;
-  if (web_touch_action & blink::WebTouchActionPanY)
-    content_touch_action |= TOUCH_ACTION_PAN_Y;
-  if (web_touch_action & blink::WebTouchActionPinchZoom)
-    content_touch_action |= TOUCH_ACTION_PINCH_ZOOM;
-
-#endif
   Send(new InputHostMsg_SetTouchAction(routing_id_, content_touch_action));
 }
 

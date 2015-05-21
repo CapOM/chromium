@@ -103,7 +103,7 @@ class LayerTreeHostNoMessageLoopTest
   void SetupLayerTreeHost() {
     LayerTreeSettings settings;
     settings.single_thread_proxy_scheduler = false;
-    settings.verify_property_trees = true;
+    settings.verify_property_trees = false;
     settings.raster_enabled = false;
 
     LayerTreeHost::InitParams params;
@@ -210,7 +210,7 @@ class LayerTreeHostNoMessageLoopDelegatedLayer
 
  private:
   scoped_ptr<DelegatedFrameData> CreateFrameDataWithResource(
-      ResourceProvider::ResourceId resource_id) {
+      ResourceId resource_id) {
     scoped_ptr<DelegatedFrameData> frame(new DelegatedFrameData);
     gfx::Rect frame_rect(size_);
 

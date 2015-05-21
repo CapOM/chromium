@@ -330,8 +330,8 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
   sync_tree->set_top_controls_height(top_controls_height_);
   sync_tree->PushTopControlsFromMainThread(top_controls_shown_ratio_);
 
-  host_impl->set_has_gpu_rasterization_trigger(has_gpu_rasterization_trigger_);
-  host_impl->set_content_is_suitable_for_gpu_rasterization(
+  host_impl->SetHasGpuRasterizationTrigger(has_gpu_rasterization_trigger_);
+  host_impl->SetContentIsSuitableForGpuRasterization(
       content_is_suitable_for_gpu_rasterization_);
   RecordGpuRasterizationHistogram();
 
@@ -434,8 +434,8 @@ scoped_ptr<LayerTreeHostImpl> LayerTreeHost::CreateLayerTreeHostImpl(
       settings_, client, proxy_.get(), rendering_stats_instrumentation_.get(),
       shared_bitmap_manager_, gpu_memory_buffer_manager_, task_graph_runner_,
       id_);
-  host_impl->set_has_gpu_rasterization_trigger(has_gpu_rasterization_trigger_);
-  host_impl->set_content_is_suitable_for_gpu_rasterization(
+  host_impl->SetHasGpuRasterizationTrigger(has_gpu_rasterization_trigger_);
+  host_impl->SetContentIsSuitableForGpuRasterization(
       content_is_suitable_for_gpu_rasterization_);
   shared_bitmap_manager_ = NULL;
   gpu_memory_buffer_manager_ = NULL;
@@ -1279,8 +1279,8 @@ void LayerTreeHost::QueueSwapPromise(scoped_ptr<SwapPromise> swap_promise) {
 }
 
 void LayerTreeHost::BreakSwapPromises(SwapPromise::DidNotSwapReason reason) {
-  for (size_t i = 0; i < swap_promise_list_.size(); i++)
-    swap_promise_list_[i]->DidNotSwap(reason);
+  for (auto* swap_promise : swap_promise_list_)
+    swap_promise->DidNotSwap(reason);
   swap_promise_list_.clear();
 }
 

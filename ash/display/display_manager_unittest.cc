@@ -15,10 +15,12 @@
 #include "ash/test/ash_test_base.h"
 #include "ash/test/display_manager_test_api.h"
 #include "ash/test/mirror_window_test_api.h"
+#include "ash/wm/window_state.h"
 #include "base/command_line.h"
 #include "base/format_macros.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
+#include "ui/aura/client/aura_constants.h"
 #include "ui/aura/env.h"
 #include "ui/aura/window_observer.h"
 #include "ui/aura/window_tree_host.h"
@@ -121,12 +123,8 @@ class DisplayManagerTest : public test::AshTestBase,
 
   // aura::WindowObserver overrides:
   void OnWindowDestroying(aura::Window* window) override {
-    // TODO(oshima): When moving between unified desktop, the
-    // primary root window can be deleted.
-    if (!display_manager()->IsInUnifiedMode()) {
-      ASSERT_EQ(Shell::GetPrimaryRootWindow(), window);
-      root_window_destroyed_ = true;
-    }
+    ASSERT_EQ(Shell::GetPrimaryRootWindow(), window);
+    root_window_destroyed_ = true;
   }
 
  private:
@@ -1465,10 +1463,14 @@ TEST_F(DisplayManagerTest, MAYBE_UpdateDisplayWithHostOrigin) {
 TEST_F(DisplayManagerTest, UnifiedDesktopBasic) {
   if (!SupportsMultipleDisplays())
     return;
+  // Don't check root window destruction in unified mode.
+  Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
-  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
-  display_manager()->SetMultiDisplayMode(DisplayManager::UNIFIED);
   UpdateDisplay("300x200,400x500");
+
+  // Switch to unified desktop.
+  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
+  display_manager()->ReconfigureDisplays();
 
   gfx::Screen* screen =
       gfx::Screen::GetScreenByType(gfx::SCREEN_TYPE_ALTERNATE);
@@ -1480,18 +1482,26 @@ TEST_F(DisplayManagerTest, UnifiedDesktopBasic) {
   display_manager()->SetMirrorMode(false);
   EXPECT_EQ("700x500", screen->GetPrimaryDisplay().size().ToString());
 
-  // Swithc to single desktop.
+  // Switch to single desktop.
   UpdateDisplay("500x300");
   EXPECT_EQ("500x300", screen->GetPrimaryDisplay().size().ToString());
 
-  // Swithc to unified desktop.
+  // Switch to unified desktop.
   UpdateDisplay("500x300,400x500");
   EXPECT_EQ("900x500", screen->GetPrimaryDisplay().size().ToString());
+
+  // Switch back to extended desktop.
+  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::EXTENDED);
+  display_manager()->ReconfigureDisplays();
+  EXPECT_EQ("500x300", screen->GetPrimaryDisplay().size().ToString());
+  EXPECT_EQ("400x500", ScreenUtil::GetSecondaryDisplay().size().ToString());
 }
 
 TEST_F(DisplayManagerTest, RotateUnifiedDesktop) {
   if (!SupportsMultipleDisplays())
     return;
+  // Don't check root window destruction in unified mode.
+  Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
   display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
   display_manager()->SetMultiDisplayMode(DisplayManager::UNIFIED);
@@ -1510,6 +1520,29 @@ TEST_F(DisplayManagerTest, RotateUnifiedDesktop) {
 
   UpdateDisplay("300x200");
   EXPECT_EQ("300x200", screen->GetPrimaryDisplay().size().ToString());
+}
+
+// Makes sure the transition from unified to single won't crash
+// with docked wnidows.
+TEST_F(DisplayManagerTest, UnifiedWithDockWindows) {
+  if (!SupportsMultipleDisplays())
+    return;
+  // Don't check root window destruction in unified mode.
+  Shell::GetPrimaryRootWindow()->RemoveObserver(this);
+
+  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
+  display_manager()->SetMultiDisplayMode(DisplayManager::UNIFIED);
+  UpdateDisplay("300x200,400x500");
+
+  scoped_ptr<aura::Window> docked(
+      CreateTestWindowInShellWithBounds(gfx::Rect(10, 10, 50, 50)));
+  docked->SetProperty(aura::client::kShowStateKey, ui::SHOW_STATE_DOCKED);
+  ASSERT_TRUE(wm::GetWindowState(docked.get())->IsDocked());
+  EXPECT_EQ("0,0 250x453", docked->bounds().ToString());
+  UpdateDisplay("300x200");
+  // Make sure the window is still docked.
+  EXPECT_TRUE(wm::GetWindowState(docked.get())->IsDocked());
+  EXPECT_EQ("0,0 250x250", docked->bounds().ToString());
 }
 
 class ScreenShutdownTest : public test::AshTestBase {

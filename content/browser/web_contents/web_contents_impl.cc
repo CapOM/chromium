@@ -727,11 +727,6 @@ void WebContentsImpl::RequestAXTreeSnapshot(AXTreeSnapshotCallback callback) {
   GetMainFrame()->RequestAXTreeSnapshot(callback);
 }
 
-void WebContentsImpl::ClearNavigationTransitionData() {
-  FrameTreeNode* node = frame_tree_.root();
-  node->render_manager()->ClearNavigationTransitionData();
-}
-
 WebUI* WebContentsImpl::CreateWebUI(const GURL& url) {
   WebUIImpl* web_ui = new WebUIImpl(this);
   WebUIController* controller = WebUIControllerFactoryRegistry::GetInstance()->
@@ -1204,6 +1199,7 @@ void WebContentsImpl::Init(const WebContents::CreateParams& params) {
   GetRenderManager()->Init(
       params.browser_context, params.site_instance, params.routing_id,
       params.main_frame_routing_id);
+  frame_tree_.root()->SetFrameName(params.main_frame_name);
 
   WebContentsViewDelegate* delegate =
       GetContentClient()->browser()->GetWebContentsViewDelegate(this);
@@ -1582,6 +1578,7 @@ void WebContentsImpl::CreateNewWindow(
   CreateParams create_params(GetBrowserContext(), site_instance.get());
   create_params.routing_id = route_id;
   create_params.main_frame_routing_id = main_frame_route_id;
+  create_params.main_frame_name = base::UTF16ToUTF8(params.frame_name);
   create_params.opener = this;
   create_params.opener_suppressed = params.opener_suppressed;
   if (params.disposition == NEW_BACKGROUND_TAB)
@@ -2585,15 +2582,6 @@ void WebContentsImpl::DidStartProvisionalLoad(
   }
 }
 
-void WebContentsImpl::DidStartNavigationTransition(
-    RenderFrameHostImpl* render_frame_host) {
-#if defined(OS_ANDROID)
-  int render_frame_id = render_frame_host->GetRoutingID();
-  GetWebContentsAndroid()->DidStartNavigationTransitionForFrame(
-      render_frame_id);
-#endif
-}
-
 void WebContentsImpl::DidFailProvisionalLoadWithError(
     RenderFrameHostImpl* render_frame_host,
     const FrameHostMsg_DidFailProvisionalLoadWithError_Params& params) {
@@ -3345,14 +3333,6 @@ void WebContentsImpl::NotifyViewSwapped(RenderViewHost* old_host,
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     RenderViewHostChanged(old_host, new_host));
 
-  // TODO(avi): Remove. http://crbug.com/170921
-  std::pair<RenderViewHost*, RenderViewHost*> details =
-      std::make_pair(old_host, new_host);
-  NotificationService::current()->Notify(
-      NOTIFICATION_RENDER_VIEW_HOST_CHANGED,
-      Source<WebContents>(this),
-      Details<std::pair<RenderViewHost*, RenderViewHost*> >(&details));
-
   // Ensure that the associated embedder gets cleared after a RenderViewHost
   // gets swapped, so we don't reuse the same embedder next time a
   // RenderViewHost is attached to this WebContents.
@@ -3654,17 +3634,16 @@ void WebContentsImpl::UpdateState(RenderViewHost* rvh,
   // leaving a page, in which case our state may have already been moved to
   // the next page. The navigation controller will look up the appropriate
   // NavigationEntry and update it when it is notified via the delegate.
-
-  int entry_index = controller_.GetEntryIndexWithPageID(
+  NavigationEntryImpl* entry = controller_.GetEntryWithPageID(
       rvh->GetSiteInstance(), page_id);
-  if (entry_index < 0)
+
+  if (!entry)
     return;
-  NavigationEntry* entry = controller_.GetEntryAtIndex(entry_index);
 
   if (page_state == entry->GetPageState())
     return;  // Nothing to update.
   entry->SetPageState(page_state);
-  controller_.NotifyEntryChanged(entry, entry_index);
+  controller_.NotifyEntryChanged(entry);
 }
 
 void WebContentsImpl::UpdateTargetURL(RenderViewHost* render_view_host,
@@ -3703,21 +3682,6 @@ void WebContentsImpl::Close(RenderViewHost* rvh) {
 void WebContentsImpl::SwappedOut(RenderFrameHost* rfh) {
   if (delegate_ && rfh->GetRenderViewHost() == GetRenderViewHost())
     delegate_->SwappedOut(this);
-}
-
-void WebContentsImpl::DidDeferAfterResponseStarted(
-    const TransitionLayerData& transition_data) {
-#if defined(OS_ANDROID)
-  GetWebContentsAndroid()->DidDeferAfterResponseStarted(transition_data);
-#endif
-}
-
-bool WebContentsImpl::WillHandleDeferAfterResponseStarted() {
-#if defined(OS_ANDROID)
-  return GetWebContentsAndroid()->WillHandleDeferAfterResponseStarted();
-#else
-  return false;
-#endif
 }
 
 void WebContentsImpl::RequestMove(const gfx::Rect& new_bounds) {
@@ -3867,11 +3831,6 @@ void WebContentsImpl::UpdateTitle(RenderFrameHost* render_frame_host,
   // For example, it might be from a pending RVH for the pending entry.
   NavigationEntryImpl* entry = controller_.GetEntryWithPageID(
       rvh->GetSiteInstance(), page_id);
-
-  // Re http://crbug.com/369661, page id is going away. This function should
-  // only ever be called for the last committed entry. When this is verified,
-  // this function can be greatly simplified.
-  CHECK_EQ(entry, controller_.GetLastCommittedEntry());
 
   // We can handle title updates when we don't have an entry in
   // UpdateTitleForEntry, but only if the update is from the current RVH.
@@ -4427,11 +4386,6 @@ void WebContentsImpl::RemoveAllMediaPlayerEntries(
   if (it == player_map->end())
     return;
   player_map->erase(it);
-}
-
-void WebContentsImpl::ResumeResponseDeferredAtStart() {
-  FrameTreeNode* node = frame_tree_.root();
-  node->render_manager()->ResumeResponseDeferredAtStart();
 }
 
 void WebContentsImpl::SetForceDisableOverscrollContent(bool force_disable) {

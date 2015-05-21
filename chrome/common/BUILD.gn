@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//tools/grit/grit_rule.gni")
+import("//third_party/mojo/src/mojo/public/tools/bindings/mojom.gni")
 
 gypi_values = exec_script("//build/gypi_to_gn.py",
                           [ rebase_path("../chrome_common.gypi") ],
@@ -84,6 +85,7 @@ static_library("common") {
   } else {
     # Non-iOS.
     deps += [
+      ":mojo_bindings",
       "//components/visitedlink/common",
       "//components/autofill/content/common",
       "//components/autofill/core/common",
@@ -94,6 +96,9 @@ static_library("common") {
       "//ipc",
       "//third_party/re2",
       "//third_party/widevine/cdm:version_h",
+    ]
+    public_deps = [
+      "//third_party/mojo/src/mojo/public/cpp/bindings",
     ]
   }
 
@@ -110,9 +115,6 @@ static_library("common") {
       "//extensions/strings",
       "//media/cast:net",
     ]
-    if (enable_media_router) {
-      defines += [ "ENABLE_MEDIA_ROUTER=1" ]
-    }
     if (is_chromeos) {
       sources +=
           rebase_path(gypi_values.chrome_common_extensions_chromeos_sources,
@@ -243,9 +245,6 @@ static_library("common") {
                            ".",
                            "//chrome")
   }
-  if (enable_media_router) {
-    defines += [ "ENABLE_MEDIA_ROUTER=1" ]
-  }
 }
 
 import("//chrome/version.gni")
@@ -344,5 +343,11 @@ static_library("app_mode_app_support") {
   deps = [
     ":constants",
     "//base",
+  ]
+}
+
+mojom("mojo_bindings") {
+  sources = [
+    "resource_usage_reporter.mojom",
   ]
 }

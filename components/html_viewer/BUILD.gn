@@ -75,6 +75,8 @@ source_set("lib") {
     "html_document.h",
     "mock_web_blob_registry_impl.cc",
     "mock_web_blob_registry_impl.h",
+    "setup.cc",
+    "setup.h",
     "touch_handler.cc",
     "touch_handler.h",
     "web_clipboard_impl.cc",
@@ -113,6 +115,8 @@ source_set("lib") {
     "//components/clipboard/public/interfaces",
     "//components/gpu/public/interfaces",
     "//components/mime_util",
+    "//components/resource_provider/public/cpp",
+    "//components/resource_provider/public/interfaces",
     "//components/scheduler:scheduler",
     "//components/surfaces/public/interfaces",
     "//components/webcrypto",
@@ -121,19 +125,15 @@ source_set("lib") {
     "//media",
     "//media/blink",
     "//media/mojo",
-    "//mojo/application",
+    "//mojo/application/public/cpp",
     "//mojo/cc",
-    "//mojo/common",
     "//mojo/converters/surfaces",
     "//mojo/services/network/public/cpp",
     "//mojo/services/network/public/interfaces",
     "//net",
     "//skia",
     "//third_party/mojo/src/mojo/public/c/system:for_shared_library",
-    "//third_party/mojo/src/mojo/public/cpp/utility",
-    "//third_party/mojo/src/mojo/public/interfaces/application",
     "//third_party/mojo_services/src/accessibility/public/interfaces",
-    "//third_party/mojo_services/src/content_handler/public/interfaces",
     "//ui/mojo/events:interfaces",
     "//ui/events",
     "//ui/events:gesture_detection",
@@ -161,7 +161,6 @@ source_set("lib") {
 
   data_deps = [
     "//components/clipboard",
-    "//components/native_viewport",
     "//components/surfaces",
     "//components/view_manager",
   ]
@@ -177,17 +176,12 @@ mojo_application_package("html_viewer") {
   deps = [
     ":html_viewer_resources_grit",
     ":lib",
-    "//components/resource_provider/public/cpp",
-    "//components/resource_provider/public/interfaces",
     "//mojo/common",
     "//mojo/platform_handle",
     "//third_party/icu:icudata",
     "//ui/resources:ui_test_pak",
   ]
-  data_deps = [
-    "//mojo/services/network:network",
-    "//components/resource_provider",
-  ]
+  data_deps = [ "//mojo/services/network:network" ]
   resources = [
     "$root_out_dir/icudtl.dat",
     "$root_out_dir/ui_test.pak",
@@ -223,10 +217,12 @@ mojo_native_application("apptests") {
   ]
 
   deps = [
-    ":lib",
-    ":html_viewer",
-    "//mojo/application:test_support",
+    "//base",
+    "//mojo/application/public/cpp:test_support",
     "//net:test_support",
     "//testing/gtest",
+    "//third_party/mojo_services/src/accessibility/public/interfaces",
   ]
+
+  data_deps = [ ":html_viewer" ]
 }

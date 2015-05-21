@@ -32,7 +32,7 @@
 #include "cc/output/filter_operations.h"
 #include "cc/quads/shared_quad_state.h"
 #include "cc/resources/resource_provider.h"
-#include "cc/resources/tile_priority.h"
+#include "cc/tiles/tile_priority.h"
 #include "skia/ext/refptr.h"
 #include "third_party/skia/include/core/SkColor.h"
 #include "third_party/skia/include/core/SkImageFilter.h"
@@ -60,6 +60,7 @@ class Occlusion;
 template <typename LayerType>
 class OcclusionTracker;
 class OpacityTree;
+class PrioritizedTile;
 class RenderPass;
 class RenderPassId;
 class Renderer;
@@ -150,20 +151,15 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
     return scroll_children_.get();
   }
 
-  void set_transform_tree_index(int index) {
-    transform_tree_index_ = index;
-    SetNeedsPushProperties();
-  }
-  void set_clip_tree_index(int index) {
-    clip_tree_index_ = index;
-    SetNeedsPushProperties();
-  }
-  void set_opacity_tree_index(int index) {
-    opacity_tree_index_ = index;
-    SetNeedsPushProperties();
-  }
-  int clip_tree_index() const { return clip_tree_index_; }
+  void set_property_tree_sequence_number(int sequence_number) {}
+
+  void SetTransformTreeIndex(int index);
   int transform_tree_index() const { return transform_tree_index_; }
+
+  void SetClipTreeIndex(int index);
+  int clip_tree_index() const { return clip_tree_index_; }
+
+  void SetOpacityTreeIndex(int index);
   int opacity_tree_index() const { return opacity_tree_index_; }
 
   void set_offset_to_transform_parent(const gfx::Vector2dF& offset) {
@@ -254,7 +250,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 #endif
   }
 
-  virtual void GetContentsResourceId(ResourceProvider::ResourceId* resource_id,
+  virtual void GetContentsResourceId(ResourceId* resource_id,
                                      gfx::Size* resource_size) const;
 
   virtual bool HasDelegatedContent() const;
@@ -604,8 +600,8 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   virtual scoped_ptr<LayerImpl> CreateLayerImpl(LayerTreeImpl* tree_impl);
   virtual void PushPropertiesTo(LayerImpl* layer);
 
-  virtual void GetAllTilesAndPrioritiesForTracing(
-      std::map<const Tile*, TilePriority>* tile_map) const;
+  virtual void GetAllPrioritizedTilesForTracing(
+      std::vector<PrioritizedTile>* prioritized_tiles) const;
   virtual void AsValueInto(base::trace_event::TracedValue* dict) const;
 
   virtual size_t GPUMemoryUsageInBytes() const;

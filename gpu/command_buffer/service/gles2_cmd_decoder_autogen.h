@@ -2070,6 +2070,74 @@ error::Error GLES2DecoderImpl::HandleGetVertexAttribiv(
   return error::kNoError;
 }
 
+error::Error GLES2DecoderImpl::HandleGetVertexAttribIiv(
+    uint32_t immediate_data_size,
+    const void* cmd_data) {
+  if (!unsafe_es3_apis_enabled())
+    return error::kUnknownCommand;
+  const gles2::cmds::GetVertexAttribIiv& c =
+      *static_cast<const gles2::cmds::GetVertexAttribIiv*>(cmd_data);
+  (void)c;
+  GLuint index = static_cast<GLuint>(c.index);
+  GLenum pname = static_cast<GLenum>(c.pname);
+  typedef cmds::GetVertexAttribIiv::Result Result;
+  GLsizei num_values = 0;
+  GetNumValuesReturnedForGLGet(pname, &num_values);
+  Result* result = GetSharedMemoryAs<Result*>(
+      c.params_shm_id, c.params_shm_offset, Result::ComputeSize(num_values));
+  GLint* params = result ? result->GetData() : NULL;
+  if (params == NULL) {
+    return error::kOutOfBounds;
+  }
+  LOCAL_COPY_REAL_GL_ERRORS_TO_WRAPPER("GetVertexAttribIiv");
+  // Check that the client initialized the result.
+  if (result->size != 0) {
+    return error::kInvalidArguments;
+  }
+  DoGetVertexAttribIiv(index, pname, params);
+  GLenum error = glGetError();
+  if (error == GL_NO_ERROR) {
+    result->SetNumResults(num_values);
+  } else {
+    LOCAL_SET_GL_ERROR(error, "GetVertexAttribIiv", "");
+  }
+  return error::kNoError;
+}
+
+error::Error GLES2DecoderImpl::HandleGetVertexAttribIuiv(
+    uint32_t immediate_data_size,
+    const void* cmd_data) {
+  if (!unsafe_es3_apis_enabled())
+    return error::kUnknownCommand;
+  const gles2::cmds::GetVertexAttribIuiv& c =
+      *static_cast<const gles2::cmds::GetVertexAttribIuiv*>(cmd_data);
+  (void)c;
+  GLuint index = static_cast<GLuint>(c.index);
+  GLenum pname = static_cast<GLenum>(c.pname);
+  typedef cmds::GetVertexAttribIuiv::Result Result;
+  GLsizei num_values = 0;
+  GetNumValuesReturnedForGLGet(pname, &num_values);
+  Result* result = GetSharedMemoryAs<Result*>(
+      c.params_shm_id, c.params_shm_offset, Result::ComputeSize(num_values));
+  GLuint* params = result ? result->GetData() : NULL;
+  if (params == NULL) {
+    return error::kOutOfBounds;
+  }
+  LOCAL_COPY_REAL_GL_ERRORS_TO_WRAPPER("GetVertexAttribIuiv");
+  // Check that the client initialized the result.
+  if (result->size != 0) {
+    return error::kInvalidArguments;
+  }
+  DoGetVertexAttribIuiv(index, pname, params);
+  GLenum error = glGetError();
+  if (error == GL_NO_ERROR) {
+    result->SetNumResults(num_values);
+  } else {
+    LOCAL_SET_GL_ERROR(error, "GetVertexAttribIuiv", "");
+  }
+  return error::kNoError;
+}
+
 error::Error GLES2DecoderImpl::HandleHint(uint32_t immediate_data_size,
                                           const void* cmd_data) {
   const gles2::cmds::Hint& c = *static_cast<const gles2::cmds::Hint*>(cmd_data);
@@ -3880,7 +3948,7 @@ error::Error GLES2DecoderImpl::HandleVertexAttribI4i(
   GLint y = static_cast<GLint>(c.y);
   GLint z = static_cast<GLint>(c.z);
   GLint w = static_cast<GLint>(c.w);
-  glVertexAttribI4i(indx, x, y, z, w);
+  DoVertexAttribI4i(indx, x, y, z, w);
   return error::kNoError;
 }
 
@@ -3905,7 +3973,7 @@ error::Error GLES2DecoderImpl::HandleVertexAttribI4ivImmediate(
   if (values == NULL) {
     return error::kOutOfBounds;
   }
-  glVertexAttribI4iv(indx, values);
+  DoVertexAttribI4iv(indx, values);
   return error::kNoError;
 }
 
@@ -3922,7 +3990,7 @@ error::Error GLES2DecoderImpl::HandleVertexAttribI4ui(
   GLuint y = static_cast<GLuint>(c.y);
   GLuint z = static_cast<GLuint>(c.z);
   GLuint w = static_cast<GLuint>(c.w);
-  glVertexAttribI4ui(indx, x, y, z, w);
+  DoVertexAttribI4ui(indx, x, y, z, w);
   return error::kNoError;
 }
 
@@ -3947,7 +4015,7 @@ error::Error GLES2DecoderImpl::HandleVertexAttribI4uivImmediate(
   if (values == NULL) {
     return error::kOutOfBounds;
   }
-  glVertexAttribI4uiv(indx, values);
+  DoVertexAttribI4uiv(indx, values);
   return error::kNoError;
 }
 
@@ -4167,7 +4235,7 @@ error::Error GLES2DecoderImpl::HandleTexStorage2DEXT(
   GLenum internalFormat = static_cast<GLenum>(c.internalFormat);
   GLsizei width = static_cast<GLsizei>(c.width);
   GLsizei height = static_cast<GLsizei>(c.height);
-  if (!validators_->texture_target.IsValid(target)) {
+  if (!validators_->texture_bind_target.IsValid(target)) {
     LOCAL_SET_GL_ERROR_INVALID_ENUM("glTexStorage2DEXT", target, "target");
     return error::kNoError;
   }

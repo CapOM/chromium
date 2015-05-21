@@ -54,8 +54,8 @@
 #include "components/translate/core/browser/language_state.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/notification_details.h"
-#include "content/public/browser/notification_source.h"
 #include "content/public/browser/notification_service.h"
+#include "content/public/browser/notification_source.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
@@ -330,11 +330,13 @@ void BrowserWindowCocoa::OnActiveTabChanged(content::WebContents* old_contents,
                                             content::WebContents* new_contents,
                                             int index,
                                             int reason) {
+  [controller_ onActiveTabChanged:old_contents to:new_contents];
   // TODO(pkasting): Perhaps the code in
   // TabStripController::activateTabWithContents should move here?  Or this
   // should call that (instead of TabStripModelObserverBridge doing so)?  It's
   // not obvious to me why Mac doesn't handle tab changes in BrowserWindow the
   // way views and GTK do.
+  // See http://crbug.com/340720 for discussion.
 }
 
 void BrowserWindowCocoa::ZoomChangedForActiveTab(bool can_show_bubble) {
@@ -801,6 +803,10 @@ void BrowserWindowCocoa::ShowAvatarBubbleFromAvatarButton(
   [controller showAvatarBubbleAnchoredAt:anchor
                                 withMode:mode
                          withServiceType:manage_accounts_params.service_type];
+}
+
+void BrowserWindowCocoa::CloseAvatarBubbleFromAvatarButton() {
+  [[controller_ avatarButtonController] closeAvatarBubble];
 }
 
 int

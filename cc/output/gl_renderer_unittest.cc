@@ -14,9 +14,9 @@
 #include "cc/output/copy_output_request.h"
 #include "cc/output/copy_output_result.h"
 #include "cc/output/overlay_strategy_single_on_top.h"
+#include "cc/output/texture_mailbox_deleter.h"
 #include "cc/quads/texture_draw_quad.h"
 #include "cc/resources/resource_provider.h"
-#include "cc/resources/texture_mailbox_deleter.h"
 #include "cc/test/fake_impl_proxy.h"
 #include "cc/test/fake_layer_tree_host_impl.h"
 #include "cc/test/fake_output_surface.h"
@@ -124,8 +124,6 @@ class GLRendererShaderPixelTest : public GLRendererPixelTest {
 
   void TestShadersWithPrecision(TexCoordPrecision precision) {
     EXPECT_PROGRAM_VALID(renderer()->GetTextureIOSurfaceProgram(precision));
-    EXPECT_PROGRAM_VALID(renderer()->GetVideoYUVProgram(precision));
-    EXPECT_PROGRAM_VALID(renderer()->GetVideoYUVAProgram(precision));
     if (renderer()->Capabilities().using_egl_image)
       EXPECT_PROGRAM_VALID(renderer()->GetVideoStreamTextureProgram(precision));
     else
@@ -165,6 +163,8 @@ class GLRendererShaderPixelTest : public GLRendererPixelTest {
         renderer()->GetTileProgramSwizzleOpaque(precision, sampler));
     EXPECT_PROGRAM_VALID(
         renderer()->GetTileProgramSwizzleAA(precision, sampler));
+    EXPECT_PROGRAM_VALID(renderer()->GetVideoYUVProgram(precision, sampler));
+    EXPECT_PROGRAM_VALID(renderer()->GetVideoYUVAProgram(precision, sampler));
   }
 
   void TestShadersWithMasks(TexCoordPrecision precision,
@@ -1558,7 +1558,7 @@ TEST_F(GLRendererShaderTest, DrawRenderPassQuadShaderPermutations) {
   RenderPassId root_pass_id(1, 0);
   TestRenderPass* root_pass;
 
-  ResourceProvider::ResourceId mask = resource_provider_->CreateResource(
+  ResourceId mask = resource_provider_->CreateResource(
       gfx::Size(20, 12), GL_CLAMP_TO_EDGE,
       ResourceProvider::TEXTURE_HINT_IMMUTABLE,
       resource_provider_->best_texture_format());
@@ -2169,9 +2169,8 @@ TEST_F(GLRendererTest, DontOverlayWithCopyRequests) {
   mailbox.set_allow_overlay(true);
   scoped_ptr<SingleReleaseCallbackImpl> release_callback =
       SingleReleaseCallbackImpl::Create(base::Bind(&MailboxReleased));
-  ResourceProvider::ResourceId resource_id =
-      resource_provider->CreateResourceFromTextureMailbox(
-          mailbox, release_callback.Pass());
+  ResourceId resource_id = resource_provider->CreateResourceFromTextureMailbox(
+      mailbox, release_callback.Pass());
   bool premultiplied_alpha = false;
   bool flipped = false;
   bool nearest_neighbor = false;
@@ -2296,9 +2295,8 @@ TEST_F(GLRendererTest, OverlaySyncPointsAreProcessed) {
   mailbox.set_allow_overlay(true);
   scoped_ptr<SingleReleaseCallbackImpl> release_callback =
       SingleReleaseCallbackImpl::Create(base::Bind(&MailboxReleased));
-  ResourceProvider::ResourceId resource_id =
-      resource_provider->CreateResourceFromTextureMailbox(
-          mailbox, release_callback.Pass());
+  ResourceId resource_id = resource_provider->CreateResourceFromTextureMailbox(
+      mailbox, release_callback.Pass());
   bool premultiplied_alpha = false;
   bool flipped = false;
   bool nearest_neighbor = false;

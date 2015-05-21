@@ -15,9 +15,18 @@ void InitCoreServicesForContext(mojo::runner::Context* context) {
   manager->RegisterApplicationPackageAlias(GURL("mojo:clipboard"),
                                            GURL("mojo:core_services"), "Core");
 #if !defined(OS_ANDROID)
+  manager->RegisterApplicationPackageAlias(GURL("mojo:native_viewport_service"),
+                                           GURL("mojo:core_services"),
+                                           "Surfaces");
+#endif
   manager->RegisterApplicationPackageAlias(
       GURL("mojo:network_service"), GURL("mojo:core_services"), "Network");
+#if !defined(OS_ANDROID)
+  manager->RegisterApplicationPackageAlias(
+      GURL("mojo:omnibox"), GURL("mojo:core_services"), "Core");
 #endif
+  manager->RegisterApplicationPackageAlias(
+      GURL("mojo:resource_provider"), GURL("mojo:core_services"), "Core");
   manager->RegisterApplicationPackageAlias(
       GURL("mojo:surfaces_service"), GURL("mojo:core_services"), "Surfaces");
   manager->RegisterApplicationPackageAlias(GURL("mojo:tracing"),

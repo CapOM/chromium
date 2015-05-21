@@ -97,8 +97,9 @@ import java.util.Map.Entry;
  * being tied to the view system.
  */
 @JNINamespace("content")
-public class ContentViewCore
-        implements AccessibilityStateChangeListener, ScreenOrientationObserver {
+public class ContentViewCore implements
+        AccessibilityStateChangeListener, ScreenOrientationObserver,
+        SystemCaptioningBridge.SystemCaptioningBridgeListener {
 
     private static final String TAG = "ContentViewCore";
 
@@ -631,7 +632,7 @@ public class ContentViewCore
         mRenderCoordinates.setDeviceScaleFactor(deviceScaleFactor);
         mAccessibilityManager = (AccessibilityManager)
                 getContext().getSystemService(Context.ACCESSIBILITY_SERVICE);
-        mSystemCaptioningBridge = CaptioningBridgeFactory.create(this);
+        mSystemCaptioningBridge = CaptioningBridgeFactory.getSystemCaptioningBridge(mContext);
         mGestureStateListeners = new ObserverList<GestureStateListener>();
         mGestureStateListenersIterator = mGestureStateListeners.rewindableIterator();
 
@@ -1188,6 +1189,11 @@ public class ContentViewCore
         }
     }
 
+    @CalledByNative
+    private void requestDisallowInterceptTouchEvent() {
+        mContainerView.requestDisallowInterceptTouchEvent(true);
+    }
+
     private static boolean isValidTouchEventActionForNative(int eventAction) {
         // Only these actions have any effect on gesture detection.  Other
         // actions have no corresponding WebTouchEvent type and may confuse the
@@ -1475,7 +1481,7 @@ public class ContentViewCore
         ScreenOrientationListener.getInstance().addObserver(this, mContext);
         GamepadList.onAttachedToWindow(mContext);
         mAccessibilityManager.addAccessibilityStateChangeListener(this);
-        mSystemCaptioningBridge.registerBridge();
+        mSystemCaptioningBridge.addListener(this);
     }
 
     /**
@@ -1498,7 +1504,7 @@ public class ContentViewCore
         // locking and app switching.
         setTextHandlesTemporarilyHidden(true);
         hidePopupsAndPreserveSelection();
-        mSystemCaptioningBridge.unregisterBridge();
+        mSystemCaptioningBridge.removeListener(this);
     }
 
     /**
@@ -1790,34 +1796,29 @@ public class ContentViewCore
      * are overridden, so that View's mScrollX and mScrollY will be unchanged at
      * (0, 0). This is critical for drawing ContentView correctly.
      */
-    public void scrollBy(int xPix, int yPix) {
-        if (mNativeContentViewCore != 0) {
-            nativeScrollBy(mNativeContentViewCore,
-                    SystemClock.uptimeMillis(), 0, 0, xPix, yPix);
-        }
+    public void scrollBy(float dxPix, float dyPix) {
+        if (mNativeContentViewCore == 0) return;
+        if (dxPix == 0 && dyPix == 0) return;
+        long time = SystemClock.uptimeMillis();
+        // It's a very real (and valid) possibility that a fling may still
+        // be active when programatically scrolling. Cancelling the fling in
+        // such cases ensures a consistent gesture event stream.
+        if (mPotentiallyActiveFlingCount > 0) nativeFlingCancel(mNativeContentViewCore, time);
+        nativeScrollBegin(mNativeContentViewCore, time, 0, 0, -dxPix, -dyPix);
+        nativeScrollBy(mNativeContentViewCore, time, 0, 0, dxPix, dyPix);
+        nativeScrollEnd(mNativeContentViewCore, time);
     }
 
     /**
      * @see View#scrollTo(int, int)
      */
-    public void scrollTo(int xPix, int yPix) {
+    public void scrollTo(float xPix, float yPix) {
         if (mNativeContentViewCore == 0) return;
         final float xCurrentPix = mRenderCoordinates.getScrollXPix();
         final float yCurrentPix = mRenderCoordinates.getScrollYPix();
         final float dxPix = xPix - xCurrentPix;
         final float dyPix = yPix - yCurrentPix;
-        if (dxPix != 0 || dyPix != 0) {
-            long time = SystemClock.uptimeMillis();
-            // It's a very real (and valid) possibility that a fling may still
-            // be active when programatically scrolling. Cancelling the fling in
-            // such cases ensures a consistent gesture event stream.
-            if (mPotentiallyActiveFlingCount > 0) nativeFlingCancel(mNativeContentViewCore, time);
-            nativeScrollBegin(mNativeContentViewCore, time,
-                    xCurrentPix, yCurrentPix, -dxPix, -dyPix);
-            nativeScrollBy(mNativeContentViewCore,
-                    time, xCurrentPix, yCurrentPix, dxPix, dyPix);
-            nativeScrollEnd(mNativeContentViewCore, time);
-        }
+        scrollBy(dxPix, dyPix);
     }
 
     // NOTE: this can go away once ContentView.getScrollX() reports correct values.
@@ -2602,7 +2603,7 @@ public class ContentViewCore
     private void onRenderProcessChange() {
         attachImeAdapter();
         // Immediately sync closed caption settings to the new render process.
-        mSystemCaptioningBridge.syncToDelegate();
+        mSystemCaptioningBridge.syncToListener(this);
     }
 
     /**
@@ -2910,13 +2911,9 @@ public class ContentViewCore
         return null;
     }
 
-    /**
-     * Set closed captioning text track style settings.
-     *
-     * @param settings The TextTrackSettings object containing the new settings.
-     */
     @TargetApi(Build.VERSION_CODES.KITKAT)
-    public void setTextTrackSettings(TextTrackSettings settings) {
+    @Override
+    public void onSystemCaptioningChanged(TextTrackSettings settings) {
         if (mNativeContentViewCore == 0) return;
         nativeSetTextTrackSettings(mNativeContentViewCore, settings.getTextTrackBackgroundColor(),
                 settings.getTextTrackFontFamily(), settings.getTextTrackFontStyle(),

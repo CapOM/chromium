@@ -39,6 +39,8 @@ int CurrentWorkerId() {
 WebBluetoothError::ErrorType WebBluetoothErrorFromBluetoothError(
     BluetoothError error_type) {
   switch (error_type) {
+    case BluetoothError::NETWORK_ERROR:
+      return WebBluetoothError::NetworkError;
     case BluetoothError::NOT_FOUND:
       return WebBluetoothError::NotFoundError;
     case BluetoothError::SECURITY:
@@ -116,11 +118,6 @@ void BluetoothDispatcher::connectGATT(
   int request_id = pending_connect_requests_.Add(callbacks);
   Send(new BluetoothHostMsg_ConnectGATT(CurrentWorkerId(), request_id,
                                         device_instance_id.utf8()));
-}
-
-void BluetoothDispatcher::SetBluetoothMockDataSetForTesting(
-    const std::string& name) {
-  Send(new BluetoothHostMsg_SetBluetoothMockDataSetForTesting(name));
 }
 
 void BluetoothDispatcher::OnWorkerRunLoopStopped() {

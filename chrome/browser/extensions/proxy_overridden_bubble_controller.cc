@@ -5,6 +5,7 @@
 #include "chrome/browser/extensions/proxy_overridden_bubble_controller.h"
 
 #include "base/metrics/histogram.h"
+#include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/settings_api_helpers.h"
 #include "chrome/browser/profiles/profile.h"
@@ -43,7 +44,8 @@ class ProxyOverriddenBubbleDelegate
       ExtensionMessageBubbleController::BubbleAction user_action) override;
   void PerformAction(const ExtensionIdList& list) override;
   base::string16 GetTitle() const override;
-  base::string16 GetMessageBody(bool anchored_to_browser_action) const override;
+  base::string16 GetMessageBody(bool anchored_to_browser_action,
+                                int extension_count) const override;
   base::string16 GetOverflowText(
       const base::string16& overflow_count) const override;
   GURL GetLearnMoreUrl() const override;
@@ -121,13 +123,20 @@ base::string16 ProxyOverriddenBubbleDelegate::GetTitle() const {
 }
 
 base::string16 ProxyOverriddenBubbleDelegate::GetMessageBody(
-    bool anchored_to_browser_action) const {
+    bool anchored_to_browser_action,
+    int extension_count) const {
   if (anchored_to_browser_action) {
     return l10n_util::GetStringUTF16(
         IDS_EXTENSIONS_PROXY_CONTROLLED_FIRST_LINE_EXTENSION_SPECIFIC);
   } else {
-    return l10n_util::GetStringUTF16(
-        IDS_EXTENSIONS_PROXY_CONTROLLED_FIRST_LINE);
+    const Extension* extension =
+        ExtensionRegistry::Get(profile())->GetExtensionById(
+            extension_id_, ExtensionRegistry::EVERYTHING);
+    // If the bubble is about to show, the extension should certainly exist.
+    CHECK(extension);
+    return l10n_util::GetStringFUTF16(
+        IDS_EXTENSIONS_PROXY_CONTROLLED_FIRST_LINE,
+        base::UTF8ToUTF16(extension->name()));
   }
 }
 

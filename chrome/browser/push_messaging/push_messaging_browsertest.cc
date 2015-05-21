@@ -77,7 +77,6 @@ class PushMessagingBrowserTest : public InProcessBrowserTest {
   // InProcessBrowserTest:
   void SetUpCommandLine(base::CommandLine* command_line) override {
     command_line->AppendSwitch(switches::kEnablePushMessagePayload);
-    command_line->AppendSwitch(switches::kEnablePushMessagingHasPermission);
 
     InProcessBrowserTest::SetUpCommandLine(command_line);
   }
@@ -246,8 +245,9 @@ PushMessagingAppIdentifier
 PushMessagingBrowserTest::GetAppIdentifierForServiceWorkerRegistration(
     int64 service_worker_registration_id) {
   GURL origin = https_server()->GetURL(std::string()).GetOrigin();
-  PushMessagingAppIdentifier app_identifier = PushMessagingAppIdentifier::Get(
-      GetBrowser()->profile(), origin, service_worker_registration_id);
+  PushMessagingAppIdentifier app_identifier =
+      PushMessagingAppIdentifier::FindByServiceWorker(
+          GetBrowser()->profile(), origin, service_worker_registration_id);
   EXPECT_FALSE(app_identifier.is_null());
   return app_identifier;
 }
@@ -370,8 +370,13 @@ IN_PROC_BROWSER_TEST_F(PushMessagingManifestUserVisibleOnlyTrueTest,
   ASSERT_TRUE(RunScript("subscribePush()", &script_result));
   EXPECT_EQ(GetEndpointForSubscriptionId("1-0"), script_result);
 
+  // permissionState has been introduced later so it does not
+  // respect the manifest key.
   ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  EXPECT_EQ("permission status - granted", script_result);
+  EXPECT_EQ(
+      "NotSupportedError - Push subscriptions that don't enable"
+      " userVisibleOnly are not supported.",
+      script_result);
 }
 
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribePersisted) {
@@ -1036,8 +1041,8 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
       GetAppIdentifierForServiceWorkerRegistration(0LL);
   EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
   PushMessagingAppIdentifier stored_app_identifier =
-      PushMessagingAppIdentifier::Get(GetBrowser()->profile(),
-                                      app_identifier.app_id());
+      PushMessagingAppIdentifier::FindByAppId(GetBrowser()->profile(),
+                                              app_identifier.app_id());
   EXPECT_FALSE(stored_app_identifier.is_null());
 
   // Simulate a user clearing site data (including Service Workers, crucially).
@@ -1063,8 +1068,8 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
 
   // |app_identifier| should no longer be stored in prefs.
   PushMessagingAppIdentifier stored_app_identifier2 =
-      PushMessagingAppIdentifier::Get(GetBrowser()->profile(),
-                                      app_identifier.app_id());
+      PushMessagingAppIdentifier::FindByAppId(GetBrowser()->profile(),
+                                              app_identifier.app_id());
   EXPECT_TRUE(stored_app_identifier2.is_null());
 }
 

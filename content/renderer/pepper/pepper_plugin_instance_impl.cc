@@ -663,13 +663,20 @@ v8::Local<v8::Context> PepperPluginInstanceImpl::GetMainWorldContext() {
 void PepperPluginInstanceImpl::Delete() {
   is_deleted_ = true;
 
-  if (render_frame_ &&
+  if (render_frame_ && render_frame_->render_view() &&
       render_frame_->render_view()->plugin_find_handler() == this) {
     render_frame_->render_view()->set_plugin_find_handler(NULL);
   }
 
   // Keep a reference on the stack. See NOTE above.
   scoped_refptr<PepperPluginInstanceImpl> ref(this);
+
+  // It is important to destroy the throttler before anything else.
+  // The plugin instance may flush its graphics pipeline during its postmortem
+  // spasm, causing the throttler to engage and obtain new dangling reference
+  // to the plugin container being destroyed.
+  throttler_.reset();
+
   // Force the MessageChannel to release its "passthrough object" which should
   // release our last reference to the "InstanceObject" and will probably
   // destroy it. We want to do this prior to calling DidDestroy in case the
@@ -698,8 +705,6 @@ void PepperPluginInstanceImpl::Delete() {
     fullscreen_container_->Destroy();
     fullscreen_container_ = NULL;
   }
-
-  throttler_.reset();
 
   // Force-unbind any Graphics. In the case of Graphics2D, if the plugin
   // leaks the graphics 2D, it may actually get cleaned up after our

@@ -5,7 +5,7 @@
 #include "components/view_manager/public/cpp/view_manager_client_factory.h"
 
 #include "components/view_manager/public/cpp/lib/view_manager_client_impl.h"
-#include "third_party/mojo/src/mojo/public/interfaces/application/shell.mojom.h"
+#include "mojo/application/public/interfaces/shell.mojom.h"
 
 namespace mojo {
 
@@ -16,19 +16,6 @@ ViewManagerClientFactory::ViewManagerClientFactory(
 }
 
 ViewManagerClientFactory::~ViewManagerClientFactory() {
-}
-
-// static
-ViewManagerClient* ViewManagerClientFactory::WeakBindViewManagerToPipe(
-    InterfaceRequest<ViewManagerClient> request,
-    ViewManagerServicePtr view_manager_service,
-    Shell* shell,
-    ViewManagerDelegate* delegate) {
-  const bool delete_on_error = false;
-  auto client = new ViewManagerClientImpl(delegate, shell, request.Pass(),
-                                          delete_on_error);
-  client->SetViewManagerService(view_manager_service.Pass());
-  return client;
 }
 
 // InterfaceFactory<ViewManagerClient> implementation.

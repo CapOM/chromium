@@ -30,6 +30,12 @@ void AppListServiceViews::Init(Profile* initial_profile) {
 }
 
 void AppListServiceViews::ShowForProfile(Profile* requested_profile) {
+  // App list profiles should not be off-the-record. It is currently possible to
+  // get here in an off-the-record profile via the Web Store
+  // (http://crbug.com/416380).
+  // TODO(mgiuca): DCHECK that requested_profile->IsOffTheRecord() and
+  // requested_profile->IsGuestSession() are false, once that is resolved.
+
   ShowForProfileInternal(requested_profile,
                          app_list::AppListModel::INVALID_STATE);
 }
@@ -47,6 +53,19 @@ void AppListServiceViews::ShowForAppInstall(Profile* profile,
 void AppListServiceViews::ShowForCustomLauncherPage(Profile* profile) {
   ShowForProfileInternal(profile,
                          app_list::AppListModel::STATE_CUSTOM_LAUNCHER_PAGE);
+}
+
+void AppListServiceViews::HideCustomLauncherPage() {
+  if (!shower_.IsAppListVisible())
+    return;
+
+  app_list::ContentsView* contents_view =
+      shower_.app_list()->app_list_main_view()->contents_view();
+
+  if (contents_view->IsStateActive(
+          app_list::AppListModel::STATE_CUSTOM_LAUNCHER_PAGE)) {
+    contents_view->SetActiveState(app_list::AppListModel::STATE_START, true);
+  }
 }
 
 void AppListServiceViews::DismissAppList() {

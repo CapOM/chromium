@@ -5,8 +5,8 @@
 #include "mojo/runner/android/native_viewport_application_loader.h"
 
 #include "components/gles2/gpu_state.h"
-#include "components/native_viewport/native_viewport_impl.h"
-#include "mojo/public/cpp/application/application_impl.h"
+#include "components/view_manager/native_viewport/native_viewport_impl.h"
+#include "mojo/application/public/cpp/application_impl.h"
 
 namespace mojo {
 namespace runner {
@@ -36,7 +36,12 @@ void NativeViewportApplicationLoader::Create(
     InterfaceRequest<NativeViewport> request) {
   if (!gpu_state_)
     gpu_state_ = new gles2::GpuState;
-  new native_viewport::NativeViewportImpl(false, gpu_state_, request.Pass());
+  // Pass a null AppRefCount because on Android the NativeViewPort app must
+  // live on the main thread and we don't want to exit that when all the native
+  // viewports are gone.
+  new native_viewport::NativeViewportImpl(
+      false, gpu_state_, request.Pass(),
+      make_scoped_ptr<mojo::AppRefCount>(nullptr));
 }
 
 void NativeViewportApplicationLoader::Create(ApplicationConnection* connection,

@@ -996,10 +996,11 @@ FileManager.prototype = /** @struct */ {
     directoryTree.dataModel = new NavigationListModel(
         assert(this.volumeManager_),
         assert(this.folderShortcutsModel_),
-        new NavigationModelMenuItem(
-            str('ADD_NEW_SERVICES_BUTTON_LABEL'),
-            '#add-new-services-menu',
-            'add-new-services'));
+        this.dialogType === DialogType.FULL_PAGE ?
+            new NavigationModelMenuItem(
+                str('ADD_NEW_SERVICES_BUTTON_LABEL'),
+                '#add-new-services-menu',
+                'add-new-services') : null);
 
     this.ui_.initDirectoryTree(directoryTree);
   };
@@ -1251,6 +1252,13 @@ FileManager.prototype = /** @struct */ {
    */
   FileManager.prototype.isOnDrive = function() {
     return this.directoryModel_.isOnDrive();
+  };
+
+  /**
+   * @return {boolean} True if the current directory content is from MTP volume.
+   */
+  FileManager.prototype.isOnMTP = function() {
+    return this.directoryModel_.isOnMTP();
   };
 
   /**

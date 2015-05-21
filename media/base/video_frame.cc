@@ -11,7 +11,6 @@
 #include "base/logging.h"
 #include "base/memory/aligned_memory.h"
 #include "base/strings/string_piece.h"
-#include "gpu/command_buffer/common/mailbox_holder.h"
 #include "media/base/limits.h"
 #include "media/base/video_util.h"
 #include "ui/gfx/geometry/point.h"
@@ -245,12 +244,14 @@ scoped_refptr<VideoFrame> VideoFrame::WrapNativeTexture(
     const gfx::Rect& visible_rect,
     const gfx::Size& natural_size,
     base::TimeDelta timestamp,
-    bool allow_overlay) {
+    bool allow_overlay,
+    bool has_alpha) {
   gpu::MailboxHolder mailbox_holders[kMaxPlanes];
   mailbox_holders[kARGBPlane] = mailbox_holder;
+  TextureFormat texture_format = has_alpha ? TEXTURE_RGBA : TEXTURE_RGB;
   scoped_refptr<VideoFrame> frame(
       new VideoFrame(NATIVE_TEXTURE, coded_size, visible_rect, natural_size,
-                     mailbox_holders, TEXTURE_RGBA, timestamp, false));
+                     mailbox_holders, texture_format, timestamp, false));
   frame->mailbox_holders_release_cb_ = mailbox_holder_release_cb;
   frame->allow_overlay_ = allow_overlay;
   return frame;
@@ -556,6 +557,7 @@ size_t VideoFrame::NumPlanes(Format format) {
 size_t VideoFrame::NumTextures(TextureFormat texture_format) {
   switch (texture_format) {
     case TEXTURE_RGBA:
+    case TEXTURE_RGB:
       return 1;
     case TEXTURE_YUV_420:
       return 3;

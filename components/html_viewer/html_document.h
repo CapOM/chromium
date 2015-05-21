@@ -15,16 +15,16 @@
 #include "components/view_manager/public/cpp/view_manager_delegate.h"
 #include "components/view_manager/public/cpp/view_observer.h"
 #include "mandoline/services/navigation/public/interfaces/navigation.mojom.h"
+#include "mojo/application/public/cpp/interface_factory.h"
+#include "mojo/application/public/cpp/lazy_interface_ptr.h"
+#include "mojo/application/public/cpp/service_provider_impl.h"
+#include "mojo/application/public/interfaces/application.mojom.h"
+#include "mojo/application/public/interfaces/content_handler.mojom.h"
 #include "mojo/services/network/public/interfaces/url_loader.mojom.h"
 #include "third_party/WebKit/public/web/WebFrameClient.h"
 #include "third_party/WebKit/public/web/WebSandboxFlags.h"
 #include "third_party/WebKit/public/web/WebViewClient.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/interface_factory.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/lazy_interface_ptr.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/service_provider_impl.h"
 #include "third_party/mojo/src/mojo/public/cpp/bindings/interface_impl.h"
-#include "third_party/mojo/src/mojo/public/interfaces/application/application.mojom.h"
-#include "third_party/mojo_services/src/content_handler/public/interfaces/content_handler.mojom.h"
 
 namespace base {
 class MessageLoopProxy;
@@ -44,6 +44,7 @@ class View;
 namespace html_viewer {
 
 class AxProviderImpl;
+class Setup;
 class WebLayerTreeViewImpl;
 class WebMediaPlayerFactory;
 
@@ -65,15 +66,15 @@ class HTMLDocument : public blink::WebViewClient,
   HTMLDocument(mojo::InterfaceRequest<mojo::ServiceProvider> services,
                mojo::URLResponsePtr response,
                mojo::Shell* shell,
-               scoped_refptr<base::MessageLoopProxy> compositor_thread,
-               WebMediaPlayerFactory* web_media_player_factory,
-               bool is_headless);
+               Setup* setup);
   ~HTMLDocument() override;
 
  private:
   // Updates the size and scale factor of the webview and related classes from
   // |root_|.
   void UpdateWebviewSizeFromViewSize();
+
+  void InitSetupAndLoadIfNecessary();
 
   // WebViewClient methods:
   virtual blink::WebStorageNamespace* createSessionStorageNamespace();
@@ -125,6 +126,10 @@ class HTMLDocument : public blink::WebViewClient,
   void OnViewBoundsChanged(mojo::View* view,
                            const mojo::Rect& old_bounds,
                            const mojo::Rect& new_bounds) override;
+  void OnViewViewportMetricsChanged(
+      mojo::View* view,
+      const mojo::ViewportMetrics& old_metrics,
+      const mojo::ViewportMetrics& new_metrics) override;
   void OnViewDestroyed(mojo::View* view) override;
   void OnViewInputEvent(mojo::View* view, const mojo::EventPtr& event) override;
 
@@ -162,12 +167,9 @@ class HTMLDocument : public blink::WebViewClient,
   // A flag set on didFinishLoad.
   bool did_finish_load_ = false;
 
-  // Set if the content will never be displayed.
-  bool is_headless_;
+  Setup* setup_;
 
   scoped_ptr<TouchHandler> touch_handler_;
-
-  float device_pixel_ratio_;
 
   DISALLOW_COPY_AND_ASSIGN(HTMLDocument);
 };

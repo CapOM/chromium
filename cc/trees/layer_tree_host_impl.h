@@ -31,11 +31,11 @@
 #include "cc/output/renderer.h"
 #include "cc/quads/render_pass.h"
 #include "cc/resources/resource_provider.h"
-#include "cc/resources/tile_manager.h"
 #include "cc/resources/ui_resource_client.h"
 #include "cc/scheduler/commit_earlyout_reason.h"
 #include "cc/scheduler/draw_result.h"
 #include "cc/scheduler/video_frame_controller.h"
+#include "cc/tiles/tile_manager.h"
 #include "cc/trees/layer_tree_settings.h"
 #include "cc/trees/proxy.h"
 #include "skia/ext/refptr.h"
@@ -321,13 +321,16 @@ class CC_EXPORT LayerTreeHostImpl
   virtual bool InitializeRenderer(scoped_ptr<OutputSurface> output_surface);
   TileManager* tile_manager() { return tile_manager_.get(); }
 
-  void set_has_gpu_rasterization_trigger(bool flag) {
+  void SetHasGpuRasterizationTrigger(bool flag) {
     has_gpu_rasterization_trigger_ = flag;
+    UpdateGpuRasterizationStatus();
   }
-  void set_content_is_suitable_for_gpu_rasterization(bool flag) {
+  void SetContentIsSuitableForGpuRasterization(bool flag) {
     content_is_suitable_for_gpu_rasterization_ = flag;
+    UpdateGpuRasterizationStatus();
   }
-  void UpdateGpuRasterizationStatus();
+  bool CanUseGpuRasterization();
+  void UpdateTreeResourcesForGpuRasterizationIfNeeded();
   bool use_gpu_rasterization() const { return use_gpu_rasterization_; }
   bool use_msaa() const { return use_msaa_; }
 
@@ -470,13 +473,12 @@ class CC_EXPORT LayerTreeHostImpl
   void EvictAllUIResources();
   bool EvictedUIResourcesExist() const;
 
-  virtual ResourceProvider::ResourceId ResourceIdForUIResource(
-      UIResourceId uid) const;
+  virtual ResourceId ResourceIdForUIResource(UIResourceId uid) const;
 
   virtual bool IsUIResourceOpaque(UIResourceId uid) const;
 
   struct UIResourceData {
-    ResourceProvider::ResourceId resource_id;
+    ResourceId resource_id;
     gfx::Size size;
     bool opaque;
   };
@@ -571,6 +573,8 @@ class CC_EXPORT LayerTreeHostImpl
   void ReleaseTreeResources();
   void RecreateTreeResources();
 
+  void UpdateGpuRasterizationStatus();
+
   bool IsSynchronousSingleThreaded() const;
 
   Viewport* viewport() { return viewport_.get(); }
@@ -646,6 +650,7 @@ class CC_EXPORT LayerTreeHostImpl
   bool use_gpu_rasterization_;
   bool use_msaa_;
   GpuRasterizationStatus gpu_rasterization_status_;
+  bool tree_resources_for_gpu_rasterization_dirty_;
   scoped_ptr<TileTaskWorkerPool> tile_task_worker_pool_;
   scoped_ptr<ResourcePool> resource_pool_;
   scoped_ptr<ResourcePool> staging_resource_pool_;

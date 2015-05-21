@@ -46,6 +46,9 @@ class AccountTrackerService : public KeyedService,
   // Value representing no hosted domain in the kProfileHostedDomain preference.
   static const char kNoHostedDomainFound[];
 
+  // Value representing no picture URL associated with an account.
+  static const char kNoPictureURLFound[];
+
   // Information about a specific account.
   struct AccountInfo {
     AccountInfo();
@@ -58,10 +61,10 @@ class AccountTrackerService : public KeyedService,
     std::string given_name;
     std::string hosted_domain;
     std::string locale;
-    // TODO(rogerta): eventually this structure will include other information
-    // about the account, like full name, profile picture URL, etc.
+    std::string picture_url;
+    std::vector<std::string> service_flags;
 
-    bool IsValid();
+    bool IsValid() const;
   };
 
   // Clients of AccountTrackerService can implement this interface and register
@@ -124,21 +127,25 @@ class AccountTrackerService : public KeyedService,
   // value PickAccountIdForAccount() when given the same arguments.
   std::string SeedAccountInfo(const std::string& gaia,
                               const std::string& email);
+  void SeedAccountInfo(AccountInfo info);
 
   AccountIdMigrationState GetMigrationState();
   static AccountIdMigrationState GetMigrationState(PrefService* pref_service);
 
  protected:
   // Available to be called in tests.
-  void SetAccountStateFromUserInfo(const std::string& account_id,
-                                   const base::DictionaryValue* user_info);
+  void SetAccountStateFromUserInfo(
+      const std::string& account_id,
+      const base::DictionaryValue* user_info,
+      const std::vector<std::string>* service_flags);
 
  private:
   friend class AccountInfoFetcher;
 
   // These methods are called by fetchers.
   void OnUserInfoFetchSuccess(AccountInfoFetcher* fetcher,
-                              const base::DictionaryValue* user_info);
+                              const base::DictionaryValue* user_info,
+                              const std::vector<std::string>* service_flags);
   void OnUserInfoFetchFailure(AccountInfoFetcher* fetcher);
 
   // Refreshes the AccountInfo associated with |account_id| if it's invalid or

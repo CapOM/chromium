@@ -115,6 +115,23 @@ void WebIDBDatabaseImpl::get(long long transaction_id,
                                     callbacks);
 }
 
+void WebIDBDatabaseImpl::getAll(long long transaction_id,
+                                long long object_store_id,
+                                long long index_id,
+                                const WebIDBKeyRange& key_range,
+                                long long max_count,
+                                bool key_only,
+                                WebIDBCallbacks* callbacks) {
+  // TODO(cmumford): Remove DCHECK for key_only once IDBIndex.getAllKeys is
+  //                 implemented.
+  DCHECK(!key_only);
+  IndexedDBDispatcher* dispatcher =
+      IndexedDBDispatcher::ThreadSpecificInstance(thread_safe_sender_.get());
+  dispatcher->RequestIDBDatabaseGetAll(
+      ipc_database_id_, transaction_id, object_store_id, index_id,
+      IndexedDBKeyRangeBuilder::Build(key_range), max_count, callbacks);
+}
+
 void WebIDBDatabaseImpl::put(long long transaction_id,
                              long long object_store_id,
                              const blink::WebData& value,

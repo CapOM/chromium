@@ -500,6 +500,8 @@
       'browser/ui/sync/profile_signin_confirmation_helper_browsertest.cc',
       'browser/ui/tab_modal_confirm_dialog_browsertest.cc',
       'browser/ui/tab_modal_confirm_dialog_browsertest.h',
+      'browser/ui/test/scoped_fake_nswindow_main_status.h',
+      'browser/ui/test/scoped_fake_nswindow_main_status.mm',
       'browser/ui/website_settings/permission_bubble_browser_test_util.cc',
       'browser/ui/website_settings/permission_bubble_browser_test_util.h',
       'browser/ui/toolbar/browser_actions_bar_browsertest.cc',
@@ -794,6 +796,8 @@
       'browser/safe_browsing/safe_browsing_blocking_page_test.cc',
       'browser/safe_browsing/safe_browsing_service_browsertest.cc',
       'browser/safe_browsing/safe_browsing_test.cc',
+      'browser/safe_browsing/test_database_manager.cc',
+      'browser/safe_browsing/test_database_manager.h',
       'renderer/safe_browsing/malware_dom_details_browsertest.cc',
       'renderer/safe_browsing/phishing_classifier_browsertest.cc',
       'renderer/safe_browsing/phishing_classifier_delegate_browsertest.cc',
@@ -839,7 +843,7 @@
       'browser/ui/app_list/search/webstore/webstore_provider_browsertest.cc',
       'browser/ui/app_list/speech_recognizer_browsertest.cc',
     ],
-    'chrome_browser_tests_media_router_webui_sources': [
+    'chrome_browser_tests_media_router_sources': [
       'browser/ui/webui/media_router/media_router_dialog_controller_browsertest.cc',
     ],
     # Javascript sources. These are combined with the .cc files in the GYP build
@@ -1503,7 +1507,7 @@
         '../sync/sync.gyp:sync',
         '../testing/gmock.gyp:gmock',
         '../testing/gtest.gyp:gtest',
-        '../third_party/hunspell_new/hunspell.gyp:hunspell',
+        '../third_party/hunspell/hunspell.gyp:hunspell',
         '../third_party/icu/icu.gyp:icui18n',
         '../third_party/icu/icu.gyp:icuuc',
         '../third_party/libpng/libpng.gyp:libpng',
@@ -1843,6 +1847,7 @@
         '../third_party/zlib/google/zip.gyp:zip',
         '../ui/base/ui_base.gyp:ui_base',
         '../ui/events/events.gyp:events_base',
+        '../ui/events/ozone/events_ozone.gyp:events_ozone_layout',
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_geometry',
       ],
@@ -2241,7 +2246,8 @@
          ],
         }],
         ['enable_media_router==1', {
-          'sources': [ '<@(chrome_browser_tests_media_router_webui_sources)' ],
+          'sources': [ '<@(chrome_browser_tests_media_router_sources)' ],
+          'dependencies': [ 'browser/media/router/media_router.gyp:media_router_test_support' ],
         }],
         ['OS=="win"', {
           'sources': [
@@ -2959,7 +2965,7 @@
           'variables': {
             'apk_name': 'ChromeShellTest',
             'java_in_dir': 'android/shell/javatests',
-            'additional_src_dirs': ['android/javatests/src'],
+            'additional_src_dirs': ['android/javatests_shell/src'],
             'is_test_apk': 1,
           },
           'includes': [ '../build/java_apk.gypi' ],

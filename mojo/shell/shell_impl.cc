@@ -4,10 +4,10 @@
 
 #include "mojo/shell/shell_impl.h"
 
+#include "mojo/application/public/interfaces/content_handler.mojom.h"
 #include "mojo/common/common_type_converters.h"
 #include "mojo/common/url_type_converters.h"
 #include "mojo/shell/application_manager.h"
-#include "third_party/mojo_services/src/content_handler/public/interfaces/content_handler.mojom.h"
 
 namespace mojo {
 namespace shell {
@@ -27,10 +27,10 @@ ShellImpl::ShellImpl(ApplicationPtr application,
 ShellImpl::~ShellImpl() {
 }
 
-void ShellImpl::InitializeApplication(Array<String> args) {
+void ShellImpl::InitializeApplication() {
   ShellPtr shell;
   binding_.Bind(GetProxy(&shell));
-  application_->Initialize(shell.Pass(), args.Pass(), identity_.url.spec());
+  application_->Initialize(shell.Pass(), identity_.url.spec());
 }
 
 void ShellImpl::ConnectToClient(const GURL& requested_url,

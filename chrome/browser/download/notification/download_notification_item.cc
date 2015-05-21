@@ -11,12 +11,15 @@
 #include "chrome/browser/notifications/notification.h"
 #include "chrome/browser/notifications/notification_ui_manager.h"
 #include "chrome/browser/notifications/profile_notification.h"
+#include "chrome/browser/ui/scoped_tabbed_browser_displayer.h"
+#include "chrome/common/url_constants.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/download_interrupt_reasons.h"
 #include "content/public/browser/download_item.h"
+#include "content/public/browser/page_navigator.h"
 #include "content/public/browser/web_contents.h"
 #include "grit/theme_resources.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -71,10 +74,7 @@ std::string DownloadNotificationItem::NotificationWatcher::id() const {
 DownloadNotificationItem::DownloadNotificationItem(content::DownloadItem* item,
                                                    Profile* profile,
                                                    Delegate* delegate)
-    : openable_(false),
-      downloading_(false),
-      image_resource_id_(0),
-      profile_(profile),
+    : profile_(profile),
       watcher_(new NotificationWatcher(this)),
       item_(item),
       delegate_(delegate) {
@@ -112,15 +112,35 @@ DownloadNotificationItem::~DownloadNotificationItem() {
 }
 
 void DownloadNotificationItem::OnNotificationClick() {
-  if (openable_) {
-    if (item_->IsDone())
-      item_->OpenDownload();
-    else
-      item_->SetOpenWhenComplete(!item_->GetOpenWhenComplete());  // Toggle
+  if (item_->IsDangerous()) {
+#if defined(FULL_SAFE_BROWSING)
+    DownloadCommands(item_).ExecuteCommand(
+        DownloadCommands::LEARN_MORE_SCANNING);
+#else
+    CloseNotificationByUser();
+#endif
+    return;
   }
 
-  if (item_->IsDone())
-    CloseNotificationByUser();
+  switch (item_->GetState()) {
+    case content::DownloadItem::IN_PROGRESS:
+      item_->SetOpenWhenComplete(!item_->GetOpenWhenComplete());  // Toggle
+      break;
+    case content::DownloadItem::CANCELLED:
+    case content::DownloadItem::INTERRUPTED:
+      GetBrowser()->OpenURL(content::OpenURLParams(
+          GURL(chrome::kChromeUIDownloadsURL), content::Referrer(),
+          NEW_FOREGROUND_TAB, ui::PAGE_TRANSITION_LINK,
+          false /* is_renderer_initiated */));
+      CloseNotificationByUser();
+      break;
+    case content::DownloadItem::COMPLETE:
+      item_->OpenDownload();
+      CloseNotificationByUser();
+      break;
+    case content::DownloadItem::MAX_DOWNLOAD_STATE:
+      NOTREACHED();
+  }
 }
 
 void DownloadNotificationItem::OnNotificationButtonClick(int button_index) {
@@ -138,6 +158,10 @@ void DownloadNotificationItem::OnNotificationButtonClick(int button_index) {
   }
 
   DownloadCommands(item_).ExecuteCommand(command);
+
+  // Shows the notification again after clicking "Keep" on dangerous download.
+  if (command == DownloadCommands::KEEP)
+    UpdateNotificationData(ADD_NEW);
 }
 
 // DownloadItem::Observer methods
@@ -145,6 +169,13 @@ void DownloadNotificationItem::OnDownloadUpdated(content::DownloadItem* item) {
   DCHECK_EQ(item, item_);
 
   UpdateNotificationData(UPDATE_EXISTING);
+}
+
+void DownloadNotificationItem::CloseNotificationByNonUser() {
+  const std::string& notification_id = watcher_->id();
+  const ProfileID profile_id = NotificationUIManager::GetProfileID(profile_);
+
+  notification_ui_manager()->CancelById(notification_id, profile_id);
 }
 
 void DownloadNotificationItem::CloseNotificationByUser() {
@@ -172,20 +203,16 @@ void DownloadNotificationItem::UpdateNotificationData(
   DownloadItemModel model(item_);
   DownloadCommands command(item_);
 
-  if (!downloading_) {
-    if (item_->GetState() == content::DownloadItem::IN_PROGRESS) {
+  if (previous_download_state_ != content::DownloadItem::IN_PROGRESS) {
+    if (item_->GetState() == content::DownloadItem::IN_PROGRESS)
       delegate_->OnDownloadStarted(this);
-      downloading_ = true;
-    }
   } else {
-    if (item_->GetState() != content::DownloadItem::IN_PROGRESS) {
+    if (item_->GetState() != content::DownloadItem::IN_PROGRESS)
       delegate_->OnDownloadStopped(this);
-      downloading_ = false;
-    }
   }
 
   if (item_->IsDangerous()) {
-    notification_->set_type(message_center::NOTIFICATION_TYPE_SIMPLE);
+    notification_->set_type(message_center::NOTIFICATION_TYPE_BASE_FORMAT);
     notification_->set_title(GetTitle());
     notification_->set_message(GetWarningText());
 
@@ -210,15 +237,21 @@ void DownloadNotificationItem::UpdateNotificationData(
         }
         break;
       case content::DownloadItem::COMPLETE:
-        notification_->set_type(message_center::NOTIFICATION_TYPE_SIMPLE);
+        DCHECK(item_->IsDone());
+
+        // Shows a notifiation as progress type once so the visible content will
+        // be updated.
+        // Note: only progress-type notification's content will be updated
+        // immediately when the message center is visible.
+        notification_->set_type(message_center::NOTIFICATION_TYPE_PROGRESS);
+        notification_->set_progress(100);
+
         if (is_off_the_record) {
           // TODO(yoshiki): Replace the tentative image.
           SetNotificationImage(IDR_DOWNLOAD_NOTIFICATION_INCOGNITO);
         } else {
           SetNotificationImage(IDR_DOWNLOAD_NOTIFICATION_DOWNLOADING);
         }
-
-        // TODO(yoshiki): Popup a notification again.
         break;
       case content::DownloadItem::CANCELLED:
         // Confgirms that a download is cancelled by user action.
@@ -228,12 +261,15 @@ void DownloadNotificationItem::UpdateNotificationData(
                    content::DOWNLOAD_INTERRUPT_REASON_USER_SHUTDOWN);
 
         CloseNotificationByUser();
+
+        previous_download_state_ = item_->GetState();
         return;  // Skips the remaining since the notification has closed.
       case content::DownloadItem::INTERRUPTED:
-        notification_->set_type(message_center::NOTIFICATION_TYPE_SIMPLE);
+        // Shows a notifiation as progress type once so the visible content will
+        // be updated. (same as the case of type = COMPLETE)
+        notification_->set_type(message_center::NOTIFICATION_TYPE_PROGRESS);
+        notification_->set_progress(0);
         SetNotificationImage(IDR_DOWNLOAD_NOTIFICATION_WARNING);
-
-        // TODO(yoshiki): Popup a notification again.
         break;
       case content::DownloadItem::MAX_DOWNLOAD_STATE:  // sentinel
         NOTREACHED();
@@ -242,20 +278,15 @@ void DownloadNotificationItem::UpdateNotificationData(
 
   std::vector<message_center::ButtonInfo> notification_actions;
   scoped_ptr<std::vector<DownloadCommands::Command>> actions(
-      GetPossibleActions().Pass());
+      GetExtraActions().Pass());
 
-  openable_ = false;
   button_actions_.reset(new std::vector<DownloadCommands::Command>);
   for (auto it = actions->begin(); it != actions->end(); it++) {
-    if (*it == DownloadCommands::OPEN_WHEN_COMPLETE) {
-      openable_ = true;
-    } else {
-      button_actions_->push_back(*it);
-      message_center::ButtonInfo button_info =
-          message_center::ButtonInfo(GetCommandLabel(*it));
-      button_info.icon = command.GetCommandIcon(*it);
-      notification_actions.push_back(button_info);
-    }
+    button_actions_->push_back(*it);
+    message_center::ButtonInfo button_info =
+        message_center::ButtonInfo(GetCommandLabel(*it));
+    button_info.icon = command.GetCommandIcon(*it);
+    notification_actions.push_back(button_info);
   }
   notification_->set_buttons(notification_actions);
 
@@ -263,12 +294,27 @@ void DownloadNotificationItem::UpdateNotificationData(
     // TODO(yoshiki): If the downloaded file is an image, show the thumbnail.
   }
 
-  if (type == ADD_NEW)
+  if (type == ADD_NEW) {
     notification_ui_manager()->Add(*notification_, profile_);
-  else if (type == UPDATE_EXISTING)
+  } else if (type == UPDATE_EXISTING) {
     notification_ui_manager()->Update(*notification_, profile_);
-  else
+
+    // When the download is just completed (or interrupted), close the
+    // notification once and re-show it immediately so it'll pop up.
+    if ((item_->GetState() == content::DownloadItem::COMPLETE &&
+         previous_download_state_ != content::DownloadItem::COMPLETE) ||
+        (item_->GetState() == content::DownloadItem::INTERRUPTED &&
+         previous_download_state_ != content::DownloadItem::INTERRUPTED)) {
+      CloseNotificationByNonUser();
+      // Changes the type from PROGRESS to BASE_FORMAT.
+      notification_->set_type(message_center::NOTIFICATION_TYPE_BASE_FORMAT);
+      notification_ui_manager()->Add(*notification_, profile_);
+    }
+  } else {
     NOTREACHED();
+  }
+
+  previous_download_state_ = item_->GetState();
 }
 
 void DownloadNotificationItem::OnDownloadOpened(content::DownloadItem* item) {
@@ -309,7 +355,7 @@ NotificationUIManager* DownloadNotificationItem::notification_ui_manager()
 }
 
 scoped_ptr<std::vector<DownloadCommands::Command>>
-DownloadNotificationItem::GetPossibleActions() const {
+DownloadNotificationItem::GetExtraActions() const {
   scoped_ptr<std::vector<DownloadCommands::Command>> actions(
       new std::vector<DownloadCommands::Command>());
 
@@ -321,7 +367,6 @@ DownloadNotificationItem::GetPossibleActions() const {
 
   switch (item_->GetState()) {
     case content::DownloadItem::IN_PROGRESS:
-      actions->push_back(DownloadCommands::OPEN_WHEN_COMPLETE);
       if (!item_->IsPaused())
         actions->push_back(DownloadCommands::PAUSE);
       else
@@ -330,10 +375,10 @@ DownloadNotificationItem::GetPossibleActions() const {
       break;
     case content::DownloadItem::CANCELLED:
     case content::DownloadItem::INTERRUPTED:
-      actions->push_back(DownloadCommands::RETRY);
+      if (item_->CanResume())
+        actions->push_back(DownloadCommands::RESUME);
       break;
     case content::DownloadItem::COMPLETE:
-      actions->push_back(DownloadCommands::OPEN_WHEN_COMPLETE);
       actions->push_back(DownloadCommands::SHOW_IN_FOLDER);
       break;
     case content::DownloadItem::MAX_DOWNLOAD_STATE:
@@ -354,9 +399,10 @@ base::string16 DownloadNotificationItem::GetTitle() const {
     case content::DownloadItem::COMPLETE:
       title_text = l10n_util::GetStringFUTF16(
           IDS_DOWNLOAD_STATUS_DOWNLOADED_TITLE, file_name);
+      break;
     case content::DownloadItem::INTERRUPTED:
       title_text = l10n_util::GetStringFUTF16(
-          IDS_DOWNLOAD_STATUS_DOWNLOADED_TITLE, file_name);
+          IDS_DOWNLOAD_STATUS_DOWNLOAD_FAILED_TITLE, file_name);
       break;
     case content::DownloadItem::CANCELLED:
       title_text = l10n_util::GetStringFUTF16(
@@ -388,10 +434,6 @@ base::string16 DownloadNotificationItem::GetCommandLabel(
       break;
     case DownloadCommands::SHOW_IN_FOLDER:
       id = IDS_DOWNLOAD_LINK_SHOW;
-      break;
-    case DownloadCommands::RETRY:
-      // Only for non menu.
-      id = IDS_DOWNLOAD_LINK_RETRY;
       break;
     case DownloadCommands::DISCARD:
       id = IDS_DISCARD_DOWNLOAD;
@@ -454,4 +496,11 @@ base::string16 DownloadNotificationItem::GetWarningText() const {
   }
   NOTREACHED();
   return base::string16();
+}
+
+Browser* DownloadNotificationItem::GetBrowser() {
+  chrome::ScopedTabbedBrowserDisplayer browser_displayer(
+      profile_, chrome::GetActiveDesktop());
+  DCHECK(browser_displayer.browser());
+  return browser_displayer.browser();
 }

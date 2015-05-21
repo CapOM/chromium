@@ -49,11 +49,13 @@
       'autofill/core/browser/form_field_unittest.cc',
       'autofill/core/browser/form_structure_unittest.cc',
       'autofill/core/browser/name_field_unittest.cc',
+      'autofill/core/browser/options_util_unittest.cc',
       'autofill/core/browser/password_generator_unittest.cc',
       'autofill/core/browser/personal_data_manager_unittest.cc',
       'autofill/core/browser/phone_field_unittest.cc',
       'autofill/core/browser/phone_number_i18n_unittest.cc',
       'autofill/core/browser/phone_number_unittest.cc',
+      'autofill/core/browser/ui/card_unmask_prompt_controller_impl_unittest.cc',
       'autofill/core/browser/validation_unittest.cc',
       'autofill/core/browser/webdata/autofill_profile_syncable_service_unittest.cc',
       'autofill/core/browser/webdata/autofill_table_unittest.cc',
@@ -109,9 +111,11 @@
       'data_reduction_proxy/core/browser/data_reduction_proxy_bypass_protocol_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_bypass_stats_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_compression_stats_unittest.cc',
+      'data_reduction_proxy/core/browser/data_reduction_proxy_config_retrieval_params_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_config_service_client_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_config_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_configurator_unittest.cc',
+      'data_reduction_proxy/core/browser/data_reduction_proxy_experiments_stats_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_interceptor_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_io_data_unittest.cc',
       'data_reduction_proxy/core/browser/data_reduction_proxy_metrics_unittest.cc',
@@ -620,8 +624,6 @@
       'target_name': 'components_tests_pak',
       'type': 'none',
       'dependencies': [
-        '../ui/resources/ui_resources.gyp:ui_resources',
-        '../ui/strings/ui_strings.gyp:ui_strings',
         'components_resources.gyp:components_resources',
         'components_strings.gyp:components_strings',
       ],
@@ -632,10 +634,6 @@
             'pak_inputs': [
               '<(SHARED_INTERMEDIATE_DIR)/components/components_resources.pak',
               '<(SHARED_INTERMEDIATE_DIR)/components/strings/components_strings_en-US.pak',
-              '<(SHARED_INTERMEDIATE_DIR)/ui/resources/ui_resources_100_percent.pak',
-              '<(SHARED_INTERMEDIATE_DIR)/ui/resources/webui_resources.pak',
-              '<(SHARED_INTERMEDIATE_DIR)/ui/strings/app_locale_settings_en-US.pak',
-              '<(SHARED_INTERMEDIATE_DIR)/ui/strings/ui_strings_en-US.pak',
             ],
             'pak_output': '<(PRODUCT_DIR)/components_tests_resources.pak',
           },
@@ -735,6 +733,7 @@
         '../ui/gfx/gfx.gyp:gfx',
         '../ui/gfx/gfx.gyp:gfx_test_support',
         '../ui/resources/ui_resources.gyp:ui_resources',
+        '../ui/resources/ui_resources.gyp:ui_test_pak',
         '../ui/strings/ui_strings.gyp:ui_strings',
         '../url/url.gyp:url_lib',
         'components.gyp:auto_login_parser',
@@ -939,6 +938,9 @@
             # Exclude all tests that depends on //content (based on layered-
             # component directory structure).
             ['exclude', '^[^/]*/content/'],
+          ],
+          'mac_bundle_resources': [
+            '<(PRODUCT_DIR)/ui_test.pak',
           ],
           'dependencies': [
             '../ios/ios_tests.gyp:test_support_ios',

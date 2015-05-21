@@ -605,6 +605,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Ash.AppList.TimeBetweenTaskSwitches" units="seconds">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <summary>
+    The amount of time between selecting an item from the Ash app list. Not
+    recorded on the first time an item is selected from the app list after
+    startup.
+  </summary>
+</histogram>
+
 <histogram name="Ash.Dock.Action" enum="DockedAction">
   <owner>kuscher@google.com</owner>
   <owner>varkha@chromium.org</owner>
@@ -745,6 +755,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Ash.Shelf.TimeBetweenNavigateToTaskSwitches" units="seconds">
+  <owner>bruthig@google.com</owner>
+  <owner>tdanderson@google.com</owner>
+  <summary>
+    The number of seconds between contiguous task switch user actions triggered
+    by the Shelf buttons where the user activates a different user-predicatble
+    task. Task switches from other sources are ignored and do not affect this
+    metric. In other words, if a user performs the following steps (1) launch
+    task 'A' from the Shelf (2) Alt+Tab to task 'Z' (3) launch task 'B' from the
+    Shelf, then this will result in a sample recorded for the time delta between
+    launching tasks 'A' and 'B'.
+  </summary>
+</histogram>
+
 <histogram name="Ash.ShelfAlignmentOverTime" enum="ShelfAlignmentValue">
   <owner>kuscher@google.com</owner>
   <summary>
@@ -769,6 +793,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>kuscher@google.com</owner>
   <owner>rbyers@chromium.org</owner>
   <summary>The duration of mostly stationary long-duration touches.</summary>
+</histogram>
+
+<histogram name="Ash.Tab.TimeBetweenSwitchToExistingTabUserActions"
+    units="seconds">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <summary>
+    The number of seconds between tab switches triggered by a user gesture (e.g.
+    Ctrl+T, Ctrl+1, tapping or clicking the tab strip, etc).
+  </summary>
 </histogram>
 
 <histogram name="Ash.TouchDuration" units="milliseconds">
@@ -902,6 +936,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Ash.WindowCycleController.TimeBetweenTaskSwitches"
+    units="seconds">
+  <owner>tdanderson@google.com</owner>
+  <owner>bruthig@google.com</owner>
+  <summary>
+    The number of seconds between task switches triggered by the next window and
+    previous window accelerator keys (ie Alt+Tab, Alt+Shift+Tab).
+  </summary>
+</histogram>
+
 <histogram name="Ash.WindowSelector.ArrowKeyPresses">
   <owner>flackr@chromium.org</owner>
   <owner>tdanderson@chromium.org</owner>
@@ -982,11 +1026,25 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Ash.WindowSelector.TimeBetweenActiveWindowChanges"
+    units="seconds">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <summary>
+    The amount of time between endings of overview mode sessions which were
+    caused by the user selecting a window which was not previously active. Only
+    recorded on the second and later times after startup that the user selected
+    a window which was not previously active.
+  </summary>
+</histogram>
+
 <histogram name="Ash.WindowSelector.TimeBetweenUse" units="milliseconds">
   <owner>flackr@chromium.org</owner>
   <owner>kuscher@google.com</owner>
   <summary>
-    The amount of time between uses of overview mode to switch between windows.
+    The amount of time between uses of overview mode, recorded when overview
+    mode is entered. Only recorded on the second and later times after startup
+    that the user entered overview mode.
   </summary>
 </histogram>
 
@@ -1979,6 +2037,69 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Autofill.MacAddressBook.AcceptedSuggestionIsFromAddressBook"
+    enum="BooleanFromAddressBook">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    This metric is emitted each time the user accepts an Autofill suggestion. It
+    records whether the result is from the Address Book.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.MacAddressBook.AccessTime" units="ms">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    The amount of time spent accessing the OSX Address Book the first time after
+    Chrome was launched. If this time is larger than ~100ms, this it is likely
+    that the user was shown a blocking, modal dialog.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.MacAddressBook.ContainedMeCard"
+    enum="BooleanContainedMeCard">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    After a Chrome is given access to the Mac Address Book, whether the Address
+    Book contained a Me card.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.MacAddressBook.MeCard.HadAddress"
+    enum="BooleanHadAddress">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    When Chrome is given access to the Me Card of the Address Book, whether the
+    card has an address that contained a street number and either a city or zip
+    code.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.MacAddressBook.MeCard.HadEmail"
+    enum="BooleanHadEmail">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    When Chrome is given access to the Me Card of the Address Book, whether the
+    card has an email.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.MacAddressBook.MeCard.HadName" enum="BooleanHadName">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    When Chrome is given access to the Me Card of the Address Book, whether the
+    card has a name.
+  </summary>
+</histogram>
+
+<histogram name="Autofill.MacAddressBook.MeCard.HadPhoneNumber"
+    enum="BooleanHadPhoneNumber">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    When Chrome is given access to the Me Card of the Address Book, whether the
+    card has a phone number.
+  </summary>
+</histogram>
+
 <histogram name="Autofill.MacAddressBook.NumShowsBeforeSelected">
   <owner>erikchen@chromium.org</owner>
   <summary>
@@ -2533,6 +2654,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Cast.Network.Down.Duration.In.Seconds" units="seconds">
+  <owner>cast-analytics@google.com</owner>
+  <summary>
+    Records the time the network has been down on a Cast device.  Recorded when
+    network goes up.
+  </summary>
+</histogram>
+
+<histogram name="Cast.Network.Up.Duration.In.Minutes" units="minutes">
+  <owner>cast-analytics@google.com</owner>
+  <summary>
+    Records the time the network has been up on a Cast device.  Recorded when
+    network goes down.
+  </summary>
+</histogram>
+
 <histogram name="Cast.Sender.CastButtonShown" enum="BooleanEnabled">
   <owner>mfoltz@chromium.org</owner>
   <summary>
@@ -2607,6 +2744,41 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Indicates whether initialization of a video encode accelerator for Cast
     sender was successful.
+  </summary>
+</histogram>
+
+<histogram name="CastV2.Transport.Connect.Latency.Unknown" units="milliseconds">
+  <owner>cast-analytics@google.com</owner>
+  <summary>
+    The latency between when a Cast V2 connection is established and the first
+    message is received on that connection. &quot;Unknown&quot; is the peer
+    type, which is not known at this point in the CastV2 connection
+    establishment.  Naming conforms to the CastV2 sender-side histogram naming
+    convention &quot;CastV2.[action].[name].[peer_type]&quot;.
+  </summary>
+</histogram>
+
+<histogram name="CastV2.Transport.SslHandshake.Error.Unknown"
+    enum="NetErrorCodes">
+  <owner>cast-analytics@google.com</owner>
+  <summary>
+    On accepting a Cast V2 transport socket connection, if an error is
+    encountered, the error code is logged here. &quot;Unknown&quot; is the peer
+    type, which is not known at this point in the CastV2 connection
+    establishment.  &quot;SslHandshake.Error&quot; is the name of the action.
+    Naming conforms to the CastV2 sender-side histogram naming convention
+    &quot;CastV2.[action].[name].[peer_type]&quot;.
+  </summary>
+</histogram>
+
+<histogram name="CastV2.Transport.SslHandshake.Unknown" units="milliseconds">
+  <owner>cast-analytics@google.com</owner>
+  <summary>
+    The time taken to do the handshake during Cast V2 transport socket creation.
+    &quot;Unknown&quot; is the peer type, which is not known at this point in
+    the CastV2 connection establishment.  Naming conforms to the CastV2
+    sender-side histogram naming convention
+    &quot;CastV2.[action].[name].[peer_type]&quot;.
   </summary>
 </histogram>
 
@@ -3787,6 +3959,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Cookie.Startup.NumberOfCookiesDeleted">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    The number of session cookies deleted on startup. This metric is emitted
+    even if no cookies are deleted. This metric is not emitted if session
+    cookies are restored, rather than deleted on startup.
+  </summary>
+</histogram>
+
+<histogram name="Cookie.Startup.TimeSpentDeletingCookies" units="ms">
+  <owner>erikchen@chromium.org</owner>
+  <summary>
+    The amount of time required to delete session cookies on startup. This
+    metric is emitted even if no cookies are deleted. This metric is not emitted
+    if session cookies are restored, rather than deleted on startup.
+  </summary>
+</histogram>
+
 <histogram name="Cookie.TimeBlockedOnLoad" units="ms">
   <owner>erikwright@chromium.org</owner>
   <summary>
@@ -3953,6 +4143,24 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="CrashReport.CrashBackgroundUploadDelay" units="ms">
+  <owner>olivierrobin@chromium.org</owner>
+  <owner>pkl@chromium.org</owner>
+  <summary>
+    Time delta between when the crash took place and when the crash was uploaded
+    by the app as a background task. Only logged on iOS.
+  </summary>
+</histogram>
+
+<histogram name="CrashReport.PendingReportsOnBackgroundWakeUp">
+  <owner>olivierrobin@chromium.org</owner>
+  <owner>pkl@chromium.org</owner>
+  <summary>
+    The number of crash reports present when the app wakes up as a background
+    task to upload crash reports. Only logged on iOS.
+  </summary>
+</histogram>
+
 <histogram name="CrashReport.PermanentUploadFailure" enum="BooleanHit">
   <owner>erikwright@chromium.org</owner>
   <summary>
@@ -3997,14 +4205,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="CrosFirstRun.DialogShown">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>dzhioev@chromium.org</owner>
   <summary>
     Records the number of times when first-run dialog was shown.
   </summary>
 </histogram>
 
 <histogram name="CrosFirstRun.FurthestStep">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>dzhioev@chromium.org</owner>
   <summary>
     Index of furthest step that was reached during tutorial. Since order of
     steps could change eventially and new steps could apear we use index here
@@ -4013,23 +4221,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="CrosFirstRun.TimeSpent" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>dzhioev@chromium.org</owner>
   <summary>The total time that user spent on first-run tutorial.</summary>
 </histogram>
 
 <histogram name="CrosFirstRun.TimeSpentOnStep" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>dzhioev@chromium.org</owner>
   <summary>The time that user spent on some step of tutorial.</summary>
 </histogram>
 
 <histogram name="CrosFirstRun.TutorialCompletion"
     enum="CrosFirstRunTutorialCompletionType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>dzhioev@chromium.org</owner>
   <summary>Tracks the way how user left tutorial.</summary>
 </histogram>
 
 <histogram name="CrosFirstRun.TutorialLaunched">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>dzhioev@chromium.org</owner>
   <summary>
     Records the number of times when first-run tutorial has been launched.
   </summary>
@@ -4194,6 +4402,41 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Counts various events that trigger Chrome to bypass the primary
     configuration of the data reduction proxy.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.ConfigFetchLostBytesCL">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Size of the response body. This is the actual number of bytes received,
+    which usually agrees with but is not necessarily the same as the size
+    specified by the Content-Length header. Only recorded if the request is sent
+    while a simulated Data Reduction Proxy configuration fetch is taking place.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.ConfigFetchLostBytesDiff">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The difference between the size specified in the X-Original-Content-Length
+    header and the size of the response body. Only recorded if the request is
+    sent while a simulated Data Reduction Proxy configuration fetch is taking
+    place. Only positive values are logged, so if X-Original-Content-Length is
+    not specified or if it equals or exceeds the content length, it is not
+    logged.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.ConfigFetchLostBytesOCL">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Size specified in the X-Original-Content-Length header. If this header is
+    not present in the response, the size of the response body is used. Only
+    recorded if the request is sent while a simulated Data Reduction Proxy
+    configuration fetch is taking place.
   </summary>
 </histogram>
 
@@ -4380,6 +4623,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Reports the different network errors that main frame resource requests that
     try to use the data reduction proxy are completing with, including OK and
     ABORTED.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.ResponseProxyServerStatus"
+    enum="DataReductionProxyResponseProxyServerStatus">
+  <owner>sclittle@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Reports the state of the proxy server field in the response seen by the Data
+    Reduction Proxy bypass logic.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.SecureProxyCheck.Latency"
+    units="milliseconds">
+  <owner>jeremyim@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    Time from when the Data Reduction Proxy secure proxy check starts until it
+    completes.
   </summary>
 </histogram>
 
@@ -6874,7 +7137,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Upon a successful Smart Lock unlock or signin, records whether the user's
     phone was locked during any point while the lock screen was up. This can be
-    used to get a sense for whether users are using Smart Lock for Chrome
+    used to get a sense for whether users are using Smart Lock for Chromebook
     without something like Smart Lock for Android to keep their phones unlocked.
   </summary>
 </histogram>
@@ -11824,6 +12087,25 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="GoogleUpdate.InstallerExitCode" enum="InstallStatus">
+  <owner>grt@chromium.org</owner>
+  <summary>
+    The exit code from Chrome's installer following a failed on-demand update
+    check. All values reported for this histogram fall in the
+    GOOGLE_UPDATE_ERROR_UPDATING bucket of the GoogleUpdate.UpdateErrorCode
+    histogram and the GOOPDATEINSTALL_E_INSTALLER_FAILED bucket of the
+    GoogleUpdate.ErrorHresult histogram.
+  </summary>
+</histogram>
+
+<histogram name="GoogleUpdate.UnexpectedState">
+  <owner>grt@chromium.org</owner>
+  <summary>
+    An unrecognized CurrentState value received from Google Update while polling
+    for the status of an on-demand update check.
+  </summary>
+</histogram>
+
 <histogram name="GoogleUpdate.UpdateErrorCode" enum="GoogleUpdateErrorCode">
   <owner>grt@chromium.org</owner>
   <summary>The error code for a failed on-demand update check.</summary>
@@ -11838,7 +12120,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="GoogleUpdate.UpgradeResult" enum="GoogleUpdateUpgradeResult">
+<histogram name="GoogleUpdate.UpgradeResult" enum="GoogleUpdateUpgradeStatus">
   <owner>grt@chromium.org</owner>
   <summary>The result of an on-demand update check.</summary>
 </histogram>
@@ -11851,12 +12133,31 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="GPU.ANGLE.D3D11CreateDeviceError" units="D3DHresult">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    An extended Windows error code returned from D3D11CreateDevice on error. Can
+    be almost any valid HRESULT or DXGI error code, which are listed at
+    https://msdn.microsoft.com/en-us/library/windows/desktop/bb509553.aspx.
+  </summary>
+</histogram>
+
 <histogram name="GPU.ANGLE.D3D11CreateDeviceMS" units="milliseconds">
   <owner>jmadill@chromium.org</owner>
   <summary>
     The time that elapses for the initial call to D3D11CreateDevice on D3D11
     ANGLE. A pure system call, with no ANGLE or Chromium code, called once every
     GPU process startup.
+  </summary>
+</histogram>
+
+<histogram name="GPU.ANGLE.D3D11FeatureLevel" units="D3DFeatureLevel">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    The maxmium supported (or currently requested) Direct3D feature level in
+    D3D11 ANGLE. We support as low as 9.3, and as high as 11.1, though Chrome
+    should only use 10.0+ for D3D11. Gives an indication of how new a user's
+    video card is, what features it supports, and it's general speed tier.
   </summary>
 </histogram>
 
@@ -11873,6 +12174,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The result from initializing a D3D9 device in ANGLE. Can be success, or one
     of several error codes which indicate different reasons for failing.
+  </summary>
+</histogram>
+
+<histogram name="GPU.ANGLE.SupportsDXGI1_2" units="BooleanSupported">
+  <owner>jmadill@chromium.org</owner>
+  <summary>
+    Windows computers running Windows 8+, or running Windows 7 with a platform
+    update, support the newer version of DXGI. This update also indicates the
+    computer is capable of running Direct3D 11.1 if the hardware supports it.
   </summary>
 </histogram>
 
@@ -12352,7 +12662,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="HistoryPage.OtherDevicesMenu" enum="NtpOtherSessionsType">
+<histogram name="HistoryPage.OtherDevicesMenu" enum="OtherSessionsActions">
   <owner>mad@chromium.org</owner>
   <owner>rpop@google.com</owner>
   <summary>
@@ -12802,6 +13112,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="InputMethod.VirtualKeyboard.BackwardsMovesPerSwipe"
+    units="moves">
+  <owner>rsadam@chromium.org</owner>
+  <summary>
+    ChromeOS histogram that counts the number of times the cursor was moved to
+    the previous word by swiping backwards on the selection track. The count is
+    initialized when the user starts swiping from any side of the virtual
+    keyboard, incremented based on how far they swipe backwards on the selection
+    track, and recorded when they release their finger.
+  </summary>
+</histogram>
+
 <histogram name="InputMethod.VirtualKeyboard.CharactersBetweenBackspaces">
   <owner>rsadam@chromium.org</owner>
   <summary>
@@ -12847,6 +13169,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="InputMethod.VirtualKeyboard.MovesPerSwipe" units="moves">
+  <owner>rsadam@chromium.org</owner>
+  <summary>
+    ChromeOS histogram that counts the number of times the cursor was moved to
+    the next word by swiping forward on the selection track. The count is
+    initialized when the user starts swiping from any side of the virtual
+    keyboard, incremented based on how far they swipe forwards on the selection
+    track, and recorded when they release their finger.
+  </summary>
+</histogram>
+
 <histogram name="InputMethod.VirtualKeyboard.TapCount">
   <owner>stevet@chromium.org</owner>
   <summary>
@@ -12855,11 +13188,35 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="InputMethod.VirtualKeyboard.WordsDeletedPerSwipe"
+    units="words">
+  <owner>rsadam@chromium.org</owner>
+  <summary>
+    ChromeOS histogram that tracks the total number of words that were deleted
+    by swiping forward on the deletion track. The count is initialized when the
+    user starts swiping on the backspace key, incremented based on how far they
+    swipe forwards on the deletion track, and recorded when they release their
+    finger.
+  </summary>
+</histogram>
+
 <histogram name="InputMethod.VirtualKeyboard.WordsPerMinute">
   <owner>rsadam@chromium.org</owner>
   <summary>
     The number of words typed per minute. Recorded when the virtual keyboard is
     closed.
+  </summary>
+</histogram>
+
+<histogram name="InputMethod.VirtualKeyboard.WordsRestoredPerSwipe"
+    units="words">
+  <owner>rsadam@chromium.org</owner>
+  <summary>
+    ChromeOS histogram that tracks the total number of words that were restored
+    by swiping backwards on the deletion track. The count is initialized when
+    the user starts swiping on the backspace key, incremented based on how far
+    they swipe backwards on the deletion track, and recorded when they release
+    their finger.
   </summary>
 </histogram>
 
@@ -13451,7 +13808,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="interstitial.decision" enum="SecurityInterstitialDecision">
   <owner>felt@chromium.org</owner>
-  <summary>User decision when presented with a security interstitial.</summary>
+  <summary>
+    User decision when presented with a security interstitial. As of M44,
+    subresource interstitials were split into their own entries.
+  </summary>
 </histogram>
 
 <histogram name="interstitial.decision.repeat_visit"
@@ -13459,14 +13819,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>felt@chromium.org</owner>
   <summary>
     User decision when presented with a security interstitial, on a site that
-    the user had previously visited.
+    the user had previously visited.  As of M44, subresource interstitials were
+    split into their own entries.
   </summary>
 </histogram>
 
 <histogram name="interstitial.interaction"
     enum="SecurityInterstitialInteraction">
   <owner>felt@chromium.org</owner>
-  <summary>User interactions with a security interstitial.</summary>
+  <summary>
+    User interactions with a security interstitial.  As of M44, subresource
+    interstitials were split into their own entries.
+  </summary>
 </histogram>
 
 <histogram name="interstitial.ssl" enum="SSLResponseTypesV2">
@@ -14114,7 +14478,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="LocalStorage.CommitDelay">
+<histogram name="LocalStorage.CommitDelay" units="milliseconds">
   <owner>michaeln@chromium.org</owner>
   <summary>
     Delay between a page making changes and those changes being written to the
@@ -14172,6 +14536,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Chrome OS histogram that keeps track of the days since the least frequently
     used account signed in. Reported on every boot and once a day after that.
+  </summary>
+</histogram>
+
+<histogram name="Login.NewUserPriorityPrefsSyncResult"
+    enum="NewUserPriorityPrefsSyncResult">
+  <owner>dzhioev@chromeos.org</owner>
+  <summary>Records whether a new user's priority prefs sync timed out.</summary>
+</histogram>
+
+<histogram name="Login.NewUserPriorityPrefsSyncTime" units="milliseconds">
+  <owner>dzhioev@chromeos.org</owner>
+  <summary>
+    Time spent waiting for priority preferences to sync after new user sign in.
+    The operation will time out after 10s.
   </summary>
 </histogram>
 
@@ -16159,6 +16537,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="ModuleIntegrityVerification.Difference" units="bytes">
+  <obsolete>
+    Deprecated and removed from code as of 05/2015.
+  </obsolete>
   <owner>anthonyvd@chromium.org</owner>
   <summary>
     Represents the difference in bytes deemed modified by the two
@@ -19208,6 +19589,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.GoogleConnectionInappropriateFallback"
+    enum="BooleanInappropriateFallback">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    Records a sample for each HTTPS request to a Google server that either
+    succeeded or received an inappropriate_fallback alert. This is used to
+    estimate how frequently the fallback is used to recover from a spurious
+    network failure.
+  </summary>
+</histogram>
+
 <histogram name="Net.GoogleConnectionUsedSSLVersionFallback"
     enum="FallbackSSLVersion">
   <obsolete>
@@ -19228,8 +19620,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     For each successful HTTPS request to a Google server, whether it used the
     SSL version fallback. The value indicates the SSL version the request fell
-    back on. Since Google servers support TLS 1.2, any fallback is an indication
-    of network middleware problems.
+    back on. Since Google servers support TLS 1.2 and FALLBACK_SCSV, any
+    fallback is an indication of a broken local SSL MITM proxy.
   </summary>
 </histogram>
 
@@ -20019,6 +20411,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.PrefProxyConfig.GooglezipProxyRemovalCount">
+  <owner>sclittle@chromium.org</owner>
+  <summary>
+    Records how many *.googlezip.net Data Reduction Proxies were removed from
+    the effective proxy configuration when a proxy reconfiguration occurs.
+  </summary>
+</histogram>
+
 <histogram name="Net.Priority_High_Latency" units="milliseconds">
   <obsolete>
     Replaced by Net.Priority_High_Latency_b.
@@ -20323,6 +20723,50 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>The length of the URL that was passed into the PAC script.</summary>
+</histogram>
+
+<histogram name="Net.ProxyService.GetProxyUsingScriptTime"
+    units="100s of microseconds">
+  <owner>eroman@chromium.org</owner>
+  <summary>
+    The time taken to resolve a URL by forwarding the request to the proxy
+    resolver and executing the PAC script. This includes PAC script execution,
+    DNS queries, and internal retries. This does not include retries initiated
+    by the user, such as by calling ProxyService::ReconsiderProxyAfterError().
+  </summary>
+</histogram>
+
+<histogram name="Net.ProxyService.ResolvedUsingScript" enum="Boolean">
+  <owner>eroman@chromium.org</owner>
+  <summary>
+    Whether proxy resolution occured by forwarding the request to the proxy
+    resolver and executing the PAC script. This histogram records all URLs,
+    regardless of whether a proxy configuration is set. Note that in some cases,
+    the system proxy resolver is used. If so, this histogram indicates whether
+    the request was forwarded to the system resolver. However, on desktop
+    platforms, the number of users using the system resolver should be small
+    since the default is to use V8. Hence, the count of emissions to the 'True'
+    bucket on desktop caused by users of the system resolver should be small.
+  </summary>
+</histogram>
+
+<histogram name="Net.ProxyService.ResolveProxyTime"
+    units="100s of microseconds">
+  <owner>eroman@chromium.org</owner>
+  <summary>
+    The total time taken to resolve a URL. This includes PAC script execution,
+    DNS queries, and internal retries. This does not include retries initiated
+    by the user, such as by calling ProxyService::ReconsiderProxyAfterError().
+  </summary>
+</histogram>
+
+<histogram name="Net.ProxyService.ScriptTerminated" enum="Boolean">
+  <owner>eroman@chromium.org</owner>
+  <summary>
+    Whether a proxy resolution resulted in the PAC script terminating
+    unexpectedly. This only happens when the resolver process crashes when using
+    out-of-process PAC.
+  </summary>
 </histogram>
 
 <histogram name="Net.PublicKeyPinFailureDomain" enum="PublicKeyPinFailedDomain">
@@ -21172,6 +21616,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.RequestTime">
+  <owner>rdsmith@chromium.org</owner>
+  <summary>
+    The amount of time between request initiation and request completion for
+    success and various different errors.
+  </summary>
+</histogram>
+
 <histogram name="Net.ResourceLoader.ReadDeferral" units="milliseconds">
   <owner>clamy@chromium.org</owner>
   <summary>
@@ -21879,6 +22331,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Net.SSLCertVerificationTimeError" units="milliseconds">
   <owner>rsleevi@chromium.org</owner>
   <summary>Time to complete a certificate verification (error case).</summary>
+</histogram>
+
+<histogram name="Net.SSLFallbackErrorCode" enum="NetErrorCodes">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    For each successful HTTPS request which used the TLS version fallback, the
+    error code of the last failed attempt.
+  </summary>
+</histogram>
+
+<histogram name="Net.SSLFallbackFailureState" enum="SSLFailureState">
+  <owner>davidben@chromium.org</owner>
+  <summary>
+    For each successful HTTPS request which used the TLS version fallback, the
+    type of handshake failure of the last failed attempt.
+  </summary>
 </histogram>
 
 <histogram name="Net.SSLHostInfoDNSLookup" units="milliseconds">
@@ -24448,50 +24916,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Network.Wifi.Channel" enum="NetworkChannelType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     Chrome OS network usage metric.  The channel used for each successful WiFi
     connection.
   </summary>
 </histogram>
 
-<histogram name="Network.Wifi.Idle.NoiseLevel" units="negative dBm">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Network metric indicating the negative of the dBm noise level recorded at
-    the time the metric is collected.  Reported at least once per day and only
-    when the device is idle.
-  </summary>
-</histogram>
-
-<histogram name="Network.Wifi.Idle.SignalLevel" units="negative dBm">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Network metric indicating the negative of the dBm received signal level
-    recorded at the time the metric is collected.  Reported at least once per
-    day and only when the device is idle.
-  </summary>
-</histogram>
-
-<histogram name="Network.Wifi.Idle.SignalToNoiseRatio" units="negative dBm">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Network metric indicating signal minus noise in dBm recorded at the time the
-    metrics is collected.  Reported at least once per day and only when the
-    device is idle.
-  </summary>
-</histogram>
-
-<histogram name="Network.Wifi.NoiseLevel" units="negative dBm">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Network metric indicating the negative of the dBm noise level recorded at
-    the time the metric is collected.  Reported at least once per day.
-  </summary>
-</histogram>
-
 <histogram name="Network.Wifi.PhyMode" enum="NetworkPhyModeType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     Chrome OS network usage metric.  The channel type used for each successful
     WiFi connection.
@@ -24499,7 +24932,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Network.Wifi.RoundTripTime" units="ms">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     Network metric reporting the average round trip time to the WiFi gateway.
     Recorded at least once per day.
@@ -24507,27 +24940,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Network.Wifi.Security" enum="NetworkSecurityType">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     Chrome OS network usage metric.  The security setting for each successful
     WiFi connection.
-  </summary>
-</histogram>
-
-<histogram name="Network.Wifi.SignalLevel" units="negative dBm">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Network metric indicating the negative of the dBm received signal level
-    recorded at the time the metric is collected.  Reported at least once per
-    day.
-  </summary>
-</histogram>
-
-<histogram name="Network.Wifi.SignalToNoiseRatio" units="negative dBm">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Network metric indicating signal minus noise in dBm recorded at the time the
-    metrics is collected.  Reported at least once per day.
   </summary>
 </histogram>
 
@@ -24654,6 +25070,30 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Histogram of the time, in milliseconds, users have the cursor over a most
     visited thumbnail before moving it away from the thumbnail without clicking.
+  </summary>
+</histogram>
+
+<histogram name="NewTabPage.IconsColor">
+  <owner>newt@chromium.org</owner>
+  <summary>
+    The number of most visited tiles on the new tab page that are displayed
+    using a fallback color (as opposed to having an icon, or simply being gray).
+  </summary>
+</histogram>
+
+<histogram name="NewTabPage.IconsGray">
+  <owner>newt@chromium.org</owner>
+  <summary>
+    The number of most visited tiles on the new tab page that are displayed as
+    gray (as opposed to having an icon, or a fallback color).
+  </summary>
+</histogram>
+
+<histogram name="NewTabPage.IconsReal">
+  <owner>newt@chromium.org</owner>
+  <summary>
+    The number of most visited tiles on the new tab page that are displayed with
+    the site's icon (as opposed using a fallback color or just gray).
   </summary>
 </histogram>
 
@@ -24822,8 +25262,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="NewTabPage.OtherSessionsMenu" enum="NtpOtherSessionsType">
+<histogram name="NewTabPage.OtherSessionsMenu" enum="OtherSessionsActions">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <obsolete>
+    Deprecated 05/2015. Feature was removed.
+  </obsolete>
   <summary>
     Histogram for usage of the menu on the NTP that allows the user to access
     tabs from other devices.
@@ -26206,6 +26649,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="PasswordManager.EmptyUsernames.TextAndPasswordFieldCount">
+  <owner>msramek@chromium.org</owner>
+  <owner>vasilii@chromium.org</owner>
+  <summary>
+    The total number of text and password fields for password forms that do not
+    have a username field. This is recorded every time such a password form is
+    successfully parsed. Note that the parsing is attempted when the form is
+    encountered (i.e when the document is loaded) and also when it is submitted.
+  </summary>
+</histogram>
+
 <histogram name="PasswordManager.EmptyUsernames.WithoutCorrespondingNonempty">
   <owner>msramek@chromium.org</owner>
   <owner>vasilii@chromium.org</owner>
@@ -26458,6 +26912,26 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Pepper.PluginContextSecurity.TCPConnect" enum="BooleanSecure">
+  <owner>raymes@chromium.org</owner>
+  <owner>jww@chromium.org</owner>
+  <owner>rsleevi@chromium.org</owner>
+  <summary>
+    Whether a Pepper TCP connect attempt comes from a plugin in a secure or an
+    insecure origin.
+  </summary>
+</histogram>
+
+<histogram name="Pepper.PluginContextSecurity.UDPBind" enum="BooleanSecure">
+  <owner>raymes@chromium.org</owner>
+  <owner>jww@chromium.org</owner>
+  <owner>rsleevi@chromium.org</owner>
+  <summary>
+    Whether a Pepper UDP bind attempt comes from a plugin in a secure or an
+    insecure origin.
+  </summary>
+</histogram>
+
 <histogram name="PerformanceMonitor.AverageCPU" units="PercentCPUUsage">
   <owner>oysteine@chromium.org</owner>
   <summary>
@@ -26523,6 +26997,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Platform.CpuUsage" units="%">
   <owner>sonnyrao@chromium.org</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     Peak total (single core) CPU usage for the last sample interval.  The sample
     interval may vary from seconds to several minutes.
@@ -26617,22 +27092,12 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="Platform.DiskUsageCache" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>KB in use in the /cache filesystem tree. Logged once a day.</summary>
-</histogram>
-
 <histogram name="Platform.DiskUsageChronos" units="KB">
   <owner>keescook@google.com</owner>
   <summary>
     Chrome OS KB in use in the /home/chronos filesystem tree. Logged once a day
     during log file cleanup.
   </summary>
-</histogram>
-
-<histogram name="Platform.DiskUsageData" units="KB">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>KB in use in the /data filesystem tree. Logged once a day.</summary>
 </histogram>
 
 <histogram name="Platform.DiskUsageVar" units="KB">
@@ -26817,6 +27282,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Platform.MemoryBandwidth.ReadWrite" units="MB/s">
   <owner>hajimehoshi@chromium.org</owner>
   <owner>kouhei@chromium.org</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     Peak memory bandwith (read and write) usage during the last sample interval.
     The sample interval may vary from seconds to several minutes.
@@ -26931,6 +27397,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Platform.Storage.Flash.BadBlocks">
   <owner>dehrenberg@chromium.org</owner>
+  <owner>cast-analytics@google.com</owner>
   <summary>
     The number of blocks marked bad in an MTD partition. This is relevant for
     devices with raw NAND flash, such as Chromecast. Sampled once daily, if the
@@ -27696,14 +28163,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>sonnyrao@chromium.org</owner>
   <summary>
     Average pages/second swapped OUT over a 1s interval, sampled every 30s.
-  </summary>
-</histogram>
-
-<histogram name="Platform.Temperature.Junction" units="Celsius">
-  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
-  <summary>
-    Peak junction temperature for the last sample interval, read from TSEN on
-    the SoC.  The sample interval may vary from seconds to several minutes.
   </summary>
 </histogram>
 
@@ -31274,7 +31733,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Profile.OnLocaleReadyTime" units="milliseconds">
+  <owner>rkaplow@chromium.org</owner>
+  <summary>
+    The amount of time that elapsed during ProfileImpl::OnLocaleReady. This
+    happens once after profile was loaded.
+  </summary>
+</histogram>
+
 <histogram name="Profile.OnPrefsLoadedTime" units="milliseconds">
+  <obsolete>
+    Deprecated 04/2015, and replaced by Profile.OnLocaleReadyTime.
+  </obsolete>
   <owner>rkaplow@chromium.org</owner>
   <summary>
     The amount of time that elapsed during ProfileImpl::OnPrefsLoaded.
@@ -35081,6 +35551,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Sdch3.AdvertisedWithSecureScheme" enum="BooleanHttps">
+  <owner>ellyjones@chromium.org</owner>
+  <summary>
+    Whether an SDCH dictionary was advertised over a secure scheme or not. This
+    histogram is logged inside SdchManager at advertisement time.
+  </summary>
+</histogram>
+
 <histogram name="Sdch3.Advertisement_Count">
   <owner>rdsmith@chromium.org</owner>
   <summary>
@@ -35869,6 +36347,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>nhiroki@chromium.org</owner>
   <summary>
     Records result of storage recovery operations in ServiceWorkerStorage.
+  </summary>
+</histogram>
+
+<histogram name="ServiceWorker.UnhandledEventRatio" units="percent">
+  <owner>kinuko@chromium.org</owner>
+  <summary>
+    Records the ratio of unhandled events to all events that are dispatched to
+    each ServiceWorker.  Recorded when each ServiceWorkerVersion is destructed.
   </summary>
 </histogram>
 
@@ -36694,6 +37180,49 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Track how a profile gets signed out.</summary>
 </histogram>
 
+<histogram name="Signin.XDevicePromo.BrowsingSessionDuration" units="minutes">
+  <owner>anthonyvd@chromium.org</owner>
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    How long a browsing session was measured to be. Logged when a Browser window
+    becomes active if the previous activation was longer than the minimum
+    configured in the &quot;CrossDevicePromo&quot; experiment. Desktop only.
+  </summary>
+</histogram>
+
+<histogram name="Signin.XDevicePromo.BrowsingSessionDurationComputed"
+    units="minutes">
+  <owner>anthonyvd@chromium.org</owner>
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    How often browsers are considered activated, which in turn triggers the
+    CrossDevicePromo. Logged every time a Browser window becomes active. We need
+    this to estimate QPS for RPC calls. Desktop only.
+  </summary>
+</histogram>
+
+<histogram name="Signin.XDevicePromo.Eligibility"
+    enum="SigninXDevicePromoEligibility">
+  <owner>anthonyvd@chromium.org</owner>
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    The reasons for which a profile is or is not eligible for the Desktop Cross
+    Device Sign In Promo. Logged every time a new Browsing session is detected
+    as part of a Browser window becoming active. Desktop only.
+  </summary>
+</histogram>
+
+<histogram name="Signin.XDevicePromo.Initialized"
+    enum="SigninXDevicePromoInitialized">
+  <owner>anthonyvd@chromium.org</owner>
+  <owner>mlerman@chromium.org</owner>
+  <summary>
+    Tracks if profiles initialized the XDevicePromo, and if not, why. Logged at
+    Profile startup and (if not initialized then) when a new browsing session is
+    detected during Browser window activation. Desktop only.
+  </summary>
+</histogram>
+
 <histogram name="SimpleCache.App.CheckCRCResult" enum="CheckCRCResult">
   <owner>gavinp@chromium.org</owner>
   <summary>
@@ -37257,6 +37786,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The time from the creation of the simple cache backend until the index fails
     to load.
+  </summary>
+</histogram>
+
+<histogram name="SimpleCache.DiskOpenLatency" units="milliseconds">
+  <owner>rdsmith@chromium.org</owner>
+  <summary>
+    The time to access (open and read headers from all files) the cache entry on
+    disk.
   </summary>
 </histogram>
 
@@ -41434,6 +41971,36 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Sync.MemoryPressureWarningBeforeCleanShutdown" units="count">
+  <owner>gangwu@chromium.org</owner>
+  <summary>
+    Counts the number of times a user's sync service received a
+    MEMORY_PRESSURE_LEVEL_CRITICAL warning before the sync service shut down
+    cleanly. The sync service emits this number the next time the user's sync
+    service is started, which will likely happen the next time the user's
+    profile is opened after a Chrome restart.  This count is emitted once per
+    user/profile. Things like browser crashes that implicitly bring down all
+    users' sync services will cause unclean shutdown tags to appear on all open
+    profiles, meaning that there will be multiple emissions to this histogram as
+    those profiles are re-opened.
+  </summary>
+</histogram>
+
+<histogram name="Sync.MemoryPressureWarningBeforeUncleanShutdown" units="count">
+  <owner>gangwu@chromium.org</owner>
+  <summary>
+    Counts the number of times a user's sync service received a
+    MEMORY_PRESSURE_LEVEL_CRITICAL warning before the sync service shut down
+    uncleanly. The sync service emits this number the next time the user's sync
+    service is started, which will likely happen the next time the user's
+    profile is opened after a Chrome restart.  This count is emitted once per
+    user/profile. Things like browser crashes that implicitly bring down all
+    users' sync services will cause unclean shutdown tags to appear on all open
+    profiles, meaning that there will be multiple emissions to this histogram as
+    those profiles are re-opened.
+  </summary>
+</histogram>
+
 <histogram name="Sync.NigoriMigrationState" enum="SyncNigoriMigrationState">
   <owner>zea@chromium.org</owner>
   <summary>Breakdown of sync's nigori node keystore migration state.</summary>
@@ -44413,6 +44980,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Whether or not the network was available when requested by the
     VariationsService.
+  </summary>
+</histogram>
+
+<histogram name="Variations.RequestCount">
+  <owner>asvitkine@chromium.org</owner>
+  <summary>
+    Number of previous requests to the variations server in the same session,
+    logged each time a new request is attempted to the variations server. For
+    example, the value of the 0th bucket indicates the number of initial
+    requests to the server that took place.
   </summary>
 </histogram>
 
@@ -47782,6 +48359,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Completed"/>
 </enum>
 
+<enum name="BooleanContainedMeCard" type="int">
+  <int value="0" label="Did not contain me card."/>
+  <int value="1" label="Contained me card."/>
+</enum>
+
 <enum name="BooleanCorrupt" type="int">
   <int value="0" label="Not Corrupt"/>
   <int value="1" label="Corrupt"/>
@@ -47857,14 +48439,39 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Force Disabled"/>
 </enum>
 
+<enum name="BooleanFromAddressBook" type="int">
+  <int value="0" label="Not From Address Book"/>
+  <int value="1" label="From Address Book"/>
+</enum>
+
 <enum name="BooleanGAIAWebViewFlow" type="int">
   <int value="0" label="iframe-based flow"/>
   <int value="1" label="WebView-based flow"/>
 </enum>
 
+<enum name="BooleanHadAddress" type="int">
+  <int value="0" label="Did not have address."/>
+  <int value="1" label="Had address."/>
+</enum>
+
 <enum name="BooleanHadBlankText" type="int">
   <int value="0" label="Did not have blank text"/>
   <int value="1" label="Had blank text"/>
+</enum>
+
+<enum name="BooleanHadEmail" type="int">
+  <int value="0" label="Did not have email."/>
+  <int value="1" label="Had email."/>
+</enum>
+
+<enum name="BooleanHadName" type="int">
+  <int value="0" label="Did not have name."/>
+  <int value="1" label="Had name."/>
+</enum>
+
+<enum name="BooleanHadPhoneNumber" type="int">
+  <int value="0" label="Did not have phone number."/>
+  <int value="1" label="Had phone number."/>
 </enum>
 
 <enum name="BooleanHandshakeConfirmed" type="int">
@@ -47905,6 +48512,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <enum name="BooleanIgnored" type="int">
   <int value="0" label="Not ignored"/>
   <int value="1" label="Ignored"/>
+</enum>
+
+<enum name="BooleanInappropriateFallback" type="int">
+  <int value="0" label="Handshake successful"/>
+  <int value="1" label="inappropriate_fallback alert"/>
 </enum>
 
 <enum name="BooleanIsMobileOptimized" type="int">
@@ -47987,6 +48599,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Revoked"/>
 </enum>
 
+<enum name="BooleanSecure" type="int">
+  <int value="0" label="Insecure"/>
+  <int value="1" label="Secure"/>
+</enum>
+
 <enum name="BooleanSelected" type="int">
   <int value="0" label="No selection"/>
   <int value="1" label="Selected"/>
@@ -48010,6 +48627,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <enum name="BooleanSuccess" type="int">
   <int value="0" label="Failure"/>
   <int value="1" label="Success"/>
+</enum>
+
+<enum name="BooleanSupported" type="int">
+  <int value="0" label="Not Supported"/>
+  <int value="1" label="Supported"/>
 </enum>
 
 <enum name="BooleanSuppressed" type="int">
@@ -49118,6 +49740,51 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="7" label="Other initialization error"/>
 </enum>
 
+<enum name="D3DFeatureLevel" type="int">
+  <int value="0" label="D3D_FEATURE_LEVEL_INVALID"/>
+  <int value="1" label="D3D_FEATURE_LEVEL_9_3"/>
+  <int value="2" label="D3D_FEATURE_LEVEL_10_0"/>
+  <int value="3" label="D3D_FEATURE_LEVEL_10_1"/>
+  <int value="4" label="D3D_FEATURE_LEVEL_11_0"/>
+  <int value="5" label="D3D_FEATURE_LEVEL_11_1"/>
+</enum>
+
+<enum name="D3DHresult" type="int">
+  <int value="-2147467263" label="E_NOTIMPL"/>
+  <int value="-2147467262" label="E_NOINTERFACE"/>
+  <int value="-2147467261" label="E_POINTER"/>
+  <int value="-2147467260" label="E_ABORT"/>
+  <int value="-2147467259" label="E_FAIL"/>
+  <int value="-2147418113" label="E_UNEXPECTED"/>
+  <int value="-2147024891" label="E_ACCESSDENIED"/>
+  <int value="-2147024890" label="E_HANDLE"/>
+  <int value="-2147024882" label="E_OUTOFMEMORY"/>
+  <int value="-2147024809" label="E_INVALIDARG"/>
+  <int value="-2005270527" label="DXGI_ERROR_INVALID_CALL"/>
+  <int value="-2005270526" label="DXGI_ERROR_NOT_FOUND"/>
+  <int value="-2005270525" label="DXGI_ERROR_MORE_DATA"/>
+  <int value="-2005270524" label="DXGI_ERROR_UNSUPPORTED"/>
+  <int value="-2005270523" label="DXGI_ERROR_DEVICE_REMOVED"/>
+  <int value="-2005270522" label="DXGI_ERROR_DEVICE_HUNG"/>
+  <int value="-2005270521" label="DXGI_ERROR_DEVICE_RESET"/>
+  <int value="-2005270518" label="DXGI_ERROR_WAS_STILL_DRAWING"/>
+  <int value="-2005270517" label="DXGI_ERROR_FRAME_STATISTICS_DISJOINT"/>
+  <int value="-2005270516" label="DXGI_ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE"/>
+  <int value="-2005270496" label="DXGI_ERROR_DRIVER_INTERNAL_ERROR"/>
+  <int value="-2005270495" label="DXGI_ERROR_NONEXCLUSIVE"/>
+  <int value="-2005270494" label="DXGI_ERROR_NOT_CURRENTLY_AVAILABLE"/>
+  <int value="-2005270493" label="DXGI_ERROR_REMOTE_CLIENT_DISCONNECTED"/>
+  <int value="-2005270492" label="DXGI_ERROR_REMOTE_OUTOFMEMORY"/>
+  <int value="-2005270490" label="DXGI_ERROR_ACCESS_LOST"/>
+  <int value="-2005270489" label="DXGI_ERROR_WAIT_TIMEOUT"/>
+  <int value="-2005270488" label="DXGI_ERROR_SESSION_DISCONNECTED"/>
+  <int value="-2005270487" label="DXGI_ERROR_RESTRICT_TO_OUTPUT_STALE"/>
+  <int value="-2005270486" label="DXGI_ERROR_CANNOT_PROTECT_CONTENT"/>
+  <int value="-2005270485" label="DXGI_ERROR_ACCESS_DENIED"/>
+  <int value="-2005270484" label="DXGI_ERROR_NAME_ALREADY_EXISTS"/>
+  <int value="-2005270483" label="DXGI_ERROR_SDK_COMPONENT_MISSING"/>
+</enum>
+
 <enum name="DailyEventIntervalType" type="int">
   <int value="0" label="First Run"/>
   <int value="1" label="Day Elapsed"/>
@@ -49191,6 +49858,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Probe failed, proxy already disabled"/>
   <int value="3" label="Probe succeeded, proxy enabled"/>
   <int value="4" label="Probe succeeded, proxy already enabled"/>
+  <int value="5" label="Probe started, proxy disabled"/>
 </enum>
 
 <enum name="DataReductionProxyPromoAction" type="int">
@@ -49198,6 +49866,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Dismissed from second screen"/>
   <int value="2" label="Enabled from first screen"/>
   <int value="3" label="Enabled from second screen"/>
+</enum>
+
+<enum name="DataReductionProxyResponseProxyServerStatus" type="int">
+  <int value="0" label="Empty proxy server"/>
+  <int value="1" label="DRP proxy server"/>
+  <int value="2" label="Non-DRP proxy server without DRP via header"/>
+  <int value="3" label="Non-DRP proxy server with DRP via header"/>
 </enum>
 
 <enum name="DataReductionProxySettingsConversion" type="int">
@@ -52048,7 +52723,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1007" label="DEVELOPERPRIVATE_SHOWOPTIONS"/>
   <int value="1008" label="DEVELOPERPRIVATE_SHOWPATH"/>
   <int value="1009" label="FILEMANAGERPRIVATE_ADDPROVIDEDFILESYSTEM"/>
-  <int value="1010" label="FILEMANAGERPRIVATE_CONFIGUREPROVIDEDFILESYSTEM"/>
+  <int value="1010" label="FILEMANAGERPRIVATE_CONFIGUREVOLUME"/>
   <int value="1011" label="SEARCHENGINESPRIVATE_GETSEARCHENGINES"/>
   <int value="1012" label="SEARCHENGINESPRIVATE_SETSELECTEDSEARCHENGINE"/>
   <int value="1013" label="AUTOFILLPRIVATE_SAVEADDRESS"/>
@@ -52079,6 +52754,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1037" label="PASSWORDSPRIVATE_REMOVESAVEDPASSWORD"/>
   <int value="1038" label="PASSWORDSPRIVATE_REMOVEPASSWORDEXCEPTION"/>
   <int value="1039" label="PASSWORDSPRIVATE_GETPLAINTEXTPASSWORD"/>
+  <int value="1040" label="LAUNCHERPAGE_HIDE"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -54259,7 +54935,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="InfoBar dismissed implicitly (no interaction)"/>
 </enum>
 
-<enum name="GoogleUpdateUpgradeResult" type="int">
+<enum name="GoogleUpdateUpgradeStatus" type="int">
   <int value="0" label="UPGRADE_STARTED"/>
   <int value="1" label="UPGRADE_CHECK_STARTED"/>
   <int value="2" label="UPGRADE_IS_AVAILABLE"/>
@@ -54472,6 +55148,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="-2147467262" label="E_NOINTERFACE"/>
   <int value="-2147417848" label="RPC_E_DISCONNECTED"/>
   <int value="-2147221164" label="REGDB_E_CLASSNOTREG"/>
+  <int value="-2147219437" label="GOOPDATE_E_APP_UPDATE_DISABLED_BY_POLICY"/>
+  <int value="-2147219198" label="GOOPDATEINSTALL_E_INSTALLER_FAILED"/>
   <int value="-2147024894" label="ERROR_FILE_NOT_FOUND"/>
   <int value="-2147024893" label="ERROR_PATH_NOT_FOUND"/>
   <int value="-2147024891" label="ERROR_ACCESS_DENIED"/>
@@ -55061,6 +55739,55 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="33" label="Ran by google.com/support/"/>
   <int value="34" label="Displayed by google.com/intl/"/>
   <int value="35" label="Ran by google.com/intl/"/>
+</enum>
+
+<enum name="InstallStatus" type="int">
+  <int value="0" label="FIRST_INSTALL_SUCCESS"/>
+  <int value="1" label="INSTALL_REPAIRED"/>
+  <int value="2" label="NEW_VERSION_UPDATED"/>
+  <int value="3" label="EXISTING_VERSION_LAUNCHED"/>
+  <int value="4" label="HIGHER_VERSION_EXISTS"/>
+  <int value="5" label="USER_LEVEL_INSTALL_EXISTS"/>
+  <int value="6" label="SYSTEM_LEVEL_INSTALL_EXISTS"/>
+  <int value="7" label="INSTALL_FAILED"/>
+  <int value="8" label="SETUP_PATCH_FAILED"/>
+  <int value="9" label="OS_NOT_SUPPORTED"/>
+  <int value="10" label="OS_ERROR"/>
+  <int value="11" label="TEMP_DIR_FAILED"/>
+  <int value="12" label="UNCOMPRESSION_FAILED"/>
+  <int value="13" label="INVALID_ARCHIVE"/>
+  <int value="14" label="INSUFFICIENT_RIGHTS"/>
+  <int value="15" label="CHROME_NOT_INSTALLED"/>
+  <int value="16" label="CHROME_RUNNING"/>
+  <int value="17" label="UNINSTALL_CONFIRMED"/>
+  <int value="18" label="UNINSTALL_DELETE_PROFILE"/>
+  <int value="19" label="UNINSTALL_SUCCESSFUL"/>
+  <int value="20" label="UNINSTALL_FAILED"/>
+  <int value="21" label="UNINSTALL_CANCELLED"/>
+  <int value="22" label="UNKNOWN_STATUS"/>
+  <int value="23" label="RENAME_SUCCESSFUL"/>
+  <int value="24" label="RENAME_FAILED"/>
+  <int value="25" label="EULA_REJECTED"/>
+  <int value="26" label="EULA_ACCEPTED"/>
+  <int value="27" label="EULA_ACCEPTED_OPT_IN"/>
+  <int value="28" label="INSTALL_DIR_IN_USE"/>
+  <int value="29" label="UNINSTALL_REQUIRES_REBOOT"/>
+  <int value="30" label="IN_USE_UPDATED"/>
+  <int value="31" label="SAME_VERSION_REPAIR_FAILED"/>
+  <int value="32" label="REENTRY_SYS_UPDATE"/>
+  <int value="33" label="SXS_OPTION_NOT_SUPPORTED"/>
+  <int value="42" label="APPLY_DIFF_PATCH_FAILED"/>
+  <int value="47" label="INVALID_STATE_FOR_OPTION"/>
+  <int value="48" label="WAIT_FOR_EXISTING_FAILED"/>
+  <int value="49" label="PATCH_INVALID_ARGUMENTS"/>
+  <int value="50" label="DIFF_PATCH_SOURCE_MISSING"/>
+  <int value="51" label="UNUSED_BINARIES"/>
+  <int value="52" label="UNUSED_BINARIES_UNINSTALLED"/>
+  <int value="53" label="UNSUPPORTED_OPTION"/>
+  <int value="54" label="CPU_NOT_SUPPORTED"/>
+  <int value="55" label="REENABLE_UPDATES_SUCCEEDED"/>
+  <int value="56" label="REENABLE_UPDATES_FAILED"/>
+  <int value="57" label="UNPACKING_FAILED"/>
 </enum>
 
 <enum name="InstantControllerEvent" type="int">
@@ -56167,6 +56894,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1835975804" label="disable-offline-auto-reload"/>
   <int value="-1833149810" label="enable-accessibility-tab-switcher"/>
   <int value="-1832575380" label="show-saved-copy"/>
+  <int value="-1832221649" label="disable-out-of-process-pac"/>
   <int value="-1821058653" label="enable-delay-agnostic-aec"/>
   <int value="-1767470652" label="out-of-process-pdf"/>
   <int value="-1751928267" label="disable-icon-ntp"/>
@@ -56242,6 +56970,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1102212525" label="enable-tcp-fastopen"/>
   <int value="-1078093206" label="ash-debug-shortcuts"/>
   <int value="-1077752943" label="enable-password-generation"/>
+  <int value="-1062119671" label="enable-password-force-saving"/>
   <int value="-1056310158" label="disable-memory-pressure-chromeos"/>
   <int value="-1052782474" label="enable-cloud-devices"/>
   <int value="-1052415111" label="malware-interstitial-v2"/>
@@ -56267,6 +56996,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-814097014" label="disable-session-crashed-bubble"/>
   <int value="-813474479" label="site-per-process"/>
   <int value="-802348444" label="disable-site-engagement-service"/>
+  <int value="-798187384" label="try-supported-channel-layouts"/>
   <int value="-795600188" label="disable-async-dns"/>
   <int value="-780798969" label="disable-single-click-autofill"/>
   <int value="-770319039" label="enable-touch-editing"/>
@@ -56282,6 +57012,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-649956990" label="enable-harfbuzz-rendertext"/>
   <int value="-641719457" label="disable-compositor-touch-hit-testing"/>
   <int value="-622685174" label="enable-pdf-material-ui"/>
+  <int value="-610411643" label="enable-printer-app-search"/>
   <int value="-604814313" label="enable-pinch"/>
   <int value="-601384286" label="disable-contextual-search"/>
   <int value="-579192400" label="disable-input-view"/>
@@ -56413,6 +57144,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="834326277" label="enable-answers-in-suggest"/>
   <int value="835018878" label="disable-quic"/>
   <int value="838887742" label="manual-enhanced-bookmarks"/>
+  <int value="841343322" label="disable-new-korean-ime"/>
   <int value="851085848" label="enable-settings-window"/>
   <int value="855746780" label="disable-physical-keyboard-autocorrect"/>
   <int value="857445869" label="enable-captive-portal-bypass-proxy"/>
@@ -56424,6 +57156,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="884106779" label="supervised-user-safesites"/>
   <int value="887011602" label="enable-spelling-auto-correct"/>
   <int value="909439558" label="disable-device-discovery"/>
+  <int value="916316159" label="disable-new-app-list-mixer"/>
   <int value="929462705" label="disable-link-disambiguation-popup"/>
   <int value="936919953" label="bypass-app-banner-engagement-checks"/>
   <int value="939554480" label="enable-credit-card-scan"/>
@@ -56526,6 +57259,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1783293530" label="disallow-autofill-sync-credential"/>
   <int value="1783837132" label="enable-threaded-gpu-rasterization"/>
   <int value="1803465156" label="enable-zero-suggest-most-visited"/>
+  <int value="1812368073" label="enable-new-app-list-mixer"/>
   <int value="1814671708" label="disable-password-manager-reauthentication"/>
   <int value="1817312143" label="num-raster-threads"/>
   <int value="1819256299" label="disable-webrtc-hw-decoding"/>
@@ -58505,6 +59239,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="6" label="URL blocked for supervised user"/>
 </enum>
 
+<enum name="NewUserPriorityPrefsSyncResult" type="int">
+  <int value="0" label="Succeeded"/>
+  <int value="1" label="Timed out"/>
+</enum>
+
 <enum name="NotificationActionType" type="int">
   <int value="0" label="Unknown"/>
   <int value="1" label="Notification added"/>
@@ -58557,18 +59296,6 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="11" label="Clicked on a tile."/>
   <int value="12" label="Clicked to other NTP pane."/>
   <int value="13" label="Other action"/>
-</enum>
-
-<enum name="NtpOtherSessionsType" type="int">
-  <int value="0" label="Menu initialized"/>
-  <int value="1" label="Menu shown"/>
-  <int value="2" label="Link clicked"/>
-  <int value="3" label="Link context menu shown"/>
-  <int value="4" label="Device context menu shown"/>
-  <int value="5" label="Unused/previous device context menu shown"/>
-  <int value="6" label="Collapse Session"/>
-  <int value="7" label="Expand Session"/>
-  <int value="8" label="Open All"/>
 </enum>
 
 <enum name="NtpPaneType" type="int">
@@ -59023,6 +59750,18 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="2" label="Other possible usernames present, but none were shown"/>
   <int value="3" label="Other possible username was shown, but not selected"/>
   <int value="4" label="Other possible username was selected"/>
+</enum>
+
+<enum name="OtherSessionsActions" type="int">
+  <int value="0" label="Menu initialized"/>
+  <int value="1" label="Menu shown"/>
+  <int value="2" label="Link clicked"/>
+  <int value="3" label="Link context menu shown"/>
+  <int value="4" label="Device context menu shown"/>
+  <int value="5" label="Unused/previous device context menu shown"/>
+  <int value="6" label="Collapse Session"/>
+  <int value="7" label="Expand Session"/>
+  <int value="8" label="Open All"/>
 </enum>
 
 <enum name="OverscrollMode" type="int">
@@ -60021,8 +60760,8 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="PluginGroup" type="int">
-  <int value="0" label="Adobe Reader"/>
-  <int value="1" label="Other Plugin"/>
+  <int value="0" label="Other Plugin"/>
+  <int value="1" label="Adobe Reader"/>
   <int value="2" label="Java"/>
   <int value="3" label="Quicktime"/>
   <int value="4" label="Shockwave"/>
@@ -60548,7 +61287,10 @@ To add a new entry, add it with any value and run test to compute valid value.
 
 <enum name="PrinterServiceEventType" type="int">
   <int value="0" label="Printer added"/>
-  <int value="1" label="Page displayed"/>
+  <int value="1" label="Page displayed (Deprecated)"/>
+  <int value="2" label="Printer supported notification shown"/>
+  <int value="3" label="Printer not supported notification shown"/>
+  <int value="4" label="Printer provider Web Store app launched"/>
 </enum>
 
 <enum name="PrintPreviewFailureType" type="int">
@@ -61713,6 +62455,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="63" label="IDC_WRITING_DIRECTION_DEFAULT"/>
   <int value="64" label="IDC_WRITING_DIRECTION_LTR"/>
   <int value="65" label="IDC_WRITING_DIRECTION_RTL"/>
+  <int value="66" label="IDC_CONTENT_CONTEXT_SHOW_ORIGINAL_IMAGE"/>
 </enum>
 
 <enum name="ReportProcessingResult" type="int">
@@ -62709,6 +63452,42 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="10" label="Devices page"/>
   <int value="11" label="Reauth"/>
   <int value="12" label="Unknown"/>
+</enum>
+
+<enum name="SigninXDevicePromoEligibility" type="int">
+  <int value="0" label="Eligible">The user is eligible for the promo.</int>
+  <int value="1" label="Opted Out">
+    The profile has previously opted out of the promo.
+  </int>
+  <int value="2" label="Signed In">The profile is already signed in.</int>
+  <int value="3" label="Not Single GAIA Account">
+    The profile does not have a single, peristent GAIA cookie.
+  </int>
+  <int value="4" label="Unknown count of devices">
+    Yet to determine how many devices the user has.
+  </int>
+  <int value="5" label="Error fetching device activity">
+    An error was returned trying to determine the account's devices.
+  </int>
+  <int value="6" label="Throttled fetching device activity">
+    The call to get device activity was throttled, and never executed.
+  </int>
+  <int value="7" label="Zero devices found">The user has no devices.</int>
+  <int value="8" label="No devices active">
+    The user has no device that was recently active.
+  </int>
+</enum>
+
+<enum name="SigninXDevicePromoInitialized" type="int">
+  <int value="0" label="Initialized">
+    The promo was initialized successfully.
+  </int>
+  <int value="1" label="Opted Out">
+    The profile is opted out, so the promo didn't initialize.
+  </int>
+  <int value="2" label="No variations config">
+    Unable to read the variations configuration.
+  </int>
 </enum>
 
 <enum name="SimpleCache.EntryCreatedAndStream2Omitted" type="int">
@@ -63761,6 +64540,16 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="7" label="CERT_WEAK_SIGNATURE_ALGORITHM"/>
   <int value="8" label="CERT_WEAK_KEY"/>
   <int value="9" label="UNKNOWN"/>
+</enum>
+
+<enum name="SSLFailureState" type="int">
+  <int value="0" label="No failure"/>
+  <int value="1" label="Unknown failure"/>
+  <int value="2" label="Failed to process ClientHello"/>
+  <int value="3" label="Buggy AES-GCM"/>
+  <int value="4" label="Failed with client authentication"/>
+  <int value="5" label="Session version mismatch"/>
+  <int value="6" label="Failed with Next Proto Negotiation"/>
 </enum>
 
 <enum name="SSLGoodCertSeenEvent" type="int">
@@ -66096,6 +66885,26 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PLT.PT_StartToFinish"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="DataReductionProxy_AutoLoFi" separator="_">
+  <suffix name="DataReductionProxy_AutoLoFiOn"
+      label="Only page loads through the data reduction proxy with auto LoFi
+             enabled are considered."/>
+  <suffix name="DataReductionProxy_AutoLoFiOff"
+      label="Only page loads through the data reduction proxy with auto LoFi
+             disabled are considered."/>
+  <suffix name="HTTPS_DataReductionProxy_AutoLoFiOn"
+      label="Only page loads through the data reduction proxy through an HTTP
+             tunnel for HTTPS origins with auto LoFi enabled are considered."/>
+  <suffix name="HTTPS_DataReductionProxy_AutoLoFiOff"
+      label="Only page loads through the data reduction proxy through an HTTP
+             tunnel for HTTPS origins with auto LoFi disabled are considered."/>
+  <affected-histogram name="PLT.PT_BeginToFinish"/>
+  <affected-histogram name="PLT.PT_CommitToFinish"/>
+  <affected-histogram name="PLT.PT_RequestToDomContentLoaded"/>
+  <affected-histogram name="PLT.PT_RequestToFinish"/>
+  <affected-histogram name="PLT.PT_StartToFinish"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="DataReductionProxy_TamperingFingerprints"
     separator="_">
   <suffix name="ChromeProxy"
@@ -66301,6 +67110,22 @@ To add a new entry, add it with any value and run test to compute valid value.
       label="Bypass due to invalid proxy certificate"/>
   <suffix name="NetworkErrorOther" label="Bypass due to any network error"/>
   <affected-histogram name="DataReductionProxy.BypassedBytes"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="DataReductionProxyConfigFetchLostBytes" separator="_">
+  <suffix name="0" label="Bucket 0 for gathering multiple data points."/>
+  <suffix name="1" label="Bucket 1 for gathering multiple data points."/>
+  <suffix name="2" label="Bucket 2 for gathering multiple data points."/>
+  <suffix name="3" label="Bucket 3 for gathering multiple data points."/>
+  <suffix name="4" label="Bucket 4 for gathering multiple data points."/>
+  <suffix name="5" label="Bucket 5 for gathering multiple data points."/>
+  <suffix name="6" label="Bucket 6 for gathering multiple data points."/>
+  <suffix name="7" label="Bucket 7 for gathering multiple data points."/>
+  <suffix name="8" label="Bucket 8 for gathering multiple data points."/>
+  <suffix name="9" label="Bucket 9 for gathering multiple data points."/>
+  <affected-histogram name="DataReductionProxy.ConfigFetchLostBytesCL"/>
+  <affected-histogram name="DataReductionProxy.ConfigFetchLostBytesDiff"/>
+  <affected-histogram name="DataReductionProxy.ConfigFetchLostBytesOCL"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="DataReductionProxyMissingViaHeaderBytes"
@@ -67211,8 +68036,12 @@ To add a new entry, add it with any value and run test to compute valid value.
       label="The version of the Module Integrity Verifier that doesn't use a
              hash set to track relocations."/>
   <suffix name="WithByteSet"
-      label="The version of the Module Integrity Verifier that uses a hash
-             set to track relocations."/>
+      label="The version of the Module Integrity Verifier that uses a hash set
+             to track relocations.">
+    <obsolete>
+      Deprecated and removed from code as of 05/2015.
+    </obsolete>
+  </suffix>
   <affected-histogram name="ModuleIntegrityVerification.BytesModified"/>
   <affected-histogram name="ModuleIntegrityVerification.Difference"/>
 </histogram_suffixes>
@@ -68519,6 +69348,18 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="Net.QuicDiskCache.FailureReason"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="NetRequestTime" separator=".">
+  <suffix name="ErrAborted" label="Request aborted"/>
+  <suffix name="ErrConnectionReset" label="Connection reset"/>
+  <suffix name="ErrConnectionTimedOut" label="Request connection timed out"/>
+  <suffix name="ErrInternetDisconnected" label="Internet disconnected"/>
+  <suffix name="ErrNameNotResolved" label="Request domain not resolved"/>
+  <suffix name="ErrTimedOut" label="Request timed out"/>
+  <suffix name="MiscError" label="Uncategorized error"/>
+  <suffix name="Success" label="Success"/>
+  <affected-histogram name="Net.RequestTime"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="NetworkErrors" separator=".">
   <suffix name="AuthExtTimeout" label="with the last error AuthExtTimeout"/>
   <suffix name="Offline" label="with the last error Offline"/>
@@ -69592,8 +70433,11 @@ To add a new entry, add it with any value and run test to compute valid value.
     ordering="prefix">
   <suffix name="bad_clock"/>
   <suffix name="harmful"/>
+  <suffix name="harmful_subresource"/>
   <suffix name="malware"/>
+  <suffix name="malware_subresource"/>
   <suffix name="phishing"/>
+  <suffix name="phishing_subresource"/>
   <suffix name="ssl_nonoverridable"/>
   <suffix name="ssl_overridable"/>
   <affected-histogram name="interstitial.decision"/>

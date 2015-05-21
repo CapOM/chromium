@@ -41,7 +41,6 @@ remoting.AppConnectedView = function(containerElement, connectionInfo) {
   /** @private */
   this.host_ = connectionInfo.host();
 
-  /** @private {remoting.ContextMenuAdapter} */
   var menuAdapter = new remoting.ContextMenuChrome();
 
   // Initialize the context menus.
@@ -50,8 +49,8 @@ remoting.AppConnectedView = function(containerElement, connectionInfo) {
         new remoting.ContextMenuDom(document.getElementById('context-menu'));
   }
 
-  this.contextMenu_ =
-      new remoting.ApplicationContextMenu(menuAdapter, this.plugin_);
+  this.contextMenu_ = new remoting.ApplicationContextMenu(
+      menuAdapter, this.plugin_, connectionInfo.session());
   this.contextMenu_.setHostId(connectionInfo.host().hostId);
 
   /** @private */
@@ -239,10 +238,16 @@ remoting.AppConnectedView.prototype.sendGoogleDriveAccessToken_ =
   ];
   remoting.identity.getNewToken(googleDriveScopes).then(
     function(/** string */ token){
+      base.debug.assert(token !== previousToken_);
+      previousToken_ = token;
       sendExtensionMessage('accessToken', token);
   }).catch(remoting.Error.handler(function(/** remoting.Error */ error) {
     console.log('Failed to refresh access token: ' + error.toString());
   }));
 };
+
+// The access token last received from getNewToken. Saved to ensure that we
+// get a fresh token each time.
+var previousToken_ = '';
 
 })();

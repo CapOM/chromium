@@ -34,6 +34,7 @@ class DataReductionProxyConfig;
 class DataReductionProxyConfigServiceClient;
 class DataReductionProxyConfigurator;
 class DataReductionProxyEventCreator;
+class DataReductionProxyExperimentsStats;
 class DataReductionProxyService;
 
 // Contains and initializes all Data Reduction Proxy objects that operate on
@@ -60,7 +61,8 @@ class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
   void ShutdownOnUIThread();
 
   // Sets the Data Reduction Proxy service after it has been created.
-  void SetDataReductionProxyService(
+  // Virtual for testing.
+  virtual void SetDataReductionProxyService(
       base::WeakPtr<DataReductionProxyService> data_reduction_proxy_service);
 
   void RetrieveConfig();
@@ -81,9 +83,7 @@ class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
   // configuration should be set. Use the alternative configuration only if
   // |enabled| and |alternative_enabled| are true. |at_startup| is true only
   // when DataReductionProxySettings is initialized.
-  void SetProxyPrefs(bool enabled,
-                     bool alternative_enabled,
-                     bool at_startup);
+  void SetProxyPrefs(bool enabled, bool alternative_enabled, bool at_startup);
 
   // Bridge methods to safely call to the UI thread objects.
   void UpdateContentLengths(int64 received_content_length,
@@ -124,6 +124,10 @@ class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
     return config_client_.get();
   }
 
+  DataReductionProxyExperimentsStats* experiments_stats() const {
+    return experiments_stats_.get();
+  }
+
   net::ProxyDelegate* proxy_delegate() const {
     return proxy_delegate_.get();
   }
@@ -153,6 +157,8 @@ class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
  private:
   friend class TestDataReductionProxyIOData;
   FRIEND_TEST_ALL_PREFIXES(DataReductionProxyIODataTest, TestConstruction);
+  FRIEND_TEST_ALL_PREFIXES(DataReductionProxyIODataTest,
+                           TestResetBadProxyListOnDisableDataSaver);
 
   // Used for testing.
   DataReductionProxyIOData();
@@ -164,6 +170,9 @@ class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
 
   // Records that the data reduction proxy is unreachable or not.
   void SetUnreachable(bool unreachable);
+
+  // Stores an int64 value in preferences storage.
+  void SetInt64Pref(const std::string& pref_path, int64 value);
 
   // The type of Data Reduction Proxy client.
   Client client_;
@@ -196,6 +205,9 @@ class DataReductionProxyIOData : public DataReductionProxyEventStorageDelegate {
 
   // Requests new Data Reduction Proxy configurations from a remote service.
   scoped_ptr<DataReductionProxyConfigServiceClient> config_client_;
+
+  // Used to track stats for experiments.
+  scoped_ptr<DataReductionProxyExperimentsStats> experiments_stats_;
 
   // A net log.
   net::NetLog* net_log_;

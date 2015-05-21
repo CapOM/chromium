@@ -268,17 +268,6 @@ class DrmDevice::IOWatcher
   DISALLOW_COPY_AND_ASSIGN(IOWatcher);
 };
 
-DrmDevice::DrmDevice(const base::FilePath& device_path)
-    : device_path_(device_path),
-      file_(device_path,
-            base::File::FLAG_OPEN | base::File::FLAG_READ |
-                base::File::FLAG_WRITE),
-      page_flip_manager_(new PageFlipManager()) {
-  LOG_IF(FATAL, !file_.IsValid())
-      << "Failed to open '" << device_path_.value()
-      << "': " << base::File::ErrorToString(file_.error_details());
-}
-
 DrmDevice::DrmDevice(const base::FilePath& device_path, base::File file)
     : device_path_(device_path),
       file_(file.Pass()),
@@ -290,7 +279,7 @@ DrmDevice::~DrmDevice() {
     watcher_->Shutdown();
 }
 
-bool DrmDevice::Initialize() {
+bool DrmDevice::Initialize(bool use_atomic) {
   // Ignore devices that cannot perform modesetting.
   if (!CanQueryForResources(file_.GetPlatformFile())) {
     VLOG(2) << "Cannot query for resources for '" << device_path_.value()
@@ -299,10 +288,13 @@ bool DrmDevice::Initialize() {
   }
 
 #if defined(USE_DRM_ATOMIC)
-  plane_manager_.reset(new HardwareDisplayPlaneManagerAtomic());
-#else
-  plane_manager_.reset(new HardwareDisplayPlaneManagerLegacy());
+  // Use atomic only if the build, kernel & flags all allow it.
+  if (use_atomic && SetCapability(DRM_CLIENT_CAP_ATOMIC, 1))
+    plane_manager_.reset(new HardwareDisplayPlaneManagerAtomic());
 #endif  // defined(USE_DRM_ATOMIC)
+
+  if (!plane_manager_)
+    plane_manager_.reset(new HardwareDisplayPlaneManagerLegacy());
   if (!plane_manager_->Initialize(this)) {
     LOG(ERROR) << "Failed to initialize the plane manager for "
                << device_path_.value();
@@ -559,20 +551,33 @@ bool DrmDevice::CloseBufferHandle(uint32_t handle) {
 
 bool DrmDevice::CommitProperties(drmModePropertySet* properties,
                                  uint32_t flags,
+                                 bool is_sync,
                                  const PageFlipCallback& callback) {
 #if defined(USE_DRM_ATOMIC)
-  scoped_ptr<PageFlipPayload> payload(
-      new PageFlipPayload(base::ThreadTaskRunnerHandle::Get(), callback));
-  if (!drmModePropertySetCommit(file_.GetPlatformFile(), flags, payload.get(),
-                                properties)) {
-    // If successful the payload will be removed by the event
-    ignore_result(payload.release());
+  flags |= DRM_MODE_PAGE_FLIP_EVENT;
+  uint64_t id = page_flip_manager_->GetNextId();
+  if (!drmModePropertySetCommit(file_.GetPlatformFile(), flags,
+                                reinterpret_cast<void*>(id), properties)) {
+    page_flip_manager_->RegisterCallback(id, callback);
+
+    // If the flip was requested synchronous or if no watcher has been installed
+    // yet, then synchronously handle the page flip events.
+    if (is_sync || !watcher_) {
+      TRACE_EVENT1("drm", "OnDrmEvent", "socket", file_.GetPlatformFile());
+
+      ProcessDrmEvent(
+          file_.GetPlatformFile(),
+          base::Bind(&PageFlipManager::OnPageFlip, page_flip_manager_));
+    }
     return true;
   }
-  return false;
-#else
-  return false;
 #endif  // defined(USE_DRM_ATOMIC)
+  return false;
+}
+
+bool DrmDevice::SetCapability(uint64_t capability, uint64_t value) {
+  DCHECK(file_.IsValid());
+  return !drmSetClientCap(file_.GetPlatformFile(), capability, value);
 }
 
 bool DrmDevice::SetMaster() {

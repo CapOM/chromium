@@ -106,6 +106,7 @@ android_library("chrome_java") {
     "//third_party/cacheinvalidation:cacheinvalidation_proto_java",
     "//third_party/jsr-305:jsr_305_javalib",
     "//media/base/android:media_java",
+    "//media/midi:midi_java",
     "//ui/android:ui_java",
     "//ui/android:ui_java_resources",
     google_play_services_library,
@@ -127,22 +128,22 @@ android_library("chrome_java") {
 # GYP: //chrome/chrome_browser.gypi:activity_type_ids_java
 # GYP: //chrome/chrome_browser.gypi:profile_account_management_metrics_java
 # GYP: //chrome/chrome_browser.gypi:profile_sync_service_model_type_selection_java
+# GYP: //chrome/chrome_browser.gypi:connection_security_helper_security_levels_java
 # GYP: //chrome/chrome_browser.gypi:tab_load_status_java
-# GYP: //chrome/chrome_browser.gypi:toolbar_model_security_levels_java
 java_cpp_enum("chrome_android_java_enums_srcjar") {
   sources = [
     "//chrome/browser/android/activity_type_ids.h",
     "//chrome/browser/android/tab_android.h",
     "//chrome/browser/profiles/profile_metrics.h",
+    "//chrome/browser/ssl/connection_security_helper.h",
     "//chrome/browser/sync/profile_sync_service_android.cc",
-    "//chrome/browser/ui/toolbar/toolbar_model.h",
   ]
   outputs = [
     "org/chromium/chrome/browser/ActivityTypeIds.java",
     "org/chromium/chrome/browser/TabLoadStatus.java",
     "org/chromium/chrome/browser/profiles/ProfileAccountManagementMetrics.java",
+    "org/chromium/chrome/browser/ssl/ConnectionSecurityHelperSecurityLevel.java",
     "org/chromium/chrome/browser/sync/ModelTypeSelection.java",
-    "org/chromium/chrome/browser/ui/toolbar/ToolbarModelSecurityLevel.java",
   ]
 }
 
@@ -392,7 +393,7 @@ android_apk("chrome_sync_shell_apk") {
 # GYP: part of //chrome/chrome_tests.gypi:chrome_shell_test_apk
 android_library("chrome_javatests") {
   testonly = true
-  DEPRECATED_java_in_dir = "javatests/src"
+  DEPRECATED_java_in_dir = "javatests_shell/src"
   deps = [
     ":chrome_java",
     ":chrome_java_resources",
@@ -405,6 +406,7 @@ android_library("chrome_javatests") {
     "//components/bookmarks/common/android:bookmarks_java",
     "//components/dom_distiller/android:dom_distiller_core_java",
     "//components/invalidation:java",
+    "//components/invalidation:javatests",
     "//components/navigation_interception/android:navigation_interception_java",
     "//components/precache/android:precache_java",
     "//components/precache/android:precache_javatests",

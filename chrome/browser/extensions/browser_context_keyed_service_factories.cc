@@ -15,6 +15,7 @@
 #include "chrome/browser/extensions/api/cookies/cookies_api.h"
 #include "chrome/browser/extensions/api/developer_private/developer_private_api.h"
 #include "chrome/browser/extensions/api/dial/dial_api_factory.h"
+#include "chrome/browser/extensions/api/easy_unlock_private/easy_unlock_private_api.h"
 #include "chrome/browser/extensions/api/extension_action/extension_action_api.h"
 #include "chrome/browser/extensions/api/feedback_private/feedback_private_api.h"
 #include "chrome/browser/extensions/api/font_settings/font_settings_api.h"
@@ -47,6 +48,7 @@
 #include "chrome/browser/extensions/extension_toolbar_model_factory.h"
 #include "chrome/browser/extensions/extension_web_ui_override_registrar.h"
 #include "chrome/browser/extensions/install_tracker_factory.h"
+#include "chrome/browser/extensions/install_verifier_factory.h"
 #include "chrome/browser/extensions/menu_manager_factory.h"
 #include "chrome/browser/extensions/plugin_manager.h"
 #include "chrome/browser/extensions/token_cache/token_cache_service_factory.h"
@@ -61,6 +63,7 @@
 #include "extensions/browser/api/usb/usb_device_resource.h"
 #include "extensions/browser/api/virtual_keyboard_private/virtual_keyboard_private_api.h"
 #include "extensions/browser/api/web_request/web_request_api.h"
+#include "extensions/browser/declarative_user_script_manager_factory.h"
 
 #if defined(OS_CHROMEOS)
 #include "chrome/browser/chromeos/extensions/file_manager/event_router_factory.h"
@@ -92,8 +95,10 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   extensions::CommandService::GetFactoryInstance();
   extensions::ContentSettingsService::GetFactoryInstance();
   extensions::CookiesAPI::GetFactoryInstance();
+  extensions::DeclarativeUserScriptManagerFactory::GetInstance();
   extensions::DeveloperPrivateAPI::GetFactoryInstance();
   extensions::DialAPIFactory::GetInstance();
+  extensions::EasyUnlockPrivateAPI::GetFactoryInstance();
   extensions::ExtensionActionAPI::GetFactoryInstance();
   extensions::ExtensionGarbageCollectorFactory::GetInstance();
   extensions::ExtensionStorageMonitorFactory::GetInstance();
@@ -107,6 +112,7 @@ void EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   extensions::HotwordPrivateEventService::GetFactoryInstance();
   extensions::IdentityAPI::GetFactoryInstance();
   extensions::InstallTrackerFactory::GetInstance();
+  extensions::InstallVerifierFactory::GetInstance();
 #if defined(OS_CHROMEOS)
   extensions::InputImeAPI::GetFactoryInstance();
   extensions::InputMethodAPI::GetFactoryInstance();

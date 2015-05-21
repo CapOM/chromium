@@ -423,30 +423,6 @@ void RenderFrameHostManager::OnCrossSiteResponse(
   cross_site_transferring_request_.reset();
 }
 
-void RenderFrameHostManager::OnDeferredAfterResponseStarted(
-    const GlobalRequestID& global_request_id,
-    RenderFrameHostImpl* pending_render_frame_host) {
-  DCHECK(!response_started_id_);
-
-  response_started_id_.reset(new GlobalRequestID(global_request_id));
-}
-
-void RenderFrameHostManager::ResumeResponseDeferredAtStart() {
-  DCHECK(response_started_id_);
-
-  RenderProcessHostImpl* process =
-      static_cast<RenderProcessHostImpl*>(render_frame_host_->GetProcess());
-  process->ResumeResponseDeferredAtStart(*response_started_id_);
-
-  render_frame_host_->ClearPendingTransitionRequestData();
-
-  response_started_id_.reset();
-}
-
-void RenderFrameHostManager::ClearNavigationTransitionData() {
-  render_frame_host_->ClearPendingTransitionRequestData();
-}
-
 void RenderFrameHostManager::DidNavigateFrame(
     RenderFrameHostImpl* render_frame_host,
     bool was_caused_by_user_gesture) {
@@ -937,6 +913,7 @@ bool RenderFrameHostManager::ClearProxiesInSiteInstance(
     // in the proxy) and it was still pending swap out, move the RFH to the
     // pending deletion list first.
     if (node->IsMainFrame() &&
+        proxy->render_frame_host() &&
         proxy->render_frame_host()->rfh_state() ==
         RenderFrameHostImpl::STATE_PENDING_SWAP_OUT) {
       scoped_ptr<RenderFrameHostImpl> swapped_out_rfh =
@@ -1346,11 +1323,18 @@ void RenderFrameHostManager::CreatePendingRenderFrameHost(
   if (delegate_->IsHidden())
     create_render_frame_flags |= CREATE_RF_HIDDEN;
 
-  int opener_route_id = CreateOpenerRenderViewsIfNeeded(
-      old_instance, new_instance, &create_render_frame_flags);
-
   if (pending_render_frame_host_)
     CancelPending();
+
+  // The process for the new SiteInstance may (if we're sharing a process with
+  // another host that already initialized it) or may not (we have our own
+  // process or the existing process crashed) have been initialized. Calling
+  // Init multiple times will be ignored, so this is safe.
+  if (!new_instance->GetProcess()->Init())
+    return;
+
+  int opener_route_id = CreateOpenerRenderViewsIfNeeded(
+      old_instance, new_instance, &create_render_frame_flags);
 
   // Create a non-swapped-out RFH with the given opener.
   pending_render_frame_host_ =
@@ -1434,6 +1418,13 @@ bool RenderFrameHostManager::CreateSpeculativeRenderFrameHost(
   // |speculative_render_frame_host_| creation steps otherwise the WebUI
   // won't be properly initialized.
   speculative_web_ui_ = CreateWebUI(url, bindings);
+
+  // The process for the new SiteInstance may (if we're sharing a process with
+  // another host that already initialized it) or may not (we have our own
+  // process or the existing process crashed) have been initialized. Calling
+  // Init multiple times will be ignored, so this is safe.
+  if (!new_instance->GetProcess()->Init())
+    return false;
 
   int create_render_frame_flags = 0;
   int opener_route_id =

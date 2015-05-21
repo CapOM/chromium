@@ -10,6 +10,7 @@
 #include "base/metrics/field_trial.h"
 #include "base/prefs/scoped_user_pref_update.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/strings/string_split.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "components/signin/core/browser/refresh_token_annotation_request.h"
@@ -17,6 +18,8 @@
 #include "components/signin/core/browser/signin_manager.h"
 #include "components/signin/core/common/signin_pref_names.h"
 #include "components/signin/core/common/signin_switches.h"
+#include "google_apis/gaia/gaia_auth_consumer.h"
+#include "google_apis/gaia/gaia_auth_fetcher.h"
 #include "google_apis/gaia/gaia_auth_util.h"
 #include "google_apis/gaia/gaia_constants.h"
 #include "google_apis/gaia/gaia_oauth_client.h"
@@ -31,6 +34,8 @@ const char kAccountHostedDomainPath[] = "hd";
 const char kAccountFullNamePath[] = "full_name";
 const char kAccountGivenNamePath[] = "given_name";
 const char kAccountLocalePath[] = "locale";
+const char kAccountPictureURLPath[] = "picture_url";
+const char kAccountServiceFlagsPath[] = "service_flags";
 
 const base::TimeDelta kRefreshFromTokenServiceDelay =
     base::TimeDelta::FromHours(24);
@@ -49,8 +54,12 @@ bool IsRefreshTokenDeviceIdExperimentEnabled() {
 // This must be a string which can never be a valid domain.
 const char AccountTrackerService::kNoHostedDomainFound[] = "NO_HOSTED_DOMAIN";
 
+// This must be a string which can never be a valid picture URL.
+const char AccountTrackerService::kNoPictureURLFound[] = "NO_PICTURE_URL";
+
 class AccountInfoFetcher : public OAuth2TokenService::Consumer,
-                           public gaia::GaiaOAuthClient::Delegate {
+                           public gaia::GaiaOAuthClient::Delegate,
+                           public GaiaAuthConsumer {
  public:
   AccountInfoFetcher(OAuth2TokenService* token_service,
                      net::URLRequestContextGetter* request_context_getter,
@@ -61,6 +70,7 @@ class AccountInfoFetcher : public OAuth2TokenService::Consumer,
   const std::string& account_id() { return account_id_; }
 
   void Start();
+  void SendSuccessIfDoneFetching();
 
   // OAuth2TokenService::Consumer implementation.
   void OnGetTokenSuccess(const OAuth2TokenService::Request* request,
@@ -75,6 +85,12 @@ class AccountInfoFetcher : public OAuth2TokenService::Consumer,
   void OnOAuthError() override;
   void OnNetworkError(int response_code) override;
 
+  // Overridden from GaiaAuthConsumer:
+  void OnClientLoginSuccess(const ClientLoginResult& result) override;
+  void OnClientLoginFailure(const GoogleServiceAuthError& error) override;
+  void OnGetUserInfoSuccess(const UserInfoMap& data) override;
+  void OnGetUserInfoFailure(const GoogleServiceAuthError& error) override;
+
  private:
   OAuth2TokenService* token_service_;
   net::URLRequestContextGetter* request_context_getter_;
@@ -83,6 +99,10 @@ class AccountInfoFetcher : public OAuth2TokenService::Consumer,
 
   scoped_ptr<OAuth2TokenService::Request> login_token_request_;
   scoped_ptr<gaia::GaiaOAuthClient> gaia_oauth_client_;
+  scoped_ptr<GaiaAuthFetcher> gaia_auth_fetcher_;
+
+  scoped_ptr<base::DictionaryValue> fetched_user_info_;
+  scoped_ptr<std::vector<std::string> > fetched_service_flags_;
 };
 
 AccountInfoFetcher::AccountInfoFetcher(
@@ -108,8 +128,16 @@ void AccountInfoFetcher::Start() {
   OAuth2TokenService::ScopeSet scopes;
   scopes.insert(GaiaConstants::kGoogleUserInfoEmail);
   scopes.insert(GaiaConstants::kGoogleUserInfoProfile);
+  scopes.insert(GaiaConstants::kOAuth1LoginScope);
   login_token_request_ = token_service_->StartRequest(
       account_id_, scopes, this);
+}
+
+void AccountInfoFetcher::SendSuccessIfDoneFetching() {
+  if (fetched_user_info_ && fetched_service_flags_) {
+    service_->OnUserInfoFetchSuccess(
+        this, fetched_user_info_.get(), fetched_service_flags_.get());
+  }
 }
 
 void AccountInfoFetcher::OnGetTokenSuccess(
@@ -121,9 +149,14 @@ void AccountInfoFetcher::OnGetTokenSuccess(
   DCHECK_EQ(request, login_token_request_.get());
 
   gaia_oauth_client_.reset(new gaia::GaiaOAuthClient(request_context_getter_));
-
   const int kMaxRetries = 3;
   gaia_oauth_client_->GetUserInfo(access_token, kMaxRetries, this);
+
+  gaia_auth_fetcher_.reset(
+      new GaiaAuthFetcher(
+          this, GaiaConstants::kChromeSource, request_context_getter_));
+  gaia_auth_fetcher_->StartOAuthLogin(
+      access_token, GaiaConstants::kGaiaService);
 }
 
 void AccountInfoFetcher::OnGetTokenFailure(
@@ -148,7 +181,36 @@ void AccountInfoFetcher::OnGetUserInfoResponse(
                                "OnGetUserInfoResponse",
                                "account_id",
                                account_id_);
-  service_->OnUserInfoFetchSuccess(this, user_info.get());
+  fetched_user_info_ = user_info.Pass();
+  SendSuccessIfDoneFetching();
+}
+
+void AccountInfoFetcher::OnClientLoginSuccess(
+    const ClientLoginResult& result) {
+  gaia_auth_fetcher_->StartGetUserInfo(result.lsid);
+}
+
+void AccountInfoFetcher::OnClientLoginFailure(
+    const GoogleServiceAuthError& error) {
+  service_->OnUserInfoFetchFailure(this);
+}
+
+void AccountInfoFetcher::OnGetUserInfoSuccess(const UserInfoMap& data) {
+  fetched_service_flags_.reset(new std::vector<std::string>);
+  UserInfoMap::const_iterator services_iter = data.find("allServices");
+  if (services_iter != data.end()) {
+    base::SplitString(services_iter->second, ',', fetched_service_flags_.get());
+    SendSuccessIfDoneFetching();
+  } else {
+    DLOG(WARNING) << "AccountInfoFetcher::OnGetUserInfoSuccess: "
+                  << "GetUserInfo response didn't include allServices field.";
+    service_->OnUserInfoFetchFailure(this);
+  }
+}
+
+void AccountInfoFetcher::OnGetUserInfoFailure(
+    const GoogleServiceAuthError& error) {
+  service_->OnUserInfoFetchFailure(this);
 }
 
 void AccountInfoFetcher::OnOAuthError() {
@@ -172,10 +234,10 @@ void AccountInfoFetcher::OnNetworkError(int response_code) {
 AccountTrackerService::AccountInfo::AccountInfo() {}
 AccountTrackerService::AccountInfo::~AccountInfo() {}
 
-bool AccountTrackerService::AccountInfo::IsValid() {
+bool AccountTrackerService::AccountInfo::IsValid() const {
   return !account_id.empty() && !email.empty() && !gaia.empty() &&
          !hosted_domain.empty() && !full_name.empty() && !given_name.empty() &&
-         !locale.empty();
+         !locale.empty() && !picture_url.empty();
 }
 
 
@@ -440,7 +502,8 @@ void AccountTrackerService::StartFetchingUserInfo(
 
 void AccountTrackerService::SetAccountStateFromUserInfo(
     const std::string& account_id,
-    const base::DictionaryValue* user_info) {
+    const base::DictionaryValue* user_info,
+    const std::vector<std::string>* service_flags) {
   AccountState& state = accounts_[account_id];
 
   std::string gaia_id;
@@ -461,6 +524,15 @@ void AccountTrackerService::SetAccountStateFromUserInfo(
     user_info->GetString("given_name", &state.info.given_name);
     user_info->GetString("locale", &state.info.locale);
 
+    std::string picture_url;
+    if(user_info->GetString("picture", &picture_url)) {
+      state.info.picture_url = picture_url;
+    } else {
+      state.info.picture_url = kNoPictureURLFound;
+    }
+
+    state.info.service_flags = *service_flags;
+
     NotifyAccountUpdated(state);
     SaveToPrefs(state);
   }
@@ -468,11 +540,12 @@ void AccountTrackerService::SetAccountStateFromUserInfo(
 
 void AccountTrackerService::OnUserInfoFetchSuccess(
     AccountInfoFetcher* fetcher,
-    const base::DictionaryValue* user_info) {
+    const base::DictionaryValue* user_info,
+    const std::vector<std::string>* service_flags) {
   const std::string& account_id = fetcher->account_id();
   DCHECK(ContainsKey(accounts_, account_id));
 
-  SetAccountStateFromUserInfo(account_id, user_info);
+  SetAccountStateFromUserInfo(account_id, user_info, service_flags);
   DeleteFetcher(fetcher);
 }
 
@@ -516,6 +589,20 @@ void AccountTrackerService::LoadFromPrefs() {
           state.info.given_name = base::UTF16ToUTF8(value);
         if (dict->GetString(kAccountLocalePath, &value))
           state.info.locale = base::UTF16ToUTF8(value);
+        if (dict->GetString(kAccountPictureURLPath, &value))
+          state.info.picture_url = base::UTF16ToUTF8(value);
+
+        const base::ListValue* service_flags_list;
+        if (dict->GetList(kAccountServiceFlagsPath, &service_flags_list)) {
+          std::string flag;
+          for(base::Value* flag: *service_flags_list) {
+            std::string flag_string;
+            if(flag->GetAsString(&flag_string)) {
+              state.info.service_flags.push_back(flag_string);
+            }
+          }
+        }
+
         if (state.info.IsValid())
           NotifyAccountUpdated(state);
       }
@@ -552,6 +639,13 @@ void AccountTrackerService::SaveToPrefs(const AccountState& state) {
   dict->SetString(kAccountFullNamePath, state.info.full_name);
   dict->SetString(kAccountGivenNamePath, state.info.given_name);
   dict->SetString(kAccountLocalePath, state.info.locale);
+  dict->SetString(kAccountPictureURLPath, state.info.picture_url);
+
+  scoped_ptr<base::ListValue> service_flags_list;
+  service_flags_list.reset(new base::ListValue);
+  service_flags_list->AppendStrings(state.info.service_flags);
+
+  dict->Set(kAccountServiceFlagsPath, service_flags_list.Pass());
 }
 
 void AccountTrackerService::RemoveFromPrefs(const AccountState& state) {
@@ -678,4 +772,23 @@ std::string AccountTrackerService::SeedAccountInfo(const std::string& gaia,
            << " email=" << email;
 
   return account_id;
+}
+
+void AccountTrackerService::SeedAccountInfo(
+    AccountTrackerService::AccountInfo info) {
+  info.account_id = PickAccountIdForAccount(info.gaia, info.email);
+  if (info.hosted_domain.empty()) {
+    info.hosted_domain = kNoHostedDomainFound;
+  }
+
+  if(info.IsValid()) {
+    if(!ContainsKey(accounts_, info.account_id)) {
+      SeedAccountInfo(info.gaia, info.email);
+    }
+
+    AccountState& state = accounts_[info.account_id];
+    state.info = info;
+    NotifyAccountUpdated(state);
+    SaveToPrefs(state);
+  }
 }

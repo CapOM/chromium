@@ -143,34 +143,47 @@ public class MockAccountManager implements AccountManagerDelegate {
     public boolean addAccountExplicitly(Account account, String password, Bundle userdata) {
         AccountHolder accountHolder =
                 AccountHolder.create().account(account).password(password).build();
-        return addAccountHolderExplicitly(accountHolder);
+        return addAccountHolderExplicitly(accountHolder, false);
     }
 
     public boolean addAccountHolderExplicitly(AccountHolder accountHolder) {
+        return addAccountHolderExplicitly(accountHolder, false);
+    }
+
+    /**
+     * Add an AccountHolder directly.
+     *
+     * @param accountHolder the account holder to add
+     * @param broadcastEvent whether to broadcast an AccountChangedEvent
+     * @return whether the account holder was added successfully
+     */
+    public boolean addAccountHolderExplicitly(AccountHolder accountHolder,
+            boolean broadcastEvent) {
         boolean result = mAccounts.add(accountHolder);
-        postAsyncAccountChangedEvent();
+        if (broadcastEvent) {
+            postAsyncAccountChangedEvent();
+        }
         return result;
     }
 
     public boolean removeAccountHolderExplicitly(AccountHolder accountHolder) {
-        boolean result = mAccounts.remove(accountHolder);
-        postAsyncAccountChangedEvent();
-        return result;
+        return removeAccountHolderExplicitly(accountHolder, false);
     }
 
-    @Override
-    public AccountManagerFuture<Boolean> removeAccount(Account account,
-            AccountManagerCallback<Boolean> callback, Handler handler) {
-        mAccounts.remove(getAccountHolder(account));
-        postAsyncAccountChangedEvent();
-        return runTask(mExecutor,
-                new AccountManagerTask<Boolean>(handler, callback, new Callable<Boolean>() {
-                    @Override
-                    public Boolean call() throws Exception {
-                        // Removal always successful.
-                        return true;
-                    }
-                }));
+    /**
+     * Remove an AccountHolder directly.
+     *
+     * @param accountHolder the account holder to remove
+     * @param broadcastEvent whether to broadcast an AccountChangedEvent
+     * @return whether the account holder was removed successfully
+     */
+    public boolean removeAccountHolderExplicitly(AccountHolder accountHolder,
+            boolean broadcastEvent) {
+        boolean result = mAccounts.remove(accountHolder);
+        if (broadcastEvent) {
+            postAsyncAccountChangedEvent();
+        }
+        return result;
     }
 
     @Override

@@ -5,18 +5,22 @@
 #include "mandoline/services/core_services/core_services_application_delegate.h"
 
 #include "base/bind.h"
+#include "base/single_thread_task_runner.h"
 #include "components/clipboard/clipboard_application_delegate.h"
+#include "components/resource_provider/resource_provider_app.h"
 #include "components/surfaces/surfaces_service_application.h"
+#include "components/view_manager/native_viewport/native_viewport_application_delegate.h"
 #include "components/view_manager/view_manager_app.h"
 #include "mandoline/ui/browser/browser.h"
+#include "mojo/application/public/cpp/application_connection.h"
+#include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/common/message_pump_mojo.h"
+#include "mojo/services/network/network_service_delegate.h"
 #include "mojo/services/tracing/tracing_app.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/application_connection.h"
-#include "third_party/mojo/src/mojo/public/cpp/application/application_impl.h"
 #include "url/gurl.h"
 
 #if !defined(OS_ANDROID)
-#include "mojo/services/network/network_service_delegate.h"
+#include "mandoline/ui/omnibox/omnibox_impl.h"
 #endif
 
 namespace core_services {
@@ -30,14 +34,20 @@ class ApplicationThread;
 // SetThreadWasQuitProperly() in Run() is already used in the chrome codebase.
 // (By the time we building a base::Thread here, we already have a MessageLoop
 // on our thread, along with a lot of other bookkeeping objects, too. This is
-// why we don't call into ApplicationRunnerChromium; we already have an
-// AtExitManager et all at this point.)
+// why we don't call into ApplicationRunner; we already have an AtExitManager et
+// all at this point.)
 class ApplicationThread : public base::Thread {
  public:
-  ApplicationThread(const std::string& name,
-                    scoped_ptr<mojo::ApplicationDelegate> delegate,
-                    mojo::InterfaceRequest<mojo::Application> request)
+  ApplicationThread(
+      const base::WeakPtr<CoreServicesApplicationDelegate>
+          core_services_application,
+      const std::string& name,
+      scoped_ptr<mojo::ApplicationDelegate> delegate,
+      mojo::InterfaceRequest<mojo::Application> request)
       : base::Thread(name),
+        core_services_application_(core_services_application),
+        core_services_application_task_runner_(
+            base::MessageLoop::current()->task_runner()),
         delegate_(delegate.Pass()),
         request_(request.Pass()) {
   }
@@ -56,6 +66,12 @@ class ApplicationThread : public base::Thread {
     }
     delegate_.reset();
 
+    core_services_application_task_runner_->PostTask(
+        FROM_HERE,
+        base::Bind(&CoreServicesApplicationDelegate::ApplicationThreadDestroyed,
+                   core_services_application_,
+                   this));
+
     // TODO(erg): This is a hack.
     //
     // Right now, most of our services do not receive
@@ -69,6 +85,8 @@ class ApplicationThread : public base::Thread {
   }
 
   void RequestQuit() {
+    if (!IsRunning())
+      return;
     task_runner()->PostTask(
         FROM_HERE,
         base::Bind(&ApplicationThread::ShutdownCleanly,
@@ -82,6 +100,9 @@ class ApplicationThread : public base::Thread {
   }
 
  private:
+  base::WeakPtr<CoreServicesApplicationDelegate> core_services_application_;
+  scoped_refptr<base::SingleThreadTaskRunner>
+      core_services_application_task_runner_;
   scoped_ptr<mojo::ApplicationImpl> application_impl_;
   scoped_ptr<mojo::ApplicationDelegate> delegate_;
   mojo::InterfaceRequest<mojo::Application> request_;
@@ -89,10 +110,22 @@ class ApplicationThread : public base::Thread {
   DISALLOW_COPY_AND_ASSIGN(ApplicationThread);
 };
 
-CoreServicesApplicationDelegate::CoreServicesApplicationDelegate() {}
+CoreServicesApplicationDelegate::CoreServicesApplicationDelegate()
+    : weak_factory_(this) {
+}
 
 CoreServicesApplicationDelegate::~CoreServicesApplicationDelegate() {
   application_threads_.clear();
+}
+
+void CoreServicesApplicationDelegate::ApplicationThreadDestroyed(
+    ApplicationThread* thread) {
+  ScopedVector<ApplicationThread>::iterator iter =
+      std::find(application_threads_.begin(),
+                application_threads_.end(),
+                thread);
+  DCHECK(iter != application_threads_.end());
+  application_threads_.erase(iter);
 }
 
 bool CoreServicesApplicationDelegate::ConfigureIncomingConnection(
@@ -110,6 +143,7 @@ void CoreServicesApplicationDelegate::Quit() {
   // This will delete all threads. This also performs a blocking join, waiting
   // for the threads to end.
   application_threads_.clear();
+  weak_factory_.InvalidateWeakPtrs();
 }
 
 void CoreServicesApplicationDelegate::Create(
@@ -127,9 +161,17 @@ void CoreServicesApplicationDelegate::StartApplication(
   if (url == "mojo://clipboard/")
     delegate.reset(new clipboard::ClipboardApplicationDelegate);
 #if !defined(OS_ANDROID)
+  else if (url == "mojo://native_viewport_service/")
+    delegate.reset(new native_viewport::NativeViewportApplicationDelegate);
+#endif
   else if (url == "mojo://network_service/")
     delegate.reset(new NetworkServiceDelegate);
+#if !defined(OS_ANDROID)
+  else if (url == "mojo://omnibox/")
+    delegate.reset(new mandoline::OmniboxImpl);
 #endif
+  else if (url == "mojo://resource_provider/")
+    delegate.reset(new resource_provider::ResourceProviderApp);
   else if (url == "mojo://surfaces_service/")
     delegate.reset(new surfaces::SurfacesServiceApplication);
   else if (url == "mojo://tracing/")
@@ -146,6 +188,8 @@ void CoreServicesApplicationDelegate::StartApplication(
   // In the case of mojo:network_service, we must use an IO message loop.
   if (url == "mojo://network_service/") {
     thread_options.message_loop_type = base::MessageLoop::TYPE_IO;
+  } else if (url == "mojo://native_viewport_service/") {
+    thread_options.message_loop_type = base::MessageLoop::TYPE_UI;
   } else {
     // We must use a MessagePumpMojo to awake on mojo messages.
     thread_options.message_pump_factory =
@@ -153,7 +197,8 @@ void CoreServicesApplicationDelegate::StartApplication(
   }
 
   scoped_ptr<ApplicationThread> thread(
-      new ApplicationThread(url, delegate.Pass(), request.Pass()));
+      new ApplicationThread(weak_factory_.GetWeakPtr(), url, delegate.Pass(),
+      request.Pass()));
   thread->StartWithOptions(thread_options);
 
   application_threads_.push_back(thread.Pass());

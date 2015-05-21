@@ -20,6 +20,12 @@ if(WIN32)
     list(APPEND absolute_sources ${CMAKE_CURRENT_SOURCE_DIR}/${source})
   endforeach()
   set_property(TARGET clang APPEND PROPERTY SOURCES ${absolute_sources})
+
+  cr_add_test(blink_gc_plugin_test
+    python
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.py
+    ${CMAKE_BINARY_DIR}/bin/clang
+    )
 else()
   add_llvm_loadable_module("lib${LIBRARYNAME}" ${plugin_sources})
   add_dependencies("lib${LIBRARYNAME}" clang)
@@ -27,7 +33,8 @@ else()
   cr_install(TARGETS "lib${LIBRARYNAME}" LIBRARY DESTINATION lib)
 
   cr_add_test(blink_gc_plugin_test
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.sh
+    python
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test.py
     ${CMAKE_BINARY_DIR}/bin/clang
     $<TARGET_FILE:lib${LIBRARYNAME}>
     )

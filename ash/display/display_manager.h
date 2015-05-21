@@ -65,8 +65,8 @@ class ASH_EXPORT DisplayManager
     virtual void CreateOrUpdateMirroringDisplay(
         const DisplayInfoList& display_info_list) = 0;
 
-    // Closes the mirror window if exists.
-    virtual void CloseMirroringDisplay() = 0;
+    // Closes the mirror window if not necessary.
+    virtual void CloseMirroringDisplayIfNotNecessary() = 0;
 
     // Called before and after the display configuration changes.
     // When |clear_focus| is true, the implementation should
@@ -83,7 +83,7 @@ class ASH_EXPORT DisplayManager
   //    the 2nd display. (Software Mirroring).
   // 3) UNIFIED mode creates single desktop across multiple displays.
   enum MultiDisplayMode {
-    EXTENDED,
+    EXTENDED = 0,
     MIRRORING,
     UNIFIED,
   };
@@ -297,6 +297,11 @@ class ASH_EXPORT DisplayManager
     return default_multi_display_mode_;
   }
 
+  // Reconfigure display configuration using the same
+  // physical display. TODO(oshima): Refactor and move this
+  // impl to |SetDefaultMultiDisplayMode|.
+  void ReconfigureDisplays();
+
   // Update the bounds of the display given by |display_id|.
   bool UpdateDisplayBounds(int64 display_id,
                            const gfx::Rect& new_bounds);
@@ -343,7 +348,7 @@ private:
 
   // Creates software mirroring display related information. The display
   // used to mirror the content is removed from the |display_info_list|.
-  void CreateSoftwareMirroringDisplay(DisplayInfoList* display_info_list);
+  void CreateSoftwareMirroringDisplayInfo(DisplayInfoList* display_info_list);
 
   gfx::Display* FindDisplayForId(int64 id);
 

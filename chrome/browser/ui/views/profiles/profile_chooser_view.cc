@@ -491,7 +491,7 @@ void ProfileChooserView::ShowBubble(
   // It has to happen here to prevent the view system from creating an empty
   // container.
   if (view_mode == profiles::BUBBLE_VIEW_MODE_FAST_PROFILE_CHOOSER &&
-      profiles::HasProfileSwitchTargets(browser->profile())) {
+      !profiles::HasProfileSwitchTargets(browser->profile())) {
     return;
   }
 
@@ -515,6 +515,18 @@ void ProfileChooserView::ShowBubble(
 // static
 bool ProfileChooserView::IsShowing() {
   return profile_bubble_ != NULL;
+}
+
+// static
+ProfileChooserView::ShowingType ProfileChooserView::IsShowingInBrowser(
+    const Browser* browser) {
+  if (profile_bubble_ == nullptr)
+    return IS_NOT_SHOWING;
+
+  if (profile_bubble_->browser_ == browser || browser == nullptr)
+    return IS_SHOWING;
+
+  return IS_SHOWING_IN_ANOTHER_BROWSER;
 }
 
 // static
@@ -685,6 +697,15 @@ void ProfileChooserView::ShowView(profiles::BubbleViewMode view_to_display,
   // Clears tutorial mode for all non-profile-chooser views.
   if (view_mode_ != profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER)
     tutorial_mode_ = profiles::TUTORIAL_MODE_NONE;
+
+  if (view_mode_ == profiles::BUBBLE_VIEW_MODE_GAIA_SIGNIN ||
+      view_mode_ == profiles::BUBBLE_VIEW_MODE_GAIA_ADD_ACCOUNT ||
+      view_mode_ == profiles::BUBBLE_VIEW_MODE_GAIA_REAUTH ||
+      tutorial_mode_ == profiles::TUTORIAL_MODE_CONFIRM_SIGNIN) {
+    profile_bubble_->set_close_on_deactivate(false);
+  } else {
+    profile_bubble_->set_close_on_deactivate(close_on_deactivate_for_testing_);
+  }
 
   layout->StartRow(1, 0);
   layout->AddView(sub_view);
@@ -913,20 +934,7 @@ void ProfileChooserView::PopulateCompleteProfileChooserView(
           item.signed_in && profiles::IsLockAvailable(browser_->profile()));
       current_profile_view = CreateCurrentProfileView(item, false);
       if (IsProfileChooser(view_mode_)) {
-        switch (tutorial_mode_) {
-          case profiles::TUTORIAL_MODE_NONE:
-          case profiles::TUTORIAL_MODE_WELCOME_UPGRADE:
-            tutorial_view = CreateWelcomeUpgradeTutorialViewIfNeeded(
-                tutorial_mode_ == profiles::TUTORIAL_MODE_WELCOME_UPGRADE,
-                item);
-            break;
-          case profiles::TUTORIAL_MODE_CONFIRM_SIGNIN:
-            tutorial_view = CreateSigninConfirmationView();
-            break;
-          case profiles::TUTORIAL_MODE_SHOW_ERROR:
-            tutorial_view = CreateSigninErrorView();
-            break;
-        }
+        tutorial_view = CreateTutorialViewIfNeeded(item);
       } else {
         current_profile_accounts = CreateCurrentProfileAccountsView(item);
       }
@@ -967,13 +975,6 @@ void ProfileChooserView::PopulateCompleteProfileChooserView(
     layout->AddView(CreateSupervisedUserDisclaimerView());
   }
 
-  if (IsProfileChooser(view_mode_)) {
-    layout->StartRow(1, 0);
-    if (switches::IsFastUserSwitching()) {
-      layout->AddView(CreateOtherProfilesView(other_profiles));
-    }
-  }
-
   layout->StartRow(0, 0);
   layout->AddView(new views::Separator(views::Separator::HORIZONTAL));
 
@@ -1003,10 +1004,15 @@ views::View* ProfileChooserView::CreateProfileChooserView(
   views::View* view = new views::View();
   views::GridLayout* layout = CreateSingleColumnLayout(view, kFixedMenuWidth);
 
-  if (view_mode_ == profiles::BUBBLE_VIEW_MODE_FAST_PROFILE_CHOOSER)
+  if (view_mode_ == profiles::BUBBLE_VIEW_MODE_FAST_PROFILE_CHOOSER) {
     PopulateMinimalProfileChooserView(layout, avatar_menu);
-  else
+    // The user is using right-click switching, no need to tell them about it.
+    PrefService* local_state = g_browser_process->local_state();
+    local_state->SetBoolean(
+        prefs::kProfileAvatarRightClickTutorialDismissed, true);
+  } else {
     PopulateCompleteProfileChooserView(layout, avatar_menu);
+  }
 
   return view;
 }
@@ -1019,8 +1025,41 @@ void ProfileChooserView::DismissTutorial() {
         signin_ui_util::kUpgradeWelcomeTutorialShowMax + 1);
   }
 
+  if (tutorial_mode_ == profiles::TUTORIAL_MODE_RIGHT_CLICK_SWITCHING) {
+    PrefService* local_state = g_browser_process->local_state();
+    local_state->SetBoolean(
+        prefs::kProfileAvatarRightClickTutorialDismissed, true);
+  }
+
   tutorial_mode_ = profiles::TUTORIAL_MODE_NONE;
   ShowView(profiles::BUBBLE_VIEW_MODE_PROFILE_CHOOSER, avatar_menu_.get());
+}
+
+views::View* ProfileChooserView::CreateTutorialViewIfNeeded(
+    const AvatarMenu::Item& item) {
+  if (tutorial_mode_ == profiles::TUTORIAL_MODE_CONFIRM_SIGNIN)
+    return CreateSigninConfirmationView();
+
+  if (tutorial_mode_ == profiles::TUTORIAL_MODE_SHOW_ERROR)
+    return CreateSigninErrorView();
+
+  if (profiles::ShouldShowWelcomeUpgradeTutorial(
+      browser_->profile(), tutorial_mode_)) {
+    if (tutorial_mode_ != profiles::TUTORIAL_MODE_WELCOME_UPGRADE) {
+      Profile* profile = browser_->profile();
+      const int show_count = profile->GetPrefs()->GetInteger(
+          prefs::kProfileAvatarTutorialShown);
+      profile->GetPrefs()->SetInteger(
+          prefs::kProfileAvatarTutorialShown, show_count + 1);
+    }
+
+    return CreateWelcomeUpgradeTutorialView(item);
+  }
+
+  if (profiles::ShouldShowRightClickTutorial(browser_->profile()))
+    return CreateRightClickTutorialView();
+
+  return nullptr;
 }
 
 views::View* ProfileChooserView::CreateTutorialView(
@@ -1572,22 +1611,8 @@ views::View* ProfileChooserView::CreateAccountRemovalView() {
       kFixedAccountRemovalViewWidth);
 }
 
-views::View* ProfileChooserView::CreateWelcomeUpgradeTutorialViewIfNeeded(
-    bool tutorial_shown, const AvatarMenu::Item& avatar_item) {
-  Profile* profile = browser_->profile();
-
-  const int show_count = profile->GetPrefs()->GetInteger(
-      prefs::kProfileAvatarTutorialShown);
-  // Do not show the tutorial if user has dismissed it.
-  if (show_count > signin_ui_util::kUpgradeWelcomeTutorialShowMax)
-    return NULL;
-
-  if (!tutorial_shown) {
-    if (show_count == signin_ui_util::kUpgradeWelcomeTutorialShowMax)
-      return NULL;
-    profile->GetPrefs()->SetInteger(
-        prefs::kProfileAvatarTutorialShown, show_count + 1);
-  }
+views::View* ProfileChooserView::CreateWelcomeUpgradeTutorialView(
+    const AvatarMenu::Item& avatar_item) {
   ProfileMetrics::LogProfileNewAvatarMenuUpgrade(
       ProfileMetrics::PROFILE_AVATAR_MENU_UPGRADE_VIEW);
 
@@ -1641,6 +1666,19 @@ views::View* ProfileChooserView::CreateSigninErrorView() {
       &tutorial_learn_more_link_,
       NULL,
       &tutorial_close_button_);
+}
+
+views::View* ProfileChooserView::CreateRightClickTutorialView() {
+    return CreateTutorialView(
+      profiles::TUTORIAL_MODE_RIGHT_CLICK_SWITCHING,
+      l10n_util::GetStringUTF16(IDS_PROFILES_RIGHT_CLICK_TUTORIAL_TITLE),
+      l10n_util::GetStringUTF16(IDS_PROFILES_RIGHT_CLICK_TUTORIAL_CONTENT_TEXT),
+      base::string16(),
+      l10n_util::GetStringUTF16(IDS_PROFILES_TUTORIAL_OK_BUTTON),
+      false,
+      nullptr,
+      &tutorial_sync_settings_ok_button_,
+      nullptr);
 }
 
 views::View* ProfileChooserView::CreateSwitchUserView() {

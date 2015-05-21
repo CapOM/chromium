@@ -14,7 +14,7 @@ function LauncherSearch() {
 
   /**
    * Active query id. This value is set null when there is no active query.
-   * @private {?string}
+   * @private {?number}
    */
   this.queryId_ = null;
 
@@ -25,12 +25,12 @@ function LauncherSearch() {
   this.enabled_ = false;
 
   /**
-   * @private {function(string, string, number)}
+   * @private {function(number, string, number)}
    */
   this.onQueryStartedBound_ = this.onQueryStarted_.bind(this);
 
   /**
-   * @private {function(string)}
+   * @private {function(number)}
    */
   this.onQueryEndedBound_ = this.onQueryEnded_.bind(this);
 
@@ -98,7 +98,7 @@ LauncherSearch.prototype.initializeEventListeners_ = function(isDriveEnabled) {
 
 /**
  * Handles onQueryStarted event.
- * @param {string} queryId
+ * @param {number} queryId
  * @param {string} query
  * @param {number} limit
  */
@@ -118,11 +118,18 @@ LauncherSearch.prototype.onQueryStarted_ = function(queryId, query, limit) {
         chrome.launcherSearchProvider.setSearchResults(
             queryId,
             results.map(function(result) {
-              // TODO(yawano): Set custome icon to a result when the API becomes
-              //     to support it.
+              // Use high-dpi icons since preferred icon size is 24px in the
+              // current implementation.
+              //
+              // TODO(yawano): Use filetype_folder_shared.png for a shared
+              //     folder.
+              var iconUrl = chrome.runtime.getURL(
+                  'foreground/images/filetype/2x/filetype_' +
+                  FileType.getIcon(result.entry) + '.png');
               return {
                 itemId: result.entry.toURL(),
                 title: result.entry.name,
+                iconUrl: iconUrl,
                 // Relevance is set as 2 for all results as a temporary
                 // implementation. 2 is the middle value.
                 // TODO(yawano): Implement practical relevance calculation.
@@ -134,7 +141,7 @@ LauncherSearch.prototype.onQueryStarted_ = function(queryId, query, limit) {
 
 /**
  * Handles onQueryEnded event.
- * @param {string} queryId
+ * @param {number} queryId
  */
 LauncherSearch.prototype.onQueryEnded_ = function(queryId) {
   this.queryId_ = null;

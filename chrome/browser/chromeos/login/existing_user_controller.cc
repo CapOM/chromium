@@ -44,6 +44,7 @@
 #include "chrome/browser/chromeos/profiles/profile_helper.h"
 #include "chrome/browser/chromeos/settings/cros_settings.h"
 #include "chrome/browser/chromeos/system/device_disabling_manager.h"
+#include "chrome/browser/signin/chrome_signin_client.h"
 #include "chrome/browser/signin/easy_unlock_service.h"
 #include "chrome/browser/ui/aura/accessibility/automation_manager_aura.h"
 #include "chrome/browser/ui/webui/chromeos/login/l10n_util.h"
@@ -1119,7 +1120,20 @@ void ExistingUserController::ContinueLoginIfDeviceNotDisabled(
   continuation.Run();
 }
 
-void ExistingUserController::DoCompleteLogin(const UserContext& user_context) {
+void ExistingUserController::DoCompleteLogin(
+    const UserContext& user_context_wo_device_id) {
+  UserContext user_context = user_context_wo_device_id;
+  std::string device_id =
+      user_manager::UserManager::Get()->GetKnownUserDeviceId(
+          user_context.GetUserID());
+  if (device_id.empty()) {
+    bool is_ephemeral =
+        ChromeUserManager::Get()->AreEphemeralUsersEnabled() &&
+        user_context.GetUserID() != ChromeUserManager::Get()->GetOwnerEmail();
+    device_id = ChromeSigninClient::GenerateSigninScopedDeviceID(is_ephemeral);
+  }
+  user_context.SetDeviceId(device_id);
+
   PerformPreLoginActions(user_context);
 
   if (!time_init_.is_null()) {
@@ -1236,28 +1250,8 @@ void ExistingUserController::OnOAuth2TokensFetched(
     OnAuthFailure(AuthFailure(AuthFailure::FAILED_TO_INITIALIZE_TOKEN));
     return;
   }
-  if (StartupUtils::IsWebviewSigninEnabled()) {
-    if (!token_handle_util_.get()) {
-      token_handle_util_.reset(
-          new TokenHandleUtil(user_manager::UserManager::Get()));
-    }
-    if (token_handle_util_->ShouldObtainHandle(user_context.GetUserID())) {
-      token_handle_util_->GetTokenHandle(
-          user_context.GetUserID(), user_context.GetAccessToken(),
-          base::Bind(&ExistingUserController::OnTokenHandleObtained,
-                     weak_factory_.GetWeakPtr()));
-    }
-  }
+  UserSessionManager::GetInstance()->OnOAuth2TokensFetched(user_context);
   PerformLogin(user_context, LoginPerformer::AUTH_MODE_EXTENSION);
-}
-
-void ExistingUserController::OnTokenHandleObtained(
-    const user_manager::UserID& id,
-    TokenHandleUtil::TokenHandleStatus status) {
-  if (status != TokenHandleUtil::VALID) {
-    LOG(ERROR) << "OAuth2 token handle fetch failed.";
-    return;
-  }
 }
 
 }  // namespace chromeos

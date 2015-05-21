@@ -5,7 +5,9 @@
 {
   'variables': {
     'chromium_code': 1,
-
+    # Defines an extra set of libs with an alternate copy of org.apache.http.
+    # TODO(yfriedman): Remove this when crbug.com/488192 is fixed.
+    'net_test_extra_libs': [],
     'linux_link_kerberos%': 0,
     'conditions': [
       ['chromeos==1 or embedded==1 or OS=="android" or OS=="ios"', {
@@ -319,6 +321,7 @@
               'proxy/load_state_change_coalescer_unittest.cc',
               'proxy/mojo_proxy_resolver_factory_impl_unittest.cc',
               'proxy/mojo_proxy_resolver_impl_unittest.cc',
+              'proxy/proxy_resolver_error_observer_mojo_unittest.cc',
               'proxy/proxy_resolver_mojo_unittest.cc',
               'proxy/proxy_service_mojo_unittest.cc',
             ],
@@ -448,11 +451,14 @@
         '../testing/gtest.gyp:gtest',
         '../url/url.gyp:url_lib',
         'net',
+        'net_extras',
         'net_test_support',
       ],
       'sources': [
+        'base/mime_sniffer_perftest.cc',
         'cookies/cookie_monster_perftest.cc',
         'disk_cache/blockfile/disk_cache_perftest.cc',
+        'extras/sqlite/sqlite_persistent_cookie_store_perftest.cc',
         'proxy/proxy_resolver_perftest.cc',
         'udp/udp_socket_perftest.cc',
         'websockets/websocket_frame_perftest.cc',
@@ -923,6 +929,8 @@
             'proxy/mojo_proxy_resolver_factory_impl.h',
             'proxy/mojo_proxy_resolver_impl.cc',
             'proxy/mojo_proxy_resolver_impl.h',
+            'proxy/proxy_resolver_error_observer_mojo.cc',
+            'proxy/proxy_resolver_error_observer_mojo.h',
           ],
           'dependencies': [
             'mojo_type_converters',
@@ -1400,7 +1408,8 @@
           },
           'dependencies': [
             'url_request_failed_job_java',
-            '../base/base.gyp:base_java'
+            '../base/base.gyp:base_java',
+            '<@(net_test_extra_libs)',
           ],
           'includes': [ '../build/java.gypi' ],
         },

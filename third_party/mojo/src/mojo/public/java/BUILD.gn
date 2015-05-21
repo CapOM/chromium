@@ -36,6 +36,7 @@ android_library("bindings") {
     "bindings/src/org/chromium/mojo/bindings/Encoder.java",
     "bindings/src/org/chromium/mojo/bindings/ExecutorFactory.java",
     "bindings/src/org/chromium/mojo/bindings/HandleOwner.java",
+    "bindings/src/org/chromium/mojo/bindings/InterfaceControlMessagesHelper.java",
     "bindings/src/org/chromium/mojo/bindings/Interface.java",
     "bindings/src/org/chromium/mojo/bindings/InterfaceRequest.java",
     "bindings/src/org/chromium/mojo/bindings/MessageHeader.java",
@@ -53,20 +54,6 @@ android_library("bindings") {
   deps = [
     ":system",
   ]
-}
 
-android_library("application") {
-  java_files = [
-    "application/src/org/chromium/mojo/application/ApplicationConnection.java",
-    "application/src/org/chromium/mojo/application/ApplicationDelegate.java",
-    "application/src/org/chromium/mojo/application/ApplicationImpl.java",
-    "application/src/org/chromium/mojo/application/ApplicationRunner.java",
-    "application/src/org/chromium/mojo/application/ServiceFactoryBinder.java",
-    "application/src/org/chromium/mojo/application/ShellHelper.java",
-  ]
-  deps = [
-    ":bindings",
-    ":system",
-    "../interfaces/application:application_java",
-  ]
+  srcjar_deps = [ "../interfaces/bindings:bindings_java_sources" ]
 }

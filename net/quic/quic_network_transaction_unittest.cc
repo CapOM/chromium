@@ -63,6 +63,8 @@ static const char kQuicAlternateProtocolDifferentPortHttpHeader[] =
 static const char kQuicAlternateProtocolHttpsHeader[] =
     "Alternate-Protocol: 443:quic\r\n\r\n";
 
+const char kDefaultServerHostName[] = "www.google.com";
+
 }  // namespace
 
 // Helper class to encapsulate MockReads and MockWrites for QUIC.
@@ -134,7 +136,7 @@ class QuicNetworkTransactionTest
  protected:
   QuicNetworkTransactionTest()
       : clock_(new MockClock),
-        maker_(GetParam(), 0, clock_),
+        maker_(GetParam(), 0, clock_, kDefaultServerHostName),
         ssl_config_service_(new SSLConfigServiceDefaults),
         proxy_service_(ProxyService::CreateDirect()),
         auth_handler_factory_(
@@ -142,7 +144,9 @@ class QuicNetworkTransactionTest
         random_generator_(0),
         hanging_data_(nullptr, 0, nullptr, 0) {
     request_.method = "GET";
-    request_.url = GURL("http://www.google.com/");
+    std::string url("http://");
+    url.append(kDefaultServerHostName);
+    request_.url = GURL(url);
     request_.load_flags = 0;
     clock_->AdvanceTime(QuicTime::Delta::FromMilliseconds(20));
   }
@@ -238,7 +242,7 @@ class QuicNetworkTransactionTest
     params_.proxy_service = proxy_service_.get();
     params_.ssl_config_service = ssl_config_service_.get();
     params_.http_auth_handler_factory = auth_handler_factory_.get();
-    params_.http_server_properties = http_server_properties.GetWeakPtr();
+    params_.http_server_properties = http_server_properties_.GetWeakPtr();
     params_.quic_supported_versions = SupportedVersions(GetParam());
 
     if (use_next_protos) {
@@ -279,14 +283,14 @@ class QuicNetworkTransactionTest
               response->connection_info);
   }
 
-  void CheckResponseData(HttpNetworkTransaction* trans,
+  void CheckResponseData(const scoped_ptr<HttpNetworkTransaction>& trans,
                          const std::string& expected) {
     std::string response_data;
-    ASSERT_EQ(OK, ReadTransaction(trans, &response_data));
+    ASSERT_EQ(OK, ReadTransaction(trans.get(), &response_data));
     EXPECT_EQ(expected, response_data);
   }
 
-  void RunTransaction(HttpNetworkTransaction* trans) {
+  void RunTransaction(const scoped_ptr<HttpNetworkTransaction>& trans) {
     TestCompletionCallback callback;
     int rv = trans->Start(&request_, callback.callback(), net_log_.bound());
     EXPECT_EQ(ERR_IO_PENDING, rv);
@@ -296,9 +300,9 @@ class QuicNetworkTransactionTest
   void SendRequestAndExpectHttpResponse(const std::string& expected) {
     scoped_ptr<HttpNetworkTransaction> trans(
         new HttpNetworkTransaction(DEFAULT_PRIORITY, session_.get()));
-    RunTransaction(trans.get());
+    RunTransaction(trans);
     CheckWasHttpResponse(trans);
-    CheckResponseData(trans.get(), expected);
+    CheckResponseData(trans, expected);
   }
 
   void SendRequestAndExpectQuicResponse(const std::string& expected) {
@@ -321,22 +325,22 @@ class QuicNetworkTransactionTest
     crypto_client_stream_factory_.set_handshake_mode(handshake_mode);
     HostPortPair host_port_pair = HostPortPair::FromURL(request_.url);
     AlternativeService alternative_service(QUIC, host_port_pair.host(), 80);
-    session_->http_server_properties()->SetAlternativeService(
-        host_port_pair, alternative_service, 1.0);
+    http_server_properties_.SetAlternativeService(host_port_pair,
+                                                  alternative_service, 1.0);
   }
 
   void ExpectBrokenAlternateProtocolMapping() {
     const HostPortPair origin = HostPortPair::FromURL(request_.url);
     const AlternativeService alternative_service =
-        session_->http_server_properties()->GetAlternativeService(origin);
+        http_server_properties_.GetAlternativeService(origin);
     EXPECT_NE(UNINITIALIZED_ALTERNATE_PROTOCOL, alternative_service.protocol);
-    EXPECT_TRUE(session_->http_server_properties()->IsAlternativeServiceBroken(
+    EXPECT_TRUE(http_server_properties_.IsAlternativeServiceBroken(
         alternative_service));
   }
 
   void ExpectQuicAlternateProtocolMapping() {
     const AlternativeService alternative_service =
-        session_->http_server_properties()->GetAlternativeService(
+        http_server_properties_.GetAlternativeService(
             HostPortPair::FromURL(request_.url));
     EXPECT_EQ(QUIC, alternative_service.protocol);
   }
@@ -359,7 +363,7 @@ class QuicNetworkTransactionTest
   scoped_ptr<ProxyService> proxy_service_;
   scoped_ptr<HttpAuthHandlerFactory> auth_handler_factory_;
   MockRandom random_generator_;
-  HttpServerPropertiesImpl http_server_properties;
+  HttpServerPropertiesImpl http_server_properties_;
   HttpNetworkSession::Params params_;
   HttpRequestInfo request_;
   BoundTestNetLog net_log_;
@@ -376,10 +380,10 @@ class QuicNetworkTransactionTest
     trans->SetBeforeProxyHeadersSentCallback(
         base::Bind(&ProxyHeadersHandler::OnBeforeProxyHeadersSent,
                    base::Unretained(&proxy_headers_handler)));
-    RunTransaction(trans.get());
+    RunTransaction(trans);
     CheckWasQuicResponse(trans);
     CheckResponsePort(trans, port);
-    CheckResponseData(trans.get(), expected);
+    CheckResponseData(trans, expected);
     EXPECT_EQ(used_proxy, proxy_headers_handler.was_called());
   }
 };
@@ -619,18 +623,16 @@ TEST_P(QuicNetworkTransactionTest, ConfirmAlternativeService) {
 
   AlternativeService alternative_service(QUIC,
                                          HostPortPair::FromURL(request_.url));
-  session_->http_server_properties()->MarkAlternativeServiceRecentlyBroken(
+  http_server_properties_.MarkAlternativeServiceRecentlyBroken(
       alternative_service);
-  EXPECT_TRUE(
-      session_->http_server_properties()->WasAlternativeServiceRecentlyBroken(
-          alternative_service));
+  EXPECT_TRUE(http_server_properties_.WasAlternativeServiceRecentlyBroken(
+      alternative_service));
 
   SendRequestAndExpectHttpResponse("hello world");
   SendRequestAndExpectQuicResponse("hello!");
 
-  EXPECT_FALSE(
-      session_->http_server_properties()->WasAlternativeServiceRecentlyBroken(
-          alternative_service));
+  EXPECT_FALSE(http_server_properties_.WasAlternativeServiceRecentlyBroken(
+      alternative_service));
 }
 
 TEST_P(QuicNetworkTransactionTest, UseAlternateProtocolProbabilityForQuic) {
@@ -821,18 +823,18 @@ TEST_P(QuicNetworkTransactionTest, HungAlternateProtocol) {
   // Run the first request.
   http_data.StopAfter(arraysize(http_reads) + arraysize(http_writes));
   SendRequestAndExpectHttpResponse("hello world");
-  ASSERT_TRUE(http_data.at_read_eof());
-  ASSERT_TRUE(http_data.at_write_eof());
+  ASSERT_TRUE(http_data.AllReadDataConsumed());
+  ASSERT_TRUE(http_data.AllWriteDataConsumed());
 
   // Now run the second request in which the QUIC socket hangs,
   // and verify the the transaction continues over HTTP.
   http_data2.StopAfter(arraysize(http_reads) + arraysize(http_writes));
   SendRequestAndExpectHttpResponse("hello world");
 
-  ASSERT_TRUE(http_data2.at_read_eof());
-  ASSERT_TRUE(http_data2.at_write_eof());
-  ASSERT_TRUE(!quic_data.at_read_eof());
-  ASSERT_TRUE(!quic_data.at_write_eof());
+  ASSERT_TRUE(http_data2.AllReadDataConsumed());
+  ASSERT_TRUE(http_data2.AllWriteDataConsumed());
+  ASSERT_TRUE(!quic_data.AllReadDataConsumed());
+  ASSERT_TRUE(!quic_data.AllWriteDataConsumed());
 }
 
 TEST_P(QuicNetworkTransactionTest, ZeroRTTWithHttpRace) {
@@ -1102,8 +1104,8 @@ TEST_P(QuicNetworkTransactionTest, FailedZeroRttBrokenAlternateProtocol) {
 
   ExpectBrokenAlternateProtocolMapping();
 
-  EXPECT_TRUE(quic_data.at_read_eof());
-  EXPECT_TRUE(quic_data.at_write_eof());
+  EXPECT_TRUE(quic_data.AllReadDataConsumed());
+  EXPECT_TRUE(quic_data.AllWriteDataConsumed());
 }
 
 TEST_P(QuicNetworkTransactionTest, DISABLED_HangingZeroRttFallback) {
@@ -1205,6 +1207,7 @@ TEST_P(QuicNetworkTransactionTest, ConnectionCloseDuringConnect) {
 // the appropriate error code.  Note that this never happens in production,
 // because the handshake (which this test mocks) would fail in this scenario.
 TEST_P(QuicNetworkTransactionTest, SecureResourceOverInsecureQuic) {
+  maker_.set_hostname("www.example.org");
   MockQuicData mock_quic_data;
   mock_quic_data.AddWrite(
       ConstructRequestHeadersPacket(1, kClientDataStreamId1, true, true,
@@ -1217,7 +1220,7 @@ TEST_P(QuicNetworkTransactionTest, SecureResourceOverInsecureQuic) {
   mock_quic_data.AddRead(SYNCHRONOUS, 0);
   mock_quic_data.AddSocketDataToFactory(&socket_factory_);
 
-  request_.url = GURL("https://www.google.com:443");
+  request_.url = GURL("https://www.example.org:443");
   AddHangingNonAlternateProtocolSocketData();
   CreateSessionWithNextProtos();
   AddQuicAlternateProtocolMapping(MockCryptoClientStream::CONFIRM_HANDSHAKE);
@@ -1230,6 +1233,7 @@ TEST_P(QuicNetworkTransactionTest, SecureResourceOverInsecureQuic) {
 }
 
 TEST_P(QuicNetworkTransactionTest, SecureResourceOverSecureQuic) {
+  maker_.set_hostname("www.example.org");
   MockQuicData mock_quic_data;
   mock_quic_data.AddWrite(
       ConstructRequestHeadersPacket(1, kClientDataStreamId1, true, true,
@@ -1245,11 +1249,14 @@ TEST_P(QuicNetworkTransactionTest, SecureResourceOverSecureQuic) {
   scoped_refptr<X509Certificate> cert(
       ImportCertFromFile(GetTestCertsDirectory(), "spdy_pooling.pem"));
   ASSERT_TRUE(cert.get());
+  bool common_name_fallback_used;
+  EXPECT_TRUE(
+      cert->VerifyNameMatch("www.example.org", &common_name_fallback_used));
   ProofVerifyDetailsChromium verify_details;
   verify_details.cert_verify_result.verified_cert = cert;
-  crypto_client_stream_factory_.set_proof_verify_details(&verify_details);
+  crypto_client_stream_factory_.AddProofVerifyDetails(&verify_details);
 
-  request_.url = GURL("https://www.google.com:443");
+  request_.url = GURL("https://www.example.org:443");
   AddHangingNonAlternateProtocolSocketData();
   CreateSessionWithNextProtos();
   AddQuicAlternateProtocolMapping(MockCryptoClientStream::CONFIRM_HANDSHAKE);
