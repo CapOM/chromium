@@ -148,12 +148,11 @@ final class BluetoothAdapter {
             return false;
         }
 
-        if (mNumDiscoverySessions > 0) {
-            Log.d(TAG, "addDiscoverySession: Already scanning.");
+        mNumDiscoverySessions++;
+        Log.d(TAG, "addDiscoverySession: Now %d sessions", mNumDiscoverySessions);
+        if (mNumDiscoverySessions > 1) {
             return true;
         }
-        Log.d(TAG, "addDiscoverySession: Now %d sessions", mNumDiscoverySessions);
-        mNumDiscoverySessions++;
 
         // ScanSettings Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some devices)
         // if setReportDelay() is used or if SCAN_MODE_LOW_LATENCY isn't used.
