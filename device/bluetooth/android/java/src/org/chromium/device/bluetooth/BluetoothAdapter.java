@@ -5,6 +5,7 @@
 package org.chromium.device.bluetooth;
 
 import android.Manifest;
+import android.annotation.TargetApi;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
@@ -24,6 +25,7 @@ import java.util.List;
  * device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
+@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
