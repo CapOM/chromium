@@ -69,7 +69,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
       const CreateAdvertisementCallback& callback,
       const CreateAdvertisementErrorCallback& error_callback) override;
 
-  // Handles a scan error event.
+  // Handles a scan error event by invalidating all discovery sessions.
   void OnScanFailed(JNIEnv* env, jobject obj);
 
  protected:
