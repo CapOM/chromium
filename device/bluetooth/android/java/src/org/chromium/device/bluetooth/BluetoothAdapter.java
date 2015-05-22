@@ -32,7 +32,7 @@ final class BluetoothAdapter {
     private final long mNativeCPPObject;
     private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
-    private int mNumDiscoverySessions = 0;
+    private int mNumDiscoverySessions;
     private ScanCallback mLeScanCallback;
 
     // ---------------------------------------------------------------------------------------------
@@ -65,7 +65,9 @@ final class BluetoothAdapter {
                 && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
                         == PackageManager.PERMISSION_GRANTED;
         final boolean hasLowEnergyFeature =
-                context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE);
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
+                && context.getPackageManager().hasSystemFeature(
+                           PackageManager.FEATURE_BLUETOOTH_LE);
         mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
         if (!mHasBluetoothCapability) {
             if (!hasMinAPI) {
