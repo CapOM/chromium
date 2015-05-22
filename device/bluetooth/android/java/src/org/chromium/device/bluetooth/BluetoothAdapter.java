@@ -86,16 +86,15 @@ final class BluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Accessors @CalledByNative for BluetoothAdapterAndroid:
+    // BluetoothAdapterAndroid methods implemented in java:
 
+    // Implements BluetoothAdapterAndroid::HasBluetoothCapability.
     @CalledByNative
     private boolean hasBluetoothCapability() {
         return mHasBluetoothCapability;
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // BluetoothAdapterAndroid interface @CalledByNative for BluetoothAdapterAndroid:
-
+    // Implements BluetoothAdapterAndroid::GetAddress.
     @CalledByNative
     private String getAddress() {
         if (isPresent()) {
@@ -105,6 +104,7 @@ final class BluetoothAdapter {
         }
     }
 
+    // Implements BluetoothAdapterAndroid::GetName.
     @CalledByNative
     private String getName() {
         if (isPresent()) {
@@ -114,16 +114,19 @@ final class BluetoothAdapter {
         }
     }
 
+    // Implements BluetoothAdapterAndroid::IsPresent.
     @CalledByNative
     private boolean isPresent() {
         return mAdapter != null;
     }
 
+    // Implements BluetoothAdapterAndroid::IsPowered.
     @CalledByNative
     private boolean isPowered() {
         return isPresent() && mAdapter.isEnabled();
     }
 
+    // Implements BluetoothAdapterAndroid::IsDiscoverable.
     @CalledByNative
     private boolean isDiscoverable() {
         return isPresent()
@@ -131,11 +134,13 @@ final class BluetoothAdapter {
                 == android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE;
     }
 
+    // Implements BluetoothAdapterAndroid::IsDiscovering.
     @CalledByNative
     private boolean isDiscovering() {
         return isPresent() && mAdapter.isDiscovering();
     }
 
+    // Implements BluetoothAdapterAndroid::AddDiscoverySession.
     @CalledByNative
     private boolean addDiscoverySession() {
         if (!isPowered()) {
@@ -147,33 +152,40 @@ final class BluetoothAdapter {
             Log.d(TAG, "addDiscoverySession: Already scanning.");
             return true;
         }
-        Log.d(TAG, "addDiscoverySession");
+        Log.d(TAG, "addDiscoverySession: Now %d sessions", mNumDiscoverySessions);
         mNumDiscoverySessions++;
 
-        ScanSettings.Builder scanSettingsBuilder = new ScanSettings.Builder();
-        // Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some
-        // devices) if scanSettingsBuilder.setReportDelay() is set or if
-        // SCAN_MODE_LOW_LATENCY isn't used.
-        scanSettingsBuilder.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY);
+        // ScanSettings Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some devices)
+        // if setReportDelay() is used or if SCAN_MODE_LOW_LATENCY isn't used.
+        ScanSettings scanSettings =
+                new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
 
-        if (mLeScanCallback == null) mLeScanCallback = new DiscoveryScanCallback();
+        if (mLeScanCallback == null) {
+            mLeScanCallback = new DiscoveryScanCallback();
+        }
         mAdapter.getBluetoothLeScanner().startScan(
-                null /* filters */, scanSettingsBuilder.build(), mLeScanCallback);
+                null /* filters */, scanSettings, mLeScanCallback);
         return true;
     }
 
+    // Implements BluetoothAdapterAndroid::RemoveDiscoverySession.
     @CalledByNative
     private boolean removeDiscoverySession() {
-        Log.d(TAG, "removeDiscoverySession");
-        switch (--mNumDiscoverySessions) {
-            case -1:
-                assert false;
-                Log.w(TAG, "removeDiscoverySession: No scan in progress.");
-                mNumDiscoverySessions = 0;
-                return false;
-            case 0:
-                mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        if (mNumDiscoverySessions == 0) {
+            assert false;
+            Log.w(TAG, "removeDiscoverySession: No scan in progress.");
+            return false;
         }
+
+        --mNumDiscoverySessions;
+
+        if (mNumDiscoverySessions == 0) {
+            Log.d(TAG, "removeDiscoverySession: Stopping scan.");
+            mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        } else {
+            Log.d(TAG, "removeDiscoverySession: Now %d sessions", mNumDiscoverySessions);
+        }
+
         return true;
     }
 
