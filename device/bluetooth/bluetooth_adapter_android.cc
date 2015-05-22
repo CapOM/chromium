@@ -28,7 +28,8 @@ base::WeakPtr<BluetoothAdapterAndroid>
 BluetoothAdapterAndroid::CreateAdapter() {
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
   adapter->j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
-      AttachCurrentThread(), base::android::GetApplicationContext()));
+      AttachCurrentThread(), base::android::GetApplicationContext(),
+      reinterpret_cast<jlong>(adapter)));
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
@@ -37,7 +38,8 @@ BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting() {
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
   adapter->j_bluetooth_adapter_.Reset(
       Java_BluetoothAdapter_createWithoutPermissionForTesting(
-          AttachCurrentThread(), base::android::GetApplicationContext()));
+          AttachCurrentThread(), base::android::GetApplicationContext(),
+          reinterpret_cast<jlong>(adapter)));
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
@@ -134,6 +136,10 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
     const CreateAdvertisementCallback& callback,
     const CreateAdvertisementErrorCallback& error_callback) {
   error_callback.Run(BluetoothAdvertisement::ERROR_UNSUPPORTED_PLATFORM);
+}
+
+void BluetoothAdapterAndroid::OnScanFailed(JNIEnv* env, jobject obj) {
+  MarkDiscoverySessionsAsInactive();
 }
 
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {

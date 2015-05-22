@@ -29,6 +29,7 @@ import java.util.List;
 final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
+    private final long mNativeCPPObject;
     private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
     private int mNumDiscoverySessions = 0;
@@ -38,23 +39,25 @@ final class BluetoothAdapter {
     // Construction:
 
     @CalledByNative
-    private static BluetoothAdapter create(Context context) {
-        return new BluetoothAdapter(context);
+    private static BluetoothAdapter create(Context context, long nativeCPPObject) {
+        return new BluetoothAdapter(context, nativeCPPObject);
     }
 
     @CalledByNative
-    private static BluetoothAdapter createWithoutPermissionForTesting(Context context) {
+    private static BluetoothAdapter createWithoutPermissionForTesting(
+            Context context, long nativeCPPObject) {
         Context contextWithoutPermission = new ContextWrapper(context) {
             @Override
             public int checkCallingOrSelfPermission(String permission) {
                 return PackageManager.PERMISSION_DENIED;
             }
         };
-        return new BluetoothAdapter(contextWithoutPermission);
+        return new BluetoothAdapter(contextWithoutPermission, nativeCPPObject);
     }
 
     // Constructs a BluetoothAdapter.
-    private BluetoothAdapter(Context context) {
+    private BluetoothAdapter(Context context, long nativeCPPObject) {
+        mNativeCPPObject = nativeCPPObject;
         final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
         final boolean hasPermissions =
                 context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
@@ -84,6 +87,12 @@ final class BluetoothAdapter {
             Log.i(TAG, "BluetoothAdapter successfully constructed.");
         }
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterAndroid C++ methods declared for access from java:
+
+    // Binds to BluetoothAdapterAndroid::OnScanFailed.
+    private native void nativeOnScanFailed(long nativeBluetoothAdapterAndroid);
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
@@ -207,17 +216,15 @@ final class BluetoothAdapter {
         public void onScanFailed(int errorCode) {
             Log.w(TAG, "onScanFailed: %d", errorCode);
             // DISCUSS IN CODE REVIEW.
-            // 
-This should: 
             //
             // TODO(scheib): Current device/bluetooth API doesn't support a way to communicate
             // this asynchronous failure. If there was a way to communicate asynchronous
             // success, then the response to AddDiscoverySession would be delayed until then or
             // this error. But without only the error we must presume success.
-            // 
-            BluetoothDiscoverySession::MarkAsInactive() should be called here
+            //
             //
             // NEED ISSUE NUMBER.
+            nativeOnScanFailed(mNativeCPPObject);
         }
     }
 }
