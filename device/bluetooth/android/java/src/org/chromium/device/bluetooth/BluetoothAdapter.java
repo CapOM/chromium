@@ -91,12 +91,6 @@ final class BluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // BluetoothAdapterAndroid C++ methods declared for access from java:
-
-    // Binds to BluetoothAdapterAndroid::OnScanFailed.
-    private native void nativeOnScanFailed(long nativeBluetoothAdapterAndroid);
-
-    // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
 
     // Implements BluetoothAdapterAndroid::HasBluetoothCapability.
@@ -229,4 +223,10 @@ final class BluetoothAdapter {
             nativeOnScanFailed(mNativeBluetoothAdapterAndroid);
         }
     }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterAndroid C++ methods declared for access from java:
+
+    // Binds to BluetoothAdapterAndroid::OnScanFailed.
+    private native void nativeOnScanFailed(long nativeBluetoothAdapterAndroid);
 }
