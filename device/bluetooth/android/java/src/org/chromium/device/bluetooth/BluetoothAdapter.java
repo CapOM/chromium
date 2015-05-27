@@ -29,14 +29,14 @@ import java.util.List;
 final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
-    private final long mNativeBluetoothAdapterAndroid;
+    private long mNativeBluetoothAdapterAndroid;
     private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
     private int mNumDiscoverySessions;
     private ScanCallback mLeScanCallback;
 
     // ---------------------------------------------------------------------------------------------
-    // Construction:
+    // Construction and handler for C++ object destruction.
 
     @CalledByNative
     private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid) {
@@ -89,6 +89,18 @@ final class BluetoothAdapter {
             Log.i(TAG, "BluetoothAdapter successfully constructed.");
         }
     }
+
+    /**
+     * Shuts down any ongoing scan, removes reference to the C++ object.
+     */
+    @CalledByNative
+    private void onBluetoothAdapterAndroidDestruction() {
+        stopScan();
+        mNativeBluetoothAdapterAndroid = 0;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterAndroid Methods exposed :
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
@@ -159,17 +171,7 @@ final class BluetoothAdapter {
             return true;
         }
 
-        // ScanSettings Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some devices)
-        // if setReportDelay() is used or if SCAN_MODE_LOW_LATENCY isn't used.
-        ScanSettings scanSettings =
-                new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
-
-        if (mLeScanCallback == null) {
-            mLeScanCallback = new DiscoveryScanCallback();
-        }
-        mAdapter.getBluetoothLeScanner().startScan(
-                null /* filters */, scanSettings, mLeScanCallback);
-        return true;
+        return startScan();
     }
 
     // Implements BluetoothAdapterAndroid::RemoveDiscoverySession.
@@ -185,17 +187,56 @@ final class BluetoothAdapter {
 
         if (mNumDiscoverySessions == 0) {
             Log.d(TAG, "removeDiscoverySession: Stopping scan.");
-            mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+            return stopScan();
         } else {
             Log.d(TAG, "removeDiscoverySession: Now %d sessions", mNumDiscoverySessions);
         }
-
         return true;
     }
 
     // ---------------------------------------------------------------------------------------------
     // Implementation details:
 
+    /**
+     * Starts a Low Energy scan.
+     * @return True on success.
+     */
+    private boolean startScan() {
+        // ScanSettings Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some devices)
+        // if setReportDelay() is used or if SCAN_MODE_LOW_LATENCY isn't used.
+        ScanSettings scanSettings =
+                new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
+
+        assert mLeScanCallback == null;
+        mLeScanCallback = new DiscoveryScanCallback();
+
+        try {
+            mAdapter.getBluetoothLeScanner().startScan(
+                    null /* filters */, scanSettings, mLeScanCallback);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Cannot start scan: " + e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Stops the Low Energy scan.
+     * @return True if a scan was in progress.
+     */
+    private boolean stopScan() {
+        if (mLeScanCallback == null) {
+            return false;
+        }
+        mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        mLeScanCallback = null;
+        return true;
+    }
+
+    /**
+     * Implements callbacks used during a Low Energy scan by notifying upon
+     * devices discovered or detecting a scan failure.
+     */
     private class DiscoveryScanCallback extends ScanCallback {
         @Override
         public void onBatchScanResults(List<ScanResult> results) {

@@ -146,6 +146,8 @@ BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
+  Java_BluetoothAdapter_onBluetoothAdapterAndroidDestruction(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
 void BluetoothAdapterAndroid::AddDiscoverySession(
