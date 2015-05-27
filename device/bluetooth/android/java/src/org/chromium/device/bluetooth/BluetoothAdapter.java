@@ -29,7 +29,7 @@ import java.util.List;
 final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
-    private final long mNativeCPPObject;
+    private final long mNativeBluetoothAdapterAndroid;
     private final boolean mHasBluetoothCapability;
     private android.bluetooth.BluetoothAdapter mAdapter;
     private int mNumDiscoverySessions;
@@ -39,25 +39,25 @@ final class BluetoothAdapter {
     // Construction:
 
     @CalledByNative
-    private static BluetoothAdapter create(Context context, long nativeCPPObject) {
-        return new BluetoothAdapter(context, nativeCPPObject);
+    private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid) {
+        return new BluetoothAdapter(context, nativeBluetoothAdapterAndroid);
     }
 
     @CalledByNative
     private static BluetoothAdapter createWithoutPermissionForTesting(
-            Context context, long nativeCPPObject) {
+            Context context, long nativeBluetoothAdapterAndroid) {
         Context contextWithoutPermission = new ContextWrapper(context) {
             @Override
             public int checkCallingOrSelfPermission(String permission) {
                 return PackageManager.PERMISSION_DENIED;
             }
         };
-        return new BluetoothAdapter(contextWithoutPermission, nativeCPPObject);
+        return new BluetoothAdapter(contextWithoutPermission, nativeBluetoothAdapterAndroid);
     }
 
     // Constructs a BluetoothAdapter.
-    private BluetoothAdapter(Context context, long nativeCPPObject) {
-        mNativeCPPObject = nativeCPPObject;
+    private BluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid) {
+        mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
         final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
         final boolean hasPermissions =
                 context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
@@ -226,7 +226,7 @@ final class BluetoothAdapter {
             //
             //
             // NEED ISSUE NUMBER.
-            nativeOnScanFailed(mNativeCPPObject);
+            nativeOnScanFailed(mNativeBluetoothAdapterAndroid);
         }
     }
 }
