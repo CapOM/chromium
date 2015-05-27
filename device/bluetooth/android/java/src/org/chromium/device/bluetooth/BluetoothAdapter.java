@@ -154,7 +154,7 @@ final class BluetoothAdapter {
     // Implements BluetoothAdapterAndroid::IsDiscovering.
     @CalledByNative
     private boolean isDiscovering() {
-        return isPresent() && mAdapter.isDiscovering();
+        return isPresent() && (mAdapter.isDiscovering() || mLeScanCallback != null);
     }
 
     // Implements BluetoothAdapterAndroid::AddDiscoverySession.
