@@ -142,6 +142,18 @@ void BluetoothAdapterAndroid::OnScanFailed(JNIEnv* env, jobject obj) {
   MarkDiscoverySessionsAsInactive();
 }
 
+void BluetoothAdapterAndroid::OnDeviceDiscovered(JNIEnv* env, jobject obj) {
+  BluetoothDeviceAndroid* device = BluetoothDeviceAndroid::FromJavaObject(obj);
+
+  const std::string& address = device_chromeos->GetAddress();
+  if (devices_.count(address) == 0) {
+    devices_[address] = device;
+
+    FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
+                      DeviceAdded(this, device));
+  }
+}
+
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
 }
 

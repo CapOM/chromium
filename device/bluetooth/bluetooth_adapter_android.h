@@ -72,6 +72,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Handles a scan error event by invalidating all discovery sessions.
   void OnScanFailed(JNIEnv* env, jobject obj);
 
+  // Adds a newly discovered device.
+  void OnDeviceDiscovered(JNIEnv* env, jobject obj);
+
  protected:
   BluetoothAdapterAndroid();
   ~BluetoothAdapterAndroid() override;
