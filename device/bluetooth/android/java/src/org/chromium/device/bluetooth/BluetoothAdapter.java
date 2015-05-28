@@ -23,6 +23,8 @@ import java.util.List;
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
  * device::BluetoothAdapterAndroid.
+ *  
+ * Lifetime is controlled by device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
