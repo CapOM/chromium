@@ -68,6 +68,7 @@ final class BluetoothAdapter {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
                 && context.getPackageManager().hasSystemFeature(
                            PackageManager.FEATURE_BLUETOOTH_LE);
+        // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
         mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
         if (!mHasBluetoothCapability) {
             if (!hasMinAPI) {

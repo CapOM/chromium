@@ -15,8 +15,16 @@ class SequencedTaskRunner;
 
 namespace device {
 
-// The BluetoothAdapterAndroid class implements BluetoothAdapter for the
-// Android platform.
+// BluetoothAdapterAndroid along with the Java class
+// org.chromium.device.bluetooth.BluetoothAdapter implement BluetoothAdapter.
+//
+// The GATT Profile over Low Energy is supported, but not Classic Bluetooth at
+// this time. LE GATT support has been initially built out to support Web
+// Bluetooth, which does not need other Bluetooth features. There is no
+// technical reason they can not be supported should a need arrise.
+//
+// BluetoothAdapterAndroid is reference counted, and owns the lifetime of the
+// Java class BluetoothAdapter via j_bluetooth_adapter_.
 class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
     : public BluetoothAdapter {
  public:
