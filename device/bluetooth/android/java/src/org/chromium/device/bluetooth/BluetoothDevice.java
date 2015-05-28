@@ -4,15 +4,14 @@
 
 package org.chromium.device.bluetooth;
 
-import org.chromium.base.BluetoothAdapter;
-import org.chromium.base.CalledByNative;
-import org.chromium.base.JNINamespace;
-import org.chromium.base.Log;
-
 import android.annotation.TargetApi;
 import android.os.Build;
 
-import device.BluetoothAdapter;
+
+import org.chromium.base.CalledByNative;
+import org.chromium.base.JNINamespace;
+import org.chromium.base.Log;
+import org.chromium.device.bluetooth.BluetoothAdapter;
 
 /**
  * Exposes android.bluetooth.BluetoothDevice as necessary for C++
@@ -34,10 +33,10 @@ final class BluetoothDevice {
      *  
      * Calls adapter.onDeviceAdded to ensure objects are owned.
      */
-    public BluetoothDevice(android.bluetooth.BluetoothDevice device) {
+    public BluetoothDevice(android.bluetooth.BluetoothDevice device, BluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
-        adapter.onDeviceAdded()
+        adapter.onDeviceAdded(this);
     }
 
     @CalledByNative

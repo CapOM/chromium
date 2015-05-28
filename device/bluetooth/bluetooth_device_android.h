@@ -19,6 +19,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // Obtain a C++ BluetoothDeviceAndroid from a Java BluetoothDevice |obj|.
   static BluetoothDeviceAndroid* FromJavaObject(jobject obj);
 
+  BluetoothDeviceAndroid(JNIEnv* env, jobject obj);
+  ~BluetoothDeviceAndroid() override;
+
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
 
@@ -64,9 +67,6 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
       const ConnectErrorCallback& error_callback) override;
 
  protected:
-  BluetoothDeviceAndroid(jobject obj);
-  ~BluetoothDeviceAndroid() override;
-
   // BluetoothDevice:
   std::string GetDeviceName() const override;
 

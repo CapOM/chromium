@@ -17,6 +17,7 @@ import android.os.Build;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
+import org.chromium.device.bluetooth.BluetoothDevice;
 
 import java.util.List;
 
@@ -105,7 +106,7 @@ final class BluetoothAdapter {
     // Public Methods:
 
     public void onDeviceAdded(BluetoothDevice bluetoothDevice) {
-        nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, bluetoothDevice)
+        nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, bluetoothDevice);
     }
 
     // ---------------------------------------------------------------------------------------------

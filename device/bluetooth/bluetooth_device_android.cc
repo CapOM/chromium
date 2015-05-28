@@ -15,11 +15,11 @@ namespace device {
 // Create a BluetoothDeviceAndroid instance and return pointer for
 // an already created org.chromium.device.bluetooth.BluetoothDevice |obj|.
 static jlong Init(JNIEnv* env, jobject obj) {
-  return reinterpret_cast<jlong>(new BluetoothDeviceAndroid(obj));
+  return reinterpret_cast<jlong>(new BluetoothDeviceAndroid(env, obj));
 }
 
 // static
-static BluetoothDeviceAndroid* BluetoothAdapterAndroid::FromJavaObject(
+BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(
     jobject obj) {
   if (!obj)
     return NULL;
@@ -27,9 +27,16 @@ static BluetoothDeviceAndroid* BluetoothAdapterAndroid::FromJavaObject(
       Java_BluetoothDevice_getNativePointer(AttachCurrentThread(), obj));
 }
 
+BluetoothDeviceAndroid::BluetoothDeviceAndroid(JNIEnv* env, jobject obj) {
+  j_bluetooth_device_.Reset(env, obj);
+}
+
+BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
+}
+
 // static
-bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
-  return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
+bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
+  return RegisterNativesImpl(env);  // Generated in BluetoothDevice_jni.h
 }
 
 uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
@@ -173,13 +180,6 @@ void BluetoothDeviceAndroid::CreateGattConnection(
     const GattConnectionCallback& callback,
     const ConnectErrorCallback& error_callback) {
   NOTIMPLEMENTED();
-}
-
-BluetoothDeviceAndroid::BluetoothDeviceAndroid(jobject obj) {
-  j_bluetooth_adapter_.Reset(obj);
-}
-
-BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
 }
 
 std::string BluetoothDeviceAndroid::GetDeviceName() const {
