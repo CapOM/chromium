@@ -12,6 +12,26 @@ using base::android::AttachCurrentThread;
 
 namespace device {
 
+// Create a BluetoothDeviceAndroid instance and return pointer for
+// an already created org.chromium.device.bluetooth.BluetoothDevice |obj|.
+static jlong Init(JNIEnv* env, jobject obj) {
+  return reinterpret_cast<jlong>(new BluetoothDeviceAndroid(obj));
+}
+
+// static
+static BluetoothDeviceAndroid* BluetoothAdapterAndroid::FromJavaObject(
+    jobject obj) {
+  if (!obj)
+    return NULL;
+  return reinterpret_cast<BluetoothDeviceAndroid*>(
+      Java_BluetoothDevice_getNativePointer(AttachCurrentThread(), obj));
+}
+
+// static
+bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
+  return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
+}
+
 uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
   NOTIMPLEMENTED();
   return 0;
@@ -22,8 +42,8 @@ std::string BluetoothDeviceAndroid::GetAddress() const {
   return "";
 }
 
-BluetoothDevice::VendorIDSource
-BluetoothDeviceAndroid::GetVendorIDSource() const {
+BluetoothDevice::VendorIDSource BluetoothDeviceAndroid::GetVendorIDSource()
+    const {
   NOTIMPLEMENTED();
   return VENDOR_ID_UNKNOWN;
 }
@@ -126,9 +146,8 @@ void BluetoothDeviceAndroid::CancelPairing() {
   NOTIMPLEMENTED();
 }
 
-void BluetoothDeviceAndroid::Disconnect(
-    const base::Closure& callback,
-    const ErrorCallback& error_callback) {
+void BluetoothDeviceAndroid::Disconnect(const base::Closure& callback,
+                                        const ErrorCallback& error_callback) {
   NOTIMPLEMENTED();
 }
 
@@ -151,9 +170,16 @@ void BluetoothDeviceAndroid::ConnectToServiceInsecurely(
 }
 
 void BluetoothDeviceAndroid::CreateGattConnection(
-      const GattConnectionCallback& callback,
-      const ConnectErrorCallback& error_callback) {
+    const GattConnectionCallback& callback,
+    const ConnectErrorCallback& error_callback) {
   NOTIMPLEMENTED();
+}
+
+BluetoothDeviceAndroid::BluetoothDeviceAndroid(jobject obj) {
+  j_bluetooth_adapter_.Reset(obj);
+}
+
+BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
 }
 
 std::string BluetoothDeviceAndroid::GetDeviceName() const {

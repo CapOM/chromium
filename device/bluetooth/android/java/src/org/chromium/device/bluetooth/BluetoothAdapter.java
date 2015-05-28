@@ -23,7 +23,7 @@ import java.util.List;
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
  * device::BluetoothAdapterAndroid.
- *  
+ *
  * Lifetime is controlled by device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
@@ -102,7 +102,11 @@ final class BluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // BluetoothAdapterAndroid Methods exposed :
+    // Public Methods:
+
+    public void onDeviceAdded(BluetoothDevice bluetoothDevice) {
+        nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, bluetoothDevice)
+    }
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
@@ -268,8 +272,12 @@ final class BluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // BluetoothAdapterAndroid C++ methods declared for access from java:
+    // bluetooth_adapter_android.cc C++ methods declared for access from java:
 
     // Binds to BluetoothAdapterAndroid::OnScanFailed.
     private native void nativeOnScanFailed(long nativeBluetoothAdapterAndroid);
+
+    // Binds to BluetoothAdapterAndroid::OnDeviceAdded.
+    private native void nativeOnDeviceAdded(
+            long nativeBluetoothAdapterAndroid, BluetoothDevice bluetoothDevice);
 }

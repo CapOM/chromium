@@ -15,9 +15,9 @@ class SequencedTaskRunner;
 
 namespace device {
 
-// BluetoothAdapterAndroid along with the Java class 
+// BluetoothAdapterAndroid along with the Java class
 // org.chromium.device.bluetooth.BluetoothAdapter implement BluetoothAdapter.
-// 
+//
 // The GATT Profile over Low Energy is supported, but NOT Classic Bluetooth.
 //
 // BluetoothAdapterAndroid is reference counted, and owns the lifetime of the
@@ -79,8 +79,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Handles a scan error event by invalidating all discovery sessions.
   void OnScanFailed(JNIEnv* env, jobject obj);
 
-  // Adds a newly discovered device.
-  void OnDeviceDiscovered(JNIEnv* env, jobject obj);
+  // Adds a newly discovered device, taking ownership.
+  void OnDeviceAdded(JNIEnv* env, jobject obj, jobject device_android);
 
  protected:
   BluetoothAdapterAndroid();

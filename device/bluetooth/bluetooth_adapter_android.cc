@@ -10,6 +10,7 @@
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
 #include "device/bluetooth/bluetooth_advertisement.h"
+#include "device/bluetooth/bluetooth_device_android.h"
 #include "jni/BluetoothAdapter_jni.h"
 
 using base::android::AttachCurrentThread;
@@ -142,15 +143,22 @@ void BluetoothAdapterAndroid::OnScanFailed(JNIEnv* env, jobject obj) {
   MarkDiscoverySessionsAsInactive();
 }
 
-void BluetoothAdapterAndroid::OnDeviceDiscovered(JNIEnv* env, jobject obj) {
-  BluetoothDeviceAndroid* device = BluetoothDeviceAndroid::FromJavaObject(obj);
+void BluetoothAdapterAndroid::OnDeviceAdded(JNIEnv* env,
+                                            jobject obj,
+                                            jobject device_android) {
+  BluetoothDeviceAndroid* device =
+      BluetoothDeviceAndroid::FromJavaObject(device_android);
 
-  const std::string& address = device_chromeos->GetAddress();
+  const std::string& address = device->GetAddress();
   if (devices_.count(address) == 0) {
     devices_[address] = device;
 
     FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
                       DeviceAdded(this, device));
+  } else {
+    LOG(WARNING) << "Redundant device found"; // TODO??? Need this log? Common?
+    // TODO(scheib): Refactor to check first before constructing everything?
+    delete device;
   }
 }
 
@@ -158,6 +166,7 @@ BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
+  // TODO(scheib): Delete devices_.
   Java_BluetoothAdapter_onBluetoothAdapterAndroidDestruction(
       AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }

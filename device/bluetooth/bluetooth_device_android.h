@@ -11,11 +11,14 @@
 
 namespace device {
 
-// BluetoothDeviceAndroid along with the Java class 
+// BluetoothDeviceAndroid along with the Java class
 // org.chromium.device.bluetooth.BluetoothDevice implement BluetoothDevice.
 class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
     : public BluetoothDevice {
  public:
+  // Obtain a C++ BluetoothDeviceAndroid from a Java BluetoothDevice |obj|.
+  static BluetoothDeviceAndroid* FromJavaObject(jobject obj);
+
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
 
@@ -36,8 +39,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   bool ExpectingPinCode() const override;
   bool ExpectingPasskey() const override;
   bool ExpectingConfirmation() const override;
-  void GetConnectionInfo(
-      const ConnectionInfoCallback& callback) override;
+  void GetConnectionInfo(const ConnectionInfoCallback& callback) override;
   void Connect(device::BluetoothDevice::PairingDelegate* pairing_delegate,
                const base::Closure& callback,
                const ConnectErrorCallback& error_callback) override;
@@ -62,7 +64,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
       const ConnectErrorCallback& error_callback) override;
 
  protected:
-  BluetoothDeviceAndroid();
+  BluetoothDeviceAndroid(jobject obj);
   ~BluetoothDeviceAndroid() override;
 
   // BluetoothDevice:
