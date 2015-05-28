@@ -71,6 +71,7 @@ final class BluetoothAdapter {
                 Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
                 && context.getPackageManager().hasSystemFeature(
                            PackageManager.FEATURE_BLUETOOTH_LE);
+        // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
         mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
         if (!mHasBluetoothCapability) {
             if (!hasMinAPI) {
@@ -161,7 +162,7 @@ final class BluetoothAdapter {
     // Implements BluetoothAdapterAndroid::IsDiscovering.
     @CalledByNative
     private boolean isDiscovering() {
-        return isPresent() && mAdapter.isDiscovering();
+        return isPresent() && (mAdapter.isDiscovering() || mLeScanCallback != null);
     }
 
     // Implements BluetoothAdapterAndroid::AddDiscoverySession.

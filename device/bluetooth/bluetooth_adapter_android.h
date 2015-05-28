@@ -18,7 +18,10 @@ namespace device {
 // BluetoothAdapterAndroid along with the Java class
 // org.chromium.device.bluetooth.BluetoothAdapter implement BluetoothAdapter.
 //
-// The GATT Profile over Low Energy is supported, but NOT Classic Bluetooth.
+// The GATT Profile over Low Energy is supported, but not Classic Bluetooth at
+// this time. LE GATT support has been initially built out to support Web
+// Bluetooth, which does not need other Bluetooth features. There is no
+// technical reason they can not be supported should a need arrise.
 //
 // BluetoothAdapterAndroid is reference counted, and owns the lifetime of the
 // Java class BluetoothAdapter via j_bluetooth_adapter_. A tree of additional
