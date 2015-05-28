@@ -51,6 +51,8 @@ component("bluetooth") {
     "bluetooth_channel_mac.mm",
     "bluetooth_device.cc",
     "bluetooth_device.h",
+    "bluetooth_device_android.cc",
+    "bluetooth_device_android.h",
     "bluetooth_device_chromeos.cc",
     "bluetooth_device_chromeos.h",
     "bluetooth_device_mac.h",
@@ -247,6 +249,7 @@ if (is_android) {
   generate_jni("bluetooth_jni") {
     sources = [
       "android/java/src/org/chromium/device/bluetooth/BluetoothAdapter.java",
+      "android/java/src/org/chromium/device/bluetooth/BluetoothDevice.java",
     ]
     jni_package = "bluetooth"
   }

@@ -49,6 +49,8 @@
         'bluetooth_channel_mac.h',
         'bluetooth_device.cc',
         'bluetooth_device.h',
+        'bluetooth_device_android.h',
+        'bluetooth_device_android.cc',
         'bluetooth_device_chromeos.cc',
         'bluetooth_device_chromeos.h',
         'bluetooth_device_mac.h',
@@ -240,6 +242,7 @@
           'type': 'none',
           'sources': [
             'android/java/src/org/chromium/device/bluetooth/BluetoothAdapter.java',
+            'android/java/src/org/chromium/device/bluetooth/BluetoothDevice.java',
           ],
           'variables': {
             'jni_gen_package': 'device_bluetooth',
