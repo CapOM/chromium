@@ -254,6 +254,7 @@ final class BluetoothAdapter {
         public void onScanResult(int callbackType, ScanResult result) {
             Log.v(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
                     result.getDevice().getName());
+            new BluetoothDevice(result.getDevice(), BluetoothAdapter.this);
         }
 
         @Override
