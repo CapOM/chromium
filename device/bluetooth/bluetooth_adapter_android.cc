@@ -43,6 +43,16 @@ BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting() {
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
+base::WeakPtr<BluetoothAdapterAndroid>
+BluetoothAdapterAndroid::CreateAdapterWithFakeAdapterForTesting() {
+  BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
+  adapter->j_bluetooth_adapter_.Reset(
+      Java_BluetoothAdapter_createWithFakeAdapterForTesting(
+          AttachCurrentThread(), base::android::GetApplicationContext(),
+          reinterpret_cast<jlong>(adapter)));
+  return adapter->weak_ptr_factory_.GetWeakPtr();
+}
+
 // static
 bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
