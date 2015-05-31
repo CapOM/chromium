@@ -167,7 +167,7 @@ final class BluetoothAdapter {
         }
 
         mNumDiscoverySessions++;
-        Log.d(TAG, "addDiscoverySession: Now %d sessions", mNumDiscoverySessions);
+        Log.d(TAG, "addDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
         if (mNumDiscoverySessions > 1) {
             return true;
         }
@@ -192,10 +192,10 @@ final class BluetoothAdapter {
         --mNumDiscoverySessions;
 
         if (mNumDiscoverySessions == 0) {
-            Log.d(TAG, "removeDiscoverySession: Stopping scan.");
+            Log.d(TAG, "removeDiscoverySession: Now 0 sessions. Stopping scan.");
             return stopScan();
         } else {
-            Log.d(TAG, "removeDiscoverySession: Now %d sessions", mNumDiscoverySessions);
+            Log.d(TAG, "removeDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
         }
         return true;
     }
