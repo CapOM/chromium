@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 #include "base/bind.h"
-#include "base/message_loop/message_loop.h"
+#include "base/location.h"
+#include "base/single_thread_task_runner.h"
 #include "base/synchronization/waitable_event.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/thread.h"
 #include "content/renderer/media/rtc_video_decoder.h"
 #include "media/base/gmock_callback_support.h"
@@ -33,10 +35,22 @@ class RTCVideoDecoderTest : public ::testing::Test,
 
   void SetUp() override {
     ASSERT_TRUE(vda_thread_.Start());
-    vda_task_runner_ = vda_thread_.message_loop_proxy();
+    vda_task_runner_ = vda_thread_.task_runner();
     mock_vda_ = new media::MockVideoDecodeAccelerator;
+
+    media::VideoDecodeAccelerator::SupportedProfile supported_profile;
+    supported_profile.min_resolution.SetSize(16, 16);
+    supported_profile.max_resolution.SetSize(1920, 1088);
+    supported_profile.profile = media::H264PROFILE_MAIN;
+    supported_profiles_.push_back(supported_profile);
+    supported_profile.profile = media::VP8PROFILE_ANY;
+    supported_profiles_.push_back(supported_profile);
+
     EXPECT_CALL(*mock_gpu_factories_.get(), GetTaskRunner())
         .WillRepeatedly(Return(vda_task_runner_));
+    EXPECT_CALL(*mock_gpu_factories_.get(),
+                GetVideoDecodeAcceleratorSupportedProfiles())
+        .WillRepeatedly(Return(supported_profiles_));
     EXPECT_CALL(*mock_gpu_factories_.get(), DoCreateVideoDecodeAccelerator())
         .WillRepeatedly(Return(mock_vda_));
     EXPECT_CALL(*mock_vda_, Initialize(_, _))
@@ -55,9 +69,9 @@ class RTCVideoDecoderTest : public ::testing::Test,
     vda_thread_.Stop();
   }
 
-  int32_t Decoded(webrtc::I420VideoFrame& decoded_image) override {
+  int32_t Decoded(webrtc::VideoFrame& decoded_image) override {
     DVLOG(2) << "Decoded";
-    EXPECT_EQ(vda_task_runner_, base::MessageLoopProxy::current());
+    EXPECT_EQ(vda_task_runner_, base::ThreadTaskRunnerHandle::Get());
     return WEBRTC_VIDEO_CODEC_OK;
   }
 
@@ -97,6 +111,7 @@ class RTCVideoDecoderTest : public ::testing::Test,
   scoped_ptr<RTCVideoDecoder> rtc_decoder_;
   webrtc::VideoCodec codec_;
   base::Thread vda_thread_;
+  media::VideoDecodeAccelerator::SupportedProfiles supported_profiles_;
 
  private:
   scoped_refptr<base::SingleThreadTaskRunner> vda_task_runner_;

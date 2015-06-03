@@ -35,7 +35,7 @@ public class ConnectionInfoPopup implements OnClickListener {
     private static final String TAG = "ConnectionInfoPopup";
 
     private static final String HELP_URL =
-            "http://www.google.com/support/chrome/bin/answer.py?answer=95617";
+            "https://support.google.com/chrome/answer/95617";
     private static final int DESCRIPTION_TEXT_SIZE_SP = 12;
     private final Context mContext;
     private final Dialog mDialog;
@@ -151,8 +151,8 @@ public class ConnectionInfoPopup implements OnClickListener {
 
         mResetCertDecisionsButton = new Button(mContext);
         mResetCertDecisionsButton.setText(label);
-        mResetCertDecisionsButton.setBackground(mContext.getResources().getDrawable(
-                R.drawable.connection_info_reset_cert_decisions));
+        mResetCertDecisionsButton.setBackgroundResource(
+                R.drawable.connection_info_reset_cert_decisions);
         mResetCertDecisionsButton.setTextColor(
                 mContext.getResources().getColor(
                 R.color.connection_info_popup_reset_cert_decisions_button));

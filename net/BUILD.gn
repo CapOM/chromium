@@ -633,6 +633,8 @@ source_set("test_support") {
     "test/cert_test_util.cc",
     "test/cert_test_util.h",
     "test/cert_test_util_nss.cc",
+    "test/channel_id_test_util.cc",
+    "test/channel_id_test_util.h",
     "test/ct_test_util.cc",
     "test/ct_test_util.h",
     "test/embedded_test_server/embedded_test_server.cc",
@@ -792,8 +794,8 @@ if (use_v8_in_net && !is_android) {
       "proxy/in_process_mojo_proxy_resolver_factory.cc",
       "proxy/in_process_mojo_proxy_resolver_factory.h",
       "proxy/mojo_proxy_resolver_factory.h",
-      "proxy/proxy_resolver_mojo.cc",
-      "proxy/proxy_resolver_mojo.h",
+      "proxy/proxy_resolver_factory_mojo.cc",
+      "proxy/proxy_resolver_factory_mojo.h",
       "proxy/proxy_service_mojo.cc",
       "proxy/proxy_service_mojo.h",
     ]
@@ -1378,10 +1380,7 @@ if (!is_android && !is_mac) {
       # or functionality not supported by OpenSSL yet.
       # TODO(bulach): Add equivalent tests when the underlying
       #               functionality is ported to OpenSSL.
-      sources -= [
-        "cert/x509_util_nss_unittest.cc",
-        "quic/test_tools/crypto_test_utils_nss.cc",
-      ]
+      sources -= [ "quic/test_tools/crypto_test_utils_nss.cc" ]
     } else {
       sources -= [
         "cert/x509_util_openssl_unittest.cc",
@@ -1496,7 +1495,7 @@ if (!is_android && !is_mac) {
         "proxy/mojo_proxy_resolver_factory_impl_unittest.cc",
         "proxy/mojo_proxy_resolver_impl_unittest.cc",
         "proxy/proxy_resolver_error_observer_mojo_unittest.cc",
-        "proxy/proxy_resolver_mojo_unittest.cc",
+        "proxy/proxy_resolver_factory_mojo_unittest.cc",
         "proxy/proxy_service_mojo_unittest.cc",
       ]
     }

@@ -21,12 +21,16 @@ namespace blink {
 class WebInputEvent;
 }
 
+namespace cc {
+struct SurfaceId;
+struct SurfaceSequence;
+}
+
 namespace content {
 
 class ChildFrameCompositingHelper;
 class RenderFrameImpl;
 class RenderViewImpl;
-enum class SandboxFlags;
 struct FrameReplicationState;
 
 // When a page's frames are rendered by multiple processes, each renderer has a
@@ -61,7 +65,8 @@ class CONTENT_EXPORT RenderFrameProxy
   // proxy will eventually swap places with.
   static RenderFrameProxy* CreateProxyToReplaceFrame(
       RenderFrameImpl* frame_to_replace,
-      int routing_id);
+      int routing_id,
+      blink::WebTreeScopeType scope);
 
   // This method should be used to create a RenderFrameProxy, when there isn't
   // an existing RenderFrame. It should be called to construct a local
@@ -140,9 +145,13 @@ class CONTENT_EXPORT RenderFrameProxy
   void OnDeleteProxy();
   void OnChildFrameProcessGone();
   void OnCompositorFrameSwapped(const IPC::Message& message);
+  void OnSetChildFrameSurface(const cc::SurfaceId& surface_id,
+                              const gfx::Size& frame_size,
+                              float scale_factor,
+                              const cc::SurfaceSequence& sequence);
   void OnDisownOpener();
   void OnDidStopLoading();
-  void OnDidUpdateSandboxFlags(SandboxFlags flags);
+  void OnDidUpdateSandboxFlags(blink::WebSandboxFlags flags);
   void OnDispatchLoad();
   void OnDidUpdateName(const std::string& name);
   void OnDidUpdateOrigin(const url::Origin& origin);

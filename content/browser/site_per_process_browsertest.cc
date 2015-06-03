@@ -32,6 +32,7 @@
 #include "ipc/ipc_security_test_util.h"
 #include "net/dns/mock_host_resolver.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "third_party/WebKit/public/web/WebSandboxFlags.h"
 
 namespace content {
 
@@ -459,11 +460,24 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest, CleanupCrossSiteIframe) {
   EXPECT_EQ(foo_url, observer.last_navigation_url());
 
   // Ensure that we have created a new process for the subframes.
-  ASSERT_EQ(2U, root->child_count());
-  EXPECT_NE(shell()->web_contents()->GetSiteInstance(),
-            root->child_at(0)->current_frame_host()->GetSiteInstance());
-  EXPECT_EQ(root->child_at(0)->current_frame_host()->GetSiteInstance(),
-            root->child_at(1)->current_frame_host()->GetSiteInstance());
+  EXPECT_EQ(
+      " Site A ------------ proxies for B\n"
+      "   |--Site B ------- proxies for A\n"
+      "   +--Site B ------- proxies for A\n"
+      "Where A = http://127.0.0.1/\n"
+      "      B = http://foo.com/",
+      DepictFrameTree(root));
+
+  int subframe_process_id = root->child_at(0)
+                                ->current_frame_host()
+                                ->GetSiteInstance()
+                                ->GetProcess()
+                                ->GetID();
+  int subframe_rvh_id = root->child_at(0)
+                            ->current_frame_host()
+                            ->render_view_host()
+                            ->GetRoutingID();
+  EXPECT_TRUE(RenderViewHost::FromID(subframe_process_id, subframe_rvh_id));
 
   // Use Javascript in the parent to remove one of the frames and ensure that
   // the subframe goes away.
@@ -477,6 +491,9 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest, CleanupCrossSiteIframe) {
   GURL new_url(embedded_test_server()->GetURL("/title1.html"));
   NavigateToURL(shell(), new_url);
   ASSERT_EQ(0U, root->child_count());
+
+  // Ensure the RVH for the subframe gets cleaned up when the frame goes away.
+  EXPECT_FALSE(RenderViewHost::FromID(subframe_process_id, subframe_rvh_id));
 }
 
 // Ensure that root frames cannot be detached.
@@ -1015,8 +1032,8 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
   GURL site_c_url(embedded_test_server()->GetURL("baz.com", "/title1.html"));
   EXPECT_EQ(site_c_url, node4->current_url());
 
-  // |site_instance_c| is expected to go away once we kill |child_process_b|
-  // below; refcount it to extend the lifetime.
+  // |site_instance_c|'s frames and proxies are expected to go away once we kill
+  // |child_process_b| below.
   scoped_refptr<SiteInstanceImpl> site_instance_c =
       node4->current_frame_host()->GetSiteInstance();
 
@@ -1030,6 +1047,9 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
       "      B = http://bar.com/\n"
       "      C = http://baz.com/",
       DepictFrameTree(root));
+
+  EXPECT_GT(site_instance_c->active_frame_count(), 0U);
+
   // Kill process B.
   RenderProcessHost* child_process_b =
       root->child_at(0)->current_frame_host()->GetProcess();
@@ -1049,7 +1069,7 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
       "      B = http://bar.com/ (no process)",
       DepictFrameTree(root));
 
-  EXPECT_TRUE(site_instance_c->HasOneRef());
+  EXPECT_EQ(0U, site_instance_c->active_frame_count());
 }
 
 // Crash a subframe and ensures its children are cleared from the FrameTree.
@@ -1417,6 +1437,11 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
   // message loop, so no IPCs that alter the frame tree can be processed.
   FrameTreeNode* child = root->child_at(1);
   SiteInstance* site = NULL;
+  bool browser_side_navigation =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableBrowserSideNavigation);
+  std::string cross_site_rfh_type =
+      browser_side_navigation ? "speculative" : "pending";
   {
     TestNavigationObserver observer(shell()->web_contents());
     TestFrameNavigationObserver navigation_observer(child);
@@ -1425,19 +1450,26 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
     params.frame_tree_node_id = child->frame_tree_node_id();
     child->navigator()->GetController()->LoadURLWithParams(params);
 
-    site = child->render_manager()->pending_frame_host()->GetSiteInstance();
+    if (browser_side_navigation) {
+      site = child->render_manager()
+                 ->speculative_frame_host_for_testing()
+                 ->GetSiteInstance();
+    } else {
+      site = child->render_manager()->pending_frame_host()->GetSiteInstance();
+    }
     EXPECT_NE(shell()->web_contents()->GetSiteInstance(), site);
 
-    EXPECT_EQ(
+    std::string tree = base::StringPrintf(
         " Site A ------------ proxies for B\n"
         "   |--Site A ------- proxies for B\n"
-        "   +--Site A (B pending)\n"
+        "   +--Site A (B %s)\n"
         "        |--Site A\n"
         "        +--Site A\n"
         "             +--Site A\n"
         "Where A = http://127.0.0.1/\n"
         "      B = http://foo.com/",
-        DepictFrameTree(root));
+        cross_site_rfh_type.c_str());
+    EXPECT_EQ(tree, DepictFrameTree(root));
 
     // Now that the verification is done, run the message loop and wait for the
     // navigation to complete.
@@ -1471,19 +1503,26 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
     params.frame_tree_node_id = child->frame_tree_node_id();
     child->navigator()->GetController()->LoadURLWithParams(params);
 
-    SiteInstance* site2 =
-        child->render_manager()->pending_frame_host()->GetSiteInstance();
+    SiteInstance* site2;
+    if (browser_side_navigation) {
+      site2 = child->render_manager()
+                  ->speculative_frame_host_for_testing()
+                  ->GetSiteInstance();
+    } else {
+      site2 = child->render_manager()->pending_frame_host()->GetSiteInstance();
+    }
     EXPECT_NE(shell()->web_contents()->GetSiteInstance(), site2);
     EXPECT_NE(site, site2);
 
-    EXPECT_EQ(
+    std::string tree = base::StringPrintf(
         " Site A ------------ proxies for B C\n"
         "   |--Site A ------- proxies for B C\n"
-        "   +--Site B (C pending) -- proxies for A\n"
+        "   +--Site B (C %s) -- proxies for A\n"
         "Where A = http://127.0.0.1/\n"
         "      B = http://foo.com/\n"
         "      C = http://bar.com/",
-        DepictFrameTree(root));
+        cross_site_rfh_type.c_str());
+    EXPECT_EQ(tree, DepictFrameTree(root));
 
     navigation_observer.Wait();
     EXPECT_TRUE(observer.last_navigation_succeeded());
@@ -1696,12 +1735,14 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest, DynamicSandboxFlags) {
   EXPECT_EQ(baz_url, observer.last_navigation_url());
 
   // Both frames should not be sandboxed to start with.
-  EXPECT_EQ(SandboxFlags::NONE,
+  EXPECT_EQ(blink::WebSandboxFlags::None,
             root->child_at(0)->current_replication_state().sandbox_flags);
-  EXPECT_EQ(SandboxFlags::NONE, root->child_at(0)->effective_sandbox_flags());
-  EXPECT_EQ(SandboxFlags::NONE,
+  EXPECT_EQ(blink::WebSandboxFlags::None,
+            root->child_at(0)->effective_sandbox_flags());
+  EXPECT_EQ(blink::WebSandboxFlags::None,
             root->child_at(1)->current_replication_state().sandbox_flags);
-  EXPECT_EQ(SandboxFlags::NONE, root->child_at(1)->effective_sandbox_flags());
+  EXPECT_EQ(blink::WebSandboxFlags::None,
+            root->child_at(1)->effective_sandbox_flags());
 
   // Dynamically update sandbox flags for the first frame.
   EXPECT_TRUE(ExecuteScript(shell()->web_contents(),
@@ -1715,22 +1756,33 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest, DynamicSandboxFlags) {
   // sandbox flag updates take place only after navigations. "allow-scripts"
   // resets both SandboxFlags::Scripts and SandboxFlags::AutomaticFeatures bits
   // per blink::parseSandboxPolicy().
-  SandboxFlags expected_flags = SandboxFlags::ALL & ~SandboxFlags::SCRIPTS &
-                                ~SandboxFlags::AUTOMATIC_FEATURES;
+  blink::WebSandboxFlags expected_flags =
+      blink::WebSandboxFlags::All & ~blink::WebSandboxFlags::Scripts &
+      ~blink::WebSandboxFlags::AutomaticFeatures;
   EXPECT_EQ(expected_flags,
             root->child_at(0)->current_replication_state().sandbox_flags);
-  EXPECT_EQ(SandboxFlags::NONE, root->child_at(0)->effective_sandbox_flags());
+  EXPECT_EQ(blink::WebSandboxFlags::None,
+            root->child_at(0)->effective_sandbox_flags());
 
   // Navigate the first frame to a page on the same site.  The new sandbox
-  // flags should take effect. The new page has a child frame, so use
-  // TestFrameNavigationObserver to wait for it to be loaded.
-  TestFrameNavigationObserver frame_observer(root->child_at(0), 2);
+  // flags should take effect.
   GURL bar_url(
       embedded_test_server()->GetURL("bar.com", "/frame_tree/2-4.html"));
   NavigateFrameToURL(root->child_at(0), bar_url);
-  frame_observer.Wait();
+  // (The new page has a subframe; wait for it to load as well.)
+  ASSERT_TRUE(WaitForLoadStop(shell()->web_contents()));
   EXPECT_EQ(bar_url, root->child_at(0)->current_url());
   ASSERT_EQ(1U, root->child_at(0)->child_count());
+
+  EXPECT_EQ(
+      " Site A ------------ proxies for B C\n"
+      "   |--Site B ------- proxies for A C\n"
+      "   |    +--Site B -- proxies for A C\n"
+      "   +--Site C ------- proxies for A B\n"
+      "Where A = http://127.0.0.1/\n"
+      "      B = http://bar.com/\n"
+      "      C = http://baz.com/",
+      DepictFrameTree(root));
 
   // Confirm that the browser process has updated the frame's current sandbox
   // flags.
@@ -1757,6 +1809,16 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest, DynamicSandboxFlags) {
   NavigateFrameToURL(root->child_at(0)->child_at(0), baz_child_url);
   EXPECT_TRUE(observer.last_navigation_succeeded());
   EXPECT_EQ(baz_child_url, observer.last_navigation_url());
+
+  EXPECT_EQ(
+      " Site A ------------ proxies for B C\n"
+      "   |--Site B ------- proxies for A C\n"
+      "   |    +--Site C -- proxies for A B\n"
+      "   +--Site C ------- proxies for A B\n"
+      "Where A = http://127.0.0.1/\n"
+      "      B = http://bar.com/\n"
+      "      C = http://baz.com/",
+      DepictFrameTree(root));
 
   // Opening a popup in the child of a sandboxed frame should fail.
   success = false;
@@ -1798,11 +1860,13 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
 
   // Check that the current sandbox flags are updated but the effective
   // sandbox flags are not.
-  SandboxFlags expected_flags = SandboxFlags::ALL & ~SandboxFlags::SCRIPTS &
-                                ~SandboxFlags::AUTOMATIC_FEATURES;
+  blink::WebSandboxFlags expected_flags =
+      blink::WebSandboxFlags::All & ~blink::WebSandboxFlags::Scripts &
+      ~blink::WebSandboxFlags::AutomaticFeatures;
   EXPECT_EQ(expected_flags,
             root->child_at(1)->current_replication_state().sandbox_flags);
-  EXPECT_EQ(SandboxFlags::NONE, root->child_at(1)->effective_sandbox_flags());
+  EXPECT_EQ(blink::WebSandboxFlags::None,
+            root->child_at(1)->effective_sandbox_flags());
 
   // Navigate the second subframe to a page on bar.com.  This will trigger a
   // remote-to-local frame swap in bar.com's process.  The target page has
@@ -1863,9 +1927,10 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
             root->child_at(0)->current_url());
 
   // The frame should not be sandboxed to start with.
-  EXPECT_EQ(SandboxFlags::NONE,
+  EXPECT_EQ(blink::WebSandboxFlags::None,
             root->child_at(0)->current_replication_state().sandbox_flags);
-  EXPECT_EQ(SandboxFlags::NONE, root->child_at(0)->effective_sandbox_flags());
+  EXPECT_EQ(blink::WebSandboxFlags::None,
+            root->child_at(0)->effective_sandbox_flags());
 
   // Dynamically update the frame's sandbox flags.
   EXPECT_TRUE(ExecuteScript(shell()->web_contents(),
@@ -1879,11 +1944,13 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
   // sandbox flag updates take place only after navigations. "allow-scripts"
   // resets both SandboxFlags::Scripts and SandboxFlags::AutomaticFeatures bits
   // per blink::parseSandboxPolicy().
-  SandboxFlags expected_flags = SandboxFlags::ALL & ~SandboxFlags::SCRIPTS &
-                                ~SandboxFlags::AUTOMATIC_FEATURES;
+  blink::WebSandboxFlags expected_flags =
+      blink::WebSandboxFlags::All & ~blink::WebSandboxFlags::Scripts &
+      ~blink::WebSandboxFlags::AutomaticFeatures;
   EXPECT_EQ(expected_flags,
             root->child_at(0)->current_replication_state().sandbox_flags);
-  EXPECT_EQ(SandboxFlags::NONE, root->child_at(0)->effective_sandbox_flags());
+  EXPECT_EQ(blink::WebSandboxFlags::None,
+            root->child_at(0)->effective_sandbox_flags());
 
   // Perform a renderer-initiated same-site navigation in the first frame. The
   // new sandbox flags should take effect.
@@ -1985,11 +2052,12 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
   EXPECT_EQ(main_url.GetOrigin().spec(), parent_origin + "/");
 
   // Check that the sandbox flags in the browser process are correct.
-  // "allow-scripts" resets both SandboxFlags::Scripts and
-  // SandboxFlags::AutomaticFeatures bits per blink::parseSandboxPolicy().
-  SandboxFlags expected_flags = SandboxFlags::ALL & ~SandboxFlags::SCRIPTS &
-                                ~SandboxFlags::AUTOMATIC_FEATURES &
-                                ~SandboxFlags::ORIGIN;
+  // "allow-scripts" resets both WebSandboxFlags::Scripts and
+  // WebSandboxFlags::AutomaticFeatures bits per blink::parseSandboxPolicy().
+  blink::WebSandboxFlags expected_flags =
+      blink::WebSandboxFlags::All & ~blink::WebSandboxFlags::Scripts &
+      ~blink::WebSandboxFlags::AutomaticFeatures &
+      ~blink::WebSandboxFlags::Origin;
   EXPECT_EQ(expected_flags,
             root->child_at(1)->current_replication_state().sandbox_flags);
 

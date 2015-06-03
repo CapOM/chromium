@@ -183,7 +183,9 @@ class ViewManagerTest : public test::ApplicationTestBase,
                         public ViewManagerDelegate {
  public:
   ViewManagerTest()
-      : most_recent_view_manager_(nullptr), window_manager_(nullptr) {}
+      : most_recent_view_manager_(nullptr),
+        window_manager_(nullptr),
+        got_disconnect_(false) {}
 
   // Overridden from ApplicationDelegate:
   void Initialize(ApplicationImpl* app) override {
@@ -211,6 +213,8 @@ class ViewManagerTest : public test::ApplicationTestBase,
     return vm;
   }
 
+  bool got_disconnect() const { return got_disconnect_; }
+
   ApplicationDelegate* GetApplicationDelegate() override { return this; }
 
   // Overridden from ViewManagerDelegate:
@@ -220,7 +224,9 @@ class ViewManagerTest : public test::ApplicationTestBase,
     most_recent_view_manager_ = root->view_manager();
     QuitRunLoop();
   }
-  void OnViewManagerDisconnected(ViewManager* view_manager) override {}
+  void OnViewManagerDisconnected(ViewManager* view_manager) override {
+    got_disconnect_ = true;
+  }
 
  private:
   // Overridden from testing::Test:
@@ -234,7 +240,10 @@ class ViewManagerTest : public test::ApplicationTestBase,
   }
 
   // Overridden from testing::Test:
-  void TearDown() override { ApplicationTestBase::TearDown(); }
+  void TearDown() override {
+    view_manager_init_.reset();  // Uses application_impl() from base class.
+    ApplicationTestBase::TearDown();
+  }
 
   scoped_ptr<ViewManagerInit> view_manager_init_;
 
@@ -245,6 +254,8 @@ class ViewManagerTest : public test::ApplicationTestBase,
   // The View Manager connection held by the window manager (app running at the
   // root view).
   ViewManager* window_manager_;
+
+  bool got_disconnect_;
 
   MOJO_DISALLOW_COPY_AND_ASSIGN(ViewManagerTest);
 };
@@ -609,6 +620,111 @@ TEST_F(ViewManagerTest, Focus) {
     EXPECT_EQ(view11->id(), observer.last_gained_focus()->id());
     EXPECT_EQ(embedded->GetRoot()->id(), observer.last_lost_focus()->id());
   }
+}
+
+namespace {
+
+class DestroyedChangedObserver : public ViewObserver {
+ public:
+  DestroyedChangedObserver(View* view, bool* got_destroy)
+      : view_(view),
+        got_destroy_(got_destroy) {
+    view_->AddObserver(this);
+  }
+  ~DestroyedChangedObserver() override {
+    if (view_)
+      view_->RemoveObserver(this);
+  }
+
+ private:
+  // Overridden from ViewObserver:
+  void OnViewDestroyed(View* view) override {
+    EXPECT_EQ(view, view_);
+    view_->RemoveObserver(this);
+    *got_destroy_ = true;
+    view_ = nullptr;
+  }
+
+  View* view_;
+  bool* got_destroy_;
+
+  MOJO_DISALLOW_COPY_AND_ASSIGN(DestroyedChangedObserver);
+};
+
+}  // namespace
+
+// Verifies deleting a ViewManager sends the right notifications.
+TEST_F(ViewManagerTest, DeleteViewManager) {
+  View* view = window_manager()->CreateView();
+  ASSERT_NE(nullptr, view);
+  view->SetVisible(true);
+  window_manager()->GetRoot()->AddChild(view);
+  ViewManager* view_manager = Embed(window_manager(), view);
+  ASSERT_TRUE(view_manager);
+  bool got_destroy = false;
+  DestroyedChangedObserver observer(view_manager->GetRoot(), &got_destroy);
+  delete view_manager;
+  EXPECT_TRUE(got_disconnect());
+  EXPECT_TRUE(got_destroy);
+}
+
+// Verifies two Embed()s in the same view trigger deletion of the first
+// ViewManager.
+TEST_F(ViewManagerTest, DisconnectTriggersDelete) {
+  View* view = window_manager()->CreateView();
+  ASSERT_NE(nullptr, view);
+  view->SetVisible(true);
+  window_manager()->GetRoot()->AddChild(view);
+  ViewManager* view_manager = Embed(window_manager(), view);
+  EXPECT_NE(view_manager, window_manager());
+  View* embedded_view = view_manager->CreateView();
+  // Embed again, this should trigger disconnect and deletion of view_manager.
+  bool got_destroy;
+  DestroyedChangedObserver observer(embedded_view, &got_destroy);
+  EXPECT_FALSE(got_disconnect());
+  Embed(window_manager(), view);
+  EXPECT_TRUE(got_disconnect());
+}
+
+class ViewRemovedFromParentObserver : public ViewObserver {
+ public:
+  explicit ViewRemovedFromParentObserver(View* view)
+      : view_(view), was_removed_(false) {
+    view_->AddObserver(this);
+  }
+  ~ViewRemovedFromParentObserver() override { view_->RemoveObserver(this); }
+
+  bool was_removed() const { return was_removed_; }
+
+ private:
+  // Overridden from ViewObserver:
+  void OnTreeChanged(const TreeChangeParams& params) override {
+    if (params.target == view_ && !params.new_parent)
+      was_removed_ = true;
+  }
+
+  View* view_;
+  bool was_removed_;
+
+  MOJO_DISALLOW_COPY_AND_ASSIGN(ViewRemovedFromParentObserver);
+};
+
+TEST_F(ViewManagerTest, EmbedRemovesChildren) {
+  View* view1 = window_manager()->CreateView();
+  View* view2 = window_manager()->CreateView();
+  window_manager()->GetRoot()->AddChild(view1);
+  view1->AddChild(view2);
+
+  ViewRemovedFromParentObserver observer(view2);
+  view1->Embed(application_impl()->url());
+  EXPECT_TRUE(observer.was_removed());
+  EXPECT_EQ(nullptr, view2->parent());
+  EXPECT_TRUE(view1->children().empty());
+
+  // Run the message loop so the Embed() call above completes. Without this
+  // we may end up reconnecting to the test and rerunning the test, which is
+  // problematic since the other services don't shut down.
+  ASSERT_TRUE(DoRunLoopWithTimeout());
 }
 
 }  // namespace mojo

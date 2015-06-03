@@ -41,8 +41,9 @@ class CONTENT_EXPORT FrameTreeNode {
                 RenderViewHostDelegate* render_view_delegate,
                 RenderWidgetHostDelegate* render_widget_delegate,
                 RenderFrameHostManager::Delegate* manager_delegate,
+                blink::WebTreeScopeType scope,
                 const std::string& name,
-                SandboxFlags sandbox_flags);
+                blink::WebSandboxFlags sandbox_flags);
 
   ~FrameTreeNode();
 
@@ -100,9 +101,11 @@ class CONTENT_EXPORT FrameTreeNode {
   // Set the current name and notify proxies about the update.
   void SetFrameName(const std::string& name);
 
-  SandboxFlags effective_sandbox_flags() { return effective_sandbox_flags_; }
+  blink::WebSandboxFlags effective_sandbox_flags() {
+    return effective_sandbox_flags_;
+  }
 
-  void set_sandbox_flags(SandboxFlags sandbox_flags) {
+  void set_sandbox_flags(blink::WebSandboxFlags sandbox_flags) {
     replication_state_.sandbox_flags = sandbox_flags;
   }
 
@@ -216,7 +219,7 @@ class CONTENT_EXPORT FrameTreeNode {
   // directives in the browser process, |effective_sandbox_flags_| should be
   // used.  |effective_sandbox_flags_| is updated with any pending sandbox
   // flags when a navigation for this frame commits.
-  SandboxFlags effective_sandbox_flags_;
+  blink::WebSandboxFlags effective_sandbox_flags_;
 
   // Used to track this node's loading progress (from 0 to 1).
   double loading_progress_;

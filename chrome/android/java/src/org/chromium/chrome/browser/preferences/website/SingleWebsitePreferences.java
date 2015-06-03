@@ -6,6 +6,8 @@ package org.chromium.chrome.browser.preferences.website;
 
 import android.content.Context;
 import android.content.DialogInterface;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.preference.ListPreference;
@@ -18,6 +20,7 @@ import android.support.v7.app.AlertDialog;
 import android.text.format.Formatter;
 import android.widget.ListAdapter;
 
+import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ContentSettingsType;
 import org.chromium.chrome.browser.UrlUtilities;
@@ -273,8 +276,8 @@ public class SingleWebsitePreferences extends PreferenceFragment
             } else if (PREF_COOKIES_PERMISSION.equals(preference.getKey())) {
                 setUpListPreference(preference, mSite.getCookiePermission());
             } else if (PREF_FULLSCREEN_PERMISSION.equals(preference.getKey())) {
-                setUpListPreference(preference, mSite.getFullscreenPermission());
                 preference.setEnabled(false);
+                setUpListPreference(preference, mSite.getFullscreenPermission());
             } else if (PREF_IMAGES_PERMISSION.equals(preference.getKey())) {
                 setUpListPreference(preference, mSite.getImagesPermission());
             } else if (PREF_JAVASCRIPT_PERMISSION.equals(preference.getKey())) {
@@ -358,7 +361,18 @@ public class SingleWebsitePreferences extends PreferenceFragment
         if (explanationResourceId != 0) {
             listPreference.setTitle(explanationResourceId);
         }
-        listPreference.setIcon(ContentSettingsResources.getIcon(contentType));
+
+        if (listPreference.isEnabled()) {
+            listPreference.setIcon(ContentSettingsResources.getIcon(contentType));
+        } else {
+            Drawable icon = ApiCompatibilityUtils.getDrawable(getResources(),
+                    ContentSettingsResources.getIcon(contentType));
+            icon.mutate();
+            int disabledColor = getResources().getColor(
+                    R.color.primary_text_disabled_material_light);
+            icon.setColorFilter(disabledColor, PorterDuff.Mode.SRC_IN);
+            listPreference.setIcon(icon);
+        }
 
         preference.setSummary(mListPreferenceSummaries[index]);
         listPreference.setOnPreferenceChangeListener(this);

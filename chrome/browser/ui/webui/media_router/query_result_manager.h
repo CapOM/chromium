@@ -38,9 +38,9 @@ struct SinksQueryResult;
 //   QueryResultManager result_manager(router);
 //   result_manager.AddObserver(observer);
 //   result_manager.StartSinksQuery(MediaCastMode::DEFAULT,
-//       ForPresentationUrl("http://google.com"));
+//       MediaSourceForPresentationUrl("http://google.com"));
 //   result_manager.StartSinksQuery(MediaCastMode::TAB_MIRROR,
-//       ForTabMediaSource(123));
+//       MediaSourceForTab(123));
 //   ...
 //   [Updates will be received by observer via OnResultsUpdated()]
 //   ...
@@ -133,7 +133,7 @@ class QueryResultManager {
   std::map<MediaSinkId, MediaSinkWithCastModes> all_sinks_;
 
   // Registered observers.
-  ObserverList<Observer> observers_;
+  base::ObserverList<Observer> observers_;
 
   // Not owned by this object.
   MediaRouter* router_;

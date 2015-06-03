@@ -4,7 +4,6 @@
 
 #include "ash/system/cast/tray_cast.h"
 
-#include "ash/cast_config_delegate.h"
 #include "ash/session/session_state_delegate.h"
 #include "ash/shelf/shelf_types.h"
 #include "ash/shell.h"
@@ -22,7 +21,6 @@
 #include "ash/system/tray/tray_item_view.h"
 #include "ash/system/tray/tray_popup_label_button.h"
 #include "base/bind.h"
-#include "base/memory/weak_ptr.h"
 #include "grit/ash_resources.h"
 #include "grit/ash_strings.h"
 #include "ui/base/l10n/l10n_util.h"
@@ -276,6 +274,10 @@ class CastDuplexView : public views::View {
   // Overridden from views::View.
   void Layout() override;
 
+  // Only one of |select_view_| or |cast_view_| will be displayed at any given
+  // time. This will return the view is being displayed.
+  views::View* ActiveChildView();
+
   CastSelectDefaultView* select_view_;
   CastCastView* cast_view_;
 
@@ -288,34 +290,47 @@ CastDuplexView::CastDuplexView(SystemTrayItem* owner,
   select_view_ = new CastSelectDefaultView(owner, config_delegate, show_more);
   cast_view_ = new CastCastView(config_delegate);
   SetLayoutManager(new views::FillLayout());
-  AddChildView(select_view_);
-  AddChildView(cast_view_);
 
   ActivateSelectView();
 }
 
 CastDuplexView::~CastDuplexView() {
+  RemoveChildView(ActiveChildView());
+  delete select_view_;
+  delete cast_view_;
 }
 
 void CastDuplexView::ActivateCastView() {
-  select_view_->SetVisible(false);
-  cast_view_->SetVisible(true);
+  if (ActiveChildView() == cast_view_)
+    return;
+
+  RemoveChildView(select_view_);
+  AddChildView(cast_view_);
   InvalidateLayout();
 }
 
 void CastDuplexView::ActivateSelectView() {
-  select_view_->SetVisible(true);
-  cast_view_->SetVisible(false);
+  if (ActiveChildView() == select_view_)
+    return;
+
+  RemoveChildView(cast_view_);
+  AddChildView(select_view_);
   InvalidateLayout();
 }
 
 void CastDuplexView::Layout() {
   views::View::Layout();
 
-  if (select_view_->IsDrawn())
-    select_view_->SetBoundsRect(GetContentsBounds());
-  if (cast_view_->IsDrawn())
-    cast_view_->SetBoundsRect(GetContentsBounds());
+  select_view_->SetBoundsRect(GetContentsBounds());
+  cast_view_->SetBoundsRect(GetContentsBounds());
+}
+
+views::View* CastDuplexView::ActiveChildView() {
+  if (cast_view_->parent() == this)
+    return cast_view_;
+  if (select_view_->parent() == this)
+    return select_view_;
+  return nullptr;
 }
 
 // Exposes an icon in the tray. |TrayCast| manages the visiblity of this.
@@ -328,16 +343,12 @@ class CastTrayView : public TrayItemView {
   // itself.
   void UpdateAlignment(ShelfAlignment alignment);
 
-  // Returns a weak pointer to this instance.
-  base::WeakPtr<CastTrayView> AsWeakPtr();
-
  private:
-  base::WeakPtrFactory<CastTrayView> weak_ptr_factory_;
   DISALLOW_COPY_AND_ASSIGN(CastTrayView);
 };
 
 CastTrayView::CastTrayView(SystemTrayItem* tray_item)
-    : TrayItemView(tray_item), weak_ptr_factory_(this) {
+    : TrayItemView(tray_item) {
   CreateImageView();
 
   image_view()->SetImage(ui::ResourceBundle::GetSharedInstance()
@@ -363,10 +374,6 @@ void CastTrayView::UpdateAlignment(ShelfAlignment alignment) {
   }
   SetLayoutManager(new views::BoxLayout(layout, 0, 0, 0));
   Layout();
-}
-
-base::WeakPtr<CastTrayView> CastTrayView::AsWeakPtr() {
-  return weak_ptr_factory_.GetWeakPtr();
 }
 
 // This view displays a list of cast receivers that can be clicked on and casted
@@ -526,7 +533,8 @@ TrayCast::TrayCast(SystemTray* system_tray)
     : SystemTrayItem(system_tray),
       cast_config_delegate_(ash::Shell::GetInstance()
                                 ->system_tray_delegate()
-                                ->GetCastConfigDelegate()) {
+                                ->GetCastConfigDelegate()),
+      weak_ptr_factory_(this) {
   Shell::GetInstance()->AddShellObserver(this);
 }
 
@@ -574,21 +582,28 @@ bool TrayCast::HasCastExtension() {
          cast_config_delegate_->HasCastExtension();
 }
 
+void TrayCast::TryActivateSelectViewCallback(
+    const CastConfigDelegate::ReceiversAndActivites& receivers_activities) {
+  default_->SetVisible(!receivers_activities.empty());
+}
+
 void TrayCast::UpdatePrimaryView() {
   if (HasCastExtension() == false) {
     if (default_)
       default_->SetVisible(false);
-    if (tray_) {
-      base::MessageLoopForUI::current()->PostTask(
-          FROM_HERE, base::Bind(&tray::CastTrayView::SetVisible,
-                                tray_->AsWeakPtr(), false));
-    }
+    if (tray_)
+      tray_->SetVisible(false);
   } else {
     if (default_) {
-      if (is_casting_)
+      if (is_casting_) {
         default_->ActivateCastView();
-      else
+      } else {
         default_->ActivateSelectView();
+        // We only want to show the Select view if we have a device to cast to.
+        cast_config_delegate_->GetReceiversAndActivities(
+            base::Bind(&TrayCast::TryActivateSelectViewCallback,
+                       weak_ptr_factory_.GetWeakPtr()));
+      }
     }
 
     if (tray_)

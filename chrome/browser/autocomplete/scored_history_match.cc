@@ -31,11 +31,6 @@ const int kDaysToPrecomputeRecencyScoresFor = 366;
 // capped at the score of the largest bucket.
 const int kMaxRawTermScore = 30;
 
-// If true, assign raw scores to be max(whatever it normally would be, a score
-// that's similar to the score HistoryURL provider would assign). This variable
-// is set in the constructor by examining the field trial state.
-const bool kAlsoDoHupLikeScoring = false;
-
 // Pre-computed information to speed up calculating recency scores.
 // |days_ago_to_recency_score| is a simple array mapping how long ago a page was
 // visited (in days) to the recency score we should assign it.  This allows easy
@@ -114,6 +109,7 @@ void InitDaysAgoToRecencyScoreArray() {
 
 // static
 const size_t ScoredHistoryMatch::kMaxVisitsToScore = 10;
+bool ScoredHistoryMatch::also_do_hup_like_scoring_ = false;
 int ScoredHistoryMatch::bookmark_value_ = 1;
 bool ScoredHistoryMatch::fix_frequency_bugs_ = false;
 bool ScoredHistoryMatch::allow_tld_matches_ = false;
@@ -194,36 +190,53 @@ ScoredHistoryMatch::ScoredHistoryMatch(
     const URLPrefix* best_inlineable_prefix =
         URLPrefix::BestURLPrefix(gurl_spec, terms_vector[0]);
     if (best_inlineable_prefix) {
-      // Initialize innermost_match.
-      // The idea here is that matches that occur in the scheme or
-      // "www." are worse than matches which don't.  For the URLs
-      // "http://www.google.com" and "http://wellsfargo.com", we want
-      // the omnibox input "w" to cause the latter URL to rank higher
-      // than the former.  Note that this is not the same as checking
-      // whether one match's inlinable prefix has more components than
-      // the other match's, since in this example, both matches would
-      // have an inlinable prefix of "http://", which is one component.
-      //
-      // Instead, we look for the overall best (i.e., most components)
-      // prefix of the current URL, and then check whether the inlinable
-      // prefix has that many components.  If it does, this is an
-      // "innermost" match, and should be boosted.  In the example
-      // above, the best prefixes for the two URLs have two and one
-      // components respectively, while the inlinable prefixes each
-      // have one component; this means the first match is not innermost
-      // and the second match is innermost, resulting in us boosting the
-      // second match.
-      //
-      // Now, the code that implements this.
-      // The deepest prefix for this URL regardless of where the match is.
-      const URLPrefix* best_prefix =
-          URLPrefix::BestURLPrefix(gurl_spec, base::string16());
-      DCHECK(best_prefix);
-      // If the URL is inlineable, we must have a match.  Note the prefix that
-      // makes it inlineable may be empty.
-      can_inline = true;
-      innermost_match =
-          best_inlineable_prefix->num_components == best_prefix->num_components;
+      // When inline autocompleting this match, we're going to use the part of
+      // the URL following the end of the matching text.  However, it's possible
+      // that FormatUrl(), when formatting this suggestion for display,
+      // mucks with the text.  We need to ensure that the text we're thinking
+      // about highlighting isn't in the middle of a mucked sequence.  In
+      // particular, for the omnibox input of "x" or "xn", we may get a match
+      // in a punycoded domain name such as http://www.xn--blahblah.com/.
+      // When FormatUrl() processes the xn--blahblah part of the hostname, it'll
+      // transform the whole thing into a series of unicode characters.  It's
+      // impossible to give the user an inline autocompletion of the text
+      // following "x" or "xn" in this case because those characters no longer
+      // exist in the displayed URL string.
+      size_t offset =
+        best_inlineable_prefix->prefix.length() + terms_vector[0].length();
+      base::OffsetAdjuster::UnadjustOffset(adjustments, &offset);
+      if (offset != base::string16::npos) {
+        // Initialize innermost_match.
+        // The idea here is that matches that occur in the scheme or
+        // "www." are worse than matches which don't.  For the URLs
+        // "http://www.google.com" and "http://wellsfargo.com", we want
+        // the omnibox input "w" to cause the latter URL to rank higher
+        // than the former.  Note that this is not the same as checking
+        // whether one match's inlinable prefix has more components than
+        // the other match's, since in this example, both matches would
+        // have an inlinable prefix of "http://", which is one component.
+        //
+        // Instead, we look for the overall best (i.e., most components)
+        // prefix of the current URL, and then check whether the inlinable
+        // prefix has that many components.  If it does, this is an
+        // "innermost" match, and should be boosted.  In the example
+        // above, the best prefixes for the two URLs have two and one
+        // components respectively, while the inlinable prefixes each
+        // have one component; this means the first match is not innermost
+        // and the second match is innermost, resulting in us boosting the
+        // second match.
+        //
+        // Now, the code that implements this.
+        // The deepest prefix for this URL regardless of where the match is.
+        const URLPrefix* best_prefix =
+            URLPrefix::BestURLPrefix(gurl_spec, base::string16());
+        DCHECK(best_prefix);
+        // If the URL is inlineable, we must have a match.  Note the prefix that
+        // makes it inlineable may be empty.
+        can_inline = true;
+        innermost_match = (best_inlineable_prefix->num_components ==
+                           best_prefix->num_components);
+      }
     }
   }
 
@@ -233,7 +246,7 @@ ScoredHistoryMatch::ScoredHistoryMatch(
   raw_score = base::saturated_cast<int>(GetFinalRelevancyScore(
       topicality_score, frequency_score, *hqp_relevance_buckets_));
 
-  if (kAlsoDoHupLikeScoring && can_inline) {
+  if (also_do_hup_like_scoring_ && can_inline) {
     // HistoryURL-provider-like scoring gives any match that is
     // capable of being inlined a certain minimum score.  Some of these
     // are given a higher score that lets them be shown in inline.
@@ -376,7 +389,7 @@ void ScoredHistoryMatch::Init() {
     return;
 
   initialized = true;
-
+  also_do_hup_like_scoring_ = OmniboxFieldTrial::HQPAlsoDoHUPLikeScoring();
   bookmark_value_ = OmniboxFieldTrial::HQPBookmarkValue();
   fix_frequency_bugs_ = OmniboxFieldTrial::HQPFixFrequencyScoringBugs();
   allow_tld_matches_ = OmniboxFieldTrial::HQPAllowMatchInTLDValue();

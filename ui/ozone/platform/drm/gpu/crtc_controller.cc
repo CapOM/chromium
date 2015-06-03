@@ -69,13 +69,14 @@ bool CrtcController::Disable() {
 bool CrtcController::SchedulePageFlip(
     HardwareDisplayPlaneList* plane_list,
     const OverlayPlaneList& overlays,
+    bool test_only,
     scoped_refptr<PageFlipRequest> page_flip_request) {
   DCHECK(!page_flip_request_.get());
   DCHECK(!is_disabled_);
   const OverlayPlane* primary = OverlayPlane::GetPrimaryPlane(overlays);
   if (!primary) {
     LOG(ERROR) << "No primary plane to display on crtc " << crtc_;
-    page_flip_request->Signal();
+    page_flip_request->Signal(gfx::SwapResult::SWAP_ACK);
     return true;
   }
   DCHECK(primary->buffer.get());
@@ -85,19 +86,23 @@ bool CrtcController::SchedulePageFlip(
             << mode_.hdisplay << "x" << mode_.vdisplay << " got "
             << primary->buffer->GetSize().ToString() << " for"
             << " crtc=" << crtc_ << " connector=" << connector_;
-    page_flip_request->Signal();
+    page_flip_request->Signal(gfx::SwapResult::SWAP_ACK);
     return true;
   }
 
   if (!drm_->plane_manager()->AssignOverlayPlanes(plane_list, overlays, crtc_,
                                                   this)) {
     PLOG(ERROR) << "Failed to assign overlay planes for crtc " << crtc_;
-    page_flip_request->Signal();
+    page_flip_request->Signal(gfx::SwapResult::SWAP_FAILED);
     return false;
   }
 
-  pending_planes_ = overlays;
-  page_flip_request_ = page_flip_request;
+  if (test_only) {
+    page_flip_request->Signal(gfx::SwapResult::SWAP_ACK);
+  } else {
+    pending_planes_ = overlays;
+    page_flip_request_ = page_flip_request;
+  }
 
   return true;
 }
@@ -159,7 +164,7 @@ void CrtcController::SignalPageFlipRequest() {
     // locally to  avoid deleting the object we are making a call on.
     scoped_refptr<PageFlipRequest> last_request;
     last_request.swap(page_flip_request_);
-    last_request->Signal();
+    last_request->Signal(gfx::SwapResult::SWAP_ACK);
   }
 }
 

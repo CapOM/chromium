@@ -21,9 +21,12 @@ class MessageFilter;
 class MessageReplyDeserializer;
 }
 
-namespace content {
+namespace blink {
+enum class WebSandboxFlags;
+enum class WebTreeScopeType;
+}
 
-enum class SandboxFlags;
+namespace content {
 
 // This class is a very simple mock of RenderThread. It simulates an IPC channel
 // which supports only three messages:
@@ -44,7 +47,7 @@ class MockRenderThread : public RenderThread {
   IPC::SyncChannel* GetChannel() override;
   std::string GetLocale() override;
   IPC::SyncMessageFilter* GetSyncMessageFilter() override;
-  scoped_refptr<base::MessageLoopProxy> GetIOMessageLoopProxy() override;
+  scoped_refptr<base::SingleThreadTaskRunner> GetIOMessageLoopProxy() override;
   void AddRoute(int32 routing_id, IPC::Listener* listener) override;
   void RemoveRoute(int32 routing_id) override;
   int GenerateRoutingID() override;
@@ -134,8 +137,9 @@ class MockRenderThread : public RenderThread {
 
   // The Frame expects to be returned a valid route_id different from its own.
   void OnCreateChildFrame(int new_frame_routing_id,
+                          blink::WebTreeScopeType scope,
                           const std::string& frame_name,
-                          SandboxFlags sandbox_flags,
+                          blink::WebSandboxFlags sandbox_flags,
                           int* new_render_frame_id);
 
 #if defined(OS_WIN)

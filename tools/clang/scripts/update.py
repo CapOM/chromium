@@ -7,32 +7,40 @@
 update.sh. This script should replace update.sh on all platforms eventually."""
 
 import argparse
+import contextlib
+import cStringIO
 import os
 import re
 import shutil
 import subprocess
 import stat
 import sys
+import tarfile
 import time
+import urllib2
+import zipfile
 
 # Do NOT CHANGE this if you don't know what you're doing -- see
 # https://code.google.com/p/chromium/wiki/UpdatingClang
 # Reverting problematic clang rolls is safe, though.
 # Note: this revision is only used for Windows. Other platforms use update.sh.
-LLVM_WIN_REVISION = 'HEAD'
+# TODO(thakis): Use the same revision on Windows and non-Windows.
+# TODO(thakis): Remove update.sh, use update.py everywhere.
+LLVM_WIN_REVISION = '238562'
 
-# ASan on Windows is useful enough to use it even while the clang/win is still
-# in bringup. Use a pinned revision to make it slightly more stable.
-use_head_revision = ('LLVM_FORCE_HEAD_REVISION' in os.environ or
-  not re.search(r'\b(asan)=1', os.environ.get('GYP_DEFINES', '')))
+use_head_revision = 'LLVM_FORCE_HEAD_REVISION' in os.environ
+if use_head_revision:
+  LLVM_WIN_REVISION = 'HEAD'
 
-if not use_head_revision:
-  LLVM_WIN_REVISION = '235968'
 
 # Path constants. (All of these should be absolute paths.)
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 CHROMIUM_DIR = os.path.abspath(os.path.join(THIS_DIR, '..', '..', '..'))
-LLVM_DIR = os.path.join(CHROMIUM_DIR, 'third_party', 'llvm')
+THIRD_PARTY_DIR = os.path.join(CHROMIUM_DIR, 'third_party')
+LLVM_DIR = os.path.join(THIRD_PARTY_DIR, 'llvm')
+LLVM_BOOTSTRAP_DIR = os.path.join(THIRD_PARTY_DIR, 'llvm-bootstrap')
+LLVM_BOOTSTRAP_INSTALL_DIR = os.path.join(THIRD_PARTY_DIR,
+                                          'llvm-bootstrap-install')
 CHROME_TOOLS_SHIM_DIR = os.path.join(LLVM_DIR, 'tools', 'chrometools')
 LLVM_BUILD_DIR = os.path.join(CHROMIUM_DIR, 'third_party', 'llvm-build',
                               'Release+Asserts')
@@ -40,12 +48,40 @@ COMPILER_RT_BUILD_DIR = os.path.join(LLVM_BUILD_DIR, '32bit-compiler-rt')
 CLANG_DIR = os.path.join(LLVM_DIR, 'tools', 'clang')
 LLD_DIR = os.path.join(LLVM_DIR, 'tools', 'lld')
 COMPILER_RT_DIR = os.path.join(LLVM_DIR, 'projects', 'compiler-rt')
-STAMP_FILE = os.path.join(LLVM_BUILD_DIR, 'cr_build_revision')
+LLVM_BUILD_TOOLS_DIR = os.path.abspath(
+    os.path.join(LLVM_DIR, '..', 'llvm-build-tools'))
+STAMP_FILE = os.path.join(LLVM_DIR, '..', 'llvm-build', 'cr_build_revision')
 VERSION = '3.7.0'
+
+# URL for pre-built binaries.
+CDS_URL = 'https://commondatastorage.googleapis.com/chromium-browser-clang'
 
 LLVM_REPO_URL='https://llvm.org/svn/llvm-project'
 if 'LLVM_REPO_URL' in os.environ:
   LLVM_REPO_URL = os.environ['LLVM_REPO_URL']
+
+
+def DownloadUrl(url, output_file):
+  """Download url into output_file."""
+  CHUNK_SIZE = 4096
+  TOTAL_DOTS = 10
+  sys.stdout.write('Downloading %s ' % url)
+  sys.stdout.flush()
+  response = urllib2.urlopen(url)
+  total_size = int(response.info().getheader('Content-Length').strip())
+  bytes_done = 0
+  dots_printed = 0
+  while True:
+    chunk = response.read(CHUNK_SIZE)
+    if not chunk:
+      break
+    output_file.write(chunk)
+    bytes_done += len(chunk)
+    num_dots = TOTAL_DOTS * bytes_done / total_size
+    sys.stdout.write('.' * (num_dots - dots_printed))
+    sys.stdout.flush()
+    dots_printed = num_dots
+  print ' Done.'
 
 
 def ReadStampFile():
@@ -65,19 +101,11 @@ def WriteStampFile(s):
     f.write(s)
 
 
-def PrintRevision():
-  """Print the current Clang revision."""
-  # gyp runs update.py --print-revision even when clang isn't used.
-  # It won't use the value, but we must not error.
-  if not os.path.exists(LLVM_DIR):
-    print "0"
-    return
-
-  # TODO(hans): This needs an update when we move to prebuilt Clang binaries.
-  svn_info = subprocess.check_output(['svn', 'info', LLVM_DIR], shell=True)
+def GetSvnRevision(svn_repo):
+  """Returns current revision of the svn repo at svn_repo."""
+  svn_info = subprocess.check_output(['svn', 'info', svn_repo], shell=True)
   m = re.search(r'Revision: (\d+)', svn_info)
-  assert m
-  print m.group(1)
+  return m.group(1)
 
 
 def RmTree(dir):
@@ -161,27 +189,25 @@ def CreateChromeToolsShim():
     f.write('# two arg version to specify where build artifacts go. CMake\n')
     f.write('# disallows reuse of the same binary dir for multiple source\n')
     f.write('# dirs, so the build artifacts need to go into a subdirectory.\n')
-    f.write('add_subdirectory(${CHROMIUM_TOOLS_SRC} ' +
-            '${CMAKE_CURRENT_BINARY_DIR}/a)\n')
+    f.write('# dirs, so the build artifacts need to go into a subdirectory.\n')
+    f.write('if (CHROMIUM_TOOLS_SRC)\n')
+    f.write('  add_subdirectory(${CHROMIUM_TOOLS_SRC} ' +
+              '${CMAKE_CURRENT_BINARY_DIR}/a)\n')
+    f.write('endif (CHROMIUM_TOOLS_SRC)\n')
 
 
 def AddCMakeToPath():
-  """Look for CMake and add it to PATH if it's not there already."""
-  try:
-    # First check if cmake is already on PATH.
-    subprocess.call(['cmake', '--version'])
-    return
-  except OSError as e:
-    if e.errno != os.errno.ENOENT:
-      raise
-
-  cmake_dir = 'C:\\Program Files (x86)\\CMake\\bin'
-  if os.path.isdir(cmake_dir):
-    os.environ['PATH'] = os.environ.get('PATH', '') + os.pathsep + cmake_dir
-    return
-  print 'Failed to find CMake!'
-  sys.exit(1)
-
+  """Download CMake and add it to PATH."""
+  cmake_dir = os.path.join(LLVM_BUILD_TOOLS_DIR, 'cmake-3.2.2-win32-x86', 'bin')
+  if not os.path.exists(cmake_dir):
+    if not os.path.exists(LLVM_BUILD_TOOLS_DIR):
+      os.makedirs(LLVM_BUILD_TOOLS_DIR)
+    # The cmake archive is smaller than 20 MB, small enough to keep in memory:
+    with contextlib.closing(cStringIO.StringIO()) as f:
+      DownloadUrl(CDS_URL + '/tools/cmake-3.2.2-win32-x86.zip', f)
+      f.seek(0)
+      zipfile.ZipFile(f).extractall(path=LLVM_BUILD_TOOLS_DIR)
+  os.environ['PATH'] = cmake_dir + os.pathsep + os.environ.get('PATH', '')
 
 vs_version = None
 def GetVSVersion():
@@ -203,27 +229,39 @@ def GetVSVersion():
   return vs_version
 
 
-def SubversionCmakeArg():
-  # Since cmake's find_program can only find .exe and .com,
-  # svn.bat in depot_tools will be ignored.
-  default_pathext = ('.com', '.exe', '.bat', '.cmd')
-  for path in os.environ.get('PATH', '').split(os.pathsep):
-    for ext in default_pathext:
-      candidate = os.path.join(path, 'svn' + ext)
-      if os.path.isfile(candidate):
-        return '-DSubversion_SVN_EXECUTABLE=%s' % candidate
-  return ''
-
-
 def UpdateClang(args):
   print 'Updating Clang to %s...' % (LLVM_WIN_REVISION)
   if LLVM_WIN_REVISION != 'HEAD' and ReadStampFile() == LLVM_WIN_REVISION:
     print 'Already up to date.'
     return 0
 
-  AddCMakeToPath()
   # Reset the stamp file in case the build is unsuccessful.
   WriteStampFile('')
+
+  if not args.force_local_build:
+    # TODO(thakis): To make this work on posix, add a -1 suffix and use some
+    # PACKAGE_VERSION-like thing here instead. Also, don't hardcode Win.
+    cds_file = "clang-%s.tgz" %  LLVM_WIN_REVISION
+    cds_full_url = CDS_URL + '/Win/' + cds_file
+
+    # Check if there's a prebuilt binary and if so just fetch that. That's
+    # faster, and goma relies on having matching binary hashes on client and
+    # server too.
+    print 'Trying to download prebuilt clang'
+
+    # clang packages are smaller than 50 MB, small enough to keep in memory.
+    with contextlib.closing(cStringIO.StringIO()) as f:
+      try:
+        DownloadUrl(cds_full_url, f)
+        f.seek(0)
+        tarfile.open(mode='r:gz', fileobj=f).extractall(path=LLVM_BUILD_DIR)
+        print 'clang %s unpacked' % LLVM_WIN_REVISION
+        WriteStampFile(LLVM_WIN_REVISION)
+        return 0
+      except urllib2.HTTPError:
+        print 'Did not find prebuilt clang %s, building locally' % cds_file
+
+  AddCMakeToPath()
 
   DeleteChromeToolsShim();
   Checkout('LLVM', LLVM_REPO_URL + '/llvm/trunk', LLVM_DIR)
@@ -231,10 +269,6 @@ def UpdateClang(args):
   Checkout('LLD', LLVM_REPO_URL + '/lld/trunk', LLD_DIR)
   Checkout('compiler-rt', LLVM_REPO_URL + '/compiler-rt/trunk', COMPILER_RT_DIR)
   CreateChromeToolsShim();
-
-  if not os.path.exists(LLVM_BUILD_DIR):
-    os.makedirs(LLVM_BUILD_DIR)
-  os.chdir(LLVM_BUILD_DIR)
 
   # If building at head, define a macro that plugins can use for #ifdefing
   # out code that builds at head, but not at CLANG_REVISION or vice versa.
@@ -246,14 +280,54 @@ def UpdateClang(args):
   cflags += ' -DLLVM_FORCE_HEAD_REVISION'
   cxxflags += ' -DLLVM_FORCE_HEAD_REVISION'
 
-  cmake_args = ['-GNinja', '-DCMAKE_BUILD_TYPE=Release',
-                '-DLLVM_ENABLE_ASSERTIONS=ON', SubversionCmakeArg(),
-                '-DCMAKE_C_FLAGS=' + cflags,
-                '-DCMAKE_CXX_FLAGS=' + cxxflags,
-                '-DCHROMIUM_TOOLS_SRC=%s' % os.path.join(
-                    CHROMIUM_DIR, 'tools', 'clang'),
-                '-DCHROMIUM_TOOLS=%s' % ';'.join(args.tools)]
+  base_cmake_args = ['-GNinja', '-DCMAKE_BUILD_TYPE=Release',
+                      '-DLLVM_ENABLE_ASSERTIONS=ON']
 
+  cc, cxx = None, None
+  if args.bootstrap:
+    print 'Building bootstrap compiler'
+    if not os.path.exists(LLVM_BOOTSTRAP_DIR):
+      os.makedirs(LLVM_BOOTSTRAP_DIR)
+    os.chdir(LLVM_BOOTSTRAP_DIR)
+    bootstrap_args = base_cmake_args + [
+        '-DLLVM_TARGETS_TO_BUILD=host',
+        '-DLLVM_ENABLE_THREADS=OFF',
+        '-DCMAKE_INSTALL_PREFIX=' + LLVM_BOOTSTRAP_INSTALL_DIR,
+        '-DCMAKE_C_FLAGS=' + cflags,
+        '-DCMAKE_CXX_FLAGS=' + cxxflags,
+        ]
+    if cc is not None:  bootstrap_args.append('-DCMAKE_C_COMPILER=' + cc)
+    if cxx is not None: bootstrap_args.append('-DCMAKE_CXX_COMPILER=' + cxx)
+    RunCommand(GetVSVersion().SetupScript('x64') +
+               ['&&', 'cmake'] + bootstrap_args + [LLVM_DIR])
+    RunCommand(GetVSVersion().SetupScript('x64') + ['&&', 'ninja'])
+    if args.run_tests:
+      RunCommand(GetVSVersion().SetupScript('x64') +
+                 ['&&', 'ninja', 'check-all'])
+    RunCommand(GetVSVersion().SetupScript('x64') + ['&&', 'ninja', 'install'])
+    # TODO(thakis): Set these to clang / clang++ on posix once this script
+    # is used on posix.
+    cc = os.path.join(LLVM_BOOTSTRAP_INSTALL_DIR, 'bin', 'clang-cl.exe')
+    cxx = os.path.join(LLVM_BOOTSTRAP_INSTALL_DIR, 'bin', 'clang-cl.exe')
+    # CMake has a hard time with backslashes in compiler paths:
+    # https://stackoverflow.com/questions/13050827
+    cc = cc.replace('\\', '/')
+    cxx = cxx.replace('\\', '/')
+    print 'Building final compiler'
+
+  cmake_args = base_cmake_args + [
+      '-DCMAKE_C_FLAGS=' + cflags,
+      '-DCMAKE_CXX_FLAGS=' + cxxflags,
+      '-DCHROMIUM_TOOLS_SRC=%s' % os.path.join(CHROMIUM_DIR, 'tools', 'clang'),
+      '-DCHROMIUM_TOOLS=%s' % ';'.join(args.tools)]
+  # TODO(thakis): Append this to base_cmake_args instead once compiler-rt
+  # can build with clang-cl (http://llvm.org/PR23698)
+  if cc is not None:  cmake_args.append('-DCMAKE_C_COMPILER=' + cc)
+  if cxx is not None: cmake_args.append('-DCMAKE_CXX_COMPILER=' + cxx)
+
+  if not os.path.exists(LLVM_BUILD_DIR):
+    os.makedirs(LLVM_BUILD_DIR)
+  os.chdir(LLVM_BUILD_DIR)
   RunCommand(GetVSVersion().SetupScript('x64') +
              ['&&', 'cmake'] + cmake_args + [LLVM_DIR])
   RunCommand(GetVSVersion().SetupScript('x64') + ['&&', 'ninja', 'all'])
@@ -263,8 +337,17 @@ def UpdateClang(args):
   if not os.path.exists(COMPILER_RT_BUILD_DIR):
     os.makedirs(COMPILER_RT_BUILD_DIR)
   os.chdir(COMPILER_RT_BUILD_DIR)
+  # TODO(thakis): Add this once compiler-rt can build with clang-cl (see
+  # above).
+  #if args.bootstrap:
+    # The bootstrap compiler produces 64-bit binaries by default.
+    #cflags += ' -m32'
+    #cxxflags += ' -m32'
+  compiler_rt_args = base_cmake_args + [
+      '-DCMAKE_C_FLAGS=' + cflags,
+      '-DCMAKE_CXX_FLAGS=' + cxxflags]
   RunCommand(GetVSVersion().SetupScript('x86') +
-             ['&&', 'cmake'] + cmake_args + [LLVM_DIR])
+             ['&&', 'cmake'] + compiler_rt_args + [LLVM_DIR])
   RunCommand(GetVSVersion().SetupScript('x86') + ['&&', 'ninja', 'compiler-rt'])
 
   # TODO(hans): Make this (and the .gypi and .isolate files) version number
@@ -299,6 +382,10 @@ def UpdateClang(args):
     os.chdir(LLVM_BUILD_DIR)
     RunCommand(GetVSVersion().SetupScript('x64') +
                ['&&', 'ninja', 'cr-check-all'])
+  if args.run_tests:
+    os.chdir(LLVM_BUILD_DIR)
+    RunCommand(GetVSVersion().SetupScript('x64') +
+               ['&&', 'ninja', 'check-all'])
 
   WriteStampFile(LLVM_WIN_REVISION)
   print 'Clang update was successful.'
@@ -319,36 +406,59 @@ def main():
     # dup()ed sys.stdin is writable, try
     #   fd2 = os.dup(sys.stdin.fileno()); os.write(fd2, 'hi')
     # TODO: Fix gclient instead, http://crbug.com/95350
-    try:
-      stderr = os.fdopen(os.dup(sys.stdin.fileno()))
-    except:
-      stderr = sys.stderr
+    if '--no-stdin-hack' in sys.argv:
+      sys.argv.remove('--no-stdin-hack')
+      stderr = None
+    else:
+      try:
+        stderr = os.fdopen(os.dup(sys.stdin.fileno()))
+      except:
+        stderr = sys.stderr
     return subprocess.call(
         [os.path.join(os.path.dirname(__file__), 'update.sh')] + sys.argv[1:],
         stderr=stderr)
 
   parser = argparse.ArgumentParser(description='Build Clang.')
+  parser.add_argument('--bootstrap', action='store_true',
+                      help='first build clang with CC, then with itself.')
+  parser.add_argument('--if-needed', action='store_true',
+                      help="run only if the script thinks clang is needed")
+  parser.add_argument('--force-local-build', action='store_true',
+                      help="don't try to download prebuild binaries")
+  parser.add_argument('--print-revision', action='store_true',
+                      help='print current clang revision and exit.')
+  parser.add_argument('--run-tests', action='store_true',
+                      help='run tests after building; only for local builds')
   parser.add_argument('--tools', nargs='*',
+                      help='select which chrome tools to build',
                       default=['plugins', 'blink_gc_plugin'])
-  # For now, this flag is only used for the non-Windows flow, but argparser gets
-  # mad if it sees a flag it doesn't recognize.
-  parser.add_argument('--if-needed', action='store_true')
-  parser.add_argument('--print-revision', action='store_true')
-  parser.add_argument('--run-tests', action='store_true')
+  # For now, these flags are only used for the non-Windows flow, but argparser
+  # gets mad if it sees a flag it doesn't recognize.
+  parser.add_argument('--no-stdin-hack', action='store_true')
 
   args = parser.parse_args()
 
+  if args.if_needed:
+    if not re.search(r'\b(clang|asan)=1', os.environ.get('GYP_DEFINES', '')):
+      print 'Skipping Clang update (clang=1 was not set in GYP_DEFINES).'
+      return 0
+
+    if re.search(r'\b(make_clang_dir)=', os.environ.get('GYP_DEFINES', '')):
+      print 'Skipping Clang update (make_clang_dir= was set in GYP_DEFINES).'
+      return 0
+
+  global LLVM_WIN_REVISION
   if args.print_revision:
-    PrintRevision()
+    if use_head_revision:
+      print GetSvnRevision(LLVM_DIR)
+    else:
+      print LLVM_WIN_REVISION
     return 0
 
-  if not re.search(r'\b(clang|asan)=1', os.environ.get('GYP_DEFINES', '')):
-    print 'Skipping Clang update (clang=1 was not set in GYP_DEFINES).'
-    return 0
-
-  if re.search(r'\b(make_clang_dir)=', os.environ.get('GYP_DEFINES', '')):
-    print 'Skipping Clang update (make_clang_dir= was set in GYP_DEFINES).'
-    return 0
+  if LLVM_WIN_REVISION == 'HEAD':
+    # Use a real revision number rather than HEAD to make sure that the stamp
+    # file logic works.
+    LLVM_WIN_REVISION = GetSvnRevision(LLVM_REPO_URL)
 
   return UpdateClang(args)
 

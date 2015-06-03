@@ -31,6 +31,10 @@
 #include "ui/base/page_transition_types.h"
 #include "url/url_constants.h"
 
+#if !defined(OS_ANDROID)
+#include "content/browser/compositor/test/no_transport_image_transport_factory.h"
+#endif
+
 namespace content {
 
 class NavigatorTestWithBrowserSideNavigation
@@ -41,8 +45,20 @@ class NavigatorTestWithBrowserSideNavigation
   typedef RenderFrameHostManager::SiteInstanceDescriptor SiteInstanceDescriptor;
 
   void SetUp() override {
+#if !defined(OS_ANDROID)
+    ImageTransportFactory::InitializeForUnitTests(
+        scoped_ptr<ImageTransportFactory>(
+            new NoTransportImageTransportFactory));
+#endif
     EnableBrowserSideNavigation();
     RenderViewHostImplTestHarness::SetUp();
+  }
+
+  void TearDown() override {
+#if !defined(OS_ANDROID)
+    ImageTransportFactory::Terminate();
+#endif
+    RenderViewHostImplTestHarness::TearDown();
   }
 
   TestNavigationURLLoader* GetLoaderForNavigationRequest(
@@ -970,16 +986,11 @@ TEST_F(NavigatorTestWithBrowserSideNavigation, DataUrls) {
   contents()->NavigateAndCommit(kUrl1);
   FrameTreeNode* node = main_test_rfh()->frame_tree_node();
 
-  // Navigate to a data url.
+  // Navigate to a data url. The request should not have been sent to the IO
+  // thread but committed immediately.
   int entry_id = RequestNavigation(node, kUrl2);
   NavigationRequest* navigation_request = node->navigation_request();
   ASSERT_TRUE(navigation_request);
-  EXPECT_EQ(NavigationRequest::WAITING_FOR_RENDERER_RESPONSE,
-            navigation_request->state());
-  main_test_rfh()->SendBeforeUnloadACK(true);
-
-  // The request should not have been sent to the IO thread but committed
-  // immediately.
   EXPECT_EQ(NavigationRequest::RESPONSE_STARTED,
             navigation_request->state());
   EXPECT_FALSE(navigation_request->loader_for_testing());

@@ -14,8 +14,8 @@
 #include "android_webview/native/aw_quota_manager_bridge_impl.h"
 #include "android_webview/native/aw_web_contents_view_delegate.h"
 #include "android_webview/native/aw_web_preferences_populater_impl.h"
-#include "android_webview/native/public/aw_assets.h"
 #include "android_webview/renderer/aw_content_renderer_client.h"
+#include "base/android/apk_assets.h"
 #include "base/command_line.h"
 #include "base/cpu.h"
 #include "base/i18n/icu_util.h"
@@ -25,7 +25,7 @@
 #include "base/threading/thread_restrictions.h"
 #include "cc/base/switches.h"
 #include "components/external_video_surface/browser/android/external_video_surface_container_impl.h"
-#include "content/public/browser/android/browser_media_player_manager.h"
+#include "content/public/browser/android/browser_media_player_manager_register.h"
 #include "content/public/browser/browser_main_runner.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/common/content_descriptors.h"
@@ -60,7 +60,7 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
   BrowserViewRenderer::CalculateTileMemoryPolicy();
 
   base::CommandLine* cl = base::CommandLine::ForCurrentProcess();
-  cl->AppendSwitch(switches::kEnableBeginFrameScheduling);
+  cl->AppendSwitch(cc::switches::kEnableBeginFrameScheduling);
 
   // WebView uses the Android system's scrollbars and overscroll glow.
   cl->AppendSwitch(switches::kDisableOverscrollEdgeEffect);
@@ -90,6 +90,9 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
   // WebView does not currently support Web Speech API (crbug.com/487255)
   cl->AppendSwitch(switches::kDisableSpeechAPI);
 
+  // WebView does not currently support the Permissions API (crbug.com/490120)
+  cl->AppendSwitch(switches::kDisablePermissionsAPI);
+
   // WebView does not (yet) save Chromium data during shutdown, so add setting
   // for Chrome to aggressively persist DOM Storage to minimize data loss.
   // http://crbug.com/479767
@@ -112,12 +115,12 @@ bool AwMainDelegate::BasicStartupComplete(int* exit_code) {
   // TODO(gsennton) we should use
   // gin::IsolateHolder::kNativesFileName/kSnapshotFileName
   // here when those files have arch specific names http://crbug.com/455699
-  CHECK(AwAssets::RegisterAssetWithGlobalDescriptors(
+  CHECK(base::android::RegisterApkAssetWithGlobalDescriptors(
       kV8NativesDataDescriptor, kNativesFileName));
-  CHECK(AwAssets::RegisterAssetWithGlobalDescriptors(
+  CHECK(base::android::RegisterApkAssetWithGlobalDescriptors(
       kV8SnapshotDataDescriptor, kSnapshotFileName));
 #endif
-  CHECK(AwAssets::RegisterAssetWithGlobalDescriptors(
+  CHECK(base::android::RegisterApkAssetWithGlobalDescriptors(
       kAndroidICUDataDescriptor, base::i18n::kIcuDataFileName));
 
   return false;

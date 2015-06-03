@@ -5,10 +5,10 @@
 #include "components/view_manager/display_manager.h"
 
 #include "base/numerics/safe_conversions.h"
-#include "components/gpu/public/interfaces/gpu.mojom.h"
-#include "components/surfaces/public/interfaces/quads.mojom.h"
-#include "components/surfaces/public/interfaces/surfaces.mojom.h"
 #include "components/view_manager/connection_manager.h"
+#include "components/view_manager/public/interfaces/gpu.mojom.h"
+#include "components/view_manager/public/interfaces/quads.mojom.h"
+#include "components/view_manager/public/interfaces/surfaces.mojom.h"
 #include "components/view_manager/server_view.h"
 #include "components/view_manager/view_coordinate_conversions.h"
 #include "mojo/application/public/cpp/application_connection.h"
@@ -90,7 +90,11 @@ void DefaultDisplayManager::Init(
     ConnectionManager* connection_manager,
     mojo::NativeViewportEventDispatcherPtr event_dispatcher) {
   connection_manager_ = connection_manager;
-  app_impl_->ConnectToService("mojo:native_viewport_service",
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  // TODO(beng): should not need to connect to ourselves, should just
+  //             create the appropriate platform window directly.
+  request->url = mojo::String::From("mojo:view_manager");
+  app_impl_->ConnectToService(request.Pass(),
                               &native_viewport_);
   native_viewport_.set_error_handler(this);
   native_viewport_->Create(metrics_.size->Clone(),
@@ -101,7 +105,9 @@ void DefaultDisplayManager::Init(
   mojo::ContextProviderPtr context_provider;
   native_viewport_->GetContextProvider(GetProxy(&context_provider));
   mojo::DisplayFactoryPtr display_factory;
-  app_impl_->ConnectToService("mojo:surfaces_service", &display_factory);
+  mojo::URLRequestPtr request2(mojo::URLRequest::New());
+  request2->url = mojo::String::From("mojo:surfaces_service");
+  app_impl_->ConnectToService(request2.Pass(), &display_factory);
   display_factory->Create(context_provider.Pass(),
                           nullptr,  // returner - we never submit resources.
                           GetProxy(&display_));

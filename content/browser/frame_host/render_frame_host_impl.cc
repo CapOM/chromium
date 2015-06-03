@@ -166,7 +166,7 @@ RenderFrameHostImpl::RenderFrameHostImpl(SiteInstance* site_instance,
       weak_ptr_factory_(this) {
   bool is_swapped_out = !!(flags & CREATE_RF_SWAPPED_OUT);
   bool hidden = !!(flags & CREATE_RF_HIDDEN);
-  frame_tree_->RegisterRenderFrameHost(this);
+  frame_tree_->AddRenderViewHostRef(render_view_host_);
   GetProcess()->AddRoute(routing_id_, this);
   g_routing_id_frame_map.Get().insert(std::make_pair(
       RenderFrameHostID(GetProcess()->GetID(), routing_id_),
@@ -207,7 +207,7 @@ RenderFrameHostImpl::~RenderFrameHostImpl() {
 
   // Notify the FrameTree that this RFH is going away, allowing it to shut down
   // the corresponding RenderViewHost if it is no longer needed.
-  frame_tree_->UnregisterRenderFrameHost(this);
+  frame_tree_->ReleaseRenderViewHostRef(render_view_host_);
 
   // NULL out the swapout timer; in crash dumps this member will be null only if
   // the dtor has run.
@@ -263,6 +263,11 @@ gfx::NativeView RenderFrameHostImpl::GetNativeView() {
   if (!view)
     return NULL;
   return view->GetNativeView();
+}
+
+void RenderFrameHostImpl::AddMessageToConsole(ConsoleMessageLevel level,
+                                              const std::string& message) {
+  Send(new FrameMsg_AddMessageToConsole(routing_id_, level, message));
 }
 
 void RenderFrameHostImpl::ExecuteJavaScript(
@@ -645,15 +650,16 @@ bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
 }
 
 bool RenderFrameHostImpl::IsRenderFrameLive() {
-  // RenderFrames are created for main frames at the same time as RenderViews,
-  // so we rely on IsRenderViewLive.  For subframes, we keep track of each
-  // RenderFrame individually with render_frame_created_.
-  bool is_live = !GetParent() ?
-      render_view_host_->IsRenderViewLive() :
-      GetProcess()->HasConnection() && render_frame_created_;
+  bool is_live = GetProcess()->HasConnection() && render_frame_created_;
+
+  // If the process is for an isolated guest (e.g. <webview>), rely on the
+  // RenderViewHost liveness check. Once https://crbug.com/492830 is fixed,
+  // this can be removed.
+  if (GetProcess()->IsIsolatedGuest())
+    is_live = render_view_host_->IsRenderViewLive();
 
   // Sanity check: the RenderView should always be live if the RenderFrame is.
-  DCHECK(!is_live || render_view_host_->IsRenderViewLive());
+  DCHECK_IMPLIES(is_live, render_view_host_->IsRenderViewLive());
 
   return is_live;
 }
@@ -705,9 +711,11 @@ void RenderFrameHostImpl::OnAddMessageToConsole(
   }
 }
 
-void RenderFrameHostImpl::OnCreateChildFrame(int new_routing_id,
-                                             const std::string& frame_name,
-                                             SandboxFlags sandbox_flags) {
+void RenderFrameHostImpl::OnCreateChildFrame(
+    int new_routing_id,
+    blink::WebTreeScopeType scope,
+    const std::string& frame_name,
+    blink::WebSandboxFlags sandbox_flags) {
   // It is possible that while a new RenderFrameHost was committed, the
   // RenderFrame corresponding to this host sent an IPC message to create a
   // frame and it is delivered after this host is swapped out.
@@ -717,7 +725,7 @@ void RenderFrameHostImpl::OnCreateChildFrame(int new_routing_id,
 
   RenderFrameHostImpl* new_frame =
       frame_tree_->AddFrame(frame_tree_node_, GetProcess()->GetID(),
-                            new_routing_id, frame_name, sandbox_flags);
+                            new_routing_id, scope, frame_name, sandbox_flags);
   if (!new_frame)
     return;
 
@@ -1104,16 +1112,6 @@ void RenderFrameHostImpl::OnRenderProcessGone(int status, int exit_code) {
     iter.second.Run(ui::AXTreeUpdate());
   ax_tree_snapshot_callbacks_.clear();
 
-  if (frame_tree_node_->IsMainFrame()) {
-    // RenderViewHost/RenderWidgetHost needs to reset some stuff.
-    render_view_host_->RendererExited(
-        render_view_host_->render_view_termination_status_, exit_code);
-
-    render_view_host_->delegate_->RenderViewTerminated(
-        render_view_host_, static_cast<base::TerminationStatus>(status),
-        exit_code);
-  }
-
   // Note: don't add any more code at this point in the function because
   // |this| may be deleted. Any additional cleanup should happen before
   // the last block of code here.
@@ -1236,8 +1234,9 @@ void RenderFrameHostImpl::OnDidAssignPageId(int32 page_id) {
   render_view_host_->page_id_ = page_id;
 }
 
-void RenderFrameHostImpl::OnDidChangeSandboxFlags(int32 frame_routing_id,
-                                                  SandboxFlags flags) {
+void RenderFrameHostImpl::OnDidChangeSandboxFlags(
+    int32 frame_routing_id,
+    blink::WebSandboxFlags flags) {
   FrameTree* frame_tree = frame_tree_node()->frame_tree();
   FrameTreeNode* child =
       frame_tree->FindByRoutingID(GetProcess()->GetID(), frame_routing_id);
@@ -1813,7 +1812,8 @@ void RenderFrameHostImpl::SetUpMojoIfNeeded() {
 
   RegisterMojoServices();
   RenderFrameSetupPtr setup;
-  GetProcess()->GetServiceRegistry()->ConnectToRemoteService(&setup);
+  GetProcess()->GetServiceRegistry()->ConnectToRemoteService(
+      mojo::GetProxy(&setup));
 
   mojo::ServiceProviderPtr exposed_services;
   service_registry_->Bind(GetProxy(&exposed_services));

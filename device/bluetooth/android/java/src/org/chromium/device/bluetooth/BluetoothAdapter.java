@@ -41,36 +41,11 @@ final class BluetoothAdapter {
     // ---------------------------------------------------------------------------------------------
     // Construction and handler for C++ object destruction.
 
-    @CalledByNative
-    private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid) {
-        return new BluetoothAdapter(context, nativeBluetoothAdapterAndroid);
-    }
-
-    @CalledByNative
-    private static BluetoothAdapter createWithoutPermissionForTesting(
-            Context context, long nativeBluetoothAdapterAndroid) {
-        Context contextWithoutPermission = new ContextWrapper(context) {
-            @Override
-            public int checkCallingOrSelfPermission(String permission) {
-                return PackageManager.PERMISSION_DENIED;
-            }
-        };
-        return new BluetoothAdapter(contextWithoutPermission, nativeBluetoothAdapterAndroid);
-    }
-
     // Constructs a BluetoothAdapter.
-    private BluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid) {
+    private BluetoothAdapter(long nativeBluetoothAdapterAndroid, boolean hasPermissions,
+            boolean hasLowEnergyFeature, android.bluetooth.BluetoothAdapter adapter) {
         mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
         final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
-        final boolean hasPermissions =
-                context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
-                        == PackageManager.PERMISSION_GRANTED
-                && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
-                        == PackageManager.PERMISSION_GRANTED;
-        final boolean hasLowEnergyFeature =
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
-                && context.getPackageManager().hasSystemFeature(
-                           PackageManager.FEATURE_BLUETOOTH_LE);
         // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
         mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
         if (!mHasBluetoothCapability) {
@@ -86,11 +61,16 @@ final class BluetoothAdapter {
             return;
         }
 
-        mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
-        if (mAdapter == null) {
-            Log.i(TAG, "No adapter found.");
+        if (adapter == null) {
+            mAdapter = android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+            if (mAdapter == null) {
+                Log.i(TAG, "BluetoothAdapter initialized, but default adapter not found.");
+            } else {
+                Log.i(TAG, "BluetoothAdapter initialized with default adapter.");
+            }
         } else {
-            Log.i(TAG, "BluetoothAdapter successfully constructed.");
+            mAdapter = adapter;
+            Log.i(TAG, "BluetoothAdapter initialized with provided adapter.");
         }
     }
 
@@ -112,6 +92,42 @@ final class BluetoothAdapter {
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
+
+    // Implements BluetoothAdapterAndroid::CreateAdapter.
+    @CalledByNative
+    private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid) {
+        final boolean hasPermissions =
+                context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
+                        == PackageManager.PERMISSION_GRANTED
+                && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
+                        == PackageManager.PERMISSION_GRANTED;
+        final boolean hasLowEnergyFeature =
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
+                && context.getPackageManager().hasSystemFeature(
+                           PackageManager.FEATURE_BLUETOOTH_LE);
+        return new BluetoothAdapter(nativeBluetoothAdapterAndroid, hasPermissions,
+                hasLowEnergyFeature, /* adapter */ null);
+    }
+
+    // Implements BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting.
+    @CalledByNative
+    private static BluetoothAdapter createWithoutPermissionForTesting(
+            Context context, long nativeBluetoothAdapterAndroid) {
+        return new BluetoothAdapter(nativeBluetoothAdapterAndroid, /* hasPermissions */ false,
+                /* hasLowEnergyFeature */ true, /* adapter */ null);
+    }
+
+    // Implements BluetoothAdapterAndroid::CreateAdapterWithFakeAdapterForTesting.
+    @CalledByNative
+    private static BluetoothAdapter createWithFakeAdapterForTesting(
+            Context context, long nativeBluetoothAdapterAndroid) {
+        // TODO:  A real testing adapter.
+        android.bluetooth.BluetoothAdapter testingAdapter =
+                android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+        BluetoothAdapter adapter = new BluetoothAdapter(nativeBluetoothAdapterAndroid,
+                /* hasPermissions */ true, /* hasLowEnergyFeature */ true, testingAdapter);
+        return adapter;
+    }
 
     // Implements BluetoothAdapterAndroid::HasBluetoothCapability.
     @CalledByNative
@@ -174,12 +190,17 @@ final class BluetoothAdapter {
         }
 
         mNumDiscoverySessions++;
-        Log.d(TAG, "addDiscoverySession: Now %d sessions", mNumDiscoverySessions);
+        Log.d(TAG, "addDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
         if (mNumDiscoverySessions > 1) {
             return true;
         }
 
-        return startScan();
+        if (startScan()) {
+            return true;
+        } else {
+            mNumDiscoverySessions--;
+            return false;
+        }
     }
 
     // Implements BluetoothAdapterAndroid::RemoveDiscoverySession.
@@ -194,10 +215,10 @@ final class BluetoothAdapter {
         --mNumDiscoverySessions;
 
         if (mNumDiscoverySessions == 0) {
-            Log.d(TAG, "removeDiscoverySession: Stopping scan.");
+            Log.d(TAG, "removeDiscoverySession: Now 0 sessions. Stopping scan.");
             return stopScan();
         } else {
-            Log.d(TAG, "removeDiscoverySession: Now %d sessions", mNumDiscoverySessions);
+            Log.d(TAG, "removeDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
         }
         return true;
     }
@@ -261,16 +282,8 @@ final class BluetoothAdapter {
         @Override
         public void onScanFailed(int errorCode) {
             Log.w(TAG, "onScanFailed: %d", errorCode);
-            // DISCUSS IN CODE REVIEW.
-            //
-            // TODO(scheib): Current device/bluetooth API doesn't support a way to communicate
-            // this asynchronous failure. If there was a way to communicate asynchronous
-            // success, then the response to AddDiscoverySession would be delayed until then or
-            // this error. But without only the error we must presume success.
-            //
-            //
-            // NEED ISSUE NUMBER.
             nativeOnScanFailed(mNativeBluetoothAdapterAndroid);
+            mNumDiscoverySessions = 0;
         }
     }
 

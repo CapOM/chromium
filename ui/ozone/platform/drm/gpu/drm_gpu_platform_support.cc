@@ -150,7 +150,7 @@ class DrmGpuPlatformSupportMessageFilter : public IPC::MessageFilter {
     if (!OzoneGpuMsg_CursorSet::Read(&message, &param))
       return;
 
-    int frame_delay_ms = get<3>(param);
+    int frame_delay_ms = base::get<3>(param);
     cursor_animating_ = frame_delay_ms != 0;
   }
 
@@ -182,7 +182,7 @@ DrmGpuPlatformSupport::~DrmGpuPlatformSupport() {
 }
 
 void DrmGpuPlatformSupport::AddHandler(scoped_ptr<GpuPlatformSupport> handler) {
-  handlers_.push_back(handler.release());
+  handlers_.push_back(handler.Pass());
 }
 
 void DrmGpuPlatformSupport::OnChannelEstablished(IPC::Sender* sender) {

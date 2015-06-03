@@ -90,6 +90,10 @@
       'cloud_devices/common/cloud_devices_urls_unittest.cc',
       'cloud_devices/common/printer_description_unittest.cc',
     ],
+    'component_updater_unittest_sources': [
+      'component_updater/component_updater_service_unittest.cc',
+      'component_updater/timer_unittest.cc',
+    ],
     'content_settings_unittest_sources': [
       'content_settings/core/browser/content_settings_mock_provider.cc',
       'content_settings/core/browser/content_settings_mock_provider.h',
@@ -146,6 +150,7 @@
       'dom_distiller/core/distiller_url_fetcher_unittest.cc',
       'dom_distiller/core/dom_distiller_model_unittest.cc',
       'dom_distiller/core/dom_distiller_service_unittest.cc',
+      'dom_distiller/core/dom_distiller_request_view_base_unittest.cc',
       'dom_distiller/core/dom_distiller_store_unittest.cc',
       'dom_distiller/core/page_features_unittest.cc',
       'dom_distiller/core/task_tracker_unittest.cc',
@@ -428,6 +433,8 @@
       'precache/core/precache_url_table_unittest.cc',
     ],
     'proximity_auth_unittest_sources': [
+      'proximity_auth/ble/bluetooth_low_energy_connection_finder_unittest.cc',
+      'proximity_auth/ble/proximity_auth_ble_system_unittest.cc',
       'proximity_auth/bluetooth_connection_finder_unittest.cc',
       'proximity_auth/bluetooth_connection_unittest.cc',
       'proximity_auth/bluetooth_throttler_impl_unittest.cc',
@@ -438,7 +445,9 @@
       'proximity_auth/cryptauth/cryptauth_api_call_flow_unittest.cc',
       'proximity_auth/cryptauth/cryptauth_client_impl_unittest.cc',
       'proximity_auth/cryptauth/cryptauth_enroller_impl_unittest.cc',
+      'proximity_auth/cryptauth/cryptauth_enrollment_manager_unittest.cc',
       'proximity_auth/cryptauth/fake_secure_message_delegate_unittest.cc',
+      'proximity_auth/cryptauth/sync_scheduler_impl_unittest.cc',
       'proximity_auth/logging/logging_unittest.cc',
       'proximity_auth/proximity_auth_system_unittest.cc',
       'proximity_auth/remote_status_update_unittest.cc',
@@ -460,6 +469,7 @@
       'rappor/sampler_unittest.cc',
     ],
     'scheduler_unittest_sources': [
+      'scheduler/child/idle_helper_unittest.cc',
       'scheduler/child/nestable_task_runner_for_test.cc',
       'scheduler/child/nestable_task_runner_for_test.h',
       'scheduler/child/prioritizing_task_queue_selector_unittest.cc',
@@ -659,6 +669,7 @@
         '<@(browser_watcher_unittest_sources)',
         '<@(captive_portal_unittest_sources)',
         '<@(cloud_devices_unittest_sources)',
+        '<@(component_updater_unittest_sources)',
         '<@(content_settings_unittest_sources)',
         '<@(crash_unittest_sources)',
         '<@(crx_file_unittest_sources)',
@@ -683,7 +694,6 @@
         '<@(network_time_unittest_sources)',
         '<@(omnibox_unittest_sources)',
         '<@(os_crypt_unittest_sources)',
-        '<@(ownership_unittest_sources)',
         '<@(packed_ct_ev_whitelist_unittest_sources)',
         '<@(password_manager_unittest_sources)',
         '<@(precache_unittest_sources)',
@@ -745,6 +755,7 @@
         'components.gyp:bookmarks_test_support',
         'components.gyp:captive_portal_test_support',
         'components.gyp:cloud_devices_common',
+        'components.gyp:component_updater',
         'components.gyp:content_settings_core_browser',
         'components.gyp:content_settings_core_common',
         'components.gyp:content_settings_core_test_support',
@@ -765,8 +776,6 @@
         'components.gyp:gcm_driver',
         'components.gyp:gcm_driver_test_support',
         'components.gyp:google_core_browser',
-        'components.gyp:guest_view',
-        'components.gyp:guest_view_test_support',
         'components.gyp:history_core_browser',
         'components.gyp:history_core_common',
         'components.gyp:history_core_test_support',
@@ -788,7 +797,6 @@
         'components.gyp:omnibox',
         'components.gyp:omnibox_test_support',
         'components.gyp:os_crypt',
-        'components.gyp:ownership',
         'components.gyp:packed_ct_ev_whitelist',
         'components.gyp:password_manager_core_browser',
         'components.gyp:password_manager_core_browser',
@@ -878,6 +886,9 @@
             'components.gyp:dom_distiller_content',
             'components.gyp:error_page_renderer',
             'components.gyp:favicon_content',
+            'components.gyp:guest_view_browser',
+            'components.gyp:guest_view_common',
+            'components.gyp:guest_view_test_support',
             'components.gyp:history_content_browser',
             'components.gyp:keyed_service_content',
             'components.gyp:navigation_interception',
@@ -1020,6 +1031,7 @@
           'dependencies': [
             'components.gyp:cronet_static',
             'components.gyp:data_reduction_proxy_content',
+            '../content/content.gyp:content_java',
             '../testing/android/native_test.gyp:native_test_native_code',
           ],
           'dependencies!': [
@@ -1064,12 +1076,14 @@
             'wifi_sync/wifi_credential_unittest.cc',
             'wifi_sync/wifi_security_class_chromeos_unittest.cc',
             'wifi_sync/wifi_security_class_unittest.cc',
+            '<@(ownership_unittest_sources)',
           ],
           'sources!': [
             'storage_monitor/storage_monitor_linux_unittest.cc',
           ],
           'dependencies': [
             '../chromeos/chromeos.gyp:chromeos_test_support',
+            'components.gyp:ownership',
             'components.gyp:pairing',
             'components.gyp:user_manager_test_support',
             'components.gyp:wifi_sync',
@@ -1206,17 +1220,6 @@
           'includes': [ '../build/android/jinja_template.gypi' ],
         },
         {
-          'target_name': 'components_browsertests_jni_headers',
-          'type': 'none',
-          'sources': [
-            'test/android/browsertests_apk/src/org/chromium/components_browsertests_apk/ComponentsBrowserTestsActivity.java',
-          ],
-          'variables': {
-            'jni_gen_package': 'content/shell',
-          },
-          'includes': [ '../build/jni_generator.gypi' ],
-        },
-        {
           # TODO(GN)
           'target_name': 'components_browsertests_apk',
           'type': 'none',
@@ -1230,14 +1233,13 @@
             'components_browsertests',
           ],
           'variables': {
-            'apk_name': 'components_browsertests',
+            'test_suite_name': 'components_browsertests',
             'java_in_dir': 'test/android/browsertests_apk',
             'android_manifest_path': '<(SHARED_INTERMEDIATE_DIR)/components_browsertests_manifest/AndroidManifest.xml',
             'resource_dir': 'test/android/browsertests_apk/res',
-            'native_lib_target': 'libcomponents_browsertests',
             'asset_location': '<(PRODUCT_DIR)/components_browsertests_apk_shell/assets',
           },
-          'includes': [ '../build/java_apk.gypi' ],
+          'includes': [ '../build/apk_browsertest.gypi' ],
         },
       ],
     }],
@@ -1323,16 +1325,13 @@
           'conditions': [
             ['OS == "android"', {
               'sources' : [
-                'test/android/browsertests_apk/components_browser_tests_android.cc',
-                'test/android/browsertests_apk/components_browser_tests_android.h',
                 'test/android/browsertests_apk/components_browser_tests_jni_onload.cc',
               ],
               'sources!': [
                 'autofill/content/browser/risk/fingerprint_browsertest.cc',
               ],
               'dependencies': [
-                '../testing/android/native_test.gyp:native_test_util',
-                'components_browsertests_jni_headers',
+                '../testing/android/native_test.gyp:native_test_support',
               ],
             }],
             ['OS == "linux"', {

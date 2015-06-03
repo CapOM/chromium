@@ -4,7 +4,6 @@
 
 #include "components/tracing/child_trace_message_filter.h"
 
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/trace_event/trace_event.h"
 #include "components/tracing/child_memory_dump_manager_delegate_impl.h"
 #include "components/tracing/tracing_messages.h"
@@ -15,9 +14,9 @@ using base::trace_event::TraceLog;
 namespace tracing {
 
 ChildTraceMessageFilter::ChildTraceMessageFilter(
-    base::MessageLoopProxy* ipc_message_loop)
+    base::SingleThreadTaskRunner* ipc_task_runner)
     : sender_(NULL),
-      ipc_message_loop_(ipc_message_loop),
+      ipc_task_runner_(ipc_task_runner),
       pending_memory_dump_guid_(0) {
 }
 
@@ -59,14 +58,13 @@ ChildTraceMessageFilter::~ChildTraceMessageFilter() {}
 
 void ChildTraceMessageFilter::OnBeginTracing(
     const std::string& category_filter_str,
-    base::TimeTicks browser_time,
+    base::TraceTicks browser_time,
     const std::string& options) {
 #if defined(__native_client__)
   // NaCl and system times are offset by a bit, so subtract some time from
   // the captured timestamps. The value might be off by a bit due to messaging
   // latency.
-  base::TimeDelta time_offset = base::TimeTicks::NowFromSystemTraceTime() -
-      browser_time;
+  base::TimeDelta time_offset = base::TraceTicks::Now() - browser_time;
   TraceLog::GetInstance()->SetTimeOffset(time_offset);
 #endif
   base::trace_event::TraceOptions trace_options;
@@ -90,7 +88,7 @@ void ChildTraceMessageFilter::OnEndTracing() {
 
 void ChildTraceMessageFilter::OnEnableMonitoring(
     const std::string& category_filter_str,
-    base::TimeTicks browser_time,
+    base::TraceTicks browser_time,
     const std::string& options) {
   base::trace_event::TraceOptions trace_options;
   trace_options.SetFromString(options);
@@ -132,8 +130,9 @@ void ChildTraceMessageFilter::OnCancelWatchEvent() {
 }
 
 void ChildTraceMessageFilter::OnWatchEventMatched() {
-  if (!ipc_message_loop_->BelongsToCurrentThread()) {
-    ipc_message_loop_->PostTask(FROM_HERE,
+  if (!ipc_task_runner_->BelongsToCurrentThread()) {
+    ipc_task_runner_->PostTask(
+        FROM_HERE,
         base::Bind(&ChildTraceMessageFilter::OnWatchEventMatched, this));
     return;
   }
@@ -143,10 +142,10 @@ void ChildTraceMessageFilter::OnWatchEventMatched() {
 void ChildTraceMessageFilter::OnTraceDataCollected(
     const scoped_refptr<base::RefCountedString>& events_str_ptr,
     bool has_more_events) {
-  if (!ipc_message_loop_->BelongsToCurrentThread()) {
-    ipc_message_loop_->PostTask(FROM_HERE,
-        base::Bind(&ChildTraceMessageFilter::OnTraceDataCollected, this,
-                   events_str_ptr, has_more_events));
+  if (!ipc_task_runner_->BelongsToCurrentThread()) {
+    ipc_task_runner_->PostTask(
+        FROM_HERE, base::Bind(&ChildTraceMessageFilter::OnTraceDataCollected,
+                              this, events_str_ptr, has_more_events));
     return;
   }
   if (events_str_ptr->data().size()) {
@@ -163,13 +162,11 @@ void ChildTraceMessageFilter::OnTraceDataCollected(
 void ChildTraceMessageFilter::OnMonitoringTraceDataCollected(
      const scoped_refptr<base::RefCountedString>& events_str_ptr,
      bool has_more_events) {
-  if (!ipc_message_loop_->BelongsToCurrentThread()) {
-    ipc_message_loop_->PostTask(FROM_HERE,
-        base::Bind(&ChildTraceMessageFilter::
-                   OnMonitoringTraceDataCollected,
-                   this,
-                   events_str_ptr,
-                   has_more_events));
+  if (!ipc_task_runner_->BelongsToCurrentThread()) {
+    ipc_task_runner_->PostTask(
+        FROM_HERE,
+        base::Bind(&ChildTraceMessageFilter::OnMonitoringTraceDataCollected,
+                   this, events_str_ptr, has_more_events));
     return;
   }
   sender_->Send(new TracingHostMsg_MonitoringTraceDataCollected(

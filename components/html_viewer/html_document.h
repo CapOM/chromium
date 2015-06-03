@@ -15,6 +15,7 @@
 #include "components/view_manager/public/cpp/view_manager_delegate.h"
 #include "components/view_manager/public/cpp/view_observer.h"
 #include "mandoline/services/navigation/public/interfaces/navigation.mojom.h"
+#include "mojo/application/public/cpp/app_lifetime_helper.h"
 #include "mojo/application/public/cpp/interface_factory.h"
 #include "mojo/application/public/cpp/lazy_interface_ptr.h"
 #include "mojo/application/public/cpp/service_provider_impl.h"
@@ -27,13 +28,7 @@
 #include "third_party/mojo/src/mojo/public/cpp/bindings/interface_impl.h"
 
 namespace base {
-class MessageLoopProxy;
-}
-
-namespace media {
-class CdmFactory;
-class MediaPermission;
-class WebEncryptedMediaClientImpl;
+class SingleThreadTaskRunner;
 }
 
 namespace mojo {
@@ -46,7 +41,6 @@ namespace html_viewer {
 class AxProviderImpl;
 class Setup;
 class WebLayerTreeViewImpl;
-class WebMediaPlayerFactory;
 
 // A view for a single HTML document.
 class HTMLDocument : public blink::WebViewClient,
@@ -65,7 +59,7 @@ class HTMLDocument : public blink::WebViewClient,
   // |shell| is the Shell connection for this mojo::Application.
   HTMLDocument(mojo::InterfaceRequest<mojo::ServiceProvider> services,
                mojo::URLResponsePtr response,
-               mojo::Shell* shell,
+               mojo::ShellPtr shell,
                Setup* setup);
   ~HTMLDocument() override;
 
@@ -87,25 +81,18 @@ class HTMLDocument : public blink::WebViewClient,
   virtual blink::WebMediaPlayer* createMediaPlayer(
       blink::WebLocalFrame* frame,
       const blink::WebURL& url,
-      blink::WebMediaPlayerClient* client);
-  virtual blink::WebMediaPlayer* createMediaPlayer(
-      blink::WebLocalFrame* frame,
-      const blink::WebURL& url,
       blink::WebMediaPlayerClient* client,
       blink::WebContentDecryptionModule* initial_cdm);
   virtual blink::WebFrame* createChildFrame(
       blink::WebLocalFrame* parent,
+      blink::WebTreeScopeType scope,
       const blink::WebString& frameName,
       blink::WebSandboxFlags sandboxFlags);
   virtual void frameDetached(blink::WebFrame*);
   virtual blink::WebCookieJar* cookieJar(blink::WebLocalFrame* frame);
   virtual blink::WebNavigationPolicy decidePolicyForNavigation(
-      blink::WebLocalFrame* frame,
-      blink::WebDataSource::ExtraData* data,
-      const blink::WebURLRequest& request,
-      blink::WebNavigationType nav_type,
-      blink::WebNavigationPolicy default_policy,
-      bool isRedirect);
+      const NavigationPolicyInfo& info);
+
   virtual void didAddMessageToConsole(const blink::WebConsoleMessage& message,
                                       const blink::WebString& source_name,
                                       unsigned source_line,
@@ -139,26 +126,17 @@ class HTMLDocument : public blink::WebViewClient,
 
   void Load(mojo::URLResponsePtr response);
 
-  media::MediaPermission* GetMediaPermission();
-  media::CdmFactory* GetCdmFactory();
-
+  scoped_ptr<mojo::AppRefCount> app_refcount_;
   mojo::URLResponsePtr response_;
   mojo::ServiceProviderImpl exported_services_;
   mojo::ServiceProviderPtr embedder_service_provider_;
-  mojo::Shell* shell_;
+  mojo::ShellPtr shell_;
   mojo::LazyInterfacePtr<mojo::NavigatorHost> navigator_host_;
   blink::WebView* web_view_;
   mojo::View* root_;
   mojo::ViewManagerClientFactory view_manager_client_factory_;
   scoped_ptr<WebLayerTreeViewImpl> web_layer_tree_view_impl_;
-  scoped_refptr<base::MessageLoopProxy> compositor_thread_;
-  WebMediaPlayerFactory* web_media_player_factory_;
-
-  // EncryptedMediaClient attached to this frame; lazily initialized.
-  scoped_ptr<media::WebEncryptedMediaClientImpl> web_encrypted_media_client_;
-
-  scoped_ptr<media::MediaPermission> media_permission_;
-  scoped_ptr<media::CdmFactory> cdm_factory_;
+  scoped_refptr<base::SingleThreadTaskRunner> compositor_thread_;
 
   // HTMLDocument owns these pointers; binding requests after document load.
   std::set<mojo::InterfaceRequest<mojo::AxProvider>*> ax_provider_requests_;

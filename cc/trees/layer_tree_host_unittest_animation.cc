@@ -231,7 +231,7 @@ class LayerTreeHostAnimationTestAddAnimationWithTimingFunction
 
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
-    content_ = FakeContentLayer::Create(&client_);
+    content_ = FakeContentLayer::Create(layer_settings(), &client_);
     content_->SetBounds(gfx::Size(4, 4));
     layer_tree_host()->root_layer()->AddChild(content_);
   }
@@ -280,7 +280,7 @@ class LayerTreeHostAnimationTestSynchronizeAnimationStartTimes
 
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
-    content_ = FakeContentLayer::Create(&client_);
+    content_ = FakeContentLayer::Create(layer_settings(), &client_);
     content_->SetBounds(gfx::Size(4, 4));
     content_->set_layer_animation_delegate(this);
     layer_tree_host()->root_layer()->AddChild(content_);
@@ -360,8 +360,8 @@ class LayerTreeHostAnimationTestDoNotSkipLayersWithAnimatedOpacity
     : public LayerTreeHostAnimationTest {
  public:
   LayerTreeHostAnimationTestDoNotSkipLayersWithAnimatedOpacity()
-      : update_check_layer_(FakeContentLayer::Create(&client_)) {
-  }
+      : update_check_layer_(
+            FakeContentLayer::Create(layer_settings(), &client_)) {}
 
   void SetupTree() override {
     update_check_layer_->SetOpacity(0.f);
@@ -410,7 +410,7 @@ class LayerTreeHostAnimationTestLayerAddedWithAnimation
 
   void DidCommit() override {
     if (layer_tree_host()->source_frame_number() == 1) {
-      scoped_refptr<Layer> layer = Layer::Create();
+      scoped_refptr<Layer> layer = Layer::Create(layer_settings());
       layer->set_layer_animation_delegate(this);
 
       // Any valid AnimationCurve will do here.
@@ -558,7 +558,7 @@ class LayerTreeHostAnimationTestRunAnimationWhenNotCanDraw
 
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
-    content_ = FakeContentLayer::Create(&client_);
+    content_ = FakeContentLayer::Create(layer_settings(), &client_);
     content_->SetBounds(gfx::Size(4, 4));
     content_->set_layer_animation_delegate(this);
     layer_tree_host()->root_layer()->AddChild(content_);
@@ -598,7 +598,7 @@ class LayerTreeHostAnimationTestCheckerboardDoesntStartAnimations
     : public LayerTreeHostAnimationTest {
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
-    content_ = FakeContentLayer::Create(&client_);
+    content_ = FakeContentLayer::Create(layer_settings(), &client_);
     content_->SetBounds(gfx::Size(4, 4));
     content_->set_layer_animation_delegate(this);
     layer_tree_host()->root_layer()->AddChild(content_);
@@ -684,7 +684,7 @@ class LayerTreeHostAnimationTestScrollOffsetChangesArePropagated
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
 
-    scroll_layer_ = FakeContentLayer::Create(&client_);
+    scroll_layer_ = FakeContentLayer::Create(layer_settings(), &client_);
     scroll_layer_->SetScrollClipLayerId(layer_tree_host()->root_layer()->id());
     scroll_layer_->SetBounds(gfx::Size(1000, 1000));
     scroll_layer_->SetScrollOffset(gfx::ScrollOffset(10, 20));
@@ -741,7 +741,7 @@ class LayerTreeHostAnimationTestScrollOffsetAnimationRemoval
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
 
-    scroll_layer_ = FakeContentLayer::Create(&client_);
+    scroll_layer_ = FakeContentLayer::Create(layer_settings(), &client_);
     scroll_layer_->SetScrollClipLayerId(layer_tree_host()->root_layer()->id());
     scroll_layer_->SetBounds(gfx::Size(10000, 10000));
     scroll_layer_->SetScrollOffset(gfx::ScrollOffset(100.0, 200.0));
@@ -860,7 +860,7 @@ class LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers
       AddOpacityTransitionToLayer(
           layer_tree_host()->root_layer(), 1, 0.f, 0.5f, true);
 
-      scoped_refptr<Layer> layer = Layer::Create();
+      scoped_refptr<Layer> layer = Layer::Create(layer_settings());
       layer_tree_host()->root_layer()->AddChild(layer);
       layer->set_layer_animation_delegate(this);
       layer->SetBounds(gfx::Size(4, 4));
@@ -928,6 +928,58 @@ class LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers
 SINGLE_AND_MULTI_THREAD_BLOCKNOTIFY_TEST_F(
     LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers);
 
+// When a layer with an animation is removed from the tree and later re-added,
+// the animation should resume.
+class LayerTreeHostAnimationTestAnimatedLayerRemovedAndAdded
+    : public LayerTreeHostAnimationTest {
+ public:
+  LayerTreeHostAnimationTestAnimatedLayerRemovedAndAdded() {}
+
+  void SetupTree() override {
+    LayerTreeHostAnimationTest::SetupTree();
+    content_ = Layer::Create(layer_settings());
+    content_->SetBounds(gfx::Size(4, 4));
+    layer_tree_host()->root_layer()->AddChild(content_);
+    AddOpacityTransitionToLayer(content_.get(), 10000.0, 0.1f, 0.9f, true);
+  }
+
+  void BeginTest() override { PostSetNeedsCommitToMainThread(); }
+
+  void DidCommit() override {
+    switch (layer_tree_host()->source_frame_number()) {
+      case 1:
+        content_->RemoveFromParent();
+        break;
+      case 2:
+        layer_tree_host()->root_layer()->AddChild(content_);
+        break;
+    }
+  }
+
+  void DidActivateTreeOnThread(LayerTreeHostImpl* host_impl) override {
+    switch (host_impl->active_tree()->source_frame_number()) {
+      case 0:
+        EXPECT_TRUE(host_impl->animation_registrar()->needs_animate_layers());
+        break;
+      case 1:
+        EXPECT_FALSE(host_impl->animation_registrar()->needs_animate_layers());
+        break;
+      case 2:
+        EXPECT_TRUE(host_impl->animation_registrar()->needs_animate_layers());
+        EndTest();
+        break;
+    }
+  }
+
+  void AfterTest() override {}
+
+ private:
+  scoped_refptr<Layer> content_;
+};
+
+SINGLE_AND_MULTI_THREAD_TEST_F(
+    LayerTreeHostAnimationTestAnimatedLayerRemovedAndAdded);
+
 class LayerTreeHostAnimationTestAddAnimationAfterAnimating
     : public LayerTreeHostAnimationTest {
  public:
@@ -936,7 +988,7 @@ class LayerTreeHostAnimationTestAddAnimationAfterAnimating
 
   void SetupTree() override {
     LayerTreeHostAnimationTest::SetupTree();
-    content_ = Layer::Create();
+    content_ = Layer::Create(layer_settings());
     content_->SetBounds(gfx::Size(4, 4));
     layer_tree_host()->root_layer()->AddChild(content_);
   }

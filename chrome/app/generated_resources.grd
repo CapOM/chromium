@@ -304,6 +304,9 @@ are declared in build/common.gypi.
       </if>
 
       <!-- Website Settings UI -->
+      <message name="IDS_WEBSITE_SETTINGS_TITLE" desc="Title for Website Settings dialog.">
+        Manage sites
+      </message>
       <message name="IDS_WEBSITE_SETTINGS_INFOBAR_TEXT" desc="The string shown in the infobar after the user has changed site permissions settings, reminding them to reload the page in order for the new settings to take effect.">
         New site permissions settings will take effect after reloading the page.
       </message>
@@ -927,6 +930,9 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           <message name="IDS_CONTENT_CONTEXT_ADDSEARCHENGINE" desc="The name of the Add as Search Engine command in the content area context menu">
             Add as search en&amp;gine...
           </message>
+          <message name="IDS_CONTENT_CONTEXT_FORCESAVEPASSWORD" desc="The name of the Save Password command in the content area context menu">
+            Save password
+          </message>
         </if>
         <if expr="use_titlecase">
           <message name="IDS_CONTENT_CONTEXT_BACK" desc="In Title Case: The name of the Back command in the content area context menu">
@@ -1143,6 +1149,9 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           </message>
           <message name="IDS_CONTENT_CONTEXT_ADDSEARCHENGINE" desc="In Title Case: The name of the Add as Search Engine command in the content area context menu">
             Add As Search En&amp;gine...
+          </message>
+          <message name="IDS_CONTENT_CONTEXT_FORCESAVEPASSWORD" desc="In Title Case: The name of the Save Password command in the content area context menu">
+            Save Password
           </message>
         </if>
       </if>
@@ -3461,109 +3470,6 @@ Even if you have downloaded files from this website before, the website might ha
         </message>
       </if>
 
-      <!-- Signed Certificate Timestamps (SCTs) viewer. Only used in Views -->
-      <if expr="toolkit_views">
-        <message name="IDS_SCT_VIEWER_TITLE" desc="Title of Signed Certificate Timestamps viewer window">
-          Signed Certificate Timestamps viewer
-        </message>
-        <message name="IDS_SCT_LOG_DESCRIPTION" desc="Name of the Certificate Transparency Log that issued this signed certificate timestamp">
-          Log name
-        </message>
-        <message name="IDS_SCT_VALIDATION_INFO" desc="Signed Certificate Timestamp validation status">
-          Validation status
-        </message>
-        <message name="IDS_SCT_STATUS_NONE" desc="SCT validation status: No SCT present">
-          Not present
-        </message>
-        <message name="IDS_SCT_STATUS_LOG_UNKNOWN" desc="SCT validation status: SCT from unknown log">
-          From an unknown log
-        </message>
-        <message name="IDS_SCT_STATUS_INVALID" desc="SCT validation status: Invalid">
-          Validation failed
-        </message>
-        <message name="IDS_SCT_STATUS_OK" desc="SCT validation status: Verified OK">
-          Verified
-        </message>
-        <message name="IDS_SCT_ORIGIN" desc="SCT Origin label">
-          Origin
-        </message>
-        <message name="IDS_SCT_ORIGIN_EMBEDDED" desc="SCT is embedded in the certificate">
-          Embedded
-        </message>
-        <message name="IDS_SCT_ORIGIN_TLS_EXTENSION" desc="SCT was provided during the TLS handshake">
-          TLS Extension
-        </message>
-        <message name="IDS_SCT_ORIGIN_OCSP" desc="SCT was extracted from the OCSP response">
-          OCSP response
-        </message>
-        <message name="IDS_SCT_ORIGIN_UNKNOWN" desc="SCT came from an unknown origin">
-          Unknown
-        </message>
-        <message name="IDS_SCT_VERSION_V1" desc="SCT Version 1">
-          V1
-        </message>
-        <message name="IDS_SCT_VERSION_UNKNOWN" desc="SCT with unknown version">
-          Unknown
-        </message>
-        <message name="IDS_SCT_VERSION" desc="Version of SCT">
-          Version
-        </message>
-        <message name="IDS_SCT_TIMESTAMP" desc="Time when the SCT was issued by the log">
-          Issued at
-        </message>
-        <message name="IDS_SCT_LOGID" desc="The ID of the Certificate Transparency log issuing this SCT (hex)">
-          Log ID
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM" desc="Hash algorithm used to hash the Precertificate that was signed">
-          Hash algorithm
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_NONE" desc="None / invalid hash algorithm">
-          None
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_MD5" desc="MD5 hash alrogithm">
-          MD5
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_SHA1" desc="SHA1 hash algorithm">
-          SHA-1
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_SHA224" desc="SHA224 hash algorithm">
-          SHA-224
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_SHA256" desc="SHA256 hash algorithm">
-          SHA-256
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_SHA384" desc="SHA384 hash algorithm">
-          SHA-384
-        </message>
-        <message name="IDS_SCT_HASH_ALGORITHM_SHA512" desc="SHA512 hash algorithm">
-          SHA-512
-        </message>
-        <message name="IDS_SCT_SIGNATURE_ALGORITHM" desc="Signature algorithm used to sign over the Precertificate's hash">
-          Signature algorithm
-        </message>
-        <message name="IDS_SCT_SIGNATURE_ALGORITHM_ANONYMOUS" desc="Unknown signature algorithm">
-          Anonymous
-        </message>
-        <message name="IDS_SCT_SIGNATURE_ALGORITHM_RSA" desc="RSA signature algorithm">
-          RSA
-        </message>
-        <message name="IDS_SCT_SIGNATURE_ALGORITHM_DSA" desc="DSA signature algorithm">
-          DSA
-        </message>
-        <message name="IDS_SCT_SIGNATURE_ALGORITHM_ECDSA" desc="ECDSA signature algorithm">
-          ECDSA
-        </message>
-        <message name="IDS_SCT_SIGNATURE_DATA" desc="The signature bytes (hex)">
-          Signature data
-        </message>
-        <message name="IDS_SCT_RAW_DATA_HELP" desc="Instructions on how to get the raw data.">
-          The raw data is available through NetLog. See help for more details.
-        </message>
-        <message name="IDS_SCT_CHOOSER_FORMAT" desc="Format of combobox information layout.">
-          <ph name="SCT_INDEX">$1<ex>1</ex></ph>: <ph name="SCT_ORIGIN">$2<ex>Embedded</ex></ph>, <ph name="SCT_STATUS">$3<ex>Verified</ex></ph>
-        </message>
-      </if>
-
       <if expr="chromeos">
         <message name="IDS_CERT_MANAGER_IMPORT_AND_BIND_BUTTON" desc="Label for the button in the certificate manager which allows you to import certificates and bind to your device.">
           Import and Bind to Device...
@@ -4411,13 +4317,13 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_EXTENSION_ALERT_ITEM_EXTERNAL" desc="A statement that an external extension has been newly installed. End users have no idea what an 'external' extension is, so we simply call them extensions.">
         The extension "<ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>" has been added.
       </message>
-      <message name="IDS_EXTENSION_ALERT_ITEM_BLACKLISTED" desc="A statement that an extension has been newly blacklisted. http://www.google.com/support/chrome/bin/answer.py?hl=en&amp;answer=1210215 contains the language on which we're basing the phrasing.">
+      <message name="IDS_EXTENSION_ALERT_ITEM_BLACKLISTED" desc="A statement that an extension has been newly blacklisted. https://support.google.com/chrome/answer/1210215 contains the language on which we're basing the phrasing.">
         The extension "<ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>" was automatically removed.
       </message>
       <message name="IDS_APP_ALERT_ITEM_EXTERNAL" desc="A statement that an external packaged app has been newly installed. End users have no idea what an 'external' app is, so we simply call them apps.">
         The app "<ph name="EXTENSION_NAME">$1<ex>Gmail</ex></ph>" has been added.
       </message>
-      <message name="IDS_APP_ALERT_ITEM_BLACKLISTED" desc="A statement that a packaged app has been newly blacklisted. http://www.google.com/support/chrome/bin/answer.py?hl=en&amp;answer=1210215 contains the language on which we're basing the phrasing.">
+      <message name="IDS_APP_ALERT_ITEM_BLACKLISTED" desc="A statement that a packaged app has been newly blacklisted. https://support.google.com/chrome/answer/1210215 contains the language on which we're basing the phrasing.">
         The app "<ph name="EXTENSION_NAME">$1<ex>Gmail</ex></ph>" was automatically removed.
       </message>
       <message name="IDS_EXTENSION_ALERT_ITEM_OK" desc="The title of the default button acknowledging the information presented.">
@@ -4634,6 +4540,9 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
       <message name="IDS_EXTENSION_PROMPT_WARNING_PASSWORDS_PRIVATE" desc="Permission string for access to passwords settings.">
         Read and change saved password settings
+      </message>
+      <message name="IDS_EXTENSION_PROMPT_WARNING_USERS_PRIVATE" desc="Permission string for access to user accounts.">
+        Read and change whitelisted users
       </message>
 
       <!-- Extension/App error messages -->
@@ -5073,6 +4982,12 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
       <message name="IDS_EXTENSIONS_LOCKED_SUPERVISED_USER" desc="The error message (either shown in the extensions UI or logged) informing a supervised user that extensions cannot be changed.">
         Applications and extensions cannot be modified by supervised users.
+      </message>
+      <message name="IDS_EXTENSIONS_INSTALLED_BY_CHILD_CUSTODIAN" desc="The text in the extensions UI informing a child user that an extension was installed by their parent and cannot be changed.">
+        Installed by your parent.
+      </message>
+      <message name="IDS_EXTENSIONS_INSTALLED_BY_SUPERVISED_USER_CUSTODIAN" desc="The text in the extensions UI informing a supervised user that an extension was installed by their custodian and cannot be changed">
+        Installed by your custodian.
       </message>
       <message name="IDS_GET_MORE_EXTENSIONS" desc="The text for getting more extensions. Displayed at bottom of extension management page when there is at least one extension installed.">
         Get more extensions
@@ -5733,8 +5648,20 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_SCROLL_PREDICTION_NAME" desc="Title of the flag which enables scroll prediction.">
         Enable scroll prediction
       </message>
+      <message name="IDS_FLAGS_TOP_CHROME_MD" desc="Title of the flag which enables or disables material design in the top chrome of the browser.">
+        Material design in the browser's top chrome
+      </message>
+      <message name="IDS_FLAGS_TOP_CHROME_MD_DESCRIPTION" desc="Description of the flag which enables or disables material design in the top chrome of the browser.">
+        Enable or disable material design elements in the browser's chrome.
+      </message>
       <message name="IDS_FLAGS_ENABLE_SCROLL_PREDICTION_DESCRIPTION" desc="Description of the flag to enable scroll prediction.">
         Predicts the finger's future position during scrolls allowing time to render the frame before the finger is there.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_ADD_TO_SHELF_NAME" desc="Title of the flag which enables add to shelf banners.">
+        Enable add to shelf
+      </message>
+      <message name="IDS_FLAGS_ENABLE_ADD_TO_SHELF_DESCRIPTION" desc="Description of the flag which enables add to shelf banners.">
+        Enable the display of add to shelf banners, which prompt a user to add a web app to their shelf, or other platform-specific equivalent.
       </message>
       <message name="IDS_FLAGS_BYPASS_APP_BANNER_ENGAGEMENT_CHECKS_NAME" desc="Title of the flag which bypasses the user engagement checks for app banners.">
         Bypass user engagement checks
@@ -5813,14 +5740,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_FLAGS_DISABLE_DIRECT_WRITE_DESCRIPTION" desc="Description of the 'Disable DirectWrite' lab.">
           Disables the use of experimental DirectWrite font rendering system.
-        </message>
-      </if>
-      <if expr="is_win or is_macosx">
-        <message name="IDS_FLAGS_ENABLE_NPAPI_NAME" desc="Name of the 'Enable NPAPI' lab.">
-          Enable NPAPI
-        </message>
-        <message name="IDS_FLAGS_ENABLE_NPAPI_DESCRIPTION" desc="Description of the 'Enable NPAPI' lab.">
-          Enables the use of NPAPI plugins. This flag will be removed in Chrome 45, along with NPAPI support. See g.co/npapi
         </message>
       </if>
       <message name="IDS_FLAGS_ENABLE_EXPERIMENTAL_CANVAS_FEATURES_NAME" desc="Name of the 'Enable experimental canvas features' lab.">
@@ -5945,10 +5864,10 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Direction
       </message>
       <message name="IDS_FLAGS_WALLET_SERVICE_USE_SANDBOX_NAME" desc="Title for the flag to use the Online Wallet sandbox servers (instead of production).">
-        Use Wallet sandbox servers
+        Use Google Payments sandbox servers
       </message>
       <message name="IDS_FLAGS_WALLET_SERVICE_USE_SANDBOX_DESCRIPTION" desc="Description of the flag to use the Online Wallet sandbox servers.">
-        For developers: use the sandbox service for Wallet API calls for requestAutocomplete().
+        For developers: use the sandbox service for Google Payments API calls for requestAutocomplete().
       </message>
       <message name="IDS_FLAGS_OVERSCROLL_HISTORY_NAVIGATION_NAME" desc="Title for the flag for history navigation from horizontal overscroll.">
         Overscroll history navigation
@@ -6000,6 +5919,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_DISABLE_WEBRTC_HW_ENCODING_DESCRIPTION" desc="Description of chrome:flags option to turn off WebRTC hardware video encoding support.">
         This option disables support in WebRTC for encoding video streams using platform hardware.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_WEBRTC_DTLS12_NAME" desc="Name of chrome:flags option to enable DTLS 1.2 for WebRTC">
+        Enable negotiation with DTLS 1.2 for WebRTC.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_WEBRTC_DTLS12_DESCRIPTION" desc="Description of chrome:flags option to enable DTLS 1.2 for WebRTC">
+        When enabled, WebRTC will try to negotiate DTLS 1.2.
       </message>
       <message name="IDS_FLAGS_ENABLE_WEBRTC_STUN_ORIGIN_NAME" desc="Name of chrome:flags option to turn on Origin header for WebRTC STUN messages">
         Enable support for WebRTC Stun origin header.
@@ -6104,6 +6029,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_ASH_SCREEN_ROTATION_ANIMATION_FULL_ROTATION" desc="Screen rotation animation option.">
           Full Rotation
+        </message>
+        <message name="IDS_FLAGS_ASH_STABLE_OVERVIEW_ORDER_NAME" desc="Title for the flag which enables a stable window order in overview mode.">
+          Use a stable window order in overview.
+        </message>
+        <message name="IDS_FLAGS_ASH_STABLE_OVERVIEW_ORDER_DESCRIPTION" desc="Description for the flag to enable a stable window order in overview mode.">
+          Uses a stable window ordering in overview mode which attempts to minimize movement of windows when entering / exiting overview and between overview sessions.
         </message>
         <message name="IDS_FLAGS_ASH_ENABLE_TOUCH_VIEW_TESTING_NAME" desc="Title for the flag which can be used to test the TouchView maximizing mode.">
           Enable TouchView maximizing UI for testing
@@ -6232,6 +6163,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_EXPERIMENTAL_WEB_PLATFORM_FEATURES_DESCRIPTION" desc="Description for the flag to enable experimental Web Platform features.">
         Enable experimental Web Platform features that are in development.
+      </message>
+      <message name="IDS_FLAGS_WEB_BLUETOOTH_NAME" desc="Name for the flag to enable Web Bluetooth.">
+        Enable Web Bluetooth.
+      </message>
+      <message name="IDS_FLAGS_WEB_BLUETOOTH_DESCRIPTION" desc="Description for the flag to enable Web Bluetooth.">
+        Enables Web Bluetooth which could allow websites to connect to and control Bluetooth devices around you. Including keyboards, cameras, microphones, etc.
       </message>
       <message name="IDS_FLAGS_NTP_OTHER_SESSIONS_MENU_NAME" desc="Name for the flag to disable the 'Other devices' menu on the NTP.">
         Disable NTP 'Other devices' menu.
@@ -6866,12 +6803,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_WEB_APP_FRAME_DESCRIPTION" desc="Description of the flag that enables the web app style frame for hosted apps.">
         Enables the web app style frame for hosted apps, including bookmark apps. This is currently only available for Ash.
       </message>
-      <message name="IDS_FLAGS_ENABLE_WEBSITE_SETTINGS_NAME" desc="Name of the flag that enables the website settings manager in chrome://settings.">
-        Enables the website settings manager.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_WEBSITE_SETTINGS_DESCRIPTION" desc="Description of the flag that enables the website settings manager in chrome://settings.">
-        Enables the website settings manager on the settings page.
-      </message>
       <message name="IDS_FLAGS_ENABLE_TAB_AUDIO_MUTING_NAME" desc="Name of the flag that enables the tab audio muting UI experiment in chrome://extensions.">
         Enable tab audio muting UI control.
       </message>
@@ -7460,6 +7391,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </if>
 
       <!-- Omnibox -->
+      <message name="IDS_FLAGS_EMPHASIZE_TITLES_IN_OMNIBOX_DROPDOWN_NAME" desc="Name for the flag that causes the omnibox dropdown to emphasize the titles of URLs">
+        Emphasize titles in the omnibox dropdown
+      </message>
+      <message name="IDS_FLAGS_EMPHASIZE_TITLES_IN_OMNIBOX_DROPDOWN_DESCRIPTION" desc="Description for the flag that causes the omnibox dropdown to emphasize the titles of URLs">
+        Causes the omnibox dropdown to sometimes display suggestion titles more prominently than URLs.
+      </message>
       <if expr="not use_titlecase">
         <message name="IDS_PASTE_AND_GO" desc="The text label of the Paste And Go menu item when the clipboard contains a URL">
           Pa&amp;ste and go
@@ -8443,74 +8380,6 @@ I don't think this site should be blocked!
       <message name="IDS_ZOOMLEVELS_MANAGE_BUTTON" desc="Button on the Content Settings dialog that opens a dialog to manage your page zoom levels (zoom levels indicate that a page should be shown for example at 110% magnification).">
         Manage...
       </message>
-
-      <message name="IDS_WEBSITE_SETTINGS_TITLE" desc="Title for Website Settings dialog.">
-        Manage sites
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_EDIT_TITLE" desc="Title for Website Settings site edit dialog.">
-        Site settings
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_COOKIES_DESCRIPTION" desc="Label for granting cookies permission on the Website Settings single site view dialog.">
-        Stores data
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_DOWNLOAD_DESCRIPTION" desc="Label for granting multiple automatic downloads permission on the Website Settings single site view dialog.">
-        Automatic downloads
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_JAVASCRIPT_DESCRIPTION" desc="Label for granting scripts permission on the Website Settings single site view dialog.">
-        Runs scripts
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_IMAGES_DESCRIPTION" desc="Label for granting images permission on the Website Settings single site view dialog.">
-        Displays images
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_LOCATION_DESCRIPTION" desc="Label for granting geolocation permission on the Website Settings single site view dialog.">
-        Knows device location
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_MANAGE" desc="The label on the button that launches the Websites Settings dialog.">
-        Manage...
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_MEDIASTREAM_DESCRIPTION" desc="Label for granting mediastream permission on the Website Settings single site view dialog.">
-        Uses camera and microphone
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_NOTIFICATIONS_DESCRIPTION" desc="Label for granting notifications permission on the Website Settings single site view dialog.">
-        Shows notifications
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_PLUGINS_DESCRIPTION" desc="Label for granting plugins permission on the Website Settings single site view dialog.">
-        Uses plugins
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_POPUPS_DESCRIPTION" desc="Label for granting popup permission on the Website Settings single site view dialog.">
-        Displays popups
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_SEARCH_ORIGINS" desc="Placeholder text shown in the search box in the Website Settings dialog.">
-        Search sites
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_STORAGE_USED" desc="The status text for how much local storage a website origin is using.">
-        <ph name="USAGE">$1<ex>2.0 KB</ex></ph> stored data
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_BATTERY_USED" desc="The status text for how much power a website origin is using.">
-        <ph name="USAGE">$1<ex>16</ex></ph>% of battery
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_STORAGE_CLEAR_BUTTON" desc="The 'Clear' button in the Website Settings single site view dialog.">
-        Clear
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_BATTERY_STOP_BUTTON" desc="The 'Stop' button in the Website Settings single site view dialog.">
-        Stop
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_BATTERY_PERCENT" desc="The percent from 1 to 100 of battery consumption from a given origin or app on the Website Settings dialog.">
-        <ph name="VALUE">$1<ex>100</ex></ph>%
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_BATTERY_ZERO_PERCENT" desc="The percent shown when less than 1% of battery was consumed from a given origin or app on the Website Settings dialog.">
-        &lt;1%
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_ALLOWED_LIST_TITLE" desc="Label above the list of allowed origins for a given permission on the Website Settings dialog.">
-        Allowed
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_BLOCKED_LIST_TITLE" desc="Label above the list of blocked origins for a given permission on the Website Settings dialog.">
-        Blocked
-      </message>
-      <message name="IDS_WEBSITE_SETTINGS_CONTENT_SETTING_ENABLED" desc="Label next to the checkbox that enables/disables a content setting.">
-        On
-      </message>
-
 
       <!-- Automatic updates -->
       <if expr="is_macosx">
@@ -9676,10 +9545,6 @@ I don't think this site should be blocked!
         The server's certificate appears to be a forgery.
       </message>
 
-      <message name="IDS_ERRORPAGES_DETAILS_SSL_UNSAFE_NEGOTIATION" desc="The error message displayed when the SSL renegotiation extension is missing.">
-        The SSL renegotiation extension was missing from the secure handshake. For some sites, which are known to support the renegotiation extension, Chrome requires a more secure handshake to prevent a class of known attacks. The omission of this extension suggests that your connection was intercepted and manipulated in transit.
-      </message>
-
       <message name="IDS_ERRORPAGES_HEADING_BAD_SSL_CLIENT_AUTH_CERT" desc="Heading in the error page for SSL client certificate authentication failure.">
         Certificate-based authentication failed
       </message>
@@ -9766,9 +9631,6 @@ I don't think this site should be blocked!
         <message name="IDS_PAGEINFO_CERT_INFO_BUTTON" desc="Text of button in the page info that shows the SSL certificate.">
           Certificate information
         </message>
-        <message name="IDS_PAGEINFO_CERT_TRANSPARENCY_INFO_BUTTON" desc="Text of button in the page info that shows Signed Certificate Timestamps.">
-          Transparency information
-        </message>
         <message name="IDS_PAGEINFO_RESET_INVALID_CERTIFICATE_DECISIONS_BUTTON" desc="Text of button in the page info that resets allow/deny decisions of invalid certificates.">
           Stop using an invalid certificate
         </message>
@@ -9776,9 +9638,6 @@ I don't think this site should be blocked!
       <if expr="use_titlecase">
         <message name="IDS_PAGEINFO_CERT_INFO_BUTTON" desc="In Title Case: Text of button in the page info that shows the SSL certificate.">
           Certificate Information
-        </message>
-        <message name="IDS_PAGEINFO_CERT_TRANSPARENCY_INFO_BUTTON" desc="Text of button in the page info that shows Signed Certificate Timestamps.">
-          Transparency Information
         </message>
         <message name="IDS_PAGEINFO_RESET_INVALID_CERTIFICATE_DECISIONS_BUTTON" desc="Text of button in the page info that resets allow/deny decisions of invalid certificates.">
           Stop using an invalid certificate
@@ -9941,7 +9800,7 @@ I don't think this site should be blocked!
       </message>
       <if expr="is_android or is_ios">
         <message name="IDS_MALWARE_V3_PRIMARY_PARAGRAPH" desc="Mobile: The primary explanatory paragraph for the malware interstitial.">
-          Attackers currently on <ph name="BEGIN_BOLD">&lt;strong&gt;</ph><ph name="SITE">$1<ex>example.com</ex></ph><ph name="END_BOLD">&lt;/strong&gt;</ph> might attempt to install dangerous programs on your device that steal or delete your information (for example, photos, passwords, messages, and credit cards).
+          Attackers currently on <ph name="BEGIN_BOLD">&lt;strong&gt;</ph><ph name="SITE">$1<ex>example.com</ex></ph><ph name="END_BOLD">&lt;/strong&gt;</ph> might attempt to install dangerous apps on your device that steal or delete your information (for example, photos, passwords, messages, and credit cards).
         </message>
       </if>
       <if expr="is_macosx">
@@ -10639,7 +10498,7 @@ Dead Jim feedback.
           Add a credit card
         </message>
         <message name="IDS_AUTOFILL_USE_WALLET_DATA" desc="The text for the checkbox that controls the Autofill/Wallet integration feature.">
-          Show addresses and credit cards from Google Wallet
+          Show addresses and credit cards from Google Payments
         </message>
 
         <message name="IDS_AUTOFILL_FIELD_LABEL_EMAIL" desc="The label of the Email entry.">
@@ -11048,13 +10907,13 @@ Dead Jim feedback.
           Pay
         </message>
         <message name="IDS_AUTOFILL_DIALOG_PAY_WITHOUT_WALLET" desc="This text is shown in a payment method chooser as a way for a user to pay with local Chrome Autofill data instead of using Wallet.">
-          Disable Google Wallet
+          Disable Google Payments
         </message>
         <message name="IDS_AUTOFILL_DIALOG_PAYING_WITHOUT_WALLET" desc="This text is shown as the click target for a dormant payment method chooser when using Chrome Autofill data instead of Wallet.">
-          Google Wallet disabled
+          Google Payments disabled
         </message>
         <message name="IDS_AUTOFILL_DIALOG_SIGN_IN" desc="This link text is shown when the user is not signed in to a GAIA account.">
-          Sign in to pay with Google Wallet
+          Sign in to pay with Google Payments
         </message>
         <message name="IDS_AUTOFILL_DIALOG_ADD_ACCOUNT" desc="This text is shown to allow the user to sign in to a different GAIA account (for multi-login).">
           Add account
@@ -11062,37 +10921,37 @@ Dead Jim feedback.
         <message name="IDS_AUTOFILL_DIALOG_CANCEL_SIGN_IN" desc="This link text is shown when the user is signing in to a GAIA account as a way to cancel sign in.">
           Back
         </message>
-        <message name="IDS_AUTOFILL_DIALOG_GOOGLE_WALLET" desc="The menu item that allows a user to select Google Wallet as their payment backend.">
-          Google Wallet
+        <message name="IDS_AUTOFILL_DIALOG_GOOGLE_WALLET" desc="The menu item that allows a user to select Google Payments as their payment backend.">
+          Google Payments
         </message>
 
         <!-- Autofill dialog: notification area -->
-        <message name="IDS_AUTOFILL_DIALOG_USE_WALLET" desc="Text that shows on top of the autofill dialog when using data Google Wallet already knows about the user.">
-          Protect your payment with Google Wallet.
+        <message name="IDS_AUTOFILL_DIALOG_USE_WALLET" desc="Text that shows on top of the autofill dialog when using data Google Payments already knows about the user.">
+          Protect your payment with Google Payments.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_USE_WALLET_LINK" desc="Text that shows as a link at the top of the autofill dialog to select to use Google wallet.">
-          Use Google Wallet
+          Use Google Payments
         </message>
-        <message name="IDS_AUTOFILL_DIALOG_SAVE_DETAILS_IN_WALLET" desc="Text that shows on the top of the autofill dialog promoting saving info in Google Wallet.">
-          Save and protect your details with Google Wallet.
+        <message name="IDS_AUTOFILL_DIALOG_SAVE_DETAILS_IN_WALLET" desc="Text that shows on the top of the autofill dialog promoting saving info in Google Payments.">
+          Save and protect your details with Google Payments.
         </message>
-        <message name="IDS_AUTOFILL_DIALOG_SAVE_IN_WALLET_TOOLTIP" desc="Tooltip text that explains how Google Wallet integration works.">
-          A Google Wallet Virtual Card will be used for this transaction. A Virtual Card is a new card number so the seller never sees your real credit card number.
+        <message name="IDS_AUTOFILL_DIALOG_SAVE_IN_WALLET_TOOLTIP" desc="Tooltip text that explains how Google Payments integration works.">
+          A Google Payments Virtual Card will be used for this transaction. A Virtual Card is a new card number so the seller never sees your real credit card number.
         </message>
-        <message name="IDS_AUTOFILL_DIALOG_COMPLETE_WITHOUT_WALLET" desc="An error notification shown to users when Google Wallet is found to be unavailable.">
-          Oops, <ph name="WALLET_ERROR">$1<ex>Google Wallet is unavailable at this time.</ex></ph> You can complete this transaction without Google Wallet.
+        <message name="IDS_AUTOFILL_DIALOG_COMPLETE_WITHOUT_WALLET" desc="An error notification shown to users when Google Payments is found to be unavailable.">
+          Oops, <ph name="WALLET_ERROR">$1<ex>Google Payments is unavailable at this time.</ex></ph> You can complete this transaction without Google Payments.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_SITE_WARNING" desc="Text that explains that user data will be sent to the site.">
           The following details will be shared with <ph name="SITE">$1<ex>www.shopping.com</ex></ph>
         </message>
-        <message name="IDS_AUTOFILL_DIALOG_VERIFY_CVV" desc="Text explaining a user must enter their CVV to continuing submitting for security purposes (while using Google Wallet).">
+        <message name="IDS_AUTOFILL_DIALOG_VERIFY_CVV" desc="Text explaining a user must enter their CVV to continuing submitting for security purposes (while using Google Payments).">
           For your security, please verify your card details.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_NOT_PROD_WARNING" desc="Text warning the user that they're not using the Online Wallet production server, so their purchases probably wont succeed.">
-          Warning: You are not connected to production Wallet servers. Issued cards will be invalid.
+          Warning: You are not connected to production Google Payments servers. Issued cards will be invalid.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_FAILED_TO_SAVE_WALLET_DATA" desc="Text advising the user that there was an unrecoverable validation error on the wallet server.">
-          Could not save data to Wallet.
+          Could not save data to Google Payments.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_CHOOSE_DIFFERENT_WALLET_INSTRUMENT" desc="Text asking the user to choose a different payment method or address when using wallet.">
           More information is needed to complete this purchase.
@@ -11103,7 +10962,7 @@ Dead Jim feedback.
           Loading payment details
         </message>
         <message name="IDS_AUTOFILL_DIALOG_CARD_GENERATION_IN_PROGRESS" desc="Text the user sees while waiting for the wallet servers to respond with a generated card number.">
-          Generating Google Wallet Virtual Card...
+          Generating Google Payments Virtual Card...
         </message>
         <message name="IDS_AUTOFILL_DIALOG_CARD_GENERATION_DONE" desc="Text the user sees after the wallet servers respond with a generated card number.">
           Your Virtual Card is ready.
@@ -11111,28 +10970,28 @@ Dead Jim feedback.
 
         <!--- Autofill dialog: Wallet error messages -->
         <message name="IDS_AUTOFILL_WALLET_BUYER_ACCOUNT_ERROR" desc="Text explaining that the user's Wallet account cannot be used.">
-          There's something wrong with your Google Wallet account.
+          There's something wrong with your Google Payments account.
         </message>
         <message name="IDS_AUTOFILL_WALLET_BUYER_COUNTRY_NOT_SUPPORTED" desc="Text explaining that the user's Wallet Buyer Legal Address has a country which is unsupported. The text inside the |bars| is link text.">
-          Unfortunately, Google Wallet can only be used at this merchant by buyers with a US address. If you are a US resident, please |change your home address with Wallet| or pay without using Google Wallet.
+          Unfortunately, Google Payments can only be used at this merchant by buyers with a US address. If you are a US resident, please |change your home address with Google Payments| or pay without using Google Payments.
         </message>
-        <message name="IDS_AUTOFILL_WALLET_UNVERIFIED_KNOW_YOUR_CUSTOMER_STATUS" desc="Text explaining that Google Wallet failed/pending Know Your Customer (KYC) check. The text inside the |bars| is link text.">
+        <message name="IDS_AUTOFILL_WALLET_UNVERIFIED_KNOW_YOUR_CUSTOMER_STATUS" desc="Text explaining that Google Payments failed/pending Know Your Customer (KYC) check. The text inside the |bars| is link text.">
           We were unable to verify your account information. |Fix this problem|
         </message>
-        <message name="IDS_AUTOFILL_WALLET_UNSUPPORTED_MERCHANT" desc="Text explaining that the merchant is blacklisted for Google Wallet Chrome Payments due to compliance violation.">
-          Google Wallet is not supported with this merchant.
+        <message name="IDS_AUTOFILL_WALLET_UNSUPPORTED_MERCHANT" desc="Text explaining that the merchant is blacklisted for Google Payments Chrome Payments due to compliance violation.">
+          Google Payments is not supported with this merchant.
         </message>
         <message name="IDS_AUTOFILL_WALLET_SERVICE_UNAVAILABLE_ERROR" desc="Text explaining that Wallet is currently unavailable.">
-          Google Wallet is currently unavailable.
+          Google Payments is currently unavailable.
         </message>
         <message name="IDS_AUTOFILL_WALLET_UNKNOWN_ERROR" desc="Text explaining that Wallet encountered an unknown error.">
-          Google Wallet has encountered an error.
+          Google Payments has encountered an error.
         </message>
         <message name="IDS_AUTOFILL_WALLET_UNSUPPORTED_AGENT_OR_API_KEY" desc="Text explaining that Wallet encountered an error with the Chrome version or Google API key.">
-          Google Wallet doesn't support this version of Chrome or doesn't recognize your Google API key.
+          Google Payments doesn't support this version of Chrome or doesn't recognize your Google API key.
         </message>
         <message name="IDS_AUTOFILL_WALLET_BAD_TRANSACTION_AMOUNT" desc="Text explaining that the transaction amoutn is too big or otherwise unrecognized.">
-          Wallet can't handle this transaction.
+          Google Payments can't handle this transaction.
         </message>
         <message name="IDS_AUTOFILL_WALLET_ERROR_CODE_TOOLTIP" desc="Text shown in a (?) tooltip to explain which error Chrome encountered when trying to communicate with Online Wallet.">
           Error code: <ph name="ERROR_CODE">$1<ex>54</ex></ph>
@@ -11200,31 +11059,31 @@ Dead Jim feedback.
         </message>
 
         <!-- Autofill dialog: legal documents -->
-        <message name="IDS_AUTOFILL_DIALOG_LOCATION_DISCLOSURE" desc="Text at the bottom of the autofill dialog which stands alone to inform the user that they'll be sharing their location with Google Wallet if they choose to proceed.">
-          By clicking Continue you agree to use Google Wallet. To protect you from fraud, information about your computer (including its location) will be shared with Google Wallet.
+        <message name="IDS_AUTOFILL_DIALOG_LOCATION_DISCLOSURE" desc="Text at the bottom of the autofill dialog which stands alone to inform the user that they'll be sharing their location with Google Payments if they choose to proceed.">
+          By clicking Continue you agree to use Google Payments. To protect you from fraud, information about your computer (including its location) will be shared with Google Payments.
         </message>
-        <message name="IDS_AUTOFILL_DIALOG_LOCATION_DISCLOSURE_WITH_LEGAL_DOCS" desc="Text at the bottom of the autofill dialog which informs the user that they'll be sharing their location with Google Wallet if they choose to proceed, appended to a message about accepting other legal documents like Terms of Service.">
-          <ph name="LEGAL_DOC_AGREEMENT">$1<ex>By clicking Continue you agree to the Google Wallet Terms of Service and Privacy Policy.</ex></ph> To protect you from fraud, information about your computer (including its location) will be shared with Google Wallet.
+        <message name="IDS_AUTOFILL_DIALOG_LOCATION_DISCLOSURE_WITH_LEGAL_DOCS" desc="Text at the bottom of the autofill dialog which informs the user that they'll be sharing their location with Google Payments if they choose to proceed, appended to a message about accepting other legal documents like Terms of Service.">
+          <ph name="LEGAL_DOC_AGREEMENT">$1<ex>By clicking Continue you agree to the Google Payments Terms of Service and Privacy Policy.</ex></ph> To protect you from fraud, information about your computer (including its location) will be shared with Google Payments.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_LEGAL_LINKS_2" desc="Label at the bottom of the autofill dialog that is shown when a user needs to accept legal documents (ex: Privacy Policy, Terms Of Service).">
-          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Wallet Terms Of Service</ex></ph> and <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Privacy Policy</ex></ph>.
+          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Payments Terms Of Service</ex></ph> and <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Privacy Policy</ex></ph>.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_LEGAL_LINKS_3" desc="Label at the bottom of the autofill dialog that is shown when a user needs to accept legal documents (ex: Privacy Policy, Terms Of Service).">
-          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Wallet Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Privacy Policy</ex></ph>.
+          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Payments Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Privacy Policy</ex></ph>.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_LEGAL_LINKS_4" desc="Label at the bottom of the autofill dialog that is shown when a user needs to accept legal documents (ex: Privacy Policy, Terms Of Service).">
-          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Wallet Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Further Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_4">$4<ex>Privacy Policy</ex></ph>.
+          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Payments Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Further Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_4">$4<ex>Privacy Policy</ex></ph>.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_LEGAL_LINKS_5" desc="Label at the bottom of the autofill dialog that is shown when a user needs to accept legal documents (ex: Privacy Policy, Terms Of Service).">
-          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Wallet Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Further Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_4">$4<ex>Further Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_5">$5<ex>Privacy Policy</ex></ph>.
+          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Payments Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Further Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_4">$4<ex>Further Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_5">$5<ex>Privacy Policy</ex></ph>.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_LEGAL_LINKS_6" desc="Label at the bottom of the autofill dialog that is shown when a user needs to accept legal documents (ex: Privacy Policy, Terms Of Service).">
-          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Wallet Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Further Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_4">$4<ex>Further Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_5">$5<ex>Further Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_6">$6<ex>Privacy Policy</ex></ph>.
+          By clicking Continue you agree to the <ph name="LEGAL_DOC_LINK_TEXT_1">$1<ex>Google Payments Terms Of Service</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_2">$2<ex>Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_3">$3<ex>Further Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_4">$4<ex>Further Terms of Use</ex></ph>, <ph name="LEGAL_DOC_LINK_TEXT_5">$5<ex>Further Terms of Use</ex></ph>, and <ph name="LEGAL_DOC_LINK_TEXT_6">$6<ex>Privacy Policy</ex></ph>.
         </message>
 
         <!-- Autofill dialog: validation messages -->
         <message name="IDS_AUTOFILL_DIALOG_VALIDATION_WALLET_REQUIRES_TWO_NAMES" desc="Message displayed to user when card holder name validation for Wallet fails.">
-          Google Wallet requires at least a first and last name.
+          Google Payments requires at least a first and last name.
         </message>
         <message name="IDS_AUTOFILL_DIALOG_VALIDATION_INVALID_EMAIL_ADDRESS" desc="Message displayed to user when email address validation fails.">
           Invalid email address. Please check and try again.
@@ -11262,12 +11121,12 @@ Dead Jim feedback.
 
         <!-- Autofill dialog post-submit bubbles -->
         <message name="IDS_AUTOFILL_GENERATED_CREDIT_CARD_BUBBLE_TITLE" desc="Title of a bubble shown directly after a new card has been generated via Online Wallet using the Autofill dialog.">
-          Google Wallet is protecting your card
+          Google Payments is protecting your card
         </message>
-        <message name="IDS_AUTOFILL_GENERATED_CREDIT_CARD_BUBBLE_CONTENTS" desc="Text in the bubble explaining that a temporary card has been generated for the user's security by Google Wallet.">
-          Your card has been protected with the Google Wallet Virtual Card (<ph name="FRONTING_CREDIT_CARD">|$1|<ex>Visa - 1234</ex></ph>) and this number will appear on your receipt. This purchase will still be charged to your <ph name="BACKING_CREDIT_CARD">|$2|<ex>Visa - 5678</ex></ph>.
+        <message name="IDS_AUTOFILL_GENERATED_CREDIT_CARD_BUBBLE_CONTENTS" desc="Text in the bubble explaining that a temporary card has been generated for the user's security by Google Payments.">
+          Your card has been protected with the Google Payments Virtual Card (<ph name="FRONTING_CREDIT_CARD">|$1|<ex>Visa - 1234</ex></ph>) and this number will appear on your receipt. This purchase will still be charged to your <ph name="BACKING_CREDIT_CARD">|$2|<ex>Visa - 5678</ex></ph>.
         </message>
-        <message name="IDS_AUTOFILL_NEW_CREDIT_CARD_BUBBLE_LINK" desc="The text of a link at the bottom of the autofill dialog bubble that sends users to a Google Wallet billing/card management page.">
+        <message name="IDS_AUTOFILL_NEW_CREDIT_CARD_BUBBLE_LINK" desc="The text of a link at the bottom of the autofill dialog bubble that sends users to a Google Payments billing/card management page.">
           Manage credit cards
         </message>
       </if>
@@ -11297,7 +11156,7 @@ Dead Jim feedback.
         New card?
       </message>
       <message name="IDS_AUTOFILL_FROM_GOOGLE_ACCOUNT" desc="The name of the Google product that stores user addresses or credit cards in the cloud." formatter_data="android_java">
-        Google Wallet
+        Google Payments
       </message>
       <message name="IDS_AUTOFILL_CLEAR_LOCAL_COPY_BUTTON" desc="The label of the button that clears the local copy of a Wallet Credit Card." formatter_data="android_java">
         Clear copy
@@ -13610,6 +13469,9 @@ Some features may be unavailable.  Please check that the profile exists and you 
       <message name="IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_TEXT_INFOBAR" desc="A message that the browser shows after saving a password it has autogenerated for the user. This message appears in an infobar and contains a link to all the user's saved autogenerated passwords. The link text is a separate string in the translation console and appears here as placeholder text.">
         Password saved. You can access it and all your <ph name="SAVED_PASSWORDS_LINK">$1<ex>Google saved passwords</ex></ph> from any browser.
       </message>
+      <message name="IDS_MANAGE_PASSWORDS_CONFIRM_GENERATED_SMART_LOCK_TEXT_INFOBAR" desc="A message that the browser shows after saving a password it has autogenerated for the user if Smart Lock branding is enabled. This message appears in an infobar and contains a link to all the user's saved autogenerated passwords.">
+        Password saved. Access your passwords from any device at <ph name="MANAGEMENT_LINK">$1<ex>passwords.google.com</ex></ph>.
+      </message>
       <message name="IDS_MANAGE_PASSWORDS_LINK" desc="The text for a link to the user's saved passwords. This is inserted into an infobar or a bubble that the browser shows to the user. The infobar and the bubble use a separate string in the translation console that has a placeholder for this link title.">
         Google saved passwords
       </message>
@@ -14357,12 +14219,6 @@ After you create a new supervised user, you can manage their settings at any tim
         When enabled, the browser manages signing in and out of Google accounts.
       </message>
 
-      <message name="IDS_FLAGS_ENABLE_IFRAME_BASED_SIGNIN_NAME" desc="Title for the flag to enable iframe-based sign-in flows.">
-        Enables iframe-based Chrome sign-in flows. This flag overrides --enable-web-based-signin.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_IFRAME_BASED_SIGNIN_DESCRIPTION" desc="Description for the flag to enable iframe-based sign-in flows">
-        When enabled, will use an iframe-based Chrome sign-in flow; otherwise uses a webview-based flow.
-      </message>
       <message name="IDS_FLAGS_ENABLE_GOOGLE_PROFILE_INFO_NAME" desc="Title for the flag to enable the google profile information">
         Enable Google profile name and icon
       </message>
@@ -14370,10 +14226,10 @@ After you create a new supervised user, you can manage their settings at any tim
         Enables using Google information to populate the profile name and icon in the avatar menu.
       </message>
       <message name="IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS" desc="Name of the flag to force show the checkbox to save Wallet cards locally.">
-        Enable Wallet card saving checkbox
+        Enable Google Payments card saving checkbox
       </message>
       <message name="IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS_DESCRIPTION" desc="Name of the flag to force show the checkbox to save Wallet cards locally.">
-        Show the checkbox to offer local saving of a Wallet credit card downloaded from the server.
+        Show the checkbox to offer local saving of a credit card downloaded from the server.
       </message>
       <message name="IDS_FLAGS_ENABLE_OFFLINE_AUTO_RELOAD_NAME" desc="Name of the flag to make pages which failed to load while offline auto-reload">
         Enable Offline Auto-Reload Mode
@@ -14499,26 +14355,6 @@ After you create a new supervised user, you can manage their settings at any tim
         </message>
       </if>
 
-      <!-- Strings for controlling the minimum SSL/TLS version in about:flags. -->
-      <message name="IDS_FLAGS_SSL_VERSION_MIN_NAME" desc="Name of about::flags option to control the minimum supported SSL/TLS version">
-        Minimum SSL/TLS version supported.
-      </message>
-      <message name="IDS_FLAGS_SSL_VERSION_MIN_DESCRIPTION" desc="Description of about::flags option to control the minimum supported SSL/TLS version">
-        Configure the minimum SSL/TLS version that can be used when connecting to HTTPS servers.
-      </message>
-      <message name="IDS_FLAGS_SSL_VERSION_DEFAULT" desc="The description of the default value for the minimum SSL/TLS version.">
-        Default
-      </message>
-      <message name="IDS_FLAGS_SSL_VERSION_TLSV1" desc="Name of TLS 1.0. This is a technical term and it's very unlikely that any translation will be needed.">
-        TLS 1.0
-      </message>
-      <message name="IDS_FLAGS_SSL_VERSION_TLSV11" desc="Name of TLS 1.1. This is a technical term and it's very unlikely that any translation will be needed.">
-        TLS 1.1
-      </message>
-      <message name="IDS_FLAGS_SSL_VERSION_TLSV12" desc="Name of TLS 1.2. This is a technical term and it's very unlikely that any translation will be needed.">
-        TLS 1.2
-      </message>
-
       <!-- Strings for controlling credit card scanning feature in about:flags. -->
       <message name="IDS_FLAGS_ENABLE_CREDIT_CARD_SCAN_NAME" desc="The name of about:flags option to enable scanning of credit cards using device camera.">
         Credit card scanning
@@ -14565,14 +14401,6 @@ After you create a new supervised user, you can manage their settings at any tim
 
       <!-- Windows 8 Metro mode. -->
       <if expr="is_win">
-        <message name="IDS_METRO_FLOW_TAB_TITLE"
-                 desc="The dialog window title.">
-          Welcome to Chrome
-        </message>
-        <message name="IDS_METRO_FLOW_TITLE_SHORT"
-                 desc="The title at the top of the window guiding user through making Chrome default in Metro.">
-          Chrome is almost ready.
-        </message>
         <message name="IDS_METRO_FLOW_DESCRIPTION"
                  desc="Wordy description of what the set-Chrome-as-Metro flow is all about.">
           Click next to choose your default browser.
@@ -14580,10 +14408,6 @@ After you create a new supervised user, you can manage their settings at any tim
         <message name="IDS_METRO_FLOW_SET_DEFAULT"
                  desc="The label of the button invoking Windows8 default app settings window.">
           Next
-        </message>
-        <message name="IDS_METRO_FLOW_LOGO_STRING_ALT"
-                 desc="Alt text for the faded Chrome logo image.">
-            Chrome logo
         </message>
         <message name="IDS_METRO_MISSING_PLUGIN_PROMPT"
                  desc="Info Bar message to let user do something about the missing plugin">
@@ -14600,34 +14424,6 @@ After you create a new supervised user, you can manage their settings at any tim
         <message name="IDS_METRO_DOWNLOAD_COMPLETE_NOTIFICATION_TITLE"
                 desc="Title for notification displayed when a download request is completed">
           Download complete notification
-        </message>
-        <message name="IDS_WIN_DESKTOP_OPEN"
-                 desc="Text for the infobar button to open Chrome in desktop mode.">
-          Open Chrome on the desktop
-        </message>
-        <message name="IDS_WIN_DESKTOP_RESTART"
-                 desc="Text for the menu item to restart Chrome in desktop mode. Applies to Windows 8 only">
-          Relaunch Chrome on the desktop
-        </message>
-        <message name="IDS_WIN8_METRO_RESTART"
-                 desc="Text for the menu item to restart Chrome in metro. Applies to Windows 8 only">
-          Relaunch Chrome in Windows 8 mode
-        </message>
-        <message name="IDS_WIN8_PROMPT_TO_CLOSE_APPS_FOR_METRO"
-                 desc="Modal message box prompt shown to the user after requesting to relaunch in Windows 8 mode while packaged apps are running, which will require all packaged apps to be closed and then restarted. Dialog is shown with choices: OK, Cancel.">
-          Relaunching in Windows 8 mode will close and relaunch your Chrome apps.
-        </message>
-        <message name="IDS_WIN_CHROMEOS_RESTART"
-                 desc="Text for the menu item to restart chrome in chrome os. Aplies to Windows 7 only">
-          Relaunch in Chrome immersive mode
-        </message>
-        <message name="IDS_WIN_PROMPT_TO_CLOSE_APPS_FOR_CHROMEOS"
-                 desc="Modal message box prompt shown to the user after requesting to relaunch in Windows Chrome OS mode while packaged apps are running, which will require all packaged apps to be closed and then restarted. Dialog is shown with choices: OK, Cancel.">
-          Relaunching in Chrome immersive mode will close and relaunch your Chrome apps.
-        </message>
-        <message name="IDS_WIN_PROMPT_TO_CLOSE_APPS_FOR_DESKTOP"
-                 desc="Modal message box prompt shown to the user after requesting to relaunch in Desktop mode while packaged apps are running, which will require all packaged apps to be closed and then restarted. Dialog is shown with choices: OK, Cancel.">
-          Relaunching in Desktop mode will close and relaunch your Chrome apps.
         </message>
       </if>
 
@@ -14797,7 +14593,7 @@ After you create a new supervised user, you can manage their settings at any tim
           </message>
         </if>
         <message name="IDS_APP_LIST_SIGNIN_LEARN_MORE_LINK" desc="App launcher sign-in learn more URL.">
-          https://support.google.com/chrome/bin/answer.py?hl=[GRITLANGCODE]&amp;answer=165139&amp;p=settings_sign_in
+          https://support.google.com/chrome/?hl=[GRITLANGCODE]&amp;p=settings_sign_in
         </message>
         <message name="IDS_APP_LIST_SIGNIN_SETTINGS_TEXT" desc="App launcher sign-in settings link text.">
           App Launcher Settings
@@ -15103,22 +14899,6 @@ After you create a new supervised user, you can manage their settings at any tim
         Share
       </message>
 
-      <message name="IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_ONE_DAY">
-        Remember for one day
-      </message>
-      <message name="IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_THREE_DAYS">
-        Remember for three days
-      </message>
-      <message name="IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_ONE_WEEK">
-        Remember for one week
-      </message>
-      <message name="IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_ONE_MONTH">
-        Remember for one month
-      </message>
-      <message name="IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_THREE_MONTHS">
-        Remember for three months
-      </message>
-
       <!-- Zero suggest experiment flags -->
       <if expr="is_android">
         <message name="IDS_FLAGS_ZERO_SUGGEST_EXPERIMENT_NAME" desc="An about:flags experiment for zero suggest">
@@ -15141,13 +14921,6 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
       <message name="IDS_FLAGS_ENABLE_SINGLE_CLICK_AUTOFILL_DESCRIPTION" desc="Description of the single click autofill lab">
         Make autofill suggestions on initial mouse click on a form element.
-      </message>
-
-      <message name="IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_NAME" desc="Name of a lab">
-        Import Wallet cards
-      </message>
-      <message name="IDS_FLAGS_ENABLE_WALLET_CARD_IMPORT_DESCRIPTION" desc="Description of a lab">
-        Import cards from my Wallet.
       </message>
 
       <if expr="is_android">

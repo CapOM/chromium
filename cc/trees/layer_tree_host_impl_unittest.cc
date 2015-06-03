@@ -65,7 +65,6 @@
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkMallocPixelRef.h"
-#include "ui/gfx/frame_time.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/geometry/vector2d_conversions.h"
@@ -110,7 +109,6 @@ class LayerTreeHostImplTest : public testing::Test,
     settings.impl_side_painting = true;
     settings.renderer_settings.texture_id_allocation_chunk_size = 1;
     settings.report_overscroll_only_for_scrollable_axes = true;
-    settings.use_pinch_virtual_viewport = true;
     settings.gpu_rasterization_enabled = true;
     return settings;
   }
@@ -181,6 +179,9 @@ class LayerTreeHostImplTest : public testing::Test,
         task_graph_runner_.get(), 0);
     bool init = host_impl_->InitializeRenderer(output_surface.Pass());
     host_impl_->SetViewportSize(gfx::Size(10, 10));
+    // Set the BeginFrameArgs so that methods which use it are able to.
+    host_impl_->WillBeginImplFrame(
+        CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE));
     return init;
   }
 
@@ -1718,7 +1719,7 @@ class LayerTreeHostImplTestScrollbarAnimation : public LayerTreeHostImplTest {
 
     SetupLayers(settings);
 
-    base::TimeTicks fake_now = gfx::FrameTime::Now();
+    base::TimeTicks fake_now = base::TimeTicks::Now();
 
     EXPECT_FALSE(did_request_animate_);
     EXPECT_FALSE(did_request_redraw_);
@@ -2529,8 +2530,6 @@ class LayerTreeHostImplTopControlsTest : public LayerTreeHostImplTest {
       : layer_size_(10, 10),
         clip_size_(layer_size_),
         top_controls_height_(50) {
-    settings_.use_pinch_virtual_viewport = true;
-
     viewport_size_ = gfx::Size(clip_size_.width(),
                                clip_size_.height() + top_controls_height_);
   }
@@ -5120,6 +5119,8 @@ TEST_F(LayerTreeHostImplTest, PartialSwapReceivesDamageRect) {
           settings, this, &proxy_, &stats_instrumentation_,
           shared_bitmap_manager_.get(), NULL, task_graph_runner_.get(), 0);
   layer_tree_host_impl->InitializeRenderer(output_surface.Pass());
+  layer_tree_host_impl->WillBeginImplFrame(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE));
   layer_tree_host_impl->SetViewportSize(gfx::Size(500, 500));
 
   scoped_ptr<LayerImpl> root =
@@ -5408,6 +5409,8 @@ static scoped_ptr<LayerTreeHostImpl> SetupLayersForOpacity(
   scoped_ptr<LayerTreeHostImpl> my_host_impl = LayerTreeHostImpl::Create(
       settings, client, proxy, stats_instrumentation, manager, NULL, NULL, 0);
   my_host_impl->InitializeRenderer(output_surface.Pass());
+  my_host_impl->WillBeginImplFrame(
+      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE));
   my_host_impl->SetViewportSize(gfx::Size(100, 100));
 
   /*
@@ -6905,7 +6908,7 @@ TEST_F(LayerTreeHostImplWithTopControlsTest, TopControlsAnimationAtOrigin) {
 
   // The top controls should properly animate until finished, despite the scroll
   // offset being at the origin.
-  base::TimeTicks animation_time = gfx::FrameTime::Now();
+  base::TimeTicks animation_time = base::TimeTicks::Now();
   while (did_request_animate_) {
     did_request_redraw_ = false;
     did_request_animate_ = false;
@@ -6975,7 +6978,7 @@ TEST_F(LayerTreeHostImplWithTopControlsTest, TopControlsAnimationAfterScroll) {
   EXPECT_FALSE(did_request_commit_);
 
   // Animate the top controls to the limit.
-  base::TimeTicks animation_time = gfx::FrameTime::Now();
+  base::TimeTicks animation_time = base::TimeTicks::Now();
   while (did_request_animate_) {
     did_request_redraw_ = false;
     did_request_animate_ = false;
@@ -7039,7 +7042,7 @@ TEST_F(LayerTreeHostImplWithTopControlsTest,
   EXPECT_FALSE(did_request_commit_);
 
   // Animate the top controls to the limit.
-  base::TimeTicks animation_time = gfx::FrameTime::Now();
+  base::TimeTicks animation_time = base::TimeTicks::Now();
   while (did_request_animate_) {
     did_request_redraw_ = false;
     did_request_animate_ = false;
@@ -7750,15 +7753,23 @@ class FakeVideoFrameController : public VideoFrameController {
  public:
   void OnBeginFrame(const BeginFrameArgs& args) override {
     begin_frame_args_ = args;
+    did_draw_frame_ = false;
   }
 
-  const BeginFrameArgs& begin_frame_args() { return begin_frame_args_; }
+  void DidDrawFrame() override { did_draw_frame_ = true; }
+
+  const BeginFrameArgs& begin_frame_args() const { return begin_frame_args_; }
+
+  bool did_draw_frame() const { return did_draw_frame_; }
 
  private:
   BeginFrameArgs begin_frame_args_;
+  bool did_draw_frame_ = false;
 };
 
 TEST_F(LayerTreeHostImplTest, AddVideoFrameControllerInsideFrame) {
+  host_impl_->DidFinishImplFrame();
+
   BeginFrameArgs begin_frame_args =
       CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE);
   FakeVideoFrameController controller;
@@ -7768,9 +7779,22 @@ TEST_F(LayerTreeHostImplTest, AddVideoFrameControllerInsideFrame) {
   host_impl_->AddVideoFrameController(&controller);
   EXPECT_TRUE(controller.begin_frame_args().IsValid());
   host_impl_->DidFinishImplFrame();
+
+  EXPECT_FALSE(controller.did_draw_frame());
+  LayerTreeHostImpl::FrameData frame;
+  host_impl_->DidDrawAllLayers(frame);
+  EXPECT_TRUE(controller.did_draw_frame());
+
+  controller.OnBeginFrame(begin_frame_args);
+  EXPECT_FALSE(controller.did_draw_frame());
+  host_impl_->RemoveVideoFrameController(&controller);
+  host_impl_->DidDrawAllLayers(frame);
+  EXPECT_FALSE(controller.did_draw_frame());
 }
 
 TEST_F(LayerTreeHostImplTest, AddVideoFrameControllerOutsideFrame) {
+  host_impl_->DidFinishImplFrame();
+
   BeginFrameArgs begin_frame_args =
       CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE);
   FakeVideoFrameController controller;
@@ -7786,6 +7810,17 @@ TEST_F(LayerTreeHostImplTest, AddVideoFrameControllerOutsideFrame) {
   EXPECT_FALSE(controller.begin_frame_args().IsValid());
   host_impl_->WillBeginImplFrame(begin_frame_args);
   EXPECT_TRUE(controller.begin_frame_args().IsValid());
+
+  EXPECT_FALSE(controller.did_draw_frame());
+  LayerTreeHostImpl::FrameData frame;
+  host_impl_->DidDrawAllLayers(frame);
+  EXPECT_TRUE(controller.did_draw_frame());
+
+  controller.OnBeginFrame(begin_frame_args);
+  EXPECT_FALSE(controller.did_draw_frame());
+  host_impl_->RemoveVideoFrameController(&controller);
+  host_impl_->DidDrawAllLayers(frame);
+  EXPECT_FALSE(controller.did_draw_frame());
 }
 
 TEST_F(LayerTreeHostImplTest, GpuRasterizationStatusModes) {

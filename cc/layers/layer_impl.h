@@ -185,6 +185,9 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
     return should_flatten_transform_from_property_tree_;
   }
 
+  void UpdatePropertyTreeTransform();
+  void UpdatePropertyTreeOpacity();
+
   // For compatibility with Layer.
   bool has_render_surface() const { return !!render_surface(); }
 
@@ -628,8 +631,8 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   void Set3dSortingContextId(int id);
   int sorting_context_id() { return sorting_context_id_; }
 
-  void PassFrameTimingRequests(
-      std::vector<FrameTimingRequest>* frame_timing_requests);
+  void SetFrameTimingRequests(
+      const std::vector<FrameTimingRequest>& frame_timing_requests);
   const std::vector<FrameTimingRequest>& frame_timing_requests() const {
     return frame_timing_requests_;
   }
@@ -642,6 +645,22 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   virtual Region GetInvalidationRegion();
 
   virtual gfx::Rect GetEnclosingRectInTargetSpace() const;
+
+  void set_visited(bool visited) { visited_ = visited; }
+
+  bool visited() { return visited_; }
+
+  void set_layer_or_descendant_is_drawn(bool layer_or_descendant_is_drawn) {
+    layer_or_descendant_is_drawn_ = layer_or_descendant_is_drawn;
+  }
+
+  bool layer_or_descendant_is_drawn() { return layer_or_descendant_is_drawn_; }
+
+  void set_sorted_for_recursion(bool sorted_for_recursion) {
+    sorted_for_recursion_ = sorted_for_recursion;
+  }
+
+  bool sorted_for_recursion() { return sorted_for_recursion_; }
 
  protected:
   LayerImpl(LayerTreeImpl* layer_impl,
@@ -825,6 +844,9 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   std::vector<FrameTimingRequest> frame_timing_requests_;
   bool frame_timing_requests_dirty_;
+  bool visited_;
+  bool layer_or_descendant_is_drawn_;
+  bool sorted_for_recursion_;
 
   DISALLOW_COPY_AND_ASSIGN(LayerImpl);
 };

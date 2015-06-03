@@ -103,6 +103,11 @@ class PasswordManager : public LoginModel {
       password_manager::PasswordManagerDriver* driver,
       const autofill::PasswordForm& password_form);
 
+  // Handles a manual request to save password.
+  void OnPasswordFormForceSaveRequested(
+      password_manager::PasswordManagerDriver* driver,
+      const autofill::PasswordForm& password_form);
+
   // Called if |password_form| was filled upon in-page navigation. This often
   // means history.pushState being called from JavaScript. If this causes false
   // positive in password saving, update http://crbug.com/357696.
@@ -138,6 +143,10 @@ class PasswordManager : public LoginModel {
   // Returns true if we can show possible usernames to users in cases where
   // the username for the form is ambigious.
   bool OtherPossibleUsernamesEnabled() const;
+
+  // Returns true if |provisional_save_manager_| is ready for saving and
+  // non-blacklisted.
+  bool CanProvisionalManagerSave();
 
   // Returns true if the user needs to be prompted before a password can be
   // saved (instead of automatically saving

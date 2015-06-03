@@ -14,6 +14,7 @@
 #include "components/autofill/core/browser/autofill_field.h"
 #include "components/autofill/core/browser/form_structure.h"
 #include "components/autofill/core/common/form_data_predictions.h"
+#include "components/autofill/core/common/password_form_field_prediction_map.h"
 #include "components/password_manager/core/browser/browser_save_password_progress_logger.h"
 #include "components/password_manager/core/browser/password_autofill_manager.h"
 #include "components/password_manager/core/browser/password_form_manager.h"
@@ -85,6 +86,28 @@ void RecordWhetherTargetDomainDiffers(const GURL& src, const GURL& target) {
 
 bool IsSignupForm(const PasswordForm& form) {
   return !form.new_password_element.empty() && form.password_element.empty();
+}
+
+bool ServerTypeToPrediction(autofill::ServerFieldType server_field_type,
+                            autofill::PasswordFormFieldPredictionType* type) {
+  switch (server_field_type) {
+    case autofill::USERNAME:
+    case autofill::USERNAME_AND_EMAIL_ADDRESS:
+      *type = autofill::PREDICTION_USERNAME;
+      break;
+
+    case autofill::PASSWORD:
+      *type = autofill::PREDICTION_CURRENT_PASSWORD;
+      break;
+
+    case autofill::ACCOUNT_CREATION_PASSWORD:
+      *type = autofill::PREDICTION_NEW_PASSWORD;
+      break;
+
+    default:
+      return false;
+  }
+  return true;
 }
 
 }  // namespace
@@ -359,6 +382,16 @@ void PasswordManager::OnPasswordFormSubmitted(
   pending_login_managers_.clear();
 }
 
+void PasswordManager::OnPasswordFormForceSaveRequested(
+    password_manager::PasswordManagerDriver* driver,
+    const PasswordForm& password_form) {
+  // TODO(msramek): This is just a sketch. We will need to show a custom bubble,
+  // mark the form as force saved, and recreate the pending login managers,
+  // because the password store might have changed.
+  ProvisionallySavePassword(password_form);
+  AskUserOrSavePassword();
+}
+
 void PasswordManager::OnPasswordFormsParsed(
     password_manager::PasswordManagerDriver* driver,
     const std::vector<PasswordForm>& forms) {
@@ -438,6 +471,42 @@ void PasswordManager::CreatePendingLoginManagers(
   }
 }
 
+bool PasswordManager::CanProvisionalManagerSave() {
+  scoped_ptr<BrowserSavePasswordProgressLogger> logger;
+  if (client_->IsLoggingActive()) {
+    logger.reset(new BrowserSavePasswordProgressLogger(client_));
+    logger->LogMessage(Logger::STRING_CAN_PROVISIONAL_MANAGER_SAVE_METHOD);
+  }
+
+  if (!provisional_save_manager_.get()) {
+    if (logger) {
+      logger->LogMessage(Logger::STRING_NO_PROVISIONAL_SAVE_MANAGER);
+    }
+    return false;
+  }
+
+  if (!provisional_save_manager_->HasCompletedMatching()) {
+    // We have a provisional save manager, but it didn't finish matching yet.
+    // We just give up.
+    RecordFailure(MATCHING_NOT_COMPLETE,
+                  provisional_save_manager_->observed_form().origin,
+                  logger.get());
+    provisional_save_manager_.reset();
+    return false;
+  }
+
+  // Also get out of here if the user told us to 'never remember' passwords for
+  // this form.
+  if (provisional_save_manager_->IsBlacklisted()) {
+    RecordFailure(FORM_BLACKLISTED,
+                  provisional_save_manager_->observed_form().origin,
+                  logger.get());
+    provisional_save_manager_.reset();
+    return false;
+  }
+  return true;
+}
+
 bool PasswordManager::ShouldPromptUserToSavePassword() const {
   return !client_->IsAutomaticPasswordSavingEnabled() &&
          provisional_save_manager_->IsNewLogin() &&
@@ -456,32 +525,8 @@ void PasswordManager::OnPasswordFormsRendered(
     logger->LogMessage(Logger::STRING_ON_PASSWORD_FORMS_RENDERED_METHOD);
   }
 
-  if (!provisional_save_manager_.get()) {
-    if (logger) {
-      logger->LogMessage(Logger::STRING_NO_PROVISIONAL_SAVE_MANAGER);
-    }
+  if (!CanProvisionalManagerSave())
     return;
-  }
-
-  if (!provisional_save_manager_->HasCompletedMatching()) {
-    // We have a provisional save manager, but it didn't finish matching yet.
-    // We just give up.
-    RecordFailure(MATCHING_NOT_COMPLETE,
-                  provisional_save_manager_->observed_form().origin,
-                  logger.get());
-    provisional_save_manager_.reset();
-    return;
-  }
-
-  // Also get out of here if the user told us to 'never remember' passwords for
-  // this form.
-  if (provisional_save_manager_->IsBlacklisted()) {
-    RecordFailure(FORM_BLACKLISTED,
-                  provisional_save_manager_->observed_form().origin,
-                  logger.get());
-    provisional_save_manager_.reset();
-    return;
-  }
 
   DCHECK(client_->IsSavingEnabledForCurrentPage());
 
@@ -557,12 +602,9 @@ void PasswordManager::OnInPageNavigation(
 
   ProvisionallySavePassword(password_form);
 
-  if (!provisional_save_manager_) {
-    if (logger) {
-      logger->LogMessage(Logger::STRING_NO_PROVISIONAL_SAVE_MANAGER);
-    }
+  if (!CanProvisionalManagerSave())
     return;
-  }
+
   AskUserOrSavePassword();
 }
 
@@ -652,15 +694,15 @@ void PasswordManager::ProcessAutofillPredictions(
     password_manager::PasswordManagerDriver* driver,
     const std::vector<autofill::FormStructure*>& forms) {
   // Leave only forms that contain fields that are useful for password manager.
-  std::map<autofill::FormData, autofill::FormFieldData> predictions;
+  std::map<autofill::FormData, autofill::PasswordFormFieldPredictionMap>
+      predictions;
   for (autofill::FormStructure* form : forms) {
     for (std::vector<autofill::AutofillField*>::const_iterator field =
              form->begin();
          field != form->end(); ++field) {
-      if ((*field)->server_type() == autofill::USERNAME ||
-          (*field)->server_type() == autofill::USERNAME_AND_EMAIL_ADDRESS) {
-        predictions[form->ToFormData()] = *(*field);
-      }
+      autofill::PasswordFormFieldPredictionType prediction_type;
+      if (ServerTypeToPrediction((*field)->server_type(), &prediction_type))
+        predictions[form->ToFormData()][prediction_type] = *(*field);
     }
   }
   if (predictions.empty())

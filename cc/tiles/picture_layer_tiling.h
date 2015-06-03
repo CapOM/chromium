@@ -130,6 +130,11 @@ class CC_EXPORT PictureLayerTiling {
   }
 
   bool has_tiles() const { return !tiles_.empty(); }
+  // all_tiles_done() can return false negatives.
+  bool all_tiles_done() const { return all_tiles_done_; }
+  void set_all_tiles_done(bool all_tiles_done) {
+    all_tiles_done_ = all_tiles_done;
+  }
 
   // For testing functionality.
   void CreateAllTilesForTesting() {
@@ -271,6 +276,7 @@ class CC_EXPORT PictureLayerTiling {
   void SetLiveTilesRect(const gfx::Rect& live_tiles_rect);
   void VerifyLiveTilesRect(bool is_on_recycle_tree) const;
   Tile* CreateTile(int i, int j);
+  ScopedTilePtr TakeTileAt(int i, int j);
   // Returns true if the Tile existed and was removed from the tiling.
   bool RemoveTileAt(int i, int j);
   bool TilingMatchesTileIndices(const PictureLayerTiling* twin) const;
@@ -387,6 +393,7 @@ class CC_EXPORT PictureLayerTiling {
   bool has_skewport_rect_tiles_;
   bool has_soon_border_rect_tiles_;
   bool has_eventually_rect_tiles_;
+  bool all_tiles_done_;
 
  private:
   DISALLOW_ASSIGN(PictureLayerTiling);

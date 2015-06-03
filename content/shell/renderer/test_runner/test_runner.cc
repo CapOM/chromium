@@ -303,6 +303,12 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
                      const std::string& value,
                      const std::string& origin,
                      const std::string& embedding_origin);
+  void DispatchBeforeInstallPromptEvent(
+      int request_id,
+      const std::vector<std::string>& event_platforms,
+      v8::Local<v8::Function> callback);
+  void ResolveBeforeInstallPromptPromise(int request_id,
+                                         const std::string& platform);
 
   std::string PlatformName();
   std::string TooltipText();
@@ -314,6 +320,7 @@ class TestRunnerBindings : public gin::Wrappable<TestRunnerBindings> {
   void NotImplemented(const gin::Arguments& args);
 
   void ForceNextWebGLContextCreationToFail();
+  void ForceNextDrawingBufferCreationToFail();
 
   base::WeakPtr<TestRunner> runner_;
 
@@ -390,8 +397,8 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("setDomainRelaxationForbiddenForURLScheme",
                  &TestRunnerBindings::SetDomainRelaxationForbiddenForURLScheme)
       .SetMethod(
-           "evaluateScriptInIsolatedWorldAndReturnValue",
-           &TestRunnerBindings::EvaluateScriptInIsolatedWorldAndReturnValue)
+          "evaluateScriptInIsolatedWorldAndReturnValue",
+          &TestRunnerBindings::EvaluateScriptInIsolatedWorldAndReturnValue)
       .SetMethod("evaluateScriptInIsolatedWorld",
                  &TestRunnerBindings::EvaluateScriptInIsolatedWorld)
       .SetMethod("setIsolatedWorldSecurityOrigin",
@@ -504,8 +511,8 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("setPrinting", &TestRunnerBindings::SetPrinting)
       .SetMethod("clearPrinting", &TestRunnerBindings::ClearPrinting)
       .SetMethod(
-           "setShouldStayOnPageAfterHandlingBeforeUnload",
-           &TestRunnerBindings::SetShouldStayOnPageAfterHandlingBeforeUnload)
+          "setShouldStayOnPageAfterHandlingBeforeUnload",
+          &TestRunnerBindings::SetShouldStayOnPageAfterHandlingBeforeUnload)
       .SetMethod("setWillSendRequestClearHeader",
                  &TestRunnerBindings::SetWillSendRequestClearHeader)
       .SetMethod("dumpResourceRequestPriorities",
@@ -564,6 +571,8 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
                  &TestRunnerBindings::SetBluetoothMockDataSet)
       .SetMethod("forceNextWebGLContextCreationToFail",
                  &TestRunnerBindings::ForceNextWebGLContextCreationToFail)
+      .SetMethod("forceNextDrawingBufferCreationToFail",
+                 &TestRunnerBindings::ForceNextDrawingBufferCreationToFail)
       .SetMethod("setGeofencingMockProvider",
                  &TestRunnerBindings::SetGeofencingMockProvider)
       .SetMethod("clearGeofencingMockProvider",
@@ -571,6 +580,10 @@ gin::ObjectTemplateBuilder TestRunnerBindings::GetObjectTemplateBuilder(
       .SetMethod("setGeofencingMockPosition",
                  &TestRunnerBindings::SetGeofencingMockPosition)
       .SetMethod("setPermission", &TestRunnerBindings::SetPermission)
+      .SetMethod("dispatchBeforeInstallPromptEvent",
+                 &TestRunnerBindings::DispatchBeforeInstallPromptEvent)
+      .SetMethod("resolveBeforeInstallPromptPromise",
+                 &TestRunnerBindings::ResolveBeforeInstallPromptPromise)
 
       // Properties.
       .SetProperty("platformName", &TestRunnerBindings::PlatformName)
@@ -933,14 +946,14 @@ void TestRunnerBindings::SetMockDeviceOrientation(gin::Arguments* args) {
   if (!runner_)
     return;
 
-  bool has_alpha;
-  double alpha;
-  bool has_beta;
-  double beta;
-  bool has_gamma;
-  double gamma;
-  bool has_absolute;
-  bool absolute;
+  bool has_alpha = false;
+  double alpha = 0.0;
+  bool has_beta = false;
+  double beta = 0.0;
+  bool has_gamma = false;
+  double gamma = 0.0;
+  bool has_absolute = false;
+  bool absolute = false;
 
   args->GetNext(&has_alpha);
   args->GetNext(&alpha);
@@ -1442,6 +1455,26 @@ void TestRunnerBindings::SetPermission(const std::string& name,
       name, value, GURL(origin), GURL(embedding_origin));
 }
 
+void TestRunnerBindings::DispatchBeforeInstallPromptEvent(
+    int request_id,
+    const std::vector<std::string>& event_platforms,
+    v8::Local<v8::Function> callback) {
+  if (!runner_)
+    return;
+
+  return runner_->DispatchBeforeInstallPromptEvent(request_id, event_platforms,
+                                                   callback);
+}
+
+void TestRunnerBindings::ResolveBeforeInstallPromptPromise(
+    int request_id,
+    const std::string& platform) {
+  if (!runner_)
+    return;
+
+  return runner_->ResolveBeforeInstallPromptPromise(request_id, platform);
+}
+
 std::string TestRunnerBindings::PlatformName() {
   if (runner_)
     return runner_->platform_name_;
@@ -1480,6 +1513,11 @@ void TestRunnerBindings::SetInterceptPostMessage(bool value) {
 void TestRunnerBindings::ForceNextWebGLContextCreationToFail() {
   if (runner_)
     runner_->ForceNextWebGLContextCreationToFail();
+}
+
+void TestRunnerBindings::ForceNextDrawingBufferCreationToFail() {
+  if (runner_)
+    runner_->ForceNextDrawingBufferCreationToFail();
 }
 
 void TestRunnerBindings::NotImplemented(const gin::Arguments& args) {
@@ -2810,6 +2848,25 @@ void TestRunner::SetPermission(const std::string& name,
   delegate_->SetPermission(name, value, origin, embedding_origin);
 }
 
+void TestRunner::DispatchBeforeInstallPromptEvent(
+    int request_id,
+    const std::vector<std::string>& event_platforms,
+    v8::Local<v8::Function> callback) {
+  scoped_ptr<InvokeCallbackTask> task(
+      new InvokeCallbackTask(this, callback));
+
+  delegate_->DispatchBeforeInstallPromptEvent(
+      request_id, event_platforms,
+      base::Bind(&TestRunner::DispatchBeforeInstallPromptCallback,
+                 weak_factory_.GetWeakPtr(), base::Passed(&task)));
+}
+
+void TestRunner::ResolveBeforeInstallPromptPromise(
+    int request_id,
+    const std::string& platform) {
+  delegate_->ResolveBeforeInstallPromptPromise(request_id, platform);
+}
+
 void TestRunner::SetPOSIXLocale(const std::string& locale) {
   delegate_->SetLocale(locale);
 }
@@ -2899,6 +2956,11 @@ void TestRunner::ForceNextWebGLContextCreationToFail() {
     web_view_->forceNextWebGLContextCreationToFail();
 }
 
+void TestRunner::ForceNextDrawingBufferCreationToFail() {
+  if (web_view_)
+    web_view_->forceNextDrawingBufferCreationToFail();
+}
+
 void TestRunner::CopyImageAtAndCapturePixelsAsyncThen(
     int x, int y, v8::Local<v8::Function> callback) {
   scoped_ptr<InvokeCallbackTask> task(
@@ -2956,6 +3018,25 @@ void TestRunner::CapturePixelsCallback(scoped_ptr<InvokeCallbackTask> task,
       &buffer, context->Global(), isolate);
 
   task->SetArguments(3, argv);
+  InvokeCallback(task.Pass());
+}
+
+void TestRunner::DispatchBeforeInstallPromptCallback(
+    scoped_ptr<InvokeCallbackTask> task,
+    bool canceled) {
+  v8::Isolate* isolate = blink::mainThreadIsolate();
+  v8::HandleScope handle_scope(isolate);
+
+  v8::Local<v8::Context> context =
+      web_view_->mainFrame()->mainWorldScriptContext();
+  if (context.IsEmpty())
+    return;
+
+  v8::Context::Scope context_scope(context);
+  v8::Local<v8::Value> argv[1];
+  argv[0] = v8::Boolean::New(isolate, canceled);
+
+  task->SetArguments(1, argv);
   InvokeCallback(task.Pass());
 }
 

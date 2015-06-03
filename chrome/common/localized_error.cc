@@ -47,7 +47,7 @@ const unsigned int kErrorPagesNoDetails = 0;
 namespace {
 
 static const char kRedirectLoopLearnMoreUrl[] =
-    "https://www.google.com/support/chrome/bin/answer.py?answer=95626";
+    "https://support.google.com/chrome/answer/95626";
 static const char kWeakDHKeyLearnMoreUrl[] =
     "https://www.chromium.org/administrators/"
     "err_ssl_weak_server_ephemeral_dh_key";
@@ -254,13 +254,6 @@ const LocalizedErrorMap net_error_options[] = {
    IDS_ERRORPAGES_HEADING_SSL_PROTOCOL_ERROR,
    IDS_ERRORPAGES_SUMMARY_SSL_PROTOCOL_ERROR,
    IDS_ERRORPAGES_DETAILS_SSL_PROTOCOL_ERROR,
-   SUGGEST_NONE,
-  },
-  {net::ERR_SSL_UNSAFE_NEGOTIATION,
-   IDS_ERRORPAGES_TITLE_LOAD_FAILED,
-   IDS_ERRORPAGES_HEADING_SSL_PROTOCOL_ERROR,
-   IDS_ERRORPAGES_SUMMARY_SSL_PROTOCOL_ERROR,
-   IDS_ERRORPAGES_DETAILS_SSL_UNSAFE_NEGOTIATION,
    SUGGEST_NONE,
   },
   {net::ERR_BAD_SSL_CLIENT_AUTH_CERT,

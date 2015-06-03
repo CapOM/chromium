@@ -10,7 +10,6 @@ import("//third_party/icu/config.gni")
 generate_jni("content_shell_jni_headers") {
   jni_package = "content/shell"
   sources = [
-    "browsertests_apk/src/org/chromium/content_browsertests_apk/ContentBrowserTestsActivity.java",
     "java/src/org/chromium/content_shell/Shell.java",
     "java/src/org/chromium/content_shell/ShellLayoutTestUtils.java",
     "java/src/org/chromium/content_shell/ShellManager.java",
@@ -92,22 +91,25 @@ copy_ex("copy_content_shell_assets") {
   sources = [
     "$root_out_dir/content_shell.pak",
   ]
+  deps = []
 
   if (icu_use_data_file) {
     sources += [ "$root_build_dir/icudtl.dat" ]
+    deps += [ "//third_party/icu:icudata" ]
   }
   if (v8_use_external_startup_data) {
     sources += [
       "$root_build_dir/natives_blob.bin",
       "$root_build_dir/snapshot_blob.bin",
     ]
+    deps += [ "//v8" ]
   }
 }
 
 android_apk("content_shell_apk") {
   use_chromium_linker = true
   testonly = true
-  datadeps = [
+  data_deps = [
     # "//tools/android/forwarder",
   ]
   deps = [
@@ -155,7 +157,7 @@ android_apk("content_shell_test_apk") {
     "//net/android:net_javatests",
     "//testing/android/broker:broker_java",
   ]
-  datadeps = [
+  data_deps = [
     ":content_shell_apk",
     "//testing/android/driver:driver_apk",
   ]

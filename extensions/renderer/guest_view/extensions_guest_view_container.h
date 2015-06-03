@@ -7,7 +7,7 @@
 
 #include <queue>
 
-#include "extensions/renderer/guest_view/guest_view_container.h"
+#include "components/guest_view/renderer/guest_view_container.h"
 #include "v8/include/v8.h"
 
 namespace gfx {
@@ -16,7 +16,7 @@ class Size;
 
 namespace extensions {
 
-class ExtensionsGuestViewContainer : public GuestViewContainer {
+class ExtensionsGuestViewContainer : public guest_view::GuestViewContainer {
  public:
   explicit ExtensionsGuestViewContainer(content::RenderFrame* render_frame);
   ~ExtensionsGuestViewContainer() override;
@@ -27,12 +27,10 @@ class ExtensionsGuestViewContainer : public GuestViewContainer {
                                      v8::Isolate* isolate);
 
   // BrowserPluginDelegate implementation.
-  void DidResizeElement(const gfx::Size& old_size,
-                        const gfx::Size& new_size) override;
+  void DidResizeElement(const gfx::Size& new_size) override;
 
  private:
-  void CallElementResizeCallback(const gfx::Size& old_size,
-                                 const gfx::Size& new_size);
+  void CallElementResizeCallback(const gfx::Size& new_size);
 
   v8::Global<v8::Function> destruction_callback_;
   v8::Isolate* destruction_isolate_;

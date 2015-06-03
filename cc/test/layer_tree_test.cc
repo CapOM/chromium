@@ -34,7 +34,6 @@
 #include "cc/trees/single_thread_proxy.h"
 #include "cc/trees/thread_proxy.h"
 #include "testing/gmock/include/gmock/gmock.h"
-#include "ui/gfx/frame_time.h"
 #include "ui/gfx/geometry/size_conversions.h"
 
 namespace cc {
@@ -407,13 +406,6 @@ class LayerTreeHostClientForTesting : public LayerTreeHostClient,
                                      elastic_overscroll_delta, page_scale,
                                      top_controls_delta);
   }
-  void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
-                           float scale,
-                           float top_controls_delta) override {
-    test_hooks_->ApplyViewportDeltas(scroll_delta,
-                                     scale,
-                                     top_controls_delta);
-  }
 
   void RequestNewOutputSurface() override {
     test_hooks_->RequestNewOutputSurface();
@@ -695,7 +687,7 @@ void LayerTreeTest::DoBeginTest() {
 
 void LayerTreeTest::SetupTree() {
   if (!layer_tree_host_->root_layer()) {
-    scoped_refptr<Layer> root_layer = Layer::Create();
+    scoped_refptr<Layer> root_layer = Layer::Create(layer_settings_);
     root_layer->SetBounds(gfx::Size(1, 1));
     root_layer->SetIsDrawable(true);
     layer_tree_host_->SetRootLayer(root_layer);
@@ -786,7 +778,7 @@ void LayerTreeTest::DispatchSetNextCommitForcesRedraw() {
 void LayerTreeTest::DispatchCompositeImmediately() {
   DCHECK(!proxy() || proxy()->IsMainThread());
   if (layer_tree_host_)
-    layer_tree_host_->Composite(gfx::FrameTime::Now());
+    layer_tree_host_->Composite(base::TimeTicks::Now());
 }
 
 void LayerTreeTest::RunTest(bool threaded,
@@ -812,6 +804,7 @@ void LayerTreeTest::RunTest(bool threaded,
   settings_.impl_side_painting = impl_side_painting;
   settings_.verify_property_trees = verify_property_trees_;
   InitializeSettings(&settings_);
+  InitializeLayerSettings(&layer_settings_);
 
   main_task_runner_->PostTask(
       FROM_HERE,

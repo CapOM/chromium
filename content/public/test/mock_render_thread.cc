@@ -78,9 +78,9 @@ IPC::SyncMessageFilter* MockRenderThread::GetSyncMessageFilter() {
   return NULL;
 }
 
-scoped_refptr<base::MessageLoopProxy>
-    MockRenderThread::GetIOMessageLoopProxy() {
-  return scoped_refptr<base::MessageLoopProxy>();
+scoped_refptr<base::SingleThreadTaskRunner>
+MockRenderThread::GetIOMessageLoopProxy() {
+  return scoped_refptr<base::SingleThreadTaskRunner>();
 }
 
 void MockRenderThread::AddRoute(int32 routing_id, IPC::Listener* listener) {
@@ -226,14 +226,15 @@ void MockRenderThread::OnCreateWindow(
 
 // The Frame expects to be returned a valid route_id different from its own.
 void MockRenderThread::OnCreateChildFrame(int new_frame_routing_id,
+                                          blink::WebTreeScopeType scope,
                                           const std::string& frame_name,
-                                          SandboxFlags sandbox_flags,
+                                          blink::WebSandboxFlags sandbox_flags,
                                           int* new_render_frame_id) {
   *new_render_frame_id = new_frame_routing_id_++;
 }
 
 bool MockRenderThread::OnControlMessageReceived(const IPC::Message& msg) {
-  ObserverListBase<RenderProcessObserver>::Iterator it(&observers_);
+  base::ObserverListBase<RenderProcessObserver>::Iterator it(&observers_);
   RenderProcessObserver* observer;
   while ((observer = it.GetNext()) != NULL) {
     if (observer->OnControlMessageReceived(msg))

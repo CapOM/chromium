@@ -53,7 +53,9 @@ class ShellGrabber : public Application {
     MOJO_CHECK(false);
   }
 
-  void RequestQuit() override { MOJO_CHECK(false); }
+  void OnQuitRequested(const Callback<void(bool)>& callback) override {
+    MOJO_CHECK(false);
+  }
 
   Binding<Application> binding_;
 };
@@ -75,7 +77,7 @@ MojoResult RunAllTests(MojoHandle application_request_handle) {
 
     int argc = 0;
     base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
-    const char** argv = new const char* [cmd_line->argv().size()];
+    const char** argv = new const char* [cmd_line->argv().size() + 1];
 #if defined(OS_WIN)
     std::vector<std::string> local_strings;
 #endif
@@ -87,6 +89,7 @@ MojoResult RunAllTests(MojoHandle application_request_handle) {
       argv[argc++] = arg.c_str();
 #endif
     }
+    argv[argc] = nullptr;
 
     testing::InitGoogleTest(&argc, const_cast<char**>(&(argv[0])));
 

@@ -81,7 +81,10 @@ LayerImpl::LayerImpl(LayerTreeImpl* tree_impl,
       num_dependents_need_push_properties_(0),
       sorting_context_id_(0),
       current_draw_mode_(DRAW_MODE_NONE),
-      frame_timing_requests_dirty_(false) {
+      frame_timing_requests_dirty_(false),
+      visited_(false),
+      layer_or_descendant_is_drawn_(false),
+      sorted_for_recursion_(false) {
   DCHECK_GT(layer_id_, 0);
   DCHECK(layer_tree_impl_);
   layer_tree_impl_->RegisterLayer(this);
@@ -402,12 +405,10 @@ void LayerImpl::GetContentsResourceId(ResourceId* resource_id,
 
 gfx::Vector2dF LayerImpl::ScrollBy(const gfx::Vector2dF& scroll) {
   gfx::ScrollOffset adjusted_scroll(scroll);
-  if (layer_tree_impl()->settings().use_pinch_virtual_viewport) {
-    if (!user_scrollable_horizontal_)
-      adjusted_scroll.set_x(0);
-    if (!user_scrollable_vertical_)
-      adjusted_scroll.set_y(0);
-  }
+  if (!user_scrollable_horizontal_)
+    adjusted_scroll.set_x(0);
+  if (!user_scrollable_vertical_)
+    adjusted_scroll.set_y(0);
   DCHECK(scrollable());
   gfx::ScrollOffset old_offset = CurrentScrollOffset();
   gfx::ScrollOffset new_offset =
@@ -626,7 +627,7 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
   layer->SetDebugInfo(debug_info_);
 
   if (frame_timing_requests_dirty_) {
-    layer->PassFrameTimingRequests(&frame_timing_requests_);
+    layer->SetFrameTimingRequests(frame_timing_requests_);
     frame_timing_requests_dirty_ = false;
   }
 
@@ -646,27 +647,7 @@ gfx::Vector2dF LayerImpl::FixedContainerSizeDelta() const {
   // In virtual-viewport mode, we don't need to compensate for pinch zoom or
   // scale since the fixed container is the outer viewport, which sits below
   // the page scale.
-  if (layer_tree_impl()->settings().use_pinch_virtual_viewport)
-    return delta_from_scroll;
-
-  float scale_delta = layer_tree_impl()->page_scale_delta();
-  float scale = layer_tree_impl()->current_page_scale_factor() /
-                layer_tree_impl()->page_scale_delta();
-
-  delta_from_scroll.Scale(1.f / scale);
-
-  // The delta-from-pinch component requires some explanation: A viewport of
-  // size (w,h) will appear to be size (w/s,h/s) under scale s in the content
-  // space. If s -> s' on the impl thread, where s' = s * ds, then the apparent
-  // viewport size change in the content space due to ds is:
-  //
-  // (w/s',h/s') - (w/s,h/s) = (w,h)(1/s' - 1/s) = (w,h)(1 - ds)/(s ds)
-  //
-  gfx::Vector2dF delta_from_pinch =
-      gfx::Rect(scroll_clip_layer_->bounds()).bottom_right() - gfx::PointF();
-  delta_from_pinch.Scale((1.f - scale_delta) / (scale * scale_delta));
-
-  return delta_from_scroll + delta_from_pinch;
+  return delta_from_scroll;
 }
 
 base::DictionaryValue* LayerImpl::LayerTreeAsJson() const {
@@ -806,6 +787,34 @@ void LayerImpl::ResetAllChangeTrackingForSubtree() {
   num_dependents_need_push_properties_ = 0;
 }
 
+void LayerImpl::UpdatePropertyTreeTransform() {
+  if (transform_tree_index_ != -1) {
+    TransformTree& transform_tree =
+        layer_tree_impl()->property_trees()->transform_tree;
+    TransformNode* node = transform_tree.Node(transform_tree_index_);
+    if (node->data.local != transform_) {
+      node->data.local = transform_;
+      node->data.needs_local_transform_update = true;
+      transform_tree.set_needs_update(true);
+      // TODO(ajuma): The current criteria for creating clip nodes means that
+      // property trees may need to be rebuilt when the new transform isn't
+      // axis-aligned wrt the old transform (see Layer::SetTransform). Since
+      // rebuilding property trees every frame of a transform animation is
+      // something we should try to avoid, change property tree-building so that
+      // it doesn't depend on axis aliginment.
+    }
+  }
+}
+
+void LayerImpl::UpdatePropertyTreeOpacity() {
+  if (opacity_tree_index_ != -1) {
+    OpacityTree& opacity_tree =
+        layer_tree_impl()->property_trees()->opacity_tree;
+    OpacityNode* node = opacity_tree.Node(opacity_tree_index_);
+    node->data = opacity_;
+  }
+}
+
 gfx::ScrollOffset LayerImpl::ScrollOffsetForAnimation() const {
   return CurrentScrollOffset();
 }
@@ -816,10 +825,12 @@ void LayerImpl::OnFilterAnimated(const FilterOperations& filters) {
 
 void LayerImpl::OnOpacityAnimated(float opacity) {
   SetOpacity(opacity);
+  UpdatePropertyTreeOpacity();
 }
 
 void LayerImpl::OnTransformAnimated(const gfx::Transform& transform) {
   SetTransform(transform);
+  UpdatePropertyTreeTransform();
 }
 
 void LayerImpl::OnScrollOffsetAnimated(const gfx::ScrollOffset& scroll_offset) {
@@ -1075,9 +1086,9 @@ void LayerImpl::Set3dSortingContextId(int id) {
   NoteLayerPropertyChangedForSubtree();
 }
 
-void LayerImpl::PassFrameTimingRequests(
-    std::vector<FrameTimingRequest>* requests) {
-  frame_timing_requests_.swap(*requests);
+void LayerImpl::SetFrameTimingRequests(
+    const std::vector<FrameTimingRequest>& requests) {
+  frame_timing_requests_ = requests;
   frame_timing_requests_dirty_ = true;
   SetNeedsPushProperties();
 }
@@ -1205,6 +1216,7 @@ gfx::Vector2dF LayerImpl::ScrollDelta() const {
 
 void LayerImpl::SetScrollDelta(const gfx::Vector2dF& delta) {
   DCHECK(IsActive());
+  DCHECK(scrollable() || delta.IsZero());
   SetCurrentScrollOffset(scroll_offset_->ActiveBase() +
                          gfx::ScrollOffset(delta));
 }

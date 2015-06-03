@@ -19,12 +19,12 @@
 #include "chrome/browser/ui/autofill/popup_constants.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/chrome_pages.h"
-#include "chrome/browser/ui/passwords/password_bubble_experiment.h"
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/autofill/content/common/autofill_messages.h"
 #include "components/autofill/core/browser/password_generator.h"
+#include "components/password_manager/core/browser/password_bubble_experiment.h"
 #include "components/password_manager/core/browser/password_manager.h"
 #include "content/public/browser/native_web_keyboard_event.h"
 #include "content/public/browser/render_view_host.h"
@@ -83,7 +83,11 @@ PasswordGenerationPopupControllerImpl::PasswordGenerationPopupControllerImpl(
       driver_(driver),
       observer_(observer),
       generator_(new PasswordGenerator(max_length)),
-      controller_common_(bounds, container_view, web_contents),
+      // TODO(estade): use correct text direction.
+      controller_common_(bounds,
+                         base::i18n::LEFT_TO_RIGHT,
+                         container_view,
+                         web_contents),
       password_selected_(false),
       display_password_(false),
       weak_ptr_factory_(this) {

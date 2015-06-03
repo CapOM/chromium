@@ -7,11 +7,19 @@
 #include "base/command_line.h"
 #include "ui/views/views_touch_selection_controller_factory.h"
 
+#if defined(USE_AURA)
+#include "ui/views/touchui/touch_selection_menu_runner_views.h"
+#endif
+
 namespace views {
 
 ViewsDelegate::ViewsDelegate()
     : views_tsc_factory_(new ViewsTouchEditingControllerFactory) {
   ui::TouchEditingControllerFactory::SetInstance(views_tsc_factory_.get());
+
+#if defined(USE_AURA)
+  touch_selection_menu_runner_.reset(new TouchSelectionMenuRunnerViews());
+#endif
 }
 
 ViewsDelegate::~ViewsDelegate() {
@@ -91,18 +99,15 @@ std::string ViewsDelegate::GetApplicationName() {
   return program.BaseName().AsUTF8Unsafe();
 }
 
-#if defined(OS_LINUX) && !defined(OS_CHROMEOS)
-scoped_refptr<base::TaskRunner>
-    ViewsDelegate::GetTaskRunnerForAuraLinuxAccessibilityInit() {
-  return nullptr;
-}
-#endif
-
 #if defined(OS_WIN)
 int ViewsDelegate::GetAppbarAutohideEdges(HMONITOR monitor,
                                           const base::Closure& callback) {
   return EDGE_BOTTOM;
 }
 #endif
+
+scoped_refptr<base::TaskRunner> ViewsDelegate::GetBlockingPoolTaskRunner() {
+  return nullptr;
+}
 
 }  // namespace views

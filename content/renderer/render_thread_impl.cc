@@ -12,6 +12,7 @@
 #include "base/allocator/allocator_extension.h"
 #include "base/command_line.h"
 #include "base/lazy_instance.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/discardable_memory_allocator.h"
 #include "base/memory/shared_memory.h"
@@ -24,6 +25,7 @@
 #include "base/strings/string_tokenizer.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/simple_thread.h"
 #include "base/threading/thread_local.h"
 #include "base/threading/thread_restrictions.h"
@@ -33,6 +35,7 @@
 #include "cc/blink/web_external_bitmap_impl.h"
 #include "cc/blink/web_layer_impl.h"
 #include "cc/raster/task_graph_runner.h"
+#include "cc/trees/layer_tree_settings.h"
 #include "components/scheduler/renderer/renderer_scheduler.h"
 #include "content/child/appcache/appcache_dispatcher.h"
 #include "content/child/appcache/appcache_frontend_impl.h"
@@ -287,6 +290,8 @@ std::string HostToCustomHistogramSuffix(const std::string& host) {
     return ".docs";
   if (host == "plus.google.com")
     return ".plus";
+  if (host == "inbox.google.com")
+    return ".inbox";
   return std::string();
 }
 
@@ -539,9 +544,8 @@ void RenderThreadImpl::Init() {
 
   webrtc_identity_service_.reset(new WebRTCIdentityService());
 
-  aec_dump_message_filter_ =
-      new AecDumpMessageFilter(GetIOMessageLoopProxy(),
-                               message_loop()->message_loop_proxy());
+  aec_dump_message_filter_ = new AecDumpMessageFilter(
+      GetIOMessageLoopProxy(), message_loop()->task_runner());
   AddFilter(aec_dump_message_filter_.get());
 
   peer_connection_factory_.reset(new PeerConnectionDependencyFactory(
@@ -575,6 +579,11 @@ void RenderThreadImpl::Init() {
       !command_line.HasSwitch(switches::kDisableImplSidePainting);
   cc_blink::WebLayerImpl::SetImplSidePaintingEnabled(
       is_impl_side_painting_enabled_);
+
+  cc::LayerSettings layer_settings;
+  if (command_line.HasSwitch(switches::kEnableCompositorAnimationTimelines))
+    layer_settings.use_compositor_animation_timelines = true;
+  cc_blink::WebLayerImpl::SetLayerSettings(layer_settings);
 
   is_zero_copy_enabled_ = command_line.HasSwitch(switches::kEnableZeroCopy);
   is_one_copy_enabled_ = !command_line.HasSwitch(switches::kDisableOneCopy);
@@ -901,9 +910,9 @@ IPC::SyncMessageFilter* RenderThreadImpl::GetSyncMessageFilter() {
   return sync_message_filter();
 }
 
-scoped_refptr<base::MessageLoopProxy>
-    RenderThreadImpl::GetIOMessageLoopProxy() {
-  return ChildProcess::current()->io_message_loop_proxy();
+scoped_refptr<base::SingleThreadTaskRunner>
+RenderThreadImpl::GetIOMessageLoopProxy() {
+  return ChildProcess::current()->io_task_runner();
 }
 
 void RenderThreadImpl::AddRoute(int32 routing_id, IPC::Listener* listener) {
@@ -1038,18 +1047,16 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
 #if defined(OS_ANDROID)
     if (SynchronousCompositorFactory* factory =
         SynchronousCompositorFactory::GetInstance())
-      compositor_message_loop_proxy_ =
-          factory->GetCompositorMessageLoop();
+      compositor_task_runner_ = factory->GetCompositorTaskRunner();
 #endif
-    if (!compositor_message_loop_proxy_.get()) {
+    if (!compositor_task_runner_.get()) {
       compositor_thread_.reset(new base::Thread("Compositor"));
       compositor_thread_->Start();
 #if defined(OS_ANDROID)
       compositor_thread_->SetPriority(base::ThreadPriority::DISPLAY);
 #endif
-      compositor_message_loop_proxy_ =
-          compositor_thread_->message_loop_proxy();
-      compositor_message_loop_proxy_->PostTask(
+      compositor_task_runner_ = compositor_thread_->task_runner();
+      compositor_task_runner_->PostTask(
           FROM_HERE,
           base::Bind(base::IgnoreResult(&ThreadRestrictions::SetIOAllowed),
                      false));
@@ -1066,12 +1073,12 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
       scoped_refptr<InputEventFilter> compositor_input_event_filter(
           new InputEventFilter(main_input_callback_.callback(),
                                main_thread_compositor_task_runner_,
-                               compositor_message_loop_proxy_));
+                               compositor_task_runner_));
       input_handler_manager_client = compositor_input_event_filter.get();
       input_event_filter_ = compositor_input_event_filter;
     }
     input_handler_manager_.reset(new InputHandlerManager(
-        compositor_message_loop_proxy_, input_handler_manager_client,
+        compositor_task_runner_, input_handler_manager_client,
         renderer_scheduler_.get()));
   }
 
@@ -1085,14 +1092,14 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
   }
   AddFilter(input_event_filter_.get());
 
-  scoped_refptr<base::MessageLoopProxy> compositor_impl_side_loop;
+  scoped_refptr<base::SingleThreadTaskRunner> compositor_impl_side_task_runner;
   if (enable)
-    compositor_impl_side_loop = compositor_message_loop_proxy_;
+    compositor_impl_side_task_runner = compositor_task_runner_;
   else
-    compositor_impl_side_loop = base::MessageLoopProxy::current();
+    compositor_impl_side_task_runner = base::ThreadTaskRunnerHandle::Get();
 
   compositor_message_filter_ = new CompositorForwardingMessageFilter(
-      compositor_impl_side_loop.get());
+      compositor_impl_side_task_runner.get());
   AddFilter(compositor_message_filter_.get());
 
   RenderThreadImpl::RegisterSchemes();
@@ -1427,12 +1434,6 @@ bool RenderThreadImpl::IsElasticOverscrollEnabled() {
   return is_elastic_overscroll_enabled_;
 }
 
-bool RenderThreadImpl::UseSingleThreadScheduler() {
-  // TODO(enne): using the scheduler introduces additional composite steps
-  // that create flakiness.  This should go away eventually.
-  return !layout_test_mode_;
-}
-
 uint32 RenderThreadImpl::GetImageTextureTarget() {
   return use_image_texture_target_;
 }
@@ -1444,7 +1445,7 @@ RenderThreadImpl::GetCompositorMainThreadTaskRunner() {
 
 scoped_refptr<base::SingleThreadTaskRunner>
 RenderThreadImpl::GetCompositorImplThreadTaskRunner() {
-  return compositor_message_loop_proxy_;
+  return compositor_task_runner_;
 }
 
 gpu::GpuMemoryBufferManager* RenderThreadImpl::GetGpuMemoryBufferManager() {
@@ -1521,7 +1522,7 @@ void RenderThreadImpl::DoNotNotifyWebKitOfModalLoop() {
 }
 
 bool RenderThreadImpl::OnControlMessageReceived(const IPC::Message& msg) {
-  ObserverListBase<RenderProcessObserver>::Iterator it(&observers_);
+  base::ObserverListBase<RenderProcessObserver>::Iterator it(&observers_);
   RenderProcessObserver* observer;
   while ((observer = it.GetNext()) != NULL) {
     if (observer->OnControlMessageReceived(msg))
@@ -1629,7 +1630,7 @@ GpuChannelHost* RenderThreadImpl::EstablishGpuChannelSync(
 
   // Cache some variables that are needed on the compositor thread for our
   // implementation of GpuChannelHostFactory.
-  io_thread_task_runner_ = ChildProcess::current()->io_message_loop_proxy();
+  io_thread_task_runner_ = ChildProcess::current()->io_task_runner();
 
   gpu_channel_ =
       GpuChannelHost::Create(this,
@@ -1798,14 +1799,14 @@ void RenderThreadImpl::OnMemoryPressure(
   }
 }
 
-scoped_refptr<base::MessageLoopProxy>
+scoped_refptr<base::SingleThreadTaskRunner>
 RenderThreadImpl::GetFileThreadMessageLoopProxy() {
   DCHECK(message_loop() == base::MessageLoop::current());
   if (!file_thread_) {
     file_thread_.reset(new base::Thread("Renderer::FILE"));
     file_thread_->Start();
   }
-  return file_thread_->message_loop_proxy();
+  return file_thread_->task_runner();
 }
 
 scoped_refptr<base::SingleThreadTaskRunner>
@@ -1820,7 +1821,7 @@ RenderThreadImpl::GetMediaThreadTaskRunner() {
     AddFilter(renderer_demuxer_.get());
 #endif
   }
-  return media_thread_->message_loop_proxy();
+  return media_thread_->task_runner();
 }
 
 void RenderThreadImpl::SampleGamepads(blink::WebGamepads* data) {

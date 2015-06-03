@@ -23,6 +23,7 @@
 #include "base/strings/string16.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "components/favicon_base/favicon_usage_data.h"
 #include "components/history/core/browser/history_constants.h"
 #include "components/history/core/browser/history_database_params.h"
@@ -241,7 +242,8 @@ class HistoryBackendTestBase : public testing::Test {
                                       &test_dir_))
       return;
     backend_ = new HistoryBackend(new HistoryBackendTestDelegate(this),
-                                  &history_client_);
+                                  &history_client_,
+                                  base::ThreadTaskRunnerHandle::Get());
     backend_->Init(std::string(), false,
                    TestHistoryDatabaseParamsForPath(test_dir_));
   }
@@ -696,6 +698,59 @@ TEST_F(HistoryBackendTest, DeleteAll) {
   ASSERT_EQ(1u, urls_deleted_notifications().size());
   EXPECT_TRUE(urls_deleted_notifications()[0].first);
   EXPECT_FALSE(urls_deleted_notifications()[0].second);
+}
+
+// Test that clearing all history does not delete bookmark favicons in the
+// special case that the bookmark page URL is no longer present in the History
+// database's urls table.
+TEST_F(HistoryBackendTest, DeleteAllURLPreviouslyDeleted) {
+  ASSERT_TRUE(backend_.get());
+
+  GURL kPageURL("http://www.google.com");
+  GURL kFaviconURL("http://www.google.com/favicon.ico");
+
+  // Setup: Add visit for |kPageURL|.
+  URLRow row(kPageURL);
+  row.set_visit_count(2);
+  row.set_typed_count(1);
+  row.set_last_visit(base::Time::Now());
+  backend_->AddPagesWithDetails(std::vector<URLRow>(1u, row),
+                                history::SOURCE_BROWSED);
+
+  // Setup: Add favicon for |kPageURL|.
+  std::vector<unsigned char> data;
+  data.push_back('a');
+  favicon_base::FaviconID favicon = backend_->thumbnail_db_->AddFavicon(
+      kFaviconURL, favicon_base::FAVICON, new base::RefCountedBytes(data),
+      base::Time::Now(), kSmallSize);
+  backend_->thumbnail_db_->AddIconMapping(row.url(), favicon);
+
+  history_client_.AddBookmark(kPageURL);
+
+  // Test initial state.
+  URLID row_id = backend_->db_->GetRowForURL(kPageURL, NULL);
+  ASSERT_NE(0, row_id);
+  VisitVector visits;
+  backend_->db_->GetVisitsForURL(row_id, &visits);
+  ASSERT_EQ(1U, visits.size());
+
+  std::vector<IconMapping> icon_mappings;
+  ASSERT_TRUE(backend_->thumbnail_db_->GetIconMappingsForPageURL(
+      kPageURL, favicon_base::FAVICON, &icon_mappings));
+  ASSERT_EQ(1u, icon_mappings.size());
+
+  // Delete information for |kPageURL|, then clear all browsing data.
+  backend_->DeleteURL(kPageURL);
+  backend_->DeleteAllHistory();
+
+  // Test that the entry in the url table for the bookmark is gone but that the
+  // favicon data for the bookmark is still there.
+  ASSERT_EQ(0, backend_->db_->GetRowForURL(kPageURL, NULL));
+
+  icon_mappings.clear();
+  EXPECT_TRUE(backend_->thumbnail_db_->GetIconMappingsForPageURL(
+      kPageURL, favicon_base::FAVICON, &icon_mappings));
+  EXPECT_EQ(1u, icon_mappings.size());
 }
 
 // Checks that adding a visit, then calling DeleteAll, and then trying to add
@@ -1635,7 +1690,8 @@ TEST_F(HistoryBackendTest, MigrationVisitSource) {
   ASSERT_TRUE(base::CopyFile(old_history_path, new_history_file));
 
   backend_ = new HistoryBackend(new HistoryBackendTestDelegate(this),
-                                &history_client_);
+                                &history_client_,
+                                base::ThreadTaskRunnerHandle::Get());
   backend_->Init(std::string(), false,
                  TestHistoryDatabaseParamsForPath(new_history_path));
   backend_->Closing();
@@ -2895,7 +2951,8 @@ TEST_F(HistoryBackendTest, MigrationVisitDuration) {
   ASSERT_TRUE(base::CopyFile(old_history, new_history_file));
 
   backend_ = new HistoryBackend(new HistoryBackendTestDelegate(this),
-                                &history_client_);
+                                &history_client_,
+                                base::ThreadTaskRunnerHandle::Get());
   backend_->Init(std::string(), false,
                  TestHistoryDatabaseParamsForPath(new_history_path));
   backend_->Closing();

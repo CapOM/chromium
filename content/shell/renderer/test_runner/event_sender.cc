@@ -116,13 +116,13 @@ int GetKeyModifiers(const std::vector<std::string>& modifier_names) {
   return modifiers;
 }
 
-int GetKeyModifiersFromV8(v8::Local<v8::Value> value) {
+int GetKeyModifiersFromV8(v8::Isolate* isolate, v8::Local<v8::Value> value) {
   std::vector<std::string> modifier_names;
   if (value->IsString()) {
     modifier_names.push_back(gin::V8ToString(value));
   } else if (value->IsArray()) {
     gin::Converter<std::vector<std::string> >::FromV8(
-        NULL, value, &modifier_names);
+        isolate, value, &modifier_names);
   }
   return GetKeyModifiers(modifier_names);
 }
@@ -376,8 +376,6 @@ class EventSenderBindings : public gin::Wrappable<EventSenderBindings> {
   void ZoomPageIn();
   void ZoomPageOut();
   void SetPageZoomFactor(double factor);
-  void SetPageScaleFactor(gin::Arguments* args);
-  void SetPageScaleFactorLimits(gin::Arguments* args);
   void ClearTouchPoints();
   void ReleaseTouchPoint(unsigned index);
   void UpdateTouchPoint(unsigned index, double x, double y);
@@ -510,9 +508,6 @@ EventSenderBindings::GetObjectTemplateBuilder(v8::Isolate* isolate) {
       .SetMethod("zoomPageIn", &EventSenderBindings::ZoomPageIn)
       .SetMethod("zoomPageOut", &EventSenderBindings::ZoomPageOut)
       .SetMethod("setPageZoomFactor", &EventSenderBindings::SetPageZoomFactor)
-      .SetMethod("setPageScaleFactor", &EventSenderBindings::SetPageScaleFactor)
-      .SetMethod("setPageScaleFactorLimits",
-                 &EventSenderBindings::SetPageScaleFactorLimits)
       .SetMethod("clearTouchPoints", &EventSenderBindings::ClearTouchPoints)
       .SetMethod("releaseTouchPoint", &EventSenderBindings::ReleaseTouchPoint)
       .SetMethod("updateTouchPoint", &EventSenderBindings::UpdateTouchPoint)
@@ -651,39 +646,6 @@ void EventSenderBindings::ZoomPageOut() {
 void EventSenderBindings::SetPageZoomFactor(double factor) {
   if (sender_)
     sender_->SetPageZoomFactor(factor);
-}
-
-void EventSenderBindings::SetPageScaleFactor(gin::Arguments* args) {
-  if (!sender_)
-    return;
-  float scale_factor;
-  double x;
-  double y;
-  if (args->PeekNext().IsEmpty())
-    return;
-  args->GetNext(&scale_factor);
-  if (args->PeekNext().IsEmpty())
-    return;
-  args->GetNext(&x);
-  if (args->PeekNext().IsEmpty())
-    return;
-  args->GetNext(&y);
-  sender_->SetPageScaleFactor(scale_factor,
-                              static_cast<int>(x), static_cast<int>(y));
-}
-
-void EventSenderBindings::SetPageScaleFactorLimits(gin::Arguments* args) {
-  if (!sender_)
-    return;
-  float min_scale_factor;
-  float max_scale_factor;
-  if (args->PeekNext().IsEmpty())
-    return;
-  args->GetNext(&min_scale_factor);
-  if (args->PeekNext().IsEmpty())
-    return;
-  args->GetNext(&max_scale_factor);
-  sender_->SetPageScaleFactorLimits(min_scale_factor, max_scale_factor);
 }
 
 void EventSenderBindings::ClearTouchPoints() {
@@ -916,7 +878,7 @@ void EventSenderBindings::ScheduleAsynchronousClick(gin::Arguments* args) {
   if (!args->PeekNext().IsEmpty()) {
     args->GetNext(&button_number);
     if (!args->PeekNext().IsEmpty())
-      modifiers = GetKeyModifiersFromV8(args->PeekNext());
+      modifiers = GetKeyModifiersFromV8(args->isolate(), args->PeekNext());
   }
   sender_->ScheduleAsynchronousClick(button_number, modifiers);
 }
@@ -932,7 +894,7 @@ void EventSenderBindings::ScheduleAsynchronousKeyDown(gin::Arguments* args) {
   if (!args->PeekNext().IsEmpty()) {
     v8::Local<v8::Value> value;
     args->GetNext(&value);
-    modifiers = GetKeyModifiersFromV8(value);
+    modifiers = GetKeyModifiersFromV8(args->isolate(), value);
     if (!args->PeekNext().IsEmpty())
       args->GetNext(&location);
   }
@@ -949,7 +911,7 @@ void EventSenderBindings::MouseDown(gin::Arguments* args) {
   if (!args->PeekNext().IsEmpty()) {
     args->GetNext(&button_number);
     if (!args->PeekNext().IsEmpty())
-      modifiers = GetKeyModifiersFromV8(args->PeekNext());
+      modifiers = GetKeyModifiersFromV8(args->isolate(), args->PeekNext());
   }
   sender_->MouseDown(button_number, modifiers);
 }
@@ -963,7 +925,7 @@ void EventSenderBindings::MouseUp(gin::Arguments* args) {
   if (!args->PeekNext().IsEmpty()) {
     args->GetNext(&button_number);
     if (!args->PeekNext().IsEmpty())
-      modifiers = GetKeyModifiersFromV8(args->PeekNext());
+      modifiers = GetKeyModifiersFromV8(args->isolate(), args->PeekNext());
   }
   sender_->MouseUp(button_number, modifiers);
 }
@@ -979,7 +941,7 @@ void EventSenderBindings::KeyDown(gin::Arguments* args) {
   if (!args->PeekNext().IsEmpty()) {
     v8::Local<v8::Value> value;
     args->GetNext(&value);
-    modifiers = GetKeyModifiersFromV8(value);
+    modifiers = GetKeyModifiersFromV8(args->isolate(), value);
     if (!args->PeekNext().IsEmpty())
       args->GetNext(&location);
   }
@@ -1571,14 +1533,6 @@ void EventSender::SetPageZoomFactor(double zoom_factor) {
   }
 }
 
-void EventSender::SetPageScaleFactor(float scale_factor, int x, int y) {
-  view_->setPageScaleFactor(scale_factor, WebPoint(x, y));
-}
-
-void EventSender::SetPageScaleFactorLimits(float min_scale, float max_scale) {
-  view_->setDefaultPageScaleLimits(min_scale, max_scale);
-}
-
 void EventSender::ClearTouchPoints() {
   touch_points_.clear();
 }
@@ -1908,7 +1862,7 @@ void EventSender::MouseMoveTo(gin::Arguments* args) {
 
   int modifiers = 0;
   if (!args->PeekNext().IsEmpty())
-    modifiers = GetKeyModifiersFromV8(args->PeekNext());
+    modifiers = GetKeyModifiersFromV8(args->isolate(), args->PeekNext());
 
   if (is_drag_mode_ && pressed_button_ == WebMouseEvent::ButtonLeft &&
       !replaying_saved_events_) {
@@ -2387,7 +2341,7 @@ void EventSender::InitMouseWheelEvent(gin::Arguments* args,
       if (!args->PeekNext().IsEmpty()) {
         v8::Local<v8::Value> value;
         args->GetNext(&value);
-        modifiers = GetKeyModifiersFromV8(value);
+        modifiers = GetKeyModifiersFromV8(args->isolate(), value);
         if (!args->PeekNext().IsEmpty())
           args->GetNext(&can_scroll);
       }

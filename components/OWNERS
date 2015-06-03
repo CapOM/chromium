@@ -126,7 +126,6 @@ per-file json_schema.gypi=mpcomplete@chromium.org
 
 per-file keyed_service.gypi=erg@chromium.org
 per-file keyed_service.gypi=phajdan.jr@chromium.org
-per-file keyed_service.gypi=rlp@chromium.org
 
 per-file leveldb_proto*=cjhopman@chromium.org
 per-file leveldb_proto*=mathp@chromium.org
@@ -302,6 +301,8 @@ per-file webp_transcode.gypi=sdefresne@chromium.org
 
 per-file web_contents_delegate_android.gypi=benm@chromium.org
 per-file web_contents_delegate_android.gypi=tedchoc@chromium.org
+
+per-file web_modal.gypi=wittman@chromium.org
 
 per-file web_resource.gypi=achuith@chromium.org
 per-file web_resource.gypi=asvitkine@chromium.org

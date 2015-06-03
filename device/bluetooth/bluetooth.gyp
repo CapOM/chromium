@@ -57,6 +57,8 @@
         'bluetooth_device_mac.mm',
         'bluetooth_device_win.cc',
         'bluetooth_device_win.h',
+        'bluetooth_discovery_filter.cc',
+        'bluetooth_discovery_filter.h',
         'bluetooth_discovery_manager_mac.mm',
         'bluetooth_discovery_manager_mac.h',
         'bluetooth_discovery_session.cc',
@@ -129,6 +131,7 @@
         }],
         ['OS == "android"', {
           'dependencies': [
+            'device_bluetooth_java',
             'device_bluetooth_jni_headers',
           ],
           'sources': [

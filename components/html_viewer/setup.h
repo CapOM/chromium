@@ -25,7 +25,7 @@ namespace html_viewer {
 
 class BlinkPlatformImpl;
 class UISetup;
-class WebMediaPlayerFactory;
+class MediaFactory;
 
 // Setup encapsulates the necessary state needed by HTMLViewer. Some objects
 // are created immediately in the constructor, otherwise not until
@@ -49,8 +49,8 @@ class Setup {
   void InitIfNecessary(const gfx::Size& screen_size_in_pixels,
                        float device_pixel_ratio);
 
+  mojo::ApplicationImpl* app() const { return app_; }
   bool is_headless() const { return is_headless_; }
-
   bool did_init() const { return did_init_; }
 
   const gfx::Size& screen_size_in_pixels() const {
@@ -59,13 +59,11 @@ class Setup {
 
   float device_pixel_ratio() const { return device_pixel_ratio_; }
 
-  scoped_refptr<base::MessageLoopProxy> compositor_thread() {
-    return compositor_thread_.message_loop_proxy();
+  scoped_refptr<base::SingleThreadTaskRunner> compositor_thread() {
+    return compositor_thread_.task_runner();
   }
 
-  WebMediaPlayerFactory* web_media_player_factory() {
-    return web_media_player_factory_.get();
-  }
+  MediaFactory* media_factory() { return media_factory_.get(); }
 
  private:
   mojo::ApplicationImpl* app_;
@@ -94,7 +92,7 @@ class Setup {
   scoped_ptr<scheduler::RendererScheduler> renderer_scheduler_;
   scoped_ptr<BlinkPlatformImpl> blink_platform_;
   base::Thread compositor_thread_;
-  scoped_ptr<WebMediaPlayerFactory> web_media_player_factory_;
+  scoped_ptr<MediaFactory> media_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(Setup);
 };

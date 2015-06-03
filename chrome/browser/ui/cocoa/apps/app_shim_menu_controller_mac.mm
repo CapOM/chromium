@@ -361,7 +361,7 @@ void SetItemWithTagVisible(NSMenuItem* top_level_item,
   [[NSNotificationCenter defaultCenter]
       addObserver:self
          selector:@selector(windowMainStatusChanged:)
-             name:NSWindowWillCloseNotification
+             name:NSWindowDidResignMainNotification
            object:nil];
 }
 
@@ -386,26 +386,31 @@ void SetItemWithTagVisible(NSMenuItem* top_level_item,
     if (appWindow)
       extension = appWindow->GetExtension();
     else
-      extension = apps::ExtensionAppShimHandler::GetAppForBrowser(
+      extension = apps::ExtensionAppShimHandler::MaybeGetAppForBrowser(
           chrome::FindBrowserWithWindow(window));
 
     if (extension)
       [self addMenuItems:extension];
     else
       [self removeMenuItems];
-  } else if ([name isEqualToString:NSWindowWillCloseNotification]) {
-    // If the window being closed has main status, reset back to the Chrome
-    // menu. This once scanned [NSApp windows] to predict whether we could
+  } else if ([name isEqualToString:NSWindowDidResignMainNotification]) {
+    // When a window resigns main status, reset back to the Chrome menu.
+    // In the past we've tried:
+    // - Only doing this when a window closes, but this would not be triggered
+    // when an app becomes hidden (Cmd+h), and there are no Chrome windows to
+    // become main.
+    // - Scanning [NSApp windows] to predict whether we could
     // expect another Chrome window to become main, and skip the reset. However,
     // panels need to do strange things during window close to ensure panels
     // never get chosen for key status over a browser window (which is likely
     // because they are given an elevated [NSWindow level]). Trying to handle
-    // this case is not robust. Unfortunately, resetting the menu to Chrome
+    // this case is not robust.
+    //
+    // Unfortunately, resetting the menu to Chrome
     // unconditionally means that if another packaged app window becomes key,
     // the menu will flicker. TODO(tapted): Investigate restoring the logic when
     // the panel code is removed.
-    if ([[notification object] isMainWindow])
-      [self removeMenuItems];
+    [self removeMenuItems];
   } else {
     NOTREACHED();
   }
@@ -490,7 +495,7 @@ void SetItemWithTagVisible(NSMenuItem* top_level_item,
   } else {
     Browser* browser = chrome::FindBrowserWithWindow([NSApp keyWindow]);
     const extensions::Extension* extension =
-        apps::ExtensionAppShimHandler::GetAppForBrowser(browser);
+        apps::ExtensionAppShimHandler::MaybeGetAppForBrowser(browser);
     if (extension)
       apps::ExtensionAppShimHandler::QuitHostedAppForWindow(browser->profile(),
                                                             extension->id());
@@ -506,7 +511,7 @@ void SetItemWithTagVisible(NSMenuItem* top_level_item,
   } else {
     Browser* browser = chrome::FindBrowserWithWindow([NSApp keyWindow]);
     const extensions::Extension* extension =
-        apps::ExtensionAppShimHandler::GetAppForBrowser(browser);
+        apps::ExtensionAppShimHandler::MaybeGetAppForBrowser(browser);
     if (extension)
       apps::ExtensionAppShimHandler::HideHostedApp(browser->profile(),
                                                    extension->id());

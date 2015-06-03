@@ -25,18 +25,19 @@ class MockContentLayerClient : public ContentLayerClient {
   void PaintContents(SkCanvas* canvas,
                      const gfx::Rect& clip,
                      PaintingControlSetting picture_control) override {}
-  void PaintContentsToDisplayList(
-      DisplayItemList* display_list,
+  scoped_refptr<DisplayItemList> PaintContentsToDisplayList(
       const gfx::Rect& clip,
       PaintingControlSetting picture_control) override {
     NOTIMPLEMENTED();
+    return nullptr;
   }
   bool FillsBoundsCompletely() const override { return false; };
 };
 
 TEST(PictureLayerTest, NoTilesIfEmptyBounds) {
   MockContentLayerClient client;
-  scoped_refptr<PictureLayer> layer = PictureLayer::Create(&client);
+  scoped_refptr<PictureLayer> layer =
+      PictureLayer::Create(LayerSettings(), &client);
   layer->SetBounds(gfx::Size(10, 10));
 
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
@@ -79,7 +80,8 @@ TEST(PictureLayerTest, NoTilesIfEmptyBounds) {
 
 TEST(PictureLayerTest, SuitableForGpuRasterization) {
   MockContentLayerClient client;
-  scoped_refptr<PictureLayer> layer = PictureLayer::Create(&client);
+  scoped_refptr<PictureLayer> layer =
+      PictureLayer::Create(LayerSettings(), &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
   scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
   host->SetRootLayer(layer);
@@ -100,7 +102,8 @@ TEST(PictureLayerTest, UseTileGridSize) {
   settings.default_tile_grid_size = gfx::Size(123, 123);
 
   MockContentLayerClient client;
-  scoped_refptr<PictureLayer> layer = PictureLayer::Create(&client);
+  scoped_refptr<PictureLayer> layer =
+      PictureLayer::Create(LayerSettings(), &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
   scoped_ptr<FakeLayerTreeHost> host =
       FakeLayerTreeHost::Create(&host_client, settings);
@@ -127,7 +130,8 @@ TEST(PictureLayerTest, NonMonotonicSourceFrameNumber) {
       new TestSharedBitmapManager());
 
   MockContentLayerClient client;
-  scoped_refptr<FakePictureLayer> layer = FakePictureLayer::Create(&client);
+  scoped_refptr<FakePictureLayer> layer =
+      FakePictureLayer::Create(LayerSettings(), &client);
 
   LayerTreeHost::InitParams params;
   params.client = &host_client1;

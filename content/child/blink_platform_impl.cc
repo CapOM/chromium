@@ -11,12 +11,14 @@
 #include "base/allocator/allocator_extension.h"
 #include "base/bind.h"
 #include "base/files/file_path.h"
+#include "base/location.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/singleton.h"
 #include "base/metrics/histogram.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/process/process_metrics.h"
 #include "base/rand_util.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -49,6 +51,7 @@
 #include "content/child/thread_safe_sender.h"
 #include "content/child/web_discardable_memory_impl.h"
 #include "content/child/web_memory_dump_provider_adapter.h"
+#include "content/child/web_process_memory_dump_impl.h"
 #include "content/child/web_url_loader_impl.h"
 #include "content/child/web_url_request_util.h"
 #include "content/child/websocket_bridge.h"
@@ -424,8 +427,12 @@ static int ToMessageID(WebLocalizedString::Name name) {
   return -1;
 }
 
+// TODO(skyostil): Ensure that we always have an active task runner when
+// constructing the platform.
 BlinkPlatformImpl::BlinkPlatformImpl()
-    : main_thread_task_runner_(base::MessageLoopProxy::current()),
+    : main_thread_task_runner_(base::ThreadTaskRunnerHandle::IsSet()
+                                   ? base::ThreadTaskRunnerHandle::Get()
+                                   : nullptr),
       shared_timer_func_(NULL),
       shared_timer_fire_time_(0.0),
       shared_timer_fire_time_was_set_while_suspended_(false),
@@ -634,8 +641,8 @@ blink::Platform::TraceEventHandle BlinkPlatformImpl::addTraceEvent(
     const unsigned char* arg_types,
     const unsigned long long* arg_values,
     unsigned char flags) {
-  base::TimeTicks timestamp_tt = base::TimeTicks::FromInternalValue(
-      static_cast<int64>(timestamp * base::Time::kMicrosecondsPerSecond));
+  base::TraceTicks timestamp_tt =
+      base::TraceTicks() + base::TimeDelta::FromSecondsD(timestamp);
   base::trace_event::TraceEventHandle handle =
       TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_THREAD_ID_AND_TIMESTAMP(
           phase, category_group_enabled, name, id,
@@ -671,8 +678,8 @@ blink::Platform::TraceEventHandle BlinkPlatformImpl::addTraceEvent(
       }
     }
   }
-  base::TimeTicks timestamp_tt = base::TimeTicks::FromInternalValue(
-      static_cast<int64>(timestamp * base::Time::kMicrosecondsPerSecond));
+  base::TraceTicks timestamp_tt =
+      base::TraceTicks() + base::TimeDelta::FromSecondsD(timestamp);
   base::trace_event::TraceEventHandle handle =
       TRACE_EVENT_API_ADD_TRACE_EVENT_WITH_THREAD_ID_AND_TIMESTAMP(phase,
                                       category_group_enabled,
@@ -723,6 +730,10 @@ void BlinkPlatformImpl::unregisterMemoryDumpProvider(
   base::trace_event::MemoryDumpManager::GetInstance()->UnregisterDumpProvider(
       wmdp_adapter.get());
   wmdp_adapter->set_is_registered(false);
+}
+
+blink::WebProcessMemoryDump* BlinkPlatformImpl::createProcessMemoryDump() {
+  return new WebProcessMemoryDumpImpl();
 }
 
 namespace {
@@ -1082,8 +1093,7 @@ double BlinkPlatformImpl::monotonicallyIncreasingTime() {
 }
 
 double BlinkPlatformImpl::systemTraceTime() {
-  return base::TimeTicks::NowFromSystemTraceTime().ToInternalValue() /
-      static_cast<double>(base::Time::kMicrosecondsPerSecond);
+  return (base::TraceTicks::Now() - base::TraceTicks()).InSecondsF();
 }
 
 void BlinkPlatformImpl::cryptographicallyRandomValues(
@@ -1365,7 +1375,7 @@ BlinkPlatformImpl::MainTaskRunnerForCurrentThread() {
       main_thread_task_runner_->BelongsToCurrentThread()) {
     return main_thread_task_runner_;
   } else {
-    return base::MessageLoopProxy::current();
+    return base::ThreadTaskRunnerHandle::Get();
   }
 }
 

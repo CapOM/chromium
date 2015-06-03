@@ -122,6 +122,15 @@ chrome.developerPrivate.ExtensionState = {
 };
 
 /**
+ * @enum {string}
+ * @see https://developer.chrome.com/extensions/developerPrivate#type-CommandScope
+ */
+chrome.developerPrivate.CommandScope = {
+  GLOBAL: 'GLOBAL',
+  CHROME: 'CHROME',
+};
+
+/**
  * @typedef {{
  *   isEnabled: boolean,
  *   isActive: boolean
@@ -217,9 +226,41 @@ var HomePage;
 var ExtensionView;
 
 /**
+ * @enum {string}
+ */
+chrome.developerPrivate.ControllerType = {
+  POLICY: 'POLICY',
+  CHILD_CUSTODIAN: 'CHILD_CUSTODIAN',
+  SUPERVISED_USER_CUSTODIAN: 'SUPERVISED_USER_CUSTODIAN',
+};
+
+/**
+ * @typedef {{
+ *   type: !chrome.developerPrivate.ControllerType,
+ *   text: string
+ * }}
+ */
+var ControlledInfo;
+
+/**
+ * @typedef {{
+ *   description: string,
+ *   keybinding: string,
+ *   name: string,
+ *   isActive: boolean,
+ *   scope: !chrome.developerPrivate.CommandScope,
+ *   isExtensionAction: boolean
+ * }}
+ * @see https://developer.chrome.com/extensions/developerPrivate#type-Command
+ */
+var Command;
+
+/**
  * @typedef {{
  *   actionButtonHidden: boolean,
  *   blacklistText: (string|undefined),
+ *   commands: !Array<Command>,
+ *   controlledInfo: (ControlledInfo|undefined),
  *   dependentExtensions: !Array<string>,
  *   description: string,
  *   disableReasons: DisableReasons,
@@ -229,7 +270,6 @@ var ExtensionView;
  *   iconUrl: string,
  *   id: string,
  *   incognitoAccess: AccessModifier,
- *   installedByCustodian: boolean,
  *   installWarnings: !Array<string>,
  *   launchUrl: (string|undefined),
  *   location: !chrome.developerPrivate.Location,
@@ -240,7 +280,6 @@ var ExtensionView;
  *   offlineEnabled: boolean,
  *   optionsPage: (OptionsPage|undefined),
  *   path: (string|undefined),
- *   policyText: (string|undefined),
  *   prettifiedPath: (string|undefined),
  *   runOnAllUrls: AccessModifier,
  *   runtimeErrors: !Array<RuntimeError>,
@@ -331,6 +370,17 @@ var ExtensionConfigurationUpdate;
  * @see https://developer.chrome.com/extensions/developerPrivate#type-ProfileConfigurationUpdate
  */
 var ProfileConfigurationUpdate;
+
+/**
+ * @typedef {{
+ *   extensionId: string,
+ *   commandName: string,
+ *   scope: (!chrome.developerPrivate.CommandScope|undefined),
+ *   keybinding: (string|undefined)
+ * }}
+ * @see https://developer.chrome.com/extensions/developerPrivate#type-ExtensionCommandUpdate
+ */
+var ExtensionCommandUpdate;
 
 /**
  * @typedef {{
@@ -648,6 +698,24 @@ chrome.developerPrivate.showOptions = function(extensionId, callback) {};
  * @see https://developer.chrome.com/extensions/developerPrivate#method-showPath
  */
 chrome.developerPrivate.showPath = function(extensionId, callback) {};
+
+/**
+ * (Un)suspends global shortcut handling.
+ * @param {boolean} isSuspended Whether or not shortcut handling should be
+ *     suspended.
+ * @param {function():void=} callback
+ * @see https://developer.chrome.com/extensions/developerPrivate#method-setShortcutHandlingSuspended
+ */
+chrome.developerPrivate.setShortcutHandlingSuspended = function(isSuspended, callback) {};
+
+/**
+ * Updates an extension command.
+ * @param {ExtensionCommandUpdate} update The parameters for updating the
+ *     extension command.
+ * @param {function():void=} callback
+ * @see https://developer.chrome.com/extensions/developerPrivate#method-updateExtensionCommand
+ */
+chrome.developerPrivate.updateExtensionCommand = function(update, callback) {};
 
 /**
  * @param {string} id

@@ -80,7 +80,7 @@ class FakeLauncher : public NativeProcessLauncher {
 
   void Launch(const GURL& origin,
               const std::string& native_host_name,
-              LaunchedCallback callback) const override {
+              const LaunchedCallback& callback) const override {
     callback.Run(NativeProcessLauncher::RESULT_SUCCESS,
                  base::Process(), read_file_.Pass(), write_file_.Pass());
   }
@@ -113,7 +113,7 @@ class NativeMessagingTest : public ::testing::Test,
     last_message_ = message;
 
     // Parse the message.
-    base::Value* parsed = base::JSONReader::Read(message);
+    base::Value* parsed = base::JSONReader::DeprecatedRead(message);
     base::DictionaryValue* dict_value;
     if (parsed && parsed->GetAsDictionary(&dict_value)) {
       last_message_parsed_.reset(dict_value);

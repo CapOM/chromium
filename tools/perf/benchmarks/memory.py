@@ -2,14 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from telemetry import benchmark
+from core import perf_benchmark
 
 from measurements import memory
+from telemetry import benchmark
 import page_sets
 
 
 @benchmark.Enabled('android')
-class MemoryMobile(benchmark.Benchmark):
+class MemoryMobile(perf_benchmark.PerfBenchmark):
   test = memory.Memory
   page_set = page_sets.MobileMemoryPageSet
 
@@ -18,7 +19,7 @@ class MemoryMobile(benchmark.Benchmark):
     return 'memory.mobile_memory'
 
 
-class MemoryTop7Stress(benchmark.Benchmark):
+class MemoryTop7Stress(perf_benchmark.PerfBenchmark):
   """Use (recorded) real world web sites and measure memory consumption."""
   test = memory.Memory
   page_set = page_sets.Top7StressPageSet
@@ -28,16 +29,34 @@ class MemoryTop7Stress(benchmark.Benchmark):
     return 'memory.top_7_stress'
 
 
-class MemoryTop7StressWithSlimmingPaint(benchmark.Benchmark):
+class MemoryTop7StressWithSlimmingPaint(perf_benchmark.PerfBenchmark):
   """Use (recorded) real world web sites and measure memory consumption,
   with --enable--slimming-paint."""
 
   test = memory.Memory
   page_set = page_sets.Top7StressPageSet
 
-  def CustomizeBrowserOptions(self, options):
+  def SetExtraBrowserOptions(self, options):
     options.AppendExtraBrowserArgs(['--enable-slimming-paint'])
 
   @classmethod
   def Name(cls):
     return 'memory.top_7_stress_slimming_paint'
+
+
+@benchmark.Enabled('has tabs')
+@benchmark.Disabled('android')  # Benchmark uses > 700MB of memory.
+class MemoryIdleMultiTab(perf_benchmark.PerfBenchmark):
+  """Use (recorded) real world web sites and measure memory consumption
+  with many tabs and idle times. """
+  test = memory.Memory
+  page_set = page_sets.IdleMultiTabCasesPageSet
+
+  def SetExtraBrowserOptions(self, options):
+    # This benchmark opens tabs from JavaScript, which does not work
+    # with popup-blocking enabled.
+    options.AppendExtraBrowserArgs(['--disable-popup-blocking'])
+
+  @classmethod
+  def Name(cls):
+    return 'memory.idle_multi_tab'

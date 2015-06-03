@@ -5,6 +5,7 @@
 
 SCRIPT_DIR=$(dirname $0)
 
+DISTRO=debian
 DIST=wheezy
 APT_REPO=http://http.us.debian.org/debian
 REPO_BASEDIR="${APT_REPO}/dists/${DIST}"
@@ -13,7 +14,6 @@ KEYRING_FILE=/usr/share/keyrings/debian-archive-keyring.gpg
 # Sysroot packages: these are the packages needed to build chrome.
 # NOTE: When DEBIAN_PACKAGES is modified, the packagelist files must be updated
 # by running this script in GeneratePackageList mode.
-# TODO(thestig) Remove libgcrypt11* the next time a package gets added.
 DEBIAN_PACKAGES="\
   comerr-dev \
   gcc-4.6 \
@@ -22,6 +22,7 @@ DEBIAN_PACKAGES="\
   libasound2-dev \
   libatk1.0-0 \
   libatk1.0-dev \
+  libattr1 \
   libavahi-client3 \
   libavahi-common3 \
   libc6 \

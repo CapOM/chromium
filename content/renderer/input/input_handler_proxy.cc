@@ -6,8 +6,11 @@
 
 #include "base/auto_reset.h"
 #include "base/command_line.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
+#include "base/single_thread_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/trace_event/trace_event.h"
 #include "content/common/input/did_overscroll_params.h"
 #include "content/common/input/web_input_event_traits.h"
@@ -17,7 +20,6 @@
 #include "third_party/WebKit/public/platform/Platform.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
 #include "ui/events/latency_info.h"
-#include "ui/gfx/frame_time.h"
 #include "ui/gfx/geometry/point_conversions.h"
 
 using blink::WebFloatPoint;
@@ -407,7 +409,7 @@ InputHandlerProxy::EventDisposition InputHandlerProxy::HandleMouseWheel(
     // Note that the call to the elasticity controller is made asynchronously,
     // to minimize divergence between main thread and impl thread event
     // handling paths.
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&InputScrollElasticityController::ObserveWheelEventAndResult,
                    scroll_elasticity_controller_->GetWeakPtr(), wheel_event,

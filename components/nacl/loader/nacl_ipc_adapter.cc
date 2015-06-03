@@ -18,8 +18,8 @@
 #include "ipc/ipc_channel.h"
 #include "ipc/ipc_platform_file.h"
 #include "native_client/src/public/nacl_desc.h"
+#include "native_client/src/public/nacl_desc_custom.h"
 #include "native_client/src/trusted/desc/nacl_desc_base.h"
-#include "native_client/src/trusted/desc/nacl_desc_custom.h"
 #include "native_client/src/trusted/desc/nacl_desc_imc_shm.h"
 #include "native_client/src/trusted/desc/nacl_desc_io.h"
 #include "native_client/src/trusted/desc/nacl_desc_quota.h"
@@ -799,7 +799,7 @@ void NaClIPCAdapter::SendMessageOnIOThread(scoped_ptr<IPC::Message> message) {
   if (!open_resource_cb_.is_null() &&
       message->type() == PpapiHostMsg_OpenResource::ID &&
       PpapiHostMsg_OpenResource::ReadSendParam(message.get(), &send_params)) {
-    const std::string key = get<0>(send_params);
+    const std::string key = base::get<0>(send_params);
     // Both open_resource_cb_ and SaveOpenResourceMessage must be invoked
     // from the I/O thread.
     if (open_resource_cb_.Run(

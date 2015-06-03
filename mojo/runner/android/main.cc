@@ -19,12 +19,12 @@
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "base/threading/simple_thread.h"
+#include "components/view_manager/android_loader.h"
 #include "jni/ShellMain_jni.h"
 #include "mojo/common/message_pump_mojo.h"
 #include "mojo/runner/android/android_handler_loader.h"
 #include "mojo/runner/android/background_application_loader.h"
 #include "mojo/runner/android/context_init.h"
-#include "mojo/runner/android/native_viewport_application_loader.h"
 #include "mojo/runner/android/ui_application_loader_android.h"
 #include "mojo/runner/context.h"
 #include "mojo/runner/init.h"
@@ -72,9 +72,9 @@ LazyInstance<base::android::ScopedJavaGlobalRef<jobject>> g_main_activiy =
 void ConfigureAndroidServices(Context* context) {
   context->application_manager()->SetLoaderForURL(
       make_scoped_ptr(new UIApplicationLoader(
-          make_scoped_ptr(new NativeViewportApplicationLoader()),
+          make_scoped_ptr(new view_manager::AndroidLoader()),
           g_java_message_loop.Get().get())),
-      GURL("mojo:native_viewport_service"));
+      GURL("mojo:view_manager"));
 
   // Android handler is bundled with the Mojo shell, because it uses the
   // MojoShell application as the JNI bridge to bootstrap execution of other
@@ -166,11 +166,15 @@ static void Init(JNIEnv* env,
   Context* shell_context = new Context();
   shell_context->SetShellFileRoot(base::FilePath(
       base::android::ConvertJavaStringToUTF8(env, j_local_apps_directory)));
-  InitContext(shell_context);
   g_context.Get().reset(shell_context);
 
   g_java_message_loop.Get().reset(new base::MessageLoopForUI);
   base::MessageLoopForUI::current()->Start();
+
+  // This is done after the main message loop is started since it may post
+  // tasks. This is consistent with the ordering from the desktop version of
+  // this file (../desktop/launcher_process.cc).
+  InitContext(shell_context);
 
   // TODO(abarth): At which point should we switch to cross-platform
   // initialization?

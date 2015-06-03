@@ -96,7 +96,7 @@ class CC_EXPORT LayerTreeImpl {
   LayerImpl* FindPendingTreeLayerById(int id);
   bool PinchGestureActive() const;
   BeginFrameArgs CurrentBeginFrameArgs() const;
-  base::TimeDelta begin_impl_frame_interval() const;
+  base::TimeDelta CurrentBeginFrameInterval() const;
   void SetNeedsCommit();
   gfx::Rect DeviceViewport() const;
   gfx::Size DrawViewportSize() const;
@@ -131,6 +131,7 @@ class CC_EXPORT LayerTreeImpl {
 
   void SetPropertyTrees(const PropertyTrees& property_trees) {
     property_trees_ = property_trees;
+    property_trees_.transform_tree.set_source_to_parent_updates_allowed(false);
   }
   PropertyTrees* property_trees() { return &property_trees_; }
 
@@ -212,6 +213,7 @@ class CC_EXPORT LayerTreeImpl {
   // priorities. Returns false if it was unable to update.  Updating lcd
   // text may cause invalidations, so should only be done after a commit.
   bool UpdateDrawProperties(bool update_lcd_text);
+  void BuildPropertyTreesForTesting();
 
   void set_needs_update_draw_properties() {
     needs_update_draw_properties_ = true;

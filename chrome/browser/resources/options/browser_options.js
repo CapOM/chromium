@@ -49,7 +49,6 @@ cr.define('options', function() {
     ALWAYS: 0,
     WIFI_ONLY: 1,
     NEVER: 2,
-    UNSET: 3,
     DEFAULT: 1
   };
 
@@ -299,12 +298,6 @@ cr.define('options', function() {
           PageManager.showPageByName('power-overlay');
           chrome.send('coreOptionsUserMetricsAction',
                       ['Options_ShowPowerSettings']);
-        };
-        $('battery-button').onclick = function(evt) {
-          WebsiteSettingsManager.showWebsiteSettings('battery');
-        };
-        $('stored-data-button').onclick = function(evt) {
-          WebsiteSettingsManager.showWebsiteSettings('storage');
         };
         $('keyboard-settings-button').onclick = function(evt) {
           PageManager.showPageByName('keyboard-overlay');
@@ -592,14 +585,6 @@ cr.define('options', function() {
       $('easy-unlock-enable-proximity-detection').hidden =
           !loadTimeData.getBoolean('easyUnlockProximityDetectionAllowed');
 
-      // Website Settings section.
-      if (loadTimeData.getBoolean('websiteSettingsManagerEnabled')) {
-        $('website-settings-section').hidden = false;
-        $('website-management-button').onclick = function(event) {
-          PageManager.showPageByName('websiteSettings');
-        };
-      }
-
       // Web Content section.
       $('fontSettingsCustomizeFontsButton').onclick = function(event) {
         PageManager.showPageByName('fonts');
@@ -681,6 +666,14 @@ cr.define('options', function() {
         $('accessibility-spoken-feedback-check').onchange =
             updateAccessibilitySettingsButton;
         updateAccessibilitySettingsButton();
+
+        var updateScreenMagnifierCenterFocus = function() {
+          $('accessibility-screen-magnifier-center-focus-check').disabled =
+              !$('accessibility-screen-magnifier-check').checked;
+        };
+        Preferences.getInstance().addEventListener(
+            $('accessibility-screen-magnifier-check').getAttribute('pref'),
+            updateScreenMagnifierCenterFocus);
 
         var updateDelayDropdown = function() {
           $('accessibility-autoclick-dropdown').disabled =
@@ -1754,12 +1747,7 @@ cr.define('options', function() {
     setNetworkPredictionValue_: function(pref) {
       var checkbox = $('networkPredictionOptions');
       checkbox.disabled = pref.disabled;
-      if (pref.value == NetworkPredictionOptions.UNSET) {
-        checkbox.checked = (NetworkPredictionOptions.DEFAULT !=
-            NetworkPredictionOptions.NEVER);
-      } else {
-        checkbox.checked = (pref.value != NetworkPredictionOptions.NEVER);
-      }
+      checkbox.checked = (pref.value != NetworkPredictionOptions.NEVER);
     },
 
     /**

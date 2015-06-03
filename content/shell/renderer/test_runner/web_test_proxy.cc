@@ -915,7 +915,7 @@ blink::WebPlugin* WebTestProxyBase::CreatePlugin(
     const blink::WebPluginParams& params) {
   if (TestPlugin::IsSupportedMimeType(params.mimeType))
     return TestPlugin::create(frame, params, delegate_);
-  return 0;
+  return delegate_->CreatePluginPlaceholder(frame, params);
 }
 
 void WebTestProxyBase::SetStatusText(const blink::WebString& text) {
@@ -1360,8 +1360,11 @@ blink::WebNavigationPolicy WebTestProxyBase::DecidePolicyForNavigation(
   else
     result = blink::WebNavigationPolicyIgnore;
 
-  if (test_interfaces_->GetTestRunner()->policyDelegateShouldNotifyDone())
+  if (test_interfaces_->GetTestRunner()->policyDelegateShouldNotifyDone()) {
     test_interfaces_->GetTestRunner()->policyDelegateDone();
+    result = blink::WebNavigationPolicyIgnore;
+  }
+
   return result;
 }
 

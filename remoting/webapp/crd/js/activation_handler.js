@@ -29,7 +29,8 @@ remoting.ActivationHandler = function (ipc, appLauncher) {
      title: chrome.i18n.getMessage(/*i18n-content*/'NEW_WINDOW')
   });
 
-  chrome.contextMenus.onClicked.addListener(this.onContextMenu_.bind(this));
+  chrome.contextMenus.onClicked.addListener(
+      /** @type {function (Object, Tab=)} */ (this.onContextMenu_.bind(this)));
   chrome.app.runtime.onLaunched.addListener(this.onLaunched_.bind(this));
   ipc.register(remoting.ActivationHandler.Ipc.RELAUNCH,
                appLauncher.restart.bind(appLauncher));
@@ -51,19 +52,12 @@ remoting.ActivationHandler.prototype.onContextMenu_ = function(info) {
 };
 
 /**
- * Called when the App is activated (e.g. from the Chrome App Launcher).  It
- * creates a new window if there are no existing ones.  Otherwise, it will put
- * focus on the last window created.
+ * Create a new window when the App is launched.
  *
  * @private
  */
 remoting.ActivationHandler.prototype.onLaunched_ = function() {
-  var windows = chrome.app.window.getAll();
-  if (windows.length >= 1) {
-    windows[windows.length - 1].focus();
-  } else {
-    this.appLauncher_.launch();
-  }
+  this.appLauncher_.launch();
 };
 
 })();

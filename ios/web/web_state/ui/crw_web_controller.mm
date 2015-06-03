@@ -59,6 +59,8 @@
 #include "ios/web/public/web_state/web_state.h"
 #include "ios/web/web_state/blocked_popup_info.h"
 #import "ios/web/web_state/crw_web_view_proxy_impl.h"
+#import "ios/web/web_state/error_translation_util.h"
+#include "ios/web/web_state/frame_info.h"
 #import "ios/web/web_state/js/credential_util.h"
 #import "ios/web/web_state/js/crw_js_early_script_manager.h"
 #import "ios/web/web_state/js/crw_js_plugin_placeholder_manager.h"
@@ -87,7 +89,6 @@ using web::WebStateImpl;
 
 namespace web {
 
-NSString* const kPageChangedNotification = @"kPageChangedNotification";
 NSString* const kContainerViewID = @"Container View";
 const char* kWindowNameSeparator = "#";
 NSString* const kUserIsInteractingKey = @"userIsInteracting";
@@ -2556,12 +2557,6 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   [self resetDocumentSpecificState];
 
   [self didStartLoadingURL:currentURL updateHistory:YES];
-
-  // TODO(stuartmorgan): Eliminate this; interested parties should be direct
-  // delegates/observers.
-  [[NSNotificationCenter defaultCenter]
-      postNotificationName:web::kPageChangedNotification
-                    object:self];
 }
 
 - (void)resetDocumentSpecificState {
@@ -2671,20 +2666,20 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
 // method, which provides less information than the WKWebView version. Audit
 // this for things that should be handled in the subclass instead.
 - (BOOL)shouldAllowLoadWithRequest:(NSURLRequest*)request
+                       targetFrame:(const web::FrameInfo*)targetFrame
                        isLinkClick:(BOOL)isLinkClick {
-  NSURL* nsurl = request.URL;
-  GURL url = net::GURLWithNSURL(request.URL);
+  GURL requestURL = net::GURLWithNSURL(request.URL);
 
   // Check if the request should be delayed.
-  if (_externalRequest && _externalRequest->url == url) {
+  if (_externalRequest && _externalRequest->url == requestURL) {
     // Links that can't be shown in a tab by Chrome but can be handled by
     // external apps (e.g. tel:, mailto:) are opened directly despite the target
     // attribute on the link. We don't open a new tab for them because Mobile
     // Safari doesn't do that (and sites are expecting us to do the same) and
     // also because there would be nothing shown in that new tab; it would
     // remain on about:blank (see crbug.com/240178)
-    if ([CRWWebController webControllerCanShow:url] ||
-        ![_delegate openExternalURL:url]) {
+    if ([CRWWebController webControllerCanShow:requestURL] ||
+        ![_delegate openExternalURL:requestURL]) {
       web::NewWindowInfo windowInfo = *_externalRequest;
       dispatch_async(dispatch_get_main_queue(), ^{
         [self openPopupWithInfo:windowInfo];
@@ -2702,7 +2697,7 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   // is moved there as well.
   if (shouldCheckNativeApp || isLinkClick) {
     // Check If the URL is handled by a native app.
-    if ([self urlTriggersNativeAppLaunch:url
+    if ([self urlTriggersNativeAppLaunch:requestURL
                                sourceURL:[self currentNavigationURL]]) {
       // External app has been launched successfully. Stop the current page
       // load operation (e.g. notifying all observers) and record the URL so
@@ -2710,16 +2705,17 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
       if ([self cancellable])
         [_delegate webPageOrderedClose];
       [self abortLoad];
-      [_openedApplicationURL addObject:nsurl];
+      [_openedApplicationURL addObject:request.URL];
       return NO;
     }
   }
 
   // The WebDelegate may instruct the CRWWebController to stop loading, and
   // instead instruct the next page to be loaded in an animation.
+  GURL mainDocumentURL = net::GURLWithNSURL(request.mainDocumentURL);
   DCHECK(self.webView);
-  if (![self shouldOpenURL:url
-           mainDocumentURL:net::GURLWithNSURL(request.mainDocumentURL)
+  if (![self shouldOpenURL:requestURL
+           mainDocumentURL:mainDocumentURL
                linkClicked:isLinkClick]) {
     return NO;
   }
@@ -2728,18 +2724,23 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   // external application.
   // TODO(droger):  Check transition type before opening an external
   // application? For example, only allow it for TYPED and LINK transitions.
-  if (![CRWWebController webControllerCanShow:url]) {
-    if (![self shouldOpenExternalURL:url]) {
+  if (![CRWWebController webControllerCanShow:requestURL]) {
+    if (![self shouldOpenExternalURL:requestURL]) {
       return NO;
     }
-    // TODO(jimblackler): investigate possible side-effects of this where
-    // navigation to the unknown scheme was performed by a script or in an
-    // iFrame.
-    [self abortLoad];
-    if ([_delegate openExternalURL:url]) {
+
+    // Abort load if navigation is hapenning on the main frame. If |targetFrame|
+    // is unknown use heuristic to guess the target frame by comparing
+    // documentURL and navigation URL. This heuristic may have false positives.
+    bool shouldAbortLoad = targetFrame ? targetFrame->is_main_frame
+                                       : requestURL == mainDocumentURL;
+    if (shouldAbortLoad)
+      [self abortLoad];
+
+    if ([_delegate openExternalURL:requestURL]) {
       // Record the URL so that errors reported following the 'NO' reply can be
       // safely ignored.
-      [_openedApplicationURL addObject:nsurl];
+      [_openedApplicationURL addObject:request.URL];
       return NO;
     }
     return NO;
@@ -2771,6 +2772,9 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
 }
 
 - (void)handleLoadError:(NSError*)error inMainFrame:(BOOL)inMainFrame {
+  // Attempt to translate iOS errors into their corresponding net errors.
+  error = web::NetErrorFromError(error);
+
   if ([error code] == NSURLErrorUnsupportedURL)
     return;
   // In cases where a Plug-in handles the load do not take any further action.

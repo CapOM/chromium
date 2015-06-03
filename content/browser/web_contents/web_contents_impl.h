@@ -109,6 +109,8 @@ class CONTENT_EXPORT WebContentsImpl
 
   static std::vector<WebContentsImpl*> GetAllWebContents();
 
+  static WebContentsImpl* FromFrameTreeNode(FrameTreeNode* frame_tree_node);
+
   // Returns the opener WebContentsImpl, if any. This can be set to null if the
   // opener is closed or the page clears its window.opener.
   WebContentsImpl* opener() const { return opener_; }
@@ -155,6 +157,10 @@ class CONTENT_EXPORT WebContentsImpl
   // Creates a BrowserPluginEmbedder object for this WebContents if one doesn't
   // already exist.
   void CreateBrowserPluginEmbedderIfNecessary();
+
+  // Cancels modal dialogs in this WebContents, as well as in any browser
+  // plugins it is hosting.
+  void CancelActiveAndPendingDialogs();
 
   // Gets the current fullscreen render widget's routing ID. Returns
   // MSG_ROUTING_NONE when there is no fullscreen render widget.
@@ -272,6 +278,7 @@ class CONTENT_EXPORT WebContentsImpl
   bool IsBeingDestroyed() const override;
   void NotifyNavigationStateChanged(InvalidateTypes changed_flags) override;
   base::TimeTicks GetLastActiveTime() const override;
+  void SetLastActiveTime(base::TimeTicks last_active_time) override;
   void WasShown() override;
   void WasHidden() override;
   bool NeedToFireBeforeUnload() override;
@@ -814,6 +821,8 @@ class CONTENT_EXPORT WebContentsImpl
                    const std::string& name,
                    const base::ListValue& args);
 #if defined(ENABLE_PLUGINS)
+  void OnPepperInstanceCreated();
+  void OnPepperInstanceDeleted();
   void OnPepperPluginHung(int plugin_child_id,
                           const base::FilePath& path,
                           bool is_hung);
@@ -1102,6 +1111,9 @@ class CONTENT_EXPORT WebContentsImpl
 
   // The last published theme color.
   SkColor last_sent_theme_color_;
+
+  // Whether the first visually non-empty paint has occurred.
+  bool did_first_visually_non_empty_paint_;
 
   // Data for misc internal state ----------------------------------------------
 

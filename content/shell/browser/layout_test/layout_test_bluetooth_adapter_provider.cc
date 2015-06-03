@@ -10,16 +10,22 @@
 #include "device/bluetooth/bluetooth_uuid.h"
 #include "device/bluetooth/test/mock_bluetooth_adapter.h"
 #include "device/bluetooth/test/mock_bluetooth_discovery_session.h"
+#include "device/bluetooth/test/mock_bluetooth_gatt_connection.h"
 #include "testing/gmock/include/gmock/gmock.h"
 
 using device::BluetoothAdapter;
 using device::BluetoothAdapterFactory;
 using device::BluetoothDevice;
 using device::BluetoothDiscoverySession;
+using device::BluetoothGattConnection;
+using device::BluetoothGattService;
 using device::BluetoothUUID;
 using device::MockBluetoothAdapter;
 using device::MockBluetoothDevice;
 using device::MockBluetoothDiscoverySession;
+using device::MockBluetoothGattConnection;
+using device::MockBluetoothGattService;
+using testing::Between;
 using testing::Invoke;
 using testing::Return;
 using testing::NiceMock;
@@ -33,12 +39,30 @@ ACTION_TEMPLATE(RunCallback,
   return ::testing::get<k>(args).Run();
 }
 
+// Invokes Run() on the k-th argument of the function with 1 argument.
+ACTION_TEMPLATE(RunCallback,
+                HAS_1_TEMPLATE_PARAMS(int, k),
+                AND_1_VALUE_PARAMS(p0)) {
+  return ::testing::get<k>(args).Run(p0);
+}
+
 // Invokes Run() on the k-th argument of the function with the result
 // of |func| as an argument.
 ACTION_TEMPLATE(RunCallbackWithResult,
                 HAS_1_TEMPLATE_PARAMS(int, k),
                 AND_1_VALUE_PARAMS(func)) {
   return ::testing::get<k>(args).Run(func());
+}
+
+// Function to iterate over the adapter's devices and return the one
+// that matches the address.
+ACTION_P(GetMockDevice, adapter) {
+  std::string address = arg0;
+  for (BluetoothDevice* device : adapter->GetMockDevices()) {
+    if (device->GetAddress() == address)
+      return device;
+  }
+  return NULL;
 }
 }
 
@@ -48,18 +72,17 @@ namespace content {
 scoped_refptr<BluetoothAdapter>
 LayoutTestBluetoothAdapterProvider::GetBluetoothAdapter(
     const std::string& fake_adapter_name) {
-  // TODO(ortuno): Remove RejectRequestDevice once LayoutTests are modified
-  if (fake_adapter_name == "RejectRequestDevice_NotFoundError" ||
-      fake_adapter_name == "EmptyAdapter") {
+  if (fake_adapter_name == "EmptyAdapter")
     return GetEmptyAdapter();
-  }
-  // TODO(ortuno): Remove "Single Empty Device" once LayoutTests are modified
-  else if (fake_adapter_name == "Single Empty Device" ||
-           fake_adapter_name == "SingleEmptyDeviceAdapter") {
+  else if (fake_adapter_name == "SingleEmptyDeviceAdapter")
     return GetSingleEmptyDeviceAdapter();
-  } else if (fake_adapter_name == "") {
+  else if (fake_adapter_name == "ConnectableDeviceAdapter")
+    return GetConnectableDeviceAdapter();
+  else if (fake_adapter_name == "UnconnectableDeviceAdapter")
+    return GetUnconnectableDeviceAdapter();
+  else if (fake_adapter_name == "")
     return NULL;
-  }
+
   NOTREACHED();
   return NULL;
 }
@@ -81,6 +104,10 @@ LayoutTestBluetoothAdapterProvider::GetEmptyAdapter() {
       .WillByDefault(
           Invoke(adapter.get(), &MockBluetoothAdapter::GetConstMockDevices));
 
+  // The call to ::GetDevice will invoke GetMockDevice which returns a device
+  // matching the address provided if the device was added to the mock.
+  ON_CALL(*adapter, GetDevice(_)).WillByDefault(GetMockDevice(adapter.get()));
+
   return adapter.Pass();
 }
 
@@ -92,6 +119,38 @@ LayoutTestBluetoothAdapterProvider::GetSingleEmptyDeviceAdapter() {
   adapter->AddMockDevice(GetEmptyDevice(adapter.get()));
 
   return adapter.Pass();
+}
+
+// static
+scoped_refptr<NiceMock<MockBluetoothAdapter>>
+LayoutTestBluetoothAdapterProvider::GetConnectableDeviceAdapter() {
+  scoped_refptr<NiceMock<MockBluetoothAdapter>> adapter(GetEmptyAdapter());
+
+  adapter->AddMockDevice(GetConnectableDevice(adapter.get()));
+
+  return adapter.Pass();
+}
+
+// static
+scoped_refptr<NiceMock<MockBluetoothAdapter>>
+LayoutTestBluetoothAdapterProvider::GetUnconnectableDeviceAdapter() {
+  scoped_refptr<NiceMock<MockBluetoothAdapter>> adapter(GetEmptyAdapter());
+
+  adapter->AddMockDevice(GetUnconnectableDevice(adapter.get()));
+
+  return adapter.Pass();
+}
+
+// static
+scoped_ptr<NiceMock<MockBluetoothDiscoverySession>>
+LayoutTestBluetoothAdapterProvider::GetDiscoverySession() {
+  scoped_ptr<NiceMock<MockBluetoothDiscoverySession>> discovery_session(
+      new NiceMock<MockBluetoothDiscoverySession>());
+
+  ON_CALL(*discovery_session, Stop(_, _))
+      .WillByDefault(RunCallback<0 /* success_callback */>());
+
+  return discovery_session.Pass();
 }
 
 // static
@@ -114,19 +173,61 @@ LayoutTestBluetoothAdapterProvider::GetEmptyDevice(
   list.push_back(BluetoothUUID("1800"));
   list.push_back(BluetoothUUID("1801"));
   ON_CALL(*empty_device, GetUUIDs()).WillByDefault(Return(list));
+
+  empty_device->AddMockService(
+      GetMockService(empty_device.get(), "1800" /* Generic Access */));
+  empty_device->AddMockService(
+      GetMockService(empty_device.get(), "1801" /* Generic Attribute */));
+
+  // Using Invoke allows the device returned from this method to be futher
+  // modified and have more services added to it. The call to ::GetGattServices
+  // will invoke ::GetMockServices, returning all services added up to that
+  // time.
+  ON_CALL(*empty_device, GetGattServices())
+      .WillByDefault(
+          Invoke(empty_device.get(), &MockBluetoothDevice::GetMockServices));
+
   return empty_device.Pass();
 }
 
 // static
-scoped_ptr<NiceMock<MockBluetoothDiscoverySession>>
-LayoutTestBluetoothAdapterProvider::GetDiscoverySession() {
-  scoped_ptr<NiceMock<MockBluetoothDiscoverySession>> discovery_session(
-      new NiceMock<MockBluetoothDiscoverySession>());
+scoped_ptr<NiceMock<MockBluetoothDevice>>
+LayoutTestBluetoothAdapterProvider::GetConnectableDevice(
+    MockBluetoothAdapter* adapter) {
+  scoped_ptr<NiceMock<MockBluetoothDevice>> device(GetEmptyDevice(adapter));
 
-  ON_CALL(*discovery_session, Stop(_, _))
-      .WillByDefault(RunCallback<0 /* success_callback */>());
+  BluetoothDevice* device_ptr = device.get();
 
-  return discovery_session.Pass();
+  ON_CALL(*device, CreateGattConnection(_, _))
+      .WillByDefault(
+          RunCallbackWithResult<0 /* success_callback */>([device_ptr]() {
+            return make_scoped_ptr(new NiceMock<MockBluetoothGattConnection>(
+                device_ptr->GetAddress()));
+          }));
+
+  return device.Pass();
+}
+
+// static
+scoped_ptr<NiceMock<MockBluetoothDevice>>
+LayoutTestBluetoothAdapterProvider::GetUnconnectableDevice(
+    MockBluetoothAdapter* adapter) {
+  scoped_ptr<NiceMock<MockBluetoothDevice>> device(GetEmptyDevice(adapter));
+
+  ON_CALL(*device, CreateGattConnection(_, _))
+      .WillByDefault(
+          RunCallback<1 /* error_callback */>(BluetoothDevice::ERROR_FAILED));
+
+  return device.Pass();
+}
+
+// static
+scoped_ptr<NiceMock<MockBluetoothGattService>>
+LayoutTestBluetoothAdapterProvider::GetMockService(MockBluetoothDevice* device,
+                                                   const std::string& uuid) {
+  return make_scoped_ptr(new NiceMock<MockBluetoothGattService>(
+      device, uuid /* identifier */, BluetoothUUID(uuid), true /* is_primary */,
+      false /* is_local */));
 }
 
 }  // namespace content

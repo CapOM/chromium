@@ -53,6 +53,7 @@ class WebLayerTreeViewImplForTesting
   virtual void didStopFlinging();
   virtual void finishAllRendering();
   virtual void setDeferCommits(bool defer_commits);
+  virtual void registerForAnimations(blink::WebLayer* layer);
   virtual void registerViewportLayers(
       const blink::WebLayer* overscrollElasticityLayer,
       const blink::WebLayer* pageScaleLayerLayer,
@@ -71,9 +72,6 @@ class WebLayerTreeViewImplForTesting
   void ApplyViewportDeltas(const gfx::Vector2dF& inner_delta,
                            const gfx::Vector2dF& outer_delta,
                            const gfx::Vector2dF& elastic_overscroll_delta,
-                           float page_scale,
-                           float top_controls_delta) override;
-  void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
                            float page_scale,
                            float top_controls_delta) override;
   void RequestNewOutputSurface() override;

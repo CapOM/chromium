@@ -51,8 +51,12 @@ copy_ex("copy_mandoline_assets") {
   dest = mandoline_assets_dir
   deps = [
     "//components/html_viewer",
-    "//components/surfaces",
+    "//components/view_manager",
+    "//components/view_manager/surfaces",
     "//mandoline/services/core_services",
+    "//mojo/runner:bootstrap",
+    "//mojo/runner:bootstrap_java",
+    "//mojo/services/network",
   ]
   sources = [
     "$root_out_dir/core_services.mojo",
@@ -86,7 +90,7 @@ android_apk("mandoline_apk") {
     "//mojo/runner:java",
     "//mojo/runner:resources",
     "//base:base_java",
-    "//components/view_manager/native_viewport:native_viewport_java",
+    "//components/view_manager:view_manager_java",
     "//third_party/android_tools:google_play_services_default_resources",
   ]
 }

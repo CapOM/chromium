@@ -18,7 +18,7 @@
 
 /**
  * @type {?{
- *   filter: !Object.<string, *>,
+ *   filter: !Object<*>,
  *   webstoreUrl: ?string
  * }}
  */
@@ -53,8 +53,7 @@ function getString(id) {
 }
 
 /**
- * @param {Object.<string, string>} strings Localized strings used by the
- *     container.
+ * @param {Object<string>} strings Localized strings used by the container.
  * @return {!CWSWidgetContainer.PlatformDelegate}
  */
 function createPlatformDelegate(strings) {
@@ -98,7 +97,7 @@ function createPlatformDelegate(strings) {
           });
     },
 
-    /** @param {function(Array.<string>)} callback */
+    /** @param {function(Array<string>)} callback */
     getInstalledItems: function(callback) { callback([]); },
 
     /**

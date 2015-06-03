@@ -10,19 +10,24 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <vector>
 
 #include "base/files/file_util.h"
 #include "base/files/scoped_file.h"
 #include "base/lazy_instance.h"
 #include "base/logging.h"
+#include "base/metrics/field_trial.h"
+#include "base/metrics/histogram.h"
 #include "base/posix/eintr_wrapper.h"
 #include "base/process/process_metrics.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/safe_strerror_posix.h"
+#include "base/scoped_generic.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/synchronization/lock.h"
 #include "base/threading/platform_thread.h"
 #include "base/threading/thread_restrictions.h"
+#include "base/time/time.h"
 
 #if defined(OS_MACOSX)
 #include "base/mac/foundation_util.h"
@@ -39,6 +44,139 @@ namespace {
 
 LazyInstance<Lock>::Leaky g_thread_lock_ = LAZY_INSTANCE_INITIALIZER;
 
+#if !defined(OS_ANDROID)
+struct ScopedPathUnlinkerTraits {
+  static FilePath* InvalidValue() { return nullptr; }
+
+  static void Free(FilePath* path) {
+    // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/466437
+    // is fixed.
+    tracked_objects::ScopedTracker tracking_profile(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "466437 SharedMemory::Create::Unlink"));
+    if (unlink(path->value().c_str()))
+      PLOG(WARNING) << "unlink";
+  }
+};
+
+// Unlinks the FilePath when the object is destroyed.
+typedef ScopedGeneric<FilePath*, ScopedPathUnlinkerTraits> ScopedPathUnlinker;
+
+const char kSharedMemoryBatchCreate[] = "kSharedMemoryBatchCreate";
+const char kSharedMemoryCreateStrategy[] = "SharedMemoryCreateStrategy";
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+const int kBatchSize = 5;
+
+// This variable must only be accessed if |g_thread_lock_| is held.
+LazyInstance<std::vector<FILE*>>::Leaky g_file_pool_ =
+    LAZY_INSTANCE_INITIALIZER;
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
+
+// Whether to generate more than 1 shared memory handle at a time, and store
+// the results in a pool.
+bool ShouldBatchCreateSharedMemory() {
+#if !defined(OS_MACOSX) || defined(OS_IOS)
+  return false;
+#endif  // !defined(OS_MACOSX) || defined(OS_IOS)
+
+  g_thread_lock_.Get().AssertAcquired();
+
+  static bool has_determined_group = false;
+  static bool batch_create_shared_memory = false;
+
+  if (has_determined_group)
+    return batch_create_shared_memory;
+
+  const std::string group_name =
+      base::FieldTrialList::FindFullName(kSharedMemoryCreateStrategy);
+  batch_create_shared_memory = group_name == kSharedMemoryBatchCreate;
+  has_determined_group = true;
+  return batch_create_shared_memory;
+}
+
+// Makes a temporary file, fdopens it, and then unlinks it. |fp| is populated
+// with the fdopened FILE. |readonly_fd| is populated with the opened fd if
+// options.share_read_only is true. |path| is populated with the location of
+// the file before it was unlinked.
+// Returns false if there's an unhandled failure.
+bool CreateAnonymousSharedMemory(const SharedMemoryCreateOptions& options,
+                                 ScopedFILE* fp,
+                                 ScopedFD* readonly_fd,
+                                 FilePath* path) {
+  // It doesn't make sense to have a open-existing private piece of shmem
+  DCHECK(!options.open_existing_deprecated);
+  // Q: Why not use the shm_open() etc. APIs?
+  // A: Because they're limited to 4mb on OS X.  FFFFFFFUUUUUUUUUUU
+  FilePath directory;
+  ScopedPathUnlinker path_unlinker;
+  if (GetShmemTempDir(options.executable, &directory)) {
+    // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/466437
+    // is fixed.
+    tracked_objects::ScopedTracker tracking_profile(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "466437 SharedMemory::Create::OpenTemporaryFile"));
+    fp->reset(base::CreateAndOpenTemporaryFileInDir(directory, path));
+
+    // Deleting the file prevents anyone else from mapping it in (making it
+    // private), and prevents the need for cleanup (once the last fd is
+    // closed, it is truly freed).
+    if (*fp)
+      path_unlinker.reset(path);
+  }
+
+  if (*fp) {
+    if (options.share_read_only) {
+      // TODO(erikchen): Remove ScopedTracker below once
+      // http://crbug.com/466437 is fixed.
+      tracked_objects::ScopedTracker tracking_profile(
+          FROM_HERE_WITH_EXPLICIT_FUNCTION(
+              "466437 SharedMemory::Create::OpenReadonly"));
+      // Also open as readonly so that we can ShareReadOnlyToProcess.
+      readonly_fd->reset(HANDLE_EINTR(open(path->value().c_str(), O_RDONLY)));
+      if (!readonly_fd->is_valid()) {
+        DPLOG(ERROR) << "open(\"" << path->value() << "\", O_RDONLY) failed";
+        fp->reset();
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+// This method must only be called on OSX, since it assumes that
+// |options.executable| has no effect. It also doesn't fill in |path|, which is
+// only used for error logging when |options.share_read_only| is false.
+bool CreateAnonymousSharedMemoryFromBatch(
+    const SharedMemoryCreateOptions& options,
+    ScopedFILE* fp,
+    FilePath* path) {
+  DCHECK(!options.share_read_only);
+  g_thread_lock_.Get().AssertAcquired();
+  std::vector<FILE*>& file_pool = g_file_pool_.Get();
+
+  if (file_pool.empty()) {
+    for (int i = 0; i < kBatchSize; ++i) {
+      ScopedFILE temp_fp;
+      FilePath temp_path;
+      bool result =
+          CreateAnonymousSharedMemory(options, &temp_fp, NULL, &temp_path);
+      if (result)
+        file_pool.push_back(temp_fp.release());
+    }
+  }
+
+  if (file_pool.empty())
+    return false;
+
+  FILE* file = file_pool.back();
+  file_pool.pop_back();
+  fp->reset(file);
+  return true;
+}
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
+#endif  // !defined(OS_ANDROID)
 }
 
 SharedMemory::SharedMemory()
@@ -108,11 +246,44 @@ size_t SharedMemory::GetHandleLimit() {
   return base::GetMaxFds();
 }
 
+// static
+SharedMemoryHandle SharedMemory::ShallowCopyHandle(
+    const SharedMemoryHandle& handle) {
+  SharedMemoryHandle new_handle = handle;
+  new_handle.auto_close = false;
+  return new_handle;
+}
+
+// static
+SharedMemoryHandle SharedMemory::DeepCopyHandle(
+    const SharedMemoryHandle& handle,
+    bool clean_up_resources_on_destruction) {
+  int duped_handle = HANDLE_EINTR(dup(handle.fd));
+  if (duped_handle < 0)
+    return base::SharedMemory::NULLHandle();
+  return base::FileDescriptor(duped_handle, clean_up_resources_on_destruction);
+}
+
+// static
+int SharedMemory::GetFdFromSharedMemoryHandle(
+    const SharedMemoryHandle& handle) {
+  return handle.fd;
+}
+
 bool SharedMemory::CreateAndMapAnonymous(size_t size) {
   return CreateAnonymous(size) && Map(size);
 }
 
 #if !defined(OS_ANDROID)
+// static
+int SharedMemory::GetSizeFromSharedMemoryHandle(
+    const SharedMemoryHandle& handle) {
+  struct stat st;
+  if (fstat(handle.fd, &st) != 0)
+    return -1;
+  return st.st_size;
+}
+
 // Chromium mostly only uses the unique/private shmem as specified by
 // "name == L"". The exception is in the StatsTable.
 // TODO(jrg): there is no way to "clean up" all unused named shmem if
@@ -142,46 +313,26 @@ bool SharedMemory::Create(const SharedMemoryCreateOptions& options) {
 
   FilePath path;
   if (options.name_deprecated == NULL || options.name_deprecated->empty()) {
-    // It doesn't make sense to have a open-existing private piece of shmem
-    DCHECK(!options.open_existing_deprecated);
-    // Q: Why not use the shm_open() etc. APIs?
-    // A: Because they're limited to 4mb on OS X.  FFFFFFFUUUUUUUUUUU
-    FilePath directory;
-    if (GetShmemTempDir(options.executable, &directory)) {
-      // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/466437
-      // is fixed.
-      tracked_objects::ScopedTracker tracking_profile2(
-          FROM_HERE_WITH_EXPLICIT_FUNCTION(
-              "466437 SharedMemory::Create::OpenTemporaryFile"));
-      fp.reset(CreateAndOpenTemporaryFileInDir(directory, &path));
+    AutoLock a(g_thread_lock_.Get());
+
+    Time start_time = base::Time::Now();
+    if (options.share_read_only || !ShouldBatchCreateSharedMemory()) {
+      bool result =
+          CreateAnonymousSharedMemory(options, &fp, &readonly_fd, &path);
+      if (!result)
+        return false;
+    } else {
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+      bool result = CreateAnonymousSharedMemoryFromBatch(options, &fp, &path);
+      if (!result)
+        return false;
+#else
+      NOTREACHED();
+#endif  // defined(OS_MACOSX) && !defined(OS_IOS)
     }
-
-    if (fp) {
-      if (options.share_read_only) {
-        // TODO(erikchen): Remove ScopedTracker below once
-        // http://crbug.com/466437 is fixed.
-        tracked_objects::ScopedTracker tracking_profile3(
-            FROM_HERE_WITH_EXPLICIT_FUNCTION(
-                "466437 SharedMemory::Create::OpenReadonly"));
-        // Also open as readonly so that we can ShareReadOnlyToProcess.
-        readonly_fd.reset(HANDLE_EINTR(open(path.value().c_str(), O_RDONLY)));
-        if (!readonly_fd.is_valid()) {
-          DPLOG(ERROR) << "open(\"" << path.value() << "\", O_RDONLY) failed";
-          fp.reset();
-          return false;
-        }
-      }
-
-      // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/466437
-      // is fixed.
-      tracked_objects::ScopedTracker tracking_profile4(
-          FROM_HERE_WITH_EXPLICIT_FUNCTION(
-              "466437 SharedMemory::Create::Unlink"));
-      // Deleting the file prevents anyone else from mapping it in (making it
-      // private), and prevents the need for cleanup (once the last fd is
-      // closed, it is truly freed).
-      if (unlink(path.value().c_str()))
-        PLOG(WARNING) << "unlink";
+    if (!options.share_read_only) {
+      UMA_HISTOGRAM_TIMES("SharedMemory.TimeSpentMakingAnonymousMemory",
+                          Time::Now() - start_time);
     }
   } else {
     if (!FilePathForMemoryName(*options.name_deprecated, &path))

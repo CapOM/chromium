@@ -40,6 +40,7 @@ group("all_components") {
     "//components/device_event_log",
     "//components/devtools_discovery",
     "//components/devtools_http_handler",
+    "//components/devtools_service",
     "//components/dom_distiller/core",
     "//components/domain_reliability",
     "//components/enhanced_bookmarks",
@@ -49,7 +50,6 @@ group("all_components") {
     "//components/gcm_driver",
     "//components/gcm_driver/instance_id",
     "//components/google/core/browser",
-    "//components/guest_view:guest_view",
     "//components/history/content/browser",
     "//components/history/core/browser",
     "//components/history/core/common",
@@ -236,6 +236,9 @@ group("all_components") {
     deps += [
       "//components/app_modal",
       "//components/browsing_data",
+      "//components/guest_view/browser",
+      "//components/guest_view/common",
+      "//components/guest_view/renderer",
       "//components/scheduler",
     ]
   }
@@ -266,6 +269,7 @@ test("components_unittests") {
     "//components/bookmarks/managed:unit_tests",
     "//components/captive_portal:unit_tests",
     "//components/cloud_devices/common:unit_tests",
+    "//components/component_updater:unit_tests",
     "//components/content_settings/core/browser:unit_tests",
     "//components/content_settings/core/common:unit_tests",
     "//components/crx_file:unit_tests",
@@ -283,7 +287,6 @@ test("components_unittests") {
     "//components/metrics:unit_tests",
     "//components/mime_util:unit_tests",
     "//components/omnibox:unit_tests",
-    "//components/ownership:unit_tests",
     "//components/packed_ct_ev_whitelist:unit_tests",
     "//components/undo:unit_tests",
     "//components/update_client:unit_tests",
@@ -302,8 +305,16 @@ test("components_unittests") {
   ]
   data_deps = [ ":components_tests_pak" ]
 
+  if (is_android) {
+    deps += [ "//content/public/android:content_java" ]
+  }
+
   if (!is_android && !is_ios) {
     deps += [ "//components/proximity_auth:unit_tests" ]
+  }
+
+  if (is_chromeos) {
+    deps += [ "//components/ownership:unit_tests" ]
   }
 
   # TODO(GYP) need this target.
@@ -340,17 +351,6 @@ repack("components_tests_pak") {
     "//components/resources",
     "//components/strings",
   ]
-}
-
-if (is_android) {
-  import("//build/config/android/rules.gni")
-
-  generate_jni("components_browsertests_jni_headers") {
-    jni_package = "components_browsertests/shell"
-    sources = [
-      "test/android/browsertests_apk/src/org/chromium/components_browsertests_apk/ComponentsBrowserTestsActivity.java",
-    ]
-  }
 }
 
 test("components_browsertests") {
@@ -394,10 +394,7 @@ test("components_browsertests") {
       "test/android/browsertests_apk/components_browser_tests_jni_onload.cc",
     ]
     sources -= [ "autofill/content/browser/risk/fingerprint_browsertest.cc" ]
-    deps += [
-      ":components_browsertests_jni_headers",
-      "//testing/android/native_test:native_test_util",
-    ]
+    deps += [ "//testing/android/native_test:native_test_support" ]
 
     use_launcher = false
   }

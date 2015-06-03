@@ -270,12 +270,11 @@ class MockDownloadWebContentsDelegate : public content::WebContentsDelegate {
         last_download_allowed_(false) {}
   ~MockDownloadWebContentsDelegate() override {}
 
-  void CanDownload(content::RenderViewHost* render_view_host,
-                   const GURL& url,
+  void CanDownload(const GURL& url,
                    const std::string& request_method,
                    const base::Callback<void(bool)>& callback) override {
     orig_delegate_->CanDownload(
-        render_view_host, url, request_method,
+        url, request_method,
         base::Bind(&MockDownloadWebContentsDelegate::DownloadDecided,
                    base::Unretained(this)));
   }
@@ -843,6 +842,10 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
   content::WebContents* guest_web_contents_;
   content::WebContents* embedder_web_contents_;
 };
+
+// Test suite that containts tests that are meant to run with and without
+// --site-per-process.
+class WebViewCommonTest : public extensions::PlatformAppBrowserTest {};
 
 class WebViewDPITest : public WebViewTest {
  protected:
@@ -2717,4 +2720,16 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, AllowTransparencyAndAllowScalingPropagate) {
       extensions::WebViewGuest::FromWebContents(GetGuestWebContents());
   ASSERT_TRUE(guest->allow_transparency());
   ASSERT_TRUE(guest->allow_scaling());
+}
+
+IN_PROC_BROWSER_TEST_F(WebViewCommonTest, BasicPostMessage) {
+  ASSERT_TRUE(StartEmbeddedTestServer());  // For serving guest pages.
+  ASSERT_TRUE(RunPlatformAppTest("platform_apps/web_view/post_message/basic"))
+      << message_;
+}
+
+// Tests that webviews do get garbage collected.
+IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestGarbageCollect) {
+  TestHelper("testGarbageCollect", "web_view/shim", NO_TEST_SERVER);
+  GetGuestViewManager()->WaitForSingleViewGarbageCollected();
 }

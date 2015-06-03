@@ -96,6 +96,7 @@ SurfaceFactoryOzone::BufferFormat GetOzoneFormatFor(
     case gfx::GpuMemoryBuffer::DXT5:
     case gfx::GpuMemoryBuffer::ETC1:
     case gfx::GpuMemoryBuffer::R_8:
+    case gfx::GpuMemoryBuffer::RGBA_4444:
     case gfx::GpuMemoryBuffer::RGBA_8888:
     case gfx::GpuMemoryBuffer::YUV_420:
       NOTREACHED();
@@ -111,6 +112,8 @@ SurfaceFactoryOzone::BufferUsage GetOzoneUsageFor(
   switch (usage) {
     case gfx::GpuMemoryBuffer::MAP:
       return SurfaceFactoryOzone::MAP;
+    case gfx::GpuMemoryBuffer::PERSISTENT_MAP:
+      return SurfaceFactoryOzone::PERSISTENT_MAP;
     case gfx::GpuMemoryBuffer::SCANOUT:
       return SurfaceFactoryOzone::SCANOUT;
   }

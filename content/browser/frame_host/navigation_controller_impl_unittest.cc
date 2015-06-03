@@ -42,6 +42,7 @@
 #include "net/base/net_util.h"
 #include "skia/ext/platform_canvas.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/WebKit/public/web/WebSandboxFlags.h"
 
 using base::Time;
 
@@ -236,12 +237,12 @@ class NavigationControllerTest
       return navigation_request->common_params().url;
     }
     const IPC::Message* message =
-      process()->sink().GetFirstMessageMatching(FrameMsg_Navigate::ID);
+        process()->sink().GetFirstMessageMatching(FrameMsg_Navigate::ID);
     CHECK(message);
-    Tuple<CommonNavigationParams, StartNavigationParams,
+    base::Tuple<CommonNavigationParams, StartNavigationParams,
           RequestNavigationParams> nav_params;
     FrameMsg_Navigate::Read(message, &nav_params);
-    return get<0>(nav_params).url;
+    return base::get<0>(nav_params).url;
   }
 
  protected:
@@ -1517,6 +1518,7 @@ TEST_F(NavigationControllerTest, Back) {
   EXPECT_GE(controller.GetEntryAtIndex(1)->GetTimestamp(),
             controller.GetEntryAtIndex(0)->GetTimestamp());
 
+  main_test_rfh()->PrepareForCommit();
   main_test_rfh()->SendNavigate(0, entry_id, false, url2);
   EXPECT_EQ(1U, navigation_entry_committed_counter_);
   navigation_entry_committed_counter_ = 0;
@@ -2116,8 +2118,9 @@ TEST_F(NavigationControllerTest, AutoSubframe) {
   navigation_entry_committed_counter_ = 0;
 
   // Add a subframe and navigate it.
-  main_test_rfh()->OnCreateChildFrame(MSG_ROUTING_NONE, std::string(),
-                                      SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(
+      MSG_ROUTING_NONE, blink::WebTreeScopeType::Document, std::string(),
+      blink::WebSandboxFlags::None);
   RenderFrameHostImpl* subframe =
       contents()->GetFrameTree()->root()->child_at(0)->current_frame_host();
   const GURL url2("http://foo/2");
@@ -2161,8 +2164,9 @@ TEST_F(NavigationControllerTest, AutoSubframe) {
   }
 
   // Add a second subframe and navigate.
-  main_test_rfh()->OnCreateChildFrame(MSG_ROUTING_NONE, std::string(),
-                                      SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(
+      MSG_ROUTING_NONE, blink::WebTreeScopeType::Document, std::string(),
+      blink::WebSandboxFlags::None);
   RenderFrameHostImpl* subframe2 =
       contents()->GetFrameTree()->root()->child_at(1)->current_frame_host();
   const GURL url3("http://foo/3");
@@ -2206,8 +2210,9 @@ TEST_F(NavigationControllerTest, AutoSubframe) {
   }
 
   // Add a nested subframe and navigate.
-  subframe->OnCreateChildFrame(MSG_ROUTING_NONE, std::string(),
-                               SandboxFlags::NONE);
+  subframe->OnCreateChildFrame(MSG_ROUTING_NONE,
+                               blink::WebTreeScopeType::Document, std::string(),
+                               blink::WebSandboxFlags::None);
   RenderFrameHostImpl* subframe3 = contents()
                                        ->GetFrameTree()
                                        ->root()
@@ -2819,6 +2824,10 @@ TEST_F(NavigationControllerTest, RestoreNavigateAfterFailure) {
       0, NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY, &entries);
   ASSERT_EQ(0u, entries.size());
 
+  // Ensure the RenderFrame is initialized before simulating events coming from
+  // it.
+  main_test_rfh()->InitializeRenderFrameIfNeeded();
+
   // Before navigating to the restored entry, it should have a restore_type
   // and no SiteInstance.
   entry = our_controller.GetEntryAtIndex(0);
@@ -3247,6 +3256,8 @@ TEST_F(NavigationControllerTest, RendererInitiatedPendingEntries) {
 
   // We create pending entries for renderer-initiated navigations so that we
   // can show them in new tabs when it is safe.
+  main_test_rfh()->SendRendererInitiatedNavigationRequest(url1, false);
+  main_test_rfh()->PrepareForCommit();
   navigator->DidStartProvisionalLoad(main_test_rfh(), url1);
 
   // Simulate what happens if a BrowserURLHandler rewrites the URL, causing
@@ -3616,8 +3627,9 @@ TEST_F(NavigationControllerTest, SameSubframe) {
   EXPECT_EQ(controller.GetLastCommittedEntryIndex(), 0);
 
   // Add and navigate a subframe that would normally count as in-page.
-  main_test_rfh()->OnCreateChildFrame(MSG_ROUTING_NONE, std::string(),
-                                      SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(
+      MSG_ROUTING_NONE, blink::WebTreeScopeType::Document, std::string(),
+      blink::WebSandboxFlags::None);
   RenderFrameHostImpl* subframe =
       contents()->GetFrameTree()->root()->child_at(0)->current_frame_host();
   const GURL subframe_url("http://www.google.com/#");
@@ -3766,8 +3778,9 @@ TEST_F(NavigationControllerTest, SubframeWhilePending) {
 
   // Send a subframe update from the first page, as if one had just
   // automatically loaded. Auto subframes don't increment the page ID.
-  main_test_rfh()->OnCreateChildFrame(MSG_ROUTING_NONE, std::string(),
-                                      SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(
+      MSG_ROUTING_NONE, blink::WebTreeScopeType::Document, std::string(),
+      blink::WebSandboxFlags::None);
   RenderFrameHostImpl* subframe =
       contents()->GetFrameTree()->root()->child_at(0)->current_frame_host();
   const GURL url1_sub("http://foo/subframe");

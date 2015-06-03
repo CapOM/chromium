@@ -567,6 +567,17 @@ class TestSpdyVisitor : public SpdyFramerVisitorInterface,
   SpdyHeaderBlock headers_;
 };
 
+class SpdyFramerPeer {
+ public:
+  static size_t kControlFrameBufferSize() {
+    return SpdyFramer::kControlFrameBufferSize;
+  }
+  static size_t GetNumberRequiredContinuationFrames(SpdyFramer* framer,
+                                                    size_t size) {
+    return framer->GetNumberRequiredContinuationFrames(size);
+  }
+};
+
 // Retrieves serialized headers from a HEADERS or SYN_STREAM frame.
 base::StringPiece GetSerializedHeaders(const SpdyFrame* frame,
                                        const SpdyFramer& framer) {
@@ -605,15 +616,6 @@ base::StringPiece GetSerializedHeaders(const SpdyFrame* frame,
                        frame->size() - framer.GetHeadersMinimumSize());
   }
 }
-
-}  // namespace test
-
-using test::SetFrameLength;
-using test::SetFrameFlags;
-using test::CompareCharArraysWithHexError;
-using test::SpdyFramerTestUtil;
-using test::TestSpdyVisitor;
-using test::GetSerializedHeaders;
 
 class SpdyFramerTest : public ::testing::TestWithParam<SpdyMajorVersion> {
  protected:
@@ -3282,8 +3284,10 @@ TEST_P(SpdyFramerTest, GetNumberRequiredContinuationFrames) {
 
   SpdyFramer framer(spdy_version_);
   // Test case from https://crbug.com/464748.
-  EXPECT_EQ(1u, framer.GetNumberRequiredContinuationFrames(2039));
-  EXPECT_EQ(2u, framer.GetNumberRequiredContinuationFrames(2040));
+  EXPECT_EQ(1u,
+            SpdyFramerPeer::GetNumberRequiredContinuationFrames(&framer, 2039));
+  EXPECT_EQ(2u,
+            SpdyFramerPeer::GetNumberRequiredContinuationFrames(&framer, 2040));
 }
 
 TEST_P(SpdyFramerTest, CreateContinuationUncompressed) {
@@ -3424,17 +3428,13 @@ TEST_P(SpdyFramerTest, CreateAltSvc) {
   SpdyFramer framer(spdy_version_);
 
   const char kDescription[] = "ALTSVC frame";
-  const unsigned char kType = static_cast<unsigned char>(
+  const char kType = static_cast<unsigned char>(
       SpdyConstants::SerializeFrameType(spdy_version_, ALTSVC));
   const unsigned char kFrameData[] = {
-    0x00, 0x00, 0x17, kType, 0x00,
-    0x00, 0x00, 0x00, 0x03,
-    0x00, 0x00, 0x00, 0x05,
-    0x01, 0xbb, 0x00, 0x04,  // Port = 443
-    'p',  'i',  'd',  '1',   // Protocol-ID
-    0x04, 'h',  'o',  's',
-    't',  'o',  'r',  'i',
-    'g',  'i',  'n',
+      0x00, 0x00, 0x1d, kType, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00,
+      0x06, 'o',  'r',  'i',   'g',  'i',  'n',  'p',  'i',  'd',
+      '1',  '=',  '"',  'h',   'o',  's',  't',  ':',  '4',  '4',
+      '3',  '"',  ';',  ' ',   'm',  'a',  '=',  '5',
   };
   SpdyAltSvcIR altsvc_ir(3);
   altsvc_ir.set_max_age(5);
@@ -3606,12 +3606,14 @@ TEST_P(SpdyFramerTest, ControlFrameAtMaxSizeLimit) {
   EXPECT_LT(kBigValueSize, visitor.header_buffer_length_);
 }
 
-// This test is disabled because Chromium is willing to accept control frames up
-// to the maximum size allowed by the specification, and SpdyFrameBuilder is not
-// capable of building larger frames.
-TEST_P(SpdyFramerTest, DISABLED_ControlFrameTooLarge) {
+TEST_P(SpdyFramerTest, ControlFrameMaximumSize) {
   if (spdy_version_ > SPDY3) {
     // TODO(jgraettinger): This test setup doesn't work with HPACK.
+    return;
+  }
+  if (spdy_version_ < SPDY3) {
+    // Since SPDY/2 uses 16 bit header field lengths, one cannot easily create a
+    // header frame of maximum size.
     return;
   }
   // First find the size of the header value in order to just reach the control
@@ -3623,8 +3625,7 @@ TEST_P(SpdyFramerTest, DISABLED_ControlFrameTooLarge) {
   syn_stream.set_priority(1);
   scoped_ptr<SpdyFrame> control_frame(framer.SerializeSynStream(syn_stream));
   const size_t kBigValueSize =
-      SpdyConstants::GetFrameMaximumSize(spdy_version_) -
-      control_frame->size() + 1;
+      SpdyConstants::GetFrameMaximumSize(spdy_version_) - control_frame->size();
 
   // Create a frame at exatly that size.
   string big_value(kBigValueSize, 'x');
@@ -3635,20 +3636,16 @@ TEST_P(SpdyFramerTest, DISABLED_ControlFrameTooLarge) {
   control_frame.reset(framer.SerializeSynStream(syn_stream));
 
   EXPECT_TRUE(control_frame.get() != NULL);
-  EXPECT_EQ(SpdyConstants::GetFrameMaximumSize(spdy_version_) + 1,
+  EXPECT_EQ(SpdyConstants::GetFrameMaximumSize(spdy_version_),
             control_frame->size());
 
   TestSpdyVisitor visitor(spdy_version_);
   visitor.SimulateInFramer(
       reinterpret_cast<unsigned char*>(control_frame->data()),
       control_frame->size());
-  EXPECT_FALSE(visitor.header_buffer_valid_);
-  EXPECT_EQ(1, visitor.error_count_);
-  EXPECT_EQ(SpdyFramer::SPDY_CONTROL_PAYLOAD_TOO_LARGE,
-            visitor.framer_.error_code())
-      << SpdyFramer::ErrorCodeToString(framer.error_code());
-  EXPECT_EQ(0, visitor.syn_frame_count_);
-  EXPECT_EQ(0u, visitor.header_buffer_length_);
+  EXPECT_TRUE(visitor.header_buffer_valid_);
+  EXPECT_EQ(0, visitor.error_count_);
+  EXPECT_EQ(1, visitor.syn_frame_count_);
 }
 
 TEST_P(SpdyFramerTest, TooLargeHeadersFrameUsesContinuation) {
@@ -3784,8 +3781,8 @@ TEST_P(SpdyFramerTest, ControlFrameSizesAreValidated) {
   SpdyFramer framer(spdy_version_);
   // Create a GoAway frame that has a few extra bytes at the end.
   // We create enough overhead to overflow the framer's control frame buffer.
-  ASSERT_LE(SpdyFramer::kControlFrameBufferSize, 250u);
-  const size_t length = SpdyFramer::kControlFrameBufferSize + 1;
+  ASSERT_LE(SpdyFramerPeer::kControlFrameBufferSize(), 250u);
+  const size_t length = SpdyFramerPeer::kControlFrameBufferSize() + 1;
   const unsigned char kV3FrameData[] = {  // Also applies for V2.
     0x80, spdy_version_ch_, 0x00, 0x07,
     0x00, 0x00, 0x00, static_cast<unsigned char>(length),
@@ -3889,8 +3886,7 @@ TEST_P(SpdyFramerTest, ReadLargeSettingsFrame) {
                          7);
 
   scoped_ptr<SpdyFrame> control_frame(framer.SerializeSettings(settings_ir));
-  EXPECT_LT(SpdyFramer::kControlFrameBufferSize,
-            control_frame->size());
+  EXPECT_LT(SpdyFramerPeer::kControlFrameBufferSize(), control_frame->size());
   TestSpdyVisitor visitor(spdy_version_);
   visitor.use_compression_ = false;
 
@@ -4708,7 +4704,7 @@ TEST_P(SpdyFramerTest, SizesTest) {
     EXPECT_EQ(13u, framer.GetWindowUpdateSize());
     EXPECT_EQ(9u, framer.GetBlockedSize());
     EXPECT_EQ(13u, framer.GetPushPromiseMinimumSize());
-    EXPECT_EQ(18u, framer.GetAltSvcMinimumSize());
+    EXPECT_EQ(11u, framer.GetAltSvcMinimumSize());
     EXPECT_EQ(9u, framer.GetFrameMinimumSize());
     EXPECT_EQ(16393u, framer.GetFrameMaximumSize());
     EXPECT_EQ(16384u, framer.GetDataFrameMaximumPayload());
@@ -5712,10 +5708,7 @@ TEST_P(SpdyFramerTest, OnAltSvc) {
   altsvc_ir.set_host("h1");
   altsvc_ir.set_origin("o1");
   scoped_ptr<SpdySerializedFrame> frame(framer.SerializeFrame(altsvc_ir));
-  framer.ProcessInput(frame->data(), framer.GetAltSvcMinimumSize() +
-                      altsvc_ir.protocol_id().length() +
-                      altsvc_ir.host().length() +
-                      altsvc_ir.origin().length());
+  framer.ProcessInput(frame->data(), frame->size());
 
   EXPECT_EQ(SpdyFramer::SPDY_RESET, framer.state());
   EXPECT_EQ(SpdyFramer::SPDY_NO_ERROR, framer.error_code())
@@ -5733,22 +5726,18 @@ TEST_P(SpdyFramerTest, OnAltSvcNoOrigin) {
   SpdyFramer framer(spdy_version_);
   framer.set_visitor(&visitor);
 
-  EXPECT_CALL(visitor, OnAltSvc(kStreamId,
-                                10,
-                                443,
-                                StringPiece("pid"),
-                                StringPiece("h1"),
-                                StringPiece("")));
+  EXPECT_CALL(visitor,
+              OnAltSvc(kStreamId, 10, 443, StringPiece("p\"=i:d"),
+                       StringPiece("h_\\o\"st"), StringPiece("o_r|g!n")));
 
   SpdyAltSvcIR altsvc_ir(1);
   altsvc_ir.set_max_age(10);
   altsvc_ir.set_port(443);
-  altsvc_ir.set_protocol_id("pid");
-  altsvc_ir.set_host("h1");
+  altsvc_ir.set_protocol_id("p\"=i:d");
+  altsvc_ir.set_host("h_\\o\"st");
+  altsvc_ir.set_origin("o_r|g!n");
   scoped_ptr<SpdySerializedFrame> frame(framer.SerializeFrame(altsvc_ir));
-  framer.ProcessInput(frame->data(), framer.GetAltSvcMinimumSize() +
-                      altsvc_ir.protocol_id().length() +
-                      altsvc_ir.host().length());
+  framer.ProcessInput(frame->data(), frame->size());
 
   EXPECT_EQ(SpdyFramer::SPDY_RESET, framer.state());
   EXPECT_EQ(SpdyFramer::SPDY_NO_ERROR, framer.error_code())
@@ -5772,9 +5761,7 @@ TEST_P(SpdyFramerTest, OnAltSvcEmptyProtocolId) {
   altsvc_ir.set_host("h1");
   altsvc_ir.set_origin("o1");
   scoped_ptr<SpdySerializedFrame> frame(framer.SerializeFrame(altsvc_ir));
-  framer.ProcessInput(frame->data(), framer.GetAltSvcMinimumSize() +
-                      altsvc_ir.protocol_id().length() +
-                      altsvc_ir.host().length());
+  framer.ProcessInput(frame->data(), frame->size());
 
   EXPECT_EQ(SpdyFramer::SPDY_ERROR, framer.state());
   EXPECT_EQ(SpdyFramer::SPDY_INVALID_CONTROL_FRAME, framer.error_code())
@@ -5786,97 +5773,26 @@ TEST_P(SpdyFramerTest, OnAltSvcBadLengths) {
     return;
   }
 
-  const unsigned char kType = static_cast<unsigned char>(
-      SpdyConstants::SerializeFrameType(spdy_version_, ALTSVC));
-  {
-    TestSpdyVisitor visitor(spdy_version_);
-    SpdyFramer framer(spdy_version_);
-    framer.set_visitor(&visitor);
+  const SpdyStreamId kStreamId = 1;
 
-    const unsigned char kFrameDataLargePIDLen[] = {
-      0x00, 0x00, 0x17, kType, 0x00,
-      0x00, 0x00, 0x00, 0x03,
-      0x00, 0x00, 0x00, 0x05,
-      0x01, 0xbb, 0x00, 0x05,  // Port = 443
-      'p',  'i',  'd',  '1',   // Protocol-ID
-      0x04, 'h',  'o',  's',
-      't',  'o',  'r',  'i',
-      'g',  'i',  'n',
-    };
+  testing::StrictMock<test::MockSpdyFramerVisitor> visitor;
+  SpdyFramer framer(spdy_version_);
+  framer.set_visitor(&visitor);
 
-    visitor.SimulateInFramer(kFrameDataLargePIDLen,
-                             sizeof(kFrameDataLargePIDLen));
-    EXPECT_EQ(1, visitor.error_count_);
-    EXPECT_EQ(SpdyFramer::SPDY_INVALID_CONTROL_FRAME,
-              visitor.framer_.error_code());
-  }
+  EXPECT_CALL(visitor, OnAltSvc(kStreamId, 10, 443, StringPiece("pid"),
+                                StringPiece("h1"), StringPiece("")));
 
-  {
-    TestSpdyVisitor visitor(spdy_version_);
-    SpdyFramer framer(spdy_version_);
-    framer.set_visitor(&visitor);
-    const unsigned char kFrameDataPIDLenLargerThanFrame[] = {
-      0x00, 0x00, 0x17, kType, 0x00,
-      0x00, 0x00, 0x00, 0x03,
-      0x00, 0x00, 0x00, 0x05,
-      0x01, 0xbb, 0x00, 0x99,  // Port = 443
-      'p',  'i',  'd',  '1',   // Protocol-ID
-      0x04, 'h',  'o',  's',
-      't',  'o',  'r',  'i',
-      'g',  'i',  'n',
-    };
+  SpdyAltSvcIR altsvc_ir(1);
+  altsvc_ir.set_max_age(10);
+  altsvc_ir.set_port(443);
+  altsvc_ir.set_protocol_id("pid");
+  altsvc_ir.set_host("h1");
+  scoped_ptr<SpdySerializedFrame> frame(framer.SerializeFrame(altsvc_ir));
+  framer.ProcessInput(frame->data(), frame->size());
 
-    visitor.SimulateInFramer(kFrameDataPIDLenLargerThanFrame,
-                             sizeof(kFrameDataPIDLenLargerThanFrame));
-    EXPECT_EQ(1, visitor.error_count_);
-    EXPECT_EQ(SpdyFramer::SPDY_INVALID_CONTROL_FRAME,
-              visitor.framer_.error_code());
-  }
-
-  {
-    TestSpdyVisitor visitor(spdy_version_);
-    SpdyFramer framer(spdy_version_);
-    framer.set_visitor(&visitor);
-
-    const unsigned char kFrameDataLargeHostLen[] = {
-      0x00, 0x00, 0x17, kType, 0x00,
-      0x00, 0x00, 0x00, 0x03,
-      0x00, 0x00, 0x00, 0x05,
-      0x01, 0xbb, 0x00, 0x04,  // Port = 443
-      'p',  'i',  'd',  '1',   // Protocol-ID
-      0x0f, 'h',  'o',  's',
-      't',  'o',  'r',  'i',
-      'g',  'i',  'n',
-    };
-
-    visitor.SimulateInFramer(kFrameDataLargeHostLen,
-                             sizeof(kFrameDataLargeHostLen));
-    EXPECT_EQ(1, visitor.error_count_);
-    EXPECT_EQ(SpdyFramer::SPDY_INVALID_CONTROL_FRAME,
-              visitor.framer_.error_code());
-  }
-
-  {
-    TestSpdyVisitor visitor(spdy_version_);
-    SpdyFramer framer(spdy_version_);
-    framer.set_visitor(&visitor);
-    const unsigned char kFrameDataSmallPIDLen[] = {
-      0x00, 0x00, 0x17, kType, 0x00,
-      0x00, 0x00, 0x00, 0x03,
-      0x00, 0x00, 0x00, 0x05,
-      0x01, 0xbb, 0x00, 0x01,  // Port = 443
-      'p',  'i',  'd',  '1',   // Protocol-ID
-      0x04, 'h',  'o',  's',
-      't',  'o',  'r',  'i',
-      'g',  'i',  'n',
-    };
-
-    visitor.SimulateInFramer(kFrameDataSmallPIDLen,
-                             sizeof(kFrameDataSmallPIDLen));
-    EXPECT_EQ(1, visitor.error_count_);
-    EXPECT_EQ(SpdyFramer::SPDY_INVALID_CONTROL_FRAME,
-              visitor.framer_.error_code());
-  }
+  EXPECT_EQ(SpdyFramer::SPDY_RESET, framer.state());
+  EXPECT_EQ(SpdyFramer::SPDY_NO_ERROR, framer.error_code())
+      << SpdyFramer::ErrorCodeToString(framer.error_code());
 }
 
 // Tests handling of ALTSVC frames delivered in small chunks.
@@ -5884,6 +5800,7 @@ TEST_P(SpdyFramerTest, ReadChunkedAltSvcFrame) {
   if (spdy_version_ <= SPDY3) {
     return;
   }
+
   SpdyFramer framer(spdy_version_);
   SpdyAltSvcIR altsvc_ir(1);
   altsvc_ir.set_max_age(20);
@@ -5988,5 +5905,7 @@ TEST_P(SpdyFramerTest, ReadIncorrectlySizedPriority) {
             visitor.framer_.error_code())
       << SpdyFramer::ErrorCodeToString(visitor.framer_.error_code());
 }
+
+}  // namespace test
 
 }  // namespace net

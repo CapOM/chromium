@@ -135,12 +135,13 @@ bool ProxyTestHarnessBase::SupportsInterface(const char* name) {
   if (!reply_msg)
     return false;
 
-  TupleTypes<PpapiMsg_SupportsInterface::ReplyParam>::ValueTuple reply_data;
+  base::TupleTypes<PpapiMsg_SupportsInterface::ReplyParam>::ValueTuple
+      reply_data;
   EXPECT_TRUE(PpapiMsg_SupportsInterface::ReadReplyParam(
       reply_msg, &reply_data));
 
   sink().ClearMessages();
-  return get<0>(reply_data);
+  return base::get<0>(reply_data);
 }
 
 // PluginProxyTestHarness ------------------------------------------------------
@@ -235,8 +236,8 @@ void PluginProxyTestHarness::CreatePluginGlobals(
   }
 }
 
-base::MessageLoopProxy*
-PluginProxyTestHarness::PluginDelegateMock::GetIPCMessageLoop() {
+base::SingleThreadTaskRunner*
+PluginProxyTestHarness::PluginDelegateMock::GetIPCTaskRunner() {
   return ipc_message_loop_;
 }
 
@@ -253,6 +254,19 @@ PluginProxyTestHarness::PluginDelegateMock::ShareHandleWithRemote(
   return IPC::GetFileHandleForProcess(handle,
                                       base::GetCurrentProcessHandle(),
                                       should_close_source);
+}
+
+base::SharedMemoryHandle
+PluginProxyTestHarness::PluginDelegateMock::ShareSharedMemoryHandleWithRemote(
+    const base::SharedMemoryHandle& handle,
+    base::ProcessId remote_pid) {
+#if defined(OS_POSIX)
+  return ShareHandleWithRemote(handle.fd, remote_pid, false);
+#elif defined(OS_WIN)
+  return ShareHandleWithRemote(handle, remote_pid, false);
+#else
+#error Not implemented.
+#endif
 }
 
 std::set<PP_Instance>*
@@ -470,8 +484,7 @@ void HostProxyTestHarness::CreateHostGlobals() {
   }
 }
 
-base::MessageLoopProxy*
-HostProxyTestHarness::DelegateMock::GetIPCMessageLoop() {
+base::MessageLoopProxy* HostProxyTestHarness::DelegateMock::GetIPCTaskRunner() {
   return ipc_message_loop_;
 }
 
@@ -489,6 +502,18 @@ HostProxyTestHarness::DelegateMock::ShareHandleWithRemote(
                                       should_close_source);
 }
 
+base::SharedMemoryHandle
+HostProxyTestHarness::DelegateMock::ShareSharedMemoryHandleWithRemote(
+    const base::SharedMemoryHandle& handle,
+    base::ProcessId remote_pid) {
+#if defined(OS_POSIX)
+  return ShareHandleWithRemote(handle.fd, remote_pid, false);
+#elif defined(OS_WIN)
+  return ShareHandleWithRemote(handle, remote_pid, false);
+#else
+#error Not implemented.
+#endif
+}
 
 // HostProxyTest ---------------------------------------------------------------
 

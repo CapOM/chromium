@@ -16,21 +16,25 @@
 
 namespace cc {
 
-scoped_refptr<PictureLayer> PictureLayer::Create(ContentLayerClient* client) {
-  return make_scoped_refptr(new PictureLayer(client));
+scoped_refptr<PictureLayer> PictureLayer::Create(const LayerSettings& settings,
+                                                 ContentLayerClient* client) {
+  return make_scoped_refptr(new PictureLayer(settings, client));
 }
 
-PictureLayer::PictureLayer(ContentLayerClient* client)
-    : client_(client),
+PictureLayer::PictureLayer(const LayerSettings& settings,
+                           ContentLayerClient* client)
+    : Layer(settings),
+      client_(client),
       instrumentation_object_tracker_(id()),
       update_source_frame_number_(-1),
       is_mask_(false),
       nearest_neighbor_(false) {
 }
 
-PictureLayer::PictureLayer(ContentLayerClient* client,
+PictureLayer::PictureLayer(const LayerSettings& settings,
+                           ContentLayerClient* client,
                            scoped_ptr<RecordingSource> source)
-    : PictureLayer(client) {
+    : PictureLayer(settings, client) {
   recording_source_ = source.Pass();
 }
 
@@ -88,9 +92,8 @@ void PictureLayer::SetLayerTreeHost(LayerTreeHost* host) {
   const LayerTreeSettings& settings = layer_tree_host()->settings();
   if (!recording_source_) {
     if (settings.use_display_lists) {
-      recording_source_.reset(new DisplayListRecordingSource(
-          settings.default_tile_grid_size,
-          settings.use_cached_picture_in_display_list));
+      recording_source_.reset(
+          new DisplayListRecordingSource(settings.default_tile_grid_size));
     } else {
       recording_source_.reset(new PicturePile(settings.minimum_contents_scale,
                                               settings.default_tile_grid_size));
@@ -186,9 +189,8 @@ skia::RefPtr<SkPicture> PictureLayer::GetPicture() const {
 
   if (settings.use_display_lists) {
     scoped_ptr<RecordingSource> recording_source;
-    recording_source.reset(new DisplayListRecordingSource(
-        settings.default_tile_grid_size,
-        settings.use_cached_picture_in_display_list));
+    recording_source.reset(
+        new DisplayListRecordingSource(settings.default_tile_grid_size));
     Region recording_invalidation;
     recording_source->UpdateAndExpandInvalidation(
         client_, &recording_invalidation, layer_size, gfx::Rect(layer_size),

@@ -5,9 +5,11 @@
 #include "content/renderer/browser_plugin/browser_plugin.h"
 
 #include "base/command_line.h"
-#include "base/message_loop/message_loop.h"
+#include "base/location.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/common/browser_plugin/browser_plugin_constants.h"
 #include "content/common/browser_plugin/browser_plugin_messages.h"
 #include "content/common/view_messages.h"
@@ -100,8 +102,6 @@ bool BrowserPlugin::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(BrowserPluginMsg_SetTooltipText, OnSetTooltipText)
     IPC_MESSAGE_HANDLER(BrowserPluginMsg_ShouldAcceptTouchEvents,
                         OnShouldAcceptTouchEvents)
-    IPC_MESSAGE_UNHANDLED(
-        handled = delegate_ && delegate_->OnMessageReceived(message))
   IPC_END_MESSAGE_MAP()
   return handled;
 }
@@ -180,15 +180,15 @@ void BrowserPlugin::OnCompositorFrameSwapped(const IPC::Message& message) {
   guest_crashed_ = false;
 
   scoped_ptr<cc::CompositorFrame> frame(new cc::CompositorFrame);
-  get<1>(param).frame.AssignTo(frame.get());
+  base::get<1>(param).frame.AssignTo(frame.get());
 
   EnableCompositing(true);
   compositing_helper_->OnCompositorFrameSwapped(
       frame.Pass(),
-      get<1>(param).producing_route_id,
-      get<1>(param).output_surface_id,
-      get<1>(param).producing_host_id,
-      get<1>(param).shared_memory_handle);
+      base::get<1>(param).producing_route_id,
+      base::get<1>(param).output_surface_id,
+      base::get<1>(param).producing_host_id,
+      base::get<1>(param).shared_memory_handle);
 }
 
 void BrowserPlugin::OnGuestGone(int browser_plugin_instance_id) {
@@ -202,10 +202,9 @@ void BrowserPlugin::OnGuestGone(int browser_plugin_instance_id) {
   // to fire their listeners and potentially overlay the webview with custom
   // behavior. If the BrowserPlugin is destroyed in the meantime, then the
   // task will not be executed.
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE,
-      base::Bind(&BrowserPlugin::ShowSadGraphic,
-                 weak_ptr_factory_.GetWeakPtr()));
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE, base::Bind(&BrowserPlugin::ShowSadGraphic,
+                            weak_ptr_factory_.GetWeakPtr()));
 }
 
 void BrowserPlugin::OnSetContentsOpaque(int browser_plugin_instance_id,
@@ -302,10 +301,9 @@ bool BrowserPlugin::initialize(WebPluginContainer* container) {
 
   // Defer attach call so that if there's any pending browser plugin
   // destruction, then it can progress first.
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE,
-      base::Bind(&BrowserPlugin::UpdateInternalInstanceId,
-                 weak_ptr_factory_.GetWeakPtr()));
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE, base::Bind(&BrowserPlugin::UpdateInternalInstanceId,
+                            weak_ptr_factory_.GetWeakPtr()));
   return true;
 }
 
@@ -417,8 +415,7 @@ void BrowserPlugin::updateGeometry(const WebRect& window_rect,
                                    const WebRect& unobscured_rect,
                                    const WebVector<WebRect>& cut_outs_rects,
                                    bool is_visible) {
-  int old_width = view_rect_.width();
-  int old_height = view_rect_.height();
+  gfx::Rect old_view_rect = view_rect_;
   view_rect_ = window_rect;
 
   if (!ready_) {
@@ -427,15 +424,13 @@ void BrowserPlugin::updateGeometry(const WebRect& window_rect,
     ready_ = true;
   }
 
-  if (delegate_) {
-    delegate_->DidResizeElement(
-        gfx::Size(old_width, old_height), view_rect_.size());
-  }
+  if (delegate_ && (view_rect_.size() != old_view_rect.size()))
+    delegate_->DidResizeElement(view_rect_.size());
 
   if (!attached())
     return;
 
-  if (old_width == window_rect.width && old_height == window_rect.height) {
+  if (old_view_rect.size() == view_rect_.size()) {
     // Let the browser know about the updated view rect.
     BrowserPluginManager::Get()->Send(new BrowserPluginHostMsg_UpdateGeometry(
         browser_plugin_instance_id_, view_rect_));

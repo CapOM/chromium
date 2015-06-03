@@ -450,10 +450,19 @@ bool FillFormOnPasswordReceived(
     std::map<const blink::WebInputElement, blink::WebString>&
         nonscript_modified_values,
     base::Callback<void(blink::WebInputElement*)> registration_callback) {
-  // Do not fill if the password field is in an iframe.
-  DCHECK(password_element.document().frame());
-  if (password_element.document().frame()->parent())
-    return false;
+  // Do not fill if the password field is in a chain of iframes not having
+  // identical origin.
+  blink::WebFrame* cur_frame = password_element.document().frame();
+  blink::WebString bottom_frame_origin =
+          cur_frame->securityOrigin().toString();
+
+  DCHECK(cur_frame);
+
+  while (cur_frame->parent()) {
+    cur_frame = cur_frame->parent();
+    if (!bottom_frame_origin.equals(cur_frame->securityOrigin().toString()))
+      return false;
+  }
 
   // If we can't modify the password, don't try to set the username
   if (!IsElementAutocompletable(password_element))
@@ -965,8 +974,10 @@ bool PasswordAutofillAgent::OnMessageReceived(const IPC::Message& message) {
   IPC_BEGIN_MESSAGE_MAP(PasswordAutofillAgent, message)
     IPC_MESSAGE_HANDLER(AutofillMsg_FillPasswordForm, OnFillPasswordForm)
     IPC_MESSAGE_HANDLER(AutofillMsg_SetLoggingState, OnSetLoggingState)
-    IPC_MESSAGE_HANDLER(AutofillMsg_AutofillUsernameDataReceived,
-                        OnAutofillUsernameDataReceived)
+    IPC_MESSAGE_HANDLER(AutofillMsg_AutofillUsernameAndPasswordDataReceived,
+                        OnAutofillUsernameAndPasswordDataReceived)
+    IPC_MESSAGE_HANDLER(AutofillMsg_FindFocusedPasswordForm,
+                        OnFindFocusedPasswordForm)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -1060,7 +1071,7 @@ void PasswordAutofillAgent::WillSubmitForm(const blink::WebFormElement& form) {
   }
 
   scoped_ptr<PasswordForm> submitted_form =
-      CreatePasswordForm(form, nullptr, &form_predictions_);
+      CreatePasswordForm(form, &nonscript_modified_values_, &form_predictions_);
 
   // If there is a provisionally saved password, copy over the previous
   // password value so we get the user's typed password, not the value that
@@ -1236,9 +1247,28 @@ void PasswordAutofillAgent::OnSetLoggingState(bool active) {
   logging_state_active_ = active;
 }
 
-void PasswordAutofillAgent::OnAutofillUsernameDataReceived(
-    const FormDataFieldDataMap& predictions) {
+void PasswordAutofillAgent::OnAutofillUsernameAndPasswordDataReceived(
+    const FormsPredictionsMap& predictions) {
   form_predictions_ = predictions;
+}
+
+void PasswordAutofillAgent::OnFindFocusedPasswordForm() {
+  scoped_ptr<PasswordForm> password_form;
+
+  blink::WebElement element = render_frame()->GetFocusedElement();
+  if (!element.isNull() && element.hasHTMLTagName("input")) {
+    blink::WebInputElement input = element.to<blink::WebInputElement>();
+    if (input.isPasswordField() && !input.form().isNull()) {
+      password_form = CreatePasswordForm(
+          input.form(), &nonscript_modified_values_, &form_predictions_);
+    }
+  }
+
+  if (!password_form.get())
+    password_form.reset(new PasswordForm());
+
+  Send(new AutofillHostMsg_FocusedPasswordFormFound(
+      routing_id(), *password_form));
 }
 
 ////////////////////////////////////////////////////////////////////////////////

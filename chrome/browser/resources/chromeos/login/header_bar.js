@@ -173,10 +173,7 @@ cr.define('login', function() {
         return;
       }
 
-      $('pod-row').loadLastWallpaper();
-
-      Oobe.showScreen({id: SCREEN_ACCOUNT_PICKER});
-      Oobe.resetSigninUI(true);
+      Oobe.showUserPods();
     },
 
     /**
@@ -348,7 +345,8 @@ cr.define('login', function() {
           isNewGaiaScreenWithBackButton ||
           supervisedUserCreationDialogIsActive;
       $('cancel-add-user-button').hidden =
-          ((gaiaIsActive || isPasswordChangedUI) && this.isNewGaiaFlow_) ||
+          ((gaiaIsActive || isPasswordChangedUI || isSamlPasswordConfirm) &&
+              this.isNewGaiaFlow_) ||
           accountPickerIsActive ||
           !this.allowCancel_ ||
           wrongHWIDWarningIsActive ||

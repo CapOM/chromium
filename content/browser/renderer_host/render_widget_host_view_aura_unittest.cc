@@ -11,6 +11,8 @@
 #include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/test/simple_test_tick_clock.h"
+#include "cc/output/begin_frame_args.h"
 #include "cc/output/compositor_frame.h"
 #include "cc/output/compositor_frame_metadata.h"
 #include "cc/output/copy_output_request.h"
@@ -20,6 +22,7 @@
 #include "content/browser/compositor/resize_lock.h"
 #include "content/browser/compositor/test/no_transport_image_transport_factory.h"
 #include "content/browser/frame_host/render_widget_host_view_guest.h"
+#include "content/browser/renderer_host/input/input_router.h"
 #include "content/browser/renderer_host/input/web_input_event_util.h"
 #include "content/browser/renderer_host/overscroll_controller.h"
 #include "content/browser/renderer_host/overscroll_controller_delegate.h"
@@ -191,6 +194,7 @@ class FakeFrameSubscriber : public RenderWidgetHostViewFrameSubscriber {
                           base::TimeTicks present_time,
                           scoped_refptr<media::VideoFrame>* storage,
                           DeliverFrameCallback* callback) override {
+    last_present_time_ = present_time;
     *storage = media::VideoFrame::CreateFrame(media::VideoFrame::YV12,
                                               size_,
                                               gfx::Rect(size_),
@@ -200,8 +204,10 @@ class FakeFrameSubscriber : public RenderWidgetHostViewFrameSubscriber {
     return true;
   }
 
+  base::TimeTicks last_present_time() const { return last_present_time_; }
+
   static void CallbackMethod(base::Callback<void(bool)> callback,
-                             base::TimeTicks timestamp,
+                             base::TimeTicks present_time,
                              bool success) {
     callback.Run(success);
   }
@@ -209,6 +215,7 @@ class FakeFrameSubscriber : public RenderWidgetHostViewFrameSubscriber {
  private:
   gfx::Size size_;
   base::Callback<void(bool)> callback_;
+  base::TimeTicks last_present_time_;
 };
 
 class FakeWindowEventDispatcher : public aura::WindowEventDispatcher {
@@ -217,9 +224,10 @@ class FakeWindowEventDispatcher : public aura::WindowEventDispatcher {
       : WindowEventDispatcher(host),
         processed_touch_event_count_(0) {}
 
-  void ProcessedTouchEvent(aura::Window* window,
+  void ProcessedTouchEvent(uint32 unique_event_id,
+                           aura::Window* window,
                            ui::EventResult result) override {
-    WindowEventDispatcher::ProcessedTouchEvent(window, result);
+    WindowEventDispatcher::ProcessedTouchEvent(unique_event_id, window, result);
     processed_touch_event_count_++;
   }
 
@@ -383,6 +391,7 @@ class RenderWidgetHostViewAuraTest : public testing::Test {
 
     browser_context_.reset(new TestBrowserContext);
     process_host_ = new MockRenderProcessHost(browser_context_.get());
+    process_host_->Init();
 
     sink_ = &process_host_->sink();
 
@@ -476,10 +485,11 @@ class RenderWidgetHostViewAuraTest : public testing::Test {
       return;
     }
 
-    if (!WebInputEventTraits::WillReceiveAckFromRenderer(*get<0>(params)))
+    if (!WebInputEventTraits::WillReceiveAckFromRenderer(
+            *base::get<0>(params)))
       return;
 
-    const blink::WebInputEvent* event = get<0>(params);
+    const blink::WebInputEvent* event = base::get<0>(params);
     SendTouchEventACK(event->type, ack_result,
         WebInputEventTraits::GetUniqueTouchEventId(*event));
   }
@@ -967,20 +977,21 @@ TEST_F(RenderWidgetHostViewAuraTest, SetCompositionText) {
     InputMsg_ImeSetComposition::Param params;
     InputMsg_ImeSetComposition::Read(msg, &params);
     // composition text
-    EXPECT_EQ(composition_text.text, get<0>(params));
+    EXPECT_EQ(composition_text.text, base::get<0>(params));
     // underlines
-    ASSERT_EQ(underlines.size(), get<1>(params).size());
+    ASSERT_EQ(underlines.size(), base::get<1>(params).size());
     for (size_t i = 0; i < underlines.size(); ++i) {
-      EXPECT_EQ(underlines[i].start_offset, get<1>(params)[i].startOffset);
-      EXPECT_EQ(underlines[i].end_offset, get<1>(params)[i].endOffset);
-      EXPECT_EQ(underlines[i].color, get<1>(params)[i].color);
-      EXPECT_EQ(underlines[i].thick, get<1>(params)[i].thick);
+      EXPECT_EQ(underlines[i].start_offset,
+                base::get<1>(params)[i].startOffset);
+      EXPECT_EQ(underlines[i].end_offset, base::get<1>(params)[i].endOffset);
+      EXPECT_EQ(underlines[i].color, base::get<1>(params)[i].color);
+      EXPECT_EQ(underlines[i].thick, base::get<1>(params)[i].thick);
       EXPECT_EQ(underlines[i].background_color,
-                get<1>(params)[i].backgroundColor);
+                base::get<1>(params)[i].backgroundColor);
     }
     // highlighted range
-    EXPECT_EQ(4, get<2>(params)) << "Should be the same to the caret pos";
-    EXPECT_EQ(4, get<3>(params)) << "Should be the same to the caret pos";
+    EXPECT_EQ(4, base::get<2>(params)) << "Should be the same to the caret pos";
+    EXPECT_EQ(4, base::get<3>(params)) << "Should be the same to the caret pos";
   }
 
   view_->ImeCancelComposition();
@@ -1287,9 +1298,9 @@ TEST_F(RenderWidgetHostViewAuraTest, PhysicalBackingSizeWithScale) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ("100x100", get<0>(params).new_size.ToString());  // dip size
+    EXPECT_EQ("100x100", base::get<0>(params).new_size.ToString());  // dip size
     EXPECT_EQ("100x100",
-        get<0>(params).physical_backing_size.ToString());  // backing size
+        base::get<0>(params).physical_backing_size.ToString());  // backing size
   }
 
   widget_host_->ResetSizeAndRepaintPendingFlags();
@@ -1304,10 +1315,10 @@ TEST_F(RenderWidgetHostViewAuraTest, PhysicalBackingSizeWithScale) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(2.0f, get<0>(params).screen_info.deviceScaleFactor);
-    EXPECT_EQ("100x100", get<0>(params).new_size.ToString());  // dip size
+    EXPECT_EQ(2.0f, base::get<0>(params).screen_info.deviceScaleFactor);
+    EXPECT_EQ("100x100", base::get<0>(params).new_size.ToString());  // dip size
     EXPECT_EQ("200x200",
-        get<0>(params).physical_backing_size.ToString());  // backing size
+        base::get<0>(params).physical_backing_size.ToString());  // backing size
   }
 
   widget_host_->ResetSizeAndRepaintPendingFlags();
@@ -1322,10 +1333,10 @@ TEST_F(RenderWidgetHostViewAuraTest, PhysicalBackingSizeWithScale) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(1.0f, get<0>(params).screen_info.deviceScaleFactor);
-    EXPECT_EQ("100x100", get<0>(params).new_size.ToString());  // dip size
+    EXPECT_EQ(1.0f, base::get<0>(params).screen_info.deviceScaleFactor);
+    EXPECT_EQ("100x100", base::get<0>(params).new_size.ToString());  // dip size
     EXPECT_EQ("100x100",
-        get<0>(params).physical_backing_size.ToString());  // backing size
+        base::get<0>(params).physical_backing_size.ToString());  // backing size
   }
 }
 
@@ -1490,14 +1501,16 @@ TEST_F(RenderWidgetHostViewAuraTest, DISABLED_FullscreenResize) {
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
     EXPECT_EQ("0,0 800x600",
-              gfx::Rect(get<0>(params).screen_info.availableRect).ToString());
-    EXPECT_EQ("800x600", get<0>(params).new_size.ToString());
+              gfx::Rect(
+                  base::get<0>(params).screen_info.availableRect).ToString());
+    EXPECT_EQ("800x600", base::get<0>(params).new_size.ToString());
     // Resizes are blocked until we swapped a frame of the correct size, and
     // we've committed it.
     view_->OnSwapCompositorFrame(
         0,
         MakeDelegatedFrame(
-            1.f, get<0>(params).new_size, gfx::Rect(get<0>(params).new_size)));
+            1.f, base::get<0>(params).new_size,
+            gfx::Rect(base::get<0>(params).new_size)));
     ui::DrawWaiterForTest::WaitForCommit(
         root_window->GetHost()->compositor());
   }
@@ -1515,12 +1528,14 @@ TEST_F(RenderWidgetHostViewAuraTest, DISABLED_FullscreenResize) {
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
     EXPECT_EQ("0,0 1600x1200",
-              gfx::Rect(get<0>(params).screen_info.availableRect).ToString());
-    EXPECT_EQ("1600x1200", get<0>(params).new_size.ToString());
+              gfx::Rect(
+                  base::get<0>(params).screen_info.availableRect).ToString());
+    EXPECT_EQ("1600x1200", base::get<0>(params).new_size.ToString());
     view_->OnSwapCompositorFrame(
         0,
         MakeDelegatedFrame(
-            1.f, get<0>(params).new_size, gfx::Rect(get<0>(params).new_size)));
+            1.f, base::get<0>(params).new_size,
+            gfx::Rect(base::get<0>(params).new_size)));
     ui::DrawWaiterForTest::WaitForCommit(
         root_window->GetHost()->compositor());
   }
@@ -1619,7 +1634,7 @@ TEST_F(RenderWidgetHostViewAuraTest, Resize) {
     EXPECT_EQ(ViewMsg_Resize::ID, msg->type());
     ViewMsg_Resize::Param params;
     ViewMsg_Resize::Read(msg, &params);
-    EXPECT_EQ(size2.ToString(), get<0>(params).new_size.ToString());
+    EXPECT_EQ(size2.ToString(), base::get<0>(params).new_size.ToString());
   }
   // Send resize ack to observe new Resize messages.
   update_params.view_size = size2;
@@ -1674,7 +1689,7 @@ TEST_F(RenderWidgetHostViewAuraTest, Resize) {
         // to this extra IPC coming in.
         InputMsg_HandleInputEvent::Param params;
         InputMsg_HandleInputEvent::Read(msg, &params);
-        const blink::WebInputEvent* event = get<0>(params);
+        const blink::WebInputEvent* event = base::get<0>(params);
         EXPECT_EQ(blink::WebInputEvent::MouseMove, event->type);
         break;
       }
@@ -1684,7 +1699,7 @@ TEST_F(RenderWidgetHostViewAuraTest, Resize) {
         EXPECT_FALSE(has_resize);
         ViewMsg_Resize::Param params;
         ViewMsg_Resize::Read(msg, &params);
-        EXPECT_EQ(size3.ToString(), get<0>(params).new_size.ToString());
+        EXPECT_EQ(size3.ToString(), base::get<0>(params).new_size.ToString());
         has_resize = true;
         break;
       }
@@ -2166,7 +2181,11 @@ class RenderWidgetHostViewAuraCopyRequestTest
     : public RenderWidgetHostViewAuraShutdownTest {
  public:
   RenderWidgetHostViewAuraCopyRequestTest()
-      : callback_count_(0), result_(false) {}
+      : callback_count_(0),
+        result_(false),
+        frame_subscriber_(nullptr),
+        tick_clock_(nullptr),
+        view_rect_(100, 100) {}
 
   void CallbackMethod(bool result) {
     result_ = result;
@@ -2180,8 +2199,74 @@ class RenderWidgetHostViewAuraCopyRequestTest
     run_loop.Run();
   }
 
+  void InitializeView() {
+    view_->InitAsChild(NULL);
+    view_->GetDelegatedFrameHost()->SetRequestCopyOfOutputCallbackForTesting(
+        base::Bind(&FakeRenderWidgetHostViewAura::InterceptCopyOfOutput,
+                   base::Unretained(view_)));
+    aura::client::ParentWindowWithContext(
+        view_->GetNativeView(), parent_view_->GetNativeView()->GetRootWindow(),
+        gfx::Rect());
+    view_->SetSize(view_rect_.size());
+    view_->Show();
+
+    frame_subscriber_ = new FakeFrameSubscriber(
+        view_rect_.size(),
+        base::Bind(&RenderWidgetHostViewAuraCopyRequestTest::CallbackMethod,
+                   base::Unretained(this)));
+    view_->BeginFrameSubscription(make_scoped_ptr(frame_subscriber_));
+    ASSERT_EQ(0, callback_count_);
+    ASSERT_FALSE(view_->last_copy_request_);
+  }
+
+  void InstallFakeTickClock() {
+    // Create a fake tick clock and transfer ownership to the frame host.
+    tick_clock_ = new base::SimpleTestTickClock();
+    view_->GetDelegatedFrameHost()->tick_clock_ = make_scoped_ptr(tick_clock_);
+  }
+
+  void OnSwapCompositorFrame() {
+    view_->OnSwapCompositorFrame(
+        1, MakeDelegatedFrame(1.f, view_rect_.size(), view_rect_));
+    ASSERT_TRUE(view_->last_copy_request_);
+  }
+
+  void ReleaseSwappedFrame() {
+    scoped_ptr<cc::CopyOutputRequest> request =
+        view_->last_copy_request_.Pass();
+    request->SendTextureResult(view_rect_.size(), request->texture_mailbox(),
+                               scoped_ptr<cc::SingleReleaseCallback>());
+    RunLoopUntilCallback();
+  }
+
+  void OnSwapCompositorFrameAndRelease() {
+    OnSwapCompositorFrame();
+    ReleaseSwappedFrame();
+  }
+
+  void RunOnCompositingDidCommitAndReleaseFrame() {
+    view_->RunOnCompositingDidCommit();
+    ReleaseSwappedFrame();
+  }
+
+  void OnUpdateVSyncParameters(base::TimeTicks timebase,
+                               base::TimeDelta interval) {
+    view_->GetDelegatedFrameHost()->OnUpdateVSyncParameters(timebase, interval);
+  }
+
+  base::TimeTicks vsync_timebase() {
+    return view_->GetDelegatedFrameHost()->vsync_timebase_;
+  }
+
+  base::TimeDelta vsync_interval() {
+    return view_->GetDelegatedFrameHost()->vsync_interval_;
+  }
+
   int callback_count_;
   bool result_;
+  FakeFrameSubscriber* frame_subscriber_;  // Owned by |view_|.
+  base::SimpleTestTickClock* tick_clock_;  // Owned by DelegatedFrameHost.
+  const gfx::Rect view_rect_;
 
  private:
   base::Closure quit_closure_;
@@ -2194,43 +2279,15 @@ class RenderWidgetHostViewAuraCopyRequestTest
 // browser composites, and even if the frame subscriber desires more frames than
 // the number of browser composites.
 TEST_F(RenderWidgetHostViewAuraCopyRequestTest, DedupeFrameSubscriberRequests) {
-  gfx::Rect view_rect(100, 100);
-  scoped_ptr<cc::CopyOutputRequest> request;
-
-  view_->InitAsChild(NULL);
-  view_->GetDelegatedFrameHost()->SetRequestCopyOfOutputCallbackForTesting(
-      base::Bind(&FakeRenderWidgetHostViewAura::InterceptCopyOfOutput,
-                 base::Unretained(view_)));
-  aura::client::ParentWindowWithContext(
-      view_->GetNativeView(),
-      parent_view_->GetNativeView()->GetRootWindow(),
-      gfx::Rect());
-  view_->SetSize(view_rect.size());
-  view_->Show();
-
-  view_->BeginFrameSubscription(make_scoped_ptr(new FakeFrameSubscriber(
-      view_rect.size(),
-      base::Bind(&RenderWidgetHostViewAuraCopyRequestTest::CallbackMethod,
-                 base::Unretained(this)))).Pass());
+  InitializeView();
   int expected_callback_count = 0;
-  ASSERT_EQ(expected_callback_count, callback_count_);
-  ASSERT_FALSE(view_->last_copy_request_);
 
   // Normal case: A browser composite executes for each render frame swap.
   for (int i = 0; i < 3; ++i) {
-    // Renderer provides another frame.
-    view_->OnSwapCompositorFrame(
-        1, MakeDelegatedFrame(1.f, view_rect.size(), gfx::Rect(view_rect)));
-    ASSERT_TRUE(view_->last_copy_request_);
-    request = view_->last_copy_request_.Pass();
-
-    // Browser composites with the frame, executing the copy request, and then
-    // the result is delivered.
-    view_->RunOnCompositingDidCommit();
-    request->SendTextureResult(view_rect.size(),
-                               request->texture_mailbox(),
-                               scoped_ptr<cc::SingleReleaseCallback>());
-    RunLoopUntilCallback();
+    // Renderer provides another frame and the Browser composites with the
+    // frame, executing the copy request, and then the result is delivered.
+    OnSwapCompositorFrame();
+    RunOnCompositingDidCommitAndReleaseFrame();
 
     // The callback should be run with success status.
     ++expected_callback_count;
@@ -2245,12 +2302,7 @@ TEST_F(RenderWidgetHostViewAuraCopyRequestTest, DedupeFrameSubscriberRequests) {
 
     // The renderer provides |num_swaps| frames.
     for (int j = 0; j < num_swaps; ++j) {
-      view_->OnSwapCompositorFrame(
-          1, MakeDelegatedFrame(1.f, view_rect.size(), gfx::Rect(view_rect)));
-      ASSERT_TRUE(view_->last_copy_request_);
-      // The following statement simulates the layer de-duping the copy request
-      // coming from the same source (i.e., the DelegatedFrameHost):
-      request = view_->last_copy_request_.Pass();
+      OnSwapCompositorFrame();
       if (j > 0) {
         ++expected_callback_count;
         ASSERT_EQ(expected_callback_count, callback_count_);
@@ -2260,11 +2312,7 @@ TEST_F(RenderWidgetHostViewAuraCopyRequestTest, DedupeFrameSubscriberRequests) {
 
     // Browser composites with the frame, executing the last copy request that
     // was made, and then the result is delivered.
-    view_->RunOnCompositingDidCommit();
-    request->SendTextureResult(view_rect.size(),
-                               request->texture_mailbox(),
-                               scoped_ptr<cc::SingleReleaseCallback>());
-    RunLoopUntilCallback();
+    RunOnCompositingDidCommitAndReleaseFrame();
 
     // The final callback should be run with success status.
     ++expected_callback_count;
@@ -2277,64 +2325,34 @@ TEST_F(RenderWidgetHostViewAuraCopyRequestTest, DedupeFrameSubscriberRequests) {
 }
 
 TEST_F(RenderWidgetHostViewAuraCopyRequestTest, DestroyedAfterCopyRequest) {
-  gfx::Rect view_rect(100, 100);
-  scoped_ptr<cc::CopyOutputRequest> request;
+  InitializeView();
 
-  view_->InitAsChild(NULL);
-  view_->GetDelegatedFrameHost()->SetRequestCopyOfOutputCallbackForTesting(
-      base::Bind(&FakeRenderWidgetHostViewAura::InterceptCopyOfOutput,
-                 base::Unretained(view_)));
-  aura::client::ParentWindowWithContext(
-      view_->GetNativeView(),
-      parent_view_->GetNativeView()->GetRootWindow(),
-      gfx::Rect());
-  view_->SetSize(view_rect.size());
-  view_->Show();
-
-  scoped_ptr<FakeFrameSubscriber> frame_subscriber(new FakeFrameSubscriber(
-      view_rect.size(),
-      base::Bind(&RenderWidgetHostViewAuraCopyRequestTest::CallbackMethod,
-                 base::Unretained(this))));
-
-  EXPECT_EQ(0, callback_count_);
-  EXPECT_FALSE(view_->last_copy_request_);
-
-  view_->BeginFrameSubscription(frame_subscriber.Pass());
-  view_->OnSwapCompositorFrame(
-      1, MakeDelegatedFrame(1.f, view_rect.size(), gfx::Rect(view_rect)));
-
+  OnSwapCompositorFrame();
   EXPECT_EQ(0, callback_count_);
   EXPECT_TRUE(view_->last_copy_request_);
   EXPECT_TRUE(view_->last_copy_request_->has_texture_mailbox());
-  request = view_->last_copy_request_.Pass();
 
   // Notify DelegatedFrameHost that the copy requests were moved to the
   // compositor thread by calling OnCompositingDidCommit().
-  view_->RunOnCompositingDidCommit();
+  //
   // Send back the mailbox included in the request. There's no release callback
   // since the mailbox came from the RWHVA originally.
-  request->SendTextureResult(view_rect.size(),
-                             request->texture_mailbox(),
-                             scoped_ptr<cc::SingleReleaseCallback>());
-  RunLoopUntilCallback();
+  RunOnCompositingDidCommitAndReleaseFrame();
 
   // The callback should succeed.
   EXPECT_EQ(1, callback_count_);
   EXPECT_TRUE(result_);
 
-  view_->OnSwapCompositorFrame(
-      1, MakeDelegatedFrame(1.f, view_rect.size(), gfx::Rect(view_rect)));
-
+  OnSwapCompositorFrame();
   EXPECT_EQ(1, callback_count_);
-  request = view_->last_copy_request_.Pass();
+  scoped_ptr<cc::CopyOutputRequest> request = view_->last_copy_request_.Pass();
 
   // Destroy the RenderWidgetHostViewAura and ImageTransportFactory.
   TearDownEnvironment();
 
   // Send the result after-the-fact.  It goes nowhere since DelegatedFrameHost
   // has been destroyed.
-  request->SendTextureResult(view_rect.size(),
-                             request->texture_mailbox(),
+  request->SendTextureResult(view_rect_.size(), request->texture_mailbox(),
                              scoped_ptr<cc::SingleReleaseCallback>());
 
   // Because the copy request callback may be holding state within it, that
@@ -2343,6 +2361,63 @@ TEST_F(RenderWidgetHostViewAuraCopyRequestTest, DestroyedAfterCopyRequest) {
   // these things being destroyed.
   EXPECT_EQ(2, callback_count_);
   EXPECT_FALSE(result_);
+}
+
+TEST_F(RenderWidgetHostViewAuraCopyRequestTest, PresentTime) {
+  InitializeView();
+  InstallFakeTickClock();
+
+  // Verify our initial state.
+  EXPECT_EQ(base::TimeTicks(), frame_subscriber_->last_present_time());
+  EXPECT_EQ(base::TimeTicks(), tick_clock_->NowTicks());
+
+  // Start our fake clock from a non-zero, but not an even multiple of the
+  // interval, value to differentiate it from our initialization state.
+  const base::TimeDelta kDefaultInterval =
+      cc::BeginFrameArgs::DefaultInterval();
+  tick_clock_->Advance(kDefaultInterval / 3);
+
+  // Swap the first frame without any vsync information.
+  ASSERT_EQ(base::TimeTicks(), vsync_timebase());
+  ASSERT_EQ(base::TimeDelta(), vsync_interval());
+
+  // During this first call, there is no known vsync information, so while the
+  // callback should succeed the present time is effectively just current time.
+  OnSwapCompositorFrameAndRelease();
+  EXPECT_EQ(tick_clock_->NowTicks(), frame_subscriber_->last_present_time());
+
+  // Now initialize the vsync parameters with a null timebase, but a known vsync
+  // interval; which should give us slightly better frame time estimates.
+  OnUpdateVSyncParameters(base::TimeTicks(), kDefaultInterval);
+  ASSERT_EQ(base::TimeTicks(), vsync_timebase());
+  ASSERT_EQ(kDefaultInterval, vsync_interval());
+
+  // Now that we have a vsync interval, the presentation time estimate should be
+  // the nearest presentation interval, which is just kDefaultInterval since our
+  // tick clock is initialized to a time before that.
+  OnSwapCompositorFrameAndRelease();
+  EXPECT_EQ(base::TimeTicks() + kDefaultInterval,
+            frame_subscriber_->last_present_time());
+
+  // Now initialize the vsync parameters with a valid timebase and a known vsync
+  // interval; which should give us the best frame time estimates.
+  const base::TimeTicks kBaseTime = tick_clock_->NowTicks();
+  OnUpdateVSyncParameters(kBaseTime, kDefaultInterval);
+  ASSERT_EQ(kBaseTime, vsync_timebase());
+  ASSERT_EQ(kDefaultInterval, vsync_interval());
+
+  // Now that we have a vsync interval and a timebase, the presentation time
+  // should be based on the number of vsync intervals which have elapsed since
+  // the vsync timebase.  Advance time by a non integer number of intervals to
+  // verify.
+  const double kElapsedIntervals = 2.5;
+  tick_clock_->Advance(kDefaultInterval * kElapsedIntervals);
+  OnSwapCompositorFrameAndRelease();
+  EXPECT_EQ(kBaseTime + kDefaultInterval * std::ceil(kElapsedIntervals),
+            frame_subscriber_->last_present_time());
+
+  // Destroy the RenderWidgetHostViewAura and ImageTransportFactory.
+  TearDownEnvironment();
 }
 
 TEST_F(RenderWidgetHostViewAuraTest, VisibleViewportTest) {
@@ -2371,7 +2446,7 @@ TEST_F(RenderWidgetHostViewAuraTest, VisibleViewportTest) {
 
   ViewMsg_Resize::Param params;
   ViewMsg_Resize::Read(message, &params);
-  EXPECT_EQ(60, get<0>(params).visible_viewport_size.height());
+  EXPECT_EQ(60, base::get<0>(params).visible_viewport_size.height());
 }
 
 // Ensures that touch event positions are never truncated to integers.
@@ -3231,6 +3306,10 @@ TEST_F(RenderWidgetHostViewAuraOverscrollTest,
   EXPECT_TRUE(ScrollStateIsUnknown());
   EXPECT_EQ(0U, sink_->message_count());
 
+  // Dropped flings should neither propagate *nor* indicate that they were
+  // consumed and have triggered a fling animation (as tracked by the router).
+  EXPECT_FALSE(parent_host_->input_router()->HasPendingEvents());
+
   SimulateWheelEvent(-5, 0, 0, true);    // sent directly
   SimulateWheelEvent(-60, 0, 0, true);   // enqueued
   SimulateWheelEvent(-100, 0, 0, true);  // coalesced into previous event
@@ -3255,6 +3334,7 @@ TEST_F(RenderWidgetHostViewAuraOverscrollTest,
   EXPECT_EQ(OVERSCROLL_WEST, overscroll_delegate()->completed_mode());
   EXPECT_TRUE(ScrollStateIsUnknown());
   EXPECT_EQ(0U, sink_->message_count());
+  EXPECT_FALSE(parent_host_->input_router()->HasPendingEvents());
 }
 
 TEST_F(RenderWidgetHostViewAuraOverscrollTest, OverscrollResetsOnBlur) {
@@ -3493,7 +3573,7 @@ TEST_F(RenderWidgetHostViewAuraTest, SurfaceIdNamespaceInitialized) {
   view_->SetSize(size);
   view_->OnSwapCompositorFrame(0,
                                MakeDelegatedFrame(1.f, size, gfx::Rect(size)));
-  EXPECT_EQ(view_->GetSurfaceIdNamespace(), get<0>(params));
+  EXPECT_EQ(view_->GetSurfaceIdNamespace(), base::get<0>(params));
 }
 
 }  // namespace content

@@ -4,12 +4,14 @@
 
 #include "components/html_viewer/setup.h"
 
+#include <string>
+
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/i18n/icu_util.h"
 #include "base/logging.h"
 #include "components/html_viewer/blink_platform_impl.h"
-#include "components/html_viewer/web_media_player_factory.h"
+#include "components/html_viewer/media_factory.h"
 #include "components/scheduler/renderer/renderer_scheduler.h"
 #include "gin/v8_initializer.h"
 #include "mojo/application/public/cpp/application_impl.h"
@@ -17,6 +19,7 @@
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 #include "ui/base/resource/resource_bundle.h"
 #include "ui/base/ui_base_paths.h"
+#include "v8/include/v8.h"
 
 #if defined(OS_ANDROID)
 #include "components/html_viewer/ui_setup_android.h"
@@ -28,15 +31,14 @@ namespace html_viewer {
 
 namespace {
 
-// Enable MediaRenderer in media pipeline instead of using the internal
-// media::Renderer implementation.
-const char kEnableMojoMediaRenderer[] = "enable-mojo-media-renderer";
-
 // Disables support for (unprefixed) Encrypted Media Extensions.
 const char kDisableEncryptedMedia[] = "disable-encrypted-media";
 
 // Prevents creation of any output surface.
 const char kIsHeadless[] = "is-headless";
+
+// Specifies the flags passed to JS engine.
+const char kJavaScriptFlags[] = "js-flags";
 
 size_t kDesiredMaxMemory = 20 * 1024 * 1024;
 
@@ -77,6 +79,10 @@ Setup::Setup(mojo::ApplicationImpl* app)
 }
 
 Setup::~Setup() {
+  if (blink_platform_) {
+    renderer_scheduler_->Shutdown();
+    blink::shutdown();
+  }
 }
 
 void Setup::InitHeadless() {
@@ -98,7 +104,7 @@ void Setup::InitIfNecessary(const gfx::Size& screen_size_in_pixels,
 
   if (!resource_loader_.BlockUntilLoaded()) {
     // Assume on error we're being shut down.
-    mojo::ApplicationImpl::Terminate();
+    app_->Terminate();
     return;
   }
 
@@ -142,16 +148,14 @@ void Setup::InitIfNecessary(const gfx::Size& screen_size_in_pixels,
   }
 
   compositor_thread_.Start();
-#if defined(OS_ANDROID)
-  // TODO(sky): Get WebMediaPlayerFactory working on android.
-  NOTIMPLEMENTED();
-#else
-  bool enable_mojo_media_renderer =
-      command_line->HasSwitch(kEnableMojoMediaRenderer);
 
-  web_media_player_factory_.reset(new WebMediaPlayerFactory(
-      compositor_thread_.message_loop_proxy(), enable_mojo_media_renderer));
-#endif
+  media_factory_.reset(
+      new MediaFactory(compositor_thread_.message_loop_proxy()));
+
+  if (command_line->HasSwitch(kJavaScriptFlags)) {
+    std::string flags(command_line->GetSwitchValueASCII(kJavaScriptFlags));
+    v8::V8::SetFlagsFromString(flags.c_str(), static_cast<int>(flags.size()));
+  }
 }
 
 }  // namespace html_viewer

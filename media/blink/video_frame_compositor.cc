@@ -16,23 +16,20 @@ namespace media {
 // background rendering to keep the Render() callbacks moving.
 const int kBackgroundRenderingTimeoutMs = 250;
 
+// Returns true if the format has no Alpha channel (hence is always opaque).
 static bool IsOpaque(const scoped_refptr<VideoFrame>& frame) {
   switch (frame->format()) {
     case VideoFrame::UNKNOWN:
     case VideoFrame::YV12:
-    case VideoFrame::YV12J:
-    case VideoFrame::YV12HD:
-    case VideoFrame::YV16:
     case VideoFrame::I420:
+    case VideoFrame::YV16:
     case VideoFrame::YV24:
+#if defined(OS_MACOSX) || defined(OS_CHROMEOS)
     case VideoFrame::NV12:
+#endif
+    case VideoFrame::XRGB:
       return true;
-
     case VideoFrame::YV12A:
-#if defined(VIDEO_HOLE)
-    case VideoFrame::HOLE:
-#endif  // defined(VIDEO_HOLE)
-    case VideoFrame::NATIVE_TEXTURE:
     case VideoFrame::ARGB:
       break;
   }
@@ -58,6 +55,8 @@ VideoFrameCompositor::VideoFrameCompositor(
       client_(nullptr),
       rendering_(false),
       rendered_last_frame_(false),
+      is_background_rendering_(false),
+      new_background_frame_(false),
       // Assume 60Hz before the first UpdateCurrentFrame() call.
       last_interval_(base::TimeDelta::FromSecondsD(1.0 / 60)),
       callback_(nullptr) {
@@ -247,6 +246,12 @@ bool VideoFrameCompositor::CallRender(base::TimeTicks deadline_min,
   const bool new_frame = ProcessNewFrame(
       callback_->Render(deadline_min, deadline_max, background_rendering));
 
+  // We may create a new frame here with background rendering, but the provider
+  // has no way of knowing that a new frame had been processed, so keep track of
+  // the new frame, and return true on the next call to |CallRender|.
+  const bool had_new_background_frame = new_background_frame_;
+  new_background_frame_ = background_rendering && new_frame;
+
   is_background_rendering_ = background_rendering;
   last_interval_ = deadline_max - deadline_min;
 
@@ -254,7 +259,7 @@ bool VideoFrameCompositor::CallRender(base::TimeTicks deadline_min,
   // or not; in either case we should wait for |kBackgroundRenderingTimeoutMs|.
   if (background_rendering_enabled_)
     background_rendering_timer_.Reset();
-  return new_frame;
+  return new_frame || had_new_background_frame;
 }
 
 }  // namespace media

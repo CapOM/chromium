@@ -17,7 +17,9 @@
 #include "content/shell/renderer/layout_test/blink_test_runner.h"
 #include "content/shell/renderer/layout_test/layout_test_render_frame_observer.h"
 #include "content/shell/renderer/layout_test/layout_test_render_process_observer.h"
+#include "content/shell/renderer/layout_test/test_media_stream_renderer_factory.h"
 #include "content/shell/renderer/shell_render_view_observer.h"
+#include "content/shell/renderer/test_runner/app_banner_client.h"
 #include "content/shell/renderer/test_runner/mock_credential_manager_client.h"
 #include "content/shell/renderer/test_runner/web_test_interfaces.h"
 #include "content/shell/renderer/test_runner/web_test_proxy.h"
@@ -160,6 +162,24 @@ WebThemeEngine* LayoutTestContentRendererClient::OverrideThemeEngine() {
   return LayoutTestRenderProcessObserver::GetInstance()
       ->test_interfaces()
       ->ThemeEngine();
+}
+
+scoped_ptr<blink::WebAppBannerClient>
+LayoutTestContentRendererClient::CreateAppBannerClient(
+    RenderFrame* render_frame) {
+  WebTestInterfaces* interfaces =
+      LayoutTestRenderProcessObserver::GetInstance()->test_interfaces();
+  return interfaces->CreateAppBannerClient();
+}
+
+scoped_ptr<MediaStreamRendererFactory>
+LayoutTestContentRendererClient::CreateMediaStreamRendererFactory() {
+#if defined(ENABLE_WEBRTC)
+  return scoped_ptr<MediaStreamRendererFactory>(
+      new TestMediaStreamRendererFactory());
+#else
+  return nullptr;
+#endif
 }
 
 void LayoutTestContentRendererClient::WebTestProxyCreated(

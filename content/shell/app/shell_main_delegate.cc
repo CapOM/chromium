@@ -173,6 +173,8 @@ bool ShellMainDelegate::BasicStartupComplete(int* exit_code) {
     if (!command_line.HasSwitch(switches::kStableReleaseMode)) {
       command_line.AppendSwitch(
         switches::kEnableExperimentalWebPlatformFeatures);
+      // Only enable WebBluetooth during Layout Tests in non release mode.
+      command_line.AppendSwitch(switches::kEnableWebBluetooth);
     }
 
     if (!command_line.HasSwitch(switches::kEnableThreadedCompositing)) {
@@ -201,7 +203,7 @@ bool ShellMainDelegate::BasicStartupComplete(int* exit_code) {
                                    "MAP *.test 127.0.0.1");
 
     // TODO(wfh): crbug.com/295137 Remove this when NPAPI is gone.
-    command_line.AppendSwitch(switches::kEnableNpapi);
+    command_line.AppendSwitch(switches::kEnableNpapiForTesting);
 
     // Unless/until WebM files are added to the media layout tests, we need to
     // avoid removing MP4/H264/AAC so that layout tests can run on Android.

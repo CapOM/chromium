@@ -4,7 +4,7 @@
 
 #include "mojo/runner/android/native_viewport_application_loader.h"
 
-#include "components/gles2/gpu_state.h"
+#include "components/view_manager/gles2/gpu_state.h"
 #include "components/view_manager/native_viewport/native_viewport_impl.h"
 #include "mojo/application/public/cpp/application_impl.h"
 

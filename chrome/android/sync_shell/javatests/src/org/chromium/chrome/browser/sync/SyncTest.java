@@ -148,6 +148,20 @@ public class SyncTest extends SyncTestBase {
 
     @LargeTest
     @Feature({"Sync"})
+    public void testStopAndStartSync() throws InterruptedException {
+        setupTestAccountAndSignInToSync(CLIENT_ID);
+        Account account =
+                AccountManagerHelper.createAccountFromName(SyncTestUtil.DEFAULT_TEST_ACCOUNT);
+
+        SyncTestUtil.verifySyncIsSignedIn(mContext, account);
+        stopSync();
+        SyncTestUtil.verifySyncIsDisabled(mContext, account);
+        startSync();
+        SyncTestUtil.verifySyncIsSignedIn(mContext, account);
+    }
+
+    @LargeTest
+    @Feature({"Sync"})
     public void testDisableAndEnableSyncThroughAndroid() throws InterruptedException {
         setupTestAccountAndSignInToSync(CLIENT_ID);
         SyncTestUtil.ensureSyncInitialized(mContext);
@@ -223,30 +237,6 @@ public class SyncTest extends SyncTestBase {
                 1, typedUrls.size());
         JSONObject typedUrl = typedUrls.get(0).second;
         assertEquals("The wrong URL was found for the typed URL.", url, typedUrl.getString("url"));
-    }
-
-    @LargeTest
-    @Feature({"Sync"})
-    public void testDownloadBookmark() throws Exception {
-        setupTestAccountAndSignInToSync(CLIENT_ID);
-        assertEquals("No bookmarks should exist on the client by default.",
-                0, SyncTestUtil.getLocalData(mContext, "Bookmarks").size());
-
-        String title = "Title";
-        String url = "http://chromium.org/";
-        mFakeServerHelper.injectBookmarkEntity(
-                title, url, mFakeServerHelper.getBookmarkBarFolderId());
-
-        SyncTestUtil.triggerSyncAndWaitForCompletion(mContext);
-
-        List<Pair<String, JSONObject>> bookmarks = SyncTestUtil.getLocalData(
-                mContext, "Bookmarks");
-        assertEquals("Only the injected bookmark should exist on the client.",
-                1, bookmarks.size());
-        JSONObject bookmark = bookmarks.get(0).second;
-        assertEquals("The wrong title was found for the bookmark.", title,
-                bookmark.getString("title"));
-        assertEquals("The wrong URL was found for the bookmark.", url, bookmark.getString("url"));
     }
 
     private static ContentViewCore getContentViewCore(ChromeShellActivity activity) {

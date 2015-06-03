@@ -29,6 +29,7 @@ namespace content {
 namespace {
 
 using webrtc::AudioProcessing;
+using webrtc::NoiseSuppression;
 
 const int kAudioProcessingNumberOfChannels = 1;
 
@@ -493,7 +494,8 @@ void MediaStreamAudioProcessor::InitializeAudioProcessingModule(
   if (IsDelayAgnosticAecEnabled())
     config.Set<webrtc::ReportedDelay>(new webrtc::ReportedDelay(false));
   if (goog_beamforming) {
-    ConfigureBeamforming(&config);
+    ConfigureBeamforming(&config, audio_constraints.GetPropertyAsString(
+        MediaAudioConstraints::kGoogArrayGeometry));
   }
   config.Set<webrtc::AudioProcessing48kHzSupport>(
       new webrtc::AudioProcessing48kHzSupport(audio_proc_48kHz_support_));
@@ -513,8 +515,15 @@ void MediaStreamAudioProcessor::InitializeAudioProcessingModule(
     echo_information_.reset(new EchoInformation());
   }
 
-  if (goog_ns)
-    EnableNoiseSuppression(audio_processing_.get());
+  if (goog_ns) {
+    // The beamforming postfilter is effective at suppressing stationary noise,
+    // so reduce the single-channel NS aggressiveness when enabled.
+    const NoiseSuppression::Level ns_level =
+        config.Get<webrtc::Beamforming>().enabled ? NoiseSuppression::kLow
+                                                  : NoiseSuppression::kHigh;
+
+    EnableNoiseSuppression(audio_processing_.get(), ns_level);
+  }
 
   if (goog_high_pass_filter)
     EnableHighPassFilter(audio_processing_.get());
@@ -532,20 +541,45 @@ void MediaStreamAudioProcessor::InitializeAudioProcessingModule(
   RecordProcessingState(AUDIO_PROCESSING_ENABLED);
 }
 
-void MediaStreamAudioProcessor::ConfigureBeamforming(webrtc::Config* config) {
-  bool enabled = false;
-  std::vector<webrtc::Point> geometry(1, webrtc::Point(0.f, 0.f, 0.f));
+void MediaStreamAudioProcessor::ConfigureBeamforming(
+    webrtc::Config* config,
+    const std::string& geometry_str) const {
+  std::vector<webrtc::Point> geometry = ParseArrayGeometry(geometry_str);
 #if defined(OS_CHROMEOS)
-  const std::string board = base::SysInfo::GetLsbReleaseBoard();
-  if (board.find("peach_pi") != std::string::npos) {
-    enabled = true;
-    geometry.push_back(webrtc::Point(0.050f, 0.f, 0.f));
-  } else if (board.find("swanky") != std::string::npos) {
-    enabled = true;
-    geometry.push_back(webrtc::Point(0.052f, 0.f, 0.f));
+  if(geometry.size() == 0) {
+    const std::string board = base::SysInfo::GetLsbReleaseBoard();
+    if (board.find("peach_pi") != std::string::npos) {
+      geometry.push_back(webrtc::Point(-0.025f, 0.f, 0.f));
+      geometry.push_back(webrtc::Point(0.025f, 0.f, 0.f));
+    } else if (board.find("swanky") != std::string::npos) {
+      geometry.push_back(webrtc::Point(-0.026f, 0.f, 0.f));
+      geometry.push_back(webrtc::Point(0.026f, 0.f, 0.f));
+    } else if (board.find("samus") != std::string::npos) {
+      geometry.push_back(webrtc::Point(-0.032f, 0.f, 0.f));
+      geometry.push_back(webrtc::Point(0.032f, 0.f, 0.f));
+    }
   }
 #endif
-  config->Set<webrtc::Beamforming>(new webrtc::Beamforming(enabled, geometry));
+  config->Set<webrtc::Beamforming>(new webrtc::Beamforming(geometry.size() > 1,
+                                                           geometry));
+}
+
+std::vector<webrtc::Point> MediaStreamAudioProcessor::ParseArrayGeometry(
+    const std::string& geometry_str) const {
+  std::vector<webrtc::Point> result;
+  std::vector<float> values;
+  std::istringstream str(geometry_str);
+  std::copy(std::istream_iterator<float>(str),
+            std::istream_iterator<float>(),
+            std::back_inserter(values));
+  if (values.size() % 3 == 0) {
+    for (size_t i = 0; i < values.size(); i += 3) {
+      result.push_back(webrtc::Point(values[i + 0],
+                                     values[i + 1],
+                                     values[i + 2]));
+    }
+  }
+  return result;
 }
 
 void MediaStreamAudioProcessor::InitializeCaptureFifo(

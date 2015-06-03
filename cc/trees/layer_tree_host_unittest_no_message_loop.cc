@@ -21,7 +21,6 @@
 #include "cc/trees/layer_tree_host_single_thread_client.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/skia/include/core/SkColor.h"
-#include "ui/gfx/frame_time.h"
 
 namespace cc {
 namespace {
@@ -62,9 +61,6 @@ class LayerTreeHostNoMessageLoopTest
   void ApplyViewportDeltas(const gfx::Vector2dF& inner_delta,
                            const gfx::Vector2dF& outer_delta,
                            const gfx::Vector2dF& elastic_overscroll_delta,
-                           float page_scale,
-                           float top_controls_delta) override {}
-  void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
                            float page_scale,
                            float top_controls_delta) override {}
   void RequestNewOutputSurface() override {
@@ -117,7 +113,7 @@ class LayerTreeHostNoMessageLoopTest
   void Composite() {
     did_commit_ = false;
     did_commit_and_draw_frame_ = false;
-    layer_tree_host_->Composite(gfx::FrameTime::Now());
+    layer_tree_host_->Composite(base::TimeTicks::Now());
     EXPECT_TRUE(did_initialize_output_surface_);
     EXPECT_TRUE(did_commit_);
     EXPECT_TRUE(did_commit_and_draw_frame_);
@@ -151,7 +147,7 @@ class LayerTreeHostNoMessageLoopSmokeTest
     // Set up root layer.
     {
       scoped_refptr<SolidColorLayer> solid_color_layer =
-          SolidColorLayer::Create();
+          SolidColorLayer::Create(LayerSettings());
       solid_color_layer->SetBackgroundColor(SK_ColorRED);
       solid_color_layer->SetBounds(size_);
       solid_color_layer->SetIsDrawable(true);
@@ -177,9 +173,10 @@ class LayerTreeHostNoMessageLoopDelegatedLayer
     frame_provider_ = new DelegatedFrameProvider(
         resource_collection_.get(), CreateFrameDataWithResource(998));
 
-    root_layer_ = Layer::Create();
-    delegated_layer_ =
-        FakeDelegatedRendererLayer::Create(frame_provider_.get());
+    LayerSettings layer_settings;
+    root_layer_ = Layer::Create(layer_settings);
+    delegated_layer_ = FakeDelegatedRendererLayer::Create(
+        layer_settings, frame_provider_.get());
     delegated_layer_->SetBounds(size_);
     delegated_layer_->SetIsDrawable(true);
     root_layer_->AddChild(delegated_layer_);

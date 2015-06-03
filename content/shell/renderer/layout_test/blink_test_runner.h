@@ -119,9 +119,21 @@ class BlinkTestRunner : public RenderViewObserver,
                      const GURL& origin,
                      const GURL& embedding_origin) override;
   void ResetPermissions() override;
+  scoped_refptr<cc::TextureLayer> CreateTextureLayerForMailbox(
+      cc::TextureLayerClient* client) override;
   blink::WebLayer* InstantiateWebLayer(
       scoped_refptr<cc::TextureLayer> layer) override;
   cc::SharedBitmapManager* GetSharedBitmapManager() override;
+  void DispatchBeforeInstallPromptEvent(
+      int request_id,
+      const std::vector<std::string>& event_platforms,
+      const base::Callback<void(bool)>& callback) override;
+  void ResolveBeforeInstallPromptPromise(
+      int request_id,
+      const std::string& platform) override;
+  blink::WebPlugin* CreatePluginPlaceholder(
+    blink::WebLocalFrame* frame,
+    const blink::WebPluginParams& params) override;
 
   void Reset();
 

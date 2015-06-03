@@ -45,17 +45,21 @@ class HTMLViewerApplication : public mojo::Application {
   HTMLViewerApplication(InterfaceRequest<Application> request,
                         URLResponsePtr response,
                         Setup* setup)
-      : url_(response->url),
+      : app_refcount_(setup->app()->app_lifetime_helper()->CreateAppRefCount()),
+        url_(response->url),
         binding_(this, request.Pass()),
         initial_response_(response.Pass()),
-        setup_(setup) {}
+        setup_(setup) {
+  }
+
+  ~HTMLViewerApplication() override {
+  }
 
   void Initialize(ShellPtr shell, const String& url) override {
-    ServiceProviderPtr service_provider;
     shell_ = shell.Pass();
-    shell_->ConnectToApplication("mojo:network_service",
-                                 GetProxy(&service_provider), nullptr);
-    ConnectToService(service_provider.get(), &network_service_);
+    mojo::URLRequestPtr request(mojo::URLRequest::New());
+    request->url = mojo::String::From("mojo:network_service");
+    setup_->app()->ConnectToService(request.Pass(), &network_service_);
   }
 
   void AcceptConnection(const String& requestor_url,
@@ -84,7 +88,10 @@ class HTMLViewerApplication : public mojo::Application {
     }
   }
 
-  void RequestQuit() override {}
+  void OnQuitRequested(const mojo::Callback<void(bool)>& callback) override {
+    callback.Run(true);
+    delete this;
+  }
 
  private:
   void OnResponseReceived(URLLoaderPtr loader,
@@ -92,9 +99,10 @@ class HTMLViewerApplication : public mojo::Application {
                           URLResponsePtr response) {
     // HTMLDocument is destroyed when the hosting view is destroyed.
     // TODO(sky): when headless, this leaks.
-    new HTMLDocument(services.Pass(), response.Pass(), shell_.get(), setup_);
+    new HTMLDocument(services.Pass(), response.Pass(), shell_.Pass(), setup_);
   }
 
+  scoped_ptr<mojo::AppRefCount> app_refcount_;
   String url_;
   mojo::StrongBinding<mojo::Application> binding_;
   ShellPtr shell_;
@@ -105,9 +113,12 @@ class HTMLViewerApplication : public mojo::Application {
   DISALLOW_COPY_AND_ASSIGN(HTMLViewerApplication);
 };
 
-class ContentHandlerImpl : public mojo::InterfaceImpl<ContentHandler> {
+class ContentHandlerImpl : public mojo::ContentHandler {
  public:
-  explicit ContentHandlerImpl(Setup* setup) : setup_(setup) {}
+  ContentHandlerImpl(Setup* setup,
+                     mojo::InterfaceRequest<ContentHandler> request)
+      : setup_(setup),
+        binding_(this, request.Pass()) {}
   ~ContentHandlerImpl() override {}
 
  private:
@@ -119,6 +130,7 @@ class ContentHandlerImpl : public mojo::InterfaceImpl<ContentHandler> {
   }
 
   Setup* setup_;
+  mojo::StrongBinding<mojo::ContentHandler> binding_;
 
   DISALLOW_COPY_AND_ASSIGN(ContentHandlerImpl);
 };
@@ -127,7 +139,7 @@ class HTMLViewer : public mojo::ApplicationDelegate,
                    public mojo::InterfaceFactory<ContentHandler> {
  public:
   HTMLViewer() {}
-  ~HTMLViewer() override { blink::shutdown(); }
+  ~HTMLViewer() override {}
 
  private:
   // Overridden from ApplicationDelegate:
@@ -150,7 +162,7 @@ class HTMLViewer : public mojo::ApplicationDelegate,
   // Overridden from InterfaceFactory<ContentHandler>
   void Create(ApplicationConnection* connection,
               mojo::InterfaceRequest<ContentHandler> request) override {
-    BindToRequest(new ContentHandlerImpl(setup_.get()), &request);
+    new ContentHandlerImpl(setup_.get(), request.Pass());
   }
 
   scoped_ptr<Setup> setup_;

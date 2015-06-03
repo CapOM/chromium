@@ -62,10 +62,6 @@
 #include "extensions/common/manifest.h"
 #endif
 
-#if defined(ENABLE_PLUGINS)
-#include "chrome/browser/plugins/enable_npapi_plugins_policy_handler.h"
-#endif
-
 namespace policy {
 
 namespace {
@@ -362,9 +358,6 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
   { key::kForceEphemeralProfiles,
     prefs::kForceEphemeralProfiles,
     base::Value::TYPE_BOOLEAN },
-  { key::kSSLVersionMin,
-    prefs::kSSLVersionMin,
-    base::Value::TYPE_STRING },
   { key::kSSLVersionFallbackMin,
     prefs::kSSLVersionFallbackMin,
     base::Value::TYPE_STRING },
@@ -630,10 +623,6 @@ scoped_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       base::Bind(GetExtensionAllowedTypesMap))));
   handlers->AddHandler(make_scoped_ptr(
       new extensions::ExtensionSettingsPolicyHandler(chrome_schema)));
-#endif
-
-#if defined(ENABLE_PLUGINS)
-  handlers->AddHandler(make_scoped_ptr(new EnableNpapiPluginsPolicyHandler()));
 #endif
 
 #if !defined(OS_CHROMEOS) && !defined(OS_ANDROID) && !defined(OS_IOS)

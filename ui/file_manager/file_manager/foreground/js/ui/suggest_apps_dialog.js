@@ -153,7 +153,7 @@ SuggestAppsDialog.prototype.createWidgetPlatformDelegate_ = function() {
     },
 
     /**
-     * @param {function(?Array.<!string>)} callback Callback
+     * @param {function(?Array<!string>)} callback Callback
      *     argument is a list of installed item ids (null on error).
      */
     getInstalledItems: function(callback) {
@@ -192,7 +192,7 @@ SuggestAppsDialog.prototype.createWidgetPlatformDelegate_ = function() {
  * Internal method to show a dialog. This should be called only from 'Suggest.
  * appDialog.showXxxx()' functions.
  *
- * @param {!Object<string, *>} options Map of options for the dialog.
+ * @param {!Object<*>} options Map of options for the dialog.
  * @param {string} title Title of the dialog.
  * @param {?string} webStoreUrl Url for more results. Null if not supported.
  * @param {function(SuggestAppsDialog.Result, ?string)} onDialogClosed Called

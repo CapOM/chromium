@@ -2,15 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from telemetry import benchmark
+from core import perf_benchmark
 
 from benchmarks import silk_flags
 from measurements import power
+from telemetry import benchmark
 import page_sets
 
 
 @benchmark.Enabled('android')
-class PowerAndroidAcceptance(benchmark.Benchmark):
+class PowerAndroidAcceptance(perf_benchmark.PerfBenchmark):
   """Android power acceptance test."""
   test = power.Power
   page_set = page_sets.AndroidAcceptancePageSet
@@ -20,7 +21,7 @@ class PowerAndroidAcceptance(benchmark.Benchmark):
 
 
 @benchmark.Enabled('android')
-class PowerTypical10Mobile(benchmark.Benchmark):
+class PowerTypical10Mobile(perf_benchmark.PerfBenchmark):
   """Android typical 10 mobile power test."""
   test = power.Power
   page_set = page_sets.Typical10MobilePageSet
@@ -29,13 +30,13 @@ class PowerTypical10Mobile(benchmark.Benchmark):
     return 'power.typical_10_mobile'
 
 @benchmark.Enabled('android')
-class PowerGpuRasterizationTypical10Mobile(benchmark.Benchmark):
+class PowerGpuRasterizationTypical10Mobile(perf_benchmark.PerfBenchmark):
   """Measures power on key mobile sites with GPU rasterization."""
   tag = 'gpu_rasterization'
   test = power.Power
   page_set = page_sets.Typical10MobilePageSet
 
-  def CustomizeBrowserOptions(self, options):
+  def SetExtraBrowserOptions(self, options):
     silk_flags.CustomizeBrowserOptionsForGpuRasterization(options)
 
   @classmethod
@@ -43,7 +44,7 @@ class PowerGpuRasterizationTypical10Mobile(benchmark.Benchmark):
     return 'power.gpu_rasterization.typical_10_mobile'
 
 @benchmark.Enabled('mac')
-class PowerTop10(benchmark.Benchmark):
+class PowerTop10(perf_benchmark.PerfBenchmark):
   """Top 10 quiescent power test."""
   test = power.QuiescentPower
   page_set = page_sets.Top10PageSet
@@ -53,7 +54,7 @@ class PowerTop10(benchmark.Benchmark):
 
 
 @benchmark.Enabled('mac')
-class PowerTop25(benchmark.Benchmark):
+class PowerTop25(perf_benchmark.PerfBenchmark):
   """Top 25 quiescent power test."""
   test = power.QuiescentPower
   page_set = page_sets.Top25PageSet
@@ -69,3 +70,65 @@ class PowerTop25(benchmark.Benchmark):
     if found:
       user_stories.RemoveUserStory(found)
     return user_stories
+
+
+@benchmark.Enabled('linux', 'mac', 'win', 'chromeos')
+class PowerPPSControlDisabled(perf_benchmark.PerfBenchmark):
+  """A single page with a small-ish non-essential plugin. In this test, Plugin
+  Power Saver (PPS) is disabled, so the plugin should continue animating and
+  taking power."""
+  test = power.QuiescentPower
+  page_set = page_sets.PluginPowerSaverPageSet
+
+  def SetExtraBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs(['--disable-plugin-power-saver'])
+
+  @classmethod
+  def Name(cls):
+    return 'power.pps_control_disabled'
+
+
+@benchmark.Enabled('linux', 'mac', 'win', 'chromeos')
+class PowerPPSControlEnabled(perf_benchmark.PerfBenchmark):
+  """A single page with a small-ish non-essential plugin. In this test, Plugin
+  Power Saver (PPS) is enabled, so the plugin should be throttled (idle with a
+  "Click to play" button)."""
+  test = power.QuiescentPower
+  page_set = page_sets.PluginPowerSaverPageSet
+
+  def SetExtraBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs(['--enable-plugin-power-saver'])
+
+  @classmethod
+  def Name(cls):
+    return 'power.pps_control_enabled'
+
+
+@benchmark.Enabled('linux', 'mac', 'win', 'chromeos')
+class PowerThrottledPlugins(perf_benchmark.PerfBenchmark):
+  """Tests that pages with flash ads take more power without Plugin Power Saver
+  (PPS) throttling them."""
+  test = power.QuiescentPower
+  page_set = page_sets.ThrottledPluginsPageSet
+
+  def SetExtraBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs(['--disable-plugin-power-saver'])
+
+  @classmethod
+  def Name(cls):
+    return 'power.throttled_plugins_pps_disabled'
+
+
+@benchmark.Enabled('linux', 'mac', 'win', 'chromeos')
+class PowerThrottledPluginsPPS(perf_benchmark.PerfBenchmark):
+  """Tests that pages with flash ads take less power with Plugin Power Saver
+  (PPS) enabled to throttle them."""
+  test = power.QuiescentPower
+  page_set = page_sets.ThrottledPluginsPageSet
+
+  def SetExtraBrowserOptions(self, options):
+    options.AppendExtraBrowserArgs(['--enable-plugin-power-saver'])
+
+  @classmethod
+  def Name(cls):
+    return 'power.throttled_plugins_pps_enabled'

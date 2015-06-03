@@ -245,12 +245,12 @@ SK_API void SkDebugf_FileLine(const char* file, int line, bool fatal,
 #   define SK_SUPPORT_LEGACY_GETTOPDEVICE
 #endif
 
-#ifndef    SK_SUPPORT_LEGACY_IMAGEFILTER_CTM
-#   define SK_SUPPORT_LEGACY_IMAGEFILTER_CTM
+#ifndef    SK_NO_SPECIALIZED_AA_XFERMODES
+#   define SK_NO_SPECIALIZED_AA_XFERMODES
 #endif
 
-#ifndef    SK_LEGACY_DRAWPICTURECALLBACK
-#   define SK_LEGACY_DRAWPICTURECALLBACK
+#ifndef    SK_SUPPORT_LEGACY_IMAGEFILTER_CTM
+#   define SK_SUPPORT_LEGACY_IMAGEFILTER_CTM
 #endif
 
 #ifndef    SK_SUPPORT_LEGACY_GETDEVICE
@@ -269,12 +269,12 @@ SK_API void SkDebugf_FileLine(const char* file, int line, bool fatal,
 #   define SK_IGNORE_GPU_DITHER
 #endif
 
-#ifndef    SK_SUPPORT_LEGACY_INT_COLORMATRIX
-#   define SK_SUPPORT_LEGACY_INT_COLORMATRIX
+#ifndef    SK_SUPPORT_LEGACY_UNBALANCED_PIXELREF_LOCKCOUNT
+#   define SK_SUPPORT_LEGACY_UNBALANCED_PIXELREF_LOCKCOUNT
 #endif
 
-#ifndef    SK_LEGACY_STROKE_CURVES
-#   define SK_LEGACY_STROKE_CURVES
+#ifndef    SK_SUPPORT_LEGACY_INT_COLORMATRIX
+#   define SK_SUPPORT_LEGACY_INT_COLORMATRIX
 #endif
 
 ///////////////////////// Imported from BUILD.gn and skia_common.gypi

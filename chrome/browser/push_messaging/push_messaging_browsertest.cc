@@ -162,6 +162,18 @@ class PushMessagingBrowserTest : public InProcessBrowserTest {
   gcm::FakeGCMProfileService* gcm_service() const { return gcm_service_; }
 
 #if defined(ENABLE_NOTIFICATIONS)
+  // To be called when delivery of a push message has finished. The |run_loop|
+  // will be told to quit after |messages_required| messages were received.
+  void OnDeliveryFinished(std::vector<size_t>* number_of_notifications_shown,
+                          const base::Closure& done_closure) {
+    DCHECK(number_of_notifications_shown);
+
+    number_of_notifications_shown->push_back(
+        notification_manager_->GetNotificationCount());
+
+    done_closure.Run();
+  }
+
   StubNotificationUIManager* notification_manager() const {
     return notification_manager_.get();
   }
@@ -189,22 +201,12 @@ class PushMessagingBrowserTest : public InProcessBrowserTest {
   scoped_ptr<net::SpawnedTestServer> https_server_;
   gcm::FakeGCMProfileService* gcm_service_;
   PushMessagingServiceImpl* push_service_;
+
+#if defined(ENABLE_NOTIFICATIONS)
   scoped_ptr<StubNotificationUIManager> notification_manager_;
+#endif
 
   DISALLOW_COPY_AND_ASSIGN(PushMessagingBrowserTest);
-};
-
-class PushMessagingBadManifestBrowserTest : public PushMessagingBrowserTest {
-  std::string GetTestURL() override {
-    return "files/push_messaging/test_bad_manifest.html";
-  }
-};
-
-class PushMessagingManifestUserVisibleOnlyTrueTest
-    : public PushMessagingBrowserTest {
-  std::string GetTestURL() override {
-    return "files/push_messaging/test_user_visible_only_manifest.html";
-  }
 };
 
 class PushMessagingBrowserTestEmptySubscriptionOptions
@@ -213,17 +215,6 @@ class PushMessagingBrowserTestEmptySubscriptionOptions
     return "files/push_messaging/test_no_subscription_options.html";
   }
 };
-
-IN_PROC_BROWSER_TEST_F(PushMessagingBadManifestBrowserTest,
-                       SubscribeFailsNotVisibleMessages) {
-  std::string script_result;
-
-  ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
-  ASSERT_EQ("ok - service worker registered", script_result);
-  ASSERT_TRUE(RunScript("subscribePush()", &script_result));
-  EXPECT_EQ("AbortError - Registration failed - permission denied",
-            script_result);
-}
 
 void PushMessagingBrowserTest::TryToSubscribeSuccessfully(
     const std::string& expected_push_subscription_id) {
@@ -339,44 +330,6 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTestEmptySubscriptionOptions,
   ASSERT_TRUE(RunScript("subscribePush()", &script_result));
   EXPECT_EQ("AbortError - Registration failed - permission denied",
             script_result);
-}
-
-IN_PROC_BROWSER_TEST_F(PushMessagingBadManifestBrowserTest,
-                       RegisterFailsNotVisibleMessages) {
-  std::string script_result;
-
-  ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
-  ASSERT_EQ("ok - service worker registered", script_result);
-  ASSERT_TRUE(RunScript("subscribePush()", &script_result));
-  EXPECT_EQ("AbortError - Registration failed - permission denied",
-            script_result);
-}
-
-IN_PROC_BROWSER_TEST_F(PushMessagingManifestUserVisibleOnlyTrueTest,
-                       ManifestKeyConsidered) {
-  // Chrome 42 introduced the "gcm_user_visible_only" manifest key, but Chrome
-  // 43 supersedes this by the standardized PushSubscriptionOptions.userVisible
-  // option. We maintain support for the manifest key without specifying the
-  // subscription option, so verify that it is still being considered.
-  std::string script_result;
-
-  ASSERT_TRUE(RunScript("registerServiceWorker()", &script_result));
-  ASSERT_EQ("ok - service worker registered", script_result);
-
-  InfoBarResponder accepting_responder(GetInfoBarService(), true);
-  ASSERT_TRUE(RunScript("requestNotificationPermission();", &script_result));
-  EXPECT_EQ("permission status - granted", script_result);
-
-  ASSERT_TRUE(RunScript("subscribePush()", &script_result));
-  EXPECT_EQ(GetEndpointForSubscriptionId("1-0"), script_result);
-
-  // permissionState has been introduced later so it does not
-  // respect the manifest key.
-  ASSERT_TRUE(RunScript("permissionState()", &script_result));
-  EXPECT_EQ(
-      "NotSupportedError - Push subscriptions that don't enable"
-      " userVisibleOnly are not supported.",
-      script_result);
 }
 
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest, SubscribePersisted) {
@@ -561,20 +514,29 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("testdata", script_result);
 
-  EXPECT_EQ(1u, notification_manager()->GetNotificationCount());
-  const Notification& forced_notification =
-      notification_manager()->GetNotificationAt(0);
+  ASSERT_EQ(1u, notification_manager()->GetNotificationCount());
+  {
+    const Notification& forced_notification =
+        notification_manager()->GetNotificationAt(0);
 
-  EXPECT_EQ(kPushMessagingForcedNotificationTag, forced_notification.tag());
-  EXPECT_TRUE(forced_notification.silent());
+    EXPECT_EQ(kPushMessagingForcedNotificationTag, forced_notification.tag());
+    EXPECT_TRUE(forced_notification.silent());
+  }
 
-  // Currently, this notification will stick around until the user or webapp
-  // explicitly dismisses it (though we may change this later).
+  // The notification will be automatically dismissed when the developer shows
+  // a new notification themselves at a later point in time.
   message.data["data"] = "shownotification";
   SendMessageAndWaitUntilHandled(app_identifier, message);
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("shownotification", script_result);
-  EXPECT_EQ(2u, notification_manager()->GetNotificationCount());
+
+  ASSERT_EQ(1u, notification_manager()->GetNotificationCount());
+  {
+    const Notification& first_notification =
+        notification_manager()->GetNotificationAt(0);
+
+    EXPECT_NE(kPushMessagingForcedNotificationTag, first_notification.tag());
+  }
 
   notification_manager()->CancelAll();
   EXPECT_EQ(0u, notification_manager()->GetNotificationCount());
@@ -599,6 +561,58 @@ IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
   ASSERT_TRUE(RunScript("resultQueue.pop()", &script_result, web_contents));
   EXPECT_EQ("testdata", script_result);
   EXPECT_EQ(0u, notification_manager()->GetNotificationCount());
+}
+
+IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,
+                       PushEventEnforcesUserVisibleNotificationAfterQueue) {
+  std::string script_result;
+
+  TryToSubscribeSuccessfully("1-0" /* expected_push_subscription_id */);
+
+  PushMessagingAppIdentifier app_identifier =
+      GetAppIdentifierForServiceWorkerRegistration(0LL);
+  EXPECT_EQ(app_identifier.app_id(), gcm_service()->last_registered_app_id());
+  EXPECT_EQ("1234567890", gcm_service()->last_registered_sender_ids()[0]);
+
+  ASSERT_TRUE(RunScript("isControlled()", &script_result));
+  ASSERT_EQ("false - is not controlled", script_result);
+
+  LoadTestPage();  // Reload to become controlled.
+
+  ASSERT_TRUE(RunScript("isControlled()", &script_result));
+  ASSERT_EQ("true - is controlled", script_result);
+
+  // Fire off two push messages in sequence, only the second one of which will
+  // display a notification. The additional round-trip and I/O required by the
+  // second message, which shows a notification, should give us a reasonable
+  // confidence that the ordering will be maintained.
+
+  std::vector<size_t> number_of_notifications_shown;
+
+  gcm::GCMClient::IncomingMessage message;
+  message.sender_id = "1234567890";
+
+  {
+    base::RunLoop run_loop;
+    push_service()->SetMessageCallbackForTesting(
+        base::Bind(&PushMessagingBrowserTest::OnDeliveryFinished,
+                   base::Unretained(this),
+                   &number_of_notifications_shown,
+                   base::BarrierClosure(2 /* num_closures */,
+                                        run_loop.QuitClosure())));
+
+    message.data["data"] = "testdata";
+    push_service()->OnMessage(app_identifier.app_id(), message);
+
+    message.data["data"] = "shownotification";
+    push_service()->OnMessage(app_identifier.app_id(), message);
+
+    run_loop.Run();
+  }
+
+  ASSERT_EQ(2u, number_of_notifications_shown.size());
+  EXPECT_EQ(0u, number_of_notifications_shown[0]);
+  EXPECT_EQ(1u, number_of_notifications_shown[1]);
 }
 
 IN_PROC_BROWSER_TEST_F(PushMessagingBrowserTest,

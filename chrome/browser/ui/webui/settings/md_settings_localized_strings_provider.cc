@@ -15,7 +15,7 @@ const char kLocalizedStringsFile[] = "strings.js";
 
 void AddA11yStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString(
-      "a11yPageTitle", IDS_MD_SETTINGS_ACCESSIBILITY_PAGE_TITLE);
+      "a11yPageTitle", IDS_SETTINGS_ACCESSIBILITY_PAGE_TITLE);
   html_source->AddLocalizedString(
       "accessibilityMoreFeaturesLink",
       IDS_SETTINGS_ACCESSIBILITY_MORE_FEATURES_LINK);
@@ -72,9 +72,20 @@ void AddA11yStrings(content::WebUIDataSource* html_source) {
       IDS_SETTINGS_ACCESSIBILITY_ON_SCREEN_KEYBOARD_LABEL);
 }
 
+void AddAppearanceStrings(content::WebUIDataSource* html_source) {
+  html_source->AddLocalizedString(
+      "appearancePageTitle", IDS_SETTINGS_APPEARANCE_PAGE_TITLE);
+  html_source->AddLocalizedString(
+      "appearanceShowHomeButtonLabel",
+      IDS_SETTINGS_APPEARANCE_SHOW_HOME_BUTTON_LABEL);
+  html_source->AddLocalizedString(
+      "appearanceShowBookmarksBarLabel",
+      IDS_SETTINGS_APPEARANCE_SHOW_BOOKMARKS_BAR_LABEL);
+}
+
 void AddDownloadsStrings(content::WebUIDataSource* html_source) {
   html_source->AddLocalizedString(
-      "downloadsPageTitle", IDS_MD_SETTINGS_DOWNLOADS_PAGE_TITLE);
+      "downloadsPageTitle", IDS_SETTINGS_DOWNLOADS_PAGE_TITLE);
   html_source->AddLocalizedString(
       "downloadsLocationLabel", IDS_SETTINGS_DOWNLOADS_LOCATION_LABEL);
   html_source->AddLocalizedString(
@@ -153,6 +164,7 @@ namespace settings {
 
 void AddLocalizedStrings(content::WebUIDataSource* html_source) {
   AddA11yStrings(html_source);
+  AddAppearanceStrings(html_source);
   AddDownloadsStrings(html_source);
   AddDateTimeStrings(html_source);
 #if defined(OS_CHROMEOS)

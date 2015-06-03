@@ -74,7 +74,8 @@ void RasterizeAndRecordBenchmark::DidUpdateLayers(LayerTreeHost* host) {
   DCHECK(!results_.get());
   results_ = make_scoped_ptr(new base::DictionaryValue);
   results_->SetInteger("pixels_recorded", record_results_.pixels_recorded);
-  results_->SetInteger("picture_memory_usage", record_results_.bytes_used);
+  results_->SetInteger("picture_memory_usage",
+                       static_cast<int>(record_results_.bytes_used));
 
   for (int i = 0; i < RecordingSource::RECORDING_MODE_COUNT; i++) {
     std::string name = base::StringPrintf("record_time%s_ms", kModeSuffixes[i]);
@@ -218,12 +219,8 @@ void RasterizeAndRecordBenchmark::RunOnDisplayListLayer(
                      kTimeCheckInterval);
 
       do {
-        const bool use_cached_picture = true;
-        display_list =
-            DisplayItemList::Create(visible_layer_rect, use_cached_picture);
-        painter->PaintContentsToDisplayList(
-            display_list.get(), visible_layer_rect, painting_control);
-        display_list->CreateAndCacheSkPicture();
+        display_list = painter->PaintContentsToDisplayList(visible_layer_rect,
+                                                           painting_control);
 
         if (memory_used) {
           // Verify we are recording the same thing each time.

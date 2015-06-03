@@ -417,10 +417,6 @@ section {
   margin-top: 30px;
 }
 
-#paired-clients-list table {
-  width: 100%;
-}
-
 .message {
   margin-bottom: 24px;
 }
@@ -742,4 +738,9 @@ body:not(.connected) #session-mode {
 .mouse-cursor-overlay {
   position: absolute;
   pointer-events: none;
+}
+
+#connection-dropped-dialog .restart-timer {
+  color: rgb(0, 0, 0);
+  font-weight: bold;
 }

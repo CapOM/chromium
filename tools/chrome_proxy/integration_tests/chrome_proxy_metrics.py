@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import logging
+import os
 import time
 
 from common import chrome_proxy_metrics
@@ -261,6 +262,52 @@ class ChromeProxyMetric(network_metrics.NetworkMetric):
         results.current_page, 'lo_fi_response', 'count', lo_fi_response_count))
     super(ChromeProxyMetric, self).AddResults(tab, results)
 
+  def AddResultsForPassThrough(self, tab, results):
+    compressed_count = 0
+    compressed_size = 0
+    pass_through_count = 0
+    pass_through_size = 0
+
+    for resp in self.IterResponses(tab):
+      if 'favicon.ico' in resp.response.url:
+        continue
+      if not resp.HasChromeProxyViaHeader():
+        r = resp.response
+        raise ChromeProxyMetricException, (
+            '%s: Should have Via header (%s) (refer=%s, status=%d)' % (
+                r.url, r.GetHeader('Via'), r.GetHeader('Referer'), r.status))
+      if resp.HasChromeProxyPassThroughRequest():
+        pass_through_count += 1
+        pass_through_size = resp.content_length
+      else:
+        compressed_count += 1
+        compressed_size = resp.content_length
+
+    if pass_through_count != 1:
+      raise ChromeProxyMetricException, (
+          'Expected exactly one Chrome-Proxy pass-through request, but %d '
+          'such requests were sent.' % (pass_through_count))
+
+    if compressed_count != 1:
+      raise ChromeProxyMetricException, (
+          'Expected exactly one compressed request, but %d such requests were '
+          'received.' % (compressed_count))
+
+    if compressed_size >= pass_through_size:
+        raise ChromeProxyMetricException, (
+            'Compressed image is %d bytes and pass-through image is %d. '
+            'Expecting compressed image size to be less than pass-through '
+            'image.' % (compressed_size, pass_through_size))
+
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'compressed', 'count', compressed_count))
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'compressed_size', 'bytes', compressed_size))
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'pass_through', 'count', pass_through_count))
+    results.AddValue(scalar.ScalarValue(
+        results.current_page, 'pass_through_size', 'bytes', pass_through_size))
+
   def AddResultsForBypass(self, tab, results, url_pattern=""):
     bypass_count = 0
     skipped_count = 0
@@ -328,30 +375,37 @@ class ChromeProxyMetric(network_metrics.NetworkMetric):
 
   def AddResultsForBlockOnce(self, tab, results):
     eligible_response_count = 0
-    bypass_count = 0
+    via_proxy = 0
 
     for resp in self.IterResponses(tab):
-      if resp.ShouldHaveChromeProxyViaHeader():
+      # Block-once test URLs (Data Reduction Proxy always returns
+      # block-once) should not have the Chrome-Compression-Proxy Via header.
+      if (IsTestUrlForBlockOnce(resp.response.url)):
         eligible_response_count += 1
+        if resp.HasChromeProxyViaHeader():
+          raise ChromeProxyMetricException, (
+              'Response has a Chrome-Compression-Proxy Via header: ' +
+              resp.response.url)
+      elif resp.ShouldHaveChromeProxyViaHeader():
+        via_proxy += 1
         if not resp.HasChromeProxyViaHeader():
-          bypass_count += 1
+          # For all other URLs, confirm that via header is present if expected.
+          raise ChromeProxyMetricException, (
+              'Missing Chrome-Compression-Proxy Via header.' +
+              resp.response.url)
 
-    if eligible_response_count <= 1:
+    if via_proxy == 0:
       raise ChromeProxyMetricException, (
-          'There should be more than one DRP eligible response '
-          '(eligible_response_count=%d, bypass_count=%d)\n' % (
-              eligible_response_count, bypass_count))
-    elif bypass_count != 1:
+          'None of the requests went via data reduction proxy')
+
+    if (eligible_response_count != 2):
       raise ChromeProxyMetricException, (
-          'Exactly one response should be bypassed. '
-          '(eligible_response_count=%d, bypass_count=%d)\n' % (
-              eligible_response_count, bypass_count))
-    else:
-      results.AddValue(scalar.ScalarValue(
-          results.current_page, 'eligible_responses', 'count',
-          eligible_response_count))
-      results.AddValue(scalar.ScalarValue(
-          results.current_page, 'bypass', 'count', bypass_count))
+          'Did not make expected number of requests to whitelisted block-once'
+          ' test URLs. Expected: 2, Actual: ' + str(eligible_response_count))
+
+    results.AddValue(scalar.ScalarValue(results.current_page,
+        'BlockOnce_success', 'num_eligible_response', 2))
+
 
   def AddResultsForSafebrowsingOn(self, tab, results):
     results.AddValue(scalar.ScalarValue(
@@ -526,3 +580,109 @@ class ChromeProxyMetric(network_metrics.NetworkMetric):
         results.current_page, 'bypass', 'count', bypass_count))
     results.AddValue(scalar.ScalarValue(
         results.current_page, 'via', 'count', via_count))
+
+
+PROXIED = 'proxied'
+DIRECT = 'direct'
+
+class ChromeProxyVideoMetric(network_metrics.NetworkMetric):
+  """Metrics for video pages.
+
+  Wraps the video metrics produced by videowrapper.js, such as the video
+  duration and size in pixels. Also checks a few basic HTTP response headers
+  such as Content-Type and Content-Length in the video responses.
+  """
+
+  def __init__(self, tab):
+    super(ChromeProxyVideoMetric, self).__init__()
+    with open(os.path.join(os.path.dirname(__file__), 'videowrapper.js')) as f:
+      js = f.read()
+      tab.ExecuteJavaScript(js)
+
+  def Start(self, page, tab):
+    tab.ExecuteJavaScript('window.__chromeProxyCreateVideoWrappers()')
+    self.videoMetrics = None
+    super(ChromeProxyVideoMetric, self).Start(page, tab)
+
+  def Stop(self, page, tab):
+    tab.WaitForJavaScriptExpression('window.__chromeProxyVideoLoaded', 30)
+    m = tab.EvaluateJavaScript('window.__chromeProxyVideoMetrics')
+
+    # Now wait for the video to stop playing.
+    # Give it 2x the total duration to account for buffering.
+    waitTime = 2 * m['video_duration']
+    tab.WaitForJavaScriptExpression('window.__chromeProxyVideoEnded', waitTime)
+
+    # Load the final metrics.
+    m = tab.EvaluateJavaScript('window.__chromeProxyVideoMetrics')
+    self.videoMetrics = m
+    # Cast this to an integer as it is often approximate (for an unknown reason)
+    m['video_duration'] = int(m['video_duration'])
+    super(ChromeProxyVideoMetric, self).Stop(page, tab)
+
+  def ResponseFromEvent(self, event):
+    return chrome_proxy_metrics.ChromeProxyResponse(event)
+
+  def AddResults(self, tab, results):
+    raise NotImplementedError
+
+  def AddResultsForProxied(self, tab, results):
+    return self._AddResultsShared(PROXIED, tab, results)
+
+  def AddResultsForDirect(self, tab, results):
+    return self._AddResultsShared(DIRECT, tab, results)
+
+  def _AddResultsShared(self, kind, tab, results):
+    def err(s):
+      raise ChromeProxyMetricException, s
+
+    # Should have played the video.
+    if not self.videoMetrics['ready']:
+      err('%s: video not played' % kind)
+
+    # Should have an HTTP response for the video.
+    wantContentType = 'video/webm' if kind == PROXIED else 'video/mp4'
+    found = False
+    for r in self.IterResponses(tab):
+      resp = r.response
+      if kind == DIRECT and r.HasChromeProxyViaHeader():
+        err('%s: page has proxied Via header' % kind)
+      if resp.GetHeader('Content-Type') != wantContentType:
+        continue
+      if found:
+        err('%s: multiple video responses' % kind)
+      found = True
+
+      cl = resp.GetHeader('Content-Length')
+      xocl = resp.GetHeader('X-Original-Content-Length')
+      if cl != None:
+        self.videoMetrics['content_length_header'] = int(cl)
+      if xocl != None:
+        self.videoMetrics['x_original_content_length_header'] = int(xocl)
+
+      # Should have CL always.
+      if cl == None:
+        err('%s: missing ContentLength' % kind)
+      # Proxied: should have CL < XOCL
+      # Direct: should not have XOCL
+      if kind == PROXIED:
+        if xocl == None or int(cl) >= int(xocl):
+          err('%s: bigger response (%s > %s)' % (kind, str(cl), str(xocl)))
+      else:
+        if xocl != None:
+          err('%s: has XOriginalContentLength' % kind)
+
+    if not found:
+      err('%s: missing video response' % kind)
+
+    # Finally, add all the metrics to the results.
+    for (k,v) in self.videoMetrics.iteritems():
+      k = "%s_%s" % (k, kind)
+      results.AddValue(scalar.ScalarValue(results.current_page, k, "", v))
+
+# Returns whether |url| is a block-once test URL. Data Reduction Proxy has been
+# configured to always return block-once for these URLs.
+def IsTestUrlForBlockOnce(url):
+  return (url == 'http://check.googlezip.net/blocksingle/' or
+      url == 'http://chromeproxy-test.appspot.com/default?respBody=T0s=&respStatus=200&flywheelAction=block-once')
+

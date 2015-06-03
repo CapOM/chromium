@@ -16,7 +16,6 @@
 #include "cc/animation/scrollbar_animation_controller_thinning.h"
 #include "cc/base/math_util.h"
 #include "cc/base/synced_property.h"
-#include "cc/base/util.h"
 #include "cc/debug/devtools_instrumentation.h"
 #include "cc/debug/traced_value.h"
 #include "cc/input/layer_scroll_offset_delegate.h"
@@ -30,6 +29,7 @@
 #include "cc/trees/layer_tree_host_common.h"
 #include "cc/trees/layer_tree_host_impl.h"
 #include "cc/trees/occlusion_tracker.h"
+#include "cc/trees/property_tree_builder.h"
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/size_conversions.h"
 #include "ui/gfx/geometry/vector2d_conversions.h"
@@ -414,6 +414,21 @@ void LayerTreeImpl::DidUpdatePageScale() {
         max_page_scale_factor_);
   }
 
+  if (page_scale_layer() && page_scale_layer()->transform_tree_index() != -1) {
+    TransformNode* node = property_trees_.transform_tree.Node(
+        page_scale_layer()->transform_tree_index());
+    node->data.post_local_scale_factor = current_page_scale_factor();
+    node->data.needs_local_transform_update = true;
+    // TODO(enne): property trees can't ask the layer these things, but
+    // the page scale layer should *just* be the page scale.
+    DCHECK_EQ(page_scale_layer()->position().ToString(),
+              gfx::PointF().ToString());
+    DCHECK_EQ(page_scale_layer()->transform_origin().ToString(),
+              gfx::Point3F().ToString());
+    node->data.update_post_local_transform(gfx::PointF(), gfx::Point3F());
+    property_trees_.transform_tree.set_needs_update(true);
+  }
+
   ForceScrollbarParameterUpdateAfterScaleChange(page_scale_layer());
 
   HideInnerViewportScrollbarsIfNearMinimumScale();
@@ -678,6 +693,13 @@ bool LayerTreeImpl::UpdateDrawProperties(bool update_lcd_text) {
   return true;
 }
 
+void LayerTreeImpl::BuildPropertyTreesForTesting() {
+  PropertyTreeBuilder::BuildPropertyTrees(
+      root_layer_.get(), page_scale_layer_, current_page_scale_factor(),
+      device_scale_factor(), gfx::Rect(DrawViewportSize()),
+      layer_tree_host_impl_->DrawTransform(), &property_trees_);
+}
+
 const LayerImplList& LayerTreeImpl::RenderSurfaceLayerList() const {
   // If this assert triggers, then the list is dirty.
   DCHECK(!needs_update_draw_properties_);
@@ -881,8 +903,8 @@ BeginFrameArgs LayerTreeImpl::CurrentBeginFrameArgs() const {
   return layer_tree_host_impl_->CurrentBeginFrameArgs();
 }
 
-base::TimeDelta LayerTreeImpl::begin_impl_frame_interval() const {
-  return layer_tree_host_impl_->begin_impl_frame_interval();
+base::TimeDelta LayerTreeImpl::CurrentBeginFrameInterval() const {
+  return layer_tree_host_impl_->CurrentBeginFrameInterval();
 }
 
 void LayerTreeImpl::SetNeedsCommit() {
@@ -1075,9 +1097,9 @@ void LayerTreeImpl::QueueSwapPromise(scoped_ptr<SwapPromise> swap_promise) {
 
 void LayerTreeImpl::PassSwapPromises(
     ScopedPtrVector<SwapPromise>* new_swap_promise) {
-  // Any left over promises have failed to swap before the next frame.
-  BreakSwapPromises(SwapPromise::SWAP_FAILS);
-  swap_promise_list_.swap(*new_swap_promise);
+  swap_promise_list_.insert_and_take(swap_promise_list_.end(),
+                                     new_swap_promise);
+  new_swap_promise->clear();
 }
 
 void LayerTreeImpl::FinishSwapPromises(CompositorFrameMetadata* metadata) {
@@ -1357,7 +1379,7 @@ static void FindClosestMatchingLayer(
 static bool ScrollsAnyDrawnRenderSurfaceLayerListMember(LayerImpl* layer) {
   if (!layer->scrollable())
     return false;
-  if (layer->draw_properties().layer_or_descendant_is_drawn)
+  if (layer->layer_or_descendant_is_drawn())
     return true;
 
   if (!layer->scroll_children())
@@ -1366,7 +1388,7 @@ static bool ScrollsAnyDrawnRenderSurfaceLayerListMember(LayerImpl* layer) {
            layer->scroll_children()->begin();
        it != layer->scroll_children()->end();
        ++it) {
-    if ((*it)->draw_properties().layer_or_descendant_is_drawn)
+    if ((*it)->layer_or_descendant_is_drawn())
       return true;
   }
   return false;

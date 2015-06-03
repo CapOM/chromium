@@ -205,6 +205,8 @@ group("both_gn_and_gyp") {
       "//base/android/linker:chromium_android_linker",
       "//build/android/gyp/test:hello_world",
       "//build/android/rezip",
+      "//chrome/android:chrome_public_apk",
+      "//chrome/android:chrome_public_test_apk",
       "//chrome/android:chrome_shell_apk",
       "//chrome/test/chromedriver/test/webview_shell:chromedriver_webview_shell_apk",
       "//tools/imagediff($host_toolchain)",
@@ -752,7 +754,7 @@ if (!is_ios) {
     }
 
     if (!is_win && !is_android) {
-      deps += [ "//breakpad:minidump_stackwalk" ]
+      deps += [ "//breakpad:minidump_stackwalk($host_toolchain)" ]
     }
 
     if (is_mac) {
@@ -846,7 +848,6 @@ if (is_linux) {
       "//base:base_unittests",  # PASSES 4/20/2015
       "//cc:cc_unittests",  # PASSES 4/17/2015
       "//chrome_elf:chrome_elf_unittests",  # FAILS 4/20/2015
-      "//chrome/app_installer:app_installer_unittests",  # PASSES 4/24/2015
       "//chrome/installer/util:installer_util_unittests",
       "//chrome/test:browser_tests",
       "//chrome/test:interactive_ui_tests",

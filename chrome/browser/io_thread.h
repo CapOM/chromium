@@ -56,6 +56,7 @@ class HttpServerProperties;
 class HttpTransactionFactory;
 class HttpUserAgentSettings;
 class NetworkDelegate;
+class NetworkQualityEstimator;
 class ProxyConfigService;
 class ProxyService;
 class SSLConfigService;
@@ -161,6 +162,7 @@ class IOThread : public content::BrowserThreadDelegate {
 #endif
     scoped_ptr<net::HostMappingRules> host_mapping_rules;
     scoped_ptr<net::HttpUserAgentSettings> http_user_agent_settings;
+    scoped_ptr<net::NetworkQualityEstimator> network_quality_estimator;
     bool ignore_certificate_errors;
     bool use_stale_while_revalidate;
     uint16 testing_fixed_http_port;
@@ -255,7 +257,6 @@ class IOThread : public content::BrowserThreadDelegate {
   // This handles initialization and destruction of state that must
   // live on the IO thread.
   void Init() override;
-  void InitAsync() override;
   void CleanUp() override;
 
   // Initializes |params| based on the settings in |globals|.

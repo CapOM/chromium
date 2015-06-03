@@ -7,6 +7,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/histogram_tester.h"
 #include "base/time/time.h"
+#include "content/browser/compositor/test/no_transport_image_transport_factory.h"
 #include "content/browser/frame_host/cross_site_transferring_request.h"
 #include "content/browser/frame_host/navigation_controller_impl.h"
 #include "content/browser/frame_host/navigation_entry_impl.h"
@@ -41,6 +42,7 @@
 #include "content/test/test_web_contents.h"
 #include "net/base/load_flags.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/WebKit/public/web/WebSandboxFlags.h"
 #include "ui/base/page_transition_types.h"
 
 namespace content {
@@ -270,9 +272,16 @@ class RenderFrameHostManagerTest : public RenderViewHostImplTestHarness {
   void SetUp() override {
     RenderViewHostImplTestHarness::SetUp();
     WebUIControllerFactory::RegisterFactory(&factory_);
+#if !defined(OS_ANDROID)
+    ImageTransportFactory::InitializeForUnitTests(
+        make_scoped_ptr(new NoTransportImageTransportFactory));
+#endif
   }
 
   void TearDown() override {
+#if !defined(OS_ANDROID)
+    ImageTransportFactory::Terminate();
+#endif
     RenderViewHostImplTestHarness::TearDown();
     WebUIControllerFactory::UnregisterFactoryForTesting(&factory_);
   }
@@ -670,8 +679,9 @@ TEST_F(RenderFrameHostManagerTest, DropCreateChildFrameWhileSwappedOut) {
   {
     RenderFrameHostCreatedObserver observer(contents());
     initial_rfh->OnCreateChildFrame(
-        initial_rfh->GetProcess()->GetNextRoutingID(), std::string(),
-        SandboxFlags::NONE);
+        initial_rfh->GetProcess()->GetNextRoutingID(),
+        blink::WebTreeScopeType::Document, std::string(),
+        blink::WebSandboxFlags::None);
     EXPECT_TRUE(observer.created());
   }
 
@@ -693,8 +703,9 @@ TEST_F(RenderFrameHostManagerTest, DropCreateChildFrameWhileSwappedOut) {
     // to create child frames.
     RenderFrameHostCreatedObserver observer(contents());
     initial_rfh->OnCreateChildFrame(
-        initial_rfh->GetProcess()->GetNextRoutingID(), std::string(),
-        SandboxFlags::NONE);
+        initial_rfh->GetProcess()->GetNextRoutingID(),
+        blink::WebTreeScopeType::Document, std::string(),
+        blink::WebSandboxFlags::None);
     EXPECT_FALSE(observer.created());
   }
 }
@@ -1089,6 +1100,7 @@ TEST_F(RenderFrameHostManagerTest, WebUI) {
 TEST_F(RenderFrameHostManagerTest, WebUIInNewTab) {
   set_should_create_webui(true);
   SiteInstance* blank_instance = SiteInstance::Create(browser_context());
+  blank_instance->GetProcess()->Init();
 
   // Create a blank tab.
   scoped_ptr<TestWebContents> web_contents1(
@@ -1976,10 +1988,12 @@ TEST_F(RenderFrameHostManagerTest, DetachPendingChild) {
   contents()->NavigateAndCommit(kUrlA);
   contents()->GetMainFrame()->OnCreateChildFrame(
       contents()->GetMainFrame()->GetProcess()->GetNextRoutingID(),
-      std::string("frame_name"), SandboxFlags::NONE);
+      blink::WebTreeScopeType::Document, "frame_name",
+      blink::WebSandboxFlags::None);
   contents()->GetMainFrame()->OnCreateChildFrame(
       contents()->GetMainFrame()->GetProcess()->GetNextRoutingID(),
-      std::string("frame_name"), SandboxFlags::NONE);
+      blink::WebTreeScopeType::Document, "frame_name",
+      blink::WebSandboxFlags::None);
   RenderFrameHostManager* root_manager =
       contents()->GetFrameTree()->root()->render_manager();
   RenderFrameHostManager* iframe1 =
@@ -2117,7 +2131,8 @@ TEST_F(RenderFrameHostManagerTest, TwoTabsCrashOneReloadsOneLeaves) {
   // |contents1| creates an out of process iframe.
   contents1->GetMainFrame()->OnCreateChildFrame(
       contents1->GetMainFrame()->GetProcess()->GetNextRoutingID(),
-      std::string("frame_name"), SandboxFlags::NONE);
+      blink::WebTreeScopeType::Document, "frame_name",
+      blink::WebSandboxFlags::None);
   RenderFrameHostManager* iframe =
       contents()->GetFrameTree()->root()->child_at(0)->render_manager();
   NavigationEntryImpl entry(NULL /* instance */, -1 /* page_id */, kUrl2,

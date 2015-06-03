@@ -149,6 +149,7 @@ _ANDROID_NEGATIVE_FILTER['chrome_stable'] = (
         # The stable channel Chrome for Android does not yet support Synthetic
         # Gesture DevTools commands.
         # TODO(samuong): reenable when it does.
+        'ChromeDriverTest.testHasTouchScreen',
         'ChromeDriverTest.testTouchScrollElement',
         'ChromeDriverTest.testTouchDoubleTapElement',
         'ChromeDriverTest.testTouchLongPressElement',
@@ -159,6 +160,7 @@ _ANDROID_NEGATIVE_FILTER['chrome_beta'] = (
         # The beta channel Chrome for Android does not yet support Synthetic
         # Gesture DevTools commands.
         # TODO(samuong): reenable when it does.
+        'ChromeDriverTest.testHasTouchScreen',
         'ChromeDriverTest.testTouchScrollElement',
         'ChromeDriverTest.testTouchDoubleTapElement',
         'ChromeDriverTest.testTouchLongPressElement',
@@ -184,6 +186,14 @@ _ANDROID_NEGATIVE_FILTER['chromedriver_webview_shell'] = (
         'ChromeDriverTest.testEmulateNetworkConditionsOffline',
         'ChromeDriverTest.testEmulateNetworkConditionsSpeed',
         'ChromeDriverTest.testEmulateNetworkConditionsName',
+        # The WebView shell that we test against (on KitKat) does not yet
+        # support Synthetic Gesture DevTools commands.
+        # TODO(samuong): reenable when it does.
+        'ChromeDriverTest.testHasTouchScreen',
+        'ChromeDriverTest.testTouchScrollElement',
+        'ChromeDriverTest.testTouchDoubleTapElement',
+        'ChromeDriverTest.testTouchLongPressElement',
+        'ChromeDriverTest.testTouchPinch',
     ]
 )
 
@@ -1033,10 +1043,43 @@ class ChromeDriverTest(ChromeDriverBaseTest):
     # TODO(samuong): when this test starts failing, re-enable touch tests and
     # delete this test.
     if _ANDROID_PACKAGE_KEY:
-      if _ANDROID_PACKAGE_KEY in ['chrome_stable', 'chrome_beta']:
+      packages = ['chrome_stable', 'chrome_beta', 'chromedriver_webview_shell']
+      if _ANDROID_PACKAGE_KEY in packages:
         self.assertRaisesRegexp(RuntimeError,
                                 'Server returned error: Not Implemented',
                                 self._driver.TouchPinch, 1, 2, 3.0)
+
+  def testHasTouchScreen(self):
+    self.assertIn('hasTouchScreen', self._driver.capabilities)
+    if _ANDROID_PACKAGE_KEY:
+      self.assertTrue(self._driver.capabilities['hasTouchScreen'])
+    else:
+      self.assertFalse(self._driver.capabilities['hasTouchScreen'])
+
+  def testSwitchesToTopFrameAfterNavigation(self):
+    self._driver.Load(self.GetHttpUrlForFile('/chromedriver/outer.html'))
+    frame = self._driver.FindElement('tag name', 'iframe')
+    self._driver.SwitchToFrame(frame)
+    self._driver.Load(self.GetHttpUrlForFile('/chromedriver/outer.html'))
+    p = self._driver.FindElement('tag name', 'p')
+    self.assertEquals('Two', p.GetText())
+
+  def testSwitchesToTopFrameAfterRefresh(self):
+    self._driver.Load(self.GetHttpUrlForFile('/chromedriver/outer.html'))
+    frame = self._driver.FindElement('tag name', 'iframe')
+    self._driver.SwitchToFrame(frame)
+    self._driver.Refresh()
+    p = self._driver.FindElement('tag name', 'p')
+    self.assertEquals('Two', p.GetText())
+
+  def testSwitchesToTopFrameAfterGoingBack(self):
+    self._driver.Load(self.GetHttpUrlForFile('/chromedriver/outer.html'))
+    frame = self._driver.FindElement('tag name', 'iframe')
+    self._driver.SwitchToFrame(frame)
+    self._driver.Load(self.GetHttpUrlForFile('/chromedriver/inner.html'))
+    self._driver.GoBack()
+    p = self._driver.FindElement('tag name', 'p')
+    self.assertEquals('Two', p.GetText())
 
 
 class ChromeDriverAndroidTest(ChromeDriverBaseTest):
@@ -1302,20 +1345,6 @@ class MobileEmulationCapabilityTest(ChromeDriverBaseTest):
     value = driver.ExecuteScript('return arguments[0].value;', text)
     self.assertEquals('0123456789+-*/ Hi, there!', value)
 
-  def testHoverOverElement(self):
-    driver = self.CreateDriver(
-        mobile_emulation = {'deviceName': 'Google Nexus 5'})
-    driver.Load('about:blank')
-    div = driver.ExecuteScript(
-        'document.body.innerHTML = "<div>old</div>";'
-        'var div = document.getElementsByTagName("div")[0];'
-        'div.addEventListener("mouseover", function() {'
-        '  document.body.appendChild(document.createElement("br"));'
-        '});'
-        'return div;')
-    div.HoverOver()
-    self.assertEquals(1, len(driver.FindElements('tag name', 'br')))
-
   def testClickElement(self):
     driver = self.CreateDriver(
         mobile_emulation = {'deviceName': 'Google Nexus 5'})
@@ -1329,6 +1358,12 @@ class MobileEmulationCapabilityTest(ChromeDriverBaseTest):
         'return div;')
     div.Click()
     self.assertEquals(1, len(driver.FindElements('tag name', 'br')))
+
+  def testHasTouchScreen(self):
+    driver = self.CreateDriver(
+        mobile_emulation = {'deviceName': 'Google Nexus 5'})
+    self.assertIn('hasTouchScreen', driver.capabilities)
+    self.assertTrue(driver.capabilities['hasTouchScreen'])
 
 
 class ChromeDriverLogTest(unittest.TestCase):

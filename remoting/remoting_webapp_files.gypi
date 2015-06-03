@@ -20,7 +20,6 @@
     'remoting_webapp_js_proto_files': [
       'webapp/js_proto/chrome_proto.js',
       'webapp/js_proto/chrome_cast_proto.js',
-      'webapp/js_proto/chrome_event_proto.js',
       'webapp/js_proto/dom_proto.js',
       'webapp/js_proto/remoting_proto.js',
     ],
@@ -109,14 +108,11 @@
       'webapp/crd/js/mock_xhr_unittest.js',
     ],
     'remoting_webapp_unittests_js_mock_files': [
-      # Some proto files can be repurposed as simple mocks for the unittests.
-      # Note that some defs in chrome_proto are overwritten by chrome_mocks.
       'webapp/crd/js/mock_client_plugin.js',
       'webapp/crd/js/mock_host_daemon_facade.js',
       'webapp/crd/js/mock_host_list_api.js',
       'webapp/crd/js/mock_identity.js',
       'webapp/crd/js/mock_signal_strategy.js',
-      'webapp/js_proto/chrome_proto.js',
       'webapp/js_proto/chrome_mocks.js',
       'webapp/unittests/sinon_helpers.js',
       'webapp/crd/js/mock_xhr.js',
@@ -124,6 +120,7 @@
     # Prototypes for objects that are not mocked.
     'remoting_webapp_unittests_js_proto_files': [
       'webapp/js_proto/chrome_cast_proto.js',
+      'webapp/js_proto/chrome_proto.js',
       'webapp/js_proto/dom_proto.js',
       'webapp/js_proto/remoting_proto.js',
       'webapp/js_proto/qunit_proto.js',
@@ -132,6 +129,7 @@
     'remoting_webapp_unittests_all_js_files': [
       '<@(remoting_webapp_unittests_js_files)',
       '<@(remoting_webapp_unittests_js_mock_files)',
+      'webapp/unittests/qunit_callbacks.js',
     ],
     # All the files needed to run the unittests.
     'remoting_webapp_unittests_all_files': [
@@ -180,6 +178,7 @@
       'webapp/base/js/protocol_extension.js',
       'webapp/base/js/error.js',
       'webapp/base/js/plugin_settings.js',
+      'webapp/base/js/suspend_detector.js',
       'webapp/base/js/typecheck.js',
       'webapp/base/js/xhr.js',
     ],
@@ -209,6 +208,7 @@
     ],
     # Shared UI JavaScript files.
     'remoting_webapp_shared_js_ui_files': [
+      'webapp/base/js/connection_dropped_dialog.js',
       'webapp/base/js/connection_stats.js',
       'webapp/base/js/l10n.js',
       'webapp/base/js/ui_mode.js',
@@ -492,6 +492,7 @@
       'webapp/base/resources/open_sans.woff',
       'webapp/base/resources/spinner.gif',
       'webapp/crd/html/butter_bar.css',
+      'webapp/crd/html/crd_main.css',
       'webapp/crd/html/toolbar.css',
       'webapp/crd/html/menu_button.css',
       'webapp/crd/html/window_frame.css',

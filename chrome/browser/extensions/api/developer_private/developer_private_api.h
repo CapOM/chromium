@@ -10,6 +10,7 @@
 #include "base/files/file.h"
 #include "base/memory/weak_ptr.h"
 #include "base/scoped_observer.h"
+#include "chrome/browser/extensions/api/commands/command_service.h"
 #include "chrome/browser/extensions/api/developer_private/entry_picker.h"
 #include "chrome/browser/extensions/api/extension_action/extension_action_api.h"
 #include "chrome/browser/extensions/api/file_system/file_system_api.h"
@@ -55,6 +56,7 @@ class DeveloperPrivateEventRouter : public ExtensionRegistryObserver,
                                     public ErrorConsole::Observer,
                                     public ProcessManagerObserver,
                                     public AppWindowRegistry::Observer,
+                                    public CommandService::Observer,
                                     public ExtensionActionAPI::Observer,
                                     public ExtensionPrefsObserver,
                                     public ExtensionManagement::Observer,
@@ -97,6 +99,12 @@ class DeveloperPrivateEventRouter : public ExtensionRegistryObserver,
   void OnAppWindowAdded(AppWindow* window) override;
   void OnAppWindowRemoved(AppWindow* window) override;
 
+  // CommandService::Observer:
+  void OnExtensionCommandAdded(const std::string& extension_id,
+                               const Command& added_command) override;
+  void OnExtensionCommandRemoved(const std::string& extension_id,
+                                 const Command& removed_command) override;
+
   // ExtensionActionAPI::Observer:
   void OnExtensionActionVisibilityChanged(const std::string& extension_id,
                                           bool is_now_visible) override;
@@ -137,6 +145,8 @@ class DeveloperPrivateEventRouter : public ExtensionRegistryObserver,
       extension_prefs_observer_;
   ScopedObserver<ExtensionManagement, ExtensionManagement::Observer>
       extension_management_observer_;
+  ScopedObserver<CommandService, CommandService::Observer>
+      command_service_observer_;
 
   Profile* profile_;
 
@@ -180,6 +190,10 @@ class DeveloperPrivateAPI : public BrowserContextKeyedAPI,
   // EventRouter::Observer implementation.
   void OnListenerAdded(const EventListenerInfo& details) override;
   void OnListenerRemoved(const EventListenerInfo& details) override;
+
+  DeveloperPrivateEventRouter* developer_private_event_router() {
+    return developer_private_event_router_.get();
+  }
 
  private:
   friend class BrowserContextKeyedAPIFactory<DeveloperPrivateAPI>;
@@ -568,6 +582,28 @@ class DeveloperPrivateShowPathFunction : public DeveloperPrivateAPIFunction {
 
  protected:
   ~DeveloperPrivateShowPathFunction() override;
+  ResponseAction Run() override;
+};
+
+class DeveloperPrivateSetShortcutHandlingSuspendedFunction
+    : public DeveloperPrivateAPIFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("developerPrivate.setShortcutHandlingSuspended",
+                             DEVELOPERPRIVATE_SETSHORTCUTHANDLINGSUSPENDED);
+
+ protected:
+  ~DeveloperPrivateSetShortcutHandlingSuspendedFunction() override;
+  ResponseAction Run() override;
+};
+
+class DeveloperPrivateUpdateExtensionCommandFunction
+    : public DeveloperPrivateAPIFunction {
+ public:
+  DECLARE_EXTENSION_FUNCTION("developerPrivate.updateExtensionCommand",
+                             DEVELOPERPRIVATE_UPDATEEXTENSIONCOMMAND);
+
+ protected:
+  ~DeveloperPrivateUpdateExtensionCommandFunction() override;
   ResponseAction Run() override;
 };
 

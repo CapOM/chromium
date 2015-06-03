@@ -5,25 +5,27 @@
 #include "components/scheduler/renderer/renderer_scheduler_impl.h"
 
 #include "base/bind.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/trace_event_argument.h"
 #include "cc/output/begin_frame_args.h"
 #include "components/scheduler/child/nestable_single_thread_task_runner.h"
 #include "components/scheduler/child/prioritizing_task_queue_selector.h"
-#include "ui/gfx/frame_time.h"
 
 namespace scheduler {
 
 RendererSchedulerImpl::RendererSchedulerImpl(
     scoped_refptr<NestableSingleThreadTaskRunner> main_task_runner)
     : helper_(main_task_runner,
-              this,
               "renderer.scheduler",
               TRACE_DISABLED_BY_DEFAULT("renderer.scheduler"),
-              "RendererSchedulerIdlePeriod",
-              TASK_QUEUE_COUNT,
-              base::TimeDelta()),
+              TASK_QUEUE_COUNT),
+      idle_helper_(&helper_,
+                   this,
+                   IDLE_TASK_QUEUE,
+                   "renderer.scheduler",
+                   TRACE_DISABLED_BY_DEFAULT("renderer.scheduler"),
+                   "RendererSchedulerIdlePeriod",
+                   base::TimeDelta()),
       control_task_runner_(helper_.ControlTaskRunner()),
       compositor_task_runner_(
           helper_.TaskRunnerForQueue(COMPOSITOR_TASK_QUEUE)),
@@ -35,6 +37,7 @@ RendererSchedulerImpl::RendererSchedulerImpl(
           helper_.ControlTaskRunner()),
       current_policy_(Policy::NORMAL),
       renderer_hidden_(false),
+      was_shutdown_(false),
       last_input_type_(blink::WebInputEvent::Undefined),
       input_stream_state_(InputStreamState::INACTIVE),
       policy_may_need_update_(&incoming_signals_lock_),
@@ -58,10 +61,15 @@ RendererSchedulerImpl::~RendererSchedulerImpl() {
   TRACE_EVENT_OBJECT_DELETED_WITH_ID(
       TRACE_DISABLED_BY_DEFAULT("renderer.scheduler"), "RendererScheduler",
       this);
+  // Ensure the renderer scheduler was shut down explicitly, because otherwise
+  // we could end up having stale pointers to the Blink heap which has been
+  // terminated by this point.
+  DCHECK(was_shutdown_);
 }
 
 void RendererSchedulerImpl::Shutdown() {
   helper_.Shutdown();
+  was_shutdown_ = true;
 }
 
 scoped_refptr<base::SingleThreadTaskRunner>
@@ -77,7 +85,7 @@ RendererSchedulerImpl::CompositorTaskRunner() {
 
 scoped_refptr<SingleThreadIdleTaskRunner>
 RendererSchedulerImpl::IdleTaskRunner() {
-  return helper_.IdleTaskRunner();
+  return idle_helper_.IdleTaskRunner();
 }
 
 scoped_refptr<base::SingleThreadTaskRunner>
@@ -93,7 +101,7 @@ RendererSchedulerImpl::TimerTaskRunner() {
 }
 
 bool RendererSchedulerImpl::CanExceedIdleDeadlineIfRequired() const {
-  return helper_.CanExceedIdleDeadlineIfRequired();
+  return idle_helper_.CanExceedIdleDeadlineIfRequired();
 }
 
 void RendererSchedulerImpl::AddTaskObserver(
@@ -131,9 +139,9 @@ void RendererSchedulerImpl::DidCommitFrameToCompositor() {
   if (now < estimated_next_frame_begin_) {
     // TODO(rmcilroy): Consider reducing the idle period based on the runtime of
     // the next pending delayed tasks (as currently done in for long idle times)
-    helper_.StartIdlePeriod(
-        SchedulerHelper::IdlePeriodState::IN_SHORT_IDLE_PERIOD, now,
-        estimated_next_frame_begin_, true);
+    idle_helper_.StartIdlePeriod(
+        IdleHelper::IdlePeriodState::IN_SHORT_IDLE_PERIOD, now,
+        estimated_next_frame_begin_);
   }
 }
 
@@ -148,7 +156,7 @@ void RendererSchedulerImpl::BeginFrameNotExpectedSoon() {
   // instead of this approximation.
   DidProcessInputEvent(base::TimeTicks());
 
-  helper_.EnableLongIdlePeriod();
+  idle_helper_.EnableLongIdlePeriod();
 }
 
 void RendererSchedulerImpl::OnRendererHidden() {
@@ -158,7 +166,7 @@ void RendererSchedulerImpl::OnRendererHidden() {
   if (helper_.IsShutdown() || renderer_hidden_)
     return;
 
-  helper_.EnableLongIdlePeriod();
+  idle_helper_.EnableLongIdlePeriod();
 
   // Ensure that we stop running idle tasks after a few seconds of being hidden.
   end_renderer_hidden_idle_period_closure_.Cancel();
@@ -171,7 +179,7 @@ void RendererSchedulerImpl::OnRendererHidden() {
 
   TRACE_EVENT_OBJECT_SNAPSHOT_WITH_ID(
       TRACE_DISABLED_BY_DEFAULT("renderer.scheduler"), "RendererScheduler",
-      this, AsValueLocked(helper_.Now()));
+      this, AsValue(helper_.Now()));
 }
 
 void RendererSchedulerImpl::OnRendererVisible() {
@@ -187,14 +195,14 @@ void RendererSchedulerImpl::OnRendererVisible() {
 
   TRACE_EVENT_OBJECT_SNAPSHOT_WITH_ID(
       TRACE_DISABLED_BY_DEFAULT("renderer.scheduler"), "RendererScheduler",
-      this, AsValueLocked(helper_.Now()));
+      this, AsValue(helper_.Now()));
 }
 
 void RendererSchedulerImpl::EndIdlePeriod() {
   TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("renderer.scheduler"),
                "RendererSchedulerImpl::EndIdlePeriod");
   helper_.CheckOnValidThread();
-  helper_.EndIdlePeriod();
+  idle_helper_.EndIdlePeriod();
 }
 
 void RendererSchedulerImpl::DidReceiveInputEventOnCompositorThread(
@@ -301,9 +309,7 @@ bool RendererSchedulerImpl::ShouldYieldForHighPriorityWork() {
 
 base::TimeTicks RendererSchedulerImpl::CurrentIdleTaskDeadlineForTesting()
     const {
-  base::TimeTicks deadline;
-  helper_.CurrentIdleTaskDeadlineCallback(&deadline);
-  return deadline;
+  return idle_helper_.CurrentIdleTaskDeadline();
 }
 
 RendererSchedulerImpl::Policy RendererSchedulerImpl::SchedulerPolicy() const {
@@ -387,6 +393,8 @@ void RendererSchedulerImpl::UpdatePolicyLocked(UpdateType update_type) {
       helper_.SetQueuePriority(LOADING_TASK_QUEUE,
                                PrioritizingTaskQueueSelector::NORMAL_PRIORITY);
       break;
+    default:
+      NOTREACHED();
   }
   if (timer_queue_suspend_count_ != 0 || policy_disables_timers) {
     helper_.DisableQueue(TIMER_TASK_QUEUE);
@@ -482,24 +490,6 @@ SchedulerHelper* RendererSchedulerImpl::GetSchedulerHelperForTesting() {
   return &helper_;
 }
 
-RendererSchedulerImpl::PollableNeedsUpdateFlag::PollableNeedsUpdateFlag(
-    base::Lock* write_lock_)
-    : flag_(false), write_lock_(write_lock_) {
-}
-
-RendererSchedulerImpl::PollableNeedsUpdateFlag::~PollableNeedsUpdateFlag() {
-}
-
-void RendererSchedulerImpl::PollableNeedsUpdateFlag::SetWhileLocked(
-    bool value) {
-  write_lock_->AssertAcquired();
-  base::subtle::Release_Store(&flag_, value);
-}
-
-bool RendererSchedulerImpl::PollableNeedsUpdateFlag::IsSet() const {
-  return base::subtle::Acquire_Load(&flag_) != 0;
-}
-
 void RendererSchedulerImpl::SuspendTimerQueue() {
   helper_.CheckOnValidThread();
   timer_queue_suspend_count_++;
@@ -517,6 +507,8 @@ void RendererSchedulerImpl::ResumeTimerQueue() {
 // static
 const char* RendererSchedulerImpl::TaskQueueIdToString(QueueId queue_id) {
   switch (queue_id) {
+    case IDLE_TASK_QUEUE:
+      return "idle_tq";
     case COMPOSITOR_TASK_QUEUE:
       return "compositor_tq";
     case LOADING_TASK_QUEUE:
@@ -560,6 +552,12 @@ const char* RendererSchedulerImpl::InputStreamStateToString(
 }
 
 scoped_refptr<base::trace_event::ConvertableToTraceFormat>
+RendererSchedulerImpl::AsValue(base::TimeTicks optional_now) const {
+  base::AutoLock lock(incoming_signals_lock_);
+  return AsValueLocked(optional_now);
+}
+
+scoped_refptr<base::trace_event::ConvertableToTraceFormat>
 RendererSchedulerImpl::AsValueLocked(base::TimeTicks optional_now) const {
   helper_.CheckOnValidThread();
   incoming_signals_lock_.AssertAcquired();
@@ -571,8 +569,8 @@ RendererSchedulerImpl::AsValueLocked(base::TimeTicks optional_now) const {
 
   state->SetString("current_policy", PolicyToString(current_policy_));
   state->SetString("idle_period_state",
-                   SchedulerHelper::IdlePeriodStateToString(
-                       helper_.SchedulerIdlePeriodState()));
+                   IdleHelper::IdlePeriodStateToString(
+                       idle_helper_.SchedulerIdlePeriodState()));
   state->SetBoolean("renderer_hidden_", renderer_hidden_);
   state->SetString("input_stream_state",
                    InputStreamStateToString(input_stream_state_));

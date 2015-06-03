@@ -12,6 +12,7 @@
 #include "base/macros.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/values.h"
+#import "ios/net/http_response_headers_util.h"
 #import "ios/web/crw_network_activity_indicator_manager.h"
 #import "ios/web/navigation/crw_session_controller.h"
 #include "ios/web/navigation/web_load_params.h"
@@ -20,6 +21,7 @@
 #import "ios/web/public/web_state/js/crw_js_injection_manager.h"
 #import "ios/web/ui_web_view_util.h"
 #include "ios/web/web_state/blocked_popup_info.h"
+#include "ios/web/web_state/frame_info.h"
 #import "ios/web/web_state/js/crw_js_window_id_manager.h"
 #import "ios/web/web_state/js/page_script_util.h"
 #import "ios/web/web_state/ui/crw_web_controller+protected.h"
@@ -480,6 +482,7 @@ NSString* const kScriptImmediateName = @"crwebinvokeimmediate";
   return [web::CreateWKWebView(
               CGRectZero,
               config,
+              self.webStateImpl->GetBrowserState(),
               self.webStateImpl->GetRequestGroupID(),
               [self useDesktopUserAgent]) autorelease];
 }
@@ -933,18 +936,33 @@ NSString* const kScriptImmediateName = @"crwebinvokeimmediate";
 
   if (navigationAction.sourceFrame.isMainFrame)
     self.documentMIMEType = nil;
+
+  web::FrameInfo targetFrame(navigationAction.targetFrame.isMainFrame);
   BOOL isLinkClick = [self isLinkNavigation:navigationAction.navigationType];
-  WKNavigationActionPolicy policy =
-      [self shouldAllowLoadWithRequest:request
-                           isLinkClick:isLinkClick] ?
-      WKNavigationActionPolicyAllow : WKNavigationActionPolicyCancel;
-  decisionHandler(policy);
+  BOOL allowLoad = [self shouldAllowLoadWithRequest:request
+                                        targetFrame:&targetFrame
+                                        isLinkClick:isLinkClick];
+  decisionHandler(allowLoad ? WKNavigationActionPolicyAllow
+                            : WKNavigationActionPolicyCancel);
 }
 
 - (void)webView:(WKWebView *)webView
     decidePolicyForNavigationResponse:(WKNavigationResponse *)navigationResponse
                       decisionHandler:
                           (void (^)(WKNavigationResponsePolicy))handler {
+  if ([navigationResponse.response isKindOfClass:[NSHTTPURLResponse class]]) {
+    // Create HTTP headers from the response.
+    // TODO(kkhorimoto): Due to the limited interface of NSHTTPURLResponse, some
+    // data in the HttpResponseHeaders generated here is inexact.  Once
+    // UIWebView is no longer supported, update WebState's implementation so
+    // that the Content-Language and the MIME type can be set without using this
+    // imperfect conversion.
+    scoped_refptr<net::HttpResponseHeaders> HTTPHeaders =
+        net::CreateHeadersFromNSHTTPURLResponse(
+            static_cast<NSHTTPURLResponse*>(navigationResponse.response));
+    self.webStateImpl->OnHttpResponseHeadersReceived(
+        HTTPHeaders.get(), net::GURLWithNSURL(navigationResponse.response.URL));
+  }
   if (navigationResponse.isForMainFrame)
     self.documentMIMEType = navigationResponse.response.MIMEType;
   handler(navigationResponse.canShowMIMEType ? WKNavigationResponsePolicyAllow :

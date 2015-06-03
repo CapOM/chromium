@@ -13,14 +13,13 @@
 #include "base/lazy_instance.h"
 #include "content/browser/devtools/devtools_manager.h"
 #include "content/browser/devtools/forwarding_agent_host.h"
-#include "content/browser/devtools/protocol/devtools_protocol_handler.h"
+#include "content/browser/devtools/protocol/devtools_protocol_dispatcher.h"
 #include "content/browser/devtools/render_frame_devtools_agent_host.h"
 #include "content/browser/devtools/service_worker_devtools_agent_host.h"
 #include "content/browser/devtools/service_worker_devtools_manager.h"
 #include "content/browser/devtools/shared_worker_devtools_agent_host.h"
 #include "content/browser/devtools/shared_worker_devtools_manager.h"
 #include "content/public/browser/browser_thread.h"
-#include "content/public/browser/devtools_manager_delegate.h"
 
 namespace content {
 
@@ -77,12 +76,9 @@ scoped_refptr<DevToolsAgentHost> DevToolsAgentHost::GetForWorker(
 }
 
 DevToolsAgentHostImpl::DevToolsAgentHostImpl()
-    : protocol_handler_(new DevToolsProtocolHandler(
-          base::Bind(&DevToolsAgentHostImpl::SendMessageToClient,
-                     base::Unretained(this)))),
-      id_(base::GenerateGUID()),
+    : id_(base::GenerateGUID()),
       client_(NULL),
-      handle_all_commands_(false) {
+      message_buffer_size_(0) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   g_instances.Get()[id_] = this;
 }
@@ -170,6 +166,35 @@ void DevToolsAgentHostImpl::SendMessageToClient(const std::string& message) {
   client_->DispatchProtocolMessage(this, message);
 }
 
+void DevToolsAgentHostImpl::ProcessChunkedMessageFromAgent(
+    const DevToolsMessageChunk& chunk) {
+  if (chunk.is_last && !chunk.post_state.empty())
+    state_cookie_ = chunk.post_state;
+
+  if (chunk.is_first && chunk.is_last) {
+    CHECK(message_buffer_size_ == 0);
+    SendMessageToClient(chunk.data);
+    return;
+  }
+
+  if (chunk.is_first) {
+    message_buffer_ = std::string();
+    message_buffer_.reserve(chunk.message_size);
+    message_buffer_size_ = chunk.message_size;
+  }
+
+  CHECK(message_buffer_.size() + chunk.data.size() <=
+      message_buffer_size_);
+  message_buffer_.append(chunk.data);
+
+  if (chunk.is_last) {
+    CHECK(message_buffer_.size() == message_buffer_size_);
+    SendMessageToClient(message_buffer_);
+    message_buffer_ = std::string();
+    message_buffer_size_ = 0;
+  }
+}
+
 // static
 void DevToolsAgentHost::DetachAllClients() {
   if (g_instances == NULL)
@@ -226,32 +251,6 @@ void DevToolsAgentHostImpl::Inspect(BrowserContext* browser_context) {
   DevToolsManager* manager = DevToolsManager::GetInstance();
   if (manager->delegate())
     manager->delegate()->Inspect(browser_context, this);
-}
-
-bool DevToolsAgentHostImpl::DispatchProtocolMessage(
-    const std::string& message) {
-  scoped_ptr<base::DictionaryValue> command =
-      protocol_handler_->ParseCommand(message);
-  if (!command)
-    return true;
-
-  DevToolsManagerDelegate* delegate =
-      DevToolsManager::GetInstance()->delegate();
-  if (delegate) {
-    scoped_ptr<base::DictionaryValue> response(
-        delegate->HandleCommand(this, command.get()));
-    if (response) {
-      std::string json_response;
-      base::JSONWriter::Write(*response, &json_response);
-      SendMessageToClient(json_response);
-      return true;
-    }
-  }
-
-  if (!handle_all_commands_)
-    return protocol_handler_->HandleOptionalCommand(command.Pass());
-  protocol_handler_->HandleCommand(command.Pass());
-  return true;
 }
 
 }  // namespace content

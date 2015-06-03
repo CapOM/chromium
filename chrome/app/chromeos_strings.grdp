@@ -2091,12 +2091,6 @@ Press any key to continue exploring.
   <message name="IDS_OPTIONS_BATTERY_STATUS_LABEL" desc="The label for the battery information in the 'Power' overlay.">
     Battery:
   </message>
-  <message name="IDS_OPTIONS_SETTINGS_BATTERY_DESCRIPTION" desc="The 'Battery' button on the chrome://settings page.">
-    Battery...
-  </message>
-  <message name="IDS_OPTIONS_SETTINGS_STORAGE_DESCRIPTION" desc="The 'Storage' button on the chrome://settings page.">
-    Stored data...
-  </message>
   <message name="IDS_OPTIONS_SETTINGS_SET_TIME_BUTTON" desc="In the settings tab, the prompt on the button to open a dialog to set date and time.">
     Set date and time
   </message>
@@ -2268,9 +2262,12 @@ Press any key to continue exploring.
   <message name="IDS_OPTIONS_SETTINGS_ACCESSIBILITY_HIGH_CONTRAST_DESCRIPTION" desc="In the settings tab, the text next to the checkbox for high contrast mode.">
     Use high contrast mode
   </message>
-  <message name="IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_DESCRIPTION" desc="In the settings tab, the text next to the dropdown for screen magnifier.">
+  <message name="IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_DESCRIPTION" desc="In the settings tab, the text next to the checkbox for screen magnifier.">
     Enable screen magnifier
   </message>
+  <message name="IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_CENTER_FOCUS" desc="In the settings tab, the text next to the checkbox for centering focus for screen magnifier.">
+    Keep magnifier focus centered on screen
+  </message>  
   <message name="IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_OFF" desc="In the settings tab, the option indication the screen magnifier is off.">
     Off
   </message>
@@ -2955,7 +2952,7 @@ Press any key to continue exploring.
     System installation settings
   </message>
   <message name="IDS_EULA_TPM_DESCRIPTION" desc="Dialog box text">
-    Your computer contains a Trusted Platform Module (TPM) security device, which is used to implement many critical security features in Chrome OS. Visit the Chromebook Help Center to learn more: http://support.google.com/chromebook/?p=tpm
+    Your computer contains a Trusted Platform Module (TPM) security device, which is used to implement many critical security features in Chrome OS. Visit the Chromebook Help Center to learn more: https://support.google.com/chromebook/?p=tpm
   </message>
   <message name="IDS_EULA_TPM_KEY_DESCRIPTION" desc="Dialog box text">
     Below is the randomly generated TPM password that has been assigned to your computer:
@@ -5474,7 +5471,7 @@ Battery full
     <ph name="USER_NAME">$1<ex>Ivan Arbuzov</ex></ph> (owner)
   </message>
   <message name="IDS_LOGIN_POD_REMOVE_USER" desc="Login screen user pod menu item text.">
-    Remove this user
+    Remove this person
   </message>
   <message name="IDS_LOGIN_VERSION_LABEL_FORMAT" desc="Login screen version text format.">
     <ph name="PRODUCT_NAME">$1<ex>Google Chrome</ex></ph> <ph name="PRODUCT_VERSION">$2<ex>15.0.0.0</ex></ph> (Platform <ph name="PLATFORM_VERSION">$3<ex>900.0-11.09.01</ex></ph>) <ph name="DEVICE_SERIAL_NUMBER">$4<ex>SN:123456789ABC</ex></ph>

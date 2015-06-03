@@ -58,9 +58,11 @@ class CopyOutputRequest;
 class LayerAnimationEventObserver;
 class LayerClient;
 class LayerImpl;
+class LayerSettings;
 class LayerTreeHost;
 class LayerTreeHostCommon;
 class LayerTreeImpl;
+class LayerTreeSettings;
 class PriorityCalculator;
 class RenderingStatsInstrumentation;
 class ResourceUpdateQueue;
@@ -84,7 +86,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     INVALID_ID = -1,
   };
 
-  static scoped_refptr<Layer> Create();
+  static scoped_refptr<Layer> Create(const LayerSettings& settings);
 
   int id() const { return layer_id_; }
 
@@ -172,6 +174,8 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void SetPosition(const gfx::PointF& position);
   gfx::PointF position() const { return position_; }
 
+  // A layer that is a container for fixed position layers cannot be both
+  // scrollable and have a non-identity transform.
   void SetIsContainerForFixedPositionLayers(bool container);
   bool IsContainerForFixedPositionLayers() const;
 
@@ -424,10 +428,12 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
       scoped_refptr<LayerAnimationController> controller);
 
   void set_layer_animation_delegate(AnimationDelegate* delegate) {
+    DCHECK(layer_animation_controller_);
     layer_animation_controller_->set_layer_animation_delegate(delegate);
   }
 
   bool HasActiveAnimation() const;
+  void RegisterForAnimations(AnimationRegistrar* registrar);
 
   void AddLayerAnimationEventObserver(
       LayerAnimationEventObserver* animation_observer);
@@ -559,12 +565,28 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
     return num_layer_or_descendants_with_input_handler_;
   }
 
+  void set_num_children_with_scroll_parent(
+      int num_children_with_scroll_parent) {
+    num_children_with_scroll_parent_ = num_children_with_scroll_parent;
+  }
+
+  int num_children_with_scroll_parent() {
+    return num_children_with_scroll_parent_;
+  }
+
+  void set_visited(bool visited);
+  bool visited();
+  void set_layer_or_descendant_is_drawn(bool layer_or_descendant_is_drawn);
+  bool layer_or_descendant_is_drawn();
+  void set_sorted_for_recursion(bool sorted_for_recursion);
+  bool sorted_for_recursion();
+
  protected:
   friend class LayerImpl;
   friend class TreeSynchronizer;
   ~Layer() override;
 
-  Layer();
+  explicit Layer(const LayerSettings& settings);
 
   // These SetNeeds functions are in order of severity of update:
   //
@@ -703,6 +725,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   int property_tree_sequence_number_;
   int num_layer_or_descendants_with_copy_request_;
   int num_layer_or_descendants_with_input_handler_;
+  int num_children_with_scroll_parent_;
   gfx::Vector2dF offset_to_transform_parent_;
   bool should_flatten_transform_from_property_tree_ : 1;
   bool should_scroll_on_main_thread_ : 1;
@@ -736,6 +759,14 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   LayerPositionConstraint position_constraint_;
   Layer* scroll_parent_;
   scoped_ptr<std::set<Layer*>> scroll_children_;
+
+  // The following three variables are tracker variables. They are bools
+  // wrapped inside an integer variable. If true, their value equals the
+  // LayerTreeHost's meta_information_sequence_number. This wrapping of bools
+  // inside ints is done to avoid a layer tree treewalk to reset their values.
+  int layer_or_descendant_is_drawn_tracker_;
+  int sorted_for_recursion_tracker_;
+  int visited_tracker_;
 
   Layer* clip_parent_;
   scoped_ptr<std::set<Layer*>> clip_children_;

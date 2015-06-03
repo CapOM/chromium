@@ -409,7 +409,6 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
 
       if (this.isNewGaiaFlow) {
         $('inner-container').classList.add('new-gaia-flow');
-        $('progress-dots').hidden = true;
         params.chromeType = data.chromeType;
         params.isNewGaiaFlowChromeOS = true;
       }
@@ -796,6 +795,8 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
      * Reloads extension frame.
      */
     doReload: function() {
+      if (this.isLocal)
+        return;
       this.error_ = 0;
       this.gaiaAuthHost_.reload();
       this.loading = true;
@@ -878,10 +879,8 @@ login.createScreen('GaiaSigninScreen', 'gaia-signin', function() {
         return;
       }
 
-      $('pod-row').loadLastWallpaper();
-      Oobe.showScreen({id: SCREEN_ACCOUNT_PICKER});
       this.classList.remove('whitelist-error');
-      Oobe.resetSigninUI(true);
+      Oobe.showUserPods();
     },
 
     /**

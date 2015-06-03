@@ -11,6 +11,35 @@
 // (chromium/src/components/autofill/core/common/form_data.h) for further
 // processing.
 
+/** @typedef {HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement} */
+var FormControlElement;
+
+/**
+  * @typedef {{
+  *   name: string,
+  *   form_control_type: string,
+  *   autocomplete_attributes: string,
+  *   is_autofilled: boolean,
+  *   should_autocomplete: boolean,
+  *   max_length: number,
+  *   is_checkable: boolean,
+  *   value: string
+  * }}
+  */
+var AutofillFormFieldData;
+
+/**
+  * @typedef {{
+  *   name: string,
+  *   method: string,
+  *   origin: string,
+  *   action: string,
+  *   userSubmitted: boolean,
+  *   fields: Array<AutofillFormFieldData>
+  * }}
+  */
+var AutofillFormData;
+
 /**
  * Namespace for this file. It depends on |__gCrWeb| having already been
  * injected.
@@ -22,6 +51,8 @@ __gCrWeb['autofill'] = {};
  *
  * This variable is from
  * chromium/src/components/autofill/content/renderer/form_autofill_util.cc
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.MAX_DATA_LENGTH = 1024;
 
@@ -34,6 +65,8 @@ __gCrWeb.autofill.MAX_DATA_LENGTH = 1024;
  *
  * This variable is from
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.MAX_PARSEABLE_FIELDS = 100;
 
@@ -43,6 +76,8 @@ __gCrWeb.autofill.MAX_PARSEABLE_FIELDS = 100;
  *
  * This variable is from enum RequirementsMask in
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.REQUIREMENTS_MASK_NONE = 0;
 
@@ -52,6 +87,8 @@ __gCrWeb.autofill.REQUIREMENTS_MASK_NONE = 0;
  *
  * This variable is from enum RequirementsMask in
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.REQUIREMENTS_MASK_REQUIRE_AUTOCOMPLETE = 1;
 
@@ -61,6 +98,8 @@ __gCrWeb.autofill.REQUIREMENTS_MASK_REQUIRE_AUTOCOMPLETE = 1;
  *
  * This variable is from enum ExtractMask in
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.EXTRACT_MASK_NONE = 0;
 
@@ -70,6 +109,8 @@ __gCrWeb.autofill.EXTRACT_MASK_NONE = 0;
  *
  * This variable is from enum ExtractMask in
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.EXTRACT_MASK_VALUE = 1 << 0;
 
@@ -81,6 +122,8 @@ __gCrWeb.autofill.EXTRACT_MASK_VALUE = 1 << 0;
  *
  * This variable is from enum ExtractMask in
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.EXTRACT_MASK_OPTION_TEXT = 1 << 1;
 
@@ -90,26 +133,258 @@ __gCrWeb.autofill.EXTRACT_MASK_OPTION_TEXT = 1 << 1;
  *
  * This variable is from enum ExtractMask in
  * chromium/src/components/autofill/content/renderer/form_autofill_util.h
+ *
+ * @const {number}
  */
 __gCrWeb.autofill.EXTRACT_MASK_OPTIONS = 1 << 2;
 
 /**
  * The last element that was autofilled.
+ *
+ * @type {Element}
  */
 __gCrWeb.autofill.lastAutoFilledElement = null;
 
 /**
  * The last element that was active (used to restore focus if necessary).
+ *
+ * @type {Element}
  */
 __gCrWeb.autofill.lastActiveElement = null;
 
 /**
+ * Extracts fields from |controlElements| with |requirements| and |extractMask|
+ * to |formFields|. The extracted fields are also placed in |nameMap|.
+ *
+ * It is based on the logic in
+ *     bool ExtractFieldsFromControlElements(
+ *         const WebVector<WebFormControlElement>& control_elements,
+ *         RequirementsMask requirements,
+ *         ExtractMask extract_mask,
+ *         ScopedVector<FormFieldData>* form_fields,
+ *         std::vector<bool>* fields_extracted,
+ *         std::map<base::string16, FormFieldData*>* name_map)
+ * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc
+ *
+ * TODO(thestig): Get rid of |requirements| to match the C++ version.
+ *
+ * @param {Array<FormControlElement>} controlElements The control elements that
+ *     will be processed.
+ * @param {number} requirements The requirement on control element
+ *     autocompletion.
+ * @param {number} extractMask Mask controls what data is extracted from
+ *     controlElements.
+ * @param {Array<AutofillFormFieldData>} formFields The extracted form fields.
+ * @param {Array<boolean>} fieldsExtracted Indicates whether the fields were
+ *     extracted.
+ * @param {Object<AutofillFormFieldData>} nameMap Map of field names to
+ *     fields.
+ * @return {boolean} Whether there are fields and not too many fields in the
+ *     form.
+ */
+function extractFieldsFromControlElements_(controlElements, requirements,
+    extractMask, formFields, fieldsExtracted, nameMap) {
+  for (var i = 0; i < controlElements.length; ++i) {
+    fieldsExtracted[i] = false;
+
+    var controlElement = controlElements[i];
+    if (!__gCrWeb.autofill.isAutofillableElement(controlElement)) {
+      continue;
+    }
+
+    if ((requirements &
+            __gCrWeb.autofill.REQUIREMENTS_MASK_REQUIRE_AUTOCOMPLETE) &&
+        __gCrWeb.autofill.isAutofillableInputElement(controlElement) &&
+        !__gCrWeb.autofill.satisfiesRequireAutocomplete(
+            controlElement, false)) {
+      continue;
+    }
+
+    // Create a new AutofillFormFieldData, fill it out and map it to the
+    // field's name.
+    var formField = new __gCrWeb['common'].JSONSafeObject;
+    __gCrWeb.autofill.webFormControlElementToFormField(
+        controlElement, extractMask, formField);
+    formFields.push(formField);
+    nameMap[formField['name']] = formField;
+    fieldsExtracted[i] = true;
+
+    // To avoid overly expensive computation, we impose a maximum number of
+    // allowable fields.
+    if (formFields.length > __gCrWeb.autofill.MAX_PARSEABLE_FIELDS) {
+      return false;
+    }
+  }
+
+  return formFields.length > 0;
+}
+
+/**
+ * For each label element, get the corresponding form control element, use the
+ * form control element's name as a key into the |nameMap| to find the
+ * previously created AutofillFormFieldData and set the AutofillFormFieldData's
+ * label to the label.firstChild().nodeValue() of the label element.
+ *
+ * It is based on the logic in
+ *     void MatchLabelsAndFields(
+ *         const WebElementCollection& labels,
+ *         std::map<WebFormControlElement, FormFieldData*>* element_map);
+ * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc
+ *
+ * This differs in that it takes a formElement field, instead of calling
+ * field_element.isFormControlElement().
+ *
+ * @param {NodeList} labels The labels to match.
+ * @param {HTMLFormElement} formElement The form element being processed.
+ * @param {Object<AutofillFormFieldData>} nameMap Map of field names to
+ *     fields.
+ */
+function matchLabelsAndFields_(labels, formElement, nameMap) {
+  for (var index = 0; index < labels.length; ++index) {
+    var label = labels[index];
+    var fieldElement = label.control;
+    var elementName;
+    if (!fieldElement) {
+      // Sometimes site authors will incorrectly specify the corresponding
+      // field element's name rather than its id, so we compensate here.
+      elementName = label.htmlFor;
+    } else if (fieldElement.form != formElement ||
+                   fieldElement.type === 'hidden') {
+      continue;
+    } else {
+      elementName = __gCrWeb['common'].nameForAutofill(fieldElement);
+    }
+
+    if (!elementName)
+      continue;
+
+    var fieldElementData = nameMap[elementName];
+    if (!fieldElementData)
+      continue;
+
+    if (!('label' in fieldElementData)) {
+      fieldElementData['label'] = '';
+    }
+    var labelText = __gCrWeb.autofill.findChildText(label);
+    // Concatenate labels because some sites might have multiple label
+    // candidates.
+    if (fieldElementData['label'].length > 0 &&
+        labelText.length > 0) {
+      fieldElementData['label'] += ' ';
+    }
+    fieldElementData['label'] += labelText;
+  }
+}
+
+/**
+ * Common function shared by webFormElementToFormData() and
+ * unownedFormElementsAndFieldSetsToFormData(). Either pass in:
+ * 1) |formElement|, |formControlElement| and an empty |fieldsets|.
+ * or
+ * 2) a non-empty |fieldsets|.
+ *
+ * It is based on the logic in
+ *     bool FormOrFieldsetsToFormData(
+ *         const blink::WebFormElement* form_element,
+ *         const blink::WebFormControlElement* form_control_element,
+ *         const std::vector<blink::WebElement>& fieldsets,
+ *         const WebVector<WebFormControlElement>& control_elements,
+ *         RequirementsMask requirements,
+ *         ExtractMask extract_mask,
+ *         FormData* form,
+ *         FormFieldData* field)
+ * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc
+ *
+ * @param {HTMLFormElement} formElement The form element that will be processed.
+ * @param {FormControlElement} formControlElement A control element in
+ *     formElment, the FormField of which will be returned in field.
+ * @param {Array<Element>} fieldsets The fieldsets to look through if
+ *     formElement and formControlElement are not specified.
+ * @param {Array<FormControlElement>} controlElements The control elements that
+ *     will be processed.
+ * @param {number} requirements The requirement on formElement autocompletion.
+ * @param {number} extractMask Mask controls what data is extracted from
+ *     formElement.
+ * @param {AutofillFormData} form Form to fill in the AutofillFormData
+ *     information of formElement.
+ * @param {AutofillFormFieldData|null} field Field to fill in the form field
+ *     information of formControlElement.
+ * @return {boolean} Whether there are fields and not too many fields in the
+ *     form.
+ */
+function formOrFieldsetsToFormData_(formElement, formControlElement,
+    fieldsets, controlElements, requirements, extractMask, form, field) {
+  // A map from a AutofillFormFieldData's name to the AutofillFormFieldData
+  // itself.
+  var nameMap = {};
+
+  // The extracted FormFields.
+  var formFields = [];
+
+  // A vector of bools that indicate whether each element in |controlElements|
+  // meets the requirements and thus will be in the resulting |form|.
+  var fieldsExtracted = [];
+
+  if (!extractFieldsFromControlElements_(controlElements, requirements,
+                                         extractMask, formFields,
+                                         fieldsExtracted, nameMap)) {
+    return false;
+  }
+
+  if (formElement) {
+    // Loop through the label elements inside the form element. For each label
+    // element, get the corresponding form control element, use the form control
+    // element's name as a key into the <name, AutofillFormFieldData> |nameMap|
+    // to find the previously created AutofillFormFieldData and set the
+    // AutofillFormFieldData's label.
+    var labels = formElement.getElementsByTagName('label');
+    matchLabelsAndFields_(labels, formElement, nameMap);
+  } else {
+    // Same as the if block, but for all the labels in fieldset
+    for (var i = 0; i < fieldsets.length; ++i) {
+      var labels = fieldsets[i].getElementsByTagName('label');
+      matchLabelsAndFields_(labels, formElement, nameMap);
+    }
+  }
+
+  // Loop through the form control elements, extracting the label text from
+  // the DOM.  We use the |fieldsExtracted| vector to make sure we assign the
+  // extracted label to the correct field, as it's possible |form_fields| will
+  // not contain all of the elements in |control_elements|.
+  for (var i = 0, fieldIdx = 0;
+       i < controlElements.length && fieldIdx < formFields.length; ++i) {
+    // This field didn't meet the requirements, so don't try to find a label
+    // for it.
+    if (!fieldsExtracted[i])
+      continue;
+
+    var controlElement = controlElements[i];
+    var fieldLabel = formFields[fieldIdx]['label'];
+    if (!fieldLabel) {
+      formFields[fieldIdx]['label'] =
+          __gCrWeb.autofill.inferLabelForElement(controlElement);
+    }
+    if (controlElement === formControlElement)
+      field = formFields[fieldIdx];
+    ++fieldIdx;
+  }
+
+  form['fields'] = formFields;
+  // Protect against custom implementation of Array.toJSON in host pages.
+  form['fields'].toJSON = null;
+  return true;
+}
+
+/**
  * Scans DOM and returns a JSON string representation of forms and form
  * extraction results.
- * @param {int} requiredFields The minimum number of fields forms must have to
- *     be extracted.
- * @param {int} requirements The requirements mask for forms, e.g. autocomplete
- *     attribute state.
+ *
+ * TODO(thestig): Merge with extractNewForms()?
+ *
+ * @param {number} requiredFields The minimum number of fields forms must have
+ *     to be extracted.
+ * @param {number} requirements The requirements mask for forms, e.g.
+ *      autocomplete attribute state.
  * @return {string} A JSON encoded object with object['forms'] containing the
  *     forms data and object['has_more_forms'] indicating if there are more
  *     forms to extract.
@@ -117,16 +392,20 @@ __gCrWeb.autofill.lastActiveElement = null;
 __gCrWeb.autofill['extractForms'] = function(requiredFields, requirements) {
   var forms = [];
   // Protect against custom implementation of Array.toJSON in host pages.
-  forms.toJSON = null;
+  /** @suppress {checkTypes} */(function() { forms.toJSON = null; })();
+
   // TODO(chenyu): check if any preparation is needed for information such as
   // user_submitted or the one added in core.js is sufficient.
-  var hasMoreForms = __gCrWeb.autofill.extractFormsAndFormElements(
+  __gCrWeb.autofill.extractNewForms(
       window,
       requiredFields,
       requirements,
       forms);
   var results = new __gCrWeb.common.JSONSafeObject;
-  results['has_more_forms'] = hasMoreForms;
+  // TODO(thestig): This is no longer used, but removing it will require changes
+  // internal to iOS, where some unit tests check this value and expects it to
+  // be false. Once those are removed, this can be removed.
+  results['has_more_forms'] = false;
   results['forms'] = forms;
   return __gCrWeb.stringify(results);
 };
@@ -151,7 +430,7 @@ __gCrWeb.autofill['clearActiveElement'] = function() {
  * document.activeElement or the value of lastActiveElement if that value is
  * non-null.
  *
- * @param {Object} data The data to fill in.
+ * @param {AutofillFormFieldData} data The data to fill in.
  */
 __gCrWeb.autofill['fillActiveFormField'] = function(data) {
   var activeElement = document.activeElement;
@@ -170,7 +449,7 @@ __gCrWeb.autofill['fillActiveFormField'] = function(data) {
 /**
  * Fills a number of fields in the same named form.
  *
- * @param {Object} data The data to fill in.
+ * @param {Object<AutofillFormData>} data The data to fill in.
  */
 __gCrWeb.autofill['fillForm'] = function(data) {
   var form = __gCrWeb.common.getFormElementFromIdentifier(data.formName);
@@ -190,7 +469,7 @@ __gCrWeb.autofill['fillForm'] = function(data) {
 /**
  * Dispatch an autocomplete event to the named form.
  *
- * @param {String} name Identifier for form element (from getFormIdentifier).
+ * @param {string} name Identifier for form element (from getFormIdentifier).
  */
 __gCrWeb.autofill['dispatchAutocompleteEvent'] = function(name) {
   var formElement = __gCrWeb.common.getFormElementFromIdentifier(name);
@@ -201,57 +480,65 @@ __gCrWeb.autofill['dispatchAutocompleteEvent'] = function(name) {
 /**
  * Dispatch an autocomplete error event to the named form.
  *
- * @param {String} name Identifier for form element (from getFormIdentifier).
- * @param {String} reason Reason to supply in event.reason; one of 'cancel',
+ * @param {string} name Identifier for form element (from getFormIdentifier).
+ * @param {string} reason Reason to supply in event.reason; one of 'cancel',
  *     'invalid' or 'disabled'; see requestAutocomplete spec.
+ * @suppress {checkTypes}
  */
 __gCrWeb.autofill['dispatchAutocompleteErrorEvent'] = function(name, reason) {
   var formElement = __gCrWeb.common.getFormElementFromIdentifier(name);
-  var event = new CustomEvent('autocompleteerror', {});
-  event.reason = reason;
+  var event = new CustomEvent('autocompleteerror', {'reason': reason});
   formElement.dispatchEvent(event);
 };
 
 /**
- * Dispatch an autocomplete error event to the named form.
+ * See extractFormsAndFormElements below.
  *
- * @param {String} name Identifier for form element (from getFormIdentifier).
- * @param {String} reason Reason to supply in event.reason; one of 'cancel',
- *     'invalid' or 'disabled'; see requestAutocomplete spec.
+ * @param {HTMLFrameElement|Window} frame A window or a frame containing forms
+ *     from which the data will be extracted.
+ * @param {number} minimumRequiredFields The minimum number of fields a form
+ *     should contain for autofill.
+ * @param {number} requirements The requirements mask for forms, e.g.
+ *     autocomplete attribute state.
+ * @param {Array<AutofillFormData>} forms Forms that will be filled in data of
+ *     forms in frame.
  */
-__gCrWeb.autofill['dispatchAutocompleteErrorEvent'] = function(name, reason) {
-  var formElement = __gCrWeb.common.getFormElementFromIdentifier(name);
-  var event = new CustomEvent('autocompleteerror', {});
-  event.reason = reason;
-  formElement.dispatchEvent(event);
-};
+__gCrWeb.autofill.extractNewForms = function(
+    frame, minimumRequiredFields, requirements, forms) {
+  __gCrWeb.autofill.extractFormsAndFormElements(
+      frame, minimumRequiredFields, requirements, forms);
+}
 
 /**
  * Scans the DOM in |frame| extracting and storing forms. Fills |forms| with
- * extracted forms. Returns true if there are unextracted forms due to
- * |minimumRequiredFields| limit, else false.
+ * extracted forms.
  *
  * This method is based on the logic in method
  *
- *     bool FormCache::ExtractFormsAndFormElements(
+ *     bool FormCache::ExtractNewForms(
  *         const WebFrame& frame,
- *         size_t minimum_required_fields,
- *         std::vector<FormData>* forms,
- *         std::vector<WebFormElement>* web_form_elements)
+ *         std::vector<FormData>* forms)
  *
  * in chromium/src/components/autofill/content/renderer/form_cache.cc.
  *
- * The difference is in this implementation, no form elements are returned in
- * |web_form_elements|, and cache is not considered. Initial values of select
- * and checkable elements are not recorded at the momemt.
+ * The difference is in this implementation, the cache is not considered.
+ * Initial values of select and checkable elements are not recorded at the
+ * moment.
  *
- * @param {Object} frame A window or a frame containing forms from which the
- *     data will be extracted.
- * @param {int} minimumRequiredFields The minimum number of fields a form should
- *     contain for autofill.
- * @param {int} requirements The requirements mask for forms, e.g. autocomplete
- *     attribute state.
- * @param {Object} forms Forms that will be filled in data of forms in frame.
+ * This version still takes the minimumRequiredFields and requirements
+ * parameters. Whereas the C++ version does not.
+ *
+ * TODO(thestig): Update iOS internal callers to use extractNewForms(). Once
+ * that happens, this can be removed.
+ *
+ * @param {HTMLFrameElement|Window} frame A window or a frame containing forms
+ *     from which the data will be extracted.
+ * @param {number} minimumRequiredFields The minimum number of fields a form
+ *     should contain for autofill.
+ * @param {number} requirements The requirements mask for forms, e.g.
+ *     autocomplete attribute state.
+ * @param {Array<AutofillFormData>} forms Forms that will be filled in data of
+ *     forms in frame.
  * @return {boolean} Whether there are unextracted forms due to
  *     |minimumRequiredFields| limit.
  */
@@ -265,15 +552,16 @@ __gCrWeb.autofill.extractFormsAndFormElements = function(
     return false;
   }
 
+  /** @type {HTMLCollection} */
   var webForms = doc.forms;
 
   var numFieldsSeen = 0;
   var hasSkippedForms = false;
   for (var formIndex = 0; formIndex < webForms.length; ++formIndex) {
+    /** @type {HTMLFormElement} */
     var formElement = webForms[formIndex];
-    var controlElements = [];
-    __gCrWeb.autofill.extractAutofillableElements(
-        formElement, requirements, controlElements);
+    var controlElements = __gCrWeb.autofill.extractAutofillableElementsInForm(
+        formElement, requirements);
     var numEditableElements = 0;
     for (var elementIndex = 0; elementIndex < controlElements.length;
          ++elementIndex) {
@@ -286,7 +574,8 @@ __gCrWeb.autofill.extractFormsAndFormElements = function(
     // To avoid overly expensive computation, we impose a minimum number of
     // allowable fields.  The corresponding maximum number of allowable
     // fields is imposed by webFormElementToFormData().
-    if (numEditableElements < minimumRequiredFields) {
+    if (numEditableElements < minimumRequiredFields &&
+        controlElements.length > 0) {
       hasSkippedForms = true;
       continue;
     }
@@ -295,7 +584,8 @@ __gCrWeb.autofill.extractFormsAndFormElements = function(
         __gCrWeb.autofill.EXTRACT_MASK_OPTIONS;
     var form = new __gCrWeb['common'].JSONSafeObject;
     if (!__gCrWeb.autofill.webFormElementToFormData(
-        frame, formElement, null, requirements, extractMask, form)) {
+        frame, formElement, null, requirements, extractMask, form,
+        null /* field */)) {
       continue;
     }
     numFieldsSeen += form['fields'].length;
@@ -314,7 +604,7 @@ __gCrWeb.autofill.extractFormsAndFormElements = function(
   var frames = frame.frames;
   for (var i = 0; i < frames.length; i++) {
     var hasSkippedInframe = __gCrWeb.autofill.extractFormsAndFormElements(
-            frames[i], minimumRequiredFields, requirements, forms);
+        frames[i], minimumRequiredFields, requirements, forms);
     hasSkippedForms = hasSkippedForms || hasSkippedInframe;
   }
   return hasSkippedForms;
@@ -339,16 +629,18 @@ __gCrWeb.autofill.extractFormsAndFormElements = function(
  *         FormFieldData* field)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc
  *
- * @param {Element} frame The frame where the formElement is in.
- * @param {Element} formElement The form element that will be processed.
- * @param {Element} formControlElement A control element in formElment, the
- *     FormField of which will be returned in field.
- * @param {int} requirements The requirement on formElement autocompletion.
- * @param {int} extractMask Mask controls what data is extracted from
+ * @param {HTMLFrameElement|Window} frame The window or frame where the
+ *     formElement is in.
+ * @param {HTMLFormElement} formElement The form element that will be processed.
+ * @param {FormControlElement} formControlElement A control element in
+ *     formElment, the FormField of which will be returned in field.
+ * @param {number} requirements The requirement on formElement autocompletion.
+ * @param {number} extractMask Mask controls what data is extracted from
  *     formElement.
- * @param {Object} form Form to fill in the FormData information of formElement.
- * @param {Object} field Field to fill in the form field information of
- *     formControlElement.
+ * @param {AutofillFormData} form Form to fill in the AutofillFormData
+ *     information of formElement.
+ * @param {AutofillFormFieldData|null} field Field to fill in the form field
+ *     information of formControlElement.
  * @return {boolean} Whether there are fields and not too many fields in the
  *     form.
  */
@@ -384,119 +676,11 @@ __gCrWeb.autofill.webFormElementToFormData = function(
   // valid, which is computed by creating a <a> element, and we don't check if
   // the action is valid.
 
-  // A map from a FormFieldData's name to the FormFieldData itself.
-  var nameMap = {};
-
-  // The extracted FormFields.
-  var formFields = [];
-
   var controlElements = __gCrWeb['common'].getFormControlElements(formElement);
 
-  // A vector of bools that indicate whether each element in |controlElements|
-  // meets the requirements and thus will be in the resulting |form|.
-  var fieldsExtracted = [];
-
-  for (var i = 0; i < controlElements.length; ++i) {
-    fieldsExtracted[i] = false;
-
-    var controlElement = controlElements[i];
-    if (!__gCrWeb.autofill.isAutofillableElement(controlElement)) {
-      continue;
-    }
-
-    if (requirements &
-            __gCrWeb.autofill.REQUIREMENTS_MASK_REQUIRE_AUTOCOMPLETE &&
-        __gCrWeb.autofill.isAutofillableInputElement(controlElement) &&
-        !__gCrWeb.autofill.satisfiesRequireAutocomplete(
-            controlElement, false)) {
-      continue;
-    }
-
-    // Create a new FormFieldData, fill it out and map it to the field's name.
-    var formField = new __gCrWeb['common'].JSONSafeObject;
-    __gCrWeb.autofill.webFormControlElementToFormField(
-        controlElement, extractMask, formField);
-    formFields.push(formField);
-    nameMap[formField['name']] = formField;
-    fieldsExtracted[i] = true;
-
-    // To avoid overly expensive computation, we impose a maximum number of
-    // allowable fields.
-    if (formFields.length > __gCrWeb.autofill.MAX_PARSEABLE_FIELDS) {
-      return false;
-    }
-  }
-
-  // If we failed to extract any fields, give up.
-  if (formFields.length === 0) {
-    return false;
-  }
-
-  // Loop through the label elements inside the form element. For each label
-  // element, get the corresponding form control element, use the form control
-  // element's name as a key into the <name, FormFieldData> nameMap to find the
-  // previously created FormFieldData and set the FormFieldData's label.
-  var labels = formElement.getElementsByTagName('label');
-  for (var index = 0; index < labels.length; ++index) {
-    var label = labels[index];
-    if (!label.control && !label.htmlFor) {
-      continue;
-    }
-    var fieldElement = label.control;
-    var elementName;
-    if (!fieldElement) {
-      // Sometimes site authors will incorrectly specify the corresponding
-      // field element's name rather than its id, so we compensate here.
-      elementName = label.htmlFor;
-    } else if (fieldElement.form != formElement ||
-                   fieldElement.type === 'hidden') {
-      continue;
-    } else {
-      elementName = __gCrWeb['common'].nameForAutofill(fieldElement);
-    }
-
-    var fieldElementData = nameMap[elementName];
-    if (fieldElementData) {
-      if (!fieldElementData['label']) {
-        fieldElementData['label'] = '';
-      }
-      var labelText = __gCrWeb.autofill.findChildText(label);
-      // Concatenate labels because some sites might have multiple label
-      // candidates.
-      if (fieldElementData['label'].length > 0 &&
-          labelText.length > 0) {
-        fieldElementData['label'] += ' ';
-      }
-      fieldElementData['label'] += labelText;
-    }
-  }
-
-  // Loop through the form control elements, extracting the label text from
-  // the DOM.  We use the |fieldsExtracted| vector to make sure we assign the
-  // extracted label to the correct field, as it's possible |form_fields| will
-  // not contain all of the elements in |control_elements|.
-  for (var i = 0, fieldIdx = 0;
-       i < controlElements.length && fieldIdx < formFields.length; ++i) {
-    // This field didn't meet the requirements, so don't try to find a label
-    // for it.
-    if (!fieldsExtracted[i])
-      continue;
-
-    var controlElement = controlElements[i];
-    var fieldLabel = formFields[fieldIdx]['label'];
-    if (!fieldLabel || fieldLabel.length === 0) {
-      formFields[fieldIdx]['label'] =
-          __gCrWeb.autofill.inferLabelForElement(controlElement);
-    }
-    if (controlElement === formControlElement)
-      field = formField;
-    ++fieldIdx;
-  }
-
-  form['fields'] = formFields;
-  // Protect against custom implementation of Array.toJSON in host pages.
-  form['fields'].toJSON = null;
-  return true;
+  return formOrFieldsetsToFormData_(formElement, formControlElement,
+      [] /* fieldsets */, controlElements, requirements, extractMask, form,
+      field);
 };
 
 /**
@@ -506,13 +690,13 @@ __gCrWeb.autofill.webFormElementToFormData = function(
  *     bool HasTagName(const WebNode& node, const blink::WebString& tag)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc.
  *
- * @param {Element} node Node to examine.
+ * @param {Node} node Node to examine.
  * @param {string} tag Tag name.
  * @return {boolean} Whether the tag of node is tag.
  */
 __gCrWeb.autofill.hasTagName = function(node, tag) {
-  return node.nodeType === document.ELEMENT_NODE &&
-         node.tagName === tag.toUpperCase();
+  return node.nodeType === Node.ELEMENT_NODE &&
+         /** @type {Element} */(node).tagName === tag.toUpperCase();
 };
 
 /**
@@ -522,7 +706,7 @@ __gCrWeb.autofill.hasTagName = function(node, tag) {
  *     bool IsAutofillableElement(const WebFormControlElement& element)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc.
  *
- * @param {Element} element An element to examine.
+ * @param {FormControlElement} element An element to examine.
  * @return {boolean} Whether element is one of the element types that can be
  *     autofilled.
  */
@@ -617,8 +801,8 @@ __gCrWeb.autofill.combineAndCollapseWhitespace = function(
  * This is a helper function for the findChildText() function (see below).
  * Search depth is limited with the |depth| parameter.
  * Based on form_autofill_util::findChildTextInner().
- * @param {Element} node The node to fetch the text content from.
- * @param {int} depth The maximum depth to descend on the DOM.
+ * @param {Node} node The node to fetch the text content from.
+ * @param {number} depth The maximum depth to descend on the DOM.
  * @return {string} The discovered and adapted string.
  */
 __gCrWeb.autofill.findChildTextInner = function(node, depth) {
@@ -627,29 +811,32 @@ __gCrWeb.autofill.findChildTextInner = function(node, depth) {
   }
 
   // Skip over comments.
-  if (node.nodeType === document.COMMENT_NODE) {
+  if (node.nodeType === Node.COMMENT_NODE) {
     return __gCrWeb.autofill.findChildTextInner(node.nextSibling, depth - 1);
   }
 
-  if (node.nodeType !== document.ELEMENT_NODE &&
-      node.nodeType !== document.TEXT_NODE) {
+  if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE) {
     return '';
   }
 
   // Ignore elements known not to contain inferable labels.
-  if (node.nodeType === document.ELEMENT_NODE) {
+  if (node.nodeType === Node.ELEMENT_NODE) {
     if (node.tagName === 'OPTION' ||
         node.tagName === 'SCRIPT' ||
-        node.tagName === 'NOSCRIPT' ||
-        (__gCrWeb.common.isFormControlElement(node) &&
-         __gCrWeb.autofill.isAutofillableElement(node))) {
+        node.tagName === 'NOSCRIPT') {
       return '';
+    }
+    if (__gCrWeb.common.isFormControlElement(node)) {
+      var input = /** @type {FormControlElement} */ (node);
+      if (__gCrWeb.autofill.isAutofillableElement(input)) {
+        return '';
+      }
     }
   }
 
   // Extract the text exactly at this node.
   var nodeText = __gCrWeb.autofill.nodeValue(node);
-  if (node.nodeType === document.TEXT_NODE && !nodeText) {
+  if (node.nodeType === Node.TEXT_NODE && !nodeText) {
     // In the C++ version, this text node would have been stripped completely.
     // Just pass the buck.
     return __gCrWeb.autofill.findChildTextInner(node.nextSibling, depth);
@@ -659,7 +846,7 @@ __gCrWeb.autofill.findChildTextInner = function(node, depth) {
   // Preserve inter-element whitespace separation.
   var childText =
       __gCrWeb.autofill.findChildTextInner(node.firstChild, depth - 1);
-  var addSpace = node.nodeType === document.TEXT_NODE && !nodeText;
+  var addSpace = node.nodeType === Node.TEXT_NODE && !nodeText;
   // Emulate apparently incorrect Chromium behavior tracked in crbug 239819.
   addSpace = false;
   nodeText = __gCrWeb.autofill.combineAndCollapseWhitespace(nodeText,
@@ -669,7 +856,7 @@ __gCrWeb.autofill.findChildTextInner = function(node, depth) {
   // Again, preserve inter-element whitespace separation.
   var siblingText =
       __gCrWeb.autofill.findChildTextInner(node.nextSibling, depth - 1);
-  addSpace = node.nodeType === document.TEXT_NODE && !nodeText;
+  addSpace = node.nodeType === Node.TEXT_NODE && !nodeText;
   // Emulate apparently incorrect Chromium behavior tracked in crbug 239819.
   addSpace = false;
   nodeText = __gCrWeb.autofill.combineAndCollapseWhitespace(nodeText,
@@ -688,14 +875,14 @@ __gCrWeb.autofill.findChildTextInner = function(node, depth) {
  * which is a faster alternative to |innerText()| for performance critical
  * operations.
  *
- * @param {Element} node A node of which the child text will be return.
+ * @param {Node} node A node of which the child text will be return.
  * @return {string} The child text.
  */
 __gCrWeb.autofill.findChildText = function(node) {
-  if (node.nodeType === document.TEXT_NODE)
+  if (node.nodeType === Node.TEXT_NODE)
     return __gCrWeb.autofill.nodeValue(node);
-  var child = node.firstChild;
 
+  var child = node.firstChild;
   var kChildSearchDepth = 10;
   var nodeText = __gCrWeb.autofill.findChildTextInner(child, kChildSearchDepth);
   nodeText = nodeText.trim();
@@ -734,13 +921,12 @@ __gCrWeb.autofill.inferLabelFromPrevious = function(element) {
 
     // Skip over comments.
     var nodeType = previous.nodeType;
-    if (nodeType === document.COMMENT_NODE_NODE) {
+    if (nodeType === Node.COMMENT_NODE) {
       continue;
     }
 
     // Otherwise, only consider normal HTML elements and their contents.
-    if (nodeType != document.TEXT_NODE &&
-        nodeType != document.ELEMENT_NODE) {
+    if (nodeType != Node.TEXT_NODE && nodeType != Node.ELEMENT_NODE) {
       break;
     }
 
@@ -748,15 +934,14 @@ __gCrWeb.autofill.inferLabelFromPrevious = function(element) {
     // Coalesce any text contained in multiple consecutive
     //  (a) plain text nodes or
     //  (b) inline HTML elements that are essentially equivalent to text nodes.
-    if (nodeType === document.TEXT_NODE ||
+    if (nodeType === Node.TEXT_NODE ||
         __gCrWeb.autofill.hasTagName(previous, 'b') ||
         __gCrWeb.autofill.hasTagName(previous, 'strong') ||
         __gCrWeb.autofill.hasTagName(previous, 'span') ||
         __gCrWeb.autofill.hasTagName(previous, 'font')) {
       var value = __gCrWeb.autofill.findChildText(previous);
       // A text node's value will be empty if it is for a line break.
-      var addSpace = nodeType === document.TEXT_NODE &&
-          value.length === 0;
+      var addSpace = nodeType === Node.TEXT_NODE && value.length === 0;
       inferredLabel =
           __gCrWeb.autofill.combineAndCollapseWhitespace(
               value, inferredLabel, addSpace);
@@ -825,7 +1010,7 @@ __gCrWeb.autofill.inferLabelFromListItem = function(element) {
 
   var parentNode = element.parentNode;
   while (parentNode &&
-         parentNode.nodeType === document.ELEMENT_NODE &&
+         parentNode.nodeType === Node.ELEMENT_NODE &&
          !__gCrWeb.autofill.hasTagName(parentNode, 'li')) {
     parentNode = parentNode.parentNode;
   }
@@ -858,7 +1043,7 @@ __gCrWeb.autofill.inferLabelFromTableColumn = function(element) {
 
   var parentNode = element.parentNode;
   while (parentNode &&
-         parentNode.nodeType === document.ELEMENT_NODE &&
+         parentNode.nodeType === Node.ELEMENT_NODE &&
          !__gCrWeb.autofill.hasTagName(parentNode, 'td')) {
     parentNode = parentNode.parentNode;
   }
@@ -901,7 +1086,7 @@ __gCrWeb.autofill.inferLabelFromTableRow = function(element) {
 
   var parentNode = element.parentNode;
   while (parentNode &&
-         parentNode.nodeType === document.ELEMENT_NODE &&
+         parentNode.nodeType === Node.ELEMENT_NODE &&
          !__gCrWeb.autofill.hasTagName(parentNode, 'tr')) {
     parentNode = parentNode.parentNode;
   }
@@ -993,7 +1178,7 @@ __gCrWeb.autofill.inferLabelFromDefinitionList = function(element) {
 
   var parentNode = element.parentNode;
   while (parentNode &&
-         parentNode.nodeType === document.ELEMENT_NODE &&
+         parentNode.nodeType === Node.ELEMENT_NODE &&
          !__gCrWeb.autofill.hasTagName(parentNode, 'dd')) {
     parentNode = parentNode.parentNode;
   }
@@ -1004,8 +1189,7 @@ __gCrWeb.autofill.inferLabelFromDefinitionList = function(element) {
 
   // Skip by any intervening text nodes.
   var previous = parentNode.previousSibling;
-  while (previous &&
-         previous.nodeType === document.TEXT_NODE) {
+  while (previous && previous.nodeType === Node.TEXT_NODE) {
     previous = previous.previousSibling;
   }
 
@@ -1109,8 +1293,8 @@ __gCrWeb.autofill.getOptionStringsFromElement = function(
  * Different from FillFormField(), is_initiating_node is not considered in
  * this implementation.
  *
- * @param {Object} data Data that will be filled into field.
- * @param {Element} field The element to which data will be filled.
+ * @param {AutofillFormFieldData} data Data that will be filled into field.
+ * @param {FormControlElement} field The element to which data will be filled.
  */
 __gCrWeb.autofill.fillFormField = function(data, field) {
   // Nothing to fill.
@@ -1153,7 +1337,7 @@ __gCrWeb.autofill.fillFormField = function(data, field) {
  *     bool IsTextInput(const blink::WebInputElement* element)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} element An element to examine.
+ * @param {FormControlElement} element An element to examine.
  * @return {boolean} Whether element is a text input field.
  */
 __gCrWeb.autofill.isTextInput = function(element) {
@@ -1170,7 +1354,7 @@ __gCrWeb.autofill.isTextInput = function(element) {
  *     bool IsSelectElement(const blink::WebFormControlElement& element)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} element An element to examine.
+ * @param {FormControlElement} element An element to examine.
  * @return {boolean} Whether element is a 'select' element.
  */
 __gCrWeb.autofill.isSelectElement = function(element) {
@@ -1187,7 +1371,7 @@ __gCrWeb.autofill.isSelectElement = function(element) {
  *     bool IsTextAreaElement(const blink::WebFormControlElement& element)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} element An element to examine.
+ * @param {FormControlElement} element An element to examine.
  * @return {boolean} Whether element is a 'textarea' element.
  */
 __gCrWeb.autofill.isTextAreaElement = function(element) {
@@ -1204,7 +1388,7 @@ __gCrWeb.autofill.isTextAreaElement = function(element) {
  *     bool IsCheckableElement(const blink::WebInputElement* element)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} element An element to examine.
+ * @param {FormControlElement} element An element to examine.
  * @return {boolean} Whether element is a checkbox or a radio button.
  */
 __gCrWeb.autofill.isCheckableElement = function(element) {
@@ -1222,7 +1406,7 @@ __gCrWeb.autofill.isCheckableElement = function(element) {
  *    bool IsAutofillableInputElement(const blink::WebInputElement* element)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} element An element to examine.
+ * @param {FormControlElement} element An element to examine.
  * @return {boolean} Whether element is one of the input element types that
  *     can be autofilled.
  */
@@ -1236,11 +1420,11 @@ __gCrWeb.autofill.isAutofillableInputElement = function(element) {
  * used in src/components/autofill/content/renderer/form_autofill_util.h.
  * Newlines and tabs are stripped.
  *
- * @param {Element} element An element to examine.
+ * @param {Node} node A node to examine.
  * @return {string} The text contained in |element|.
  */
-__gCrWeb.autofill.nodeValue = function(element) {
-  return (element.nodeValue || '').replace(/[\n\t]/gm, '');
+__gCrWeb.autofill.nodeValue = function(node) {
+  return (node.nodeValue || '').replace(/[\n\t]/gm, '');
 };
 
 /**
@@ -1259,16 +1443,20 @@ __gCrWeb.autofill.value = function(element) {
  * Returns the auto-fillable form control elements in |formElement|.
  *
  * It is based on the logic in
- *     void ExtractAutofillableElements(
+ *     std::vector<blink::WebFormControlElement> ExtractAutofillableElements(
  *         const blink::WebFormElement& form_element,
  *         RequirementsMask requirements,
  *         std::vector<blink::WebFormControlElement>* autofillable_elements);
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} formElement A form element to be processed.
- * @param {int} requirementsMask A mask on the requirement.
- * @param {Array.<Element>} autofillableElements The array of autofillable
- *     elements.
+ * TODO(thestig): This should match ExtractAutofillableElementsFromSet() from
+ *                r306470 once all internal callers have switched over to
+ *                extractAutofillableElementsInForm().
+ *
+ * @param {HTMLFormElement} formElement A form element to be processed.
+ * @param {number} requirementsMask A mask on the requirement.
+ * @param {Array<FormControlElement>} autofillableElements The array of
+ *     autofillable elements.
  */
 __gCrWeb.autofill.extractAutofillableElements = function(
     formElement, requirementsMask, autofillableElements) {
@@ -1297,6 +1485,28 @@ __gCrWeb.autofill.extractAutofillableElements = function(
 };
 
 /**
+ * Returns all the auto-fillable form control elements in |formElement|.
+ *
+ * It is based on the logic in
+ *     void ExtractAutofillableElementsInForm(
+ *         const blink::WebFormElement& form_element,
+ *         RequirementsMask requirements);
+ * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
+ *
+ * @param {HTMLFormElement} formElement A form element to be processed.
+ * @param {number} requirementsMask A mask on the requirement.
+ * @return {Array<FormControlElement>} The array of autofillable elements.
+ */
+__gCrWeb.autofill.extractAutofillableElementsInForm = function(
+    formElement, requirementsMask) {
+  var autofillableElements = [];
+
+  __gCrWeb.autofill.extractAutofillableElements(
+      formElement, requirementsMask, autofillableElements);
+  return autofillableElements;
+};
+
+/**
  * Fills out a FormField object from a given form control element.
  *
  * It is based on the logic in
@@ -1306,13 +1516,14 @@ __gCrWeb.autofill.extractAutofillableElements = function(
  *         FormFieldData* field);
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * @param {Element} element The element to be processed.
- * @param {int} extractMask A bit field mask to extract data from |element|.
+ * @param {FormControlElement} element The element to be processed.
+ * @param {number} extractMask A bit field mask to extract data from |element|.
  *     See the document on variable __gCrWeb.autofill.EXTRACT_MASK_NONE,
  *     __gCrWeb.autofill.EXTRACT_MASK_VALUE,
  *     __gCrWeb.autofill.EXTRACT_MASK_OPTION_TEXT and
  *     __gCrWeb.autofill.EXTRACT_MASK_OPTIONS.
- * @param {Object} field Field to fill in the element information.
+ * @param {AutofillFormFieldData} field Field to fill in the element
+ *     information.
  */
 __gCrWeb.autofill.webFormControlElementToFormField = function(
     element, extractMask, field) {
@@ -1396,11 +1607,11 @@ __gCrWeb.autofill.webFormControlElementToFormField = function(
  * For debugging purposes, annotate forms on the page with prediction data using
  * the placeholder attribute.
  *
- * @param {Object} data The form and field identifiers with their prection data.
+ * @param {Object<AutofillFormData>} data The form and field identifiers with
+ *     their prediction data.
  */
 __gCrWeb.autofill['fillPredictionData'] = function(data) {
-
-  for (formName in data) {
+  for (var formName in data) {
     var form = __gCrWeb.common.getFormElementFromIdentifier(formName);
     var formData = data[formName];
     var controlElements = __gCrWeb.common.getFormControlElements(form);

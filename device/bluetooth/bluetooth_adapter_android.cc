@@ -44,6 +44,16 @@ BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting() {
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
+base::WeakPtr<BluetoothAdapterAndroid>
+BluetoothAdapterAndroid::CreateAdapterWithFakeAdapterForTesting() {
+  BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
+  adapter->j_bluetooth_adapter_.Reset(
+      Java_BluetoothAdapter_createWithFakeAdapterForTesting(
+          AttachCurrentThread(), base::android::GetApplicationContext(),
+          reinterpret_cast<jlong>(adapter)));
+  return adapter->weak_ptr_factory_.GetWeakPtr();
+}
+
 // static
 bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
@@ -200,6 +210,7 @@ void BluetoothAdapterAndroid::SetDiscoveryFilter(
     scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
+  // TODO(scheib): Support filters crbug.com/490401
   NOTIMPLEMENTED();
   error_callback.Run();
 }

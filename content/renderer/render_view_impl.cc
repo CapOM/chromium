@@ -18,7 +18,6 @@
 #include "base/json/json_writer.h"
 #include "base/lazy_instance.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/process/kill.h"
@@ -673,7 +672,8 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
       this, params.main_frame_routing_id);
   // The main frame WebLocalFrame object is closed by
   // RenderFrameImpl::frameDetached().
-  WebLocalFrame* web_frame = WebLocalFrame::create(main_render_frame_);
+  WebLocalFrame* web_frame = WebLocalFrame::create(
+      blink::WebTreeScopeType::Document, main_render_frame_);
   main_render_frame_->SetWebFrame(web_frame);
 
   compositor_deps_ = compositor_deps;
@@ -734,7 +734,8 @@ void RenderViewImpl::Initialize(const ViewMsg_New_Params& params,
   if (params.proxy_routing_id != MSG_ROUTING_NONE) {
     CHECK(params.swapped_out);
     proxy = RenderFrameProxy::CreateProxyToReplaceFrame(
-        main_render_frame_, params.proxy_routing_id);
+        main_render_frame_, params.proxy_routing_id,
+        blink::WebTreeScopeType::Document);
     main_render_frame_->set_render_frame_proxy(proxy);
   }
 
@@ -877,7 +878,7 @@ RenderView* RenderView::FromRoutingID(int routing_id) {
 }
 
 /* static */
-size_t RenderViewImpl::GetRenderViewCount() {
+size_t RenderView::GetRenderViewCount() {
   return g_view_map.Get().size();
 }
 
@@ -1013,8 +1014,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
       prefs.should_clear_document_background);
   settings->setEnableScrollAnimator(prefs.enable_scroll_animator);
 
-  settings->setRegionBasedColumnsEnabled(prefs.region_based_columns_enabled);
-
   WebRuntimeFeatures::enableTouch(prefs.touch_enabled);
   settings->setMaxTouchPoints(prefs.pointer_events_max_touch_points);
   settings->setAvailablePointerTypes(prefs.available_pointer_types);
@@ -1114,8 +1113,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   WebNetworkStateNotifier::setOnLine(prefs.is_online);
   WebNetworkStateNotifier::setWebConnectionType(
       NetConnectionTypeToWebConnectionType(prefs.connection_type));
-  settings->setPinchVirtualViewportEnabled(
-      prefs.pinch_virtual_viewport_enabled);
 
   settings->setPinchOverlayScrollbarThickness(
       prefs.pinch_overlay_scrollbar_thickness);
@@ -1168,6 +1165,10 @@ blink::WebView* RenderViewImpl::webview() const {
 void RenderViewImpl::PepperInstanceCreated(
     PepperPluginInstanceImpl* instance) {
   active_pepper_instances_.insert(instance);
+
+  RenderFrameImpl* const render_frame = instance->render_frame();
+  render_frame->Send(
+      new FrameHostMsg_PepperInstanceCreated(render_frame->GetRoutingID()));
 }
 
 void RenderViewImpl::PepperInstanceDeleted(
@@ -1178,6 +1179,11 @@ void RenderViewImpl::PepperInstanceDeleted(
     pepper_last_mouse_event_target_ = NULL;
   if (focused_pepper_plugin_ == instance)
     PepperFocusChanged(instance, false);
+
+  RenderFrameImpl* const render_frame = instance->render_frame();
+  if (render_frame)
+    render_frame->Send(
+        new FrameHostMsg_PepperInstanceDeleted(render_frame->GetRoutingID()));
 }
 
 void RenderViewImpl::PepperFocusChanged(PepperPluginInstanceImpl* instance,
@@ -1266,7 +1272,7 @@ bool RenderViewImpl::OnMessageReceived(const IPC::Message& message) {
   if (main_frame && main_frame->isWebLocalFrame())
     GetContentClient()->SetActiveURL(main_frame->document().url());
 
-  ObserverListBase<RenderViewObserver>::Iterator it(&observers_);
+  base::ObserverListBase<RenderViewObserver>::Iterator it(&observers_);
   RenderViewObserver* observer;
   while ((observer = it.GetNext()) != NULL)
     if (observer->OnMessageReceived(message))

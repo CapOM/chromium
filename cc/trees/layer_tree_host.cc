@@ -94,6 +94,7 @@ LayerTreeHost::LayerTreeHost(InitParams* params)
       needs_meta_info_recomputation_(true),
       client_(params->client),
       source_frame_number_(0),
+      meta_information_sequence_number_(1),
       rendering_stats_instrumentation_(RenderingStatsInstrumentation::Create()),
       output_surface_lost_(true),
       settings_(*params->settings),
@@ -372,8 +373,12 @@ void LayerTreeHost::WillCommit() {
 
 void LayerTreeHost::UpdateHudLayer() {
   if (debug_state_.ShowHudInfo()) {
-    if (!hud_layer_.get())
-      hud_layer_ = HeadsUpDisplayLayer::Create();
+    if (!hud_layer_.get()) {
+      LayerSettings hud_layer_settings;
+      hud_layer_settings.use_compositor_animation_timelines =
+          settings_.use_compositor_animation_timelines;
+      hud_layer_ = HeadsUpDisplayLayer::Create(hud_layer_settings);
+    }
 
     if (root_layer_.get() && !hud_layer_->parent())
       root_layer_->AddChild(hud_layer_);
@@ -1071,22 +1076,12 @@ void LayerTreeHost::ApplyScrollAndScale(ScrollAndScaleSet* info) {
 
     ApplyPageScaleDeltaFromImplSide(info->page_scale_delta);
     elastic_overscroll_ += info->elastic_overscroll_delta;
-    if (!settings_.use_pinch_virtual_viewport) {
-      // TODO(miletus): Make sure either this code path is totally gone,
-      // or revisit the flooring here if the old pinch viewport code path
-      // is causing problems with fractional scroll offset.
-      client_->ApplyViewportDeltas(
-          gfx::ToFlooredVector2d(inner_viewport_scroll_delta +
-                                 outer_viewport_scroll_delta),
-          info->page_scale_delta, info->top_controls_delta);
-    } else {
-      // TODO(ccameron): pass the elastic overscroll here so that input events
-      // may be translated appropriately.
-      client_->ApplyViewportDeltas(
-          inner_viewport_scroll_delta, outer_viewport_scroll_delta,
-          info->elastic_overscroll_delta, info->page_scale_delta,
-          info->top_controls_delta);
-    }
+    // TODO(ccameron): pass the elastic overscroll here so that input events
+    // may be translated appropriately.
+    client_->ApplyViewportDeltas(
+        inner_viewport_scroll_delta, outer_viewport_scroll_delta,
+        info->elastic_overscroll_delta, info->page_scale_delta,
+        info->top_controls_delta);
   }
 }
 

@@ -5,6 +5,8 @@
 // IPC messages for interacting with frames.
 // Multiply-included message file, hence no include guard.
 
+#include "cc/surfaces/surface_id.h"
+#include "cc/surfaces/surface_sequence.h"
 #include "content/common/content_export.h"
 #include "content/common/content_param_traits.h"
 #include "content/common/frame_message_enums.h"
@@ -15,6 +17,7 @@
 #include "content/common/resource_request_body.h"
 #include "content/public/common/color_suggestion.h"
 #include "content/public/common/common_param_traits.h"
+#include "content/public/common/console_message_level.h"
 #include "content/public/common/context_menu_params.h"
 #include "content/public/common/frame_navigate_params.h"
 #include "content/public/common/javascript_message_type.h"
@@ -23,6 +26,7 @@
 #include "content/public/common/resource_response.h"
 #include "content/public/common/transition_element.h"
 #include "ipc/ipc_message_macros.h"
+#include "third_party/WebKit/public/web/WebTreeScopeType.h"
 #include "ui/gfx/ipc/gfx_param_traits.h"
 #include "url/gurl.h"
 #include "url/origin.h"
@@ -44,8 +48,12 @@ IPC_ENUM_TRAITS_MAX_VALUE(FrameMsg_UILoadMetricsReportType::Value,
                           FrameMsg_UILoadMetricsReportType::REPORT_TYPE_LAST)
 IPC_ENUM_TRAITS_MAX_VALUE(blink::WebContextMenuData::MediaType,
                           blink::WebContextMenuData::MediaTypeLast)
+IPC_ENUM_TRAITS_MAX_VALUE(blink::WebContextMenuData::InputFieldType,
+                          blink::WebContextMenuData::InputFieldTypeLast)
+IPC_ENUM_TRAITS(blink::WebSandboxFlags)  // Bitmask.
+IPC_ENUM_TRAITS_MAX_VALUE(blink::WebTreeScopeType,
+                          blink::WebTreeScopeType::Last)
 IPC_ENUM_TRAITS_MAX_VALUE(ui::MenuSourceType, ui::MENU_SOURCE_TYPE_LAST)
-IPC_ENUM_TRAITS(content::SandboxFlags)  // Bitmask.
 
 IPC_STRUCT_TRAITS_BEGIN(content::ColorSuggestion)
   IPC_STRUCT_TRAITS_MEMBER(color)
@@ -89,6 +97,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::ContextMenuParams)
   IPC_STRUCT_TRAITS_MEMBER(selection_start)
   IPC_STRUCT_TRAITS_MEMBER(selection_end)
 #endif
+  IPC_STRUCT_TRAITS_MEMBER(input_field_type)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(content::CustomContextMenuContext)
@@ -279,6 +288,7 @@ IPC_STRUCT_TRAITS_BEGIN(content::RequestNavigationParams)
   IPC_STRUCT_TRAITS_MEMBER(page_state)
   IPC_STRUCT_TRAITS_MEMBER(page_id)
   IPC_STRUCT_TRAITS_MEMBER(nav_entry_id)
+  IPC_STRUCT_TRAITS_MEMBER(has_committed_real_load)
   IPC_STRUCT_TRAITS_MEMBER(intended_as_new_entry)
   IPC_STRUCT_TRAITS_MEMBER(pending_history_list_offset)
   IPC_STRUCT_TRAITS_MEMBER(current_history_list_offset)
@@ -404,6 +414,12 @@ IPC_STRUCT_END()
 IPC_MESSAGE_ROUTED1(FrameMsg_CompositorFrameSwapped,
                     FrameMsg_CompositorFrameSwapped_Params /* params */)
 
+IPC_MESSAGE_ROUTED4(FrameMsg_SetChildFrameSurface,
+                    cc::SurfaceId /* surface_id */,
+                    gfx::Size /* frame_size */,
+                    float /* scale_factor */,
+                    cc::SurfaceSequence /* sequence */)
+
 // Notifies the embedding frame that the process rendering the child frame's
 // contents has terminated.
 IPC_MESSAGE_ROUTED0(FrameMsg_ChildFrameProcessGone)
@@ -471,6 +487,11 @@ IPC_MESSAGE_ROUTED0(FrameMsg_DidStopLoading)
 // Request for the renderer to insert CSS into the frame.
 IPC_MESSAGE_ROUTED1(FrameMsg_CSSInsertRequest,
                     std::string  /* css */)
+
+// Add message to the devtools console.
+IPC_MESSAGE_ROUTED2(FrameMsg_AddMessageToConsole,
+                    content::ConsoleMessageLevel /* level */,
+                    std::string /* message */)
 
 // Request for the renderer to execute JavaScript in the frame's context.
 //
@@ -562,7 +583,7 @@ IPC_MESSAGE_ROUTED1(FrameMsg_SetAccessibilityMode,
 IPC_MESSAGE_ROUTED0(FrameMsg_DispatchLoad)
 
 // Notifies the frame that its parent has changed the frame's sandbox flags.
-IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateSandboxFlags, content::SandboxFlags)
+IPC_MESSAGE_ROUTED1(FrameMsg_DidUpdateSandboxFlags, blink::WebSandboxFlags)
 
 // Update a proxy's window.name property.  Used when the frame's name is
 // changed in another process.
@@ -635,10 +656,11 @@ IPC_MESSAGE_ROUTED4(FrameHostMsg_AddMessageToConsole,
 //
 // Each of these messages will have a corresponding FrameHostMsg_Detach message
 // sent when the frame is detached from the DOM.
-IPC_SYNC_MESSAGE_CONTROL3_1(FrameHostMsg_CreateChildFrame,
+IPC_SYNC_MESSAGE_CONTROL4_1(FrameHostMsg_CreateChildFrame,
                             int32 /* parent_routing_id */,
+                            blink::WebTreeScopeType /* scope */,
                             std::string /* frame_name */,
-                            content::SandboxFlags /* sandbox flags */,
+                            blink::WebSandboxFlags /* sandbox flags */,
                             int32 /* new_routing_id */)
 
 // Sent by the renderer to the parent RenderFrameHost when a child frame is
@@ -727,7 +749,7 @@ IPC_MESSAGE_ROUTED1(FrameHostMsg_DidAssignPageId,
 // frame.
 IPC_MESSAGE_ROUTED2(FrameHostMsg_DidChangeSandboxFlags,
                     int32 /* subframe_routing_id */,
-                    content::SandboxFlags /* updated_flags */)
+                    blink::WebSandboxFlags /* updated_flags */)
 
 // Changes the title for the page in the UI when the page is navigated or the
 // title changes. Sent for top-level frames.
@@ -774,6 +796,14 @@ IPC_SYNC_MESSAGE_CONTROL3_1(FrameHostMsg_CookiesEnabled,
                             bool /* cookies_enabled */)
 
 #if defined(ENABLE_PLUGINS)
+// Notification sent from a renderer to the browser that a Pepper plugin
+// instance is created in the DOM.
+IPC_MESSAGE_ROUTED0(FrameHostMsg_PepperInstanceCreated)
+
+// Notification sent from a renderer to the browser that a Pepper plugin
+// instance is deleted from the DOM.
+IPC_MESSAGE_ROUTED0(FrameHostMsg_PepperInstanceDeleted)
+
 // Sent to the browser when the renderer detects it is blocked on a pepper
 // plugin message for too long. This is also sent when it becomes unhung
 // (according to the value of is_hung). The browser can give the user the
@@ -830,6 +860,16 @@ IPC_SYNC_MESSAGE_CONTROL4_2(FrameHostMsg_OpenChannelToPlugin,
 // See FrameMsg_CompositorFrameSwapped
 IPC_MESSAGE_ROUTED1(FrameHostMsg_CompositorFrameSwappedACK,
                     FrameHostMsg_CompositorFrameSwappedACK_Params /* params */)
+
+// Satisfies a Surface destruction dependency associated with |sequence|.
+IPC_MESSAGE_ROUTED1(FrameHostMsg_SatisfySequence,
+                    cc::SurfaceSequence /* sequence */)
+
+// Creates a destruction dependency for the Surface specified by the given
+// |surface_id|.
+IPC_MESSAGE_ROUTED2(FrameHostMsg_RequireSequence,
+                    cc::SurfaceId /* surface_id */,
+                    cc::SurfaceSequence /* sequence */)
 
 // Provides the result from handling BeforeUnload.  |proceed| matches the return
 // value of the frame's beforeunload handler: true if the user decided to

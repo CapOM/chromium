@@ -9,6 +9,7 @@
 
 #include "base/compiler_specific.h"
 #include "content/common/content_export.h"
+#include "content/common/devtools_messages.h"
 #include "content/public/browser/devtools_agent_host.h"
 
 namespace IPC {
@@ -18,7 +19,6 @@ class Message;
 namespace content {
 
 class BrowserContext;
-class DevToolsProtocolHandler;
 
 // Describes interface for managing devtools agents from the browser process.
 class CONTENT_EXPORT DevToolsAgentHostImpl : public DevToolsAgentHost {
@@ -28,9 +28,6 @@ class CONTENT_EXPORT DevToolsAgentHostImpl : public DevToolsAgentHost {
 
   // Informs the hosted agent that a client host has detached.
   virtual void Detach() = 0;
-
-  // Sends a message to the agent.
-  bool DispatchProtocolMessage(const std::string& message) override;
 
   // Opens the inspector for this host.
   void Inspect(BrowserContext* browser_context);
@@ -50,11 +47,11 @@ class CONTENT_EXPORT DevToolsAgentHostImpl : public DevToolsAgentHost {
   DevToolsAgentHostImpl();
   ~DevToolsAgentHostImpl() override;
 
-  scoped_ptr<DevToolsProtocolHandler> protocol_handler_;
+  std::string state_cookie_;
 
-  void set_handle_all_protocol_commands() { handle_all_commands_ = true; }
   void HostClosed();
   void SendMessageToClient(const std::string& message);
+  void ProcessChunkedMessageFromAgent(const DevToolsMessageChunk& chunk);
   static void NotifyCallbacks(DevToolsAgentHostImpl* agent_host, bool attached);
 
  private:
@@ -62,7 +59,8 @@ class CONTENT_EXPORT DevToolsAgentHostImpl : public DevToolsAgentHost {
 
   const std::string id_;
   DevToolsAgentHostClient* client_;
-  bool handle_all_commands_;
+  std::string message_buffer_;
+  uint32 message_buffer_size_;
 };
 
 }  // namespace content

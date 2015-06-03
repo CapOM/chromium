@@ -18,6 +18,7 @@
 #include "content/common/accessibility_mode_enums.h"
 #include "content/common/frame_message_enums.h"
 #include "content/common/mojo/service_registry_impl.h"
+#include "content/public/common/console_message_level.h"
 #include "content/public/common/javascript_message_type.h"
 #include "content/public/common/referrer.h"
 #include "content/public/renderer/render_frame.h"
@@ -103,7 +104,6 @@ class RenderWidget;
 class RenderWidgetFullscreenPepper;
 class ScreenOrientationDispatcher;
 class UserMediaClientImpl;
-enum class SandboxFlags;
 struct CommonNavigationParams;
 struct CustomContextMenuContext;
 struct FrameReplicationState;
@@ -156,12 +156,6 @@ class CONTENT_EXPORT RenderFrameImpl
                                                              int32);
   static void InstallCreateHook(
       CreateRenderFrameImplFunction create_render_frame_impl);
-
-  static content::SandboxFlags WebToContentSandboxFlags(
-      blink::WebSandboxFlags flags);
-
-  static blink::WebSandboxFlags ContentToWebSandboxFlags(
-      content::SandboxFlags flags);
 
   virtual ~RenderFrameImpl();
 
@@ -365,6 +359,11 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual void didAccessInitialDocument(blink::WebLocalFrame* frame);
   virtual blink::WebFrame* createChildFrame(
       blink::WebLocalFrame* parent,
+      blink::WebTreeScopeType scope,
+      const blink::WebString& name,
+      blink::WebSandboxFlags sandboxFlags);
+  virtual blink::WebFrame* createChildFrame(
+      blink::WebLocalFrame* parent,
       const blink::WebString& name,
       blink::WebSandboxFlags sandboxFlags);
   virtual void didDisownOpener(blink::WebLocalFrame* frame);
@@ -401,10 +400,6 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual void didCreateDataSource(blink::WebLocalFrame* frame,
                                    blink::WebDataSource* datasource);
   virtual void didStartProvisionalLoad(blink::WebLocalFrame* frame,
-                                       double triggering_event_time);
-  // TODO(dglazkov): Remove once Navigation Transitions are gone from Blink.
-  virtual void didStartProvisionalLoad(blink::WebLocalFrame* frame,
-                                       bool is_transition_navigation,
                                        double triggering_event_time);
   virtual void didReceiveServerRedirectForProvisionalLoad(
       blink::WebLocalFrame* frame);
@@ -634,6 +629,8 @@ class CONTENT_EXPORT RenderFrameImpl
   void OnReplace(const base::string16& text);
   void OnReplaceMisspelling(const base::string16& text);
   void OnCSSInsertRequest(const std::string& css);
+  void OnAddMessageToConsole(ConsoleMessageLevel level,
+                             const std::string& message);
   void OnJavaScriptExecuteRequest(const base::string16& javascript,
                                   int id,
                                   bool notify_result);
@@ -657,7 +654,7 @@ class CONTENT_EXPORT RenderFrameImpl
   void OnSetAccessibilityMode(AccessibilityMode new_mode);
   void OnSnapshotAccessibilityTree(int callback_id);
   void OnDisownOpener();
-  void OnDidUpdateSandboxFlags(SandboxFlags flags);
+  void OnDidUpdateSandboxFlags(blink::WebSandboxFlags flags);
   void OnTextTrackSettingsChanged(
       const FrameMsg_TextTrackSettings_Params& params);
   void OnPostMessageEvent(const FrameMsg_PostMessage_Params& params);
@@ -748,8 +745,7 @@ class CONTENT_EXPORT RenderFrameImpl
       blink::WebMediaPlayerClient* client);
 
   // Creates a factory object used for creating audio and video renderers.
-  // The method is virtual so that layouttests can override it.
-  virtual scoped_ptr<MediaStreamRendererFactory> CreateRendererFactory();
+  scoped_ptr<MediaStreamRendererFactory> CreateRendererFactory();
 
   // Checks that the RenderView is ready to display the navigation to |url|. If
   // the return value is false, the navigation should be abandoned.

@@ -88,15 +88,16 @@ void CompareFixedBoundsLayerAndNormalLayer(const WebFloatPoint& anchor_point,
 
   scoped_ptr<WebLayerImplFixedBounds> root_layer(new WebLayerImplFixedBounds());
 
-  WebLayerImplFixedBounds* fixed_bounds_layer =
-      new WebLayerImplFixedBounds(cc::PictureImageLayer::Create());
+  WebLayerImplFixedBounds* fixed_bounds_layer = new WebLayerImplFixedBounds(
+      cc::PictureImageLayer::Create(WebLayerImpl::LayerSettings()));
   fixed_bounds_layer->setBounds(bounds);
   fixed_bounds_layer->SetFixedBounds(fixed_bounds);
   fixed_bounds_layer->setTransform(transform.matrix());
   fixed_bounds_layer->setPosition(position);
   root_layer->addChild(fixed_bounds_layer);
 
-  WebLayerImpl* normal_layer(new WebLayerImpl(cc::PictureImageLayer::Create()));
+  WebLayerImpl* normal_layer(
+      new WebLayerImpl(cc::PictureImageLayer::Create(cc::LayerSettings())));
 
   normal_layer->setBounds(bounds);
   normal_layer->setTransform(transform.matrix());
@@ -114,7 +115,7 @@ void CompareFixedBoundsLayerAndNormalLayer(const WebFloatPoint& anchor_point,
         root_layer->layer(), kDeviceViewportSize, &render_surface_layer_list);
     inputs.device_scale_factor = kDeviceScaleFactor;
     inputs.page_scale_factor = kPageScaleFactor;
-    inputs.page_scale_application_layer = root_layer->layer(),
+    inputs.page_scale_layer = root_layer->layer(),
     cc::LayerTreeHostCommon::CalculateDrawProperties(&inputs);
 
     ExpectEqualLayerRectsInTarget(normal_layer->layer(),
@@ -131,7 +132,7 @@ void CompareFixedBoundsLayerAndNormalLayer(const WebFloatPoint& anchor_point,
         root_layer->layer(), kDeviceViewportSize, &render_surface_layer_list);
     inputs.device_scale_factor = kDeviceScaleFactor;
     inputs.page_scale_factor = kPageScaleFactor;
-    inputs.page_scale_application_layer = root_layer->layer(),
+    inputs.page_scale_layer = root_layer->layer(),
     cc::LayerTreeHostCommon::CalculateDrawProperties(&inputs);
 
     ExpectEqualLayerRectsInTarget(normal_layer->layer(),

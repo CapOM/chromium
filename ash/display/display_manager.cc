@@ -140,9 +140,6 @@ DisplayManager::DisplayManager()
   if (base::SysInfo::IsRunningOnChromeOS())
     DisplayInfo::SetUse125DSFForUIScaling(true);
 
-  if (switches::UnifiedDesktopEnabled())
-    default_multi_display_mode_ = UNIFIED;
-
   change_display_upon_host_resize_ = !base::SysInfo::IsRunningOnChromeOS();
 #endif
   gfx::Screen::SetScreenInstance(gfx::SCREEN_TYPE_ALTERNATE, screen_.get());
@@ -340,6 +337,7 @@ void DisplayManager::SetDisplayRotation(int64 display_id,
                                         gfx::Display::Rotation rotation,
                                         gfx::Display::RotationSource source) {
   DisplayInfoList display_info_list;
+  bool is_active = false;
   for (const auto& display : active_display_list_) {
     DisplayInfo info = GetDisplayInfo(display.id());
     if (info.id() == display_id) {
@@ -348,11 +346,17 @@ void DisplayManager::SetDisplayRotation(int64 display_id,
         return;
       }
       info.SetRotation(rotation, source);
+      is_active = true;
     }
     display_info_list.push_back(info);
   }
-  AddMirrorDisplayInfoIfAny(&display_info_list);
-  UpdateDisplays(display_info_list);
+  if (is_active) {
+    AddMirrorDisplayInfoIfAny(&display_info_list);
+    UpdateDisplays(display_info_list);
+  } else if (display_info_.find(display_id) != display_info_.end()) {
+    // Inactive displays can reactivate, ensure they have been updated.
+    display_info_[display_id].SetRotation(rotation, source);
+  }
 }
 
 bool DisplayManager::SetDisplayUIScale(int64 display_id,
@@ -638,16 +642,47 @@ void DisplayManager::OnNativeDisplaysChanged(
     else if (display_modes_.find(iter->id()) != display_modes_.end())
       display_modes_[iter->id()] = *display_modes_iter;
   }
-  if (gfx::Display::HasInternalDisplay() && !internal_display_connected &&
-      display_info_.find(gfx::Display::InternalDisplayId()) ==
-          display_info_.end()) {
-    DisplayInfo internal_display_info(
-        gfx::Display::InternalDisplayId(),
-        l10n_util::GetStringUTF8(IDS_ASH_INTERNAL_DISPLAY_NAME),
-        false  /*Internal display must not have overscan */);
-    internal_display_info.SetBounds(gfx::Rect(0, 0, 800, 600));
-    display_info_[gfx::Display::InternalDisplayId()] = internal_display_info;
+  if (gfx::Display::HasInternalDisplay() && !internal_display_connected) {
+    if (display_info_.find(gfx::Display::InternalDisplayId()) ==
+        display_info_.end()) {
+      // Create a dummy internal display if the chrome restarted
+      // in docked mode.
+      DisplayInfo internal_display_info(
+          gfx::Display::InternalDisplayId(),
+          l10n_util::GetStringUTF8(IDS_ASH_INTERNAL_DISPLAY_NAME),
+          false /*Internal display must not have overscan */);
+      internal_display_info.SetBounds(gfx::Rect(0, 0, 800, 600));
+      display_info_[gfx::Display::InternalDisplayId()] = internal_display_info;
+    } else {
+      // Internal display is no longer active. Reset its rotation to user
+      // preference, so that it is restored when the internal display becomes
+      // active again.
+      gfx::Display::Rotation user_rotation =
+          display_info_[gfx::Display::InternalDisplayId()].GetRotation(
+              gfx::Display::ROTATION_SOURCE_USER);
+      display_info_[gfx::Display::InternalDisplayId()].SetRotation(
+          user_rotation, gfx::Display::ROTATION_SOURCE_USER);
+    }
   }
+
+#if defined(OS_CHROMEOS)
+  if (new_display_info_list.size() > 1) {
+    std::sort(new_display_info_list.begin(), new_display_info_list.end(),
+              DisplayInfoSortFunctor());
+    DisplayIdPair pair = std::make_pair(new_display_info_list[0].id(),
+                                        new_display_info_list[1].id());
+    DisplayLayout layout = layout_store_->GetRegisteredDisplayLayout(pair);
+    default_multi_display_mode_ =
+        (layout.default_unified && switches::UnifiedDesktopEnabled())
+            ? UNIFIED
+            : EXTENDED;
+    // Mirror mode is set by DisplayConfigurator on the device.
+    // Emulate it when running on linux desktop.
+    if (!base::SysInfo::IsRunningOnChromeOS() && layout.mirrored)
+      SetMultiDisplayMode(MIRRORING);
+  }
+#endif
+
   UpdateDisplays(new_display_info_list);
 }
 

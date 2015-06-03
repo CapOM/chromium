@@ -276,6 +276,7 @@ const Extension* ExtensionBrowserTest::LoadExtensionAsComponentWithManifest(
     return NULL;
   }
 
+  service->component_loader()->set_ignore_whitelist_for_testing(true);
   std::string extension_id = service->component_loader()->Add(manifest, path);
   const Extension* extension =
       registry->enabled_extensions().GetByID(extension_id);
@@ -617,6 +618,9 @@ void ExtensionBrowserTest::OpenWindow(content::WebContents* contents,
 
 void ExtensionBrowserTest::NavigateInRenderer(content::WebContents* contents,
                                               const GURL& url) {
+  // Ensure any existing navigations complete before trying to navigate anew, to
+  // avoid triggering of the unload event for the wrong navigation.
+  content::WaitForLoadStop(contents);
   bool result = false;
   content::WindowedNotificationObserver windowed_observer(
       content::NOTIFICATION_LOAD_STOP,

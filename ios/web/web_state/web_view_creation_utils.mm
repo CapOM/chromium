@@ -10,6 +10,7 @@
 #include "base/logging.h"
 #include "base/mac/scoped_nsobject.h"
 #import "ios/web/alloc_with_zone_interceptor.h"
+#import "ios/web/public/browsing_data_partition.h"
 #include "ios/web/public/browser_state.h"
 #include "ios/web/public/web_client.h"
 #include "ios/web/ui_web_view_util.h"
@@ -126,8 +127,16 @@ UIWebView* CreateWebView(CGRect frame) {
 
 WKWebView* CreateWKWebView(CGRect frame,
                            WKWebViewConfiguration* configuration,
+                           BrowserState* browser_state,
                            NSString* request_group_id,
                            BOOL use_desktop_user_agent) {
+  DCHECK(browser_state);
+  DCHECK(web::BrowsingDataPartition::IsSynchronized());
+
+  WKWebViewConfigurationProvider& config_provider =
+      WKWebViewConfigurationProvider::FromBrowserState(browser_state);
+  DCHECK_EQ([config_provider.GetWebViewConfiguration() processPool],
+            [configuration processPool]);
   web::BuildAndRegisterUserAgentForUIWebView(request_group_id,
                                              use_desktop_user_agent);
   return CreateWKWebViewWithConfiguration(frame, configuration);
@@ -135,6 +144,8 @@ WKWebView* CreateWKWebView(CGRect frame,
 
 WKWebView* CreateWKWebView(CGRect frame, BrowserState* browser_state) {
   DCHECK(browser_state);
+  DCHECK(web::BrowsingDataPartition::IsSynchronized());
+
   WKWebViewConfigurationProvider& config_provider =
       WKWebViewConfigurationProvider::FromBrowserState(browser_state);
   return CreateWKWebViewWithConfiguration(
@@ -155,6 +166,8 @@ id<CRWSimpleWebViewController> CreateSimpleWebViewController(
     CGRect frame,
     BrowserState* browser_state,
     WebViewType web_view_type) {
+  DCHECK(web::BrowsingDataPartition::IsSynchronized());
+
   // Transparently return the correct subclass.
   if (web_view_type == WK_WEB_VIEW_TYPE) {
     base::scoped_nsobject<WKWebView> web_view(
@@ -169,6 +182,8 @@ id<CRWSimpleWebViewController> CreateStaticFileSimpleWebViewController(
     CGRect frame,
     BrowserState* browser_state,
     WebViewType web_view_type) {
+  DCHECK(web::BrowsingDataPartition::IsSynchronized());
+
   // Transparently return the correct subclass.
   if (web_view_type == WK_WEB_VIEW_TYPE) {
     // TOOD(shreyasv): Create a new util function vending a WKWebView, wrap that

@@ -56,28 +56,29 @@ TEST(ParseBrowserInfo, BlinkVersionContainsGitHash) {
 
 TEST(ParseBrowserString, KitKatWebView) {
   BrowserInfo browser_info;
-  Status status = ParseBrowserString(
-      false, "Version/4.0 Chrome/30.0.0.0", &browser_info);
+  browser_info.is_android = true;
+  Status status =
+      ParseBrowserString("Version/4.0 Chrome/30.0.0.0", &browser_info);
   ASSERT_TRUE(status.IsOk());
   ASSERT_EQ("webview", browser_info.browser_name);
-  ASSERT_EQ(std::string(), browser_info.browser_version);
+  ASSERT_EQ("30.0.0.0", browser_info.browser_version);
   ASSERT_EQ(kToTBuildNo, browser_info.build_no);
 }
 
 TEST(ParseBrowserString, LollipopWebView) {
   BrowserInfo browser_info;
-  Status status = ParseBrowserString(
-      true, "Chrome/37.0.0.0", &browser_info);
+  browser_info.is_android = true;
+  Status status = ParseBrowserString("Chrome/37.0.0.0", &browser_info);
   ASSERT_TRUE(status.IsOk());
   ASSERT_EQ("webview", browser_info.browser_name);
-  ASSERT_EQ(std::string(), browser_info.browser_version);
+  ASSERT_EQ("37.0.0.0", browser_info.browser_version);
   ASSERT_EQ(kToTBuildNo, browser_info.build_no);
 }
 
 TEST(ParseBrowserString, AndroidChrome) {
   BrowserInfo browser_info;
-  Status status = ParseBrowserString(
-      true, "Chrome/39.0.2171.59", &browser_info);
+  browser_info.is_android = true;
+  Status status = ParseBrowserString("Chrome/39.0.2171.59", &browser_info);
   ASSERT_TRUE(status.IsOk());
   ASSERT_EQ("chrome", browser_info.browser_name);
   ASSERT_EQ("39.0.2171.59", browser_info.browser_version);
@@ -86,8 +87,8 @@ TEST(ParseBrowserString, AndroidChrome) {
 
 TEST(ParseBrowserString, DesktopChrome) {
   BrowserInfo browser_info;
-  Status status = ParseBrowserString(
-      false, "Chrome/39.0.2171.59", &browser_info);
+  browser_info.is_android = false;
+  Status status = ParseBrowserString("Chrome/39.0.2171.59", &browser_info);
   ASSERT_TRUE(status.IsOk());
   ASSERT_EQ("chrome", browser_info.browser_name);
   ASSERT_EQ("39.0.2171.59", browser_info.browser_version);

@@ -85,7 +85,8 @@ class CC_EXPORT ResourceProvider {
       BlockingTaskRunner* blocking_main_thread_task_runner,
       int highp_threshold_min,
       bool use_rgba_4444_texture_format,
-      size_t id_allocation_chunk_size);
+      size_t id_allocation_chunk_size,
+      bool use_persistent_map_for_gpu_memory_buffers);
   virtual ~ResourceProvider();
 
   void DidLoseOutputSurface() { lost_output_surface_ = true; }
@@ -97,6 +98,9 @@ class CC_EXPORT ResourceProvider {
   ResourceFormat best_texture_format() const { return best_texture_format_; }
   ResourceFormat yuv_resource_format() const { return yuv_resource_format_; }
   bool use_sync_query() const { return use_sync_query_; }
+  bool use_persistent_map_for_gpu_memory_buffers() const {
+    return use_persistent_map_for_gpu_memory_buffers_;
+  }
   size_t num_resources() const { return resources_.size(); }
 
   // Checks whether a resource is in use by a consumer.
@@ -424,8 +428,10 @@ class CC_EXPORT ResourceProvider {
   // Indicates if we can currently lock this resource for write.
   bool CanLockForWrite(ResourceId id);
 
-  // Copy pixels from source to destination.
-  void CopyResource(ResourceId source_id, ResourceId dest_id);
+  // Copy |rect| pixels from source to destination.
+  void CopyResource(ResourceId source_id,
+                    ResourceId dest_id,
+                    const gfx::Rect& rect);
 
   void WaitSyncPointIfNeeded(ResourceId id);
 
@@ -436,6 +442,17 @@ class CC_EXPORT ResourceProvider {
   OutputSurface* output_surface() { return output_surface_; }
 
   void ValidateResource(ResourceId id) const;
+
+ protected:
+  ResourceProvider(OutputSurface* output_surface,
+                   SharedBitmapManager* shared_bitmap_manager,
+                   gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager,
+                   BlockingTaskRunner* blocking_main_thread_task_runner,
+                   int highp_threshold_min,
+                   bool use_rgba_4444_texture_format,
+                   size_t id_allocation_chunk_size,
+                   bool use_persistent_map_for_gpu_memory_buffers);
+  void Initialize();
 
  private:
   struct Resource {
@@ -524,18 +541,6 @@ class CC_EXPORT ResourceProvider {
            resource->read_lock_fence->HasPassed();
   }
 
-  ResourceProvider(OutputSurface* output_surface,
-                   SharedBitmapManager* shared_bitmap_manager,
-                   gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager,
-                   BlockingTaskRunner* blocking_main_thread_task_runner,
-                   int highp_threshold_min,
-                   ResourceType default_resource_type,
-                   bool use_rgba_4444_texture_format,
-                   size_t id_allocation_chunk_size);
-
-  void InitializeSoftware();
-  void InitializeGL();
-
   Resource* InsertResource(ResourceId id, const Resource& resource);
   Resource* GetResource(ResourceId id);
   const Resource* LockForRead(ResourceId id);
@@ -582,7 +587,7 @@ class CC_EXPORT ResourceProvider {
   int next_child_;
   ChildMap children_;
 
-  const ResourceType default_resource_type_;
+  ResourceType default_resource_type_;
   bool use_texture_storage_ext_;
   bool use_texture_format_bgra_;
   bool use_texture_usage_hint_;
@@ -602,6 +607,7 @@ class CC_EXPORT ResourceProvider {
   scoped_ptr<IdAllocator> buffer_id_allocator_;
 
   bool use_sync_query_;
+  bool use_persistent_map_for_gpu_memory_buffers_;
   // Fence used for CopyResource if CHROMIUM_sync_query is not supported.
   scoped_refptr<SynchronousFence> synchronous_fence_;
 

@@ -56,6 +56,8 @@
       'sources': [
         'cdm/browser_cdm_cast.cc',
         'cdm/browser_cdm_cast.h',
+        'cdm/chromecast_init_data.cc',
+        'cdm/chromecast_init_data.h',
       ],
       'conditions': [
         ['use_playready==1', {
@@ -116,22 +118,26 @@
       'sources': [
         'cma/backend/audio_pipeline_device.cc',
         'cma/backend/audio_pipeline_device.h',
+        'cma/backend/audio_pipeline_device_default.cc',
+        'cma/backend/audio_pipeline_device_default.h',
         'cma/backend/media_clock_device.cc',
         'cma/backend/media_clock_device.h',
+        'cma/backend/media_clock_device_default.cc',
+        'cma/backend/media_clock_device_default.h',
         'cma/backend/media_component_device.cc',
         'cma/backend/media_component_device.h',
+        'cma/backend/media_component_device_default.cc',
+        'cma/backend/media_component_device_default.h',
         'cma/backend/media_pipeline_device.cc',
         'cma/backend/media_pipeline_device.h',
-        'cma/backend/media_pipeline_device_fake.cc',
-        'cma/backend/media_pipeline_device_fake.h',
+        'cma/backend/media_pipeline_device_default.cc',
+        'cma/backend/media_pipeline_device_default.h',
         'cma/backend/media_pipeline_device_params.cc',
         'cma/backend/media_pipeline_device_params.h',
         'cma/backend/video_pipeline_device.cc',
+        'cma/backend/video_pipeline_device_default.cc',
+        'cma/backend/video_pipeline_device_default.h',
         'cma/backend/video_pipeline_device.h',
-        'cma/backend/video_plane.cc',
-        'cma/backend/video_plane.h',
-        'cma/backend/video_plane_fake.cc',
-        'cma/backend/video_plane_fake.h',
       ],
       'conditions': [
         ['chromecast_branding=="Chrome"', {
@@ -140,8 +146,7 @@
           ],
         }, {
           'sources': [
-            'cma/backend/media_pipeline_device_fake_factory.cc',
-            'cma/backend/video_plane_fake_factory.cc',
+            'cma/backend/media_pipeline_device_default_factory.cc',
           ],
         }],
       ],
@@ -265,6 +270,7 @@
         '../../testing/gtest.gyp:gtest_main',
       ],
       'sources': [
+        'cdm/chromecast_init_data_unittest.cc',
         'cma/backend/audio_video_pipeline_device_unittest.cc',
         'cma/base/balanced_media_task_runner_unittest.cc',
         'cma/base/buffering_controller_unittest.cc',
@@ -274,6 +280,7 @@
         'cma/ipc/media_message_unittest.cc',
         'cma/ipc_streamer/av_streamer_unittest.cc',
         'cma/pipeline/audio_video_pipeline_impl_unittest.cc',
+        'cma/test/cma_end_to_end_test.cc',
         'cma/test/frame_generator_for_test.cc',
         'cma/test/frame_generator_for_test.h',
         'cma/test/frame_segmenter_for_test.cc',

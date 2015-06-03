@@ -12,17 +12,20 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/files/file_util.h"
-#include "base/message_loop/message_loop.h"
+#include "base/location.h"
 #include "base/metrics/histogram.h"
 #include "base/path_service.h"
 #include "base/process/launch.h"
 #include "base/process/process_iterator.h"
 #include "base/rand_util.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/sys_byteorder.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "base/win/windows_version.h"
 #include "build/build_config.h"
@@ -48,7 +51,7 @@
 #include "ipc/ipc_switches.h"
 #include "native_client/src/shared/imc/nacl_imc_c.h"
 #include "net/base/net_util.h"
-#include "net/socket/tcp_listen_socket.h"
+#include "net/socket/socket_descriptor.h"
 #include "ppapi/host/host_factory.h"
 #include "ppapi/host/ppapi_host.h"
 #include "ppapi/proxy/ppapi_messages.h"
@@ -58,6 +61,8 @@
 #if defined(OS_POSIX)
 
 #include <fcntl.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
 
 #include "ipc/ipc_channel_posix.h"
 #elif defined(OS_WIN)
@@ -819,16 +824,46 @@ void NaClProcessHost::SetDebugStubPort(int port) {
 static const uint16_t kInitialDebugStubPort = 4014;
 
 net::SocketDescriptor NaClProcessHost::GetDebugStubSocketHandle() {
-  net::SocketDescriptor s = net::kInvalidSocket;
   // We always try to allocate the default port first. If this fails, we then
   // allocate any available port.
   // On success, if the test system has register a handler
   // (GdbDebugStubPortListener), we fire a notification.
   uint16 port = kInitialDebugStubPort;
-  s = net::TCPListenSocket::CreateAndBind("127.0.0.1", port);
-  if (s == net::kInvalidSocket) {
-    s = net::TCPListenSocket::CreateAndBindAnyPort("127.0.0.1", &port);
+  net::SocketDescriptor s =
+      net::CreatePlatformSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if (s != net::kInvalidSocket) {
+    // Allow rapid reuse.
+    static const int kOn = 1;
+    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &kOn, sizeof(kOn));
+
+    sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    addr.sin_port = base::HostToNet16(port);
+    if (bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr))) {
+      // Try allocate any available port.
+      addr.sin_port = base::HostToNet16(0);
+      if (bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr))) {
+        close(s);
+        LOG(ERROR) << "Could not bind socket to port" << port;
+        s = net::kInvalidSocket;
+      } else {
+        sockaddr_in sock_addr;
+        socklen_t sock_addr_size = sizeof(sock_addr);
+        if (getsockname(s, reinterpret_cast<struct sockaddr*>(&sock_addr),
+                        &sock_addr_size) != 0 ||
+            sock_addr_size != sizeof(sock_addr)) {
+          LOG(ERROR) << "Could not determine bound port, getsockname() failed";
+          close(s);
+          s = net::kInvalidSocket;
+        } else {
+          port = base::NetToHost16(sock_addr.sin_port);
+        }
+      }
+    }
   }
+
   if (s != net::kInvalidSocket) {
     SetDebugStubPort(port);
   }
@@ -1100,10 +1135,8 @@ bool NaClProcessHost::StartPPAPIProxy(ScopedChannelHandle channel_handle) {
   DCHECK_EQ(PROCESS_TYPE_NACL_LOADER, process_->GetData().process_type);
 
   ipc_proxy_channel_ = IPC::ChannelProxy::Create(
-      channel_handle.release(),
-      IPC::Channel::MODE_CLIENT,
-      NULL,
-      base::MessageLoopProxy::current().get());
+      channel_handle.release(), IPC::Channel::MODE_CLIENT, NULL,
+      base::ThreadTaskRunnerHandle::Get().get());
   // Create the browser ppapi host and enable PPAPI message dispatching to the
   // browser process.
   ppapi_host_.reset(content::BrowserPpapiHost::CreateExternalPluginProcess(
@@ -1350,8 +1383,7 @@ bool NaClProcessHost::AttachDebugExceptionHandler(const std::string& info,
                info);
   } else {
     NaClStartDebugExceptionHandlerThread(
-        process.Pass(), info,
-        base::MessageLoopProxy::current(),
+        process.Pass(), info, base::ThreadTaskRunnerHandle::Get(),
         base::Bind(&NaClProcessHost::OnDebugExceptionHandlerLaunchedByBroker,
                    weak_factory_.GetWeakPtr()));
     return true;

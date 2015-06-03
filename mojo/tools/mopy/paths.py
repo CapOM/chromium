@@ -15,8 +15,6 @@ class Paths(object):
     self.src_root = os.path.abspath(os.path.join(__file__,
       os.pardir, os.pardir, os.pardir, os.pardir))
     self.mojo_dir = os.path.join(self.src_root, "mojo")
-    self.adb_path = os.path.join(self.src_root, 'third_party', 'android_tools',
-                                 'sdk', 'platform-tools', 'adb')
 
     self.build_dir = config.build_dir
     if self.build_dir is None:
@@ -38,7 +36,9 @@ class Paths(object):
     if config.target_os == Config.OS_WINDOWS:
       self.mojo_runner += ".exe"
     if config.target_os == Config.OS_ANDROID:
-      self.mojo_runner = os.path.join(self.build_dir, "apks", config.apk_name)
+      self.apk_path = os.path.join(self.build_dir, "apks", config.apk_name)
+      self.mojo_runner = os.path.join(self.src_root, "mojo", "tools",
+                                      "android_mojo_shell.py")
 
   def RelPath(self, path):
     """Returns the given path, relative to the current directory."""

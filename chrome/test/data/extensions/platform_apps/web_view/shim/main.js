@@ -2537,14 +2537,6 @@ function testResizeEvents() {
     embedder.test.assertEq(e.newHeight, 400)
   }
 
-  var resizeListener = function(e) {
-    webview.onresize = null;
-    webview.oncontentresize = contentResizeListener;
-
-    console.log('onresize');
-    checkSizes(e);
-  };
-
   var contentResizeListener = function(e) {
     webview.oncontentresize = null;
 
@@ -2555,7 +2547,7 @@ function testResizeEvents() {
 
   var loadstopListener = function(e) {
     webview.removeEventListener('loadstop', loadstopListener);
-    webview.onresize = resizeListener;
+    webview.oncontentresize = contentResizeListener;
 
     console.log('Resizing <webview> width from 600px to 500px.');
     webview.style.width = '500px';
@@ -2687,6 +2679,13 @@ function testPlugin() {
   document.body.appendChild(webview);
 }
 
+function testGarbageCollect() {
+  var webview = new WebView();
+  webview = null;
+  window.gc();
+  embedder.test.succeed();
+}
+
 embedder.test.testList = {
   'testAllowTransparencyAttribute': testAllowTransparencyAttribute,
   'testAutosizeHeight': testAutosizeHeight,
@@ -2785,6 +2784,7 @@ embedder.test.testList = {
   'testDisabledZoomMode': testDisabledZoomMode,
   'testZoomBeforeNavigation': testZoomBeforeNavigation,
   'testPlugin': testPlugin,
+  'testGarbageCollect': testGarbageCollect
 };
 
 onload = function() {

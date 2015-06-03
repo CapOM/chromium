@@ -168,8 +168,8 @@ void TraceEventTestFixture::OnTraceDataCollected(
   trace_buffer_.Finish();
 
   scoped_ptr<Value> root;
-  root.reset(base::JSONReader::Read(json_output_.json_output,
-                                    JSON_PARSE_RFC | JSON_DETACHABLE_CHILDREN));
+  root.reset(base::JSONReader::DeprecatedRead(
+      json_output_.json_output, JSON_PARSE_RFC | JSON_DETACHABLE_CHILDREN));
 
   if (!root.get()) {
     LOG(ERROR) << json_output_.json_output;
@@ -2296,10 +2296,10 @@ class TraceEventCallbackTest : public TraceEventTestFixture {
   std::vector<std::string> collected_events_categories_;
   std::vector<std::string> collected_events_names_;
   std::vector<unsigned char> collected_events_phases_;
-  std::vector<TimeTicks> collected_events_timestamps_;
+  std::vector<TraceTicks> collected_events_timestamps_;
 
   static TraceEventCallbackTest* s_instance;
-  static void Callback(TimeTicks timestamp,
+  static void Callback(TraceTicks timestamp,
                        char phase,
                        const unsigned char* category_group_enabled,
                        const char* name,
@@ -2498,11 +2498,9 @@ TEST_F(TraceEventTestFixture, TraceBufferVectorReportFull) {
       trace_log->CreateTraceBufferVectorOfSize(100));
   do {
     TRACE_EVENT_BEGIN_WITH_ID_TID_AND_TIMESTAMP0(
-        "all", "with_timestamp", 0, 0,
-        TimeTicks::NowFromSystemTraceTime().ToInternalValue());
+        "all", "with_timestamp", 0, 0, TraceTicks::Now().ToInternalValue());
     TRACE_EVENT_END_WITH_ID_TID_AND_TIMESTAMP0(
-        "all", "with_timestamp", 0, 0,
-        TimeTicks::NowFromSystemTraceTime().ToInternalValue());
+        "all", "with_timestamp", 0, 0, TraceTicks::Now().ToInternalValue());
   } while (!trace_log->BufferIsFull());
 
   EndTraceAndFlush();
@@ -2659,105 +2657,6 @@ TEST_F(TraceEventTestFixture, TraceRecordAsMuchAsPossibleMode) {
   TraceBuffer* buffer = TraceLog::GetInstance()->trace_buffer();
   EXPECT_EQ(512000000UL, buffer->Capacity());
   TraceLog::GetInstance()->SetDisabled();
-}
-
-// Test the category filter.
-TEST_F(TraceEventTestFixture, CategoryFilter) {
-  // Using the default filter.
-  CategoryFilter default_cf = CategoryFilter(
-      CategoryFilter::kDefaultCategoryFilterString);
-  std::string category_filter_str = default_cf.ToString();
-  EXPECT_STREQ("-*Debug,-*Test", category_filter_str.c_str());
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("not-excluded-category"));
-  EXPECT_FALSE(
-      default_cf.IsCategoryGroupEnabled("disabled-by-default-category"));
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("Category1,CategoryDebug"));
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("CategoryDebug,Category1"));
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("CategoryTest,Category2"));
-
-  // Make sure that upon an empty string, we fall back to the default filter.
-  default_cf = CategoryFilter();
-  category_filter_str = default_cf.ToString();
-  EXPECT_STREQ("-*Debug,-*Test", category_filter_str.c_str());
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("not-excluded-category"));
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("Category1,CategoryDebug"));
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("CategoryDebug,Category1"));
-  EXPECT_TRUE(default_cf.IsCategoryGroupEnabled("CategoryTest,Category2"));
-
-  // Using an arbitrary non-empty filter.
-  CategoryFilter cf("included,-excluded,inc_pattern*,-exc_pattern*");
-  category_filter_str = cf.ToString();
-  EXPECT_STREQ("included,inc_pattern*,-excluded,-exc_pattern*",
-               category_filter_str.c_str());
-  EXPECT_TRUE(cf.IsCategoryGroupEnabled("included"));
-  EXPECT_TRUE(cf.IsCategoryGroupEnabled("inc_pattern_category"));
-  EXPECT_FALSE(cf.IsCategoryGroupEnabled("exc_pattern_category"));
-  EXPECT_FALSE(cf.IsCategoryGroupEnabled("excluded"));
-  EXPECT_FALSE(cf.IsCategoryGroupEnabled("not-excluded-nor-included"));
-  EXPECT_FALSE(cf.IsCategoryGroupEnabled("Category1,CategoryDebug"));
-  EXPECT_FALSE(cf.IsCategoryGroupEnabled("CategoryDebug,Category1"));
-  EXPECT_FALSE(cf.IsCategoryGroupEnabled("CategoryTest,Category2"));
-
-  cf.Merge(default_cf);
-  category_filter_str = cf.ToString();
-  EXPECT_STREQ("-excluded,-exc_pattern*,-*Debug,-*Test",
-                category_filter_str.c_str());
-  cf.Clear();
-
-  CategoryFilter reconstructed_cf(category_filter_str);
-  category_filter_str = reconstructed_cf.ToString();
-  EXPECT_STREQ("-excluded,-exc_pattern*,-*Debug,-*Test",
-               category_filter_str.c_str());
-
-  // One included category.
-  CategoryFilter one_inc_cf("only_inc_cat");
-  category_filter_str = one_inc_cf.ToString();
-  EXPECT_STREQ("only_inc_cat", category_filter_str.c_str());
-
-  // One excluded category.
-  CategoryFilter one_exc_cf("-only_exc_cat");
-  category_filter_str = one_exc_cf.ToString();
-  EXPECT_STREQ("-only_exc_cat", category_filter_str.c_str());
-
-  // Enabling a disabled- category does not require all categories to be traced
-  // to be included.
-  CategoryFilter disabled_cat("disabled-by-default-cc,-excluded");
-  EXPECT_STREQ("disabled-by-default-cc,-excluded",
-               disabled_cat.ToString().c_str());
-  EXPECT_TRUE(disabled_cat.IsCategoryGroupEnabled("disabled-by-default-cc"));
-  EXPECT_TRUE(disabled_cat.IsCategoryGroupEnabled("some_other_group"));
-  EXPECT_FALSE(disabled_cat.IsCategoryGroupEnabled("excluded"));
-
-  // Enabled a disabled- category and also including makes all categories to
-  // be traced require including.
-  CategoryFilter disabled_inc_cat("disabled-by-default-cc,included");
-  EXPECT_STREQ("included,disabled-by-default-cc",
-               disabled_inc_cat.ToString().c_str());
-  EXPECT_TRUE(
-      disabled_inc_cat.IsCategoryGroupEnabled("disabled-by-default-cc"));
-  EXPECT_TRUE(disabled_inc_cat.IsCategoryGroupEnabled("included"));
-  EXPECT_FALSE(disabled_inc_cat.IsCategoryGroupEnabled("other_included"));
-
-  // Test that IsEmptyOrContainsLeadingOrTrailingWhitespace actually catches
-  // categories that are explicitly forbiden.
-  // This method is called in a DCHECK to assert that we don't have these types
-  // of strings as categories.
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      " bad_category "));
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      " bad_category"));
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      "bad_category "));
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      "   bad_category"));
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      "bad_category   "));
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      "   bad_category   "));
-  EXPECT_TRUE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      ""));
-  EXPECT_FALSE(CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-      "good_category"));
 }
 
 void BlockUntilStopped(WaitableEvent* task_start_event,
@@ -2974,7 +2873,7 @@ TEST_F(TraceEventTestFixture, EchoToConsoleTraceEventRecursion) {
 TEST_F(TraceEventTestFixture, TimeOffset) {
   BeginTrace();
   // Let TraceLog timer start from 0.
-  TimeDelta time_offset = TimeTicks::NowFromSystemTraceTime() - TimeTicks();
+  TimeDelta time_offset = TraceTicks::Now() - TraceTicks();
   TraceLog::GetInstance()->SetTimeOffset(time_offset);
 
   {
@@ -2982,17 +2881,15 @@ TEST_F(TraceEventTestFixture, TimeOffset) {
     TRACE_EVENT0("all", "duration2");
   }
   TRACE_EVENT_BEGIN_WITH_ID_TID_AND_TIMESTAMP0(
-      "all", "with_timestamp", 0, 0,
-      TimeTicks::NowFromSystemTraceTime().ToInternalValue());
+      "all", "with_timestamp", 0, 0, TraceTicks::Now().ToInternalValue());
   TRACE_EVENT_END_WITH_ID_TID_AND_TIMESTAMP0(
-      "all", "with_timestamp", 0, 0,
-      TimeTicks::NowFromSystemTraceTime().ToInternalValue());
+      "all", "with_timestamp", 0, 0, TraceTicks::Now().ToInternalValue());
 
   EndTraceAndFlush();
   DropTracedMetadataRecords();
 
   double end_time = static_cast<double>(
-      (TimeTicks::NowFromSystemTraceTime() - time_offset).ToInternalValue());
+      (TraceTicks::Now() - time_offset).ToInternalValue());
   double last_timestamp = 0;
   for (size_t i = 0; i < trace_parsed_.GetSize(); ++i) {
     const DictionaryValue* item;
@@ -3046,84 +2943,6 @@ TEST_F(TraceEventTestFixture, SyntheticDelayConfigurationToString) {
   const char config[] = "DELAY(test.Delay;16;oneshot)";
   CategoryFilter filter(config);
   EXPECT_EQ(config, filter.ToString());
-}
-
-TEST(TraceOptionsTest, TraceOptionsFromString) {
-  TraceOptions options;
-  EXPECT_TRUE(options.SetFromString("record-until-full"));
-  EXPECT_EQ(RECORD_UNTIL_FULL, options.record_mode);
-  EXPECT_FALSE(options.enable_sampling);
-  EXPECT_FALSE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString("record-continuously"));
-  EXPECT_EQ(RECORD_CONTINUOUSLY, options.record_mode);
-  EXPECT_FALSE(options.enable_sampling);
-  EXPECT_FALSE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString("trace-to-console"));
-  EXPECT_EQ(ECHO_TO_CONSOLE, options.record_mode);
-  EXPECT_FALSE(options.enable_sampling);
-  EXPECT_FALSE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString("record-as-much-as-possible"));
-  EXPECT_EQ(RECORD_AS_MUCH_AS_POSSIBLE, options.record_mode);
-  EXPECT_FALSE(options.enable_sampling);
-  EXPECT_FALSE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString("record-until-full, enable-sampling"));
-  EXPECT_EQ(RECORD_UNTIL_FULL, options.record_mode);
-  EXPECT_TRUE(options.enable_sampling);
-  EXPECT_FALSE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString("enable-systrace,record-continuously"));
-  EXPECT_EQ(RECORD_CONTINUOUSLY, options.record_mode);
-  EXPECT_FALSE(options.enable_sampling);
-  EXPECT_TRUE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString(
-      "enable-systrace, trace-to-console,enable-sampling"));
-  EXPECT_EQ(ECHO_TO_CONSOLE, options.record_mode);
-  EXPECT_TRUE(options.enable_sampling);
-  EXPECT_TRUE(options.enable_systrace);
-
-  EXPECT_TRUE(options.SetFromString(
-      "record-continuously,record-until-full,trace-to-console"));
-  EXPECT_EQ(ECHO_TO_CONSOLE, options.record_mode);
-  EXPECT_FALSE(options.enable_systrace);
-  EXPECT_FALSE(options.enable_sampling);
-
-  EXPECT_TRUE(options.SetFromString(""));
-  EXPECT_EQ(RECORD_UNTIL_FULL, options.record_mode);
-  EXPECT_FALSE(options.enable_systrace);
-  EXPECT_FALSE(options.enable_sampling);
-
-  EXPECT_FALSE(options.SetFromString("foo-bar-baz"));
-}
-
-TEST(TraceOptionsTest, TraceOptionsToString) {
-  // Test that we can intialize TraceOptions from a string got from
-  // TraceOptions.ToString() method to get a same TraceOptions.
-  TraceRecordMode modes[] = {RECORD_UNTIL_FULL,
-                             RECORD_CONTINUOUSLY,
-                             ECHO_TO_CONSOLE,
-                             RECORD_AS_MUCH_AS_POSSIBLE};
-  bool enable_sampling_options[] = {true, false};
-  bool enable_systrace_options[] = {true, false};
-
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 2; ++j) {
-      for (int k = 0; k < 2; ++k) {
-        TraceOptions original_option = TraceOptions(modes[i]);
-        original_option.enable_sampling = enable_sampling_options[j];
-        original_option.enable_systrace = enable_systrace_options[k];
-        TraceOptions new_options;
-        EXPECT_TRUE(new_options.SetFromString(original_option.ToString()));
-        EXPECT_EQ(original_option.record_mode, new_options.record_mode);
-        EXPECT_EQ(original_option.enable_sampling, new_options.enable_sampling);
-        EXPECT_EQ(original_option.enable_systrace, new_options.enable_systrace);
-      }
-    }
-  }
 }
 
 }  // namespace trace_event

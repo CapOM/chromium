@@ -47,6 +47,7 @@
 #include "ui/compositor/compositor.h"
 #include "ui/compositor/compositor_constants.h"
 #include "ui/compositor/compositor_switches.h"
+#include "ui/compositor/layer.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/native_widget_types.h"
 
@@ -55,8 +56,9 @@
 #elif defined(USE_OZONE)
 #include "content/browser/compositor/browser_compositor_overlay_candidate_validator_ozone.h"
 #include "content/browser/compositor/software_output_device_ozone.h"
+#include "ui/ozone/public/overlay_manager_ozone.h"
+#include "ui/ozone/public/ozone_platform.h"
 #include "ui/ozone/public/ozone_switches.h"
-#include "ui/ozone/public/surface_factory_ozone.h"
 #elif defined(USE_X11)
 #include "content/browser/compositor/software_output_device_x11.h"
 #elif defined(OS_MACOSX)
@@ -101,6 +103,8 @@ GpuProcessTransportFactory::GpuProcessTransportFactory()
     : next_surface_id_namespace_(1u),
       task_graph_runner_(new cc::TaskGraphRunner),
       callback_factory_(this) {
+  ui::Layer::InitializeUILayerSettings();
+
   if (UseSurfacesEnabled())
     surface_manager_ = make_scoped_ptr(new cc::SurfaceManager);
 
@@ -158,7 +162,9 @@ scoped_ptr<BrowserCompositorOverlayCandidateValidator>
 CreateOverlayCandidateValidator(gfx::AcceleratedWidget widget) {
 #if defined(USE_OZONE)
   ui::OverlayCandidatesOzone* overlay_candidates =
-      ui::SurfaceFactoryOzone::GetInstance()->GetOverlayCandidates(widget);
+      ui::OzonePlatform::GetInstance()
+          ->GetOverlayManager()
+          ->GetOverlayCandidates(widget);
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (overlay_candidates &&
       (command_line->HasSwitch(switches::kEnableHardwareOverlays) ||
@@ -294,8 +300,9 @@ void GpuProcessTransportFactory::EstablishedGpuChannel(
           scoped_ptr<BrowserCompositorOverlayCandidateValidator>()));
     } else
 #if defined(USE_OZONE)
-    if (ui::SurfaceFactoryOzone::GetInstance()
-            ->CanShowPrimaryPlaneAsOverlay()) {
+        if (ui::OzonePlatform::GetInstance()
+                ->GetOverlayManager()
+                ->CanShowPrimaryPlaneAsOverlay()) {
       surface =
           make_scoped_ptr(new GpuSurfacelessBrowserCompositorOutputSurface(
               context_provider, data->surface_id, compositor->vsync_manager(),
@@ -401,8 +408,10 @@ void GpuProcessTransportFactory::RemoveCompositor(ui::Compositor* compositor) {
 
 bool GpuProcessTransportFactory::DoesCreateTestContexts() { return false; }
 
-uint32 GpuProcessTransportFactory::GetImageTextureTarget() {
-  return BrowserGpuChannelHostFactory::GetImageTextureTarget();
+uint32 GpuProcessTransportFactory::GetImageTextureTarget(
+    gfx::GpuMemoryBuffer::Format format,
+    gfx::GpuMemoryBuffer::Usage usage) {
+  return BrowserGpuChannelHostFactory::GetImageTextureTarget(format, usage);
 }
 
 cc::SharedBitmapManager* GpuProcessTransportFactory::GetSharedBitmapManager() {
@@ -432,8 +441,11 @@ gfx::GLSurfaceHandle GpuProcessTransportFactory::GetSharedSurfaceHandle() {
 
 scoped_ptr<cc::SurfaceIdAllocator>
 GpuProcessTransportFactory::CreateSurfaceIdAllocator() {
-  return make_scoped_ptr(
-      new cc::SurfaceIdAllocator(next_surface_id_namespace_++));
+  scoped_ptr<cc::SurfaceIdAllocator> allocator =
+      make_scoped_ptr(new cc::SurfaceIdAllocator(next_surface_id_namespace_++));
+  if (GetSurfaceManager())
+    allocator->RegisterSurfaceIdNamespace(GetSurfaceManager());
+  return allocator;
 }
 
 void GpuProcessTransportFactory::ResizeDisplay(ui::Compositor* compositor,

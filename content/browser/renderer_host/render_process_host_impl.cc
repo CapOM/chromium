@@ -1,4 +1,4 @@
-// Copyright (c) 2012 The Chromium Authors. All rights reserved.
+// Copyright 2012 The Chromium Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -38,6 +38,7 @@
 #include "components/scheduler/common/scheduler_switches.h"
 #include "content/browser/appcache/appcache_dispatcher_host.h"
 #include "content/browser/appcache/chrome_appcache_service.h"
+#include "content/browser/background_sync/background_sync_service_impl.h"
 #include "content/browser/bad_message.h"
 #include "content/browser/bluetooth/bluetooth_dispatcher_host.h"
 #include "content/browser/browser_child_process_host_impl.h"
@@ -931,8 +932,7 @@ void RenderProcessHostImpl::CreateMessageFilters() {
   AddFilter(new NavigatorConnectDispatcherHost(
       storage_partition_impl_->GetNavigatorConnectContext(),
       message_port_message_filter_.get()));
-  if (browser_command_line.HasSwitch(
-          switches::kEnableExperimentalWebPlatformFeatures)) {
+  if (browser_command_line.HasSwitch(switches::kEnableWebBluetooth)) {
     bluetooth_dispatcher_host_ = new BluetoothDispatcherHost();
     AddFilter(bluetooth_dispatcher_host_.get());
   }
@@ -948,6 +948,10 @@ void RenderProcessHostImpl::RegisterMojoServices() {
   mojo_application_host_->service_registry()->AddService(
       base::Bind(&PermissionServiceContext::CreateService,
                  base::Unretained(permission_service_context_.get())));
+
+  mojo_application_host_->service_registry()->AddService(base::Bind(
+      &content::BackgroundSyncServiceImpl::Create,
+      base::Unretained(storage_partition_impl_->GetBackgroundSyncContext())));
 
 #if defined(OS_ANDROID)
   ServiceRegistrarAndroid::RegisterProcessHostServices(
@@ -1096,9 +1100,6 @@ StoragePartition* RenderProcessHostImpl::GetStoragePartition() const {
 }
 
 static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
-  if (IsPinchVirtualViewportEnabled())
-    command_line->AppendSwitch(cc::switches::kEnablePinchVirtualViewport);
-
   if (IsPropertyTreeVerificationEnabled())
     command_line->AppendSwitch(cc::switches::kEnablePropertyTreeVerification);
 
@@ -1133,10 +1134,22 @@ static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
   if (IsForceGpuRasterizationEnabled())
     command_line->AppendSwitch(switches::kForceGpuRasterization);
 
+  // TODO(reveman): We currently assume that the compositor will use BGRA_8888
+  // if it's able to, and RGBA_8888 otherwise. Since we don't know what it will
+  // use we hardcode BGRA_8888 here for now. We should instead
+  // move decisions about GpuMemoryBuffer format to the browser embedder so we
+  // know it here, and pass that decision to the compositor for each usage.
+  // crbug.com/490362
+  gfx::GpuMemoryBuffer::Format format = gfx::GpuMemoryBuffer::BGRA_8888;
+
+  // TODO(danakj): When one-copy uploads support partial update, change this
+  // usage to PERSISTENT_MAP for one-copy.
+  gfx::GpuMemoryBuffer::Usage usage = gfx::GpuMemoryBuffer::MAP;
+
   command_line->AppendSwitchASCII(
       switches::kUseImageTextureTarget,
       base::UintToString(
-          BrowserGpuChannelHostFactory::GetImageTextureTarget()));
+          BrowserGpuChannelHostFactory::GetImageTextureTarget(format, usage)));
 
   // Appending disable-gpu-feature switches due to software rendering list.
   GpuDataManagerImpl* gpu_data_manager = GpuDataManagerImpl::GetInstance();
@@ -1223,6 +1236,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableNewVideoRenderer,
     switches::kDisableNotifications,
     switches::kDisableOverlayScrollbar,
+    switches::kDisablePermissionsAPI,
     switches::kDisablePinch,
     switches::kDisablePrefixedEncryptedMedia,
     switches::kDisableSeccompFilterSandbox,
@@ -1236,7 +1250,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisableTouchEditing,
     switches::kDisableV8IdleTasks,
     switches::kDomAutomationController,
-    switches::kEnableBeginFrameScheduling,
     switches::kEnableBleedingEdgeRenderingFastPaths,
     switches::kEnableBlinkFeatures,
     switches::kEnableBrowserSideNavigation,
@@ -1281,6 +1294,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableViewport,
     switches::kEnableViewportMeta,
     switches::kEnableVtune,
+    switches::kEnableWebBluetooth,
     switches::kEnableWebGLDraftExtensions,
     switches::kEnableWebGLImageChromium,
     switches::kExplicitlyAllowedPorts,
@@ -1326,6 +1340,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     cc::switches::kDisableCompositedAntialiasing,
     cc::switches::kDisableMainFrameBeforeActivation,
     cc::switches::kDisableThreadedAnimation,
+    cc::switches::kEnableBeginFrameScheduling,
     cc::switches::kEnableGpuBenchmarking,
     cc::switches::kEnableMainFrameBeforeActivation,
     cc::switches::kMaxUnusedResourceMemoryUsagePercentage,
@@ -1349,6 +1364,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
 #if defined(ENABLE_WEBRTC)
     switches::kDisableWebRtcHWDecoding,
     switches::kDisableWebRtcHWEncoding,
+    switches::kEnableWebRtcDtls12,
     switches::kEnableWebRtcHWH264Encoding,
     switches::kEnableWebRtcStunOrigin,
     switches::kWebRtcMaxCaptureFramerate,
@@ -2202,6 +2218,11 @@ void RenderProcessHostImpl::SetBackgrounded(bool backgrounded) {
   if (backgrounded_ && audio_renderer_host_->HasActiveAudio())
     return;
 
+  const base::CommandLine* command_line =
+      base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(switches::kDisableRendererBackgrounding))
+    return;
+
 #if defined(OS_WIN)
   // The cbstext.dll loads as a global GetMessage hook in the browser process
   // and intercepts/unintercepts the kernel32 API SetPriorityClass in a
@@ -2213,14 +2234,15 @@ void RenderProcessHostImpl::SetBackgrounded(bool backgrounded) {
     return;
 #endif  // OS_WIN
 
-#if defined(OS_WIN)
-  // Same as below, but bound to an experiment (http://crbug.com/458594)
-  // initially on Windows. Enabled by default in the asbence of field trials to
-  // get coverage on the perf waterfall.
+#if defined(OS_WIN) || defined(OS_MACOSX)
+  // Same as below, but bound to an experiment (http://crbug.com/458594 on
+  // Windows, http://crbug.com/398103 on the Mac). Enabled by default in the
+  // absence of field trials to get coverage on the perf waterfall.
   base::FieldTrial* trial =
       base::FieldTrialList::Find("BackgroundRendererProcesses");
-  if (!trial || trial->group_name() != "Disallow")
+  if (!trial || !StartsWithASCII(trial->group_name(), "Disallow", true)) {
     child_process_launcher_->SetProcessBackgrounded(backgrounded);
+  }
 #else
   // Control the background state from the browser process, otherwise the task
   // telling the renderer to "unbackground" itself may be preempted by other

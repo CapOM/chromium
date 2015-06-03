@@ -16,7 +16,6 @@ MidiPermissionContext::MidiPermissionContext(Profile* profile)
 MidiPermissionContext::~MidiPermissionContext() {
 }
 
-
 void MidiPermissionContext::UpdateTabContext(const PermissionRequestID& id,
                                              const GURL& requesting_frame,
                                              bool allowed) {
@@ -34,4 +33,8 @@ void MidiPermissionContext::UpdateTabContext(const PermissionRequestID& id,
   } else {
     content_settings->OnMidiSysExAccessBlocked(requesting_frame);
   }
+}
+
+bool MidiPermissionContext::IsRestrictedToSecureOrigins() const {
+  return true;
 }

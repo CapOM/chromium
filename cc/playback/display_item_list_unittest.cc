@@ -9,6 +9,7 @@
 #include "cc/output/filter_operation.h"
 #include "cc/output/filter_operations.h"
 #include "cc/playback/clip_display_item.h"
+#include "cc/playback/display_item_list_settings.h"
 #include "cc/playback/drawing_display_item.h"
 #include "cc/playback/filter_display_item.h"
 #include "cc/playback/transform_display_item.h"
@@ -50,8 +51,7 @@ TEST(DisplayItemListTest, SingleDrawingItem) {
   picture = skia::AdoptRef(recorder.endRecordingAsPicture());
   auto* item = list->CreateAndAppendItem<DrawingDisplayItem>();
   item->SetNew(picture);
-  list->ProcessAppendedItems();
-  list->CreateAndCacheSkPicture();
+  list->Finalize();
   DrawDisplayList(pixels, layer_rect, list);
 
   SkBitmap expected_bitmap;
@@ -110,8 +110,7 @@ TEST(DisplayItemListTest, ClipItem) {
   item3->SetNew(picture.Pass());
 
   list->CreateAndAppendItem<EndClipDisplayItem>();
-  list->ProcessAppendedItems();
-  list->CreateAndCacheSkPicture();
+  list->Finalize();
 
   DrawDisplayList(pixels, layer_rect, list);
 
@@ -173,8 +172,7 @@ TEST(DisplayItemListTest, TransformItem) {
   item3->SetNew(picture);
 
   list->CreateAndAppendItem<EndTransformDisplayItem>();
-  list->ProcessAppendedItems();
-  list->CreateAndCacheSkPicture();
+  list->Finalize();
 
   DrawDisplayList(pixels, layer_rect, list);
 
@@ -228,8 +226,7 @@ TEST(DisplayItemListTest, FilterItem) {
   auto* item = list->CreateAndAppendItem<FilterDisplayItem>();
   item->SetNew(filters, filter_bounds);
   list->CreateAndAppendItem<EndFilterDisplayItem>();
-  list->ProcessAppendedItems();
-  list->CreateAndCacheSkPicture();
+  list->Finalize();
 
   DrawDisplayList(pixels, layer_rect, list);
 
@@ -272,7 +269,7 @@ TEST(DisplayItemListTest, CompactingItems) {
   picture = skia::AdoptRef(recorder.endRecordingAsPicture());
   auto* item1 = list_without_caching->CreateAndAppendItem<DrawingDisplayItem>();
   item1->SetNew(picture);
-  list_without_caching->ProcessAppendedItems();
+  list_without_caching->Finalize();
   DrawDisplayList(pixels, layer_rect, list_without_caching);
 
   unsigned char expected_pixels[4 * 100 * 100] = {0};
@@ -281,8 +278,7 @@ TEST(DisplayItemListTest, CompactingItems) {
       DisplayItemList::Create(layer_rect, use_cached_picture);
   auto* item2 = list_with_caching->CreateAndAppendItem<DrawingDisplayItem>();
   item2->SetNew(picture);
-  list_with_caching->ProcessAppendedItems();
-  list_with_caching->CreateAndCacheSkPicture();
+  list_with_caching->Finalize();
   DrawDisplayList(expected_pixels, layer_rect, list_with_caching);
 
   EXPECT_EQ(0, memcmp(pixels, expected_pixels, 4 * 100 * 100));
@@ -310,8 +306,7 @@ TEST(DisplayItemListTest, PictureMemoryUsage) {
   list = DisplayItemList::Create(layer_rect, true);
   auto* item = list->CreateAndAppendItem<DrawingDisplayItem>();
   item->SetNew(picture);
-  list->ProcessAppendedItems();
-  list->CreateAndCacheSkPicture();
+  list->Finalize();
   memory_usage = list->PictureMemoryUsage();
   EXPECT_GE(memory_usage, picture_size);
   EXPECT_LE(memory_usage, 2 * picture_size);
@@ -320,7 +315,7 @@ TEST(DisplayItemListTest, PictureMemoryUsage) {
   list = DisplayItemList::Create(layer_rect, false);
   item = list->CreateAndAppendItem<DrawingDisplayItem>();
   item->SetNew(picture);
-  list->ProcessAppendedItems();
+  list->Finalize();
   memory_usage = list->PictureMemoryUsage();
   EXPECT_GE(memory_usage, picture_size);
   EXPECT_LE(memory_usage, 2 * picture_size);
@@ -328,11 +323,12 @@ TEST(DisplayItemListTest, PictureMemoryUsage) {
   // To avoid double counting, we expect zero size to be computed if both the
   // picture and items are retained (currently this only happens due to certain
   // categories being traced).
-  list = new DisplayItemList(layer_rect, true, true);
+  DisplayItemListSettings settings;
+  settings.use_cached_picture = true;
+  list = new DisplayItemList(layer_rect, settings, true);
   item = list->CreateAndAppendItem<DrawingDisplayItem>();
   item->SetNew(picture);
-  list->ProcessAppendedItems();
-  list->CreateAndCacheSkPicture();
+  list->Finalize();
   memory_usage = list->PictureMemoryUsage();
   EXPECT_EQ(static_cast<size_t>(0), memory_usage);
 }

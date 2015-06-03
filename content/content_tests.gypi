@@ -9,10 +9,6 @@
       'public/test/nested_message_pump_android.cc',
       'public/test/nested_message_pump_android.h',
       'test/layouttest_support.cc',
-      'test/test_media_stream_renderer_factory.cc',
-      'test/test_media_stream_renderer_factory.h',
-      'test/test_video_frame_provider.cc',
-      'test/test_video_frame_provider.h',
     ],
     'test_support_content_sources': [
       # TODO(phajdan.jr): All of those files should live in content/test (if
@@ -219,6 +215,7 @@
       'browser/indexed_db/mock_browsertest_indexed_db_class_factory.h',
       'browser/loader/resource_dispatcher_host_browsertest.cc',
       'browser/manifest/manifest_browsertest.cc',
+      'browser/media/android/media_session_browsertest.cc',
       'browser/media/encrypted_media_browsertest.cc',
       'browser/media/media_browsertest.cc',
       'browser/media/media_browsertest.h',
@@ -239,6 +236,7 @@
       'browser/shared_worker/worker_browsertest.cc',
       'browser/site_per_process_browsertest.cc',
       'browser/site_per_process_browsertest.h',
+      'browser/tracing/background_tracing_manager_browsertest.cc',
       'browser/tracing/tracing_controller_browsertest.cc',
       'browser/web_contents/opened_by_dom_browsertest.cc',
       'browser/web_contents/touch_editable_impl_aura_browsertest.cc',
@@ -268,8 +266,6 @@
     'content_browsertests_android_sources': [
       'browser/accessibility/android_granularity_movement_browsertest.cc',
       'browser/accessibility/android_hit_testing_browsertest.cc',
-      'shell/android/browsertests_apk/content_browser_tests_android.cc',
-      'shell/android/browsertests_apk/content_browser_tests_android.h',
       'shell/android/browsertests_apk/content_browser_tests_jni_onload.cc',
     ],
     'content_browsertests_webrtc_sources': [
@@ -340,6 +336,8 @@
       'browser/appcache/mock_appcache_storage_unittest.cc',
       'browser/background_sync/background_sync_manager_unittest.cc',
       'browser/background_sync/background_sync_network_observer_unittest.cc',
+      'browser/background_sync/background_sync_power_observer_unittest.cc',
+      'browser/background_sync/background_sync_service_impl_unittest.cc',
       'browser/browser_thread_unittest.cc',
       'browser/browser_url_handler_impl_unittest.cc',
       'browser/byte_stream_unittest.cc',
@@ -484,6 +482,7 @@
       'browser/notification_service_impl_unittest.cc',
       'browser/notifications/notification_database_data_unittest.cc',
       'browser/notifications/notification_database_unittest.cc',
+      'browser/notifications/notification_id_generator_unittest.cc',
       'browser/notifications/platform_notification_context_unittest.cc',
       'browser/power_monitor_message_broadcaster_unittest.cc',
       'browser/power_profiler/power_profiler_service_unittest.cc',
@@ -595,6 +594,7 @@
       'child/site_isolation_policy_unittest.cc',
       'child/v8_value_converter_impl_unittest.cc',
       'child/web_data_consumer_handle_impl_unittest.cc',
+      'child/web_process_memory_dump_impl_unittest.cc',
       'child/web_url_loader_impl_unittest.cc',
       'child/worker_task_runner_unittest.cc',
       'common/android/address_parser_unittest.cc',
@@ -622,8 +622,8 @@
       'common/inter_process_time_ticks_converter_unittest.cc',
       'common/mac/attributed_string_coder_unittest.mm',
       'common/mac/font_descriptor_unittest.mm',
-      'common/origin_util_unittest.cc',
       'common/one_writer_seqlock_unittest.cc',
+      'common/origin_util_unittest.cc',
       'common/page_state_serialization_unittest.cc',
       'common/page_zoom_unittest.cc',
       'common/plugin_list_unittest.cc',
@@ -1442,7 +1442,7 @@
               'dependencies': [
                 'content_shell_jni_headers',
                 'content_shell_lib',
-                '../testing/android/native_test.gyp:native_test_util',
+                '../testing/android/native_test.gyp:native_test_support',
               ],
             }],
             ['OS=="mac"', {
@@ -1804,11 +1804,10 @@
             'content_shell_java',
           ],
           'variables': {
-            'apk_name': 'content_browsertests',
+            'test_suite_name': 'content_browsertests',
             'java_in_dir': 'shell/android/browsertests_apk',
             'android_manifest_path': '<(SHARED_INTERMEDIATE_DIR)/content_browsertests_manifest/AndroidManifest.xml',
             'resource_dir': 'shell/android/browsertests_apk/res',
-            'native_lib_target': 'libcontent_browsertests',
             'additional_input_paths': ['<(PRODUCT_DIR)/content_shell/assets/content_shell.pak'],
             'asset_location': '<(PRODUCT_DIR)/content_shell/assets',
             'conditions': [
@@ -1825,7 +1824,7 @@
               }],
             ],
           },
-          'includes': [ '../build/java_apk.gypi' ],
+          'includes': [ '../build/apk_browsertest.gypi' ],
         },
         {
           # TODO(GN)

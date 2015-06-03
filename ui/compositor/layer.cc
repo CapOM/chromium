@@ -26,6 +26,7 @@
 #include "cc/output/filter_operation.h"
 #include "cc/output/filter_operations.h"
 #include "cc/resources/transferable_resource.h"
+#include "cc/trees/layer_tree_settings.h"
 #include "ui/compositor/compositor_switches.h"
 #include "ui/compositor/dip_util.h"
 #include "ui/compositor/layer_animator.h"
@@ -53,6 +54,9 @@ struct UIImplSidePaintingStatus {
   bool enabled;
 };
 base::LazyInstance<UIImplSidePaintingStatus> g_ui_impl_side_painting_status =
+    LAZY_INSTANCE_INITIALIZER;
+
+base::LazyInstance<cc::LayerSettings> g_ui_layer_settings =
     LAZY_INSTANCE_INITIALIZER;
 
 }  // namespace
@@ -124,6 +128,7 @@ Layer::~Layer() {
     layer_mask_back_link_->SetMaskLayer(NULL);
   for (size_t i = 0; i < children_.size(); ++i)
     children_[i]->parent_ = NULL;
+
   cc_layer_->RemoveLayerAnimationEventObserver(this);
   cc_layer_->RemoveFromParent();
 }
@@ -131,6 +136,18 @@ Layer::~Layer() {
 // static
 bool Layer::UsingPictureLayer() {
   return g_ui_impl_side_painting_status.Get().enabled;
+}
+
+// static
+const cc::LayerSettings& Layer::UILayerSettings() {
+  return g_ui_layer_settings.Get();
+}
+
+// static
+void Layer::InitializeUILayerSettings() {
+  base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
+  if (command_line->HasSwitch(switches::kUIEnableCompositorAnimationTimelines))
+    g_ui_layer_settings.Get().use_compositor_animation_timelines = true;
 }
 
 const Compositor* Layer::GetCompositor() const {
@@ -141,22 +158,29 @@ float Layer::opacity() const {
   return cc_layer_->opacity();
 }
 
-void Layer::SetCompositor(Compositor* compositor) {
-  // This function must only be called to set the compositor on the root layer,
-  // or to reset it.
-  DCHECK(!compositor || !compositor_);
-  DCHECK(!compositor || compositor->root_layer() == this);
+void Layer::SetCompositor(Compositor* compositor,
+                          scoped_refptr<cc::Layer> root_layer) {
+  // This function must only be called to set the compositor on the root ui
+  // layer.
+  DCHECK(compositor);
+  DCHECK(!compositor_);
+  DCHECK(compositor->root_layer() == this);
   DCHECK(!parent_);
-  if (compositor_) {
+
+  compositor_ = compositor;
+  OnDeviceScaleFactorChanged(compositor->device_scale_factor());
+  AddAnimatorsInTreeToCollection(compositor_->layer_animator_collection());
+
+  root_layer->AddChild(cc_layer_);
+  SendPendingThreadedAnimations();
+}
+
+void Layer::ResetCompositor() {
+  DCHECK(!parent_);
+  if (compositor_)
     RemoveAnimatorsInTreeFromCollection(
         compositor_->layer_animator_collection());
-  }
-  compositor_ = compositor;
-  if (compositor) {
-    OnDeviceScaleFactorChanged(compositor->device_scale_factor());
-    SendPendingThreadedAnimations();
-    AddAnimatorsInTreeToCollection(compositor_->layer_animator_collection());
-  }
+  compositor_ = nullptr;
 }
 
 void Layer::Add(Layer* child) {
@@ -337,8 +361,7 @@ void Layer::SetMaskLayer(Layer* layer_mask) {
   if (layer_mask_)
     layer_mask_->layer_mask_back_link_ = NULL;
   layer_mask_ = layer_mask;
-  cc_layer_->SetMaskLayer(
-      layer_mask ? layer_mask->cc_layer() : NULL);
+  cc_layer_->SetMaskLayer(layer_mask ? layer_mask->cc_layer_ : NULL);
   // We need to reference the linked object so that it can properly break the
   // link to us when it gets deleted.
   if (layer_mask) {
@@ -522,9 +545,9 @@ void Layer::SwitchToLayer(scoped_refptr<cc::Layer> new_layer) {
 void Layer::SwitchCCLayerForTest() {
   scoped_refptr<cc::Layer> new_layer;
   if (Layer::UsingPictureLayer())
-    new_layer = cc::PictureLayer::Create(this);
+    new_layer = cc::PictureLayer::Create(UILayerSettings(), this);
   else
-    new_layer = cc::ContentLayer::Create(this);
+    new_layer = cc::ContentLayer::Create(UILayerSettings(), this);
   SwitchToLayer(new_layer);
   content_layer_ = new_layer;
 }
@@ -538,7 +561,7 @@ void Layer::SetTextureMailbox(
   DCHECK(release_callback);
   if (!texture_layer_.get()) {
     scoped_refptr<cc::TextureLayer> new_layer =
-        cc::TextureLayer::CreateForMailbox(this);
+        cc::TextureLayer::CreateForMailbox(UILayerSettings(), this);
     new_layer->SetFlipped(true);
     SwitchToLayer(new_layer);
     texture_layer_ = new_layer;
@@ -577,7 +600,7 @@ void Layer::SetShowDelegatedContent(cc::DelegatedFrameProvider* frame_provider,
   DCHECK(type_ == LAYER_TEXTURED || type_ == LAYER_SOLID_COLOR);
 
   scoped_refptr<cc::DelegatedRendererLayer> new_layer =
-      cc::DelegatedRendererLayer::Create(frame_provider);
+      cc::DelegatedRendererLayer::Create(UILayerSettings(), frame_provider);
   SwitchToLayer(new_layer);
   delegated_renderer_layer_ = new_layer;
 
@@ -594,8 +617,8 @@ void Layer::SetShowSurface(
     gfx::Size frame_size_in_dip) {
   DCHECK(type_ == LAYER_TEXTURED || type_ == LAYER_SOLID_COLOR);
 
-  scoped_refptr<cc::SurfaceLayer> new_layer =
-      cc::SurfaceLayer::Create(satisfy_callback, require_callback);
+  scoped_refptr<cc::SurfaceLayer> new_layer = cc::SurfaceLayer::Create(
+      UILayerSettings(), satisfy_callback, require_callback);
   new_layer->SetSurfaceId(surface_id, scale, surface_size);
   SwitchToLayer(new_layer);
   surface_layer_ = new_layer;
@@ -610,7 +633,8 @@ void Layer::SetShowSolidColorContent() {
   if (solid_color_layer_.get())
     return;
 
-  scoped_refptr<cc::SolidColorLayer> new_layer = cc::SolidColorLayer::Create();
+  scoped_refptr<cc::SolidColorLayer> new_layer =
+      cc::SolidColorLayer::Create(UILayerSettings());
   SwitchToLayer(new_layer);
   solid_color_layer_ = new_layer;
 
@@ -755,8 +779,7 @@ void Layer::PaintContents(
   }
 }
 
-void Layer::PaintContentsToDisplayList(
-    cc::DisplayItemList* display_list,
+scoped_refptr<cc::DisplayItemList> Layer::PaintContentsToDisplayList(
     const gfx::Rect& clip,
     ContentLayerClient::PaintingControlSetting painting_control) {
   TRACE_EVENT1("ui", "Layer::PaintContentsToDisplayList", "name", name_);
@@ -765,10 +788,15 @@ void Layer::PaintContentsToDisplayList(
       gfx::IntersectRects(damaged_region_.bounds(), local_bounds));
   DCHECK(clip.Contains(invalidation));
   ClearDamagedRects();
-  if (!delegate_)
-    return;
-  delegate_->OnPaintLayer(
-      PaintContext(display_list, device_scale_factor_, clip, invalidation));
+  const bool use_cached_picture = false;
+  scoped_refptr<cc::DisplayItemList> display_list =
+      cc::DisplayItemList::Create(clip, use_cached_picture);
+  if (delegate_) {
+    delegate_->OnPaintLayer(PaintContext(
+        display_list.get(), device_scale_factor_, clip, invalidation));
+  }
+  display_list->Finalize();
+  return display_list;
 }
 
 bool Layer::FillsBoundsCompletely() const { return fills_bounds_completely_; }
@@ -1029,16 +1057,16 @@ void Layer::SendPendingThreadedAnimations() {
 
 void Layer::CreateCcLayer() {
   if (type_ == LAYER_SOLID_COLOR) {
-    solid_color_layer_ = cc::SolidColorLayer::Create();
+    solid_color_layer_ = cc::SolidColorLayer::Create(UILayerSettings());
     cc_layer_ = solid_color_layer_.get();
   } else if (type_ == LAYER_NINE_PATCH) {
-    nine_patch_layer_ = cc::NinePatchLayer::Create();
+    nine_patch_layer_ = cc::NinePatchLayer::Create(UILayerSettings());
     cc_layer_ = nine_patch_layer_.get();
   } else {
     if (Layer::UsingPictureLayer())
-      content_layer_ = cc::PictureLayer::Create(this);
+      content_layer_ = cc::PictureLayer::Create(UILayerSettings(), this);
     else
-      content_layer_ = cc::ContentLayer::Create(this);
+      content_layer_ = cc::ContentLayer::Create(UILayerSettings(), this);
     cc_layer_ = content_layer_.get();
   }
   cc_layer_->SetTransformOrigin(gfx::Point3F());

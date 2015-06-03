@@ -21,7 +21,6 @@
 #include "base/gtest_prod_util.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/observer_list.h"
 #include "base/threading/thread_checker.h"
 #include "net/base/net_export.h"
@@ -184,7 +183,7 @@ class NET_EXPORT SdchManager {
 
   void SetAllowLatencyExperiment(const GURL& url, bool enable);
 
-  base::Value* SdchInfoToValue() const;
+  scoped_ptr<base::Value> SdchInfoToValue() const;
 
   // Add an SDCH dictionary to our list of availible
   // dictionaries. This addition will fail if addition is illegal
@@ -206,9 +205,6 @@ class NET_EXPORT SdchManager {
   void RemoveObserver(SdchObserver* observer);
 
   static scoped_ptr<DictionarySet> CreateEmptyDictionarySetForTesting();
-
-  // For investigation of http://crbug.com/454198; remove when resolved.
-  base::WeakPtr<SdchManager> GetWeakPtr();
 
  private:
   struct BlacklistInfo {
@@ -255,8 +251,6 @@ class NET_EXPORT SdchManager {
   ObserverList<SdchObserver, true> observers_;
 
   base::ThreadChecker thread_checker_;
-
-  base::WeakPtrFactory<SdchManager> factory_;
 
   DISALLOW_COPY_AND_ASSIGN(SdchManager);
 };

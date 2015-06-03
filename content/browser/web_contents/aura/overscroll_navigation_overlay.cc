@@ -46,22 +46,6 @@ bool DoesEntryMatchURL(NavigationEntry* entry, const GURL& url) {
 
 }  // namespace
 
-// A class that sets masks to bounds to false on a layer and restores the old
-// value on destruction.
-class OverscrollNavigationOverlay::ScopedLayerClippingSetting {
- public:
-  explicit ScopedLayerClippingSetting(ui::Layer* layer)
-      : masks_to_bounds_(layer->GetMasksToBounds()), layer_(layer) {
-    layer_->SetMasksToBounds(false);
-  }
-
-  ~ScopedLayerClippingSetting() { layer_->SetMasksToBounds(masks_to_bounds_); }
-
- private:
-  bool masks_to_bounds_;
-  ui::Layer* layer_;
-};
-
 // Responsible for fading out and deleting the layer of the overlay window.
 class OverlayDismissAnimator
     : public ui::LayerAnimationObserver {
@@ -144,9 +128,6 @@ void OverscrollNavigationOverlay::StopObservingIfDone() {
       owa_->is_active()) {
     return;
   }
-  // Restore layer clipping.
-  contents_layer_settings_.reset();
-  contents_layer_parent_settings_.reset();
 
   // OverlayDismissAnimator deletes the dismiss layer and itself when the
   // animation completes.
@@ -224,41 +205,47 @@ aura::Window* OverscrollNavigationOverlay::GetMainWindow() const {
 }
 
 void OverscrollNavigationOverlay::OnOverscrollCompleting() {
-  GetMainWindow()->ReleaseCapture();
-  // We start the navigation as soon as we know the overscroll gesture is
-  // completing.
-  DCHECK(direction_ != NONE);
+  aura::Window* main_window = GetMainWindow();
+  if (!main_window)
+    return;
+  main_window->ReleaseCapture();
+}
 
-  // Avoid clipping on the screenshot caused by the contents window being moved
-  // outside of the screen bounds.
-  contents_layer_settings_.reset(
-      new ScopedLayerClippingSetting(web_contents_->GetNativeView()->layer()));
-  contents_layer_parent_settings_.reset(new ScopedLayerClippingSetting(
-      web_contents_->GetNativeView()->layer()->parent()));
+void OverscrollNavigationOverlay::OnOverscrollCompleted(
+    scoped_ptr<aura::Window> window) {
+  DCHECK(direction_ != NONE);
+  aura::Window* main_window = GetMainWindow();
+  if (!main_window) {
+    UMA_HISTOGRAM_ENUMERATION(
+        "Overscroll.Cancelled", direction_, NAVIGATION_COUNT);
+    return;
+  }
 
   // Make sure we can navigate first, as other factors can trigger a navigation
   // during an overscroll gesture and navigating without history produces a
   // crash.
+  bool navigated = false;
   if (direction_ == FORWARD && web_contents_->GetController().CanGoForward()) {
     web_contents_->GetController().GoForward();
+    navigated = true;
   } else if (direction_ == BACK && web_contents_->GetController().CanGoBack()) {
     web_contents_->GetController().GoBack();
+    navigated = true;
   } else {
     // We need to dismiss the overlay without navigating as soon as the
     // overscroll finishes.
     UMA_HISTOGRAM_ENUMERATION(
         "Overscroll.Cancelled", direction_, NAVIGATION_COUNT);
     loading_complete_ = true;
-    return;
   }
-  UMA_HISTOGRAM_ENUMERATION(
-      "Overscroll.Navigated2", direction_, NAVIGATION_COUNT);
-  StartObserving();
-}
 
-void OverscrollNavigationOverlay::OnOverscrollCompleted(
-    scoped_ptr<aura::Window> window) {
-  GetMainWindow()->SetTransform(gfx::Transform());
+  if (navigated) {
+    UMA_HISTOGRAM_ENUMERATION(
+        "Overscroll.Navigated2", direction_, NAVIGATION_COUNT);
+    StartObserving();
+  }
+
+  main_window->SetTransform(gfx::Transform());
   window_ = window.Pass();
   // Make sure the window is in its default position.
   window_->SetBounds(gfx::Rect(web_contents_window_->bounds().size()));
@@ -272,7 +259,10 @@ void OverscrollNavigationOverlay::OnOverscrollCompleted(
 void OverscrollNavigationOverlay::OnOverscrollCancelled() {
   UMA_HISTOGRAM_ENUMERATION(
       "Overscroll.Cancelled", direction_, NAVIGATION_COUNT);
-  GetMainWindow()->ReleaseCapture();
+  aura::Window* main_window = GetMainWindow();
+  if (!main_window)
+    return;
+  main_window->ReleaseCapture();
   direction_ = NONE;
   StopObservingIfDone();
 }

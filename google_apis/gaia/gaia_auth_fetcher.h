@@ -197,6 +197,9 @@ class GaiaAuthFetcher : public net::URLFetcherDelegate {
   // Starts a request to list the accounts in the GAIA cookie.
   void StartListAccounts();
 
+  // Starts a request to log out the accounts in the GAIA cookie.
+  void StartLogOut();
+
   // Starts a request to get the list of URLs to check for connection info.
   // Returns token/URL pairs to check, and the resulting status can be given to
   // /MergeSession requests.
@@ -229,6 +232,28 @@ class GaiaAuthFetcher : public net::URLFetcherDelegate {
   static GoogleServiceAuthError GenerateOAuthLoginError(
       const std::string& data,
       const net::URLRequestStatus& status);
+
+ protected:
+  // Create and start |fetcher_|, used to make all Gaia request.  |body| is
+  // used as the body of the POST request sent to GAIA.  Any strings listed in
+  // |headers| are added as extra HTTP headers in the request.
+  //
+  // |load_flags| are passed to directly to net::URLFetcher::Create() when
+  // creating the URL fetcher.
+  //
+  // HasPendingFetch() should return false before calling this method, and will
+  // return true afterwards.
+  virtual void CreateAndStartGaiaFetcher(const std::string& body,
+                                         const std::string& headers,
+                                         const GURL& gaia_gurl,
+                                         int load_flags);
+
+  // Dispatch the results of a request.
+  void DispatchFetchedRequest(const GURL& url,
+                              const std::string& data,
+                              const net::ResponseCookies& cookies,
+                              const net::URLRequestStatus& status,
+                              int response_code);
 
  private:
   // ClientLogin body constants that don't change
@@ -318,6 +343,10 @@ class GaiaAuthFetcher : public net::URLFetcherDelegate {
   void OnListAccountsFetched(const std::string& data,
                              const net::URLRequestStatus& status,
                              int response_code);
+
+  void OnLogOutFetched(const std::string& data,
+                       const net::URLRequestStatus& status,
+                       int response_code);
 
   void OnGetUserInfoFetched(const std::string& data,
                             const net::URLRequestStatus& status,
@@ -420,20 +449,6 @@ class GaiaAuthFetcher : public net::URLFetcherDelegate {
                                               const std::string& domain,
                                               const std::string& login_hint);
 
-  // Create a fetcher usable for making any Gaia request.  |body| is used
-  // as the body of the POST request sent to GAIA.  Any strings listed in
-  // |headers| are added as extra HTTP headers in the request.
-  //
-  // |load_flags| are passed to directly to net::URLFetcher::Create() when
-  // creating the URL fetcher.
-  static scoped_ptr<net::URLFetcher> CreateGaiaFetcher(
-      net::URLRequestContextGetter* getter,
-      const std::string& body,
-      const std::string& headers,
-      const GURL& gaia_gurl,
-      int load_flags,
-      net::URLFetcherDelegate* delegate);
-
   // From a URLFetcher result, generate an appropriate error.
   // From the API documentation, both IssueAuthToken and ClientLogin have
   // the same error returns.
@@ -454,6 +469,7 @@ class GaiaAuthFetcher : public net::URLFetcherDelegate {
   const GURL uberauth_token_gurl_;
   const GURL oauth_login_gurl_;
   const GURL list_accounts_gurl_;
+  const GURL logout_gurl_;
   const GURL get_check_connection_info_url_;
   const GURL oauth2_iframe_url_;
 

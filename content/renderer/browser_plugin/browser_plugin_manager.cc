@@ -8,7 +8,6 @@
 #include "content/common/browser_plugin/browser_plugin_messages.h"
 #include "content/common/frame_messages.h"
 #include "content/public/renderer/browser_plugin_delegate.h"
-#include "content/public/renderer/content_renderer_client.h"
 #include "content/renderer/browser_plugin/browser_plugin.h"
 #include "content/renderer/render_thread_impl.h"
 #include "ipc/ipc_message_macros.h"
@@ -87,11 +86,8 @@ void BrowserPluginManager::DidCommitCompositorFrame(
 
 bool BrowserPluginManager::OnControlMessageReceived(
     const IPC::Message& message) {
-  if (!BrowserPlugin::ShouldForwardToBrowserPlugin(message) &&
-      !content::GetContentClient()->renderer()->
-          ShouldForwardToGuestContainer(message)) {
+  if (!BrowserPlugin::ShouldForwardToBrowserPlugin(message))
     return false;
-  }
 
   int browser_plugin_instance_id = browser_plugin::kInstanceIDNone;
   // All allowed messages must have |browser_plugin_instance_id| as their
@@ -124,11 +120,11 @@ void BrowserPluginManager::OnCompositorFrameSwappedPluginUnavailable(
     return;
 
   FrameHostMsg_CompositorFrameSwappedACK_Params params;
-  params.producing_host_id = get<1>(param).producing_host_id;
-  params.producing_route_id = get<1>(param).producing_route_id;
-  params.output_surface_id = get<1>(param).output_surface_id;
+  params.producing_host_id = base::get<1>(param).producing_host_id;
+  params.producing_route_id = base::get<1>(param).producing_route_id;
+  params.output_surface_id = base::get<1>(param).output_surface_id;
   Send(new BrowserPluginHostMsg_CompositorFrameSwappedACK(
-      get<0>(param), params));
+      base::get<0>(param), params));
 }
 
 }  // namespace content
