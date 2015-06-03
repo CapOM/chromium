@@ -464,6 +464,7 @@ RenderWidgetHostViewAura::RenderWidgetHostViewAura(RenderWidgetHost* host,
       has_snapped_to_boundary_(false),
       touch_editing_client_(NULL),
       is_guest_view_hack_(is_guest_view_hack),
+      begin_frame_observer_proxy_(this),
       weak_ptr_factory_(this) {
   if (!is_guest_view_hack_)
     host_->SetView(this);
@@ -493,6 +494,8 @@ bool RenderWidgetHostViewAura::OnMessageReceived(
     // RenderWidgetHostViewAndroid should also be moved at the same time.
     IPC_MESSAGE_HANDLER(ViewHostMsg_TextInputStateChanged,
                         OnTextInputStateChanged)
+    IPC_MESSAGE_HANDLER(ViewHostMsg_SetNeedsBeginFrames,
+                        OnSetNeedsBeginFrames)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -720,6 +723,15 @@ gfx::NativeViewAccessible RenderWidgetHostViewAura::GetNativeViewAccessible() {
 
 ui::TextInputClient* RenderWidgetHostViewAura::GetTextInputClient() {
   return this;
+}
+
+void RenderWidgetHostViewAura::OnSetNeedsBeginFrames(bool needs_begin_frames) {
+  begin_frame_observer_proxy_.SetNeedsBeginFrames(needs_begin_frames);
+}
+
+void RenderWidgetHostViewAura::SendBeginFrame(const cc::BeginFrameArgs& args) {
+  delegated_frame_host_->SetVSyncParameters(args.frame_time, args.interval);
+  host_->Send(new ViewMsg_BeginFrame(host_->GetRoutingID(), args));
 }
 
 void RenderWidgetHostViewAura::SetKeyboardFocus() {
@@ -1303,7 +1315,8 @@ void RenderWidgetHostViewAura::ProcessAckedTouchEvent(
   for (size_t i = 0; i < touch.event.touchesLength; ++i) {
     if (touch.event.touches[i].state == required_state) {
       DCHECK(!sent_ack);
-      host->dispatcher()->ProcessedTouchEvent(window_, result);
+      host->dispatcher()->ProcessedTouchEvent(touch.event.uniqueTouchEventId,
+                                              window_, result);
       sent_ack = true;
     }
   }
@@ -1333,9 +1346,19 @@ InputEventAckState RenderWidgetHostViewAura::FilterInputEvent(
   if (overscroll_controller_)
     consumed |= overscroll_controller_->WillHandleEvent(input_event);
 
-  return consumed && !WebTouchEvent::isTouchEventType(input_event.type)
-             ? INPUT_EVENT_ACK_STATE_CONSUMED
-             : INPUT_EVENT_ACK_STATE_NOT_CONSUMED;
+  // Touch events should always propagate to the renderer.
+  if (WebTouchEvent::isTouchEventType(input_event.type))
+    return INPUT_EVENT_ACK_STATE_NOT_CONSUMED;
+
+  // Reporting consumed for a fling suggests that there's now an *active* fling
+  // that requires both animation and a fling-end notification. However, the
+  // OverscrollController consumes a fling to stop its propagation; it doesn't
+  // actually tick a fling animation. Report no consumer to convey this.
+  if (consumed && input_event.type == blink::WebInputEvent::GestureFlingStart)
+    return INPUT_EVENT_ACK_STATE_NO_CONSUMER_EXISTS;
+
+  return consumed ? INPUT_EVENT_ACK_STATE_CONSUMED
+                  : INPUT_EVENT_ACK_STATE_NOT_CONSUMED;
 }
 
 BrowserAccessibilityManager*
@@ -2650,6 +2673,8 @@ void RenderWidgetHostViewAura::AddedToRootWindow() {
 #endif
 
   delegated_frame_host_->SetCompositor(window_->GetHost()->compositor());
+  if (window_->GetHost()->compositor())
+    begin_frame_observer_proxy_.SetCompositor(window_->GetHost()->compositor());
 }
 
 void RenderWidgetHostViewAura::RemovingFromRootWindow() {
@@ -2662,6 +2687,7 @@ void RenderWidgetHostViewAura::RemovingFromRootWindow() {
 
   window_->GetHost()->RemoveObserver(this);
   delegated_frame_host_->ResetCompositor();
+  begin_frame_observer_proxy_.ResetCompositor();
 
 #if defined(OS_WIN)
   // Update the legacy window's parent temporarily to the desktop window. It

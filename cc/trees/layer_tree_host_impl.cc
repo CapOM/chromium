@@ -22,7 +22,6 @@
 #include "cc/animation/scrollbar_animation_controller.h"
 #include "cc/animation/timing_function.h"
 #include "cc/base/math_util.h"
-#include "cc/base/util.h"
 #include "cc/debug/benchmark_instrumentation.h"
 #include "cc/debug/debug_rect_history.h"
 #include "cc/debug/devtools_instrumentation.h"
@@ -76,7 +75,6 @@
 #include "cc/trees/tree_synchronizer.h"
 #include "gpu/GLES2/gl2extchromium.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
-#include "ui/gfx/frame_time.h"
 #include "ui/gfx/geometry/rect_conversions.h"
 #include "ui/gfx/geometry/scroll_offset.h"
 #include "ui/gfx/geometry/size_conversions.h"
@@ -190,6 +188,7 @@ LayerTreeHostImpl::LayerTreeHostImpl(
     int id)
     : client_(client),
       proxy_(proxy),
+      current_begin_frame_tracker_(BEGINFRAMETRACKER_FROM_HERE),
       content_is_suitable_for_gpu_rasterization_(true),
       has_gpu_rasterization_trigger_(false),
       use_gpu_rasterization_(false),
@@ -222,7 +221,6 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       max_memory_needed_bytes_(0),
       device_scale_factor_(1.f),
       resourceless_software_draw_(false),
-      begin_impl_frame_interval_(BeginFrameArgs::DefaultInterval()),
       animation_registrar_(AnimationRegistrar::Create()),
       rendering_stats_instrumentation_(rendering_stats_instrumentation),
       micro_benchmark_controller_(this),
@@ -400,6 +398,10 @@ bool LayerTreeHostImpl::CanDraw() const {
 }
 
 void LayerTreeHostImpl::Animate(base::TimeTicks monotonic_time) {
+  // mithro(TODO): Enable these checks.
+  // DCHECK(!current_begin_frame_tracker_.HasFinished());
+  // DCHECK(monotonic_time == current_begin_frame_tracker_.Current().frame_time)
+  //  << "Called animate with unknown frame time!?";
   if (input_handler_client_)
     input_handler_client_->Animate(monotonic_time);
   AnimatePageScale(monotonic_time);
@@ -1147,6 +1149,10 @@ void LayerTreeHostImpl::ResetTreesForTesting() {
   recycle_tree_ = nullptr;
 }
 
+size_t LayerTreeHostImpl::SourceAnimationFrameNumberForTesting() const {
+  return fps_counter_->current_frame_number();
+}
+
 void LayerTreeHostImpl::EnforceManagedMemoryPolicy(
     const ManagedMemoryPolicy& policy) {
 
@@ -1580,6 +1586,9 @@ void LayerTreeHostImpl::DidDrawAllLayers(const FrameData& frame) {
   for (size_t i = 0; i < frame.will_draw_layers.size(); ++i)
     frame.will_draw_layers[i]->DidDraw(resource_provider_.get());
 
+  for (auto& it : video_frame_controllers_)
+    it->DidDrawFrame();
+
   // Once all layers have been drawn, pending texture uploads should no
   // longer block future uploads.
   resource_provider_->MarkPendingUploadsAsNonBlocking();
@@ -1709,16 +1718,7 @@ bool LayerTreeHostImpl::SwapBuffers(const LayerTreeHostImpl::FrameData& frame) {
 }
 
 void LayerTreeHostImpl::WillBeginImplFrame(const BeginFrameArgs& args) {
-  // Sample the frame time now. This time will be used for updating animations
-  // when we draw.
-  DCHECK(!current_begin_frame_args_.IsValid());
-  current_begin_frame_args_ = args;
-  // TODO(mithro): Stop overriding the frame time once the usage of frame
-  // timing is unified.
-  current_begin_frame_args_.frame_time = gfx::FrameTime::Now();
-
-  // Cache the begin impl frame interval
-  begin_impl_frame_interval_ = args.interval;
+  current_begin_frame_tracker_.Start(args);
 
   if (is_likely_to_require_a_draw_) {
     // Optimistically schedule a draw. This will let us expect the tile manager
@@ -1732,8 +1732,7 @@ void LayerTreeHostImpl::WillBeginImplFrame(const BeginFrameArgs& args) {
 }
 
 void LayerTreeHostImpl::DidFinishImplFrame() {
-  DCHECK(current_begin_frame_args_.IsValid());
-  current_begin_frame_args_ = BeginFrameArgs();
+  current_begin_frame_tracker_.Finish();
 }
 
 void LayerTreeHostImpl::UpdateViewportContainerSizes() {
@@ -2109,36 +2108,41 @@ void LayerTreeHostImpl::CreateResourceAndTileTaskWorkerPool(
     return;
   }
 
-  if (GetRendererCapabilities().using_image) {
-    unsigned image_target = settings_.use_image_texture_target;
-    DCHECK_IMPLIES(
-        image_target == GL_TEXTURE_RECTANGLE_ARB,
-        context_provider->ContextCapabilities().gpu.texture_rectangle);
-    DCHECK_IMPLIES(
-        image_target == GL_TEXTURE_EXTERNAL_OES,
-        context_provider->ContextCapabilities().gpu.egl_image_external);
+  DCHECK(GetRendererCapabilities().using_image);
+  unsigned image_target = settings_.use_image_texture_target;
+  DCHECK_IMPLIES(image_target == GL_TEXTURE_RECTANGLE_ARB,
+                 context_provider->ContextCapabilities().gpu.texture_rectangle);
+  DCHECK_IMPLIES(
+      image_target == GL_TEXTURE_EXTERNAL_OES,
+      context_provider->ContextCapabilities().gpu.egl_image_external);
 
-    if (settings_.use_zero_copy || IsSynchronousSingleThreaded()) {
-      *resource_pool =
-          ResourcePool::Create(resource_provider_.get(), image_target);
+  if (settings_.use_zero_copy) {
+    *resource_pool =
+        ResourcePool::Create(resource_provider_.get(), image_target);
 
-      *tile_task_worker_pool = ZeroCopyTileTaskWorkerPool::Create(
-          task_runner, task_graph_runner, resource_provider_.get());
-      return;
-    }
+    *tile_task_worker_pool = ZeroCopyTileTaskWorkerPool::Create(
+        task_runner, task_graph_runner, resource_provider_.get());
+    return;
+  }
 
-    if (settings_.use_one_copy) {
-      // We need to create a staging resource pool when using copy rasterizer.
-      *staging_resource_pool =
-          ResourcePool::Create(resource_provider_.get(), image_target);
-      *resource_pool =
-          ResourcePool::Create(resource_provider_.get(), GL_TEXTURE_2D);
+  if (settings_.use_one_copy) {
+    // Synchronous single-threaded mode depends on tiles being ready to
+    // draw when raster is complete.  Therefore, it must use one of zero
+    // copy, software raster, or GPU raster.
+    DCHECK(!IsSynchronousSingleThreaded());
 
-      *tile_task_worker_pool = OneCopyTileTaskWorkerPool::Create(
-          task_runner, task_graph_runner, context_provider,
-          resource_provider_.get(), staging_resource_pool_.get());
-      return;
-    }
+    // We need to create a staging resource pool when using copy rasterizer.
+    *staging_resource_pool =
+        ResourcePool::Create(resource_provider_.get(), image_target);
+    *resource_pool =
+        ResourcePool::Create(resource_provider_.get(), GL_TEXTURE_2D);
+
+    *tile_task_worker_pool = OneCopyTileTaskWorkerPool::Create(
+        task_runner, task_graph_runner, context_provider,
+        resource_provider_.get(), staging_resource_pool_.get(),
+        settings_.max_bytes_per_copy_operation,
+        settings_.use_persistent_map_for_gpu_memory_buffers);
+    return;
   }
 
   // Synchronous single-threaded mode depends on tiles being ready to
@@ -2210,7 +2214,8 @@ bool LayerTreeHostImpl::InitializeRenderer(
       proxy_->blocking_main_thread_task_runner(),
       settings_.renderer_settings.highp_threshold_min,
       settings_.renderer_settings.use_rgba_4444_textures,
-      settings_.renderer_settings.texture_id_allocation_chunk_size);
+      settings_.renderer_settings.texture_id_allocation_chunk_size,
+      settings_.use_persistent_map_for_gpu_memory_buffers);
 
   CreateAndSetRenderer();
 
@@ -3135,10 +3140,6 @@ std::string LayerTreeHostImpl::LayerTreeAsJson() const {
   return str;
 }
 
-int LayerTreeHostImpl::SourceAnimationFrameNumber() const {
-  return fps_counter_->current_frame_number();
-}
-
 void LayerTreeHostImpl::StartAnimatingScrollbarAnimationController(
     ScrollbarAnimationController* controller) {
   scrollbar_animation_controllers_.insert(controller);
@@ -3164,8 +3165,9 @@ void LayerTreeHostImpl::AddVideoFrameController(
     VideoFrameController* controller) {
   bool was_empty = video_frame_controllers_.empty();
   video_frame_controllers_.insert(controller);
-  if (current_begin_frame_args_.IsValid())
-    controller->OnBeginFrame(current_begin_frame_args_);
+  if (current_begin_frame_tracker_.DangerousMethodHasStarted() &&
+      !current_begin_frame_tracker_.DangerousMethodHasFinished())
+    controller->OnBeginFrame(current_begin_frame_tracker_.Current());
   if (was_empty)
     client_->SetVideoNeedsBeginFrames(true);
 }
@@ -3192,14 +3194,13 @@ TreePriority LayerTreeHostImpl::GetTreePriority() const {
 }
 
 BeginFrameArgs LayerTreeHostImpl::CurrentBeginFrameArgs() const {
-  // Try to use the current frame time to keep animations non-jittery.  But if
-  // we're not in a frame (because this is during an input event or a delayed
-  // task), fall back to physical time.  This should still be monotonic.
-  if (current_begin_frame_args_.IsValid())
-    return current_begin_frame_args_;
-  return BeginFrameArgs::Create(
-      BEGINFRAME_FROM_HERE, gfx::FrameTime::Now(), base::TimeTicks(),
-      BeginFrameArgs::DefaultInterval(), BeginFrameArgs::NORMAL);
+  // TODO(mithro): Replace call with current_begin_frame_tracker_.Current()
+  // once all calls which happens outside impl frames are fixed.
+  return current_begin_frame_tracker_.DangerousMethodCurrentOrLast();
+}
+
+base::TimeDelta LayerTreeHostImpl::CurrentBeginFrameInterval() const {
+  return current_begin_frame_tracker_.Interval();
 }
 
 scoped_refptr<base::trace_event::ConvertableToTraceFormat>

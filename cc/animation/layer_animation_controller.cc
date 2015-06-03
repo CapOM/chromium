@@ -584,15 +584,6 @@ void LayerAnimationController::PushNewAnimationsToImplThread(
     if (controller_impl->GetAnimationById(animations_[i]->id()))
       continue;
 
-    // If the animation is not running on the impl thread, it does not
-    // necessarily mean that it needs to be copied over and started; it may
-    // have already finished. In this case, the impl thread animation will
-    // have already notified that it has started and the main thread animation
-    // will no longer need
-    // a synchronized start time.
-    if (!animations_[i]->needs_synchronized_start_time())
-      continue;
-
     // Scroll animations always start at the current scroll offset.
     if (animations_[i]->target_property() == Animation::SCROLL_OFFSET) {
       gfx::ScrollOffset current_scroll_offset;
@@ -984,7 +975,7 @@ void LayerAnimationController::NotifyObserversOpacityAnimated(
     bool notify_active_observers,
     bool notify_pending_observers) {
   if (value_observers_.might_have_observers()) {
-    ObserverListBase<LayerAnimationValueObserver>::Iterator it(
+    base::ObserverListBase<LayerAnimationValueObserver>::Iterator it(
         &value_observers_);
     LayerAnimationValueObserver* obs;
     while ((obs = it.GetNext()) != nullptr) {
@@ -1001,7 +992,7 @@ void LayerAnimationController::NotifyObserversTransformAnimated(
     bool notify_active_observers,
     bool notify_pending_observers) {
   if (value_observers_.might_have_observers()) {
-    ObserverListBase<LayerAnimationValueObserver>::Iterator it(
+    base::ObserverListBase<LayerAnimationValueObserver>::Iterator it(
         &value_observers_);
     LayerAnimationValueObserver* obs;
     while ((obs = it.GetNext()) != nullptr) {
@@ -1018,7 +1009,7 @@ void LayerAnimationController::NotifyObserversFilterAnimated(
     bool notify_active_observers,
     bool notify_pending_observers) {
   if (value_observers_.might_have_observers()) {
-    ObserverListBase<LayerAnimationValueObserver>::Iterator it(
+    base::ObserverListBase<LayerAnimationValueObserver>::Iterator it(
         &value_observers_);
     LayerAnimationValueObserver* obs;
     while ((obs = it.GetNext()) != nullptr) {
@@ -1035,7 +1026,7 @@ void LayerAnimationController::NotifyObserversScrollOffsetAnimated(
     bool notify_active_observers,
     bool notify_pending_observers) {
   if (value_observers_.might_have_observers()) {
-    ObserverListBase<LayerAnimationValueObserver>::Iterator it(
+    base::ObserverListBase<LayerAnimationValueObserver>::Iterator it(
         &value_observers_);
     LayerAnimationValueObserver* obs;
     while ((obs = it.GetNext()) != nullptr) {
@@ -1055,7 +1046,7 @@ void LayerAnimationController::NotifyObserversAnimationWaitingForDeletion() {
 
 bool LayerAnimationController::HasValueObserver() {
   if (value_observers_.might_have_observers()) {
-    ObserverListBase<LayerAnimationValueObserver>::Iterator it(
+    base::ObserverListBase<LayerAnimationValueObserver>::Iterator it(
         &value_observers_);
     return it.GetNext() != nullptr;
   }
@@ -1064,7 +1055,7 @@ bool LayerAnimationController::HasValueObserver() {
 
 bool LayerAnimationController::HasActiveValueObserver() {
   if (value_observers_.might_have_observers()) {
-    ObserverListBase<LayerAnimationValueObserver>::Iterator it(
+    base::ObserverListBase<LayerAnimationValueObserver>::Iterator it(
         &value_observers_);
     LayerAnimationValueObserver* obs;
     while ((obs = it.GetNext()) != nullptr)

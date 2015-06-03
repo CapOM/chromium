@@ -6,9 +6,11 @@
 
 #include <list>
 
+#include "base/lazy_instance.h"
 #include "base/memory/linked_ptr.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/synchronization/lock.h"
+#include "base/threading/thread_local.h"
 #include "gpu/command_buffer/service/texture_manager.h"
 #include "ui/gl/gl_image.h"
 #include "ui/gl/gl_implementation.h"
@@ -34,7 +36,9 @@ class GLImageSync : public gfx::GLImage {
   unsigned GetInternalFormat() override;
   bool BindTexImage(unsigned target) override;
   void ReleaseTexImage(unsigned target) override;
-  bool CopyTexImage(unsigned target) override;
+  bool CopyTexSubImage(unsigned target,
+                       const gfx::Point& offset,
+                       const gfx::Rect& rect) override;
   void WillUseTexImage() override;
   void WillModifyTexImage() override;
   void DidModifyTexImage() override;
@@ -87,7 +91,9 @@ void GLImageSync::ReleaseTexImage(unsigned target) {
   NOTREACHED();
 }
 
-bool GLImageSync::CopyTexImage(unsigned target) {
+bool GLImageSync::CopyTexSubImage(unsigned target,
+                                  const gfx::Point& offset,
+                                  const gfx::Rect& rect) {
   return false;
 }
 
@@ -123,10 +129,10 @@ class NativeImageBufferEGL : public NativeImageBuffer {
   void AddClient(gfx::GLImage* client) override;
   void RemoveClient(gfx::GLImage* client) override;
   bool IsClient(gfx::GLImage* client) override;
-  void BindToTexture(GLenum target) override;
+  void BindToTexture(GLenum target) const override;
 
-  EGLDisplay egl_display_;
-  EGLImageKHR egl_image_;
+  const EGLDisplay egl_display_;
+  const EGLImageKHR egl_image_;
 
   base::Lock lock_;
 
@@ -225,7 +231,7 @@ bool NativeImageBufferEGL::IsClient(gfx::GLImage* client) {
   return false;
 }
 
-void NativeImageBufferEGL::BindToTexture(GLenum target) {
+void NativeImageBufferEGL::BindToTexture(GLenum target) const {
   DCHECK(egl_image_ != EGL_NO_IMAGE_KHR);
   glEGLImageTargetTexture2DOES(target, egl_image_);
   DCHECK_EQ(static_cast<EGLint>(EGL_SUCCESS), eglGetError());
@@ -243,12 +249,16 @@ class NativeImageBufferStub : public NativeImageBuffer {
   void AddClient(gfx::GLImage* client) override {}
   void RemoveClient(gfx::GLImage* client) override {}
   bool IsClient(gfx::GLImage* client) override { return true; }
-  void BindToTexture(GLenum target) override {}
+  void BindToTexture(GLenum target) const override {}
 
   DISALLOW_COPY_AND_ASSIGN(NativeImageBufferStub);
 };
 
 bool g_avoid_egl_target_texture_reuse = false;
+
+#if DCHECK_IS_ON()
+base::LazyInstance<base::ThreadLocalBoolean> g_inside_scoped_update_texture;
+#endif
 
 }  // anonymous namespace
 
@@ -270,6 +280,27 @@ scoped_refptr<NativeImageBuffer> NativeImageBuffer::Create(GLuint texture_id) {
 // static
 void TextureDefinition::AvoidEGLTargetTextureReuse() {
   g_avoid_egl_target_texture_reuse = true;
+}
+
+ScopedUpdateTexture::ScopedUpdateTexture() {
+#if DCHECK_IS_ON()
+  DCHECK(!g_inside_scoped_update_texture.Get().Get());
+  g_inside_scoped_update_texture.Get().Set(true);
+#endif
+}
+
+ScopedUpdateTexture::~ScopedUpdateTexture() {
+#if DCHECK_IS_ON()
+  DCHECK(g_inside_scoped_update_texture.Get().Get());
+  g_inside_scoped_update_texture.Get().Set(false);
+#endif
+  // We have to make sure the changes are visible to other clients in this share
+  // group. As far as the clients are concerned, the mailbox semantics only
+  // demand a single flush from the client after changes are first made,
+  // and it is not visible to them when another share group boundary is crossed.
+  // We could probably track this and be a bit smarter about when to flush
+  // though.
+  glFlush();
 }
 
 TextureDefinition::LevelInfo::LevelInfo()
@@ -359,26 +390,29 @@ Texture* TextureDefinition::CreateTexture() const {
   glGenTextures(1, &texture_id);
 
   Texture* texture(new Texture(texture_id));
+  ScopedUpdateTexture scoped_update_texture;
   UpdateTextureInternal(texture);
 
   return texture;
 }
 
 void TextureDefinition::UpdateTextureInternal(Texture* texture) const {
+#if DCHECK_IS_ON()
+  DCHECK(g_inside_scoped_update_texture.Get().Get());
+#endif
   gfx::ScopedTextureBinder texture_binder(target_, texture->service_id());
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, min_filter_);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, mag_filter_);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_s_);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_t_);
-  if (image_buffer_.get())
-    image_buffer_->BindToTexture(target_);
-  // We have to make sure the changes are visible to other clients in this share
-  // group. As far as the clients are concerned, the mailbox semantics only
-  // demand a single flush from the client after changes are first made,
-  // and it is not visible to them when another share group boundary is crossed.
-  // We could probably track this and be a bit smarter about when to flush
-  // though.
-  glFlush();
+
+  if (image_buffer_.get()) {
+    gfx::GLImage* existing_image = texture->GetLevelImage(target_, 0);
+    // Don't need to re-bind if already bound before.
+    if (!existing_image || !image_buffer_->IsClient(existing_image)) {
+      image_buffer_->BindToTexture(target_);
+    }
+  }
 
   if (defined_) {
     texture->face_infos_.resize(1);
@@ -423,6 +457,7 @@ void TextureDefinition::UpdateTexture(Texture* texture) const {
     if (bound_id == static_cast<GLint>(old_service_id)) {
       glBindTexture(target_, service_id);
     }
+    texture->SetLevelImage(NULL, target_, 0, NULL);
   }
 
   UpdateTextureInternal(texture);

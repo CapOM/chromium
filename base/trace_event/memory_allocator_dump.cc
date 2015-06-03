@@ -41,8 +41,11 @@ const char MemoryAllocatorDump::kUnitsBytes[] = "bytes";
 const char MemoryAllocatorDump::kUnitsObjects[] = "objects";
 
 MemoryAllocatorDump::MemoryAllocatorDump(const std::string& absolute_name,
-                                         ProcessMemoryDump* process_memory_dump)
-    : absolute_name_(absolute_name), process_memory_dump_(process_memory_dump) {
+                                         ProcessMemoryDump* process_memory_dump,
+                                         const MemoryAllocatorDumpGuid& guid)
+    : absolute_name_(absolute_name),
+      process_memory_dump_(process_memory_dump),
+      guid_(guid) {
   // The |absolute_name| cannot be empty.
   DCHECK(!absolute_name.empty());
 
@@ -53,6 +56,20 @@ MemoryAllocatorDump::MemoryAllocatorDump(const std::string& absolute_name,
   // Dots are not allowed anywhere as the underlying base::DictionaryValue
   // would treat them magically and split in sub-nodes, which is not intended.
   DCHECK_EQ(std::string::npos, absolute_name.find_first_of('.'));
+}
+
+// If the caller didn't provide a guid, make one up by hashing the
+// absolute_name with the current PID.
+// Rationale: |absolute_name| is already supposed to be unique within a
+// process, the pid will make it unique among all processes.
+MemoryAllocatorDump::MemoryAllocatorDump(const std::string& absolute_name,
+                                         ProcessMemoryDump* process_memory_dump)
+    : MemoryAllocatorDump(absolute_name,
+                          process_memory_dump,
+                          MemoryAllocatorDumpGuid(StringPrintf(
+                              "%d:%s",
+                              TraceLog::GetInstance()->process_id(),
+                              absolute_name.c_str()))) {
 }
 
 MemoryAllocatorDump::~MemoryAllocatorDump() {
@@ -97,6 +114,12 @@ void MemoryAllocatorDump::AddScalar(const std::string& name,
   Add(name, kTypeScalar, units, hex_value.Pass());
 }
 
+void MemoryAllocatorDump::AddScalarF(const std::string& name,
+                                     const char* units,
+                                     double value) {
+  Add(name, kTypeScalar, units, make_scoped_ptr(new FundamentalValue(value)));
+}
+
 void MemoryAllocatorDump::AddString(const std::string& name,
                                     const char* units,
                                     const std::string& value) {
@@ -106,6 +129,8 @@ void MemoryAllocatorDump::AddString(const std::string& name,
 
 void MemoryAllocatorDump::AsValueInto(TracedValue* value) const {
   value->BeginDictionary(absolute_name_.c_str());
+  value->SetString("guid", guid_.ToString());
+
   value->BeginDictionary("attrs");
 
   for (DictionaryValue::Iterator it(attributes_); !it.IsAtEnd(); it.Advance())

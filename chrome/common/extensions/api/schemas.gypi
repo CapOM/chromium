@@ -52,7 +52,7 @@
       'identity_private.idl',
       'image_writer_private.idl',
       'inline_install_private.idl',
-      'instance_id.idl',
+      'instance_id.json',
       'launcher_page.idl',
       'location.idl',
       'manifest_types.json',
@@ -79,6 +79,7 @@
       'tab_capture.idl',
       'tabs.json',
       'types.json',
+      'users_private.idl',
       'web_navigation.json',
       # Despite the name, this API does not rely on any
       # WebRTC-specific bits and as such does not belong in

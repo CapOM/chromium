@@ -566,6 +566,10 @@ const char kAccessibilityHighContrastEnabled[] =
 // A boolean pref which determines whether screen magnifier is enabled.
 const char kAccessibilityScreenMagnifierEnabled[] =
     "settings.a11y.screen_magnifier";
+// A boolean pref which determines whether screen magnifier should center
+// the text input focus.
+const char kAccessibilityScreenMagnifierCenterFocus[] =
+    "settings.a11y.screen_magnifier_center_focus";
 // A integer pref which determines what type of screen magnifier is enabled.
 // Note that: 'screen_magnifier_type' had been used as string pref. Hence,
 // we are using another name pref here.
@@ -910,9 +914,6 @@ const char kPluginsDisabledPluginsExceptions[] =
 
 // List pref containing names of plugins that are enabled by policy.
 const char kPluginsEnabledPlugins[] = "plugins.plugins_enabled";
-
-// Whether NPAPI plugins are enabled.
-const char kEnableNpapi[] = "plugins.enable_npapi";
 
 // When bundled NPAPI Flash is removed, if at that point it is enabled while
 // Pepper Flash is disabled, we would like to turn on Pepper Flash. And we will

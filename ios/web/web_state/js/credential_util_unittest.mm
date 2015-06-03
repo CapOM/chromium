@@ -38,17 +38,6 @@ const char* kTestCredentialPassword = "baz";
 // "federationURL" value for a DictionaryValue representation of a credential.
 const char* kTestCredentialFederationURL = "https://foo.com/";
 
-// Determines whether two credentials are equal.
-bool CredentialsEqual(const Credential& credential1,
-                      const Credential& credential2) {
-  return credential1.type == credential2.type &&
-         credential1.id == credential2.id &&
-         credential1.name == credential2.name &&
-         credential1.avatar_url == credential2.avatar_url &&
-         credential1.password == credential2.password &&
-         credential1.federation_url == credential2.federation_url;
-}
-
 // Returns a Credential with Local type.
 Credential GetTestLocalCredential() {
   Credential credential;
@@ -214,6 +203,21 @@ TEST(CredentialUtilTest, SerializeLocalCredential) {
   Credential credential(GetTestLocalCredential());
   CredentialToDictionaryValue(credential, &value);
   EXPECT_TRUE(GetTestLocalCredentialDictionaryValue()->Equals(&value));
+}
+
+TEST(CredentialUtilTest, SerializeEmptyCredential) {
+  base::DictionaryValue value;
+  Credential credential;
+  CredentialToDictionaryValue(credential, &value);
+  EXPECT_TRUE(make_scoped_ptr(new base::DictionaryValue)->Equals(&value));
+}
+
+TEST(CredentialUtilTest, SerializeEmptyCredentialIntoNonEmptyDictionary) {
+  base::DictionaryValue value;
+  value.SetString("foo", "bar");
+  Credential credential;
+  CredentialToDictionaryValue(credential, &value);
+  EXPECT_TRUE(make_scoped_ptr(new base::DictionaryValue)->Equals(&value));
 }
 
 }  // namespace

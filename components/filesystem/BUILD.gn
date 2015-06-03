@@ -10,13 +10,9 @@ mojo_native_application("filesystem") {
     "directory_impl.h",
     "file_impl.cc",
     "file_impl.h",
-    "files_impl.cc",
-    "files_impl.h",
-    "futimens.h",
-    "futimens_android.cc",
+    "file_system_impl.cc",
+    "file_system_impl.h",
     "main.cc",
-    "shared_impl.cc",
-    "shared_impl.h",
     "util.cc",
     "util.h",
   ]
@@ -27,13 +23,14 @@ mojo_native_application("filesystem") {
     "//mojo/application/public/cpp",
     "//mojo/common",
     "//mojo/environment:chromium",
+    "//mojo/platform_handle",
     "//third_party/mojo/src/mojo/public/cpp/bindings",
     "//third_party/mojo/src/mojo/public/cpp/system",
   ]
 }
 
 mojo_native_application("apptests") {
-  output_name = "files_apptests"
+  output_name = "filesystem_apptests"
 
   testonly = true
 
@@ -48,6 +45,7 @@ mojo_native_application("apptests") {
     "//base",
     "//components/filesystem/public/interfaces",
     "//mojo/application/public/cpp:test_support",
+    "//mojo/platform_handle",
     "//third_party/mojo/src/mojo/public/cpp/bindings",
   ]
 }

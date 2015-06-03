@@ -148,7 +148,6 @@ WebPreferences::WebPreferences()
       should_print_backgrounds(false),
       should_clear_document_background(true),
       enable_scroll_animator(false),
-      region_based_columns_enabled(false),
       touch_enabled(false),
       device_supports_touch(false),
       device_supports_mouse(true),
@@ -185,7 +184,6 @@ WebPreferences::WebPreferences()
       smart_insert_delete_enabled(false),
 #endif
       spatial_navigation_enabled(false),
-      pinch_virtual_viewport_enabled(false),
       pinch_overlay_scrollbar_thickness(0),
       use_solid_color_scrollbars(false),
       navigate_on_drag_drop(true),

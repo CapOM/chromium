@@ -2,22 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SERVICES_FILES_FILE_IMPL_H_
-#define SERVICES_FILES_FILE_IMPL_H_
+#ifndef COMPONENTS_FILESYSTEM_FILE_IMPL_H_
+#define COMPONENTS_FILESYSTEM_FILE_IMPL_H_
 
+#include "base/files/file.h"
 #include "base/files/scoped_file.h"
 #include "base/macros.h"
 #include "components/filesystem/public/interfaces/directory.mojom.h"
 #include "mojo/public/cpp/bindings/interface_request.h"
 #include "mojo/public/cpp/bindings/strong_binding.h"
 
-namespace mojo {
-namespace files {
+namespace base {
+class FilePath;
+}
+
+namespace filesystem {
 
 class FileImpl : public File {
  public:
-  // TODO(vtl): Will need more for, e.g., |Reopen()|.
-  FileImpl(InterfaceRequest<File> request, base::ScopedFD file_fd);
+  FileImpl(mojo::InterfaceRequest<File> request,
+           const base::FilePath& path,
+           uint32 flags);
+  FileImpl(mojo::InterfaceRequest<File> request, base::File file);
   ~FileImpl() override;
 
   // |File| implementation:
@@ -26,19 +32,10 @@ class FileImpl : public File {
             int64_t offset,
             Whence whence,
             const ReadCallback& callback) override;
-  void Write(Array<uint8_t> bytes_to_write,
+  void Write(mojo::Array<uint8_t> bytes_to_write,
              int64_t offset,
              Whence whence,
              const WriteCallback& callback) override;
-  void ReadToStream(ScopedDataPipeProducerHandle source,
-                    int64_t offset,
-                    Whence whence,
-                    int64_t num_bytes_to_read,
-                    const ReadToStreamCallback& callback) override;
-  void WriteFromStream(ScopedDataPipeConsumerHandle sink,
-                       int64_t offset,
-                       Whence whence,
-                       const WriteFromStreamCallback& callback) override;
   void Tell(const TellCallback& callback) override;
   void Seek(int64_t offset,
             Whence whence,
@@ -48,23 +45,17 @@ class FileImpl : public File {
   void Touch(TimespecOrNowPtr atime,
              TimespecOrNowPtr mtime,
              const TouchCallback& callback) override;
-  void Dup(InterfaceRequest<File> file, const DupCallback& callback) override;
-  void Reopen(InterfaceRequest<File> file,
-              uint32_t open_flags,
-              const ReopenCallback& callback) override;
-  void AsBuffer(const AsBufferCallback& callback) override;
-  void Ioctl(uint32_t request,
-             Array<uint32_t> in_values,
-             const IoctlCallback& callback) override;
+  void Dup(mojo::InterfaceRequest<File> file,
+           const DupCallback& callback) override;
+  void AsHandle(const AsHandleCallback& callback) override;
 
  private:
-  StrongBinding<File> binding_;
-  base::ScopedFD file_fd_;
+  mojo::StrongBinding<File> binding_;
+  base::File file_;
 
   DISALLOW_COPY_AND_ASSIGN(FileImpl);
 };
 
-}  // namespace files
-}  // namespace mojo
+}  // namespace filesystem
 
-#endif  // SERVICES_FILES_FILE_IMPL_H_
+#endif  // COMPONENTS_FILESYSTEM_FILE_IMPL_H_

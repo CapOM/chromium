@@ -26,6 +26,7 @@
 #include "content/public/common/javascript_message_type.h"
 #include "net/http/http_response_headers.h"
 #include "third_party/WebKit/public/web/WebTextDirection.h"
+#include "third_party/WebKit/public/web/WebTreeScopeType.h"
 #include "ui/accessibility/ax_node_data.h"
 #include "ui/base/page_transition_types.h"
 
@@ -131,6 +132,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   bool IsCrossProcessSubframe() override;
   GURL GetLastCommittedURL() override;
   gfx::NativeView GetNativeView() override;
+  void AddMessageToConsole(ConsoleMessageLevel level,
+                           const std::string& message) override;
   void ExecuteJavaScript(const base::string16& javascript) override;
   void ExecuteJavaScript(const base::string16& javascript,
                          const JavaScriptResultCallback& callback) override;
@@ -202,8 +205,9 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   int routing_id() const { return routing_id_; }
   void OnCreateChildFrame(int new_routing_id,
+                          blink::WebTreeScopeType scope,
                           const std::string& frame_name,
-                          SandboxFlags sandbox_flags);
+                          blink::WebSandboxFlags sandbox_flags);
 
   RenderViewHostImpl* render_view_host() { return render_view_host_; }
   RenderFrameHostDelegate* delegate() { return delegate_; }
@@ -501,7 +505,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
   void OnDidDisownOpener();
   void OnDidChangeName(const std::string& name);
   void OnDidAssignPageId(int32 page_id);
-  void OnDidChangeSandboxFlags(int32 frame_routing_id, SandboxFlags flags);
+  void OnDidChangeSandboxFlags(int32 frame_routing_id,
+                               blink::WebSandboxFlags flags);
   void OnUpdateTitle(const base::string16& title,
                      blink::WebTextDirection title_direction);
   void OnUpdateEncoding(const std::string& encoding);

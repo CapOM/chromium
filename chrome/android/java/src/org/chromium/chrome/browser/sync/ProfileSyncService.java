@@ -55,20 +55,14 @@ public class ProfileSyncService {
      */
     public static class GetAllNodesCallback {
         private String mNodesString;
-        private boolean mHasResult = false;
 
         // Invoked when getAllNodes completes.
         public void onResult(String nodesString) {
             mNodesString = nodesString;
-            mHasResult = true;
-        }
-
-        // Whether this callback contains a result.
-        public boolean hasResult() {
-            return mHasResult;
         }
 
         // Returns the result of GetAllNodes as a JSONArray.
+        @VisibleForTesting
         public JSONArray getNodesAsJsonArray() throws JSONException {
             return new JSONArray(mNodesString);
         }
@@ -383,6 +377,9 @@ public class ProfileSyncService {
         if ((modelTypeSelection & ModelTypeSelection.AUTOFILL_WALLET) != 0) {
             syncTypes.add(ModelType.AUTOFILL_WALLET);
         }
+        if ((modelTypeSelection & ModelTypeSelection.AUTOFILL_WALLET_METADATA) != 0) {
+            syncTypes.add(ModelType.AUTOFILL_WALLET_METADATA);
+        }
         if ((modelTypeSelection & ModelTypeSelection.BOOKMARK) != 0) {
             syncTypes.add(ModelType.BOOKMARK);
         }
@@ -624,6 +621,7 @@ public class ProfileSyncService {
      * Retrieves a JSON version of local Sync data via the native GetAllNodes method.
      * This method is asynchronous; the result will be sent to the callback.
      */
+    @VisibleForTesting
     public void getAllNodes(GetAllNodesCallback callback) {
         nativeGetAllNodes(mNativeProfileSyncServiceAndroid, callback);
     }

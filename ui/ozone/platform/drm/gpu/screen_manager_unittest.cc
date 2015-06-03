@@ -14,6 +14,9 @@
 
 namespace {
 
+void EmptySwapCallback(gfx::SwapResult) {
+}
+
 // Create a basic mode for a 6x4 screen.
 const drmModeModeInfo kDefaultMode =
     {0, 6, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, {'\0'}};
@@ -446,6 +449,28 @@ TEST_F(ScreenManagerTest, EnableControllerWhenWindowHasNoBuffer) {
   // There is a new buffer after we configured with the same mode but no
   // pending frames on the window.
   EXPECT_NE(framebuffer, drm_->current_framebuffer());
+
+  window = screen_manager_->RemoveWindow(1);
+  window->Shutdown();
+}
+
+TEST_F(ScreenManagerTest, EnableControllerWhenWindowHasBuffer) {
+  scoped_ptr<ui::DrmWindow> window(
+      new ui::DrmWindow(1, device_manager_.get(), screen_manager_.get()));
+  window->Initialize();
+  window->OnBoundsChanged(GetPrimaryBounds());
+  scoped_refptr<ui::ScanoutBuffer> buffer =
+      buffer_generator_->Create(drm_, GetPrimaryBounds().size());
+  window->QueueOverlayPlane(ui::OverlayPlane(buffer));
+  window->SchedulePageFlip(false /* is_sync */, base::Bind(&EmptySwapCallback));
+  screen_manager_->AddWindow(1, window.Pass());
+
+  screen_manager_->AddDisplayController(drm_, kPrimaryCrtc, kPrimaryConnector);
+  screen_manager_->ConfigureDisplayController(
+      drm_, kPrimaryCrtc, kPrimaryConnector, GetPrimaryBounds().origin(),
+      kDefaultMode);
+
+  EXPECT_EQ(buffer->GetFramebufferId(), drm_->current_framebuffer());
 
   window = screen_manager_->RemoveWindow(1);
   window->Shutdown();

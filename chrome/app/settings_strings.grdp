@@ -2,7 +2,7 @@
 <!-- Settings-specific strings (included from generated_resources.grd). -->
 <grit-part>
   <!-- Accessibility Page -->
-  <message name="IDS_MD_SETTINGS_ACCESSIBILITY_PAGE_TITLE" desc="Name of the settings page which displays accessibility preferences.">
+  <message name="IDS_SETTINGS_ACCESSIBILITY_PAGE_TITLE" desc="Name of the settings page which displays accessibility preferences.">
     Accessibility
   </message>
   <message name="IDS_SETTINGS_ACCESSIBILITY_MORE_FEATURES_LINK" desc="Link which opens page where users can install extensions which provide additional accessibility features.">
@@ -60,8 +60,19 @@
     Enable on-screen keyboard
   </message>
 
+  <!-- Appearance Page -->
+  <message name="IDS_SETTINGS_APPEARANCE_PAGE_TITLE" desc="Name of the settings page which displays appearance preferences.">
+    Appearance
+  </message>
+  <message name="IDS_SETTINGS_APPEARANCE_SHOW_HOME_BUTTON_LABEL" desc="Label for the checkbox which enables or disables showing the home button in the toolbar.">
+    Show home button
+  </message>
+  <message name="IDS_SETTINGS_APPEARANCE_SHOW_BOOKMARKS_BAR_LABEL" desc="Label for the checkbox which enables or disables showing the bookmarks bar in the toolbar.">
+    Always show the bookmarks bar
+  </message>
+
   <!-- Downloads Page -->
-  <message name="IDS_MD_SETTINGS_DOWNLOADS_PAGE_TITLE" desc="Name of the settings page which displays download preferences.">
+  <message name="IDS_SETTINGS_DOWNLOADS_PAGE_TITLE" desc="Name of the settings page which displays download preferences.">
     Downloads
   </message>
   <message name="IDS_SETTINGS_DOWNLOADS_LOCATION_LABEL" desc="Label for the input which allows the user to specify the default download directory.">

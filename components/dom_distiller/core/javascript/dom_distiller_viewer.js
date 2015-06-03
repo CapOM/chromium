@@ -49,10 +49,16 @@ function setTitle(title) {
   collapse.style.height = "0px";
 
   holder.textContent = title;
+  document.title = title;
   var newHeight = Math.max(90, holder.getBoundingClientRect().height);
 
   collapse.style.transition = "height 0.2s";
   collapse.style.height = newHeight + "px";
+}
+
+// Set the text direction of the document ('ltr', 'rtl', or 'auto').
+function setTextDirection(direction) {
+  document.body.setAttribute('dir', direction);
 }
 
 // Maps JS Font Family to CSS class and then changes body class name.
@@ -204,8 +210,8 @@ var pincher = (function() {
   var shiftY;
 
   // The zooming speed relative to pinching speed.
-  const FONT_SCALE_MULTIPLIER = 0.5;
-  const MIN_SPAN_LENGTH = 20;
+  var FONT_SCALE_MULTIPLIER = 0.5;
+  var MIN_SPAN_LENGTH = 20;
 
   // The font size is guaranteed to be in px.
   var baseSize =

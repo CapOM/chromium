@@ -117,7 +117,7 @@ const char kAutoSelectDesktopCaptureSource[] =
     "auto-select-desktop-capture-source";
 
 // This flag causes the user engagement checks for showing app banners to be
-// bypasses. It is intended to be used by developers who wish to test that their
+// bypassed. It is intended to be used by developers who wish to test that their
 // sites otherwise meet the criteria needed to show app banners.
 const char kBypassAppBannerEngagementChecks[] =
     "bypass-app-banner-engagement-checks";
@@ -203,6 +203,10 @@ const char kDiagnosticsRecovery[]           = "diagnostics-recovery";
 // instead of as a separate page, unless this flag is specified.
 const char kDisableAboutInSettings[]        = "disable-about-in-settings";
 
+// Disables the display of a banner allowing the user to add a web
+// app to their shelf (or platform-specific equivalent)
+const char kDisableAddToShelf[] = "disable-add-to-shelf";
+
 // Disables the experimental asynchronous DNS client.
 const char kDisableAsyncDns[]               = "disable-async-dns";
 
@@ -262,12 +266,6 @@ const char kDisableExtensionsFileAccessCheck[] =
 // requests originating from extensions.
 const char kDisableExtensionsHttpThrottling[] =
     "disable-extensions-http-throttling";
-
-// Don't resolve hostnames to IPv6 addresses. This can be used when debugging
-// issues relating to IPv6, but shouldn't otherwise be needed. Be sure to file
-// bugs if something isn't working properly in the presence of IPv6. This flag
-// can be overidden by the "enable-ipv6" flag.
-const char kDisableIPv6[]                   = "disable-ipv6";
 
 // Disable the behavior that the second click on a launcher item (the click when
 // the item is already active) minimizes the item.
@@ -379,14 +377,15 @@ const char kDumpBrowserHistograms[]         = "dump-browser-histograms";
 // Overrides the path of Easy Unlock component app.
 const char kEasyUnlockAppPath[]             = "easy-unlock-app-path";
 
+// Enables the display of a banner allowing the user to add a web
+// app to their shelf (or platform-specific equivalent)
+const char kEnableAddToShelf[] = "enable-add-to-shelf";
+
 // If set, the app list will be enabled as if enabled from CWS.
 const char kEnableAppList[]                 = "enable-app-list";
 
 // Enable OS integration for Chrome app file associations.
 const char kEnableAppsFileAssociations[]    = "enable-apps-file-associations";
-
-// Enables the experimental asynchronous DNS client.
-const char kEnableAsyncDns[]                = "enable-async-dns";
 
 // Enables the benchmarking extensions.
 const char kEnableBenchmarking[]            = "enable-benchmarking";
@@ -439,12 +438,6 @@ const char kEnableExtensionActivityLogTesting[] =
 // running a tab's onunload js handler independently of the GUI -
 // crbug.com/142458 .
 const char kEnableFastUnload[]         = "enable-fast-unload";
-
-// Enables IPv6 support, even if probes suggest that it may not be fully
-// supported. Some probes may require internet connections, and this flag will
-// allow support independent of application testing. This flag overrides
-// "disable-ipv6" which appears elswhere in this file.
-const char kEnableIPv6[]                    = "enable-ipv6";
 
 // Enables experimentation with launching ephemeral apps via hyperlinks.
 const char kEnableLinkableEphemeralApps[]   = "enable-linkable-ephemeral-apps";
@@ -553,9 +546,6 @@ const char kEnableUserAlternateProtocolPorts[] =
 // Enables a new "web app" style frame for hosted apps (including bookmark
 // apps).
 extern const char kEnableWebAppFrame[] = "enable-web-app-frame";
-
-// Enables the Website Settings page on the Settings page.
-const char kEnableWebsiteSettingsManager[]  = "enable-website-settings-manager";
 
 // Enables synchronizing WiFi credentials across devices, using Chrome Sync.
 const char kEnableWifiCredentialSync[]      = "enable-wifi-credential-sync";
@@ -907,11 +897,6 @@ const char kQuicMaxPacketLength[]           = "quic-max-packet-length";
 // Specifies the version of QUIC to use.
 const char kQuicVersion[]                   = "quic-version";
 
-// Remember user proceeds through SSL interstitials for a specified amount of
-// time. In particular, remember these decisions through session restart. The
-// time delta to remember certificates should be specified in seconds.
-const char kRememberCertErrorDecisions[]    = "remember-cert-error-decisions";
-
 // If set, the app list will forget it has been installed on startup. Note this
 // doesn't prevent the app list from running, it just makes Chrome think the app
 // list hasn't been enabled (as in kEnableAppList) yet.
@@ -1083,6 +1068,12 @@ const char kSyncDisableRollback[] = "disable-sync-rollback";
 // Passes the name of the current running automated test to Chrome.
 const char kTestName[]                      = "test-name";
 
+#ifdef ENABLE_TOPCHROME_MD
+const char kTopChromeMD[]                   = "topchrome-md";
+const char kTopChromeMDEnabled[]            = "enable-topchrome-md";
+const char kTopChromeMDDisabled[]           = "disable-topchrome-md";
+#endif
+
 // Disables same-origin check on HTTP resources pushed via a SPDY proxy.
 // The value is the host:port of the trusted proxy.
 const char kTrustedSpdyProxy[]              = "trusted-spdy-proxy";
@@ -1168,6 +1159,9 @@ const char kEnableContextualSearch[]        = "enable-contextual-search";
 // Enables the DOM distiller animated button UI for Android.
 const char kEnableDomDistillerButtonAnimation[] =
     "enable-dom-distiller-button-animation";
+
+// Enables chrome hosted mode for Android.
+const char kEnableHostedMode[] = "enable-hosted-mode";
 
 // Enables instant search clicks feature.
 const char kEnableInstantSearchClicks[] = "enable-instant-search-clicks";

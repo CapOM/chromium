@@ -87,6 +87,11 @@ namespace developerPrivate {
     TERMINATED
   };
 
+  enum CommandScope {
+    GLOBAL,
+    CHROME
+  };
+
   dictionary AccessModifier {
     boolean isEnabled;
     boolean isActive;
@@ -150,9 +155,31 @@ namespace developerPrivate {
     ViewType type;
   };
 
+  enum ControllerType {
+    POLICY,
+    CHILD_CUSTODIAN,
+    SUPERVISED_USER_CUSTODIAN
+  };
+
+  dictionary ControlledInfo {
+    ControllerType type;
+    DOMString text;
+  };
+
+  dictionary Command {
+    DOMString description;
+    DOMString keybinding;
+    DOMString name;
+    boolean isActive;
+    CommandScope scope;
+    boolean isExtensionAction;
+  };
+
   dictionary ExtensionInfo {
     boolean actionButtonHidden;
     DOMString? blacklistText;
+    Command[] commands;
+    ControlledInfo? controlledInfo;
     DOMString[] dependentExtensions;
     DOMString description;
     DisableReasons disableReasons;
@@ -162,7 +189,6 @@ namespace developerPrivate {
     DOMString iconUrl;
     DOMString id;
     AccessModifier incognitoAccess;
-    boolean installedByCustodian;
     DOMString[] installWarnings;
     DOMString? launchUrl;
     Location location;
@@ -173,7 +199,6 @@ namespace developerPrivate {
     boolean offlineEnabled;
     OptionsPage? optionsPage;
     DOMString? path;
-    DOMString? policyText;
     DOMString? prettifiedPath;
     AccessModifier runOnAllUrls;
     RuntimeError[] runtimeErrors;
@@ -247,6 +272,13 @@ namespace developerPrivate {
 
   dictionary ProfileConfigurationUpdate {
     boolean? inDeveloperMode;
+  };
+
+  dictionary ExtensionCommandUpdate {
+    DOMString extensionId;
+    DOMString commandName;
+    CommandScope? scope;
+    DOMString? keybinding;
   };
 
   dictionary ReloadOptions {
@@ -516,6 +548,16 @@ namespace developerPrivate {
     // Shows the path of the extension specified.
     // |extensionId| : The id of the extension to show the path for.
     static void showPath(DOMString extensionId, optional VoidCallback callback);
+
+    // (Un)suspends global shortcut handling.
+    // |isSuspended| : Whether or not shortcut handling should be suspended.
+    static void setShortcutHandlingSuspended(boolean isSuspended,
+                                             optional VoidCallback callback);
+
+    // Updates an extension command.
+    // |update| : The parameters for updating the extension command.
+    static void updateExtensionCommand(ExtensionCommandUpdate update,
+                                       optional VoidCallback callback);
 
     [nocompile, deprecated="Use management.setEnabled"]
         static void enable(DOMString id,

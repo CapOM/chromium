@@ -45,9 +45,7 @@ class CC_BLINK_EXPORT WebCompositorSupportImpl
   virtual blink::WebCompositorAnimation* createAnimation(
       const blink::WebCompositorAnimationCurve& curve,
       blink::WebCompositorAnimation::TargetProperty target,
-#ifdef WEB_COMPOSITOR_SUPPORT_CREATE_ANIMATION_SUPPORTS_GROUP
       int group_id,
-#endif
       int animation_id);
   virtual blink::WebFilterAnimationCurve* createFilterAnimationCurve();
   virtual blink::WebFloatAnimationCurve* createFloatAnimationCurve();
@@ -59,6 +57,7 @@ class CC_BLINK_EXPORT WebCompositorSupportImpl
   virtual blink::WebTransformAnimationCurve* createTransformAnimationCurve();
   virtual blink::WebTransformOperations* createTransformOperations();
   virtual blink::WebFilterOperations* createFilterOperations();
+  virtual blink::WebDisplayItemList* createDisplayItemList();
 
  private:
   DISALLOW_COPY_AND_ASSIGN(WebCompositorSupportImpl);

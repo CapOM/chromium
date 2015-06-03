@@ -8,8 +8,7 @@
 #include "components/filesystem/public/interfaces/types.mojom.h"
 #include "mojo/application/public/cpp/application_impl.h"
 
-namespace mojo {
-namespace files {
+namespace filesystem {
 
 FilesTestBase::FilesTestBase() {
 }
@@ -18,16 +17,18 @@ FilesTestBase::~FilesTestBase() {
 }
 
 void FilesTestBase::SetUp() {
-  test::ApplicationTestBase::SetUp();
-  application_impl()->ConnectToService("mojo:files", &files_);
+  ApplicationTestBase::SetUp();
+
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  request->url = mojo::String::From("mojo:filesystem");
+  application_impl()->ConnectToService(request.Pass(), &files_);
 }
 
 void FilesTestBase::GetTemporaryRoot(DirectoryPtr* directory) {
-  Error error = ERROR_INTERNAL;
-  files()->OpenFileSystem(nullptr, GetProxy(directory), Capture(&error));
-  ASSERT_TRUE(files().WaitForIncomingMethodCall());
-  ASSERT_EQ(ERROR_OK, error);
+  FileError error = FILE_ERROR_FAILED;
+  files()->OpenFileSystem("temp", GetProxy(directory), Capture(&error));
+  ASSERT_TRUE(files().WaitForIncomingResponse());
+  ASSERT_EQ(FILE_ERROR_OK, error);
 }
 
-}  // namespace files
-}  // namespace mojo
+}  // namespace filesystem

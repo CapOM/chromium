@@ -175,7 +175,7 @@ class ProxyConfigServiceDirect : public ProxyConfigService {
 // Proxy resolver that fails every time.
 class ProxyResolverNull : public ProxyResolver {
  public:
-  ProxyResolverNull() : ProxyResolver(false /*expects_pac_bytes*/) {}
+  ProxyResolverNull() {}
 
   // ProxyResolver implementation.
   int GetProxyForURL(const GURL& url,
@@ -193,13 +193,6 @@ class ProxyResolverNull : public ProxyResolver {
     return LOAD_STATE_IDLE;
   }
 
-  void CancelSetPacScript() override { NOTREACHED(); }
-
-  int SetPacScript(
-      const scoped_refptr<ProxyResolverScriptData>& /*script_data*/,
-      const CompletionCallback& /*callback*/) override {
-    return ERR_NOT_IMPLEMENTED;
-  }
 };
 
 // ProxyResolver that simulates a PAC script which returns
@@ -207,8 +200,7 @@ class ProxyResolverNull : public ProxyResolver {
 class ProxyResolverFromPacString : public ProxyResolver {
  public:
   explicit ProxyResolverFromPacString(const std::string& pac_string)
-      : ProxyResolver(false /*expects_pac_bytes*/),
-        pac_string_(pac_string) {}
+      : pac_string_(pac_string) {}
 
   int GetProxyForURL(const GURL& url,
                      ProxyInfo* results,
@@ -224,13 +216,6 @@ class ProxyResolverFromPacString : public ProxyResolver {
   LoadState GetLoadState(RequestHandle request) const override {
     NOTREACHED();
     return LOAD_STATE_IDLE;
-  }
-
-  void CancelSetPacScript() override { NOTREACHED(); }
-
-  int SetPacScript(const scoped_refptr<ProxyResolverScriptData>& pac_script,
-                   const CompletionCallback& callback) override {
-    return OK;
   }
 
  private:
@@ -307,22 +292,23 @@ class ProxyResolverFactoryForPacResult : public ProxyResolverFactory {
 };
 
 // Returns NetLog parameters describing a proxy configuration change.
-base::Value* NetLogProxyConfigChangedCallback(
+scoped_ptr<base::Value> NetLogProxyConfigChangedCallback(
     const ProxyConfig* old_config,
     const ProxyConfig* new_config,
     NetLogCaptureMode /* capture_mode */) {
-  base::DictionaryValue* dict = new base::DictionaryValue();
+  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
   // The "old_config" is optional -- the first notification will not have
   // any "previous" configuration.
   if (old_config->is_valid())
     dict->Set("old_config", old_config->ToValue());
   dict->Set("new_config", new_config->ToValue());
-  return dict;
+  return dict.Pass();
 }
 
-base::Value* NetLogBadProxyListCallback(const ProxyRetryInfoMap* retry_info,
-                                        NetLogCaptureMode /* capture_mode */) {
-  base::DictionaryValue* dict = new base::DictionaryValue();
+scoped_ptr<base::Value> NetLogBadProxyListCallback(
+    const ProxyRetryInfoMap* retry_info,
+    NetLogCaptureMode /* capture_mode */) {
+  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
   base::ListValue* list = new base::ListValue();
 
   for (ProxyRetryInfoMap::const_iterator iter = retry_info->begin();
@@ -330,16 +316,16 @@ base::Value* NetLogBadProxyListCallback(const ProxyRetryInfoMap* retry_info,
     list->Append(new base::StringValue(iter->first));
   }
   dict->Set("bad_proxy_list", list);
-  return dict;
+  return dict.Pass();
 }
 
 // Returns NetLog parameters on a successfuly proxy resolution.
-base::Value* NetLogFinishedResolvingProxyCallback(
+scoped_ptr<base::Value> NetLogFinishedResolvingProxyCallback(
     const ProxyInfo* result,
     NetLogCaptureMode /* capture_mode */) {
-  base::DictionaryValue* dict = new base::DictionaryValue();
+  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
   dict->SetString("pac_string", result->ToPacString());
-  return dict;
+  return dict.Pass();
 }
 
 #if defined(OS_CHROMEOS)

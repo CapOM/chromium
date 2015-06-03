@@ -27,6 +27,7 @@
 #include "cc/resources/returned_resource.h"
 #include "cc/resources/transferable_resource.h"
 #include "cc/surfaces/surface_id.h"
+#include "cc/surfaces/surface_sequence.h"
 #include "content/common/content_export.h"
 #include "gpu/ipc/gpu_command_buffer_traits.h"
 #include "ipc/ipc_message_macros.h"
@@ -49,7 +50,7 @@ template <>
 struct ParamTraits<cc::FilterOperation> {
   typedef cc::FilterOperation param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* r);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* r);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -57,7 +58,7 @@ template <>
 struct ParamTraits<cc::FilterOperations> {
   typedef cc::FilterOperations param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* r);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* r);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -65,7 +66,7 @@ template <>
 struct ParamTraits<skia::RefPtr<SkImageFilter> > {
   typedef skia::RefPtr<SkImageFilter> param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* r);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* r);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -73,7 +74,7 @@ template <>
 struct ParamTraits<gfx::Transform> {
   typedef gfx::Transform param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* r);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* r);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -81,7 +82,7 @@ template <>
 struct CONTENT_EXPORT ParamTraits<cc::RenderPass> {
   typedef cc::RenderPass param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* r);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* r);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -89,7 +90,7 @@ template<>
 struct CONTENT_EXPORT ParamTraits<cc::CompositorFrame> {
   typedef cc::CompositorFrame param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* p);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* p);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -97,7 +98,7 @@ template<>
 struct CONTENT_EXPORT ParamTraits<cc::CompositorFrameAck> {
   typedef cc::CompositorFrameAck param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* p);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* p);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -105,7 +106,7 @@ template<>
 struct CONTENT_EXPORT ParamTraits<cc::DelegatedFrameData> {
   typedef cc::DelegatedFrameData param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* p);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* p);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -113,7 +114,7 @@ template <>
 struct CONTENT_EXPORT ParamTraits<cc::SoftwareFrameData> {
   typedef cc::SoftwareFrameData param_type;
   static void Write(Message* m, const param_type& p);
-  static bool Read(const Message* m, PickleIterator* iter, param_type* p);
+  static bool Read(const Message* m, base::PickleIterator* iter, param_type* p);
   static void Log(const param_type& p, std::string* l);
 };
 
@@ -144,7 +145,12 @@ IPC_STRUCT_TRAITS_BEGIN(cc::RenderPassId)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(cc::SurfaceId)
-IPC_STRUCT_TRAITS_MEMBER(id)
+  IPC_STRUCT_TRAITS_MEMBER(id)
+IPC_STRUCT_TRAITS_END()
+
+IPC_STRUCT_TRAITS_BEGIN(cc::SurfaceSequence)
+  IPC_STRUCT_TRAITS_MEMBER(id_namespace)
+  IPC_STRUCT_TRAITS_MEMBER(sequence)
 IPC_STRUCT_TRAITS_END()
 
 IPC_STRUCT_TRAITS_BEGIN(cc::DrawQuad)

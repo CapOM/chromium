@@ -12,6 +12,7 @@
 #include "cc/test/fake_output_surface_client.h"
 #include "cc/test/fake_picture_layer_tiling_client.h"
 #include "cc/test/fake_picture_pile_impl.h"
+#include "cc/test/fake_resource_provider.h"
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "ui/gfx/geometry/size_conversions.h"
@@ -214,13 +215,8 @@ class PictureLayerTilingSetTestWithResources : public testing::Test {
     scoped_ptr<SharedBitmapManager> shared_bitmap_manager(
         new TestSharedBitmapManager());
     scoped_ptr<ResourceProvider> resource_provider =
-        ResourceProvider::Create(output_surface.get(),
-                                 shared_bitmap_manager.get(),
-                                 NULL,
-                                 NULL,
-                                 0,
-                                 false,
-                                 1);
+        FakeResourceProvider::Create(output_surface.get(),
+                                     shared_bitmap_manager.get());
 
     FakePictureLayerTilingClient client(resource_provider.get());
     client.SetTileSize(gfx::Size(256, 256));
@@ -334,6 +330,12 @@ TEST(PictureLayerTilingSetTest, TileSizeChange) {
     EXPECT_EQ(tile_size1, tile->content_rect().size());
 
   // Update to a new source frame with a new tile size.
+  // Note that setting a new raster source can typically only happen after
+  // activation, since we can't set the raster source twice on the pending tree
+  // without activating. For test, just remove and add a new tiling instead.
+  pending_set->RemoveAllTilings();
+  pending_set->AddTiling(1.f, pile);
+  pending_set->tiling_at(0)->set_resolution(HIGH_RESOLUTION);
   pending_client.SetTileSize(tile_size2);
   pending_set->UpdateTilingsToCurrentRasterSourceForCommit(pile.get(), Region(),
                                                            1.f, 1.f);

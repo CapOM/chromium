@@ -8,7 +8,6 @@
 #include <string>
 
 #include "content/common/content_export.h"
-#include "ipc/ipc_message.h"
 
 namespace gfx {
 class Size;
@@ -46,12 +45,7 @@ class CONTENT_EXPORT BrowserPluginDelegate {
   virtual void SetElementInstanceID(int element_instance_id) {}
 
   // Called when the plugin resizes.
-  virtual void DidResizeElement(const gfx::Size& old_size,
-                                const gfx::Size& new_size) {}
-
-  // Called when a message is received.  Returns true iff the message was
-  // handled.
-  virtual bool OnMessageReceived(const IPC::Message& message);
+  virtual void DidResizeElement(const gfx::Size& new_size) {}
 
   // Return a scriptable object for the plugin.
   virtual v8::Local<v8::Object> V8ScriptableObject(v8::Isolate* isolate);

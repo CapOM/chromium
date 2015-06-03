@@ -598,7 +598,8 @@ void RenderFrameHostManager::SwapOutOldFrame(
   // (There should not be one yet.)
   CHECK(!GetRenderFrameProxyHost(old_render_frame_host->GetSiteInstance()));
   RenderFrameProxyHost* proxy = new RenderFrameProxyHost(
-      old_render_frame_host->GetSiteInstance(), frame_tree_node_);
+      old_render_frame_host->GetSiteInstance(),
+      old_render_frame_host->render_view_host(), frame_tree_node_);
   CHECK(proxy_hosts_.insert(std::make_pair(old_site_instance_id, proxy)).second)
       << "Inserting a duplicate item.";
 
@@ -640,8 +641,8 @@ void RenderFrameHostManager::DiscardUnusedFrame(
     render_frame_host->CancelSuspendedNavigations();
 
     CHECK(!GetRenderFrameProxyHost(site_instance));
-    RenderFrameProxyHost* proxy =
-        new RenderFrameProxyHost(site_instance, frame_tree_node_);
+    RenderFrameProxyHost* proxy = new RenderFrameProxyHost(
+        site_instance, render_frame_host->render_view_host(), frame_tree_node_);
     proxy_hosts_[site_instance->GetId()] = proxy;
 
     // Check if the RenderFrameHost is already swapped out, to avoid swapping it
@@ -1486,20 +1487,6 @@ scoped_ptr<RenderFrameHostImpl> RenderFrameHostManager::CreateRenderFrame(
 
       proxy_hosts_.erase(instance->GetId());
       delete proxy;
-
-      // When a new render view is created by the renderer, the new WebContents
-      // gets a RenderViewHost in the SiteInstance of its opener WebContents.
-      // If not used in the first navigation, this RVH is swapped out and is not
-      // granted bindings, so we may need to grant them when swapping it in.
-      if (web_ui && !new_render_frame_host->GetProcess()->IsIsolatedGuest()) {
-        int required_bindings = web_ui->GetBindings();
-        RenderViewHost* render_view_host =
-            new_render_frame_host->render_view_host();
-        if ((render_view_host->GetEnabledBindings() & required_bindings) !=
-            required_bindings) {
-          render_view_host->AllowBindings(required_bindings);
-        }
-      }
     }
   } else {
     // Create a new RenderFrameHost if we don't find an existing one.
@@ -1515,7 +1502,8 @@ scoped_ptr<RenderFrameHostImpl> RenderFrameHostManager::CreateRenderFrame(
       new_render_frame_host->GetProcess()->AddPendingView();
     } else {
       proxy = new RenderFrameProxyHost(
-          new_render_frame_host->GetSiteInstance(), frame_tree_node_);
+          new_render_frame_host->GetSiteInstance(),
+          new_render_frame_host->render_view_host(), frame_tree_node_);
       proxy_hosts_[instance->GetId()] = proxy;
       proxy_routing_id = proxy->GetRoutingID();
       proxy->TakeFrameHostOwnership(new_render_frame_host.Pass());
@@ -1548,6 +1536,21 @@ scoped_ptr<RenderFrameHostImpl> RenderFrameHostManager::CreateRenderFrame(
     }
   }
 
+  // When a new RenderView is created by the renderer process, the new
+  // WebContents gets a RenderViewHost in the SiteInstance of its opener
+  // WebContents. If not used in the first navigation, this RVH is swapped out
+  // and is not granted bindings, so we may need to grant them when swapping it
+  // in.
+  if (web_ui && !new_render_frame_host->GetProcess()->IsIsolatedGuest()) {
+    int required_bindings = web_ui->GetBindings();
+    RenderViewHost* render_view_host =
+        new_render_frame_host->render_view_host();
+    if ((render_view_host->GetEnabledBindings() & required_bindings) !=
+            required_bindings) {
+      render_view_host->AllowBindings(required_bindings);
+    }
+  }
+
   // Returns the new RFH if it isn't swapped out.
   if (success && !swapped_out) {
     DCHECK(new_render_frame_host->GetSiteInstance() == instance);
@@ -1567,7 +1570,9 @@ int RenderFrameHostManager::CreateRenderFrameProxy(SiteInstance* instance) {
     return proxy->GetRoutingID();
 
   if (!proxy) {
-    proxy = new RenderFrameProxyHost(instance, frame_tree_node_);
+    proxy = new RenderFrameProxyHost(
+        instance, frame_tree_node_->frame_tree()->GetRenderViewHost(instance),
+        frame_tree_node_);
     proxy_hosts_[instance->GetId()] = proxy;
   }
   proxy->InitRenderFrameProxy();
@@ -1607,6 +1612,11 @@ bool RenderFrameHostManager::InitRenderView(
   // We may have initialized this RenderViewHost for another RenderFrameHost.
   if (render_view_host->IsRenderViewLive())
     return true;
+
+  // Ensure the renderer process is initialized before creating the
+  // RenderView.
+  if (!render_view_host->GetProcess()->Init())
+    return false;
 
   // If the ongoing navigation is to a WebUI and the RenderView is not in a
   // guest process, tell the RenderViewHost about any bindings it will need

@@ -87,6 +87,7 @@
                 '../android_webview/android_webview.gyp:system_webview_apk',
                 '../android_webview/android_webview_shell.gyp:android_webview_shell_apk',
                 '../android_webview/android_webview_telemetry_shell.gyp:android_webview_telemetry_shell_apk',
+                '../chrome/android/chrome_apk.gyp:chrome_public_apk',
                 '../chrome/chrome.gyp:chrome_shell_apk',
                 '../chrome/chrome.gyp:chrome_sync_shell_apk',
                 '../remoting/remoting.gyp:remoting_apk',
@@ -376,8 +377,6 @@
         }],
         ['OS=="win"', {
           'dependencies': [
-            '../chrome/chrome.gyp:app_installer',
-            '../chrome/chrome.gyp:app_installer_unittests',
             '../chrome/chrome.gyp:crash_service',
             '../chrome/chrome.gyp:installer_util_unittests',
             # ../chrome/test/mini_installer requires mini_installer.
@@ -487,6 +486,11 @@
         ['disable_nacl==0', {
           'dependencies': [
             '../components/nacl.gyp:nacl_loader_unittests',
+          ],
+        }],
+        ['disable_nacl==0 and disable_nacl_untrusted==0 and enable_nacl_nonsfi_test==1', {
+          'dependencies': [
+            '../components/nacl_nonsfi.gyp:nacl_helper_nonsfi_unittests',
           ],
         }],
         ['disable_nacl==0 and disable_nacl_untrusted==0', {
@@ -876,6 +880,7 @@
                 # Unit test bundles packaged as an apk.
                 '../android_webview/android_webview.gyp:android_webview_test_apk',
                 '../android_webview/android_webview.gyp:android_webview_unittests_apk',
+                '../chrome/android/chrome_apk.gyp:chrome_public_test_apk',
                 '../chrome/chrome.gyp:chrome_junit_tests',
                 '../chrome/chrome.gyp:chrome_shell_test_apk',
                 '../chrome/chrome.gyp:chrome_sync_shell_test_apk',
@@ -1217,7 +1222,6 @@
               'target_name': 'chrome_official_builder_no_unittests',
               'type': 'none',
               'dependencies': [
-                '../chrome/chrome.gyp:app_installer',
                 '../chrome/chrome.gyp:crash_service',
                 '../chrome/chrome.gyp:gcapi_dll',
                 '../chrome/chrome.gyp:pack_policy_templates',
@@ -1247,7 +1251,6 @@
               'dependencies': [
 	        'chrome_official_builder_no_unittests',
                 '../base/base.gyp:base_unittests',
-		'../chrome/chrome.gyp:app_installer_unittests',
                 '../chrome/chrome.gyp:browser_tests',
                 '../chrome/chrome.gyp:sync_integration_tests',
                 '../ipc/ipc.gyp:ipc_tests',

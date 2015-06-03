@@ -486,11 +486,9 @@ void Shell::RemoveShellObserver(ShellObserver* observer) {
 
 #if defined(OS_CHROMEOS)
 bool Shell::ShouldSaveDisplaySettings() {
-  // TODO(oshima): Allow saving the settings even in unified desktop mode.
   return !(screen_orientation_controller_
                ->ignore_display_configuration_updates() ||
-           resolution_notification_controller_->DoesNotificationTimeout()) &&
-         !switches::UnifiedDesktopEnabled();
+           resolution_notification_controller_->DoesNotificationTimeout());
 }
 #endif
 
@@ -750,7 +748,6 @@ Shell::~Shell() {
 
   window_cycle_controller_.reset();
   window_selector_controller_.reset();
-  mru_window_tracker_.reset();
 
   // |shelf_window_watcher_| has a weak pointer to |shelf_Model_|
   // and has window observers.
@@ -758,6 +755,10 @@ Shell::~Shell() {
 
   // Destroy all child windows including widgets.
   display_controller_->CloseChildWindows();
+  // MruWindowTracker must be destroyed after all windows have been deleted to
+  // avoid a possible crash when Shell is destroyed from a non-normal shutdown
+  // path. (crbug.com/485438).
+  mru_window_tracker_.reset();
 
   // Chrome implementation of shelf delegate depends on FocusClient,
   // so must be deleted before |focus_client_|.

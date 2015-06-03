@@ -466,16 +466,13 @@ gfx::Rect NativeAppWindowCocoa::GetBounds() const {
 
 void NativeAppWindowCocoa::Show() {
   if (is_hidden_with_app_) {
-    // If there is a shim to gently request attention, return here. Otherwise
-    // show the window as usual.
-    if (apps::ExtensionAppShimHandler::ActivateAndRequestUserAttentionForWindow(
-            app_window_)) {
-      return;
-    }
+    apps::ExtensionAppShimHandler::UnhideWithoutActivationForWindow(
+        app_window_);
+    is_hidden_with_app_ = false;
   }
 
   [window_controller_ showWindow:nil];
-  Activate();
+  [BrowserWindowUtils activateWindowForController:window_controller_];
 }
 
 void NativeAppWindowCocoa::ShowInactive() {
@@ -491,7 +488,7 @@ void NativeAppWindowCocoa::Close() {
 }
 
 void NativeAppWindowCocoa::Activate() {
-  [BrowserWindowUtils activateWindowForController:window_controller_];
+  Show();
 }
 
 void NativeAppWindowCocoa::Deactivate() {
@@ -677,8 +674,7 @@ bool NativeAppWindowCocoa::CanHaveAlphaEnabled() const {
 }
 
 gfx::NativeView NativeAppWindowCocoa::GetHostView() const {
-  NOTIMPLEMENTED();
-  return NULL;
+  return WebContents()->GetNativeView();
 }
 
 gfx::Point NativeAppWindowCocoa::GetDialogPosition(const gfx::Size& size) {

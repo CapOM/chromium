@@ -70,19 +70,26 @@ View* BuildViewTree(ViewManagerClientImpl* client,
 
 // Responsible for removing a root from the ViewManager when that view is
 // destroyed.
-class RootObserver : public ViewObserver {
+class ViewManagerClientImpl::RootObserver : public ViewObserver {
  public:
-  explicit RootObserver(View* root) : root_(root) {}
-  ~RootObserver() override {}
+  explicit RootObserver(View* root) : root_(root) {
+    root_->AddObserver(this);
+  }
+  ~RootObserver() override {
+    if (root_)
+      root_->RemoveObserver(this);
+  }
 
  private:
   // Overridden from ViewObserver:
   void OnViewDestroyed(View* view) override {
     DCHECK_EQ(view, root_);
-    static_cast<ViewManagerClientImpl*>(root_->view_manager())
-        ->RootDestroyed(root_);
     view->RemoveObserver(this);
-    delete this;
+    View* root = root_;
+    root_ = nullptr;
+    static_cast<ViewManagerClientImpl*>(root->view_manager())
+        ->RootDestroyed(root);
+    // WARNING: we've been deleted.
   }
 
   View* root_;
@@ -93,8 +100,7 @@ class RootObserver : public ViewObserver {
 ViewManagerClientImpl::ViewManagerClientImpl(
     ViewManagerDelegate* delegate,
     Shell* shell,
-    InterfaceRequest<ViewManagerClient> request,
-    bool delete_on_error)
+    InterfaceRequest<ViewManagerClient> request)
     : connection_id_(0),
       next_id_(1),
       delegate_(delegate),
@@ -102,11 +108,14 @@ ViewManagerClientImpl::ViewManagerClientImpl(
       capture_view_(nullptr),
       focused_view_(nullptr),
       activated_view_(nullptr),
-      binding_(this, request.Pass()),
-      delete_on_error_(delete_on_error) {
+      binding_(this, request.Pass()) {
 }
 
 ViewManagerClientImpl::~ViewManagerClientImpl() {
+  // Destroy RootObserver early on so that when we delete |root_| below we don't
+  // attempt to delete this again.
+  root_observer_.reset();
+
   std::vector<View*> non_owned;
   while (!views_.empty()) {
     IdToViewMap::iterator it = views_.begin();
@@ -117,6 +126,7 @@ ViewManagerClientImpl::~ViewManagerClientImpl() {
       views_.erase(it);
     }
   }
+
   // Delete the non-owned views last. In the typical case these are roots. The
   // exception is the window manager, which may know aboutother random views
   // that it doesn't own.
@@ -192,16 +202,18 @@ void ViewManagerClientImpl::SetProperty(
 }
 
 void ViewManagerClientImpl::Embed(const String& url, Id view_id) {
-  Embed(url, view_id, nullptr, nullptr);
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  request->url = mojo::String::From(url);
+  Embed(request.Pass(), view_id, nullptr, nullptr);
 }
 
-void ViewManagerClientImpl::Embed(const String& url,
+void ViewManagerClientImpl::Embed(mojo::URLRequestPtr request,
                                   Id view_id,
                                   InterfaceRequest<ServiceProvider> services,
                                   ServiceProviderPtr exposed_services) {
   DCHECK(service_);
-  service_->EmbedUrl(url, view_id, services.Pass(), exposed_services.Pass(),
-                     ActionCompletedCallback());
+  service_->EmbedRequest(request.Pass(), view_id, services.Pass(),
+                         exposed_services.Pass(), ActionCompletedCallback());
 }
 
 void ViewManagerClientImpl::Embed(Id view_id, ViewManagerClientPtr client) {
@@ -228,6 +240,7 @@ void ViewManagerClientImpl::SetViewManagerService(
   DCHECK(!service_);
   DCHECK(service);
   service_ = service.Pass();
+  service_.set_error_handler(this);
 }
 ////////////////////////////////////////////////////////////////////////////////
 // ViewManagerClientImpl, ViewManager implementation:
@@ -277,13 +290,14 @@ void ViewManagerClientImpl::OnEmbed(ConnectionSpecificId connection_id,
   if (view_manager_service) {
     DCHECK(!service_);
     service_ = view_manager_service.Pass();
+    service_.set_error_handler(this);
   }
   connection_id_ = connection_id;
   creator_url_ = String::From(creator_url);
 
   DCHECK(!root_);
   root_ = AddViewToViewManager(this, nullptr, root_data);
-  root_->AddObserver(new RootObserver(root_));
+  root_observer_.reset(new RootObserver(root_));
 
   focused_view_ = GetViewById(focused_view_id);
 
@@ -421,8 +435,7 @@ void ViewManagerClientImpl::OnViewFocused(Id focused_view_id) {
 ////////////////////////////////////////////////////////////////////////////////
 // OnConnectionError, private:
 void ViewManagerClientImpl::OnConnectionError() {
-  if (delete_on_error_)
-    delete this;
+  delete this;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -431,6 +444,8 @@ void ViewManagerClientImpl::OnConnectionError() {
 void ViewManagerClientImpl::RootDestroyed(View* root) {
   DCHECK_EQ(root, root_);
   root_ = nullptr;
+  // When the root is gone we can't do anything useful.
+  delete this;
 }
 
 void ViewManagerClientImpl::OnActionCompleted(bool success) {

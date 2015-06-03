@@ -226,6 +226,7 @@ class PasswordManagerTest : public testing::Test {
     submitted_form_ = form;
   }
 
+  base::MessageLoop message_loop_;
   scoped_refptr<MockPasswordStore> store_;
   MockPasswordManagerClient client_;
   MockPasswordManagerDriver driver_;
@@ -879,6 +880,37 @@ TEST_F(PasswordManagerTest, InPageNavigation) {
               PromptUserToSavePasswordPtr(
                   _, CredentialSourceType::CREDENTIAL_SOURCE_PASSWORD_MANAGER))
       .WillOnce(WithArg<0>(SaveToScopedPtr(&form_to_save)));
+
+  manager()->OnInPageNavigation(&driver_, form);
+}
+
+TEST_F(PasswordManagerTest, InPageNavigationBlacklistedSite) {
+  // Test that observing a newly submitted form on blacklisted site does not
+  // show the save password bubble on call in page navigation.
+  EXPECT_CALL(driver_, FillPasswordForm(_)).Times(Exactly(0));
+  std::vector<PasswordForm> observed;
+  PasswordForm form(MakeSimpleForm());
+  observed.push_back(form);
+  // Simulate that blacklisted form stored in store.
+  PasswordForm* blacklisted_form = new PasswordForm(form);
+  blacklisted_form->username_value = ASCIIToUTF16("");
+  blacklisted_form->blacklisted_by_user = true;
+  ScopedVector<PasswordForm> result;
+  result.push_back(blacklisted_form);
+  EXPECT_CALL(*store_, GetLogins(_, _, _))
+      .WillOnce(WithArg<2>(InvokeConsumer(&result)));
+  // The initial load.
+  manager()->OnPasswordFormsParsed(&driver_, observed);
+  // The initial layout.
+  manager()->OnPasswordFormsRendered(&driver_, observed, true);
+
+  // And the form submit contract is to call ProvisionallySavePassword.
+  manager()->ProvisionallySavePassword(form);
+
+  EXPECT_CALL(client_,
+              PromptUserToSavePasswordPtr(
+                  _, CredentialSourceType::CREDENTIAL_SOURCE_PASSWORD_MANAGER))
+      .Times(Exactly(0));
 
   manager()->OnInPageNavigation(&driver_, form);
 }

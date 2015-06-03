@@ -59,13 +59,14 @@ const size_t kMaxUniqueResolveDnsPerExec = 20;
 const size_t kMaxAlertsAndErrorsBytes = 2048;
 
 // Returns event parameters for a PAC error message (line number + message).
-base::Value* NetLogErrorCallback(int line_number,
-                                 const base::string16* message,
-                                 NetLogCaptureMode /* capture_mode */) {
-  base::DictionaryValue* dict = new base::DictionaryValue();
+scoped_ptr<base::Value> NetLogErrorCallback(
+    int line_number,
+    const base::string16* message,
+    NetLogCaptureMode /* capture_mode */) {
+  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
   dict->SetInteger("line_number", line_number);
   dict->SetString("message", *message);
-  return dict;
+  return dict.Pass();
 }
 
 // The Job class is responsible for executing GetProxyForURL() and
@@ -351,9 +352,6 @@ class ProxyResolverV8Tracing : public ProxyResolver,
                      const BoundNetLog& net_log) override;
   void CancelRequest(RequestHandle request) override;
   LoadState GetLoadState(RequestHandle request) const override;
-  void CancelSetPacScript() override;
-  int SetPacScript(const scoped_refptr<ProxyResolverScriptData>& script_data,
-                   const CompletionCallback& callback) override;
 
  private:
   // The worker thread on which the ProxyResolverV8 will be run.
@@ -592,28 +590,19 @@ int Job::ExecuteProxyResolver() {
 
   switch (operation_) {
     case CREATE_V8_RESOLVER: {
-      scoped_ptr<ProxyResolverV8> resolver(new ProxyResolverV8);
-      resolver->set_js_bindings(this);
-      result = resolver->SetPacScript(script_data_, CompletionCallback());
-      resolver->set_js_bindings(nullptr);
+      scoped_ptr<ProxyResolverV8> resolver;
+      result = ProxyResolverV8::Create(script_data_, this, &resolver);
       if (result == OK)
         *resolver_out_ = resolver.Pass();
       break;
     }
     case GET_PROXY_FOR_URL: {
-      JSBindings* prev_bindings = v8_resolver()->js_bindings();
-      v8_resolver()->set_js_bindings(this);
-
       result = v8_resolver()->GetProxyForURL(
-        url_,
-        // Important: Do not write directly into |user_results_|, since if the
-        // request were to be cancelled from the origin thread, must guarantee
-        // that |user_results_| is not accessed anymore.
-        &results_,
-        CompletionCallback(),
-        NULL,
-        bound_net_log_);
-      v8_resolver()->set_js_bindings(prev_bindings);
+          url_,
+          // Important: Do not write directly into |user_results_|, since if the
+          // request were to be cancelled from the origin thread, must guarantee
+          // that |user_results_| is not accessed anymore.
+          &results_, this);
       break;
     }
   }
@@ -1011,8 +1000,7 @@ ProxyResolverV8Tracing::ProxyResolverV8Tracing(
     scoped_ptr<base::Thread> thread,
     scoped_ptr<ProxyResolverV8> resolver,
     scoped_ptr<Job::Params> job_params)
-    : ProxyResolver(true /*expects_pac_bytes*/),
-      thread_(thread.Pass()),
+    : thread_(thread.Pass()),
       v8_resolver_(resolver.Pass()),
       error_observer_(error_observer.Pass()),
       job_params_(job_params.Pass()),
@@ -1054,17 +1042,6 @@ void ProxyResolverV8Tracing::CancelRequest(RequestHandle request) {
 LoadState ProxyResolverV8Tracing::GetLoadState(RequestHandle request) const {
   Job* job = reinterpret_cast<Job*>(request);
   return job->GetLoadState();
-}
-
-void ProxyResolverV8Tracing::CancelSetPacScript() {
-  NOTREACHED();
-}
-
-int ProxyResolverV8Tracing::SetPacScript(
-    const scoped_refptr<ProxyResolverScriptData>& script_data,
-    const CompletionCallback& callback) {
-  NOTREACHED();
-  return ERR_NOT_IMPLEMENTED;
 }
 
 }  // namespace

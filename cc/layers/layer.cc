@@ -34,11 +34,11 @@ namespace cc {
 
 base::StaticAtomicSequenceNumber g_next_layer_id;
 
-scoped_refptr<Layer> Layer::Create() {
-  return make_scoped_refptr(new Layer());
+scoped_refptr<Layer> Layer::Create(const LayerSettings& settings) {
+  return make_scoped_refptr(new Layer(settings));
 }
 
-Layer::Layer()
+Layer::Layer(const LayerSettings& settings)
     : needs_push_properties_(false),
       num_dependents_need_push_properties_(false),
       stacking_order_changed_(false),
@@ -56,6 +56,7 @@ Layer::Layer()
       property_tree_sequence_number_(-1),
       num_layer_or_descendants_with_copy_request_(0),
       num_layer_or_descendants_with_input_handler_(0),
+      num_children_with_scroll_parent_(0),
       should_flatten_transform_from_property_tree_(false),
       should_scroll_on_main_thread_(false),
       have_wheel_event_handlers_(false),
@@ -81,14 +82,19 @@ Layer::Layer()
       opacity_(1.f),
       blend_mode_(SkXfermode::kSrcOver_Mode),
       scroll_parent_(nullptr),
+      layer_or_descendant_is_drawn_tracker_(0),
+      sorted_for_recursion_tracker_(0),
+      visited_tracker_(0),
       clip_parent_(nullptr),
       replica_layer_(nullptr),
       raster_scale_(0.f),
       client_(nullptr),
       frame_timing_requests_dirty_(false) {
-  layer_animation_controller_ = LayerAnimationController::Create(layer_id_);
-  layer_animation_controller_->AddValueObserver(this);
-  layer_animation_controller_->set_value_provider(this);
+  if (!settings.use_compositor_animation_timelines) {
+    layer_animation_controller_ = LayerAnimationController::Create(layer_id_);
+    layer_animation_controller_->AddValueObserver(this);
+    layer_animation_controller_->set_value_provider(this);
+  }
 }
 
 Layer::~Layer() {
@@ -99,8 +105,10 @@ Layer::~Layer() {
   // reference to us.
   DCHECK(!layer_tree_host());
 
-  layer_animation_controller_->RemoveValueObserver(this);
-  layer_animation_controller_->remove_value_provider(this);
+  if (layer_animation_controller_) {
+    layer_animation_controller_->RemoveValueObserver(this);
+    layer_animation_controller_->remove_value_provider(this);
+  }
 
   RemoveFromScrollTree();
   RemoveFromClipTree();
@@ -139,9 +147,7 @@ void Layer::SetLayerTreeHost(LayerTreeHost* host) {
     replica_layer_->SetLayerTreeHost(host);
 
   if (host) {
-    layer_animation_controller_->SetAnimationRegistrar(
-        host->animation_registrar());
-
+    RegisterForAnimations(host->animation_registrar());
     if (host->settings().layer_transforms_should_scale_layer_contents)
       reset_raster_scale_to_unknown();
   }
@@ -759,6 +765,10 @@ void Layer::AddScrollChild(Layer* child) {
   if (!scroll_children_)
     scroll_children_.reset(new std::set<Layer*>);
   scroll_children_->insert(child);
+  if (layer_tree_host_ && !layer_tree_host_->needs_meta_info_recomputation()) {
+    num_children_with_scroll_parent_++;
+    draw_properties().has_child_with_a_scroll_parent = true;
+  }
   SetNeedsCommit();
 }
 
@@ -766,6 +776,12 @@ void Layer::RemoveScrollChild(Layer* child) {
   scroll_children_->erase(child);
   if (scroll_children_->empty())
     scroll_children_ = nullptr;
+  if (layer_tree_host_ && !layer_tree_host_->needs_meta_info_recomputation()) {
+    num_children_with_scroll_parent_--;
+    DCHECK_GE(num_children_with_scroll_parent_, 0);
+    draw_properties().has_child_with_a_scroll_parent =
+        (num_children_with_scroll_parent_ != 0);
+  }
   SetNeedsCommit();
 }
 
@@ -1145,6 +1161,10 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   if (frame_viewer_instrumentation::IsTracingLayerTreeSnapshots())
     layer->SetDebugInfo(TakeDebugInfo());
 
+  layer->SetTransformTreeIndex(transform_tree_index());
+  layer->SetOpacityTreeIndex(opacity_tree_index());
+  layer->SetClipTreeIndex(clip_tree_index());
+  layer->set_offset_to_transform_parent(offset_to_transform_parent_);
   layer->SetDoubleSided(double_sided_);
   layer->SetDrawCheckerboardForMissingTiles(
       draw_checkerboard_for_missing_tiles_);
@@ -1163,8 +1183,14 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->SetTouchEventHandlerRegion(touch_event_handler_region_);
   layer->SetScrollBlocksOn(scroll_blocks_on_);
   layer->SetContentsOpaque(contents_opaque_);
-  if (!layer->OpacityIsAnimatingOnImplOnly() && !OpacityIsAnimating())
+  if (!layer->OpacityIsAnimatingOnImplOnly() && !OpacityIsAnimating()) {
     layer->SetOpacity(opacity_);
+  } else {
+    // The just-pushed opacity tree will contain |opacity_|. Since we didn't
+    // push this value to |layer|, it might have a different opacity value. To
+    // ensure consistency, we need to update the opacity tree.
+    layer->UpdatePropertyTreeOpacity();
+  }
   DCHECK(!(OpacityIsAnimating() && layer->OpacityIsAnimatingOnImplOnly()));
   layer->SetBlendMode(blend_mode_);
   layer->SetIsRootForIsolatedGroup(is_root_for_isolated_group_);
@@ -1176,15 +1202,17 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->set_should_flatten_transform_from_property_tree(
       should_flatten_transform_from_property_tree_);
   layer->SetUseParentBackfaceVisibility(use_parent_backface_visibility_);
-  if (!layer->TransformIsAnimatingOnImplOnly() && !TransformIsAnimating())
+  if (!layer->TransformIsAnimatingOnImplOnly() && !TransformIsAnimating()) {
     layer->SetTransformAndInvertibility(transform_, transform_is_invertible_);
+  } else {
+    // The just-pushed transform tree will contain |transform_|. Since we
+    // didn't push this value to |layer|, it might have a different transform
+    // value. To ensure consistency, we need to update the transform tree.
+    layer->UpdatePropertyTreeTransform();
+  }
   DCHECK(!(TransformIsAnimating() && layer->TransformIsAnimatingOnImplOnly()));
   layer->Set3dSortingContextId(sorting_context_id_);
   layer->SetNumDescendantsThatDrawContent(num_descendants_that_draw_content_);
-  layer->SetTransformTreeIndex(transform_tree_index());
-  layer->SetOpacityTreeIndex(opacity_tree_index());
-  layer->SetClipTreeIndex(clip_tree_index());
-  layer->set_offset_to_transform_parent(offset_to_transform_parent_);
 
   layer->SetScrollClipLayer(scroll_clip_layer_id_);
   layer->set_user_scrollable_horizontal(user_scrollable_horizontal_);
@@ -1283,7 +1311,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
       layer->layer_animation_controller());
 
   if (frame_timing_requests_dirty_) {
-    layer->PassFrameTimingRequests(&frame_timing_requests_);
+    layer->SetFrameTimingRequests(frame_timing_requests_);
     frame_timing_requests_dirty_ = false;
   }
 
@@ -1451,6 +1479,7 @@ bool Layer::IsActive() const {
 }
 
 bool Layer::AddAnimation(scoped_ptr <Animation> animation) {
+  DCHECK(layer_animation_controller_);
   if (!layer_animation_controller_->animation_registrar())
     return false;
 
@@ -1467,18 +1496,21 @@ bool Layer::AddAnimation(scoped_ptr <Animation> animation) {
 }
 
 void Layer::PauseAnimation(int animation_id, double time_offset) {
+  DCHECK(layer_animation_controller_);
   layer_animation_controller_->PauseAnimation(
       animation_id, base::TimeDelta::FromSecondsD(time_offset));
   SetNeedsCommit();
 }
 
 void Layer::RemoveAnimation(int animation_id) {
+  DCHECK(layer_animation_controller_);
   layer_animation_controller_->RemoveAnimation(animation_id);
   SetNeedsCommit();
 }
 
 void Layer::RemoveAnimation(int animation_id,
                             Animation::TargetProperty property) {
+  DCHECK(layer_animation_controller_);
   layer_animation_controller_->RemoveAnimation(animation_id, property);
   SetNeedsCommit();
 }
@@ -1492,16 +1524,24 @@ void Layer::SetLayerAnimationControllerForTest(
 }
 
 bool Layer::HasActiveAnimation() const {
+  DCHECK(layer_animation_controller_);
   return layer_animation_controller_->HasActiveAnimation();
+}
+
+void Layer::RegisterForAnimations(AnimationRegistrar* registrar) {
+  if (layer_animation_controller_)
+    layer_animation_controller_->SetAnimationRegistrar(registrar);
 }
 
 void Layer::AddLayerAnimationEventObserver(
     LayerAnimationEventObserver* animation_observer) {
+  DCHECK(layer_animation_controller_);
   layer_animation_controller_->AddEventObserver(animation_observer);
 }
 
 void Layer::RemoveLayerAnimationEventObserver(
     LayerAnimationEventObserver* animation_observer) {
+  DCHECK(layer_animation_controller_);
   layer_animation_controller_->RemoveEventObserver(animation_observer);
 }
 
@@ -1562,6 +1602,9 @@ bool Layer::HasDelegatedContent() const {
 
 void Layer::SetFrameTimingRequests(
     const std::vector<FrameTimingRequest>& requests) {
+  // TODO(vmpstr): Early out if there are no changes earlier in the call stack.
+  if (requests == frame_timing_requests_)
+    return;
   frame_timing_requests_ = requests;
   frame_timing_requests_dirty_ = true;
   SetNeedsCommit();
@@ -1573,6 +1616,41 @@ void Layer::DidBeginTracing() {
   // side -- otherwise this won't happen for the the layers that
   // remain unchanged since tracing started.
   SetNeedsPushProperties();
+}
+
+void Layer::set_visited(bool visited) {
+  visited_tracker_ =
+      visited ? layer_tree_host()->meta_information_sequence_number() : 0;
+}
+
+bool Layer::visited() {
+  return visited_tracker_ ==
+         layer_tree_host()->meta_information_sequence_number();
+}
+
+void Layer::set_layer_or_descendant_is_drawn(
+    bool layer_or_descendant_is_drawn) {
+  layer_or_descendant_is_drawn_tracker_ =
+      layer_or_descendant_is_drawn
+          ? layer_tree_host()->meta_information_sequence_number()
+          : 0;
+}
+
+bool Layer::layer_or_descendant_is_drawn() {
+  return layer_or_descendant_is_drawn_tracker_ ==
+         layer_tree_host()->meta_information_sequence_number();
+}
+
+void Layer::set_sorted_for_recursion(bool sorted_for_recursion) {
+  sorted_for_recursion_tracker_ =
+      sorted_for_recursion
+          ? layer_tree_host()->meta_information_sequence_number()
+          : 0;
+}
+
+bool Layer::sorted_for_recursion() {
+  return sorted_for_recursion_tracker_ ==
+         layer_tree_host()->meta_information_sequence_number();
 }
 
 }  // namespace cc

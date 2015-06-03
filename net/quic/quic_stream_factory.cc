@@ -4,6 +4,7 @@
 
 #include "net/quic/quic_stream_factory.h"
 
+#include <algorithm>
 #include <set>
 
 #include "base/cpu.h"
@@ -15,6 +16,7 @@
 #include "base/rand_util.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "base/values.h"
 #include "net/base/net_errors.h"
 #include "net/cert/cert_verifier.h"
@@ -57,8 +59,9 @@ enum CreateSessionFailure {
 // When a connection is idle for 30 seconds it will be closed.
 const int kIdleConnectionTimeoutSeconds = 30;
 
-// The initial receive window size for both streams and sessions.
-const int32 kInitialReceiveWindowSize = 10 * 1024 * 1024;  // 10MB
+// The maximum receive window sizes for QUIC sessions and streams.
+const int32 kQuicSessionMaxRecvWindowSize = 15 * 1024 * 1024;  // 15 MB
+const int32 kQuicStreamMaxRecvWindowSize = 6 * 1024 * 1024;    // 6 MB
 
 // Set the maximum number of undecryptable packets the connection will store.
 const int32 kMaxUndecryptablePackets = 100;
@@ -499,10 +502,10 @@ int QuicStreamRequest::Request(const HostPortPair& host_port_pair,
   DCHECK(!stream_);
   DCHECK(callback_.is_null());
   DCHECK(factory_);
-  bool server_and_origin_have_same_host = host_port_pair.host() == origin_host;
-  int rv =
-      factory_->Create(host_port_pair, is_https, privacy_mode,
-                       server_and_origin_have_same_host, method, net_log, this);
+  origin_host_ = origin_host.as_string();
+  privacy_mode_ = privacy_mode;
+  int rv = factory_->Create(host_port_pair, is_https, privacy_mode, origin_host,
+                            method, net_log, this);
   if (rv == ERR_IO_PENDING) {
     host_port_pair_ = host_port_pair;
     net_log_ = net_log;
@@ -586,6 +589,7 @@ QuicStreamFactory::QuicStreamFactory(
   crypto_config_.set_user_agent_id(user_agent_id);
   crypto_config_.AddCanonicalSuffix(".c.youtube.com");
   crypto_config_.AddCanonicalSuffix(".googlevideo.com");
+  crypto_config_.AddCanonicalSuffix(".googleusercontent.com");
   crypto_config_.SetProofVerifier(
       new ProofVerifierChromium(cert_verifier, transport_security_state));
   // TODO(rtenneti): http://crbug.com/487355. Temporary fix for b/20760730 until
@@ -595,7 +599,10 @@ QuicStreamFactory::QuicStreamFactory(
         new ChannelIDSourceChromium(channel_id_service));
   }
   base::CPU cpu;
-  if (cpu.has_aesni() && cpu.has_avx())
+  bool has_aes_hardware_support = cpu.has_aesni() && cpu.has_avx();
+  UMA_HISTOGRAM_BOOLEAN("Net.QuicSession.PreferAesGcm",
+                        has_aes_hardware_support);
+  if (has_aes_hardware_support)
     crypto_config_.PreferAesGcm();
   if (!IsEcdsaSupported())
     crypto_config_.DisableEcdsa();
@@ -625,13 +632,17 @@ void QuicStreamFactory::set_require_confirmation(bool require_confirmation) {
 int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
                               bool is_https,
                               PrivacyMode privacy_mode,
-                              bool server_and_origin_have_same_host,
+                              base::StringPiece origin_host,
                               base::StringPiece method,
                               const BoundNetLog& net_log,
                               QuicStreamRequest* request) {
   QuicServerId server_id(host_port_pair, is_https, privacy_mode);
-  if (HasActiveSession(server_id)) {
-    request->set_stream(CreateIfSessionExists(server_id, net_log));
+  SessionMap::iterator it = active_sessions_.find(server_id);
+  if (it != active_sessions_.end()) {
+    QuicClientSession* session = it->second;
+    if (!session->CanPool(origin_host.as_string(), privacy_mode))
+      return ERR_ALTERNATIVE_CERT_NOT_VALID_FOR_ORIGIN;
+    request->set_stream(CreateFromSession(session));
     return OK;
   }
 
@@ -666,6 +677,7 @@ int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
     }
   }
 
+  bool server_and_origin_have_same_host = host_port_pair.host() == origin_host;
   scoped_ptr<Job> job(new Job(
       this, host_resolver_, host_port_pair, server_and_origin_have_same_host,
       is_https, WasQuicRecentlyBroken(server_id), privacy_mode,
@@ -679,8 +691,12 @@ int QuicStreamFactory::Create(const HostPortPair& host_port_pair,
     return rv;
   }
   if (rv == OK) {
-    DCHECK(HasActiveSession(server_id));
-    request->set_stream(CreateIfSessionExists(server_id, net_log));
+    it = active_sessions_.find(server_id);
+    DCHECK(it != active_sessions_.end());
+    QuicClientSession* session = it->second;
+    if (!session->CanPool(origin_host.as_string(), privacy_mode))
+      return ERR_ALTERNATIVE_CERT_NOT_VALID_FOR_ORIGIN;
+    request->set_stream(CreateFromSession(session));
   }
   return rv;
 }
@@ -742,9 +758,25 @@ void QuicStreamFactory::OnJobComplete(Job* job, int rv) {
       set_require_confirmation(false);
 
     // Create all the streams, but do not notify them yet.
-    for (QuicStreamRequest* request : job_requests_map_[server_id]) {
-      DCHECK(HasActiveSession(server_id));
-      request->set_stream(CreateIfSessionExists(server_id, request->net_log()));
+    SessionMap::iterator session_it = active_sessions_.find(server_id);
+    for (RequestSet::iterator request_it = job_requests_map_[server_id].begin();
+         request_it != job_requests_map_[server_id].end();) {
+      DCHECK(session_it != active_sessions_.end());
+      QuicClientSession* session = session_it->second;
+      QuicStreamRequest* request = *request_it;
+      if (!session->CanPool(request->origin_host(), request->privacy_mode())) {
+        RequestSet::iterator old_request_it = request_it;
+        ++request_it;
+        // Remove request from containers so that OnRequestComplete() is not
+        // called later again on the same request.
+        job_requests_map_[server_id].erase(old_request_it);
+        active_requests_.erase(request);
+        // Notify request of certificate error.
+        request->OnRequestComplete(ERR_ALTERNATIVE_CERT_NOT_VALID_FOR_ORIGIN);
+        continue;
+      }
+      request->set_stream(CreateFromSession(session));
+      ++request_it;
     }
   }
 
@@ -769,20 +801,9 @@ void QuicStreamFactory::OnJobComplete(Job* job, int rv) {
   job_requests_map_.erase(server_id);
 }
 
-// Returns a newly created QuicHttpStream owned by the caller, if a
-// matching session already exists.  Returns nullptr otherwise.
-scoped_ptr<QuicHttpStream> QuicStreamFactory::CreateIfSessionExists(
-    const QuicServerId& server_id,
-    const BoundNetLog& net_log) {
-  if (!HasActiveSession(server_id)) {
-    DVLOG(1) << "No active session";
-    return scoped_ptr<QuicHttpStream>();
-  }
-
-  QuicClientSession* session = active_sessions_[server_id];
-  DCHECK(session);
-  return scoped_ptr<QuicHttpStream>(
-      new QuicHttpStream(session->GetWeakPtr()));
+scoped_ptr<QuicHttpStream> QuicStreamFactory::CreateFromSession(
+    QuicClientSession* session) {
+  return scoped_ptr<QuicHttpStream>(new QuicHttpStream(session->GetWeakPtr()));
 }
 
 bool QuicStreamFactory::IsQuicDisabled(uint16 port) {
@@ -818,6 +839,14 @@ bool QuicStreamFactory::OnHandshakeConfirmed(QuicClientSession* session,
     UMA_HISTOGRAM_SPARSE_SLOWLY("Net.QuicStreamFactory.QuicIsDisabled", port);
   }
 
+  // Collect data for port 443 for packet loss events.
+  if (port == 443 && max_number_of_lossy_connections_ > 0) {
+    UMA_HISTOGRAM_SPARSE_SLOWLY(
+        base::StringPrintf("Net.QuicStreamFactory.BadPacketLossEvents%d",
+                           max_number_of_lossy_connections_),
+        std::min(number_of_lossy_connections_[port],
+                 max_number_of_lossy_connections_));
+  }
   return true;
 }
 
@@ -910,8 +939,9 @@ void QuicStreamFactory::CloseAllSessions(int error) {
   DCHECK(all_sessions_.empty());
 }
 
-base::Value* QuicStreamFactory::QuicStreamFactoryInfoToValue() const {
-  base::ListValue* list = new base::ListValue();
+scoped_ptr<base::Value> QuicStreamFactory::QuicStreamFactoryInfoToValue()
+    const {
+  scoped_ptr<base::ListValue> list(new base::ListValue());
 
   for (SessionMap::const_iterator it = active_sessions_.begin();
        it != active_sessions_.end(); ++it) {
@@ -928,7 +958,7 @@ base::Value* QuicStreamFactory::QuicStreamFactoryInfoToValue() const {
       list->Append(session->GetInfoAsValue(hosts));
     }
   }
-  return list;
+  return list.Pass();
 }
 
 void QuicStreamFactory::ClearCachedStatesInCryptoConfig() {
@@ -1059,8 +1089,9 @@ int QuicStreamFactory::CreateSession(const QuicServerId& server_id,
   QuicConfig config = config_;
   config.SetSocketReceiveBufferToSend(socket_receive_buffer_size_);
   config.set_max_undecryptable_packets(kMaxUndecryptablePackets);
-  config.SetInitialStreamFlowControlWindowToSend(kInitialReceiveWindowSize);
-  config.SetInitialSessionFlowControlWindowToSend(kInitialReceiveWindowSize);
+  config.SetInitialSessionFlowControlWindowToSend(
+      kQuicSessionMaxRecvWindowSize);
+  config.SetInitialStreamFlowControlWindowToSend(kQuicStreamMaxRecvWindowSize);
   int64 srtt = GetServerNetworkStatsSmoothedRttInMicroseconds(server_id);
   if (srtt > 0)
     config.SetInitialRoundTripTimeUsToSend(static_cast<uint32>(srtt));

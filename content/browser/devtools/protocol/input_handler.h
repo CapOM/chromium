@@ -6,7 +6,7 @@
 #define CONTENT_BROWSER_DEVTOOLS_PROTOCOL_INPUT_HANDLER_H_
 
 #include "base/memory/weak_ptr.h"
-#include "content/browser/devtools/protocol/devtools_protocol_handler.h"
+#include "content/browser/devtools/protocol/devtools_protocol_dispatcher.h"
 #include "content/browser/renderer_host/input/synthetic_gesture.h"
 #include "ui/gfx/geometry/size_f.h"
 
@@ -43,6 +43,20 @@ class InputHandler {
                             const std::string* unmodified_text,
                             const std::string* key_identifier,
                             const std::string* code,
+                            const int* windows_virtual_key_code,
+                            const int* native_virtual_key_code,
+                            const bool* auto_repeat,
+                            const bool* is_keypad,
+                            const bool* is_system_key);
+
+  Response DispatchKeyEvent(const std::string& type,
+                            const int* modifiers,
+                            const double* timestamp,
+                            const std::string* text,
+                            const std::string* unmodified_text,
+                            const std::string* key_identifier,
+                            const std::string* code,
+                            const std::string* key,
                             const int* windows_virtual_key_code,
                             const int* native_virtual_key_code,
                             const bool* auto_repeat,

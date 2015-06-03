@@ -221,7 +221,7 @@ bool TestPlugin::initialize(blink::WebPluginContainer* container) {
   if (!InitScene())
     return false;
 
-  layer_ = cc::TextureLayer::CreateForMailbox(this);
+  layer_ = delegate_->CreateTextureLayerForMailbox(this);
   web_layer_ = make_scoped_ptr(delegate_->InstantiateWebLayer(layer_));
   container_ = container;
   container_->setWebLayer(web_layer_.get());
@@ -353,7 +353,7 @@ bool TestPlugin::PrepareTextureMailbox(
   if (texture_mailbox_.IsTexture()) {
     *release_callback =
         cc::SingleReleaseCallback::Create(base::Bind(&IgnoreReleaseCallback));
-  } else {
+  } else if (texture_mailbox_.IsSharedMemory()) {
     *release_callback = cc::SingleReleaseCallback::Create(
         base::Bind(&ReleaseSharedMemory, base::Passed(&shared_bitmap_)));
   }

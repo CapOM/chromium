@@ -6,9 +6,8 @@
 #define COMPONENTS_VIEW_MANAGER_NATIVE_VIEWPORT_NATIVE_VIEWPORT_APPLICATION_DELEGATE_H_
 
 #include "base/macros.h"
-#include "components/gles2/gpu_impl.h"
+#include "components/view_manager/gles2/gpu_impl.h"
 #include "components/view_manager/public/interfaces/native_viewport.mojom.h"
-#include "mojo/application/public/cpp/app_lifetime_helper.h"
 #include "mojo/application/public/cpp/application_delegate.h"
 #include "mojo/application/public/cpp/interface_factory_impl.h"
 #include "mojo/common/tracing_impl.h"
@@ -50,7 +49,7 @@ class NativeViewportApplicationDelegate
   scoped_ptr<ui::PlatformEventSource> event_source_;
   bool is_headless_;
   mojo::TracingImpl tracing_;
-  mojo::AppLifetimeHelper app_lifetime_helper_;
+  mojo::ApplicationImpl* application_;
 
   DISALLOW_COPY_AND_ASSIGN(NativeViewportApplicationDelegate);
 };

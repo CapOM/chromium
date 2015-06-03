@@ -4,6 +4,8 @@
 
 #include "mojo/application/public/cpp/application_impl.h"
 
+#include "base/bind.h"
+#include "base/message_loop/message_loop.h"
 #include "mojo/application/public/cpp/application_delegate.h"
 #include "mojo/application/public/cpp/lib/service_registry.h"
 #include "mojo/public/cpp/bindings/interface_ptr.h"
@@ -11,24 +13,29 @@
 
 namespace mojo {
 
-class ApplicationImpl::ShellPtrWatcher : public ErrorHandler {
- public:
-  ShellPtrWatcher(ApplicationImpl* impl) : impl_(impl) {}
+namespace {
 
-  ~ShellPtrWatcher() override {}
+void DefaultTerminationClosure() {
+  if (base::MessageLoop::current()->is_running())
+    base::MessageLoop::current()->Quit();
+}
 
-  void OnConnectionError() override { impl_->OnShellError(); }
-
- private:
-  ApplicationImpl* impl_;
-  MOJO_DISALLOW_COPY_AND_ASSIGN(ShellPtrWatcher);
-};
+}  // namespace
 
 ApplicationImpl::ApplicationImpl(ApplicationDelegate* delegate,
                                  InterfaceRequest<Application> request)
+    : ApplicationImpl(delegate, request.Pass(),
+                      base::Bind(&DefaultTerminationClosure)) {
+}
+
+ApplicationImpl::ApplicationImpl(ApplicationDelegate* delegate,
+                                 InterfaceRequest<Application> request,
+                                 const base::Closure& termination_closure)
     : delegate_(delegate),
       binding_(this, request.Pass()),
-      shell_watch_(nullptr) {
+      termination_closure_(termination_closure),
+      app_lifetime_helper_(this),
+      quit_requested_(false) {
 }
 
 void ApplicationImpl::ClearConnections() {
@@ -46,16 +53,17 @@ void ApplicationImpl::ClearConnections() {
 
 ApplicationImpl::~ApplicationImpl() {
   ClearConnections();
-  delete shell_watch_;
+  app_lifetime_helper_.ApplicationTerminated();
 }
 
 ApplicationConnection* ApplicationImpl::ConnectToApplication(
-    const String& application_url) {
+    mojo::URLRequestPtr request) {
   MOJO_CHECK(shell_);
   ServiceProviderPtr local_services;
   InterfaceRequest<ServiceProvider> local_request = GetProxy(&local_services);
   ServiceProviderPtr remote_services;
-  shell_->ConnectToApplication(application_url, GetProxy(&remote_services),
+  std::string application_url = request->url.To<std::string>();
+  shell_->ConnectToApplication(request.Pass(), GetProxy(&remote_services),
                                local_services.Pass());
   internal::ServiceRegistry* registry = new internal::ServiceRegistry(
       this, application_url, application_url, remote_services.Pass(),
@@ -70,8 +78,7 @@ ApplicationConnection* ApplicationImpl::ConnectToApplication(
 
 void ApplicationImpl::Initialize(ShellPtr shell, const mojo::String& url) {
   shell_ = shell.Pass();
-  shell_watch_ = new ShellPtrWatcher(this);
-  shell_.set_error_handler(shell_watch_);
+  shell_.set_error_handler(this);
   url_ = url;
   delegate_->Initialize(this);
 }
@@ -88,6 +95,22 @@ void ApplicationImpl::UnbindConnections(
   shell->Bind(shell_.PassInterface());
 }
 
+void ApplicationImpl::Terminate() {
+  // We can't quit immediately, since there could be in-flight requests from the
+  // shell. So check with it first.
+  if (shell_) {
+    quit_requested_ = true;
+    shell_->QuitApplication();
+  } else {
+    QuitNow();
+  }
+}
+
+void ApplicationImpl::QuitNow() {
+  delegate_->Quit();
+  termination_closure_.Run();
+}
+
 void ApplicationImpl::AcceptConnection(
     const String& requestor_url,
     InterfaceRequest<ServiceProvider> services,
@@ -100,11 +123,25 @@ void ApplicationImpl::AcceptConnection(
     return;
   }
   incoming_service_registries_.push_back(registry);
+
+  // If we were quitting because we thought there were no more services for this
+  // app in use, then that has changed so cancel the quit request.
+  if (quit_requested_)
+    quit_requested_ = false;
 }
 
-void ApplicationImpl::RequestQuit() {
-  delegate_->Quit();
-  Terminate();
+void ApplicationImpl::OnQuitRequested(const Callback<void(bool)>& callback) {
+  // If by the time we got the reply from the shell, more requests had come in
+  // then we don't want to quit the app anymore so we return false. Otherwise
+  // |quit_requested_| is true so we tell the shell to proceed with the quit.
+  callback.Run(quit_requested_);
+  if (quit_requested_)
+    QuitNow();
+}
+
+void ApplicationImpl::OnConnectionError() {
+  QuitNow();
+  shell_ = nullptr;
 }
 
 }  // namespace mojo

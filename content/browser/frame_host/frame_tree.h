@@ -80,8 +80,9 @@ class CONTENT_EXPORT FrameTree {
   RenderFrameHostImpl* AddFrame(FrameTreeNode* parent,
                                 int process_id,
                                 int new_routing_id,
+                                blink::WebTreeScopeType scope,
                                 const std::string& frame_name,
-                                SandboxFlags sandbox_flags);
+                                blink::WebSandboxFlags sandbox_flags);
   void RemoveFrame(FrameTreeNode* child);
 
   // This method walks the entire frame tree and creates a RenderFrameProxyHost
@@ -121,10 +122,11 @@ class CONTENT_EXPORT FrameTree {
   // RenderFrameHost for each SiteInstance should be created before subframes.
   RenderViewHostImpl* GetRenderViewHost(SiteInstance* site_instance);
 
-  // Keeps track of which RenderFrameHosts are using each RenderViewHost.  When
-  // the number drops to zero, we call Shutdown on the RenderViewHost.
-  void RegisterRenderFrameHost(RenderFrameHostImpl* render_frame_host);
-  void UnregisterRenderFrameHost(RenderFrameHostImpl* render_frame_host);
+  // Keeps track of which RenderFrameHosts and RenderFrameProxyHosts are using
+  // each RenderViewHost.  When the number drops to zero, we call Shutdown on
+  // the RenderViewHost.
+  void AddRenderViewHostRef(RenderViewHostImpl* render_view_host);
+  void ReleaseRenderViewHostRef(RenderViewHostImpl* render_view_host);
 
   // This is only meant to be called by FrameTreeNode. Triggers calling
   // the listener installed by SetFrameRemoveListener.

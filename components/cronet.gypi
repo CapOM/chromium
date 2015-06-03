@@ -283,6 +283,7 @@
             'cronet/android/test/src/org/chromium/net/NativeTestServer.java',
             'cronet/android/test/src/org/chromium/net/NetworkChangeNotifierUtil.java',
             'cronet/android/test/src/org/chromium/net/QuicTestServer.java',
+            'cronet/android/test/src/org/chromium/net/SdchObserver.java',
             'cronet/android/test/src/org/chromium/net/TestUploadDataStreamHandler.java',
           ],
           'variables': {
@@ -301,6 +302,8 @@
             'cronet/android/test/native_test_server.h',
             'cronet/android/test/quic_test_server.cc',
             'cronet/android/test/quic_test_server.h',
+            'cronet/android/test/sdch_test_util.cc',
+            'cronet/android/test/sdch_test_util.h',
             'cronet/android/test/test_upload_data_stream_handler.cc',
             'cronet/android/test/test_upload_data_stream_handler.h',
             'cronet/android/test/network_change_notifier_util.cc',
@@ -370,6 +373,25 @@
             'java_in_dir': 'cronet/android/test/javatests',
             'resource_dir': 'cronet/android/test/res',
             'is_test_apk': 1,
+          },
+          'includes': [ '../build/java_apk.gypi' ],
+        },
+        {
+          'target_name': 'cronet_perf_test_apk',
+          'type': 'none',
+          'dependencies': [
+            'cronet_java',
+            'cronet_stub',
+          ],
+          'variables': {
+            'apk_name': 'CronetPerfTest',
+            'java_in_dir': 'cronet/android/test/javaperftests',
+            'is_test_apk': 1,
+            'native_lib_target': 'libcronet',
+            'proguard_enabled': 'true',
+            'proguard_flags_paths': [
+              'cronet/android/proguard.cfg',
+            ],
           },
           'includes': [ '../build/java_apk.gypi' ],
         },

@@ -102,7 +102,7 @@ function FileBrowserBackground() {
 
   /**
    * String assets.
-   * @type {Object<string, string>}
+   * @type {Object<string>}
    */
   this.stringData = null;
 
@@ -603,7 +603,8 @@ FileBrowserBackground.prototype.onMountCompleted_ = function(event) {
          event.status === 'error_path_already_mounted') &&
         event.volumeMetadata.mountContext === 'user' &&
         event.volumeMetadata.volumeType ===
-            VolumeManagerCommon.VolumeType.PROVIDED) {
+            VolumeManagerCommon.VolumeType.PROVIDED &&
+        event.volumeMetadata.source === VolumeManagerCommon.Source.FILE) {
       this.navigateToVolumeWhenReady_(event.volumeMetadata.volumeId);
     }
   }.bind(this)).catch(function(error) {

@@ -104,6 +104,12 @@ class WebContents : public PageNavigator,
     // reference to its opener.
     bool opener_suppressed;
 
+    // Indicates whether this WebContents was created with a window.opener.
+    // This is used when determining whether the WebContents is allowed to be
+    // closed via window.close(). This may be true even with a null |opener|
+    // (e.g., for blocked popups).
+    bool created_with_opener;
+
     // The routing ids of the RenderView and of the main RenderFrame. Either
     // both must be provided, or both must be MSG_ROUTING_NONE to have the
     // WebContents make the assignment.
@@ -305,6 +311,7 @@ class WebContents : public PageNavigator,
   virtual bool IsWaitingForResponse() const = 0;
 
   // Returns the current load state and the URL associated with it.
+  // The load state is only updated while IsLoading() is true.
   virtual const net::LoadStateWithParam& GetLoadState() const = 0;
   virtual const base::string16& GetLoadStateHost() const = 0;
 
@@ -351,9 +358,10 @@ class WebContents : public PageNavigator,
   // change.
   virtual void NotifyNavigationStateChanged(InvalidateTypes changed_flags) = 0;
 
-  // Get the last time that the WebContents was made active (either when it was
-  // created or shown with WasShown()).
+  // Get/Set the last time that the WebContents was made active (either when it
+  // was created or shown with WasShown()).
   virtual base::TimeTicks GetLastActiveTime() const = 0;
+  virtual void SetLastActiveTime(base::TimeTicks last_active_time) = 0;
 
   // Invoked when the WebContents becomes shown/hidden.
   virtual void WasShown() = 0;

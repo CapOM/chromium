@@ -197,7 +197,6 @@ const char page_action[] = "obcimlgaoabeegjmmpldobjndiealpln";
 const char theme_crx[] = "iamefpfkojoapidjnbafmgkgncegbkad";
 const char theme2_crx[] = "pjpgmfcmabopnnfonnhmdjglfpjjfkbf";
 const char permissions_crx[] = "eagpmdpfmaekmmcejjbmjoecnejeiiin";
-const char unpacked[] = "cbcdidchbppangcjoddlpdjlenngjldk";
 const char updates_from_webstore[] = "akjooamlhcgeopfifcmlggaebeocgokj";
 const char permissions_blocklist[] = "noffkehfcaggllbcojjbopcmlhcnhcdn";
 
@@ -2331,49 +2330,6 @@ TEST_F(ExtensionServiceTest, LoadLocalizedTheme) {
   base::FilePath theme_file = extension_path.Append(chrome::kThemePackFilename);
   ASSERT_TRUE(base::PathExists(theme_file));
   ASSERT_TRUE(base::DeleteFile(theme_file, false));  // Not recursive.
-}
-
-// Tests that we can change the ID of an unpacked extension by adding a key
-// to its manifest.
-TEST_F(ExtensionServiceTest, UnpackedExtensionCanChangeID) {
-  InitializeEmptyExtensionService();
-
-  base::ScopedTempDir temp;
-  ASSERT_TRUE(temp.CreateUniqueTempDir());
-
-  base::FilePath extension_path = temp.path();
-  base::FilePath manifest_path =
-      extension_path.Append(extensions::kManifestFilename);
-  base::FilePath manifest_no_key =
-      data_dir().AppendASCII("unpacked").AppendASCII("manifest_no_key.json");
-
-  base::FilePath manifest_with_key =
-      data_dir().AppendASCII("unpacked").AppendASCII("manifest_with_key.json");
-
-  ASSERT_TRUE(base::PathExists(manifest_no_key));
-  ASSERT_TRUE(base::PathExists(manifest_with_key));
-
-  // Load the unpacked extension with no key.
-  base::CopyFile(manifest_no_key, manifest_path);
-  extensions::UnpackedInstaller::Create(service())->Load(extension_path);
-
-  base::RunLoop().RunUntilIdle();
-  EXPECT_EQ(0u, GetErrors().size());
-  ASSERT_EQ(1u, loaded_.size());
-  EXPECT_EQ(1u, registry()->enabled_extensions().size());
-
-  // Add the key to the manifest.
-  base::CopyFile(manifest_with_key, manifest_path);
-  loaded_.clear();
-
-  // Reload the extensions.
-  service()->ReloadExtensionsForTest();
-  const Extension* extension = service()->GetExtensionById(unpacked, false);
-  EXPECT_EQ(unpacked, extension->id());
-  ASSERT_EQ(1u, loaded_.size());
-
-  // TODO(jstritar): Right now this just makes sure we don't crash and burn, but
-  // we should also test that preferences are preserved.
 }
 
 #if defined(OS_POSIX)
@@ -6540,60 +6496,41 @@ TEST_F(ExtensionServiceTest, ProcessSyncDataNewExtension) {
   const base::FilePath path = data_dir().AppendASCII("good.crx");
   const ExtensionPrefs* prefs = ExtensionPrefs::Get(profile());
 
-  {
-    ext_specifics->set_enabled(true);
-    ext_specifics->set_disable_reasons(0);
-
-    syncer::SyncData sync_data =
-        syncer::SyncData::CreateLocalData(good_crx, "Name", specifics);
-    syncer::SyncChange sync_change(FROM_HERE,
-                                   syncer::SyncChange::ACTION_UPDATE,
-                                   sync_data);
-    syncer::SyncChangeList list(1);
-    list[0] = sync_change;
-    extension_sync_service()->ProcessSyncChanges(FROM_HERE, list);
-
-    ASSERT_TRUE(service()->pending_extension_manager()->IsIdPending(good_crx));
-    UpdateExtension(good_crx, path, ENABLED);
-    EXPECT_EQ(0, prefs->GetDisableReasons(good_crx));
-    // Permissions should have been granted during installation.
-    scoped_refptr<PermissionSet> permissions(
-        prefs->GetGrantedPermissions(good_crx));
-    EXPECT_FALSE(permissions->IsEmpty());
-    ASSERT_FALSE(service()->pending_extension_manager()->IsIdPending(good_crx));
-  }
-  UninstallExtension(good_crx, false);
-  {
-    ext_specifics->set_enabled(false);
-    ext_specifics->set_disable_reasons(Extension::DISABLE_USER_ACTION);
-
-    syncer::SyncData sync_data =
-        syncer::SyncData::CreateLocalData(good_crx, "Name", specifics);
-    syncer::SyncChange sync_change(FROM_HERE,
-                                   syncer::SyncChange::ACTION_UPDATE,
-                                   sync_data);
-    syncer::SyncChangeList list(1);
-    list[0] = sync_change;
-    extension_sync_service()->ProcessSyncChanges(FROM_HERE, list);
-
-    ASSERT_TRUE(service()->pending_extension_manager()->IsIdPending(good_crx));
-    UpdateExtension(good_crx, path, DISABLED);
-    EXPECT_EQ(Extension::DISABLE_USER_ACTION,
-              prefs->GetDisableReasons(good_crx));
-    // Even if the extension came in disabled, its permissions should have been
+  struct TestCase {
+    const char* name;  // For failure output only.
+    bool sync_enabled;  // The "enabled" flag coming in from Sync.
+    int sync_disable_reasons;  // The disable reason(s) coming in from Sync.
+    // The disable reason(s) that should be set on the installed extension.
+    // This will usually be the same as |sync_disable_reasons|, but see the
+    // "Legacy" case.
+    int expect_disable_reasons;
+    // Whether the extension's permissions should be auto-granted during
+    // installation.
+    bool expect_permissions_granted;
+  } test_cases[] = {
+    // Standard case: Extension comes in enabled; permissions should be granted
+    // during installation.
+    { "Standard", true, 0, 0, true },
+    // If the extension comes in disabled, its permissions should still be
     // granted (the user already approved them on another machine).
-    scoped_refptr<PermissionSet> permissions(
-        prefs->GetGrantedPermissions(good_crx));
-    EXPECT_FALSE(permissions->IsEmpty());
-    ASSERT_FALSE(service()->pending_extension_manager()->IsIdPending(good_crx));
-  }
-  UninstallExtension(good_crx, false, Extension::DISABLED);
-  {
-    ext_specifics->set_enabled(false);
+    { "Disabled", false, Extension::DISABLE_USER_ACTION,
+      Extension::DISABLE_USER_ACTION, true },
     // Legacy case (<M45): No disable reasons come in from Sync (see
     // crbug.com/484214). After installation, the reason should be set to
     // DISABLE_UNKNOWN_FROM_SYNC.
-    ext_specifics->set_disable_reasons(0);
+    { "Legacy", false, 0, Extension::DISABLE_UNKNOWN_FROM_SYNC, true },
+    // If the extension came in disabled due to a permissions increase, then the
+    // user has *not* approved the permissions, and they shouldn't be granted.
+    // crbug.com/484214
+    { "PermissionsIncrease", false, Extension::DISABLE_PERMISSIONS_INCREASE,
+      Extension::DISABLE_PERMISSIONS_INCREASE, false },
+  };
+
+  for (const TestCase& test_case : test_cases) {
+    SCOPED_TRACE(test_case.name);
+
+    ext_specifics->set_enabled(test_case.sync_enabled);
+    ext_specifics->set_disable_reasons(test_case.sync_disable_reasons);
 
     syncer::SyncData sync_data =
         syncer::SyncData::CreateLocalData(good_crx, "Name", specifics);
@@ -6605,15 +6542,20 @@ TEST_F(ExtensionServiceTest, ProcessSyncDataNewExtension) {
     extension_sync_service()->ProcessSyncChanges(FROM_HERE, list);
 
     ASSERT_TRUE(service()->pending_extension_manager()->IsIdPending(good_crx));
-    UpdateExtension(good_crx, path, DISABLED);
-    EXPECT_EQ(Extension::DISABLE_UNKNOWN_FROM_SYNC,
+    UpdateExtension(good_crx, path, test_case.sync_enabled ? ENABLED
+                                                           : DISABLED);
+    EXPECT_EQ(test_case.expect_disable_reasons,
               prefs->GetDisableReasons(good_crx));
     scoped_refptr<PermissionSet> permissions(
         prefs->GetGrantedPermissions(good_crx));
-    EXPECT_FALSE(permissions->IsEmpty());
+    EXPECT_EQ(test_case.expect_permissions_granted, !permissions->IsEmpty());
     ASSERT_FALSE(service()->pending_extension_manager()->IsIdPending(good_crx));
+
+    // Remove the extension again, so we can install it again for the next case.
+    UninstallExtension(good_crx, false,
+                       test_case.sync_enabled ? Extension::ENABLED
+                                              : Extension::DISABLED);
   }
-  UninstallExtension(good_crx, false, Extension::DISABLED);
 }
 
 TEST_F(ExtensionServiceTest, ProcessSyncDataTerminatedExtension) {

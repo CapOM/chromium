@@ -103,6 +103,8 @@
 #define BASE_FILES_FILE_PATH_H_
 
 #include <stddef.h>
+
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -122,10 +124,10 @@
 #define FILE_PATH_USES_WIN_SEPARATORS
 #endif  // OS_WIN
 
+namespace base {
+
 class Pickle;
 class PickleIterator;
-
-namespace base {
 
 // An abstraction to isolate users from the differences between native
 // pathnames on different platforms.
@@ -433,10 +435,13 @@ class BASE_EXPORT FilePath {
   StringType path_;
 };
 
-}  // namespace base
-
 // This is required by googletest to print a readable output on test failures.
-BASE_EXPORT extern void PrintTo(const base::FilePath& path, std::ostream* out);
+// This is declared here for use in gtest-based unit tests but is defined in
+// the test_support_base target. Depend on that to use this in your unit test.
+// This should not be used in production code - call ToString() instead.
+void PrintTo(const FilePath& path, std::ostream* out);
+
+}  // namespace base
 
 // Macros for string literal initialization of FilePath::CharType[], and for
 // using a FilePath::CharType[] in a printf-style format string.

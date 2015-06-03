@@ -175,8 +175,8 @@ void PpapiThread::OnChannelConnected(int32 peer_pid) {
 #endif
 }
 
-base::MessageLoopProxy* PpapiThread::GetIPCMessageLoop() {
-  return ChildProcess::current()->io_message_loop_proxy();
+base::SingleThreadTaskRunner* PpapiThread::GetIPCTaskRunner() {
+  return ChildProcess::current()->io_task_runner();
 }
 
 base::WaitableEvent* PpapiThread::GetShutdownEvent() {
@@ -197,6 +197,21 @@ IPC::PlatformFileForTransit PpapiThread::ShareHandleWithRemote(
 
   DCHECK(peer_pid != base::kNullProcessId);
   return BrokerGetFileHandleForProcess(handle, peer_pid, should_close_source);
+}
+
+base::SharedMemoryHandle PpapiThread::ShareSharedMemoryHandleWithRemote(
+    const base::SharedMemoryHandle& handle,
+    base::ProcessId remote_pid) {
+  base::PlatformFile local_platform_file =
+#if defined(OS_POSIX)
+      handle.fd;
+#elif defined(OS_WIN)
+      handle;
+#else
+#error Not implemented.
+#endif
+  return PpapiThread::ShareHandleWithRemote(local_platform_file, remote_pid,
+                                            false);
 }
 
 std::set<PP_Instance>* PpapiThread::GetGloballySeenInstanceIDSet() {

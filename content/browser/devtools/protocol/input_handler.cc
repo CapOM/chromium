@@ -150,6 +150,7 @@ Response InputHandler::DispatchKeyEvent(
     const std::string* unmodified_text,
     const std::string* key_identifier,
     const std::string* code,
+    const std::string* key,
     const int* windows_virtual_key_code,
     const int* native_virtual_key_code,
     const bool* auto_repeat,
@@ -177,20 +178,6 @@ Response InputHandler::DispatchKeyEvent(
   if (!SetKeyboardEventText(event.unmodifiedText, unmodified_text))
     return Response::InvalidParams("Invalid 'unmodifiedText' parameter");
 
-  if (key_identifier) {
-    if (key_identifier->size() >
-        blink::WebKeyboardEvent::keyIdentifierLengthCap) {
-      return Response::InvalidParams("Invalid 'keyIdentifier' parameter");
-    }
-    for (size_t i = 0; i < key_identifier->size(); ++i)
-      event.keyIdentifier[i] = (*key_identifier)[i];
-  }
-
-  if (code) {
-    event.domCode = static_cast<int>(
-        ui::KeycodeConverter::CodeStringToDomCode(code->c_str()));
-  }
-
   if (windows_virtual_key_code)
     event.windowsKeyCode = *windows_virtual_key_code;
   if (native_virtual_key_code)
@@ -202,12 +189,53 @@ Response InputHandler::DispatchKeyEvent(
   if (is_system_key)
     event.isSystemKey = *is_system_key;
 
+  if (key_identifier) {
+    if (key_identifier->size() >
+        blink::WebKeyboardEvent::keyIdentifierLengthCap) {
+      return Response::InvalidParams("Invalid 'keyIdentifier' parameter");
+    }
+    for (size_t i = 0; i < key_identifier->size(); ++i)
+      event.keyIdentifier[i] = (*key_identifier)[i];
+  } else if (event.type != blink::WebInputEvent::Char) {
+    event.setKeyIdentifierFromWindowsKeyCode();
+  }
+
+  if (code) {
+    event.domCode = static_cast<int>(
+        ui::KeycodeConverter::CodeStringToDomCode(code->c_str()));
+  }
+
+  if (key) {
+    event.domKey = static_cast<int>(
+        ui::KeycodeConverter::KeyStringToDomKey(key->c_str()));
+  }
+
   if (!host_)
     return Response::ServerError("Could not connect to view");
 
   host_->Focus();
   host_->ForwardKeyboardEvent(event);
   return Response::OK();
+}
+
+Response InputHandler::DispatchKeyEvent(
+    const std::string& type,
+    const int* modifiers,
+    const double* timestamp,
+    const std::string* text,
+    const std::string* unmodified_text,
+    const std::string* key_identifier,
+    const std::string* code,
+    const int* windows_virtual_key_code,
+    const int* native_virtual_key_code,
+    const bool* auto_repeat,
+    const bool* is_keypad,
+    const bool* is_system_key) {
+  std::string dom_key;
+  return InputHandler::DispatchKeyEvent(type, modifiers, timestamp, text,
+      unmodified_text, key_identifier, code, &dom_key,
+      windows_virtual_key_code, native_virtual_key_code, auto_repeat,
+      is_keypad, is_system_key);
 }
 
 Response InputHandler::DispatchMouseEvent(

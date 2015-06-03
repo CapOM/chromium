@@ -52,6 +52,11 @@ void PermissionContextBase::RequestPermission(
 ContentSetting PermissionContextBase::GetPermissionStatus(
     const GURL& requesting_origin,
     const GURL& embedding_origin) const {
+  if (IsRestrictedToSecureOrigins() &&
+      !content::IsOriginSecure(requesting_origin)) {
+    return CONTENT_SETTING_BLOCK;
+  }
+
   return profile_->GetHostContentSettingsMap()->GetContentSetting(
       requesting_origin, embedding_origin, permission_type_, std::string());
 }
@@ -105,8 +110,7 @@ void PermissionContextBase::DecidePermission(
     return;
   }
 
-  // The Web MIDI SYSEX API is only available to secure origins.
-  if (permission_type_ == CONTENT_SETTINGS_TYPE_MIDI_SYSEX &&
+  if (IsRestrictedToSecureOrigins() &&
       !content::IsOriginSecure(requesting_origin)) {
     NotifyPermissionSet(id, requesting_origin, embedding_origin, callback,
                         false /* persist */, CONTENT_SETTING_BLOCK);

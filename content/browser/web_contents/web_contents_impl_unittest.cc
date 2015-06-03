@@ -39,6 +39,7 @@
 #include "content/test/test_render_view_host.h"
 #include "content/test/test_web_contents.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/skia/include/core/SkColor.h"
 
 namespace content {
 namespace {
@@ -244,7 +245,8 @@ class WebContentsImplTest : public RenderViewHostImplTestHarness {
 class TestWebContentsObserver : public WebContentsObserver {
  public:
   explicit TestWebContentsObserver(WebContents* contents)
-      : WebContentsObserver(contents) {
+      : WebContentsObserver(contents),
+        last_theme_color_(SK_ColorTRANSPARENT) {
   }
   ~TestWebContentsObserver() override {}
 
@@ -259,10 +261,16 @@ class TestWebContentsObserver : public WebContentsObserver {
     last_url_ = validated_url;
   }
 
+  void DidChangeThemeColor(SkColor theme_color) override {
+    last_theme_color_ = theme_color;
+  }
+
   const GURL& last_url() const { return last_url_; }
+  SkColor last_theme_color() const { return last_theme_color_; }
 
  private:
   GURL last_url_;
+  SkColor last_theme_color_;
 
   DISALLOW_COPY_AND_ASSIGN(TestWebContentsObserver);
 };
@@ -1437,7 +1445,9 @@ TEST_F(WebContentsImplTest, TerminateHidesValidationMessage) {
   contents()->SetDelegate(&fake_delegate);
   EXPECT_FALSE(fake_delegate.hide_validation_message_was_called());
 
-  // Crash the renderer.
+  // Initialize the RenderFrame and then simulate crashing the renderer
+  // process.
+  contents()->GetMainFrame()->InitializeRenderFrameIfNeeded();
   contents()->GetMainFrame()->GetProcess()->SimulateCrash();
 
   // Confirm HideValidationMessage was called.
@@ -1681,6 +1691,7 @@ TEST_F(WebContentsImplTest,
   // Simulate the navigation to the page, that's when the interstitial gets
   // hidden.
   GURL url3("http://www.thepage.com");
+  contents()->GetMainFrame()->PrepareForCommit();
   contents()->GetMainFrame()->SendNavigate(2, 0, true, url3);
 
   EXPECT_FALSE(contents()->ShowingInterstitialPage());
@@ -1892,11 +1903,10 @@ TEST_F(WebContentsImplTest, ShowInterstitialCrashRendererThenGoBack) {
   // Crash the renderer
   contents()->GetMainFrame()->GetProcess()->SimulateCrash();
 
-  // While the interstitial is showing, go back.
+  // While the interstitial is showing, go back. This will dismiss the
+  // interstitial and not initiate a navigation, but just show the existing
+  // RenderFrameHost.
   controller().GoBack();
-  main_test_rfh()->PrepareForCommit();
-  contents()->GetMainFrame()->SendNavigate(1, entry->GetUniqueID(), false,
-                                           url1);
 
   // Make sure we are back to the original page and that the interstitial is
   // gone.
@@ -3016,6 +3026,9 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
   TestRenderFrameHost* rfh = contents()->GetMainFrame();
   AudioStateProvider* audio_state = contents()->audio_state_provider();
 
+  // Ensure RenderFrame is initialized before simulating events coming from it.
+  main_test_rfh()->InitializeRenderFrameIfNeeded();
+
   // The audio power save blocker should not be based on having a media player
   // when audio stream monitoring is available.
   if (audio_state->IsAudioStateAvailable()) {
@@ -3115,6 +3128,42 @@ TEST_F(WebContentsImplTest, MediaPowerSaveBlocking) {
   // Verify that all the power save blockers have been released.
   EXPECT_FALSE(contents()->has_video_power_save_blocker_for_testing());
   EXPECT_FALSE(contents()->has_audio_power_save_blocker_for_testing());
+}
+
+TEST_F(WebContentsImplTest, ThemeColorChangeDependingOnFirstVisiblePaint) {
+  TestWebContentsObserver observer(contents());
+  TestRenderFrameHost* rfh = contents()->GetMainFrame();
+
+  SkColor transparent = SK_ColorTRANSPARENT;
+
+  EXPECT_EQ(transparent, contents()->GetThemeColor());
+  EXPECT_EQ(transparent, observer.last_theme_color());
+
+  // Theme color changes should not propagate past the WebContentsImpl before
+  // the first visually non-empty paint has occurred.
+  RenderViewHostTester::TestOnMessageReceived(
+      test_rvh(),
+      FrameHostMsg_DidChangeThemeColor(rfh->GetRoutingID(), SK_ColorRED));
+
+  EXPECT_EQ(SK_ColorRED, contents()->GetThemeColor());
+  EXPECT_EQ(transparent, observer.last_theme_color());
+
+  // Simulate that the first visually non-empty paint has occurred. This will
+  // propagate the current theme color to the delegates.
+  RenderViewHostTester::TestOnMessageReceived(
+      test_rvh(),
+      FrameHostMsg_DidFirstVisuallyNonEmptyPaint(rfh->GetRoutingID()));
+
+  EXPECT_EQ(SK_ColorRED, contents()->GetThemeColor());
+  EXPECT_EQ(SK_ColorRED, observer.last_theme_color());
+
+  // Additional changes made by the web contents should propagate as well.
+  RenderViewHostTester::TestOnMessageReceived(
+      test_rvh(),
+      FrameHostMsg_DidChangeThemeColor(rfh->GetRoutingID(), SK_ColorGREEN));
+
+  EXPECT_EQ(SK_ColorGREEN, contents()->GetThemeColor());
+  EXPECT_EQ(SK_ColorGREEN, observer.last_theme_color());
 }
 
 }  // namespace content

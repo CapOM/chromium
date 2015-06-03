@@ -10,7 +10,7 @@
 #include "device/bluetooth/test/mock_bluetooth_adapter.h"
 #include "device/bluetooth/test/mock_bluetooth_device.h"
 #include "device/bluetooth/test/mock_bluetooth_discovery_session.h"
-
+#include "device/bluetooth/test/mock_bluetooth_gatt_service.h"
 namespace content {
 
 // Implements fake adapters with named mock data set for use in tests as a
@@ -30,7 +30,7 @@ class LayoutTestBluetoothAdapterProvider {
   static scoped_refptr<testing::NiceMock<device::MockBluetoothAdapter>>
   GetEmptyAdapter();
 
-  // Returns "SingleEmptyDevice" fake BluetoothAdapter with the following
+  // Returns "SingleEmptyDeviceAdapter" fake BluetoothAdapter with the following
   // characteristics:
   //  - |StartDiscoverySession| runs the first argument with |DiscoverySession|
   //    as argument.
@@ -38,7 +38,23 @@ class LayoutTestBluetoothAdapterProvider {
   static scoped_refptr<testing::NiceMock<device::MockBluetoothAdapter>>
   GetSingleEmptyDeviceAdapter();
 
-  // Returns a fake DiscoverySession with the following characteristics:
+  // Returns "ConnectableDeviceAdapter" fake BluetoothAdapter with the
+  // following characteristics:
+  //  - |StartDiscoverySession| runs the first argument with |DiscoverySession|
+  //    as argument.
+  //  - |GetDevices| returns a list with a |ConnectableDevice|.
+  static scoped_refptr<testing::NiceMock<device::MockBluetoothAdapter>>
+  GetConnectableDeviceAdapter();
+
+  // Returns "UnconnectableDeviceAdapter" fake BluetoothAdapter with the
+  // following characteristics:
+  //  - |StartDiscoverySession| runs the first argument with |DiscoverySession|
+  //    as argument.
+  //  - |GetDevices| returns a list with an |UnconnectableDevice|.
+  static scoped_refptr<testing::NiceMock<device::MockBluetoothAdapter>>
+  GetUnconnectableDeviceAdapter();
+
+  // Returns a fake |DiscoverySession| with the following characteristics:
   //  - |Stop| runs the first argument.
   static scoped_ptr<testing::NiceMock<device::MockBluetoothDiscoverySession>>
   GetDiscoverySession();
@@ -54,8 +70,33 @@ class LayoutTestBluetoothAdapterProvider {
   //  - |GetDeviceID| returns 2.
   //  - |IsPaired| returns true.
   //  - |GetUUIDs| returns a list with two UUIDs: "1800" and "1801".
+  //  - |GetGattServices| returns a list with two services "Generic Access" and
+  //    "Generic Attribute".
   static scoped_ptr<testing::NiceMock<device::MockBluetoothDevice>>
   GetEmptyDevice(device::MockBluetoothAdapter* adapter);
+
+  // Returns a fake |ConnectableDevice| with the same characteristics as
+  // |EmptyDevice| except:
+  //  - |CreateGattConnection| runs success callback with a
+  //    fake BluetoothGattConnection as argument.
+  static scoped_ptr<testing::NiceMock<device::MockBluetoothDevice>>
+  GetConnectableDevice(device::MockBluetoothAdapter* adapter);
+
+  // Returns a fake |UnconnectableDevice| with the same characteristics as
+  // |EmptyDevice| except:
+  //  - |CreateGattConnection| runs error callback with
+  //    |BluetoothDevice::ERROR_FAILED| as argument.
+  static scoped_ptr<testing::NiceMock<device::MockBluetoothDevice>>
+  GetUnconnectableDevice(device::MockBluetoothAdapter* adapter);
+
+  // Returns a fake BluetoothGattService with the following characteristics:
+  // - |GetIdentifier| returns |uuid|.
+  // - |GetUUID| returns BluetoothUUID(|uuid|).
+  // - |IsLocal| returns false.
+  // - |IsPrimary| returns true.
+  // - |GetDevice| returns |device|.
+  static scoped_ptr<testing::NiceMock<device::MockBluetoothGattService>>
+  GetMockService(device::MockBluetoothDevice* device, const std::string& uuid);
 };
 
 }  // namespace content

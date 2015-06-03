@@ -16,11 +16,13 @@ var remoting = remoting || {};
  * @param {remoting.ContextMenuAdapter} adapter
  * @param {remoting.ClientPlugin} plugin
  * @param {remoting.ClientSession} clientSession
+ * @param {remoting.WindowShape} windowShape
  *
  * @constructor
  * @implements {base.Disposable}
  */
-remoting.ApplicationContextMenu = function(adapter, plugin, clientSession) {
+remoting.ApplicationContextMenu = function(adapter, plugin, clientSession,
+                                           windowShape) {
   /** @private */
   this.adapter_ = adapter;
 
@@ -44,7 +46,7 @@ remoting.ApplicationContextMenu = function(adapter, plugin, clientSession) {
 
   /** @private */
   this.stats_ = new remoting.ConnectionStats(
-      document.getElementById('statistics'), plugin);
+      document.getElementById('statistics'), plugin, windowShape);
 };
 
 remoting.ApplicationContextMenu.prototype.dispose = function() {
@@ -79,13 +81,16 @@ remoting.ApplicationContextMenu.prototype.updateConnectionRTT =
 
 /** @param {OnClickData=} info */
 remoting.ApplicationContextMenu.prototype.onClicked_ = function(info) {
-  switch (info.menuItemId) {
+  var menuId = /** @type {string} */ (info.menuItemId.toString());
+  switch (menuId) {
 
     case remoting.ApplicationContextMenu.kSendFeedbackId:
       var windowAttributes = {
         bounds: {
           width: 400,
-          height: 100
+          height: 100,
+          left: undefined,
+          top: undefined
         },
         resizable: false
       };
@@ -93,7 +98,7 @@ remoting.ApplicationContextMenu.prototype.onClicked_ = function(info) {
       /** @type {remoting.ApplicationContextMenu} */
       var that = this;
 
-      /** @param {AppWindow} consentWindow */
+      /** @param {chrome.app.window.AppWindow} consentWindow */
       var onCreate = function(consentWindow) {
         var onLoad = function() {
           var message = {

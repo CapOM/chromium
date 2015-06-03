@@ -39,7 +39,8 @@ base::LazyInstance<FrameMap> g_frame_map = LAZY_INSTANCE_INITIALIZER;
 // static
 RenderFrameProxy* RenderFrameProxy::CreateProxyToReplaceFrame(
     RenderFrameImpl* frame_to_replace,
-    int routing_id) {
+    int routing_id,
+    blink::WebTreeScopeType scope) {
   CHECK_NE(routing_id, MSG_ROUTING_NONE);
 
   scoped_ptr<RenderFrameProxy> proxy(
@@ -48,7 +49,8 @@ RenderFrameProxy* RenderFrameProxy::CreateProxyToReplaceFrame(
   // When a RenderFrame is replaced by a RenderProxy, the WebRemoteFrame should
   // always come from WebRemoteFrame::create and a call to WebFrame::swap must
   // follow later.
-  blink::WebRemoteFrame* web_frame = blink::WebRemoteFrame::create(proxy.get());
+  blink::WebRemoteFrame* web_frame =
+      blink::WebRemoteFrame::create(scope, proxy.get());
   proxy->Init(web_frame, frame_to_replace->render_view());
   return proxy.release();
 }
@@ -65,7 +67,8 @@ RenderFrameProxy* RenderFrameProxy::CreateFrameProxy(
   if (parent_routing_id == MSG_ROUTING_NONE) {
     // Create a top level frame.
     render_view = RenderViewImpl::FromRoutingID(render_view_routing_id);
-    web_frame = blink::WebRemoteFrame::create(proxy.get());
+    web_frame =
+        blink::WebRemoteFrame::create(replicated_state.scope, proxy.get());
     render_view->webview()->setMainFrame(web_frame);
   } else {
     // Create a frame under an existing parent. The parent is always expected
@@ -74,10 +77,9 @@ RenderFrameProxy* RenderFrameProxy::CreateFrameProxy(
     RenderFrameProxy* parent =
         RenderFrameProxy::FromRoutingID(parent_routing_id);
     web_frame = parent->web_frame()->createRemoteChild(
+        replicated_state.scope,
         blink::WebString::fromUTF8(replicated_state.name),
-        RenderFrameImpl::ContentToWebSandboxFlags(
-            replicated_state.sandbox_flags),
-        proxy.get());
+        replicated_state.sandbox_flags, proxy.get());
     render_view = parent->render_view();
   }
 
@@ -85,6 +87,11 @@ RenderFrameProxy* RenderFrameProxy::CreateFrameProxy(
 
   // Initialize proxy's WebRemoteFrame with the security origin and other
   // replicated information.
+  // TODO(dcheng): Calling this when parent_routing_id != MSG_ROUTING_NONE is
+  // mostly redundant, since we already pass the name and sandbox flags in
+  // createLocalChild(). We should update the Blink interface so it also takes
+  // the origin. Then it will be clear that the replication call is only needed
+  // for the case of setting up a main frame proxy.
   proxy->SetReplicatedState(replicated_state);
 
   return proxy.release();
@@ -166,8 +173,7 @@ void RenderFrameProxy::SetReplicatedState(const FrameReplicationState& state) {
   DCHECK(web_frame_);
   web_frame_->setReplicatedOrigin(blink::WebSecurityOrigin::createFromString(
       blink::WebString::fromUTF8(state.origin.string())));
-  web_frame_->setReplicatedSandboxFlags(
-      RenderFrameImpl::ContentToWebSandboxFlags(state.sandbox_flags));
+  web_frame_->setReplicatedSandboxFlags(state.sandbox_flags);
   web_frame_->setReplicatedName(blink::WebString::fromUTF8(state.name));
 }
 
@@ -187,11 +193,9 @@ void RenderFrameProxy::SetReplicatedState(const FrameReplicationState& state) {
 // properly if this proxy ever parents a local frame.  The proxy's FrameOwner
 // flags are also updated here with the caveat that the FrameOwner won't learn
 // about updates to its flags until they take effect.
-void RenderFrameProxy::OnDidUpdateSandboxFlags(SandboxFlags flags) {
-  web_frame_->setReplicatedSandboxFlags(
-      RenderFrameImpl::ContentToWebSandboxFlags(flags));
-  web_frame_->setFrameOwnerSandboxFlags(
-      RenderFrameImpl::ContentToWebSandboxFlags(flags));
+void RenderFrameProxy::OnDidUpdateSandboxFlags(blink::WebSandboxFlags flags) {
+  web_frame_->setReplicatedSandboxFlags(flags);
+  web_frame_->setFrameOwnerSandboxFlags(flags);
 }
 
 bool RenderFrameProxy::OnMessageReceived(const IPC::Message& msg) {
@@ -201,6 +205,7 @@ bool RenderFrameProxy::OnMessageReceived(const IPC::Message& msg) {
     IPC_MESSAGE_HANDLER(FrameMsg_ChildFrameProcessGone, OnChildFrameProcessGone)
     IPC_MESSAGE_HANDLER_GENERIC(FrameMsg_CompositorFrameSwapped,
                                 OnCompositorFrameSwapped(msg))
+    IPC_MESSAGE_HANDLER(FrameMsg_SetChildFrameSurface, OnSetChildFrameSurface)
     IPC_MESSAGE_HANDLER(FrameMsg_DisownOpener, OnDisownOpener)
     IPC_MESSAGE_HANDLER(FrameMsg_DidStartLoading, OnDidStartLoading)
     IPC_MESSAGE_HANDLER(FrameMsg_DidStopLoading, OnDidStopLoading)
@@ -242,7 +247,7 @@ void RenderFrameProxy::OnCompositorFrameSwapped(const IPC::Message& message) {
     return;
 
   scoped_ptr<cc::CompositorFrame> frame(new cc::CompositorFrame);
-  get<0>(param).frame.AssignTo(frame.get());
+  base::get<0>(param).frame.AssignTo(frame.get());
 
   if (!compositing_helper_.get()) {
     compositing_helper_ =
@@ -251,10 +256,31 @@ void RenderFrameProxy::OnCompositorFrameSwapped(const IPC::Message& message) {
   }
   compositing_helper_->OnCompositorFrameSwapped(
       frame.Pass(),
-      get<0>(param).producing_route_id,
-      get<0>(param).output_surface_id,
-      get<0>(param).producing_host_id,
-      get<0>(param).shared_memory_handle);
+      base::get<0>(param).producing_route_id,
+      base::get<0>(param).output_surface_id,
+      base::get<0>(param).producing_host_id,
+      base::get<0>(param).shared_memory_handle);
+}
+
+void RenderFrameProxy::OnSetChildFrameSurface(
+    const cc::SurfaceId& surface_id,
+    const gfx::Size& frame_size,
+    float scale_factor,
+    const cc::SurfaceSequence& sequence) {
+  // If this WebFrame has already been detached, its parent will be null. This
+  // can happen when swapping a WebRemoteFrame with a WebLocalFrame, where this
+  // message may arrive after the frame was removed from the frame tree, but
+  // before the frame has been destroyed. http://crbug.com/446575.
+  if (!web_frame()->parent())
+    return;
+
+  if (!compositing_helper_.get()) {
+    compositing_helper_ =
+        ChildFrameCompositingHelper::CreateForRenderFrameProxy(this);
+    compositing_helper_->EnableCompositing(true);
+  }
+  compositing_helper_->OnSetSurface(surface_id, frame_size, scale_factor,
+                                    sequence);
 }
 
 void RenderFrameProxy::OnDisownOpener() {

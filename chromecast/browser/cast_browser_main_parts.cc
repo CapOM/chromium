@@ -20,6 +20,7 @@
 #include "cc/base/switches.h"
 #include "chromecast/base/cast_paths.h"
 #include "chromecast/base/cast_sys_info_util.h"
+#include "chromecast/base/chromecast_switches.h"
 #include "chromecast/base/metrics/cast_metrics_helper.h"
 #include "chromecast/base/metrics/grouped_histogram.h"
 #include "chromecast/browser/cast_browser_context.h"
@@ -30,7 +31,6 @@
 #include "chromecast/browser/pref_service_helper.h"
 #include "chromecast/browser/service/cast_service.h"
 #include "chromecast/browser/url_request_context_factory.h"
-#include "chromecast/common/chromecast_switches.h"
 #include "chromecast/common/platform_client_auth.h"
 #include "chromecast/media/base/key_systems_common.h"
 #include "chromecast/net/connectivity_checker.h"
@@ -42,6 +42,7 @@
 #include "media/audio/audio_manager.h"
 #include "media/audio/audio_manager_factory.h"
 #include "media/base/browser_cdm_factory.h"
+#include "ui/compositor/compositor_switches.h"
 
 #if defined(OS_ANDROID)
 #include "chromecast/browser/media/cast_media_client_android.h"
@@ -178,6 +179,7 @@ DefaultCommandLineSwitch g_default_switches[] = {
 #elif defined(ARCH_CPU_ARM_FAMILY) && !defined(DISABLE_DISPLAY)
   // On Linux arm, enable CMA pipeline by default.
   { switches::kEnableCmaMediaPipeline, "" },
+  { switches::kEnableHardwareOverlays, "" },
 #endif
 #endif  // defined(OS_LINUX)
   // Needed to fix a bug where the raster thread doesn't get scheduled for a

@@ -36,6 +36,7 @@
 #include "cc/surfaces/surface_id_allocator.h"
 #include "cc/surfaces/surface_manager.h"
 #include "cc/trees/layer_tree_host.h"
+#include "cc/trees/layer_tree_settings.h"
 #include "content/browser/android/child_process_launcher_android.h"
 #include "content/browser/gpu/browser_gpu_channel_host_factory.h"
 #include "content/browser/gpu/browser_gpu_memory_buffer_manager.h"
@@ -49,7 +50,9 @@
 #include "content/common/gpu/client/webgraphicscontext3d_command_buffer_impl.h"
 #include "content/common/gpu/gpu_process_launch_causes.h"
 #include "content/common/host_shared_bitmap_manager.h"
+#include "content/public/browser/android/compositor.h"
 #include "content/public/browser/android/compositor_client.h"
+#include "content/public/common/content_switches.h"
 #include "gpu/blink/webgraphicscontext3d_in_process_command_buffer_impl.h"
 #include "gpu/command_buffer/client/context_support.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
@@ -58,7 +61,7 @@
 #include "third_party/skia/include/core/SkMallocPixelRef.h"
 #include "ui/android/window_android.h"
 #include "ui/gfx/android/device_display_info.h"
-#include "ui/gfx/frame_time.h"
+#include "ui/gfx/swap_result.h"
 
 namespace content {
 
@@ -117,13 +120,14 @@ class OutputSurfaceWithoutParent : public cc::OutputSurface {
     return command_buffer_proxy;
   }
 
-  void OnSwapBuffersCompleted(
-      const std::vector<ui::LatencyInfo>& latency_info) {
+  void OnSwapBuffersCompleted(const std::vector<ui::LatencyInfo>& latency_info,
+                              gfx::SwapResult result) {
     RenderWidgetHostImpl::CompositorFrameDrawn(latency_info);
     OutputSurface::OnSwapBuffersComplete();
   }
 
-  base::CancelableCallback<void(const std::vector<ui::LatencyInfo>&)>
+  base::CancelableCallback<void(const std::vector<ui::LatencyInfo>&,
+                                gfx::SwapResult)>
       swap_buffers_completion_callback_;
 
   scoped_refptr<base::MessageLoopProxy> main_thread_;
@@ -164,6 +168,9 @@ class SingleThreadTaskGraphRunner
 base::LazyInstance<SingleThreadTaskGraphRunner> g_task_graph_runner =
     LAZY_INSTANCE_INITIALIZER;
 
+base::LazyInstance<cc::LayerSettings> g_layer_settings =
+    LAZY_INSTANCE_INITIALIZER;
+
 } // anonymous namespace
 
 // static
@@ -177,6 +184,16 @@ void Compositor::Initialize() {
   DCHECK(!CompositorImpl::IsInitialized());
   g_initialized = true;
   g_use_surface_manager = UseSurfacesEnabled();
+}
+
+// static
+const cc::LayerSettings& Compositor::LayerSettings() {
+  return g_layer_settings.Get();
+}
+
+// static
+void Compositor::SetLayerSettings(const cc::LayerSettings& settings) {
+  g_layer_settings.Get() = settings;
 }
 
 // static
@@ -198,7 +215,7 @@ scoped_ptr<cc::SurfaceIdAllocator> CompositorImpl::CreateSurfaceIdAllocator() {
 
 CompositorImpl::CompositorImpl(CompositorClient* client,
                                gfx::NativeWindow root_window)
-    : root_layer_(cc::Layer::Create()),
+    : root_layer_(cc::Layer::Create(Compositor::LayerSettings())),
       resource_manager_(&ui_resource_provider_),
       surface_id_allocator_(CreateSurfaceIdAllocator()),
       has_transparent_background_(false),
@@ -320,7 +337,7 @@ void CompositorImpl::Composite(CompositingTrigger trigger) {
   // we are about to draw.
   ignore_schedule_composite_ = true;
 
-  const base::TimeTicks frame_time = gfx::FrameTime::Now();
+  const base::TimeTicks frame_time = base::TimeTicks::Now();
   if (needs_animate_) {
     needs_animate_ = false;
     root_window_->Animate(frame_time);
@@ -412,6 +429,7 @@ void CompositorImpl::CreateLayerTreeHost() {
   settings.renderer_settings.allow_antialiasing = false;
   settings.renderer_settings.highp_threshold_min = 2048;
   settings.impl_side_painting = true;
+  settings.use_zero_copy = true;
 
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   settings.initial_debug_state.SetRecordRenderingStats(
@@ -420,6 +438,10 @@ void CompositorImpl::CreateLayerTreeHost() {
       command_line->HasSwitch(cc::switches::kUIShowFPSCounter);
   // TODO(enne): Update this this compositor to use the scheduler.
   settings.single_thread_proxy_scheduler = false;
+
+  if (command_line->HasSwitch(
+          switches::kEnableAndroidCompositorAnimationTimelines))
+    settings.use_compositor_animation_timelines = true;
 
   cc::LayerTreeHost::InitParams params;
   params.client = this;

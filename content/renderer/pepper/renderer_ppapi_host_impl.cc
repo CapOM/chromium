@@ -6,9 +6,11 @@
 
 #include "base/bind.h"
 #include "base/files/file_path.h"
+#include "base/location.h"
 #include "base/logging.h"
-#include "base/message_loop/message_loop.h"
 #include "base/process/process_handle.h"
+#include "base/single_thread_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/common/sandbox_util.h"
 #include "content/renderer/pepper/fullscreen_container.h"
 #include "content/renderer/pepper/host_globals.h"
@@ -229,6 +231,20 @@ IPC::PlatformFileForTransit RendererPpapiHostImpl::ShareHandleWithRemote(
   return dispatcher_->ShareHandleWithRemote(handle, should_close_source);
 }
 
+base::SharedMemoryHandle
+RendererPpapiHostImpl::ShareSharedMemoryHandleWithRemote(
+    const base::SharedMemoryHandle& handle) {
+  base::PlatformFile local_platform_file =
+#if defined(OS_POSIX)
+      handle.fd;
+#elif defined(OS_WIN)
+      handle;
+#else
+#error Not implemented.
+#endif
+  return ShareHandleWithRemote(local_platform_file, false);
+}
+
 bool RendererPpapiHostImpl::IsRunningInProcess() const {
   return is_running_in_process_;
 }
@@ -249,7 +265,7 @@ void RendererPpapiHostImpl::CreateBrowserResourceHosts(
   PepperBrowserConnection* browser_connection =
       PepperBrowserConnection::Get(render_frame);
   if (!browser_connection) {
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(callback, std::vector<int>(nested_msgs.size(), 0)));
   } else {

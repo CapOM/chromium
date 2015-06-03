@@ -9,12 +9,12 @@
 #include <string>
 #include <vector>
 
+#include "base/bind.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
 #include "content/public/common/content_client.h"
-#include "ipc/ipc_message.h"
 #include "third_party/WebKit/public/platform/WebPageVisibilityState.h"
 #include "third_party/WebKit/public/web/WebNavigationPolicy.h"
 #include "third_party/WebKit/public/web/WebNavigationType.h"
@@ -64,6 +64,7 @@ struct KeySystemInfo;
 namespace content {
 class BrowserPluginDelegate;
 class DocumentState;
+class MediaStreamRendererFactory;
 class RenderFrame;
 class RenderView;
 class SynchronousCompositor;
@@ -224,10 +225,6 @@ class CONTENT_EXPORT ContentRendererClient {
                           bool is_server_redirect,
                           bool* send_referrer);
 
-  // Returns true if this IPC message belongs to a guest container. Currently,
-  // BrowserPlugin is a guest container.
-  virtual bool ShouldForwardToGuestContainer(const IPC::Message& msg);
-
   // Notifies the embedder that the given frame is requesting the resource at
   // |url|.  If the function returns true, the url is changed to |new_url|.
   virtual bool WillSendRequest(blink::WebFrame* frame,
@@ -260,6 +257,10 @@ class CONTENT_EXPORT ContentRendererClient {
   virtual scoped_ptr<media::RendererFactory> CreateMediaRendererFactory(
       RenderFrame* render_frame,
       const scoped_refptr<media::MediaLog>& media_log);
+
+  // Allows an embedder to provide a MediaStreamRendererFactory.
+  virtual scoped_ptr<MediaStreamRendererFactory>
+  CreateMediaStreamRendererFactory();
 
   // Gives the embedder a chance to register the key system(s) it supports by
   // populating |key_systems|.

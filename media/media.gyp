@@ -35,11 +35,6 @@
         'use_alsa%': 0,
         'use_pulseaudio%': 0,
       }],
-      ['sysroot!=""', {
-        'pkg-config': '../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
-      }, {
-        'pkg-config': 'pkg-config'
-      }],
       # low memory buffer is used in non-Android based chromecast build due to hardware limitation.
       ['chromecast==1 and OS!="android"', {
         'use_low_memory_buffer%': 1,
@@ -404,14 +399,14 @@
         'base/video_util.h',
         'base/wall_clock_time_source.cc',
         'base/wall_clock_time_source.h',
+        'base/win/mf_initializer.cc',
+        'base/win/mf_initializer.h',
         'base/yuv_convert.cc',
         'base/yuv_convert.h',
         'blink/skcanvas_video_renderer.cc',
         'blink/skcanvas_video_renderer.h',
         'cdm/aes_decryptor.cc',
         'cdm/aes_decryptor.h',
-        'cdm/cenc_utils.cc',
-        'cdm/cenc_utils.h',
         'cdm/default_cdm_factory.cc',
         'cdm/default_cdm_factory.h',
         'cdm/json_web_key.cc',
@@ -981,6 +976,8 @@
         }],
         ['proprietary_codecs==1', {
           'sources': [
+            'cdm/cenc_utils.cc',
+            'cdm/cenc_utils.h',
             'filters/ffmpeg_aac_bitstream_converter.cc',
             'filters/ffmpeg_aac_bitstream_converter.h',
             'filters/ffmpeg_h264_to_annex_b_bitstream_converter.cc',
@@ -1168,7 +1165,6 @@
         'base/yuv_convert_unittest.cc',
         'blink/skcanvas_video_renderer_unittest.cc',
         'cdm/aes_decryptor_unittest.cc',
-        'cdm/cenc_utils_unittest.cc',
         'cdm/json_web_key_unittest.cc',
         'ffmpeg/ffmpeg_common_unittest.cc',
         'filters/audio_clock_unittest.cc',
@@ -1282,6 +1278,7 @@
         }],
         ['proprietary_codecs==1', {
           'sources': [
+            'cdm/cenc_utils_unittest.cc',
             'filters/ffmpeg_aac_bitstream_converter_unittest.cc',
             'filters/ffmpeg_h264_to_annex_b_bitstream_converter_unittest.cc',
             'filters/h264_to_annex_b_bitstream_converter_unittest.cc',
@@ -1963,6 +1960,13 @@
           ],
           'sources': [
             'audio_unittests.isolate',
+          ],
+          'conditions': [
+            ['use_x11==1', {
+              'dependencies': [
+                '../tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
+              ],
+            }],
           ],
         },
       ],

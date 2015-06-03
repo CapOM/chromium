@@ -205,9 +205,6 @@ std::string GetCurrentLocale(Profile* profile) {
 }  // namespace
 
 namespace hotword_internal {
-// Constants for the hotword field trial.
-const char kHotwordFieldTrialName[] = "VoiceTrigger";
-const char kHotwordFieldTrialDisabledGroupName[] = "Disabled";
 // String passed to indicate the training state has changed.
 const char kHotwordTrainingEnabled[] = "hotword_training_enabled";
 // Id of the hotword notification.
@@ -642,13 +639,6 @@ bool HotwordService::IsServiceAvailable() {
 }
 
 bool HotwordService::IsHotwordAllowed() {
-  std::string group = base::FieldTrialList::FindFullName(
-      hotword_internal::kHotwordFieldTrialName);
-  // Allow hotwording by default, and only disable if the field trial has been
-  // set.
-  if (group == hotword_internal::kHotwordFieldTrialDisabledGroupName)
-    return false;
-
   return DoesHotwordSupportLanguage(profile_);
 }
 
@@ -683,6 +673,12 @@ void HotwordService::SpeakerModelExistsComplete(bool exists) {
 
 void HotwordService::OptIntoHotwording(
     const LaunchMode& launch_mode) {
+  // If the notification is in the notification tray, remove it (since the user
+  // is manually opting in to hotwording, they do not need the promotion).
+  g_browser_process->notification_ui_manager()->CancelById(
+      hotword_internal::kHotwordNotificationId,
+      NotificationUIManager::GetProfileID(profile_));
+
   // First determine if we actually need to launch the app, or can just enable
   // the pref. If Audio History has already been enabled, and we already have
   // a speaker model, then we don't need to launch the app at all.

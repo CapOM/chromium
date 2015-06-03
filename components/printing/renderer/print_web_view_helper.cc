@@ -8,13 +8,15 @@
 
 #include "base/auto_reset.h"
 #include "base/json/json_writer.h"
+#include "base/location.h"
 #include "base/logging.h"
-#include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram.h"
 #include "base/process/process_handle.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "components/printing/common/print_messages.h"
 #include "content/public/common/web_preferences.h"
 #include "content/public/renderer/render_frame.h"
@@ -493,7 +495,8 @@ void PrintWebViewHelper::PrintHeaderAndFooter(
   blink::WebView* web_view = blink::WebView::create(NULL);
   web_view->settings()->setJavaScriptEnabled(true);
 
-  blink::WebLocalFrame* frame = blink::WebLocalFrame::create(NULL);
+  blink::WebLocalFrame* frame =
+      blink::WebLocalFrame::create(blink::WebTreeScopeType::Document, NULL);
   web_view->setMainFrame(frame);
 
   base::StringValue html(ResourceBundle::GetSharedInstance().GetLocalizedString(
@@ -588,6 +591,7 @@ class PrepareFrameAndViewForPrint : public blink::WebViewClient,
   // blink::WebFrameClient override:
   virtual blink::WebFrame* createChildFrame(
       blink::WebLocalFrame* parent,
+      blink::WebTreeScopeType scope,
       const blink::WebString& name,
       blink::WebSandboxFlags sandboxFlags);
   virtual void frameDetached(blink::WebFrame* frame);
@@ -707,7 +711,8 @@ void PrepareFrameAndViewForPrint::CopySelection(
   blink::WebView* web_view = blink::WebView::create(this);
   owns_web_view_ = true;
   content::RenderView::ApplyWebPreferences(prefs, web_view);
-  web_view->setMainFrame(blink::WebLocalFrame::create(this));
+  web_view->setMainFrame(
+      blink::WebLocalFrame::create(blink::WebTreeScopeType::Document, this));
   frame_.Reset(web_view->mainFrame()->toWebLocalFrame());
   node_to_print_.reset();
 
@@ -724,16 +729,17 @@ void PrepareFrameAndViewForPrint::didStopLoading() {
   DCHECK(!on_ready_.is_null());
   // Don't call callback here, because it can delete |this| and WebView that is
   // called didStopLoading.
-  base::MessageLoop::current()->PostTask(
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
       FROM_HERE, base::Bind(&PrepareFrameAndViewForPrint::CallOnReady,
                             weak_ptr_factory_.GetWeakPtr()));
 }
 
 blink::WebFrame* PrepareFrameAndViewForPrint::createChildFrame(
     blink::WebLocalFrame* parent,
+    blink::WebTreeScopeType scope,
     const blink::WebString& name,
     blink::WebSandboxFlags sandboxFlags) {
-  blink::WebFrame* frame = blink::WebLocalFrame::create(this);
+  blink::WebFrame* frame = blink::WebLocalFrame::create(scope, this);
   parent->appendChild(frame);
   return frame;
 }
@@ -1681,7 +1687,7 @@ void PrintWebViewHelper::RequestPrintPreview(PrintPreviewRequestType type) {
             base::Bind(&PrintWebViewHelper::ShowScriptedPrintPreview,
                        base::Unretained(this));
       } else {
-        base::MessageLoop::current()->PostTask(
+        base::ThreadTaskRunnerHandle::Get()->PostTask(
             FROM_HERE, base::Bind(&PrintWebViewHelper::ShowScriptedPrintPreview,
                                   weak_ptr_factory_.GetWeakPtr()));
       }

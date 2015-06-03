@@ -205,6 +205,9 @@ const char kDisableOneCopy[]                = "disable-one-copy";
 // Disable Pepper3D.
 const char kDisablePepper3d[]               = "disable-pepper-3d";
 
+// Disables the Permissions API.
+const char kDisablePermissionsAPI[]         = "disable-permissions-api";
+
 // Disables compositor-accelerated touch-screen pinch gestures.
 const char kDisablePinch[]                  = "disable-pinch";
 
@@ -223,6 +226,9 @@ const char kDisableRemoteFonts[]            = "disable-remote-fonts";
 // Turns off the accessibility in the renderer.
 const char kDisableRendererAccessibility[]  = "disable-renderer-accessibility";
 
+// Prevent renderer process backgrounding when set.
+const char kDisableRendererBackgrounding[]  = "disable-renderer-backgrounding";
+
 // Disable the seccomp filter sandbox (seccomp-bpf) (Linux only).
 const char kDisableSeccompFilterSandbox[]   = "disable-seccomp-filter-sandbox";
 
@@ -239,7 +245,7 @@ const char kDisableSmoothScrolling[]        = "disable-smooth-scrolling";
 const char kDisableSoftwareRasterizer[]     = "disable-software-rasterizer";
 
 // Disables the Web Speech API.
-const char kDisableSpeechAPI[]                 = "disable-speech-api";
+const char kDisableSpeechAPI[]              = "disable-speech-api";
 
 // Disables SVG 1.1 DOM.
 const char kDisableSVG1DOM[]                = "disable-svg1dom";
@@ -297,9 +303,6 @@ const char kEnableDistanceFieldText[]       = "enable-distance-field-text";
 // Enable the experimental Credential Manager JavaScript API.
 const char kEnableCredentialManagerAPI[]    = "enable-credential-manager-api";
 
-// Use a BeginFrame signal from browser to renderer to schedule rendering.
-const char kEnableBeginFrameScheduling[]    = "enable-begin-frame-scheduling";
-
 // Enable the creation of compositing layers when it would prevent LCD text.
 const char kEnablePreferCompositingToLCDText[] =
     "enable-prefer-compositing-to-lcd-text";
@@ -343,6 +346,9 @@ const char kEnableExperimentalCanvasFeatures[] =
 // Enables Web Platform features that are in development.
 const char kEnableExperimentalWebPlatformFeatures[] =
     "enable-experimental-web-platform-features";
+
+// Enable Web Bluetooth.
+const char kEnableWebBluetooth[] = "enable-web-bluetooth";
 
 // Enables TRACE for GL calls in the renderer.
 const char kEnableGpuClientTracing[]        = "enable-gpu-client-tracing";
@@ -401,10 +407,6 @@ const char kV8NativesPassedByFD[] = "v8-natives-passed-by-fd";
 // Signals that the V8 startup snapshot file has been transfered to the child
 // process by a file descriptor.
 const char kV8SnapshotPassedByFD[] = "v8-snapshot-passed-by-fd";
-
-// Enables the CSS multicol implementation that uses the regions implementation.
-const char kEnableRegionBasedColumns[] =
-    "enable-region-based-columns";
 
 // Cause the OS X sandbox write to syslog every time an access to a resource
 // is denied by the sandbox.
@@ -905,6 +907,9 @@ const char kDisableWebRtcEncryption[]      = "disable-webrtc-encryption";
 // Disables HW encode acceleration for WebRTC.
 const char kDisableWebRtcHWEncoding[]       = "disable-webrtc-hw-encoding";
 
+// Enables negotiation of DTLS 1.2 for WebRTC.
+const char kEnableWebRtcDtls12[]            = "enable-webrtc-dtls12";
+
 // Enables H264 HW encode acceleration for WebRTC.
 const char kEnableWebRtcHWH264Encoding[]    = "enable-webrtc-hw-h264-encoding";
 
@@ -935,6 +940,14 @@ const char kDisableScreenOrientationLock[]  = "disable-screen-orientation-lock";
 
 // WebRTC is enabled by default on Android.
 const char kDisableWebRTC[]                 = "disable-webrtc";
+
+// Enable external animation system for Android compositor.
+// See also kEnableCompositorAnimationTimelines for renderer compositors.
+const char kEnableAndroidCompositorAnimationTimelines[] =
+    "enable-android-compositor-animation-timelines";
+
+// Enable drag manipulation of longpress-triggered text selections.
+const char kEnableLongpressDragSelection[]  = "enable-longpress-drag-selection";
 
 // The telephony region (ISO country code) to use in phone number detection.
 const char kNetworkCountryIso[] = "network-country-iso";
@@ -1004,7 +1017,7 @@ const char kTraceExportEventsToETW[] = "trace-export-events-to-etw";
 #endif
 
 // Enables the use of NPAPI plugins.
-const char kEnableNpapi[]                   = "enable-npapi";
+const char kEnableNpapiForTesting[] = "enable-npapi-for-testing";
 
 // Don't dump stuff here, follow the same order as the header.
 

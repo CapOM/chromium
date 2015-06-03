@@ -107,9 +107,10 @@ void FetchManifest(blink::WebView* view, const GURL& url,
   // ownership and thus nulls the scoped_ptr. On MSVS this happens before
   // the call to Start, resulting in a crash.
   fetcher->Start(view->mainFrame(),
-    base::Bind(&FetchManifestDoneCallback,
-               base::Passed(&autodeleter),
-               callback));
+                 false,
+                 base::Bind(&FetchManifestDoneCallback,
+                            base::Passed(&autodeleter),
+                            callback));
 }
 
 void SetMockGamepadProvider(scoped_ptr<RendererGamepadProvider> provider) {
@@ -422,6 +423,12 @@ std::string DumpBackForwardList(std::vector<PageState>& page_state,
   }
   result.append("===============================================\n");
   return result;
+}
+
+scoped_refptr<cc::TextureLayer> CreateTextureLayerForMailbox(
+    cc::TextureLayerClient* client) {
+  return cc::TextureLayer::CreateForMailbox(
+      cc_blink::WebLayerImpl::LayerSettings(), client);
 }
 
 blink::WebLayer* InstantiateWebLayer(scoped_refptr<cc::TextureLayer> layer) {

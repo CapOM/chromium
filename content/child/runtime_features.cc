@@ -87,6 +87,9 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
   if (command_line.HasSwitch(switches::kEnableExperimentalWebPlatformFeatures))
     WebRuntimeFeatures::enableExperimentalFeatures(true);
 
+  if (command_line.HasSwitch(switches::kEnableWebBluetooth))
+    WebRuntimeFeatures::enableWebBluetooth(true);
+
   SetRuntimeFeatureDefaultsForPlatform();
 
   if (command_line.HasSwitch(switches::kDisableDatabases))
@@ -182,6 +185,9 @@ void SetRuntimeFeaturesDefaultsAndUpdateFromArgs(
 
   if (command_line.HasSwitch(switches::kEnablePushMessagePayload))
     WebRuntimeFeatures::enablePushMessagingData(true);
+
+  if (command_line.HasSwitch(switches::kDisablePermissionsAPI))
+    WebRuntimeFeatures::enablePermissionsAPI(false);
 
   // Delete "StaleWhileRevalidate" line from chrome_browser_field_trials.cc
   // when this experiment is done.

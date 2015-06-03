@@ -7,6 +7,8 @@
 
 #include "base/atomicops.h"
 #include "base/synchronization/lock.h"
+#include "components/scheduler/child/idle_helper.h"
+#include "components/scheduler/child/pollable_thread_safe_flag.h"
 #include "components/scheduler/child/scheduler_helper.h"
 #include "components/scheduler/renderer/deadline_task_runner.h"
 #include "components/scheduler/renderer/renderer_scheduler.h"
@@ -20,9 +22,8 @@ class ConvertableToTraceFormat;
 
 namespace scheduler {
 
-class SCHEDULER_EXPORT RendererSchedulerImpl
-    : public RendererScheduler,
-      public SchedulerHelper::SchedulerHelperDelegate {
+class SCHEDULER_EXPORT RendererSchedulerImpl : public RendererScheduler,
+                                               public IdleHelper::Delegate {
  public:
   RendererSchedulerImpl(
       scoped_refptr<NestableSingleThreadTaskRunner> main_task_runner);
@@ -61,11 +62,13 @@ class SCHEDULER_EXPORT RendererSchedulerImpl
 
   // Keep RendererSchedulerImpl::TaskQueueIdToString in sync with this enum.
   enum QueueId {
-    COMPOSITOR_TASK_QUEUE = SchedulerHelper::TASK_QUEUE_COUNT,
+    IDLE_TASK_QUEUE = SchedulerHelper::TASK_QUEUE_COUNT,
+    COMPOSITOR_TASK_QUEUE,
     LOADING_TASK_QUEUE,
     TIMER_TASK_QUEUE,
     // Must be the last entry.
     TASK_QUEUE_COUNT,
+    FIRST_QUEUE_ID = SchedulerHelper::FIRST_QUEUE_ID,
   };
 
   // Keep RendererSchedulerImpl::PolicyToString in sync with this enum.
@@ -73,6 +76,9 @@ class SCHEDULER_EXPORT RendererSchedulerImpl
     NORMAL,
     COMPOSITOR_PRIORITY,
     TOUCHSTART_PRIORITY,
+    // Must be the last entry.
+    POLICY_COUNT,
+    FIRST_POLICY = NORMAL,
   };
 
   // Keep RendererSchedulerImpl::InputStreamStateToString in sync with this
@@ -80,28 +86,13 @@ class SCHEDULER_EXPORT RendererSchedulerImpl
   enum class InputStreamState {
     INACTIVE,
     ACTIVE,
-    ACTIVE_AND_AWAITING_TOUCHSTART_RESPONSE
+    ACTIVE_AND_AWAITING_TOUCHSTART_RESPONSE,
+    // Must be the last entry.
+    INPUT_STREAM_STATE_COUNT,
+    FIRST_INPUT_STREAM_STATE = INACTIVE,
   };
 
-  class PollableNeedsUpdateFlag {
-   public:
-    PollableNeedsUpdateFlag(base::Lock* write_lock);
-    ~PollableNeedsUpdateFlag();
-
-    // Set the flag. May only be called if |write_lock| is held.
-    void SetWhileLocked(bool value);
-
-    // Returns true iff the flag is set to true.
-    bool IsSet() const;
-
-   private:
-    base::subtle::Atomic32 flag_;
-    base::Lock* write_lock_;  // Not owned.
-
-    DISALLOW_COPY_AND_ASSIGN(PollableNeedsUpdateFlag);
-  };
-
-  // SchedulerHelperDelegate implementation:
+  // IdleHelper::Delegate implementation:
   bool CanEnterLongIdlePeriod(
       base::TimeTicks now,
       base::TimeDelta* next_long_idle_period_delay_out) override;
@@ -110,6 +101,8 @@ class SCHEDULER_EXPORT RendererSchedulerImpl
   void EndIdlePeriod();
 
   // Returns the serialized scheduler state for tracing.
+  scoped_refptr<base::trace_event::ConvertableToTraceFormat> AsValue(
+      base::TimeTicks optional_now) const;
   scoped_refptr<base::trace_event::ConvertableToTraceFormat> AsValueLocked(
       base::TimeTicks optional_now) const;
   static const char* TaskQueueIdToString(QueueId queue_id);
@@ -177,6 +170,7 @@ class SCHEDULER_EXPORT RendererSchedulerImpl
   void DidProcessInputEvent(base::TimeTicks begin_frame_time);
 
   SchedulerHelper helper_;
+  IdleHelper idle_helper_;
 
   scoped_refptr<base::SingleThreadTaskRunner> control_task_runner_;
   scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner_;
@@ -191,17 +185,18 @@ class SCHEDULER_EXPORT RendererSchedulerImpl
   Policy current_policy_;
   base::TimeTicks current_policy_expiration_time_;
   bool renderer_hidden_;
+  bool was_shutdown_;
 
   base::TimeTicks estimated_next_frame_begin_;
 
   // The incoming_signals_lock_ mutex protects access to all variables in the
   // (contiguous) block below.
-  base::Lock incoming_signals_lock_;
+  mutable base::Lock incoming_signals_lock_;
   base::TimeTicks last_input_receipt_time_on_compositor_;
   base::TimeTicks last_input_process_time_on_main_;
   blink::WebInputEvent::Type last_input_type_;
   InputStreamState input_stream_state_;
-  PollableNeedsUpdateFlag policy_may_need_update_;
+  PollableThreadSafeFlag policy_may_need_update_;
   int timer_queue_suspend_count_;  // TIMER_TASK_QUEUE suspended if non-zero.
 
   base::WeakPtrFactory<RendererSchedulerImpl> weak_factory_;

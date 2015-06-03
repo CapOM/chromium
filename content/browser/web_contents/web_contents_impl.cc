@@ -315,6 +315,7 @@ WebContentsImpl::WebContentsImpl(BrowserContext* browser_context,
       has_accessed_initial_document_(false),
       theme_color_(SK_ColorTRANSPARENT),
       last_sent_theme_color_(SK_ColorTRANSPARENT),
+      did_first_visually_non_empty_paint_(false),
       capturer_count_(0),
       should_normally_be_visible_(true),
       is_being_destroyed_(false),
@@ -427,6 +428,9 @@ WebContentsImpl* WebContentsImpl::CreateWithOpener(
   WebContentsImpl* new_contents = new WebContentsImpl(
       params.browser_context, params.opener_suppressed ? NULL : opener);
 
+  if (params.created_with_opener)
+    new_contents->created_with_opener_ = true;
+
   if (params.guest_delegate) {
     // This makes |new_contents| act as a guest.
     // For more info, see comment above class BrowserPluginGuest.
@@ -463,6 +467,13 @@ std::vector<WebContentsImpl*> WebContentsImpl::GetAllWebContents() {
   return result;
 }
 
+// static
+WebContentsImpl* WebContentsImpl::FromFrameTreeNode(
+    FrameTreeNode* frame_tree_node) {
+  return static_cast<WebContentsImpl*>(
+      WebContents::FromRenderFrameHost(frame_tree_node->current_frame_host()));
+}
+
 RenderFrameHostManager* WebContentsImpl::GetRenderManagerForTesting() {
   return GetRenderManager();
 }
@@ -481,7 +492,7 @@ bool WebContentsImpl::OnMessageReceived(RenderViewHost* render_view_host,
     return true;
   }
 
-  ObserverListBase<WebContentsObserver>::Iterator it(&observers_);
+  base::ObserverListBase<WebContentsObserver>::Iterator it(&observers_);
   WebContentsObserver* observer;
   if (render_frame_host) {
     while ((observer = it.GetNext()) != NULL)
@@ -537,6 +548,10 @@ bool WebContentsImpl::OnMessageReceived(RenderViewHost* render_view_host,
     IPC_MESSAGE_HANDLER(ViewHostMsg_AppCacheAccessed, OnAppCacheAccessed)
     IPC_MESSAGE_HANDLER(ViewHostMsg_WebUISend, OnWebUISend)
 #if defined(ENABLE_PLUGINS)
+    IPC_MESSAGE_HANDLER(FrameHostMsg_PepperInstanceCreated,
+                        OnPepperInstanceCreated)
+    IPC_MESSAGE_HANDLER(FrameHostMsg_PepperInstanceDeleted,
+                        OnPepperInstanceDeleted)
     IPC_MESSAGE_HANDLER(FrameHostMsg_PepperPluginHung, OnPepperPluginHung)
     IPC_MESSAGE_HANDLER(FrameHostMsg_PluginCrashed, OnPluginCrashed)
     IPC_MESSAGE_HANDLER(ViewHostMsg_RequestPpapiBrokerPermission,
@@ -669,6 +684,13 @@ int WebContentsImpl::GetRoutingID() const {
     return MSG_ROUTING_NONE;
 
   return GetRenderViewHost()->GetRoutingID();
+}
+
+void WebContentsImpl::CancelActiveAndPendingDialogs() {
+  if (dialog_manager_)
+    dialog_manager_->CancelActiveAndPendingDialogs(this);
+  if (browser_plugin_embedder_)
+    browser_plugin_embedder_->CancelGuestDialogs();
 }
 
 int WebContentsImpl::GetFullscreenWidgetRoutingID() const {
@@ -1050,6 +1072,10 @@ void WebContentsImpl::NotifyNavigationStateChanged(
 
 base::TimeTicks WebContentsImpl::GetLastActiveTime() const {
   return last_active_time_;
+}
+
+void WebContentsImpl::SetLastActiveTime(base::TimeTicks last_active_time) {
+  last_active_time_ = last_active_time;
 }
 
 void WebContentsImpl::WasShown() {
@@ -1984,8 +2010,7 @@ void WebContentsImpl::AttachInterstitialPage(
 
   // Cancel any visible dialogs so that they don't interfere with the
   // interstitial.
-  if (dialog_manager_)
-    dialog_manager_->CancelActiveAndPendingDialogs(this);
+  CancelActiveAndPendingDialogs();
 
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     DidAttachInterstitialPage());
@@ -2711,6 +2736,8 @@ void WebContentsImpl::DidNavigateMainFramePostCommit(
     if (rwhvb)
       rwhvb->OnDidNavigateMainFrameToNewPage();
 
+    did_first_visually_non_empty_paint_ = false;
+
     // Reset theme color on navigation to new page.
     theme_color_ = SK_ColorTRANSPARENT;
   }
@@ -2741,8 +2768,8 @@ void WebContentsImpl::DidNavigateAnyFramePostCommit(
   has_accessed_initial_document_ = false;
 
   // If we navigate off the page, close all JavaScript dialogs.
-  if (dialog_manager_ && !details.is_in_page)
-    dialog_manager_->CancelActiveAndPendingDialogs(this);
+  if (!details.is_in_page)
+    CancelActiveAndPendingDialogs();
 
   // Notify observers about navigation.
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
@@ -2765,9 +2792,16 @@ bool WebContentsImpl::CanOverscrollContent() const {
 }
 
 void WebContentsImpl::OnThemeColorChanged(SkColor theme_color) {
-  // Update the theme color. This is to be published to observers on visually
-  // non empty paint.
+  // Update the theme color. This is to be published to observers after the
+  // first visually non-empty paint.
   theme_color_ = theme_color;
+
+  if (did_first_visually_non_empty_paint_ &&
+      last_sent_theme_color_ != theme_color_) {
+    FOR_EACH_OBSERVER(WebContentsObserver, observers_,
+                      DidChangeThemeColor(theme_color_));
+    last_sent_theme_color_ = theme_color_;
+  }
 }
 
 void WebContentsImpl::OnDidLoadResourceFromMemoryCache(
@@ -3000,6 +3034,14 @@ void WebContentsImpl::OnWebUISend(const GURL& source_url,
 }
 
 #if defined(ENABLE_PLUGINS)
+void WebContentsImpl::OnPepperInstanceCreated() {
+  FOR_EACH_OBSERVER(WebContentsObserver, observers_, PepperInstanceCreated());
+}
+
+void WebContentsImpl::OnPepperInstanceDeleted() {
+  FOR_EACH_OBSERVER(WebContentsObserver, observers_, PepperInstanceDeleted());
+}
+
 void WebContentsImpl::OnPepperPluginHung(int plugin_child_id,
                                          const base::FilePath& path,
                                          bool is_hung) {
@@ -3157,6 +3199,8 @@ void WebContentsImpl::OnMediaPausedNotification(int64 player_cookie) {
 void WebContentsImpl::OnFirstVisuallyNonEmptyPaint() {
   FOR_EACH_OBSERVER(WebContentsObserver, observers_,
                     DidFirstVisuallyNonEmptyPaint());
+
+  did_first_visually_non_empty_paint_ = true;
 
   if (theme_color_ != last_sent_theme_color_) {
     // Theme color should have updated by now if there was one.
@@ -3593,8 +3637,7 @@ void WebContentsImpl::RenderViewTerminated(RenderViewHost* rvh,
     ExitFullscreenMode();
 
   // Cancel any visible dialogs so they are not left dangling over the sad tab.
-  if (dialog_manager_)
-    dialog_manager_->CancelActiveAndPendingDialogs(this);
+  CancelActiveAndPendingDialogs();
 
   if (delegate_)
     delegate_->HideValidationMessage(this);
@@ -4043,6 +4086,10 @@ void WebContentsImpl::CancelModalDialogsForRenderManager() {
   // deferrer would prevent us from swapping out. We also clear the state
   // because this is a cross-process navigation, which means that it's a new
   // site that should not have to pay for the sins of its predecessor.
+  //
+  // Note that we don't bother telling browser_plugin_embedder_ because the
+  // cross-process navigation will either destroy the browser plugins or not
+  // require their dialogs to close.
   if (dialog_manager_)
     dialog_manager_->ResetDialogState(this);
 }

@@ -637,9 +637,11 @@ class PipelineIntegrationTestHost : public mojo::test::ApplicationTestBase,
 
  protected:
   scoped_ptr<Renderer> CreateRenderer() override {
+    mojo::URLRequestPtr request(mojo::URLRequest::New());
+    request->url = mojo::String::From("mojo:media");
     mojo::ServiceProvider* service_provider =
         application_impl()
-            ->ConnectToApplication("mojo://media")
+            ->ConnectToApplication(request.Pass())
             ->GetServiceProvider();
 
     mojo::MediaRendererPtr mojo_media_renderer;
@@ -1656,7 +1658,8 @@ TEST_F(PipelineIntegrationTest, BT709_VP9_WebM) {
   ASSERT_EQ(PIPELINE_OK, Start("bear-vp9-bt709.webm"));
   Play();
   ASSERT_TRUE(WaitUntilOnEnded());
-  EXPECT_VIDEO_FORMAT_EQ(last_video_frame_format_, VideoFrame::YV12HD);
+  EXPECT_VIDEO_FORMAT_EQ(last_video_frame_format_, VideoFrame::YV12);
+  EXPECT_EQ(last_video_frame_color_space_, VideoFrame::COLOR_SPACE_HD_REC709);
 }
 
 // Verify that videos with an odd frame size playback successfully.

@@ -66,6 +66,8 @@
         'serial/serial_service_unittest.cc',
         'test/run_all_unittests.cc',
         'test/usb_test_gadget_impl.cc',
+        'usb/device_impl_unittest.cc',
+        'usb/device_manager_impl_unittest.cc',
         'usb/usb_context_unittest.cc',
         'usb/usb_device_filter_unittest.cc',
         'usb/usb_device_handle_unittest.cc',
@@ -94,7 +96,6 @@
             'hid/hid.gyp:device_hid',
           ],
           'dependencies': [
-            'bluetooth/bluetooth.gyp:device_bluetooth_java',
             '../testing/android/native_test.gyp:native_test_native_code',
           ],
           'sources/': [

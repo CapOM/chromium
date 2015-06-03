@@ -14,6 +14,7 @@
 #include "components/autofill/core/common/autofill_switches.h"
 #include "components/autofill/core/common/form_data.h"
 #include "components/autofill/core/common/form_field_data.h"
+#include "components/autofill/core/common/password_form_field_prediction_map.h"
 #include "content/public/renderer/render_frame.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/WebKit/public/platform/WebString.h"
@@ -389,12 +390,13 @@ class PasswordAutofillAgentTest : public ChromeRenderViewTest {
         render_thread_->sink().GetFirstMessageMatching(
             AutofillHostMsg_ShowPasswordSuggestions::ID);
     EXPECT_TRUE(message);
-    Tuple<int, base::i18n::TextDirection, base::string16, int, gfx::RectF>
+    base::Tuple<int, base::i18n::TextDirection, base::string16, int, gfx::RectF>
         args;
     AutofillHostMsg_ShowPasswordSuggestions::Read(message, &args);
-    EXPECT_EQ(kPasswordFillFormDataId, get<0>(args));
-    EXPECT_EQ(ASCIIToUTF16(username), get<2>(args));
-    EXPECT_EQ(show_all, static_cast<bool>(get<3>(args) & autofill::SHOW_ALL));
+    EXPECT_EQ(kPasswordFillFormDataId, base::get<0>(args));
+    EXPECT_EQ(ASCIIToUTF16(username), base::get<2>(args));
+    EXPECT_EQ(show_all,
+              static_cast<bool>(base::get<3>(args) & autofill::SHOW_ALL));
 
     render_thread_->sink().ClearMessages();
   }
@@ -407,12 +409,12 @@ class PasswordAutofillAgentTest : public ChromeRenderViewTest {
         render_thread_->sink().GetFirstMessageMatching(
             AutofillHostMsg_PasswordFormSubmitted::ID);
     ASSERT_TRUE(message);
-    Tuple<autofill::PasswordForm> args;
+    base::Tuple<autofill::PasswordForm> args;
     AutofillHostMsg_PasswordFormSubmitted::Read(message, &args);
-    EXPECT_EQ(ASCIIToUTF16(username_value), get<0>(args).username_value);
-    EXPECT_EQ(ASCIIToUTF16(password_value), get<0>(args).password_value);
+    EXPECT_EQ(ASCIIToUTF16(username_value), base::get<0>(args).username_value);
+    EXPECT_EQ(ASCIIToUTF16(password_value), base::get<0>(args).password_value);
     EXPECT_EQ(ASCIIToUTF16(new_password_value),
-              get<0>(args).new_password_value);
+              base::get<0>(args).new_password_value);
   }
 
   base::string16 username1_;
@@ -447,7 +449,7 @@ TEST_F(PasswordAutofillAgentTest, InitialAutocomplete) {
       AutofillHostMsg_PasswordFormsParsed::ID);
   ASSERT_TRUE(msg != NULL);
 
-  Tuple1<std::vector<PasswordForm> > forms;
+  base::Tuple1<std::vector<PasswordForm> > forms;
   AutofillHostMsg_PasswordFormsParsed::Read(msg, &forms);
   ASSERT_EQ(1U, forms.a.size());
   PasswordForm password_form = forms.a[0];
@@ -774,9 +776,9 @@ TEST_F(PasswordAutofillAgentTest, SendPasswordFormsTest) {
   const IPC::Message* message = render_thread_->sink()
       .GetFirstMessageMatching(AutofillHostMsg_PasswordFormsRendered::ID);
   EXPECT_TRUE(message);
-  Tuple<std::vector<autofill::PasswordForm>, bool> param;
+  base::Tuple<std::vector<autofill::PasswordForm>, bool> param;
   AutofillHostMsg_PasswordFormsRendered::Read(message, &param);
-  EXPECT_TRUE(get<0>(param).size());
+  EXPECT_TRUE(base::get<0>(param).size());
 
   render_thread_->sink().ClearMessages();
   LoadHTML(kEmptyFormHTML);
@@ -784,7 +786,7 @@ TEST_F(PasswordAutofillAgentTest, SendPasswordFormsTest) {
       AutofillHostMsg_PasswordFormsRendered::ID);
   EXPECT_TRUE(message);
   AutofillHostMsg_PasswordFormsRendered::Read(message, &param);
-  EXPECT_FALSE(get<0>(param).size());
+  EXPECT_FALSE(base::get<0>(param).size());
 
   render_thread_->sink().ClearMessages();
   LoadHTML(kNonVisibleFormHTML);
@@ -792,7 +794,7 @@ TEST_F(PasswordAutofillAgentTest, SendPasswordFormsTest) {
       AutofillHostMsg_PasswordFormsRendered::ID);
   EXPECT_TRUE(message);
   AutofillHostMsg_PasswordFormsRendered::Read(message, &param);
-  EXPECT_FALSE(get<0>(param).size());
+  EXPECT_FALSE(base::get<0>(param).size());
 }
 
 TEST_F(PasswordAutofillAgentTest, SendPasswordFormsTest_Redirection) {
@@ -815,72 +817,6 @@ TEST_F(PasswordAutofillAgentTest, SendPasswordFormsTest_Redirection) {
   LoadHTML(kWebpageWithDynamicContent);
   EXPECT_TRUE(render_thread_->sink().GetFirstMessageMatching(
       AutofillHostMsg_PasswordFormsRendered::ID));
-}
-
-// Tests that a password form in an iframe will not be filled in until a user
-// interaction with the form.
-TEST_F(PasswordAutofillAgentTest, IframeNoFillTest) {
-  const char kIframeName[] = "iframe";
-  const char kWebpageWithIframeStart[] =
-      "<html>"
-      "   <head>"
-      "       <meta charset='utf-8' />"
-      "       <title>Title</title>"
-      "   </head>"
-      "   <body>"
-      "       <iframe name='iframe' src=\"";
-  const char kWebpageWithIframeEnd[] =
-      "\"></iframe>"
-      "   </body>"
-      "</html>";
-
-  std::string origin("data:text/html;charset=utf-8,");
-  origin += kSimpleWebpage;
-
-  std::string page_html(kWebpageWithIframeStart);
-  page_html += origin;
-  page_html += kWebpageWithIframeEnd;
-
-  LoadHTML(page_html.c_str());
-
-  // Set the expected form origin and action URLs.
-  fill_data_.origin = GURL(origin);
-  fill_data_.action = GURL(origin);
-
-  // Retrieve the input elements from the iframe since that is where we want to
-  // test the autofill.
-  WebFrame* iframe = GetMainFrame()->findChildByName(kIframeName);
-  ASSERT_TRUE(iframe);
-
-  SimulateOnFillPasswordFormForFrame(iframe, fill_data_);
-
-  WebDocument document = iframe->document();
-
-  WebElement username_element = document.getElementById(kUsernameName);
-  WebElement password_element = document.getElementById(kPasswordName);
-  ASSERT_FALSE(username_element.isNull());
-  ASSERT_FALSE(password_element.isNull());
-
-  WebInputElement username_input = username_element.to<WebInputElement>();
-  WebInputElement password_input = password_element.to<WebInputElement>();
-  ASSERT_FALSE(username_element.isNull());
-
-  CheckTextFieldsStateForElements(
-      username_input, "", false, password_input, "", false, false);
-
-  // Simulate the user typing in the username in the iframe which should cause
-  // an autofill.
-  content::RenderFrame::FromWebFrame(iframe)
-      ->OnMessageReceived(AutofillMsg_FirstUserGestureObservedInTab(0));
-  SimulateUserInputChangeForElement(&username_input, kAliceUsername);
-
-  CheckTextFieldsStateForElements(username_input,
-                                  kAliceUsername,
-                                  true,
-                                  password_input,
-                                  kAlicePassword,
-                                  true,
-                                  false);
 }
 
 // Tests that a password will only be filled as a suggested and will not be
@@ -1817,9 +1753,9 @@ TEST_F(PasswordAutofillAgentTest, FindingUsernameWithoutAutofillPredictions) {
   ExpectFormSubmittedWithUsernameAndPasswords("temp@google.com", "random", "");
 }
 
-// Tests that username predictions are followed when identifying the username
-// in a password form with two plain text fields.
-TEST_F(PasswordAutofillAgentTest, FindingUsernameWithAutofillPredictions) {
+// Tests that field predictions are followed when identifying the username
+// and password in a password form with two plain text fields.
+TEST_F(PasswordAutofillAgentTest, FindingFieldsWithAutofillPredictions) {
   LoadHTML(kFormHTMLWithTwoTextFields);
   UpdateUsernameAndPasswordElements();
   blink::WebInputElement email_element = GetInputElementByID(kEmailName);
@@ -1832,15 +1768,17 @@ TEST_F(PasswordAutofillAgentTest, FindingUsernameWithAutofillPredictions) {
   ASSERT_TRUE(WebFormElementToFormData(form_element,
                                        blink::WebFormControlElement(),
                                        EXTRACT_NONE, &form_data, nullptr));
-  // Simulate Autofill predictions: the first field is username.
-  std::map<autofill::FormData, autofill::FormFieldData> predictions;
-  predictions[form_data] = form_data.fields[0];
-  AutofillMsg_AutofillUsernameDataReceived msg(0, predictions);
+  // Simulate Autofill predictions: the first field is username, the third
+  // one is password.
+  std::map<autofill::FormData, PasswordFormFieldPredictionMap> predictions;
+  predictions[form_data][PREDICTION_USERNAME] = form_data.fields[0];
+  predictions[form_data][PREDICTION_NEW_PASSWORD] = form_data.fields[2];
+  AutofillMsg_AutofillUsernameAndPasswordDataReceived msg(0, predictions);
   static_cast<content::RenderFrameObserver*>(password_autofill_agent_)
       ->OnMessageReceived(msg);
 
-  // The prediction should still match even if the form changes, as long
-  // as the particular element doesn't change.
+  // The predictions should still match even if the form changes, as long
+  // as the particular elements don't change.
   std::string add_field_to_form =
       "var form = document.getElementById('LoginTestForm');"
       "var new_input = document.createElement('input');"
@@ -1856,6 +1794,26 @@ TEST_F(PasswordAutofillAgentTest, FindingUsernameWithAutofillPredictions) {
 
   // Observe that the PasswordAutofillAgent identifies the first field as
   // username.
+  // TODO(msramek): We should also test that adding another password field
+  // won't override the password field prediction either. However, the password
+  // field predictions are not taken into account yet.
+  ExpectFormSubmittedWithUsernameAndPasswords("temp", "random", "");
+}
+
+// The user types in a username and a password. Then JavaScript changes password
+// field to readonly state before submit. PasswordAutofillAgent can correctly
+// process readonly password field. This test models behaviour of gmail.com.
+TEST_F(PasswordAutofillAgentTest, ReadonlyPasswordFieldOnSubmit) {
+  SimulateUsernameChange("temp");
+  SimulatePasswordChange("random");
+
+  // Simulate that JavaScript makes password field readonly.
+  SetElementReadOnly(password_element_, true);
+  static_cast<content::RenderFrameObserver*>(password_autofill_agent_)
+      ->WillSubmitForm(username_element_.form());
+
+  // Observe that the PasswordAutofillAgent can correctly process submitted
+  // form.
   ExpectFormSubmittedWithUsernameAndPasswords("temp", "random", "");
 }
 

@@ -227,6 +227,7 @@ RenderViewHostImpl::RenderViewHostImpl(
   DCHECK(instance_.get());
   CHECK(delegate_);  // http://crbug.com/82827
 
+  GetProcess()->AddObserver(this);
   GetProcess()->EnableSendQueue();
 
   if (ResourceDispatcherHostImpl::Get()) {
@@ -261,6 +262,7 @@ RenderViewHostImpl::~RenderViewHostImpl() {
   }
 
   delegate_->RenderViewDeleted(this);
+  GetProcess()->RemoveObserver(this);
 }
 
 RenderViewHostDelegate* RenderViewHostImpl::GetDelegate() const {
@@ -434,13 +436,8 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
   prefs.text_blobs_enabled = command_line.HasSwitch(switches::kForceTextBlobs)
       || (content::IsImplSidePaintingEnabled() &&
           !command_line.HasSwitch(switches::kDisableTextBlobs));
-  prefs.region_based_columns_enabled =
-      command_line.HasSwitch(switches::kEnableRegionBasedColumns);
 
-  if (IsPinchVirtualViewportEnabled()) {
-    prefs.pinch_virtual_viewport_enabled = true;
-    prefs.pinch_overlay_scrollbar_thickness = 10;
-  }
+  prefs.pinch_overlay_scrollbar_thickness = 10;
   prefs.use_solid_color_scrollbars = ui::IsOverlayScrollbarEnabled();
 
 #if defined(OS_ANDROID)
@@ -584,6 +581,17 @@ void RenderViewHostImpl::RequestFindMatchRects(int current_version) {
   Send(new ViewMsg_FindMatchRects(GetRoutingID(), current_version));
 }
 #endif
+
+void RenderViewHostImpl::RenderProcessExited(RenderProcessHost* host,
+                                             base::TerminationStatus status,
+                                             int exit_code) {
+  if (!renderer_initialized())
+    return;
+
+  RenderWidgetHostImpl::RendererExited(status, exit_code);
+  delegate_->RenderViewTerminated(
+      this, static_cast<base::TerminationStatus>(status), exit_code);
+}
 
 void RenderViewHostImpl::DragTargetDragEnter(
     const DropData& drop_data,

@@ -43,7 +43,7 @@ public class SyncTestBase extends ChromeShellTestBase {
     @Override
     protected void setUp() throws Exception {
         super.setUp();
-        clearAppData();
+        assertTrue("Clearing app data failed.", clearAppData());
         Context targetContext = getInstrumentation().getTargetContext();
         mContext = new SyncTestUtil.SyncTestContext(targetContext);
 
@@ -71,6 +71,13 @@ public class SyncTestBase extends ChromeShellTestBase {
                 mProfileSyncService = ProfileSyncService.get(mContext);
             }
         });
+
+        // Start the activity by opening about:blank. This URL is ideal because it is not synced as
+        // a typed URL. If another URL is used, it could interfere with test data. This call is in
+        // this location so that it takes place before any other calls to getActivity(). If
+        // getActivity() is called without any prior configuration, an undesired URL
+        // (e.g., google.com) will be opened.
+        launchChromeShellWithBlankPage();
     }
 
     @Override
@@ -115,8 +122,7 @@ public class SyncTestBase extends ChromeShellTestBase {
         AndroidSyncSettings.overrideForTests(mContext, mSyncContentResolver);
     }
 
-    protected void setupTestAccountAndSignInToSync(
-            final String syncClientIdentifier)
+    protected Account setupTestAccount(final String syncClientIdentifier)
             throws InterruptedException {
         Account defaultTestAccount = SyncTestUtil.setupTestAccountThatAcceptsAllAuthTokens(
                 mAccountManager, SyncTestUtil.DEFAULT_TEST_ACCOUNT, SyncTestUtil.DEFAULT_PASSWORD);
@@ -131,6 +137,13 @@ public class SyncTestBase extends ChromeShellTestBase {
                 }, true);
 
         SyncTestUtil.verifySyncIsSignedOut(getActivity());
+        return defaultTestAccount;
+    }
+
+    protected void setupTestAccountAndSignInToSync(
+            final String syncClientIdentifier)
+            throws InterruptedException {
+        Account defaultTestAccount = setupTestAccount(syncClientIdentifier);
         signIn(defaultTestAccount);
         SyncTestUtil.verifySyncIsSignedIn(mContext, defaultTestAccount);
         assertTrue("Sync everything should be enabled",

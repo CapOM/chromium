@@ -54,28 +54,16 @@ void BrowserCdmCast::UnregisterPlayer(int registration_id) {
   player_tracker_impl_->UnregisterPlayer(registration_id);
 }
 
-void BrowserCdmCast::LoadSession(
-    ::media::MediaKeys::SessionType session_type,
-    const std::string& session_id,
-    scoped_ptr<::media::NewSessionCdmPromise> promise) {
-  NOTREACHED() << "LoadSession not supported";
-  legacy_session_error_cb_.Run(
-      session_id, ::media::MediaKeys::Exception::NOT_SUPPORTED_ERROR, 0,
-      std::string());
-}
-
 ::media::CdmContext* BrowserCdmCast::GetCdmContext() {
   NOTREACHED();
   return nullptr;
 }
 
-void BrowserCdmCast::OnSessionMessage(const std::string& session_id,
-                                      const std::vector<uint8_t>& message,
-                                      const GURL& destination_url) {
-  // Note: Message type is not supported in Chromecast. Do our best guess here.
-  ::media::MediaKeys::MessageType message_type =
-      destination_url.is_empty() ? ::media::MediaKeys::LICENSE_REQUEST
-                                 : ::media::MediaKeys::LICENSE_RENEWAL;
+void BrowserCdmCast::OnSessionMessage(
+    const std::string& session_id,
+    const std::vector<uint8_t>& message,
+    const GURL& destination_url,
+    ::media::MediaKeys::MessageType message_type) {
   session_message_cb_.Run(session_id,
                           message_type,
                           message,

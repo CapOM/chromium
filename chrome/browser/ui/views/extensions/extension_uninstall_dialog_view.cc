@@ -47,8 +47,8 @@ class ExtensionUninstallDialogViews
   void DialogDelegateDestroyed() { view_ = NULL; }
 
   // Forwards the accept and cancels to the delegate.
-  void ExtensionUninstallAccepted(bool handle_report_abuse);
-  void ExtensionUninstallCanceled();
+  void DialogAccepted(bool handle_report_abuse);
+  void DialogCanceled();
 
  private:
   void Show() override;
@@ -70,7 +70,7 @@ class ExtensionUninstallDialogDelegateView : public views::DialogDelegateView {
   ExtensionUninstallDialogDelegateView(
       ExtensionUninstallDialogViews* dialog_view,
       bool triggered_by_extension,
-      gfx::ImageSkia* image);
+      const gfx::ImageSkia* image);
   ~ExtensionUninstallDialogDelegateView() override;
 
   // Called when the ExtensionUninstallDialog has been destroyed to make sure
@@ -130,40 +130,34 @@ ExtensionUninstallDialogViews::~ExtensionUninstallDialogViews() {
 
 void ExtensionUninstallDialogViews::Show() {
   if (parent_ && parent_window_tracker_->WasNativeWindowClosed()) {
-    delegate_->ExtensionUninstallCanceled();
+    OnDialogClosed(CLOSE_ACTION_CANCELED);
     return;
   }
 
   view_ = new ExtensionUninstallDialogDelegateView(
-      this, triggering_extension_.get() != nullptr, &icon_);
+      this, triggering_extension() != nullptr, &icon());
   constrained_window::CreateBrowserModalDialogViews(view_, parent_)->Show();
 }
 
-void ExtensionUninstallDialogViews::ExtensionUninstallAccepted(
-    bool report_abuse_checked) {
+void ExtensionUninstallDialogViews::DialogAccepted(bool report_abuse_checked) {
   // The widget gets destroyed when the dialog is accepted.
   view_->DialogDestroyed();
   view_ = nullptr;
-  if (report_abuse_checked)
-    HandleReportAbuse();
   OnDialogClosed(report_abuse_checked ?
       CLOSE_ACTION_UNINSTALL_AND_REPORT_ABUSE : CLOSE_ACTION_UNINSTALL);
-
-  delegate_->ExtensionUninstallAccepted();
 }
 
-void ExtensionUninstallDialogViews::ExtensionUninstallCanceled() {
+void ExtensionUninstallDialogViews::DialogCanceled() {
   // The widget gets destroyed when the dialog is canceled.
   view_->DialogDestroyed();
   view_ = nullptr;
   OnDialogClosed(CLOSE_ACTION_CANCELED);
-  delegate_->ExtensionUninstallCanceled();
 }
 
 ExtensionUninstallDialogDelegateView::ExtensionUninstallDialogDelegateView(
     ExtensionUninstallDialogViews* dialog_view,
     bool triggered_by_extension,
-    gfx::ImageSkia* image)
+    const gfx::ImageSkia* image)
     : dialog_(dialog_view),
       triggered_by_extension_(triggered_by_extension),
       report_abuse_checkbox_(nullptr) {
@@ -179,17 +173,17 @@ ExtensionUninstallDialogDelegateView::ExtensionUninstallDialogDelegateView(
   heading_ = new views::Label(base::UTF8ToUTF16(dialog_->GetHeadingText()));
   heading_->SetMultiLine(true);
   heading_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  heading_->SetAllowCharacterBreak(true);
   AddChildView(heading_);
 }
 
 ExtensionUninstallDialogDelegateView::~ExtensionUninstallDialogDelegateView() {
   // If we're here, 2 things could have happened. Either the user closed the
-  // dialog nicely and one of ExtensionUninstallAccepted or
-  // ExtensionUninstallCanceled has been called (in which case dialog_ will be
-  // NULL), *or* neither of them have been called and we are being forced closed
-  // by our parent widget. In this case, we need to make sure to notify dialog_
-  // not to call us again, since we're about to be freed by the Widget
-  // framework.
+  // dialog nicely and one of the installed/canceled methods has been called
+  // (in which case dialog_ will be null), *or* neither of them have been
+  // called and we are being forced closed by our parent widget. In this case,
+  // we need to make sure to notify dialog_ not to call us again, since we're
+  // about to be freed by the Widget framework.
   if (dialog_)
     dialog_->DialogDelegateDestroyed();
 }
@@ -217,15 +211,15 @@ base::string16 ExtensionUninstallDialogDelegateView::GetDialogButtonLabel(
 
 bool ExtensionUninstallDialogDelegateView::Accept() {
   if (dialog_) {
-    dialog_->ExtensionUninstallAccepted(
-        report_abuse_checkbox_ && report_abuse_checkbox_->checked());
+    dialog_->DialogAccepted(report_abuse_checkbox_ &&
+                            report_abuse_checkbox_->checked());
   }
   return true;
 }
 
 bool ExtensionUninstallDialogDelegateView::Cancel() {
   if (dialog_)
-    dialog_->ExtensionUninstallCanceled();
+    dialog_->DialogCanceled();
   return true;
 }
 

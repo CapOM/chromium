@@ -60,12 +60,6 @@ void ProxyMediaKeys::CreateSessionAndGenerateRequest(
     media::EmeInitDataType init_data_type,
     const std::vector<uint8_t>& init_data,
     scoped_ptr<media::NewSessionCdmPromise> promise) {
-  if (session_type != media::MediaKeys::TEMPORARY_SESSION) {
-    promise->reject(NOT_SUPPORTED_ERROR, 0,
-                    "Only the temporary session type is supported.");
-    return;
-  }
-
   // TODO(xhwang): Move these checks up to blink and DCHECK here.
   // See http://crbug.com/342510
   CdmHostMsg_CreateSession_InitDataType create_session_init_data_type =
@@ -87,17 +81,16 @@ void ProxyMediaKeys::CreateSessionAndGenerateRequest(
 
   uint32_t promise_id = cdm_promise_adapter_.SavePromise(promise.Pass());
   manager_->CreateSessionAndGenerateRequest(
-      cdm_id_, promise_id, create_session_init_data_type, init_data);
+      cdm_id_, promise_id, session_type, create_session_init_data_type,
+      init_data);
 }
 
 void ProxyMediaKeys::LoadSession(
     SessionType session_type,
     const std::string& session_id,
     scoped_ptr<media::NewSessionCdmPromise> promise) {
-  // TODO(xhwang): Check key system and platform support for LoadSession in
-  // blink and add NOTREACHED() here. See http://crbug.com/384152
-  DLOG(ERROR) << "ProxyMediaKeys doesn't support session loading.";
-  promise->reject(NOT_SUPPORTED_ERROR, 0, "LoadSession() is not supported.");
+  uint32_t promise_id = cdm_promise_adapter_.SavePromise(promise.Pass());
+  manager_->LoadSession(cdm_id_, promise_id, session_type, session_id);
 }
 
 void ProxyMediaKeys::UpdateSession(
@@ -117,9 +110,8 @@ void ProxyMediaKeys::CloseSession(const std::string& session_id,
 void ProxyMediaKeys::RemoveSession(
     const std::string& session_id,
     scoped_ptr<media::SimpleCdmPromise> promise) {
-  // TODO(xhwang): Check key system and platform support for LoadSession in
-  // blink and add NOTREACHED() here. See http://crbug.com/384152
-  promise->reject(NOT_SUPPORTED_ERROR, 0, "RemoveSession() not supported.");
+  uint32_t promise_id = cdm_promise_adapter_.SavePromise(promise.Pass());
+  manager_->RemoveSession(cdm_id_, promise_id, session_id);
 }
 
 media::CdmContext* ProxyMediaKeys::GetCdmContext() {

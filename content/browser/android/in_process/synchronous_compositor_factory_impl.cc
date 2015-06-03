@@ -6,10 +6,12 @@
 
 #include "base/command_line.h"
 #include "base/observer_list.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/browser/android/in_process/context_provider_in_process.h"
 #include "content/browser/android/in_process/synchronous_compositor_external_begin_frame_source.h"
 #include "content/browser/android/in_process/synchronous_compositor_impl.h"
 #include "content/browser/android/in_process/synchronous_compositor_output_surface.h"
+#include "content/browser/gpu/browser_gpu_memory_buffer_manager.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/renderer/gpu/frame_swap_message_queue.h"
 #include "gpu/blink/webgraphicscontext3d_in_process_command_buffer_impl.h"
@@ -54,18 +56,10 @@ ContextHolder CreateContextHolder(
   in_process_attribs.lose_context_when_out_of_memory = true;
 
   scoped_ptr<gpu::GLInProcessContext> context(gpu::GLInProcessContext::Create(
-      service,
-      NULL /* surface */,
-      is_offscreen,
-      gfx::kNullAcceleratedWidget,
-      gfx::Size(1, 1),
-      NULL /* share_context */,
-      attributes.shareResources,
-      in_process_attribs,
-      gfx::PreferDiscreteGpu,
-      mem_limits,
-      nullptr,
-      nullptr));
+      service, NULL /* surface */, is_offscreen, gfx::kNullAcceleratedWidget,
+      gfx::Size(1, 1), NULL /* share_context */, attributes.shareResources,
+      in_process_attribs, gfx::PreferDiscreteGpu, mem_limits,
+      BrowserGpuMemoryBufferManager::current(), nullptr));
 
   gpu::GLInProcessContext* context_ptr = context.get();
 
@@ -135,8 +129,8 @@ SynchronousCompositorFactoryImpl::SynchronousCompositorFactoryImpl()
 
 SynchronousCompositorFactoryImpl::~SynchronousCompositorFactoryImpl() {}
 
-scoped_refptr<base::MessageLoopProxy>
-SynchronousCompositorFactoryImpl::GetCompositorMessageLoop() {
+scoped_refptr<base::SingleThreadTaskRunner>
+SynchronousCompositorFactoryImpl::GetCompositorTaskRunner() {
   return BrowserThread::GetMessageLoopProxyForThread(BrowserThread::UI);
 }
 
@@ -216,8 +210,8 @@ SynchronousCompositorFactoryImpl::CreateOffscreenGraphicsContext3D(
 void SynchronousCompositorFactoryImpl::CompositorInitializedHardwareDraw() {
   base::AutoLock lock(num_hardware_compositor_lock_);
   num_hardware_compositors_++;
-  if (num_hardware_compositors_ == 1 && main_thread_proxy_.get()) {
-    main_thread_proxy_->PostTask(
+  if (num_hardware_compositors_ == 1 && main_thread_task_runner_.get()) {
+    main_thread_task_runner_->PostTask(
         FROM_HERE,
         base::Bind(
             &SynchronousCompositorFactoryImpl::RestoreContextOnMainThread,
@@ -245,7 +239,7 @@ scoped_refptr<StreamTextureFactorySynchronousImpl::ContextProvider>
 SynchronousCompositorFactoryImpl::TryCreateStreamTextureFactory() {
   {
     base::AutoLock lock(num_hardware_compositor_lock_);
-    main_thread_proxy_ = base::MessageLoopProxy::current();
+    main_thread_task_runner_ = base::ThreadTaskRunnerHandle::Get();
   }
 
   // Always fail creation even if |video_context_provider_| is not NULL.

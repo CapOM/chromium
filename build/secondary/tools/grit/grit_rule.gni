@@ -313,7 +313,11 @@ template("grit") {
   } else {
     resource_ids = grit_resource_id_file
   }
-  grit_inputs += [ resource_ids ]  # Script depends on ID file.
+  if (resource_ids != "") {
+    # The script depends on the ID file. Only add this dependency if the ID
+    # file is specified.
+    grit_inputs += [ resource_ids ]
+  }
 
   if (defined(invoker.output_dir)) {
     output_dir = invoker.output_dir
@@ -445,9 +449,11 @@ template("grit") {
     # depend on us.
     sources = grit_outputs
 
-    # Deps set on the template invocation will go on the grit script running
-    # target rather than this library.
-    deps = [
+    # Deps set on the template invocation will go on the action that runs
+    # grit above rather than this library. This target needs to depend on the
+    # action publicly so other scripts can take the outputs from the grit
+    # script as inputs.
+    public_deps = [
       ":$grit_custom_target",
     ]
     public_configs = [ ":$grit_config" ]

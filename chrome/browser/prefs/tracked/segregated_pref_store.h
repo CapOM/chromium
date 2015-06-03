@@ -68,6 +68,7 @@ class SegregatedPrefStore : public PersistentPrefStore {
   PrefReadError ReadPrefs() override;
   void ReadPrefsAsync(ReadErrorDelegate* error_delegate) override;
   void CommitPendingWrite() override;
+  void SchedulePendingLossyWrites() override;
 
  private:
   // Aggregates events from the underlying stores and synthesizes external
@@ -100,7 +101,7 @@ class SegregatedPrefStore : public PersistentPrefStore {
   std::set<std::string> selected_preference_names_;
 
   scoped_ptr<PersistentPrefStore::ReadErrorDelegate> read_error_delegate_;
-  ObserverList<PrefStore::Observer, true> observers_;
+  base::ObserverList<PrefStore::Observer, true> observers_;
   AggregatingObserver aggregating_observer_;
 
   DISALLOW_COPY_AND_ASSIGN(SegregatedPrefStore);

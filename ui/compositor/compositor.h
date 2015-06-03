@@ -25,6 +25,7 @@
 #include "ui/compositor/layer_animator_collection.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/geometry/vector2d.h"
+#include "ui/gfx/gpu_memory_buffer.h"
 #include "ui/gfx/native_widget_types.h"
 
 namespace base {
@@ -95,7 +96,8 @@ class COMPOSITOR_EXPORT ContextFactory {
   virtual bool DoesCreateTestContexts() = 0;
 
   // Returns the OpenGL target to use for image textures.
-  virtual uint32 GetImageTextureTarget() = 0;
+  virtual uint32 GetImageTextureTarget(gfx::GpuMemoryBuffer::Format format,
+                                       gfx::GpuMemoryBuffer::Usage usage) = 0;
 
   // Gets the shared bitmap manager for software mode.
   virtual cc::SharedBitmapManager* GetSharedBitmapManager() = 0;
@@ -220,6 +222,14 @@ class COMPOSITOR_EXPORT Compositor
   // Gets the visibility of the underlying compositor.
   bool IsVisible();
 
+  // The "authoritative" vsync interval, if provided, will override interval
+  // reported from 3D context. This is typically the value reported by a more
+  // reliable source, e.g, the platform display configuration.
+  // In the particular case of ChromeOS -- this is the value queried through
+  // XRandR, which is more reliable than the value queried through the 3D
+  // context.
+  void SetAuthoritativeVSyncInterval(const base::TimeDelta& interval);
+
   // Returns the widget for this compositor.
   gfx::AcceleratedWidget widget() const { return widget_; }
 
@@ -277,9 +287,6 @@ class COMPOSITOR_EXPORT Compositor
   void ApplyViewportDeltas(const gfx::Vector2dF& inner_delta,
                            const gfx::Vector2dF& outer_delta,
                            const gfx::Vector2dF& elastic_overscroll_delta,
-                           float page_scale,
-                           float top_controls_delta) override {}
-  void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
                            float page_scale,
                            float top_controls_delta) override {}
   void RequestNewOutputSurface() override;

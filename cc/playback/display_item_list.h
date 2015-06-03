@@ -11,28 +11,37 @@
 #include "base/trace_event/trace_event.h"
 #include "cc/base/cc_export.h"
 #include "cc/base/scoped_ptr_vector.h"
+#include "cc/base/sidecar_list_container.h"
 #include "cc/playback/display_item.h"
 #include "cc/playback/pixel_ref_map.h"
-// TODO(danakj): Move ListContainer out of cc/quads/
-#include "cc/quads/list_container.h"
 #include "skia/ext/refptr.h"
 #include "third_party/skia/include/core/SkPicture.h"
 #include "ui/gfx/geometry/rect.h"
 
 class SkCanvas;
-class SkDrawPictureCallback;
 class SkPictureRecorder;
 
 namespace cc {
 
+class DisplayItemListSettings;
+
 class CC_EXPORT DisplayItemList
     : public base::RefCountedThreadSafe<DisplayItemList> {
  public:
+  static scoped_refptr<DisplayItemList> CreateWithoutCachedPicture(
+      const DisplayItemListSettings& settings);
+
+  // Creates a display item list with the given cull rect (if picture caching
+  // is used). The resulting display list will not support sidecar data.
   static scoped_refptr<DisplayItemList> Create(gfx::Rect layer_rect,
                                                bool use_cached_picture);
 
+  static scoped_refptr<DisplayItemList> Create(
+      gfx::Rect layer_rect,
+      const DisplayItemListSettings& settings);
+
   void Raster(SkCanvas* canvas,
-              SkDrawPictureCallback* callback,
+              SkPicture::AbortCallback* callback,
               float contents_scale) const;
 
   template <typename DisplayItemType>
@@ -44,8 +53,9 @@ class CC_EXPORT DisplayItemList
     return items_.AllocateAndConstruct<DisplayItemType>();
   }
 
-  void ProcessAppendedItems();
-  void CreateAndCacheSkPicture();
+  // Called after all items are appended, to process the items and, if
+  // applicable, create an internally cached SkPicture.
+  void Finalize();
 
   bool IsSuitableForGpuRasterization() const;
   int ApproximateOpCount() const;
@@ -57,16 +67,21 @@ class CC_EXPORT DisplayItemList
 
   void GatherPixelRefs(const gfx::Size& grid_cell_size);
 
+  // Finds the sidecar for a display item in this list.
+  void* GetSidecar(DisplayItem* display_item);
+
  private:
   DisplayItemList(gfx::Rect layer_rect,
-                  bool use_cached_picture,
+                  const DisplayItemListSettings& display_list_settings,
                   bool retain_individual_display_items);
-  DisplayItemList(gfx::Rect layer_rect, bool use_cached_picture);
+  DisplayItemList(gfx::Rect layer_rect,
+                  const DisplayItemListSettings& display_list_settings);
   ~DisplayItemList();
 
   // While appending new items, if they are not being retained, this can process
   // periodically to avoid retaining all the items and processing at the end.
   void ProcessAppendedItemsOnTheFly();
+  void ProcessAppendedItems();
 #if DCHECK_IS_ON()
   bool ProcessAppendedItemsCalled() const { return !needs_process_; }
   bool needs_process_;
@@ -74,7 +89,7 @@ class CC_EXPORT DisplayItemList
   bool ProcessAppendedItemsCalled() const { return true; }
 #endif
 
-  ListContainer<DisplayItem> items_;
+  SidecarListContainer<DisplayItem> items_;
   skia::RefPtr<SkPicture> picture_;
 
   scoped_ptr<SkPictureRecorder> recorder_;

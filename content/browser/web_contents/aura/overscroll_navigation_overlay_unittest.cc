@@ -23,7 +23,6 @@
 #include "ui/events/gesture_detection/gesture_configuration.h"
 #include "ui/events/test/event_generator.h"
 #include "ui/gfx/codec/png_codec.h"
-#include "ui/gfx/frame_time.h"
 
 namespace content {
 
@@ -40,15 +39,22 @@ class OverscrollTestWebContents : public TestWebContents {
     OverscrollTestWebContents* web_contents = new OverscrollTestWebContents(
         browser_context, fake_native_view.Pass(), fake_contents_window.Pass());
     web_contents->Init(WebContents::CreateParams(browser_context, instance));
-    web_contents->RenderFrameCreated(web_contents->GetMainFrame());
     return web_contents;
   }
+
+  void ResetNativeView() { fake_native_view_.reset(); }
+
+  void ResetContentNativeView() { fake_contents_window_.reset(); }
+
+  void set_is_being_destroyed(bool val) { is_being_destroyed_ = val; }
 
   gfx::NativeView GetNativeView() override { return fake_native_view_.get(); }
 
   gfx::NativeView GetContentNativeView() override {
     return fake_contents_window_.get();
   }
+
+  bool IsBeingDestroyed() const override { return is_being_destroyed_; }
 
  protected:
   explicit OverscrollTestWebContents(
@@ -57,11 +63,13 @@ class OverscrollTestWebContents : public TestWebContents {
       scoped_ptr<aura::Window> fake_contents_window)
       : TestWebContents(browser_context),
         fake_native_view_(fake_native_view.Pass()),
-        fake_contents_window_(fake_contents_window.Pass()) {}
+        fake_contents_window_(fake_contents_window.Pass()),
+        is_being_destroyed_(false) {}
 
  private:
   scoped_ptr<aura::Window> fake_native_view_;
   scoped_ptr<aura::Window> fake_contents_window_;
+  bool is_being_destroyed_;
 };
 
 class OverscrollNavigationOverlayTest : public RenderViewHostImplTestHarness {
@@ -98,19 +106,21 @@ class OverscrollNavigationOverlayTest : public RenderViewHostImplTestHarness {
     // offset -1  on layer_delegate_.
     scoped_ptr<aura::Window> window(
         GetOverlay()->CreateBackWindow(GetBackSlideWindowBounds()));
+    bool window_created = window;
     // Performs BACK navigation, sets image from layer_delegate_ on
     // image_delegate_.
     GetOverlay()->OnOverscrollCompleting();
-    main_test_rfh()->PrepareForCommit();
-    if (window) {
-      EXPECT_TRUE(contents()->CrossProcessNavigationPending());
+    if (window_created)
       EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::BACK);
-    } else {
-      EXPECT_FALSE(contents()->CrossProcessNavigationPending());
+    else
       EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::NONE);
-    }
     window->SetBounds(gfx::Rect(root_window()->bounds().size()));
     GetOverlay()->OnOverscrollCompleted(window.Pass());
+    main_test_rfh()->PrepareForCommit();
+    if (window_created)
+      EXPECT_TRUE(contents()->CrossProcessNavigationPending());
+    else
+      EXPECT_FALSE(contents()->CrossProcessNavigationPending());
   }
 
   gfx::Rect GetFrontSlideWindowBounds() {
@@ -298,6 +308,21 @@ TEST_F(OverscrollNavigationOverlayTest, Navigation_LoadingUpdate) {
       0, pending->GetUniqueID(), false, pending->GetURL());
   EXPECT_EQ(contents()->GetURL(), third());
 }
+
+TEST_F(OverscrollNavigationOverlayTest, CloseDuringAnimation) {
+  ui::ScopedAnimationDurationScaleMode normal_duration_(
+      ui::ScopedAnimationDurationScaleMode::NORMAL_DURATION);
+  GetOverlay()->owa_->OnOverscrollModeChange(OVERSCROLL_NONE, OVERSCROLL_EAST);
+  GetOverlay()->owa_->OnOverscrollComplete(OVERSCROLL_EAST);
+  EXPECT_EQ(GetOverlay()->direction_, OverscrollNavigationOverlay::BACK);
+  OverscrollTestWebContents* test_web_contents =
+      static_cast<OverscrollTestWebContents*>(web_contents());
+  test_web_contents->set_is_being_destroyed(true);
+  test_web_contents->ResetContentNativeView();
+  test_web_contents->ResetNativeView();
+  // Ensure a clean close.
+}
+
 
 // Tests that swapping the overlay window at the end of a gesture caused by the
 // start of a new overscroll does not crash and the events still reach the new

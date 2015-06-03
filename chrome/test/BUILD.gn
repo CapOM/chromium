@@ -101,7 +101,6 @@ source_set("test_support") {
     "//components/history/core/test:test",
     "//components/metrics:test_support",
     "//components/omnibox:test_support",
-    "//components/ownership",
     "//components/password_manager/core/browser:test_support",
     "//components/pref_registry:test_support",
     "//components/rappor:test_support",
@@ -136,7 +135,7 @@ source_set("test_support") {
       "//content/public/utility",
       "//components/autofill/core/browser:test_support",
       "//components/captive_portal:test_support",
-      "//components/guest_view:test_support",
+      "//components/guest_view/browser:test_support",
       "//components/infobars/core",
       "//components/sessions:test_support",
       "//components/user_manager:test_support",
@@ -172,6 +171,9 @@ source_set("test_support") {
       ]
     }
   }
+  if (is_chromeos) {
+    deps += [ "//components/ownership" ]
+  }
 
   if (enable_plugins) {
     sources += [
@@ -194,26 +196,6 @@ source_set("test_support") {
       "//extensions:test_support",
     ]
   }
-}
-
-source_set("test_support_unit") {
-  testonly = true
-  sources = [
-    "../browser/sync/glue/session_sync_test_helper.cc",
-    "../browser/sync/glue/session_sync_test_helper.h",
-    "base/run_all_unittests.cc",
-  ]
-
-  deps = [
-    ":test_support",
-    "//base",
-    "//chrome:resources",
-    "//chrome:strings",
-    "//chrome/browser",
-    "//chrome/common",
-    "//mojo/environment:chromium",
-    "//third_party/mojo/src/mojo/edk/system",
-  ]
 }
 
 if (!is_android) {
@@ -299,6 +281,9 @@ if (!is_android) {
           "../../ui/views/widget/desktop_aura/desktop_window_tree_host_x11_interactive_uitest.cc",
           "../../ui/views/widget/desktop_aura/x11_topmost_window_finder_interactive_uitest.cc",
         ]
+      }
+      if (use_aura) {
+        deps += [ "//ui/touch_selection" ]
       }
     }
 
@@ -505,7 +490,9 @@ if (!is_android) {
     }
   }
 
-  template("js2webui") {
+  template("js2gtest") {
+    assert(defined(invoker.test_type) &&
+           (invoker.test_type == "webui" || invoker.test_type == "unit"))
     action_name = target_name + "_action"
     source_set_name = target_name
 
@@ -531,14 +518,14 @@ if (!is_android) {
 
       outputs = [
         "$target_gen_dir/{{source_name_part}}-gen.cc",
-        "$root_out_dir/test_data/chrome/{{source_root_relative_dir}}/{{source_file_part}}",
+        "$root_out_dir/test_data/{{source_root_relative_dir}}/{{source_file_part}}",
       ]
 
       args = [
         # Need "./" for script to find binary (cur dir is not on path).
         "./" + rebase_path(d8_path, root_build_dir),
       ]
-      args += rebase_path(input_js, root_build_dir) + [ "webui" ]
+      args += rebase_path(input_js, root_build_dir) + [ invoker.test_type ]
       if (v8_use_external_startup_data) {
         args += [ "--external=y" ]
       } else {
@@ -555,13 +542,25 @@ if (!is_android) {
       ]
     }
 
+    if (defined(invoker.extra_js_files)) {
+      copy_target_name = target_name + "_copy"
+      copy(copy_target_name) {
+        visibility = [ ":$source_set_name" ]
+        sources = invoker.extra_js_files
+        outputs = [
+          "$root_out_dir/test_data/{{source_root_relative_dir}}/{{source_file_part}}",
+        ]
+      }
+    }
     source_set(source_set_name) {
       testonly = true
       if (defined(invoker.visibility)) {
         visibility = invoker.visibility
       }
       sources = get_target_outputs(":$action_name")
-      defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
+      if (defined(invoker.defines)) {
+        defines = invoker.defines
+      }
       deps = [
         ":$action_name",
 
@@ -573,10 +572,14 @@ if (!is_android) {
       if (defined(invoker.deps)) {
         deps += invoker.deps
       }
+      if (defined(invoker.extra_js_files)) {
+        data_deps = [ ":$copy_target_name" ]
+      }
     }
   }
 
-  js2webui("browser_tests_js_webui") {
+  js2gtest("browser_tests_js_webui") {
+    test_type = "webui"
     sources = rebase_path(
             chrome_tests_gypi_values.chrome_browser_tests_webui_js_sources,
             ".",
@@ -599,6 +602,7 @@ if (!is_android) {
       "//chrome/browser/ui",
       "//skia",
     ]
+    defines = [ "HAS_OUT_OF_PROC_TEST_RUNNER" ]
   }
 
   test("browser_tests") {
@@ -636,7 +640,7 @@ if (!is_android) {
       "//components/captive_portal:test_support",
       "//components/dom_distiller/content",
       "//components/dom_distiller/core:test_support",
-      "//components/guest_view:test_support",
+      "//components/guest_view/browser:test_support",
       "//components/resources",
       "//components/strings",
       "//components/translate/core/common",
@@ -1196,6 +1200,26 @@ if (!is_android) {
                                  "scope",
                                  [ "../chrome_tests_unit.gypi" ])
 
+  js2gtest("unit_tests_js") {
+    test_type = "unit"
+    sources = rebase_path(unit_gypi_values.chrome_unit_tests_gtestjs_sources,
+                          ".",
+                          "//chrome")
+    extra_js_files = rebase_path(unit_gypi_values.chrome_unit_tests_js_sources,
+                                 ".",
+                                 "//chrome")
+    if (is_chromeos) {
+      sources += rebase_path(
+              unit_gypi_values.chrome_unit_tests_chromeos_gtestjs_sources,
+              ".",
+              "//chrome")
+      extra_js_files +=
+          rebase_path(unit_gypi_values.chrome_unit_tests_chromeos_js_sources,
+                      ".",
+                      "//chrome")
+    }
+  }
+
   test("unit_tests") {
     sources =
         rebase_path(unit_gypi_values.chrome_unit_tests_sources, ".", "//chrome")
@@ -1250,6 +1274,7 @@ if (!is_android) {
 
     if (!is_ios) {
       deps += [
+        ":unit_tests_js",
         "//components/audio_modem:audio_modem_test_support",
         "//components/autofill/content/browser:test_support",
         "//components/metrics/proto",
@@ -1635,6 +1660,9 @@ if (!is_android) {
         "urlmon.lib",
         "winmm.lib",
       ]
+      if (!is_chrome_branded) {
+        sources -= [ "../browser/google/google_update_win_unittest.cc" ]
+      }
     }
     if (is_android || is_ios) {
       sources -= [
@@ -1772,5 +1800,32 @@ if (!is_android) {
         deps += [ "//third_party/cld_2:cld2_platform_impl" ]
       }
     }
+  }
+}
+
+source_set("test_support_unit") {
+  testonly = true
+  sources = [
+    "../browser/sync/glue/session_sync_test_helper.cc",
+    "../browser/sync/glue/session_sync_test_helper.h",
+    "base/run_all_unittests.cc",
+  ]
+
+  deps = [
+    ":test_support",
+    "//base",
+    "//chrome:resources",
+    "//chrome:strings",
+    "//chrome/browser",
+    "//chrome/common",
+    "//mojo/environment:chromium",
+    "//third_party/mojo/src/mojo/edk/system",
+  ]
+
+  if (!is_android && use_ash) {
+    sources +=
+        rebase_path(unit_gypi_values.chrome_test_support_unit_ash_sources,
+                    ".",
+                    "//chrome")
   }
 }

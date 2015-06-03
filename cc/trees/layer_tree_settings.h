@@ -15,6 +15,14 @@
 
 namespace cc {
 
+class CC_EXPORT LayerSettings {
+ public:
+  LayerSettings();
+  ~LayerSettings();
+
+  bool use_compositor_animation_timelines;
+};
+
 class CC_EXPORT LayerTreeSettings {
  public:
   LayerTreeSettings();
@@ -23,7 +31,6 @@ class CC_EXPORT LayerTreeSettings {
   RendererSettings renderer_settings;
   bool impl_side_painting;
   bool raster_enabled;
-  bool throttle_frame_production;
   bool single_thread_proxy_scheduler;
   bool use_external_begin_frame_source;
   bool main_frame_before_activation_enabled;
@@ -64,7 +71,6 @@ class CC_EXPORT LayerTreeSettings {
   gfx::Size max_untiled_layer_size;
   gfx::Size default_tile_grid_size;
   gfx::Size minimum_occlusion_tracking_size;
-  bool use_pinch_virtual_viewport;
   float tiling_interest_area_viewport_multiplier;
   float skewport_target_time_in_seconds;
   int skewport_extrapolation_limit_in_content_pixels;
@@ -73,6 +79,7 @@ class CC_EXPORT LayerTreeSettings {
   bool strict_layer_property_change_checking;
   bool use_one_copy;
   bool use_zero_copy;
+  bool use_persistent_map_for_gpu_memory_buffers;
   bool enable_elastic_overscroll;
   unsigned use_image_texture_target;
   bool ignore_root_layer_flings;
@@ -80,10 +87,10 @@ class CC_EXPORT LayerTreeSettings {
   bool use_occlusion_for_tile_prioritization;
   bool record_full_layer;
   bool use_display_lists;
-  bool use_cached_picture_in_display_list;
   bool verify_property_trees;
   bool gather_pixel_refs;
   bool use_compositor_animation_timelines;
+  size_t max_bytes_per_copy_operation;
 
   LayerTreeDebugState initial_debug_state;
 

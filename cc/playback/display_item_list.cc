@@ -12,9 +12,9 @@
 #include "cc/debug/picture_debug_util.h"
 #include "cc/debug/traced_picture.h"
 #include "cc/debug/traced_value.h"
+#include "cc/playback/display_item_list_settings.h"
 #include "cc/playback/largest_display_item.h"
 #include "third_party/skia/include/core/SkCanvas.h"
-#include "third_party/skia/include/core/SkDrawPictureCallback.h"
 #include "third_party/skia/include/core/SkPictureRecorder.h"
 #include "third_party/skia/include/utils/SkPictureUtils.h"
 #include "ui/gfx/skia_util.h"
@@ -37,10 +37,13 @@ const int kDefaultNumDisplayItemsToReserve = 100;
 }  // namespace
 
 DisplayItemList::DisplayItemList(gfx::Rect layer_rect,
-                                 bool use_cached_picture,
+                                 const DisplayItemListSettings& settings,
                                  bool retain_individual_display_items)
-    : items_(LargestDisplayItemSize(), kDefaultNumDisplayItemsToReserve),
-      use_cached_picture_(use_cached_picture),
+    : items_(LargestDisplayItemSize(),
+             settings.max_sidecar_size,
+             kDefaultNumDisplayItemsToReserve,
+             settings.sidecar_destroyer),
+      use_cached_picture_(settings.use_cached_picture),
       retain_individual_display_items_(retain_individual_display_items),
       layer_rect_(layer_rect),
       is_suitable_for_gpu_rasterization_(true),
@@ -59,24 +62,38 @@ DisplayItemList::DisplayItemList(gfx::Rect layer_rect,
   }
 }
 
-DisplayItemList::DisplayItemList(gfx::Rect layer_rect, bool use_cached_picture)
+DisplayItemList::DisplayItemList(gfx::Rect layer_rect,
+                                 const DisplayItemListSettings& settings)
     : DisplayItemList(layer_rect,
-                      use_cached_picture,
-                      !use_cached_picture || PictureTracingEnabled()) {
+                      settings,
+                      !settings.use_cached_picture || PictureTracingEnabled()) {
+}
+
+scoped_refptr<DisplayItemList> DisplayItemList::CreateWithoutCachedPicture(
+    const DisplayItemListSettings& settings) {
+  DCHECK(!settings.use_cached_picture);
+  return Create(gfx::Rect(), settings);
 }
 
 scoped_refptr<DisplayItemList> DisplayItemList::Create(
     gfx::Rect layer_rect,
     bool use_cached_picture) {
-  return make_scoped_refptr(
-      new DisplayItemList(layer_rect, use_cached_picture));
+  DisplayItemListSettings settings;
+  settings.use_cached_picture = use_cached_picture;
+  return Create(layer_rect, settings);
+}
+
+scoped_refptr<DisplayItemList> DisplayItemList::Create(
+    gfx::Rect layer_rect,
+    const DisplayItemListSettings& settings) {
+  return make_scoped_refptr(new DisplayItemList(layer_rect, settings));
 }
 
 DisplayItemList::~DisplayItemList() {
 }
 
 void DisplayItemList::Raster(SkCanvas* canvas,
-                             SkDrawPictureCallback* callback,
+                             SkPicture::AbortCallback* callback,
                              float contents_scale) const {
   DCHECK(ProcessAppendedItemsCalled());
   if (!use_cached_picture_) {
@@ -121,7 +138,7 @@ void DisplayItemList::ProcessAppendedItems() {
 #if DCHECK_IS_ON()
   needs_process_ = false;
 #endif
-  for (DisplayItem* item : items_) {
+  for (const DisplayItem* item : items_) {
     is_suitable_for_gpu_rasterization_ &=
         item->is_suitable_for_gpu_rasterization();
     approximate_op_count_ += item->approximate_op_count();
@@ -142,16 +159,20 @@ void DisplayItemList::ProcessAppendedItems() {
     items_.clear();
 }
 
-void DisplayItemList::CreateAndCacheSkPicture() {
-  DCHECK(ProcessAppendedItemsCalled());
-  // Convert to an SkPicture for faster rasterization.
-  DCHECK(use_cached_picture_);
-  DCHECK(!picture_);
-  picture_ = skia::AdoptRef(recorder_->endRecordingAsPicture());
-  DCHECK(picture_);
-  picture_memory_usage_ += SkPictureUtils::ApproximateBytesUsed(picture_.get());
-  recorder_.reset();
-  canvas_.clear();
+void DisplayItemList::Finalize() {
+  ProcessAppendedItems();
+
+  if (use_cached_picture_) {
+    // Convert to an SkPicture for faster rasterization.
+    DCHECK(use_cached_picture_);
+    DCHECK(!picture_);
+    picture_ = skia::AdoptRef(recorder_->endRecordingAsPicture());
+    DCHECK(picture_);
+    picture_memory_usage_ +=
+        SkPictureUtils::ApproximateBytesUsed(picture_.get());
+    recorder_.reset();
+    canvas_.clear();
+  }
 }
 
 bool DisplayItemList::IsSuitableForGpuRasterization() const {
@@ -191,18 +212,20 @@ DisplayItemList::AsValue() const {
   state->EndArray();
   state->SetValue("params.layer_rect", MathUtil::AsValue(layer_rect_));
 
-  SkPictureRecorder recorder;
-  SkCanvas* canvas =
-      recorder.beginRecording(layer_rect_.width(), layer_rect_.height());
-  canvas->translate(-layer_rect_.x(), -layer_rect_.y());
-  canvas->clipRect(gfx::RectToSkRect(layer_rect_));
-  Raster(canvas, NULL, 1.f);
-  skia::RefPtr<SkPicture> picture =
-      skia::AdoptRef(recorder.endRecordingAsPicture());
+  if (!layer_rect_.IsEmpty()) {
+    SkPictureRecorder recorder;
+    SkCanvas* canvas =
+        recorder.beginRecording(layer_rect_.width(), layer_rect_.height());
+    canvas->translate(-layer_rect_.x(), -layer_rect_.y());
+    canvas->clipRect(gfx::RectToSkRect(layer_rect_));
+    Raster(canvas, NULL, 1.f);
+    skia::RefPtr<SkPicture> picture =
+        skia::AdoptRef(recorder.endRecordingAsPicture());
 
-  std::string b64_picture;
-  PictureDebugUtil::SerializeAsBase64(picture.get(), &b64_picture);
-  state->SetString("skp64", b64_picture);
+    std::string b64_picture;
+    PictureDebugUtil::SerializeAsBase64(picture.get(), &b64_picture);
+    state->SetString("skp64", b64_picture);
+  }
 
   return state;
 }
@@ -226,4 +249,9 @@ void DisplayItemList::GatherPixelRefs(const gfx::Size& grid_cell_size) {
 
   pixel_refs_->GatherPixelRefsFromPicture(picture_.get());
 }
+
+void* DisplayItemList::GetSidecar(DisplayItem* display_item) {
+  return items_.GetSidecar(display_item);
+}
+
 }  // namespace cc

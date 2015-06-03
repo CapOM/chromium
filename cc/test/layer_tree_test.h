@@ -71,9 +71,6 @@ class TestHooks : public AnimationDelegate {
       const gfx::Vector2dF& elastic_overscroll_delta,
       float scale,
       float top_controls_delta) {}
-  virtual void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
-                                   float scale,
-                                   float top_controls_delta) {}
   virtual void BeginMainFrame(const BeginFrameArgs& args) {}
   virtual void WillBeginMainFrame() {}
   virtual void DidBeginMainFrame() {}
@@ -156,10 +153,13 @@ class LayerTreeTest : public testing::Test, public TestHooks {
     verify_property_trees_ = verify_property_trees;
   }
 
+  const LayerSettings& layer_settings() { return layer_settings_; }
+
  protected:
   LayerTreeTest();
 
   virtual void InitializeSettings(LayerTreeSettings* settings) {}
+  virtual void InitializeLayerSettings(LayerSettings* layer_settings) {}
 
   void RealEndTest();
 
@@ -219,8 +219,14 @@ class LayerTreeTest : public testing::Test, public TestHooks {
 
   TestWebGraphicsContext3D* TestContext();
 
+  TestGpuMemoryBufferManager* GetTestGpuMemoryBufferManager() {
+    return gpu_memory_buffer_manager_.get();
+  }
+
  private:
   LayerTreeSettings settings_;
+  LayerSettings layer_settings_;
+
   scoped_ptr<LayerTreeHostClientForTesting> client_;
   scoped_ptr<LayerTreeHost> layer_tree_host_;
   FakeOutputSurface* output_surface_;

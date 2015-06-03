@@ -152,7 +152,6 @@ struct CONTENT_EXPORT WebPreferences {
   bool should_clear_document_background;
   bool enable_scroll_animator;
   bool css_variables_enabled;
-  bool region_based_columns_enabled;
   bool touch_enabled;
   // TODO(mustaq): Nuke when the new API is ready
   bool device_supports_touch;
@@ -177,7 +176,6 @@ struct CONTENT_EXPORT WebPreferences {
   bool initialize_at_minimum_page_scale;
   bool smart_insert_delete_enabled;
   bool spatial_navigation_enabled;
-  bool pinch_virtual_viewport_enabled;
   int pinch_overlay_scrollbar_thickness;
   bool use_solid_color_scrollbars;
   bool navigate_on_drag_drop;

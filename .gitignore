@@ -253,6 +253,9 @@ v8.log
 /testing/gtest
 /testing/iossim/third_party/
 /testserver.log
+/tools/luci-go/linux64/isolate
+/tools/luci-go/mac64/isolate
+/tools/luci-go/win64/isolate.exe
 /third_party/accessibility-developer-tools/
 /third_party/adobe/flash/binaries
 /third_party/adobe/flash/symbols
@@ -336,6 +339,7 @@ v8.log
 /third_party/mesa/src
 /third_party/mingw-w64
 /third_party/mkl
+/third_party/mocha
 /third_party/mockito/src
 /third_party/mojo/src/mojo/public/tools/prebuilt/
 /third_party/nacl_sdk_binaries/
@@ -377,7 +381,6 @@ v8.log
 /third_party/syzygy/binaries
 /third_party/trace-viewer
 /third_party/tsan/
-/third_party/undoview
 /third_party/usb_ids
 /third_party/usrsctp/usrsctplib
 /third_party/v8-i18n

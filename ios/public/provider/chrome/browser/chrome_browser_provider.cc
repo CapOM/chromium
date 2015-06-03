@@ -40,7 +40,9 @@ ChromeBrowserProvider::GetUpdatableResourceProvider() {
   return nullptr;
 }
 
-InfoBarViewPlaceholder* ChromeBrowserProvider::CreateInfoBarView() {
+InfoBarViewPlaceholder ChromeBrowserProvider::CreateInfoBarView(
+    CGRect frame,
+    InfoBarViewDelegate* delegate) {
   return nullptr;
 }
 
@@ -62,6 +64,20 @@ const char* ChromeBrowserProvider::GetChromeUIScheme() {
 
 void ChromeBrowserProvider::SetUIViewAlphaWithAnimation(UIView* view,
                                                         float alpha) {
+}
+
+autofill::CardUnmaskPromptView*
+ChromeBrowserProvider::CreateCardUnmaskPromptView(
+    autofill::CardUnmaskPromptController* controller) {
+  return nullptr;
+}
+
+std::string ChromeBrowserProvider::GetRiskData() {
+  return std::string();
+}
+
+KeyedServiceProvider* ChromeBrowserProvider::GetKeyedServiceProvider() {
+  return nullptr;
 }
 
 }  // namespace ios

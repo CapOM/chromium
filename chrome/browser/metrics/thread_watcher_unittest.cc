@@ -257,9 +257,9 @@ class ThreadWatcherTest : public ::testing::Test {
     db_thread_.reset(new content::TestBrowserThread(BrowserThread::DB));
     io_thread_.reset(new content::TestBrowserThread(BrowserThread::IO));
     watchdog_thread_.reset(new WatchDogThread());
-    db_thread_->Start();
-    io_thread_->Start();
-    watchdog_thread_->Start();
+    db_thread_->StartAndWaitForTesting();
+    io_thread_->StartAndWaitForTesting();
+    watchdog_thread_->StartAndWaitForTesting();
 
     WatchDogThread::PostTask(
         FROM_HERE,
@@ -435,13 +435,7 @@ TEST_F(ThreadWatcherTest, CrashOnHangThreadsAllArgs) {
 
 // Test registration. When thread_watcher_list_ goes out of scope after
 // TearDown, all thread watcher objects will be deleted.
-// This test is crashing flakily on Android: http://crbug.com/485091
-#if defined(OS_ANDROID)
-#define MAYBE_Registration DISABLED_Registration
-#else
-#define MAYBE_Registration Registration
-#endif
-TEST_F(ThreadWatcherTest, MAYBE_Registration) {
+TEST_F(ThreadWatcherTest, Registration) {
   // Check ThreadWatcher object has all correct parameters.
   EXPECT_EQ(io_thread_id, io_watcher_->thread_id());
   EXPECT_EQ(io_thread_name, io_watcher_->thread_name());
@@ -697,7 +691,7 @@ TEST_F(ThreadWatcherListTest, Restart) {
   content::TestBrowserThread ui_thread(BrowserThread::UI, &message_loop_for_ui);
 
   scoped_ptr<WatchDogThread> watchdog_thread_(new WatchDogThread());
-  watchdog_thread_->Start();
+  watchdog_thread_->StartAndWaitForTesting();
 
   // See http://crbug.com/347887.
   // StartWatchingAll() will PostDelayedTask to create g_thread_watcher_list_,

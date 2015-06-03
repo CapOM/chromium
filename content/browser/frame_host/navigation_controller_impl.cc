@@ -421,6 +421,12 @@ NavigationEntryImpl* NavigationControllerImpl::GetEntryWithPageID(
   return (index != -1) ? entries_[index].get() : NULL;
 }
 
+bool NavigationControllerImpl::HasCommittedRealLoad(
+    FrameTreeNode* frame_tree_node) const {
+  NavigationEntryImpl* last_committed = GetLastCommittedEntry();
+  return last_committed && last_committed->HasFrameEntry(frame_tree_node);
+}
+
 void NavigationControllerImpl::LoadEntry(NavigationEntryImpl* entry) {
   // When navigating to a new page, we don't know for sure if we will actually
   // end up leaving the current page.  The new page load could for example
@@ -822,22 +828,33 @@ bool NavigationControllerImpl::RendererDidNavigate(
 
   // Do navigation-type specific actions. These will make and commit an entry.
   details->type = ClassifyNavigation(rfh, params);
-#if DCHECK_IS_ON()
-  // For site-per-process, both ClassifyNavigation methods get it wrong (see
-  // http://crbug.com/464014) so don't worry about a mismatch if that's the
-  // case.
-  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
-    NavigationType new_type = ClassifyNavigationWithoutPageID(rfh, params);
-    // There's constant disagreements over SAME_PAGE between the two classifiers
-    // so ignore disagreements if that's the case. Otherwise, enforce agreement.
-    // TODO(avi): Work this out.
-    if (details->type != NAVIGATION_TYPE_SAME_PAGE &&
-        new_type != NAVIGATION_TYPE_SAME_PAGE) {
-      DCHECK_EQ(details->type, new_type);
-    }
+  NavigationType new_type = ClassifyNavigationWithoutPageID(rfh, params);
+  bool ignore_mismatch = false;
+  // There are disagreements on some Android bots over SAME_PAGE between the two
+  // classifiers so ignore disagreements if that's the case.
+  ignore_mismatch |= details->type == NAVIGATION_TYPE_EXISTING_PAGE &&
+                     new_type == NAVIGATION_TYPE_SAME_PAGE;
+  ignore_mismatch |= details->type == NAVIGATION_TYPE_SAME_PAGE &&
+                     new_type == NAVIGATION_TYPE_EXISTING_PAGE;
+  // There are mismatches in the field where the new classifier thinks it's
+  // AUTO_SUBFRAME and the old classifier somehow thinks it's NEW or IGNORE. For
+  // IGNORE we know of at least one repro (https://crbug.com/492875), and for
+  // NEW it's not entirely clear what's going on, but we're pretty sure the new
+  // classifier is correct for both cases, so we're letting these mismatches go.
+  ignore_mismatch |= details->type == NAVIGATION_TYPE_NEW_SUBFRAME &&
+                     new_type == NAVIGATION_TYPE_AUTO_SUBFRAME;
+  ignore_mismatch |= details->type == NAVIGATION_TYPE_NAV_IGNORE &&
+                     new_type == NAVIGATION_TYPE_AUTO_SUBFRAME;
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+        switches::kSitePerProcess)) {
+    // We know that the old classifier is wrong for OOPIFs, so use the new one
+    // in --site-per-process mode.
+    details->type = new_type;
+    ignore_mismatch = true;
   }
-#endif  // DCHECK_IS_ON()
+  if (!ignore_mismatch) {
+    DCHECK_EQ(details->type, new_type);
+  }
 
   // is_in_page must be computed before the entry gets committed.
   details->is_in_page = AreURLsInPageNavigation(rfh->GetLastCommittedURL(),
@@ -937,15 +954,6 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
     RenderFrameHostImpl* rfh,
     const FrameHostMsg_DidCommitProvisionalLoad_Params& params) const {
   if (params.page_id == -1) {
-    // TODO(nasko, creis): An out-of-process child frame has no way of knowing
-    // the page_id of its parent, so it is passing back -1. The semantics here
-    // should be re-evaluated during session history refactor (see
-    // http://crbug.com/236848 and in particular http://crbug.com/464014). For
-    // now, we assume this means the child frame loaded and proceed. Note that
-    // this may do the wrong thing for cross-process AUTO_SUBFRAME navigations.
-    if (rfh->IsCrossProcessSubframe())
-      return NAVIGATION_TYPE_NEW_SUBFRAME;
-
     // The renderer generates the page IDs, and so if it gives us the invalid
     // page ID (-1) we know it didn't actually navigate. This happens in a few
     // cases:
@@ -1138,10 +1146,12 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
     // Just like above in the did_create_new_entry case, it's possible to
     // scribble onto an uncommitted page. Again, there isn't any navigation
     // stuff that we can do, so ignore it here as well.
-    if (!GetLastCommittedEntry())
+    NavigationEntry* last_committed = GetLastCommittedEntry();
+    if (!last_committed)
       return NAVIGATION_TYPE_NAV_IGNORE;
 
-    if (params.was_within_same_page) {
+    if (AreURLsInPageNavigation(last_committed->GetURL(), params.url,
+                                params.was_within_same_page, rfh)) {
       // This is history.replaceState(), which is renderer-initiated yet within
       // the same page.
       return NAVIGATION_TYPE_IN_PAGE;
@@ -1443,34 +1453,32 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
   // handle navigation inside of a subframe in it without creating a new entry.
   DCHECK(GetLastCommittedEntry());
 
-  // Handle the case where we're navigating back/forward to a previous subframe
-  // navigation entry. This is case "2." in NAV_AUTO_SUBFRAME comment in the
-  // header file. In case "1." this will be a NOP.
-  int entry_index = GetEntryIndexWithPageID(
-      rfh->GetSiteInstance(),
-      params.page_id);
-  if (entry_index < 0 ||
-      entry_index >= static_cast<int>(entries_.size())) {
-    NOTREACHED();
-    return false;
-  }
+  if (params.nav_entry_id) {
+    int entry_index = GetEntryIndexWithUniqueID(params.nav_entry_id);
 
-  // Update the current navigation entry in case we're going back/forward.
-  if (entry_index != last_committed_entry_index_) {
-    // Make sure that a subframe commit isn't changing the main frame's origin.
-    // Otherwise the renderer process may be confused, leading to a URL spoof.
-    // We can't check the path since that may change (https://crbug.com/373041).
-    if (GetLastCommittedEntry()->GetURL().GetOrigin() !=
-        GetEntryAtIndex(entry_index)->GetURL().GetOrigin()) {
-      // TODO(creis): This is unexpectedly being encountered in practice.  If
-      // you encounter this in practice, please post details to
-      // https://crbug.com/486916.  Once that's resolved, we'll change this to
-      // kill the renderer process with bad_message::NC_AUTO_SUBFRAME.
-      NOTREACHED() << "Unexpected main frame origin change on AUTO_SUBFRAME.";
+    // If the |nav_entry_id| is non-zero and matches an existing entry, this is
+    // a history auto" navigation.  Update the last committed index accordingly.
+    // If we don't recognize the |nav_entry_id|, it might be either a pending
+    // entry for a transfer or a recently pruned entry.  We'll handle it below.
+    if (entry_index != -1 && entry_index != last_committed_entry_index_) {
+      // Make sure that a subframe commit isn't changing the main frame's
+      // origin. Otherwise the renderer process may be confused, leading to a
+      // URL spoof. We can't check the path since that may change
+      // (https://crbug.com/373041).
+      if (GetLastCommittedEntry()->GetURL().GetOrigin() !=
+          GetEntryAtIndex(entry_index)->GetURL().GetOrigin()) {
+        // TODO(creis): This is unexpectedly being encountered in practice.  If
+        // you encounter this in practice, please post details to
+        // https://crbug.com/486916.  Once that's resolved, we'll change this to
+        // kill the renderer process with bad_message::NC_AUTO_SUBFRAME.
+        NOTREACHED() << "Unexpected main frame origin change on AUTO_SUBFRAME.";
+      }
+
+      // TODO(creis): Update the FrameNavigationEntry in --site-per-process.
+      last_committed_entry_index_ = entry_index;
+      DiscardNonCommittedEntriesInternal();
+      return true;
     }
-    last_committed_entry_index_ = entry_index;
-    DiscardNonCommittedEntriesInternal();
-    return true;
   }
 
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -1481,6 +1489,16 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
     last_committed->AddOrUpdateFrameEntry(rfh->frame_tree_node(),
                                           rfh->GetSiteInstance(), params.url,
                                           params.referrer);
+
+    // Cross-process subframe navigations may leave a pending entry around.
+    // Clear it if it's actually for the subframe.
+    // TODO(creis): Don't use pending entries for subframe navigations.
+    // See https://crbug.com/495161.
+    if (pending_entry_ &&
+        pending_entry_->frame_tree_node_id() ==
+            rfh->frame_tree_node()->frame_tree_node_id()) {
+      DiscardPendingEntry(false);
+    }
   }
 
   // We do not need to discard the pending entry in this case, since we will

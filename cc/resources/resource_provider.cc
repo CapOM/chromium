@@ -13,7 +13,7 @@
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "base/trace_event/trace_event.h"
-#include "cc/base/util.h"
+#include "cc/base/math_util.h"
 #include "cc/resources/platform_color.h"
 #include "cc/resources/returned_resource.h"
 #include "cc/resources/shared_bitmap_manager.h"
@@ -27,7 +27,6 @@
 #include "third_party/skia/include/core/SkSurface.h"
 #include "third_party/skia/include/gpu/GrContext.h"
 #include "third_party/skia/include/gpu/GrTextureProvider.h"
-#include "ui/gfx/frame_time.h"
 #include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/gpu_memory_buffer.h"
@@ -119,10 +118,11 @@ GrPixelConfig ToGrPixelConfig(ResourceFormat format) {
 gfx::GpuMemoryBuffer::Format ToGpuMemoryBufferFormat(ResourceFormat format) {
   switch (format) {
     case RGBA_8888:
-      return gfx::GpuMemoryBuffer::Format::RGBA_8888;
+      return gfx::GpuMemoryBuffer::RGBA_8888;
     case BGRA_8888:
-      return gfx::GpuMemoryBuffer::Format::BGRA_8888;
+      return gfx::GpuMemoryBuffer::BGRA_8888;
     case RGBA_4444:
+      return gfx::GpuMemoryBuffer::RGBA_4444;
     case ALPHA_8:
     case LUMINANCE_8:
     case RGB_565:
@@ -131,7 +131,7 @@ gfx::GpuMemoryBuffer::Format ToGpuMemoryBufferFormat(ResourceFormat format) {
       break;
   }
   NOTREACHED();
-  return gfx::GpuMemoryBuffer::Format::RGBA_8888;
+  return gfx::GpuMemoryBuffer::RGBA_8888;
 }
 
 class ScopedSetActiveTexture {
@@ -395,25 +395,15 @@ scoped_ptr<ResourceProvider> ResourceProvider::Create(
     BlockingTaskRunner* blocking_main_thread_task_runner,
     int highp_threshold_min,
     bool use_rgba_4444_texture_format,
-    size_t id_allocation_chunk_size) {
-  ContextProvider* context_provider = output_surface->context_provider();
-  GLES2Interface* gl =
-      context_provider ? context_provider->ContextGL() : nullptr;
-  ResourceType default_resource_type =
-      gl ? RESOURCE_TYPE_GL_TEXTURE : RESOURCE_TYPE_BITMAP;
-
+    size_t id_allocation_chunk_size,
+    bool use_persistent_map_for_gpu_memory_buffers) {
   scoped_ptr<ResourceProvider> resource_provider(new ResourceProvider(
       output_surface, shared_bitmap_manager, gpu_memory_buffer_manager,
       blocking_main_thread_task_runner, highp_threshold_min,
-      default_resource_type, use_rgba_4444_texture_format,
-      id_allocation_chunk_size));
-
-  if (gl)
-    resource_provider->InitializeGL();
-  else
-    resource_provider->InitializeSoftware();
-
-  return resource_provider.Pass();
+      use_rgba_4444_texture_format, id_allocation_chunk_size,
+      use_persistent_map_for_gpu_memory_buffers));
+  resource_provider->Initialize();
+  return resource_provider;
 }
 
 ResourceProvider::~ResourceProvider() {
@@ -837,8 +827,9 @@ base::TimeTicks ResourceProvider::EstimatedUploadCompletionTime(
   // Software resource uploads happen on impl thread, so don't bother batching
   // them up and trying to wait for them to complete.
   if (!texture_uploader_) {
-    return gfx::FrameTime::Now() + base::TimeDelta::FromMicroseconds(
-        base::Time::kMicrosecondsPerSecond * kSoftwareUploadTickRate);
+    return base::TimeTicks::Now() +
+           base::TimeDelta::FromMicroseconds(
+               base::Time::kMicrosecondsPerSecond * kSoftwareUploadTickRate);
   }
 
   base::TimeDelta upload_one_texture_time =
@@ -847,7 +838,7 @@ base::TimeTicks ResourceProvider::EstimatedUploadCompletionTime(
       uploads_per_tick;
 
   size_t total_uploads = NumBlockingUploads() + uploads_per_tick;
-  return gfx::FrameTime::Now() + upload_one_texture_time * total_uploads;
+  return base::TimeTicks::Now() + upload_one_texture_time * total_uploads;
 }
 
 ResourceProvider::Resource* ResourceProvider::InsertResource(
@@ -1090,13 +1081,16 @@ ResourceProvider::ScopedWriteLockGpuMemoryBuffer::
 
 gfx::GpuMemoryBuffer*
 ResourceProvider::ScopedWriteLockGpuMemoryBuffer::GetGpuMemoryBuffer() {
-  if (!gpu_memory_buffer_) {
-    scoped_ptr<gfx::GpuMemoryBuffer> gpu_memory_buffer =
-        gpu_memory_buffer_manager_->AllocateGpuMemoryBuffer(
-            size_, ToGpuMemoryBufferFormat(format_), gfx::GpuMemoryBuffer::MAP);
-    gpu_memory_buffer_ = gpu_memory_buffer.release();
-  }
-
+  if (gpu_memory_buffer_)
+    return gpu_memory_buffer_;
+  gfx::GpuMemoryBuffer::Usage usage =
+      resource_provider_->use_persistent_map_for_gpu_memory_buffers()
+          ? gfx::GpuMemoryBuffer::PERSISTENT_MAP
+          : gfx::GpuMemoryBuffer::MAP;
+  scoped_ptr<gfx::GpuMemoryBuffer> gpu_memory_buffer =
+      gpu_memory_buffer_manager_->AllocateGpuMemoryBuffer(
+          size_, ToGpuMemoryBufferFormat(format_), usage);
+  gpu_memory_buffer_ = gpu_memory_buffer.release();
   return gpu_memory_buffer_;
 }
 
@@ -1192,9 +1186,9 @@ ResourceProvider::ResourceProvider(
     gpu::GpuMemoryBufferManager* gpu_memory_buffer_manager,
     BlockingTaskRunner* blocking_main_thread_task_runner,
     int highp_threshold_min,
-    ResourceType default_resource_type,
     bool use_rgba_4444_texture_format,
-    size_t id_allocation_chunk_size)
+    size_t id_allocation_chunk_size,
+    bool use_persistent_map_for_gpu_memory_buffers)
     : output_surface_(output_surface),
       shared_bitmap_manager_(shared_bitmap_manager),
       gpu_memory_buffer_manager_(gpu_memory_buffer_manager),
@@ -1203,7 +1197,7 @@ ResourceProvider::ResourceProvider(
       highp_threshold_min_(highp_threshold_min),
       next_id_(1),
       next_child_(1),
-      default_resource_type_(default_resource_type),
+      default_resource_type_(RESOURCE_TYPE_BITMAP),
       use_texture_storage_ext_(false),
       use_texture_format_bgra_(false),
       use_texture_usage_hint_(false),
@@ -1213,22 +1207,25 @@ ResourceProvider::ResourceProvider(
       best_texture_format_(RGBA_8888),
       use_rgba_4444_texture_format_(use_rgba_4444_texture_format),
       id_allocation_chunk_size_(id_allocation_chunk_size),
-      use_sync_query_(false) {
+      use_sync_query_(false),
+      use_persistent_map_for_gpu_memory_buffers_(
+          use_persistent_map_for_gpu_memory_buffers) {
   DCHECK(output_surface_->HasClient());
   DCHECK(id_allocation_chunk_size_);
 }
 
-void ResourceProvider::InitializeSoftware() {
+void ResourceProvider::Initialize() {
   DCHECK(thread_checker_.CalledOnValidThread());
-  DCHECK_EQ(default_resource_type_, RESOURCE_TYPE_BITMAP);
-  // Pick an arbitrary limit here similar to what hardware might.
-  max_texture_size_ = 16 * 1024;
-  best_texture_format_ = RGBA_8888;
-}
 
-void ResourceProvider::InitializeGL() {
-  DCHECK(thread_checker_.CalledOnValidThread());
-  DCHECK_EQ(default_resource_type_, RESOURCE_TYPE_GL_TEXTURE);
+  GLES2Interface* gl = ContextGL();
+  if (!gl) {
+    default_resource_type_ = RESOURCE_TYPE_BITMAP;
+    // Pick an arbitrary limit here similar to what hardware might.
+    max_texture_size_ = 16 * 1024;
+    best_texture_format_ = RGBA_8888;
+    return;
+  }
+
   DCHECK(!texture_uploader_);
   DCHECK(!texture_id_allocator_);
   DCHECK(!buffer_id_allocator_);
@@ -1236,7 +1233,7 @@ void ResourceProvider::InitializeGL() {
   const ContextProvider::Capabilities& caps =
       output_surface_->context_provider()->ContextCapabilities();
 
-  bool use_bgra = caps.gpu.texture_format_bgra8888;
+  default_resource_type_ = RESOURCE_TYPE_GL_TEXTURE;
   use_texture_storage_ext_ = caps.gpu.texture_storage;
   use_texture_format_bgra_ = caps.gpu.texture_format_bgra8888;
   use_texture_usage_hint_ = caps.gpu.texture_usage;
@@ -1244,13 +1241,11 @@ void ResourceProvider::InitializeGL() {
   yuv_resource_format_ = caps.gpu.texture_rg ? RED_8 : LUMINANCE_8;
   use_sync_query_ = caps.gpu.sync_query;
 
-  GLES2Interface* gl = ContextGL();
-  DCHECK(gl);
-
   texture_uploader_ = TextureUploader::Create(gl);
   max_texture_size_ = 0;  // Context expects cleared value.
   gl->GetIntegerv(GL_MAX_TEXTURE_SIZE, &max_texture_size_);
-  best_texture_format_ = PlatformColor::BestTextureFormat(use_bgra);
+  best_texture_format_ =
+      PlatformColor::BestTextureFormat(use_texture_format_bgra_);
 
   texture_id_allocator_.reset(
       new TextureIdAllocator(gl, id_allocation_chunk_size_));
@@ -1635,11 +1630,11 @@ void ResourceProvider::AcquirePixelBuffer(ResourceId id) {
   gl->BindBuffer(GL_PIXEL_UNPACK_TRANSFER_BUFFER_CHROMIUM,
                  resource->gl_pixel_buffer_id);
   unsigned bytes_per_pixel = BitsPerPixel(resource->format) / 8;
-  gl->BufferData(GL_PIXEL_UNPACK_TRANSFER_BUFFER_CHROMIUM,
-                 resource->size.height() *
-                     RoundUp(bytes_per_pixel * resource->size.width(), 4u),
-                 NULL,
-                 GL_DYNAMIC_DRAW);
+  gl->BufferData(
+      GL_PIXEL_UNPACK_TRANSFER_BUFFER_CHROMIUM,
+      resource->size.height() *
+          MathUtil::RoundUp(bytes_per_pixel * resource->size.width(), 4u),
+      NULL, GL_DYNAMIC_DRAW);
   gl->BindBuffer(GL_PIXEL_UNPACK_TRANSFER_BUFFER_CHROMIUM, 0);
 }
 
@@ -1941,7 +1936,9 @@ void ResourceProvider::BindImageForSampling(Resource* resource) {
   resource->dirty_image = false;
 }
 
-void ResourceProvider::CopyResource(ResourceId source_id, ResourceId dest_id) {
+void ResourceProvider::CopyResource(ResourceId source_id,
+                                    ResourceId dest_id,
+                                    const gfx::Rect& rect) {
   TRACE_EVENT0("cc", "ResourceProvider::CopyResource");
 
   Resource* source_resource = GetResource(source_id);
@@ -1963,6 +1960,7 @@ void ResourceProvider::CopyResource(ResourceId source_id, ResourceId dest_id) {
   DCHECK_EQ(source_resource->type, dest_resource->type);
   DCHECK_EQ(source_resource->format, dest_resource->format);
   DCHECK(source_resource->size == dest_resource->size);
+  DCHECK(gfx::Rect(dest_resource->size).Contains(rect));
 
   GLES2Interface* gl = ContextGL();
   DCHECK(gl);
@@ -1987,7 +1985,8 @@ void ResourceProvider::CopyResource(ResourceId source_id, ResourceId dest_id) {
   DCHECK(!dest_resource->image_id);
   dest_resource->allocated = true;
   gl->CopySubTextureCHROMIUM(dest_resource->target, source_resource->gl_id,
-                             dest_resource->gl_id, 0, 0);
+                             dest_resource->gl_id, rect.x(), rect.y(), rect.x(),
+                             rect.y(), rect.width(), rect.height());
   if (source_resource->gl_read_lock_query_id) {
     // End query and create a read lock fence that will prevent access to
 // source resource until CopySubTextureCHROMIUM command has completed.

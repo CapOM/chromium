@@ -14,8 +14,12 @@
 #include "cc/surfaces/display.h"
 #include "cc/surfaces/surfaces_export.h"
 
+class VSyncParameterObserver;
+
 namespace cc {
+class BeginFrameSource;
 class ContextProvider;
+class DisplayScheduler;
 class SurfaceManager;
 class SurfaceDisplayOutputSurface;
 
@@ -40,9 +44,6 @@ class CC_SURFACES_EXPORT OnscreenDisplayClient
   }
 
   // DisplayClient implementation.
-  void DisplayDamaged() override;
-  void DidSwapBuffers() override;
-  void DidSwapBuffersComplete() override;
   void CommitVSyncParameters(base::TimeTicks timebase,
                              base::TimeDelta interval) override;
   void OutputSurfaceLost() override;
@@ -50,23 +51,16 @@ class CC_SURFACES_EXPORT OnscreenDisplayClient
 
   bool output_surface_lost() { return output_surface_lost_; }
 
- private:
-  void ScheduleDraw();
-  void Draw();
-
  protected:
   scoped_ptr<OutputSurface> output_surface_;
   scoped_ptr<Display> display_;
+  VSyncParameterObserver* vsync_observer_;
+  scoped_ptr<BeginFrameSource> begin_frame_source_;
+  scoped_ptr<DisplayScheduler> scheduler_;
   scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
   SurfaceDisplayOutputSurface* surface_display_output_surface_;
-  bool scheduled_draw_;
   bool output_surface_lost_;
-  // True if a draw should be scheduled, but it's hit the limit on max frames
-  // pending.
-  bool deferred_draw_;
-  int pending_frames_;
-
-  base::WeakPtrFactory<OnscreenDisplayClient> weak_ptr_factory_;
+  bool disable_gpu_vsync_;
 
   DISALLOW_COPY_AND_ASSIGN(OnscreenDisplayClient);
 };

@@ -58,7 +58,6 @@
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/chrome_select_file_policy.h"
 #include "chrome/browser/ui/host_desktop.h"
-#include "chrome/browser/ui/passwords/password_bubble_experiment.h"
 #include "chrome/browser/ui/webui/favicon_source.h"
 #include "chrome/browser/ui/webui/options/options_handlers_helper.h"
 #include "chrome/common/chrome_constants.h"
@@ -70,6 +69,7 @@
 #include "chrome/grit/chromium_strings.h"
 #include "chrome/grit/generated_resources.h"
 #include "chrome/grit/locale_settings.h"
+#include "components/password_manager/core/browser/password_bubble_experiment.h"
 #include "components/policy/core/common/policy_map.h"
 #include "components/policy/core/common/policy_namespace.h"
 #include "components/policy/core/common/policy_service.h"
@@ -389,6 +389,8 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
       IDS_OPTIONS_SETTINGS_ACCESSIBILITY_LARGE_CURSOR_DESCRIPTION },
     { "accessibilityScreenMagnifier",
       IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_DESCRIPTION },
+    { "accessibilityScreenMagnifierCenterFocus",
+      IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_CENTER_FOCUS },
     { "accessibilityScreenMagnifierFull",
       IDS_OPTIONS_SETTINGS_ACCESSIBILITY_SCREEN_MAGNIFIER_FULL },
     { "accessibilityScreenMagnifierOff",
@@ -415,7 +417,6 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
       IDS_OPTIONS_SETTINGS_ACCESSIBILITY_AUTOCLICK_DELAY_VERY_LONG },
     { "autoclickDelayVeryShort",
       IDS_OPTIONS_SETTINGS_ACCESSIBILITY_AUTOCLICK_DELAY_VERY_SHORT },
-    { "batteryButton", IDS_OPTIONS_SETTINGS_BATTERY_DESCRIPTION},
     { "changePicture", IDS_OPTIONS_CHANGE_PICTURE },
     { "changePictureCaption", IDS_OPTIONS_CHANGE_PICTURE_CAPTION },
     { "consumerManagementDescription",
@@ -457,7 +458,6 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
       IDS_OPTIONS_RESOLVE_TIMEZONE_BY_GEOLOCATION_DESCRIPTION },
     { "sectionTitleDevice", IDS_OPTIONS_DEVICE_GROUP_NAME },
     { "sectionTitleInternet", IDS_OPTIONS_INTERNET_OPTIONS_GROUP_LABEL },
-    { "storageButton", IDS_OPTIONS_SETTINGS_STORAGE_DESCRIPTION},
     { "syncButtonTextStart", IDS_SYNC_SETUP_BUTTON_LABEL },
     { "thirdPartyImeConfirmDisable", IDS_CANCEL },
     { "thirdPartyImeConfirmEnable", IDS_OK },
@@ -664,10 +664,6 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
   values->SetBoolean("showSetDefault", ShouldShowSetDefaultBrowser());
 
   values->SetBoolean("allowAdvancedSettings", ShouldAllowAdvancedSettings());
-
-  values->SetBoolean("websiteSettingsManagerEnabled",
-                     base::CommandLine::ForCurrentProcess()->HasSwitch(
-                         switches::kEnableWebsiteSettingsManager));
 
   values->SetBoolean("usingNewProfilesUI", switches::IsNewAvatarMenu());
 
@@ -1132,8 +1128,8 @@ void BrowserOptionsHandler::BecomeDefaultBrowser(const base::ListValue* args) {
   default_browser_worker_->StartSetAsDefault();
   // Callback takes care of updating UI.
 
-  // If the user attempted to make Chrome the default browser, then he/she
-  // arguably wants to be notified when that changes.
+  // If the user attempted to make Chrome the default browser, notify
+  // them when this changes.
   PrefService* prefs = Profile::FromWebUI(web_ui())->GetPrefs();
   prefs->SetBoolean(prefs::kCheckDefaultBrowser, true);
 }

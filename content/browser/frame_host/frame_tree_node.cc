@@ -53,8 +53,9 @@ FrameTreeNode::FrameTreeNode(FrameTree* frame_tree,
                              RenderViewHostDelegate* render_view_delegate,
                              RenderWidgetHostDelegate* render_widget_delegate,
                              RenderFrameHostManager::Delegate* manager_delegate,
+                             blink::WebTreeScopeType scope,
                              const std::string& name,
-                             SandboxFlags sandbox_flags)
+                             blink::WebSandboxFlags sandbox_flags)
     : frame_tree_(frame_tree),
       navigator_(navigator),
       render_manager_(this,
@@ -64,7 +65,7 @@ FrameTreeNode::FrameTreeNode(FrameTree* frame_tree,
                       manager_delegate),
       frame_tree_node_id_(next_frame_tree_node_id_++),
       parent_(NULL),
-      replication_state_(name, sandbox_flags),
+      replication_state_(scope, name, sandbox_flags),
       // Effective sandbox flags also need to be set, since initial sandbox
       // flags should apply to the initial empty document in the frame.
       effective_sandbox_flags_(sandbox_flags),

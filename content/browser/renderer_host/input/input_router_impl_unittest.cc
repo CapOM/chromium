@@ -80,7 +80,7 @@ WebInputEvent& GetEventWithType(WebInputEvent::Type type) {
 bool GetIsShortcutFromHandleInputEventMessage(const IPC::Message* msg) {
   InputMsg_HandleInputEvent::Schema::Param param;
   InputMsg_HandleInputEvent::Read(msg, &param);
-  return get<2>(param);
+  return base::get<2>(param);
 }
 
 template<typename MSG_T, typename ARG_T1>
@@ -88,7 +88,7 @@ void ExpectIPCMessageWithArg1(const IPC::Message* msg, const ARG_T1& arg1) {
   ASSERT_EQ(MSG_T::ID, msg->type());
   typename MSG_T::Schema::Param param;
   ASSERT_TRUE(MSG_T::Read(msg, &param));
-  EXPECT_EQ(arg1, get<0>(param));
+  EXPECT_EQ(arg1, base::get<0>(param));
 }
 
 template<typename MSG_T, typename ARG_T1, typename ARG_T2>
@@ -98,8 +98,8 @@ void ExpectIPCMessageWithArg2(const IPC::Message* msg,
   ASSERT_EQ(MSG_T::ID, msg->type());
   typename MSG_T::Schema::Param param;
   ASSERT_TRUE(MSG_T::Read(msg, &param));
-  EXPECT_EQ(arg1, get<0>(param));
-  EXPECT_EQ(arg2, get<1>(param));
+  EXPECT_EQ(arg1, base::get<0>(param));
+  EXPECT_EQ(arg2, base::get<1>(param));
 }
 
 #if defined(USE_AURA)
@@ -1678,6 +1678,18 @@ TEST_F(InputRouterImplTest, InputFlushAfterFling) {
   EXPECT_EQ(0U, GetAndResetDidFlushCount());
 
   // The fling end notification should signal that the router is flushed.
+  input_router()->OnMessageReceived(InputHostMsg_DidStopFlinging(0));
+  EXPECT_EQ(1U, GetAndResetDidFlushCount());
+
+  // Even flings consumed by the client require a fling-end notification.
+  client_->set_filter_state(INPUT_EVENT_ACK_STATE_CONSUMED);
+  SimulateGestureEvent(WebInputEvent::GestureScrollBegin,
+                       blink::WebGestureDeviceTouchscreen);
+  SimulateGestureEvent(WebInputEvent::GestureFlingStart,
+                       blink::WebGestureDeviceTouchscreen);
+  ASSERT_TRUE(HasPendingEvents());
+  RequestNotificationWhenFlushed();
+  EXPECT_EQ(0U, GetAndResetDidFlushCount());
   input_router()->OnMessageReceived(InputHostMsg_DidStopFlinging(0));
   EXPECT_EQ(1U, GetAndResetDidFlushCount());
 }

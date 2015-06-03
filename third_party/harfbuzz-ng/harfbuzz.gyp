@@ -7,18 +7,6 @@
     '../../build/win_precompile.gypi',
   ],
   'variables': {
-    'variables': {
-      'conditions': [
-        ['sysroot!=""', {
-          'pkg-config': '<(chroot_cmd) ../../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
-        }, {
-          'pkg-config': 'pkg-config'
-        }],
-      ],
-    },
-
-    'pkg-config': '<(pkg-config)',
-
     'conditions': [
       ['OS=="linux" and (buildtype!="Official" or chromeos==1) and embedded==0', {
         # Since version 1.31.0, pangoft2 which we depend on pulls in harfbuzz
@@ -28,12 +16,6 @@
         # control as well.
         'use_system_harfbuzz%': '<!(python ../../build/check_return_value.py <(pkg-config) --atleast-version=1.31.0 pangoft2)',
       }, {
-        'use_system_harfbuzz': 0,
-      }],
-      ['OS=="linux" and target_arch=="arm" and chromeos==0', {
-        # Override use_system_harfbuzz for ARM cross compiling so system
-        # harfbuzz is not used because the corresponding package is not
-        # available.
         'use_system_harfbuzz': 0,
       }],
     ],
@@ -79,6 +61,8 @@
             'src/hb-open-file-private.hh',
             'src/hb-open-type-private.hh',
             'src/hb-ot.h',
+            'src/hb-ot-font.cc',
+            'src/hb-ot-font.h',
             'src/hb-ot-head-table.hh',
             'src/hb-ot-hhea-table.hh',
             'src/hb-ot-hmtx-table.hh',

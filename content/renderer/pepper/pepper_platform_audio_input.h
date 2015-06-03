@@ -18,7 +18,7 @@
 class GURL;
 
 namespace base {
-class MessageLoopProxy;
+class SingleThreadTaskRunner;
 }
 
 namespace media {
@@ -103,8 +103,8 @@ class PepperPlatformAudioInput
   // I/O THREAD.
   scoped_ptr<media::AudioInputIPC> ipc_;
 
-  scoped_refptr<base::MessageLoopProxy> main_message_loop_proxy_;
-  scoped_refptr<base::MessageLoopProxy> io_message_loop_proxy_;
+  scoped_refptr<base::SingleThreadTaskRunner> main_task_runner_;
+  scoped_refptr<base::SingleThreadTaskRunner> io_task_runner_;
 
   // The frame containing the Pepper widget.
   int render_frame_id_;

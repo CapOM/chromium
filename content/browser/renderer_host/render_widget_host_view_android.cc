@@ -51,6 +51,7 @@
 #include "content/browser/renderer_host/dip_util.h"
 #include "content/browser/renderer_host/frame_metadata_util.h"
 #include "content/browser/renderer_host/input/synthetic_gesture_target_android.h"
+#include "content/browser/renderer_host/input/ui_touch_selection_helper.h"
 #include "content/browser/renderer_host/input/web_input_event_builders_android.h"
 #include "content/browser/renderer_host/input/web_input_event_util.h"
 #include "content/browser/renderer_host/render_process_host_impl.h"
@@ -63,6 +64,7 @@
 #include "content/common/input/did_overscroll_params.h"
 #include "content/common/input_messages.h"
 #include "content/common/view_messages.h"
+#include "content/public/browser/android/compositor.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/devtools_agent_host.h"
 #include "content/public/browser/render_view_host.h"
@@ -266,14 +268,16 @@ scoped_ptr<ui::TouchSelectionController> CreateSelectionController(
     ContentViewCore* content_view_core) {
   DCHECK(client);
   DCHECK(content_view_core);
-  int tap_timeout_ms = gfx::ViewConfiguration::GetTapTimeoutInMs();
-  int touch_slop_pixels = gfx::ViewConfiguration::GetTouchSlopInPixels();
-  bool show_on_tap_for_empty_editable = false;
-  return make_scoped_ptr(new ui::TouchSelectionController(
-      client,
-      base::TimeDelta::FromMilliseconds(tap_timeout_ms),
-      touch_slop_pixels / content_view_core->GetDpiScale(),
-      show_on_tap_for_empty_editable));
+  ui::TouchSelectionController::Config config;
+  config.tap_timeout = base::TimeDelta::FromMilliseconds(
+      gfx::ViewConfiguration::GetTapTimeoutInMs());
+  config.tap_slop = gfx::ViewConfiguration::GetTouchSlopInPixels() /
+                    content_view_core->GetDpiScale();
+  config.show_on_tap_for_empty_editable = false;
+  config.enable_longpress_drag_selection =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableLongpressDragSelection);
+  return make_scoped_ptr(new ui::TouchSelectionController(client, config));
 }
 
 scoped_ptr<OverscrollControllerAndroid> CreateOverscrollController(
@@ -288,32 +292,6 @@ ui::GestureProvider::Config CreateGestureProviderConfig() {
       base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableClickDelay);
   return config;
-}
-
-ui::SelectionBound::Type ConvertSelectionBoundType(
-    cc::SelectionBoundType type) {
-  switch (type) {
-    case cc::SELECTION_BOUND_LEFT:
-      return ui::SelectionBound::LEFT;
-    case cc::SELECTION_BOUND_RIGHT:
-      return ui::SelectionBound::RIGHT;
-    case cc::SELECTION_BOUND_CENTER:
-      return ui::SelectionBound::CENTER;
-    case cc::SELECTION_BOUND_EMPTY:
-      return ui::SelectionBound::EMPTY;
-  }
-  NOTREACHED() << "Unknown selection bound type";
-  return ui::SelectionBound::EMPTY;
-}
-
-ui::SelectionBound ConvertSelectionBound(
-    const cc::ViewportSelectionBound& bound) {
-  ui::SelectionBound ui_bound;
-  ui_bound.set_type(ConvertSelectionBoundType(bound.type));
-  ui_bound.set_visible(bound.visible);
-  if (ui_bound.type() != ui::SelectionBound::EMPTY)
-    ui_bound.SetEdge(bound.edge_top, bound.edge_bottom);
-  return ui_bound;
 }
 
 gfx::RectF GetSelectionRect(const ui::TouchSelectionController& controller) {
@@ -470,13 +448,15 @@ scoped_refptr<cc::Layer> RenderWidgetHostViewAndroid::CreateDelegatedLayer()
     DCHECK(manager);
     // manager must outlive compositors using it.
     scoped_refptr<cc::SurfaceLayer> surface_layer = cc::SurfaceLayer::Create(
+        Compositor::LayerSettings(),
         base::Bind(&SatisfyCallback, base::Unretained(manager)),
         base::Bind(&RequireCallback, base::Unretained(manager)));
     surface_layer->SetSurfaceId(surface_id_, 1.f, texture_size_in_layer_);
     delegated_layer = surface_layer;
   } else {
     DCHECK(frame_provider_.get());
-    delegated_layer = cc::DelegatedRendererLayer::Create(frame_provider_);
+    delegated_layer = cc::DelegatedRendererLayer::Create(
+        Compositor::LayerSettings(), frame_provider_);
   }
   delegated_layer->SetBounds(content_size_in_layer_);
   delegated_layer->SetIsDrawable(true);
@@ -1093,7 +1073,8 @@ void RenderWidgetHostViewAndroid::SubmitFrame(
       RemoveLayers();
       frame_provider_ = new cc::DelegatedFrameProvider(
           resource_collection_.get(), frame_data.Pass());
-      layer_ = cc::DelegatedRendererLayer::Create(frame_provider_);
+      layer_ = cc::DelegatedRendererLayer::Create(Compositor::LayerSettings(),
+                                                  frame_provider_);
       AttachLayers();
     } else {
       frame_provider_->SetFrameData(frame_data.Pass());
@@ -1585,7 +1566,8 @@ gfx::GLSurfaceHandle RenderWidgetHostViewAndroid::GetCompositingSurface() {
 void RenderWidgetHostViewAndroid::ProcessAckedTouchEvent(
     const TouchEventWithLatencyInfo& touch, InputEventAckState ack_result) {
   const bool event_consumed = ack_result == INPUT_EVENT_ACK_STATE_CONSUMED;
-  gesture_provider_.OnAsyncTouchEventAck(event_consumed);
+  gesture_provider_.OnTouchEventAck(touch.event.uniqueTouchEventId,
+                                    event_consumed);
 }
 
 void RenderWidgetHostViewAndroid::GestureEventAck(
@@ -1604,13 +1586,25 @@ InputEventAckState RenderWidgetHostViewAndroid::FilterInputEvent(
       blink::WebInputEvent::isGestureEventType(input_event.type)) {
     const blink::WebGestureEvent& gesture_event =
         static_cast<const blink::WebGestureEvent&>(input_event);
-    gfx::PointF gesture_location(gesture_event.x, gesture_event.y);
-    if (input_event.type == blink::WebInputEvent::GestureLongPress) {
-      if (selection_controller_->WillHandleLongPressEvent(gesture_location))
-        return INPUT_EVENT_ACK_STATE_CONSUMED;
-    } else if (input_event.type == blink::WebInputEvent::GestureTap) {
-      if (selection_controller_->WillHandleTapEvent(gesture_location))
-        return INPUT_EVENT_ACK_STATE_CONSUMED;
+    switch (gesture_event.type) {
+      case blink::WebInputEvent::GestureLongPress:
+        if (selection_controller_->WillHandleLongPressEvent(
+                base::TimeTicks() +
+                    base::TimeDelta::FromSecondsD(input_event.timeStampSeconds),
+                gfx::PointF(gesture_event.x, gesture_event.y))) {
+          return INPUT_EVENT_ACK_STATE_CONSUMED;
+        }
+        break;
+
+      case blink::WebInputEvent::GestureTap:
+        if (selection_controller_->WillHandleTapEvent(
+                gfx::PointF(gesture_event.x, gesture_event.y))) {
+          return INPUT_EVENT_ACK_STATE_CONSUMED;
+        }
+        break;
+
+      default:
+        break;
     }
   }
 

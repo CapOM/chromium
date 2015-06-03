@@ -61,15 +61,6 @@ namespace {
 // trace.
 const int kOverheadReportThresholdInMicroseconds = 50;
 
-// String options that can be used to initialize TraceOptions.
-const char kRecordUntilFull[] = "record-until-full";
-const char kRecordContinuously[] = "record-continuously";
-const char kRecordAsMuchAsPossible[] = "record-as-much-as-possible";
-const char kTraceToConsole[] = "trace-to-console";
-const char kEnableSampling[] = "enable-sampling";
-const char kEnableSystrace[] = "enable-systrace";
-const char kEnableArgumentFilter[] = "enable-argument-filter";
-
 // Controls the number of trace events we will buffer in-memory
 // before throwing them away.
 const size_t kTraceBufferChunkSize = TraceBufferChunk::kTraceBufferChunkSize;
@@ -89,8 +80,6 @@ const int kThreadFlushTimeoutMs = 3000;
 // These categories will cause deadlock when ECHO_TO_CONSOLE. crbug.com/325575.
 const char kEchoToConsoleCategoryFilter[] = "-ipc,-task";
 #endif
-
-const char kSyntheticDelayCategoryFilterPrefix[] = "DELAY(";
 
 #define MAX_CATEGORY_GROUPS 100
 
@@ -125,9 +114,8 @@ base::subtle::AtomicWord g_category_index = g_num_builtin_categories;
 LazyInstance<ThreadLocalPointer<const char> >::Leaky
     g_current_thread_name = LAZY_INSTANCE_INITIALIZER;
 
-TimeTicks ThreadNow() {
-  return TimeTicks::IsThreadNowSupported() ?
-      TimeTicks::ThreadNow() : TimeTicks();
+ThreadTicks ThreadNow() {
+  return ThreadTicks::IsSupported() ? ThreadTicks::Now() : ThreadTicks();
 }
 
 class TraceBufferRingBuffer : public TraceBuffer {
@@ -384,7 +372,8 @@ void InitializeMetadataEvent(TraceEvent* trace_event,
   unsigned long long arg_value;
   ::trace_event_internal::SetTraceValue(value, &arg_type, &arg_value);
   trace_event->Initialize(thread_id,
-                          TimeTicks(), TimeTicks(), TRACE_EVENT_PHASE_METADATA,
+                          TraceTicks(), ThreadTicks(),
+                          TRACE_EVENT_PHASE_METADATA,
                           &g_category_group_enabled[g_category_metadata],
                           metadata_name, ::trace_event_internal::kNoEventId,
                           num_args, &arg_name, &arg_type, &arg_value, NULL,
@@ -529,8 +518,8 @@ void TraceEvent::CopyFrom(const TraceEvent& other) {
 
 void TraceEvent::Initialize(
     int thread_id,
-    TimeTicks timestamp,
-    TimeTicks thread_timestamp,
+    TraceTicks timestamp,
+    ThreadTicks thread_timestamp,
     char phase,
     const unsigned char* category_group_enabled,
     const char* name,
@@ -623,8 +612,8 @@ void TraceEvent::Reset() {
     convertable_values_[i] = NULL;
 }
 
-void TraceEvent::UpdateDuration(const TimeTicks& now,
-                                const TimeTicks& thread_now) {
+void TraceEvent::UpdateDuration(const TraceTicks& now,
+                                const ThreadTicks& thread_now) {
   DCHECK_EQ(duration_.ToInternalValue(), -1);
   duration_ = now - timestamp_;
   thread_duration_ = thread_now - thread_timestamp_;
@@ -990,69 +979,6 @@ TraceBucketData::~TraceBucketData() {
 
 ////////////////////////////////////////////////////////////////////////////////
 //
-// TraceOptions
-//
-////////////////////////////////////////////////////////////////////////////////
-
-bool TraceOptions::SetFromString(const std::string& options_string) {
-  record_mode = RECORD_UNTIL_FULL;
-  enable_sampling = false;
-  enable_systrace = false;
-
-  std::vector<std::string> split;
-  std::vector<std::string>::iterator iter;
-  base::SplitString(options_string, ',', &split);
-  for (iter = split.begin(); iter != split.end(); ++iter) {
-    if (*iter == kRecordUntilFull) {
-      record_mode = RECORD_UNTIL_FULL;
-    } else if (*iter == kRecordContinuously) {
-      record_mode = RECORD_CONTINUOUSLY;
-    } else if (*iter == kTraceToConsole) {
-      record_mode = ECHO_TO_CONSOLE;
-    } else if (*iter == kRecordAsMuchAsPossible) {
-      record_mode = RECORD_AS_MUCH_AS_POSSIBLE;
-    } else if (*iter == kEnableSampling) {
-      enable_sampling = true;
-    } else if (*iter == kEnableSystrace) {
-      enable_systrace = true;
-    } else if (*iter == kEnableArgumentFilter) {
-      enable_argument_filter = true;
-    } else {
-      return false;
-    }
-  }
-  return true;
-}
-
-std::string TraceOptions::ToString() const {
-  std::string ret;
-  switch (record_mode) {
-    case RECORD_UNTIL_FULL:
-      ret = kRecordUntilFull;
-      break;
-    case RECORD_CONTINUOUSLY:
-      ret = kRecordContinuously;
-      break;
-    case ECHO_TO_CONSOLE:
-      ret = kTraceToConsole;
-      break;
-    case RECORD_AS_MUCH_AS_POSSIBLE:
-      ret = kRecordAsMuchAsPossible;
-      break;
-    default:
-      NOTREACHED();
-  }
-  if (enable_sampling)
-    ret = ret + "," + kEnableSampling;
-  if (enable_systrace)
-    ret = ret + "," + kEnableSystrace;
-  if (enable_argument_filter)
-    ret = ret + "," + kEnableArgumentFilter;
-  return ret;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-//
 // TraceLog
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -1065,8 +991,8 @@ class TraceLog::ThreadLocalEventBuffer
 
   TraceEvent* AddTraceEvent(TraceEventHandle* handle);
 
-  void ReportOverhead(const TimeTicks& event_timestamp,
-                      const TimeTicks& event_thread_timestamp);
+  void ReportOverhead(const TraceTicks& event_timestamp,
+                      const ThreadTicks& event_thread_timestamp);
 
   TraceEvent* GetEventByHandle(TraceEventHandle handle) {
     if (!chunk_ || handle.chunk_seq != chunk_->seq() ||
@@ -1163,16 +1089,16 @@ TraceEvent* TraceLog::ThreadLocalEventBuffer::AddTraceEvent(
 }
 
 void TraceLog::ThreadLocalEventBuffer::ReportOverhead(
-    const TimeTicks& event_timestamp,
-    const TimeTicks& event_thread_timestamp) {
+    const TraceTicks& event_timestamp,
+    const ThreadTicks& event_thread_timestamp) {
   if (!g_category_group_enabled[g_category_trace_event_overhead])
     return;
 
   CheckThisIsCurrentBuffer();
 
   event_count_++;
-  TimeTicks thread_now = ThreadNow();
-  TimeTicks now = trace_log_->OffsetNow();
+  ThreadTicks thread_now = ThreadNow();
+  TraceTicks now = trace_log_->OffsetNow();
   TimeDelta overhead = now - event_timestamp;
   if (overhead.InMicroseconds() >= kOverheadReportThresholdInMicroseconds) {
     TraceEvent* trace_event = AddTraceEvent(NULL);
@@ -1938,7 +1864,7 @@ TraceEventHandle TraceLog::AddTraceEvent(
     const scoped_refptr<ConvertableToTraceFormat>* convertable_values,
     unsigned char flags) {
   int thread_id = static_cast<int>(base::PlatformThread::CurrentId());
-  base::TimeTicks now = base::TimeTicks::NowFromSystemTraceTime();
+  base::TraceTicks now = base::TraceTicks::Now();
   return AddTraceEventWithThreadIdAndTimestamp(phase, category_group_enabled,
                                                name, id, thread_id, now,
                                                num_args, arg_names,
@@ -1952,7 +1878,7 @@ TraceEventHandle TraceLog::AddTraceEventWithThreadIdAndTimestamp(
     const char* name,
     unsigned long long id,
     int thread_id,
-    const TimeTicks& timestamp,
+    const TraceTicks& timestamp,
     int num_args,
     const char** arg_names,
     const unsigned char* arg_types,
@@ -1977,10 +1903,10 @@ TraceEventHandle TraceLog::AddTraceEventWithThreadIdAndTimestamp(
   if (flags & TRACE_EVENT_FLAG_MANGLE_ID)
     id = MangleEventId(id);
 
-  TimeTicks offset_event_timestamp = OffsetTimestamp(timestamp);
-  TimeTicks now = flags & TRACE_EVENT_FLAG_EXPLICIT_TIMESTAMP ?
+  TraceTicks offset_event_timestamp = OffsetTimestamp(timestamp);
+  TraceTicks now = flags & TRACE_EVENT_FLAG_EXPLICIT_TIMESTAMP ?
       OffsetNow() : offset_event_timestamp;
-  TimeTicks thread_now = ThreadNow();
+  ThreadTicks thread_now = ThreadNow();
 
   ThreadLocalEventBuffer* thread_local_event_buffer = NULL;
   // A ThreadLocalEventBuffer needs the message loop
@@ -2118,7 +2044,7 @@ TraceEventHandle TraceLog::AddTraceEventWithThreadIdAndTimestamp(
 // May be called when a COMPELETE event ends and the unfinished event has been
 // recycled (phase == TRACE_EVENT_PHASE_END and trace_event == NULL).
 std::string TraceLog::EventToConsoleMessage(unsigned char phase,
-                                            const TimeTicks& timestamp,
+                                            const TraceTicks& timestamp,
                                             TraceEvent* trace_event) {
   AutoLock thread_info_lock(thread_info_lock_);
 
@@ -2198,8 +2124,8 @@ void TraceLog::UpdateTraceEventDuration(
 
   AutoThreadLocalBoolean thread_is_in_trace_event(&thread_is_in_trace_event_);
 
-  TimeTicks thread_now = ThreadNow();
-  TimeTicks now = OffsetNow();
+  ThreadTicks thread_now = ThreadNow();
+  TraceTicks now = OffsetNow();
 
   std::string console_message;
   if (*category_group_enabled & ENABLED_FOR_RECORDING) {
@@ -2431,232 +2357,6 @@ void TraceLog::SetCurrentThreadBlocksMessageLoop() {
   }
 }
 
-bool CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-    const std::string& str) {
-  return  str.empty() ||
-          str.at(0) == ' ' ||
-          str.at(str.length() - 1) == ' ';
-}
-
-CategoryFilter::CategoryFilter(const std::string& filter_string) {
-  if (!filter_string.empty())
-    Initialize(filter_string);
-  else
-    Initialize(CategoryFilter::kDefaultCategoryFilterString);
-}
-
-CategoryFilter::CategoryFilter() {
-    Initialize(CategoryFilter::kDefaultCategoryFilterString);
-}
-
-CategoryFilter::CategoryFilter(const CategoryFilter& cf)
-    : included_(cf.included_),
-      disabled_(cf.disabled_),
-      excluded_(cf.excluded_),
-      delays_(cf.delays_) {
-}
-
-CategoryFilter::~CategoryFilter() {
-}
-
-CategoryFilter& CategoryFilter::operator=(const CategoryFilter& rhs) {
-  if (this == &rhs)
-    return *this;
-
-  included_ = rhs.included_;
-  disabled_ = rhs.disabled_;
-  excluded_ = rhs.excluded_;
-  delays_ = rhs.delays_;
-  return *this;
-}
-
-void CategoryFilter::Initialize(const std::string& filter_string) {
-  // Tokenize list of categories, delimited by ','.
-  StringTokenizer tokens(filter_string, ",");
-  // Add each token to the appropriate list (included_,excluded_).
-  while (tokens.GetNext()) {
-    std::string category = tokens.token();
-    // Ignore empty categories.
-    if (category.empty())
-      continue;
-    // Synthetic delays are of the form 'DELAY(delay;option;option;...)'.
-    if (category.find(kSyntheticDelayCategoryFilterPrefix) == 0 &&
-        category.at(category.size() - 1) == ')') {
-      category = category.substr(
-          strlen(kSyntheticDelayCategoryFilterPrefix),
-          category.size() - strlen(kSyntheticDelayCategoryFilterPrefix) - 1);
-      size_t name_length = category.find(';');
-      if (name_length != std::string::npos && name_length > 0 &&
-          name_length != category.size() - 1) {
-        delays_.push_back(category);
-      }
-    } else if (category.at(0) == '-') {
-      // Excluded categories start with '-'.
-      // Remove '-' from category string.
-      category = category.substr(1);
-      excluded_.push_back(category);
-    } else if (category.compare(0, strlen(TRACE_DISABLED_BY_DEFAULT("")),
-                                TRACE_DISABLED_BY_DEFAULT("")) == 0) {
-      disabled_.push_back(category);
-    } else {
-      included_.push_back(category);
-    }
-  }
-}
-
-void CategoryFilter::WriteString(const StringList& values,
-                                 std::string* out,
-                                 bool included) const {
-  bool prepend_comma = !out->empty();
-  int token_cnt = 0;
-  for (StringList::const_iterator ci = values.begin();
-       ci != values.end(); ++ci) {
-    if (token_cnt > 0 || prepend_comma)
-      StringAppendF(out, ",");
-    StringAppendF(out, "%s%s", (included ? "" : "-"), ci->c_str());
-    ++token_cnt;
-  }
-}
-
-void CategoryFilter::WriteString(const StringList& delays,
-                                 std::string* out) const {
-  bool prepend_comma = !out->empty();
-  int token_cnt = 0;
-  for (StringList::const_iterator ci = delays.begin();
-       ci != delays.end(); ++ci) {
-    if (token_cnt > 0 || prepend_comma)
-      StringAppendF(out, ",");
-    StringAppendF(out, "%s%s)", kSyntheticDelayCategoryFilterPrefix,
-                  ci->c_str());
-    ++token_cnt;
-  }
-}
-
-std::string CategoryFilter::ToString() const {
-  std::string filter_string;
-  WriteString(included_, &filter_string, true);
-  WriteString(disabled_, &filter_string, true);
-  WriteString(excluded_, &filter_string, false);
-  WriteString(delays_, &filter_string);
-  return filter_string;
-}
-
-bool CategoryFilter::IsCategoryGroupEnabled(
-    const char* category_group_name) const {
-  // TraceLog should call this method only as  part of enabling/disabling
-  // categories.
-
-  bool had_enabled_by_default = false;
-  DCHECK(category_group_name);
-  CStringTokenizer category_group_tokens(
-      category_group_name, category_group_name + strlen(category_group_name),
-      ",");
-  while (category_group_tokens.GetNext()) {
-    std::string category_group_token = category_group_tokens.token();
-    // Don't allow empty tokens, nor tokens with leading or trailing space.
-    DCHECK(!CategoryFilter::IsEmptyOrContainsLeadingOrTrailingWhitespace(
-               category_group_token))
-        << "Disallowed category string";
-    if (IsCategoryEnabled(category_group_token.c_str())) {
-      return true;
-    }
-    if (!MatchPattern(category_group_token.c_str(),
-                      TRACE_DISABLED_BY_DEFAULT("*")))
-      had_enabled_by_default = true;
-  }
-  // Do a second pass to check for explicitly disabled categories
-  // (those explicitly enabled have priority due to first pass).
-  category_group_tokens.Reset();
-  bool category_group_disabled = false;
-  while (category_group_tokens.GetNext()) {
-    std::string category_group_token = category_group_tokens.token();
-    for (StringList::const_iterator ci = excluded_.begin();
-         ci != excluded_.end(); ++ci) {
-      if (MatchPattern(category_group_token.c_str(), ci->c_str())) {
-        // Current token of category_group_name is present in excluded_list.
-        // Flag the exclusion and proceed further to check if any of the
-        // remaining categories of category_group_name is not present in the
-        // excluded_ list.
-        category_group_disabled = true;
-        break;
-      }
-      // One of the category of category_group_name is not present in
-      // excluded_ list. So, it has to be included_ list. Enable the
-      // category_group_name for recording.
-      category_group_disabled = false;
-    }
-    // One of the categories present in category_group_name is not present in
-    // excluded_ list. Implies this category_group_name group can be enabled
-    // for recording, since one of its groups is enabled for recording.
-    if (!category_group_disabled)
-      break;
-  }
-  // If the category group is not excluded, and there are no included patterns
-  // we consider this category group enabled, as long as it had categories
-  // other than disabled-by-default.
-  return !category_group_disabled &&
-         included_.empty() && had_enabled_by_default;
-}
-
-bool CategoryFilter::IsCategoryEnabled(const char* category_name) const {
-  StringList::const_iterator ci;
-
-  // Check the disabled- filters and the disabled-* wildcard first so that a
-  // "*" filter does not include the disabled.
-  for (ci = disabled_.begin(); ci != disabled_.end(); ++ci) {
-    if (MatchPattern(category_name, ci->c_str()))
-      return true;
-  }
-
-  if (MatchPattern(category_name, TRACE_DISABLED_BY_DEFAULT("*")))
-    return false;
-
-  for (ci = included_.begin(); ci != included_.end(); ++ci) {
-    if (MatchPattern(category_name, ci->c_str()))
-      return true;
-  }
-
-  return false;
-}
-
-bool CategoryFilter::HasIncludedPatterns() const {
-  return !included_.empty();
-}
-
-void CategoryFilter::Merge(const CategoryFilter& nested_filter) {
-  // Keep included patterns only if both filters have an included entry.
-  // Otherwise, one of the filter was specifying "*" and we want to honour the
-  // broadest filter.
-  if (HasIncludedPatterns() && nested_filter.HasIncludedPatterns()) {
-    included_.insert(included_.end(),
-                     nested_filter.included_.begin(),
-                     nested_filter.included_.end());
-  } else {
-    included_.clear();
-  }
-
-  disabled_.insert(disabled_.end(),
-                   nested_filter.disabled_.begin(),
-                   nested_filter.disabled_.end());
-  excluded_.insert(excluded_.end(),
-                   nested_filter.excluded_.begin(),
-                   nested_filter.excluded_.end());
-  delays_.insert(delays_.end(),
-                 nested_filter.delays_.begin(),
-                 nested_filter.delays_.end());
-}
-
-void CategoryFilter::Clear() {
-  included_.clear();
-  disabled_.clear();
-  excluded_.clear();
-}
-
-const CategoryFilter::StringList&
-    CategoryFilter::GetSyntheticDelayValues() const {
-  return delays_;
-}
-
 }  // namespace trace_event
 }  // namespace base
 
@@ -2676,8 +2376,8 @@ ScopedTraceBinaryEfficient::ScopedTraceBinaryEfficient(
             TRACE_EVENT_PHASE_COMPLETE, category_group_enabled_, name,
             trace_event_internal::kNoEventId,
             static_cast<int>(base::PlatformThread::CurrentId()),
-            base::TimeTicks::NowFromSystemTraceTime(),
-            0, NULL, NULL, NULL, NULL, TRACE_EVENT_FLAG_NONE);
+            base::TraceTicks::Now(), 0, NULL, NULL, NULL, NULL,
+            TRACE_EVENT_FLAG_NONE);
   }
 }
 

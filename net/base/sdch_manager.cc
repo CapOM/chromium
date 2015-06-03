@@ -81,7 +81,7 @@ void SdchManager::DictionarySet::AddDictionary(
   dictionaries_[server_hash] = dictionary;
 }
 
-SdchManager::SdchManager() : factory_(this) {
+SdchManager::SdchManager() {
   DCHECK(thread_checker_.CalledOnValidThread());
 }
 
@@ -91,12 +91,6 @@ SdchManager::~SdchManager() {
     auto it = dictionaries_.begin();
     dictionaries_.erase(it->first);
   }
-#if defined(OS_CHROMEOS)
-  // For debugging http://crbug.com/454198; remove when resolved.
-
-  // Explicitly confirm that we can't notify any observers anymore.
-  CHECK(!observers_.might_have_observers());
-#endif
 }
 
 void SdchManager::ClearData() {
@@ -474,11 +468,6 @@ SdchManager::CreateEmptyDictionarySetForTesting() {
   return scoped_ptr<DictionarySet>(new DictionarySet).Pass();
 }
 
-// For investigation of http://crbug.com/454198; remove when resolved.
-base::WeakPtr<SdchManager> SdchManager::GetWeakPtr() {
-  return factory_.GetWeakPtr();
-}
-
 // static
 void SdchManager::UrlSafeBase64Encode(const std::string& input,
                                       std::string* output) {
@@ -489,46 +478,46 @@ void SdchManager::UrlSafeBase64Encode(const std::string& input,
   std::replace(output->begin(), output->end(), '/', '_');
 }
 
-base::Value* SdchManager::SdchInfoToValue() const {
-  base::DictionaryValue* value = new base::DictionaryValue();
+scoped_ptr<base::Value> SdchManager::SdchInfoToValue() const {
+  scoped_ptr<base::DictionaryValue> value(new base::DictionaryValue());
 
   value->SetBoolean("sdch_enabled", sdch_enabled());
   value->SetBoolean("secure_scheme_support", secure_scheme_supported());
 
-  base::ListValue* entry_list = new base::ListValue();
+  scoped_ptr<base::ListValue> entry_list(new base::ListValue());
   for (const auto& entry: dictionaries_) {
-    base::DictionaryValue* entry_dict = new base::DictionaryValue();
+    scoped_ptr<base::DictionaryValue> entry_dict(new base::DictionaryValue());
     entry_dict->SetString("url", entry.second->data.url().spec());
     entry_dict->SetString("client_hash", entry.second->data.client_hash());
     entry_dict->SetString("domain", entry.second->data.domain());
     entry_dict->SetString("path", entry.second->data.path());
-    base::ListValue* port_list = new base::ListValue();
+    scoped_ptr<base::ListValue> port_list(new base::ListValue());
     for (std::set<int>::const_iterator port_it =
              entry.second->data.ports().begin();
          port_it != entry.second->data.ports().end(); ++port_it) {
       port_list->AppendInteger(*port_it);
     }
-    entry_dict->Set("ports", port_list);
+    entry_dict->Set("ports", port_list.Pass());
     entry_dict->SetString("server_hash", entry.first);
-    entry_list->Append(entry_dict);
+    entry_list->Append(entry_dict.Pass());
   }
-  value->Set("dictionaries", entry_list);
+  value->Set("dictionaries", entry_list.Pass());
 
-  entry_list = new base::ListValue();
+  entry_list.reset(new base::ListValue());
   for (DomainBlacklistInfo::const_iterator it = blacklisted_domains_.begin();
        it != blacklisted_domains_.end(); ++it) {
     if (it->second.count == 0)
       continue;
-    base::DictionaryValue* entry_dict = new base::DictionaryValue();
+    scoped_ptr<base::DictionaryValue> entry_dict(new base::DictionaryValue());
     entry_dict->SetString("domain", it->first);
     if (it->second.count != INT_MAX)
       entry_dict->SetInteger("tries", it->second.count);
     entry_dict->SetInteger("reason", it->second.reason);
-    entry_list->Append(entry_dict);
+    entry_list->Append(entry_dict.Pass());
   }
-  value->Set("blacklisted", entry_list);
+  value->Set("blacklisted", entry_list.Pass());
 
-  return value;
+  return value.Pass();
 }
 
 }  // namespace net

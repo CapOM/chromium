@@ -4,6 +4,7 @@
 
 #include "content/public/renderer/content_renderer_client.h"
 
+#include "content/public/renderer/media_stream_renderer_factory.h"
 #include "media/base/renderer_factory.h"
 #include "third_party/WebKit/public/platform/modules/app_banner/WebAppBannerClient.h"
 #include "third_party/WebKit/public/web/WebPluginPlaceholder.h"
@@ -123,11 +124,6 @@ bool ContentRendererClient::ShouldFork(blink::WebFrame* frame,
   return false;
 }
 
-bool ContentRendererClient::ShouldForwardToGuestContainer(
-    const IPC::Message& msg) {
-  return false;
-}
-
 bool ContentRendererClient::WillSendRequest(
     blink::WebFrame* frame,
     ui::PageTransition transition_type,
@@ -179,6 +175,11 @@ scoped_ptr<media::RendererFactory>
 ContentRendererClient::CreateMediaRendererFactory(
     RenderFrame* render_frame,
     const scoped_refptr<media::MediaLog>& media_log) {
+  return nullptr;
+}
+
+scoped_ptr<MediaStreamRendererFactory>
+ContentRendererClient::CreateMediaStreamRendererFactory() {
   return nullptr;
 }
 

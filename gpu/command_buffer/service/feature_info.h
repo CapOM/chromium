@@ -110,10 +110,6 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
     return &validators_;
   }
 
-  const ValueValidator<GLenum>& GetTextureFormatValidator(GLenum format) {
-    return texture_format_validators_[format];
-  }
-
   const std::string& extensions() const {
     return extensions_;
   }
@@ -134,12 +130,13 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
   bool IsES3Capable() const;
   void EnableES3Validators();
 
+  bool IsES3Enabled() const {
+    return unsafe_es3_apis_enabled_;
+  }
+
  private:
   friend class base::RefCounted<FeatureInfo>;
   friend class BufferManagerClientSideArraysTest;
-
-  typedef base::hash_map<GLenum, ValueValidator<GLenum> > ValidatorMap;
-  ValidatorMap texture_format_validators_;
 
   ~FeatureInfo();
 
@@ -161,6 +158,8 @@ class GPU_EXPORT FeatureInfo : public base::RefCounted<FeatureInfo> {
   Workarounds workarounds_;
 
   // Whether the command line switch kEnableUnsafeES3APIs is passed in.
+  bool enable_unsafe_es3_apis_switch_;
+
   bool unsafe_es3_apis_enabled_;
 
   scoped_ptr<gfx::GLVersionInfo> gl_version_info_;

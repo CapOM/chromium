@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "base/basictypes.h"
-#include "base/command_line.h"
 #include "base/debug/crash_logging.h"
 #include "base/i18n/break_iterator.h"
 #include "base/logging.h"
@@ -42,7 +41,7 @@
 #include "net/base/escape.h"
 #include "net/base/net_util.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
-#include "url/url_parse.h"
+#include "url/third_party/mozilla/url_parse.h"
 #include "url/url_util.h"
 
 bool HistoryQuickProvider::disabled_ = false;

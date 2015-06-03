@@ -39,7 +39,6 @@
 #include "ui/aura/window_tracker.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/compositor/compositor.h"
-#include "ui/compositor/compositor_vsync_manager.h"
 #include "ui/gfx/display.h"
 #include "ui/gfx/screen.h"
 #include "ui/wm/core/coordinate_conversion.h"
@@ -153,9 +152,9 @@ void SetDisplayPropertiesOnHost(AshWindowTreeHost* ash_host,
   DisplayMode mode =
       GetDisplayManager()->GetActiveModeForDisplayId(display.id());
   if (mode.refresh_rate > 0.0f) {
-    host->compositor()->vsync_manager()->SetAuthoritativeVSyncInterval(
-        base::TimeDelta::FromMicroseconds(
-            base::Time::kMicrosecondsPerSecond / mode.refresh_rate));
+    host->compositor()->SetAuthoritativeVSyncInterval(
+        base::TimeDelta::FromMicroseconds(base::Time::kMicrosecondsPerSecond /
+                                          mode.refresh_rate));
   }
 
   // Just movnig the display requires the full redraw.
@@ -845,7 +844,10 @@ void DisplayController::PostDisplayConfigurationChange() {
   DisplayLayoutStore* layout_store = display_manager->layout_store();
   if (display_manager->num_connected_displays() > 1) {
     DisplayIdPair pair = display_manager->GetCurrentDisplayIdPair();
-    layout_store->UpdateMirrorStatus(pair, display_manager->IsInMirrorMode());
+    layout_store->UpdateMultiDisplayState(
+        pair, display_manager->IsInMirrorMode(),
+        display_manager->default_multi_display_mode() ==
+            DisplayManager::UNIFIED);
 
     if (Shell::GetScreen()->GetNumDisplays() > 1 ) {
       DisplayLayout layout = layout_store->GetRegisteredDisplayLayout(pair);

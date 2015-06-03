@@ -1104,13 +1104,6 @@
       'target_name': 'browser_chromeos',
       'type': 'static_library',
       'variables': {
-        'conditions': [
-          ['sysroot!=""', {
-            'pkg-config': '../build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
-          }, {
-            'pkg-config': 'pkg-config'
-          }],
-        ],
         # Override to dynamically link the cras (ChromeOS audio) library.
         'use_cras%': 0,
         'enable_wexit_time_destructors': 1,
@@ -1136,7 +1129,6 @@
         'safe_browsing_chunk_proto',
         'safe_browsing_proto',
         'safe_browsing_report_proto',
-        '../breakpad/breakpad.gyp:breakpad_client',
         '../build/linux/system.gyp:dbus',
         '../chromeos/chromeos.gyp:chromeos',
         '../chromeos/chromeos.gyp:chromeos_test_support',

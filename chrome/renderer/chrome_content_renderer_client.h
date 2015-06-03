@@ -43,6 +43,7 @@ namespace extensions {
 class Dispatcher;
 class Extension;
 class ExtensionSet;
+class ExtensionsGuestViewContainerDispatcher;
 class RendererPermissionsPolicyDelegate;
 }
 
@@ -114,7 +115,6 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
                   bool is_initial_navigation,
                   bool is_server_redirect,
                   bool* send_referrer) override;
-  bool ShouldForwardToGuestContainer(const IPC::Message& msg) override;
   bool WillSendRequest(blink::WebFrame* frame,
                        ui::PageTransition transition_type,
                        const GURL& url,
@@ -168,13 +168,11 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   void SetSpellcheck(SpellCheck* spellcheck);
 #endif
 
-#if defined(ENABLE_PLUGINS)
   static blink::WebPlugin* CreatePlugin(
       content::RenderFrame* render_frame,
       blink::WebLocalFrame* frame,
       const blink::WebPluginParams& params,
       const ChromeViewHostMsg_GetPluginInfo_Output& output);
-#endif
 
 #if defined(ENABLE_PLUGINS) && defined(ENABLE_EXTENSIONS)
   static bool IsExtensionOrSharedModuleWhitelisted(
@@ -226,6 +224,8 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   scoped_ptr<extensions::Dispatcher> extension_dispatcher_;
   scoped_ptr<extensions::RendererPermissionsPolicyDelegate>
       permissions_policy_delegate_;
+  scoped_ptr<extensions::ExtensionsGuestViewContainerDispatcher>
+      guest_view_container_dispatcher_;
 #endif
 
   scoped_ptr<network_hints::PrescientNetworkingDispatcher>

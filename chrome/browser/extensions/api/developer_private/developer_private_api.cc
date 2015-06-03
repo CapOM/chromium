@@ -19,6 +19,7 @@
 #include "chrome/browser/extensions/api/extension_action/extension_action_api.h"
 #include "chrome/browser/extensions/api/file_handlers/app_file_handler_util.h"
 #include "chrome/browser/extensions/devtools_util.h"
+#include "chrome/browser/extensions/extension_commands_global_registry.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_tab_util.h"
 #include "chrome/browser/extensions/extension_ui_util.h"
@@ -208,6 +209,7 @@ DeveloperPrivateEventRouter::DeveloperPrivateEventRouter(Profile* profile)
       warning_service_observer_(this),
       extension_prefs_observer_(this),
       extension_management_observer_(this),
+      command_service_observer_(this),
       profile_(profile),
       event_router_(EventRouter::Get(profile_)),
       weak_factory_(this) {
@@ -220,6 +222,7 @@ DeveloperPrivateEventRouter::DeveloperPrivateEventRouter(Profile* profile)
   extension_prefs_observer_.Add(ExtensionPrefs::Get(profile));
   extension_management_observer_.Add(
       ExtensionManagementFactory::GetForBrowserContext(profile));
+  command_service_observer_.Add(CommandService::Get(profile));
 }
 
 DeveloperPrivateEventRouter::~DeveloperPrivateEventRouter() {
@@ -307,6 +310,20 @@ void DeveloperPrivateEventRouter::OnAppWindowAdded(AppWindow* window) {
 void DeveloperPrivateEventRouter::OnAppWindowRemoved(AppWindow* window) {
   BroadcastItemStateChanged(developer::EVENT_TYPE_VIEW_UNREGISTERED,
                             window->extension_id());
+}
+
+void DeveloperPrivateEventRouter::OnExtensionCommandAdded(
+    const std::string& extension_id,
+    const Command& added_command) {
+  BroadcastItemStateChanged(developer::EVENT_TYPE_PREFS_CHANGED,
+                            extension_id);
+}
+
+void DeveloperPrivateEventRouter::OnExtensionCommandRemoved(
+    const std::string& extension_id,
+    const Command& removed_command) {
+  BroadcastItemStateChanged(developer::EVENT_TYPE_PREFS_CHANGED,
+                            extension_id);
 }
 
 void DeveloperPrivateEventRouter::OnExtensionActionVisibilityChanged(
@@ -1378,6 +1395,45 @@ ExtensionFunction::ResponseAction DeveloperPrivateShowPathFunction::Run() {
                                   extension->path().Append(kManifestFilename));
   return RespondNow(NoArguments());
 }
+
+DeveloperPrivateSetShortcutHandlingSuspendedFunction::
+~DeveloperPrivateSetShortcutHandlingSuspendedFunction() {}
+
+ExtensionFunction::ResponseAction
+DeveloperPrivateSetShortcutHandlingSuspendedFunction::Run() {
+  scoped_ptr<developer::SetShortcutHandlingSuspended::Params> params(
+      developer::SetShortcutHandlingSuspended::Params::Create(*args_));
+  EXTENSION_FUNCTION_VALIDATE(params);
+  ExtensionCommandsGlobalRegistry::Get(GetProfile())->
+      SetShortcutHandlingSuspended(params->is_suspended);
+  return RespondNow(NoArguments());
+}
+
+DeveloperPrivateUpdateExtensionCommandFunction::
+~DeveloperPrivateUpdateExtensionCommandFunction() {}
+
+ExtensionFunction::ResponseAction
+DeveloperPrivateUpdateExtensionCommandFunction::Run() {
+  scoped_ptr<developer::UpdateExtensionCommand::Params> params(
+      developer::UpdateExtensionCommand::Params::Create(*args_));
+  EXTENSION_FUNCTION_VALIDATE(params);
+  const developer::ExtensionCommandUpdate& update = params->update;
+
+  CommandService* command_service = CommandService::Get(GetProfile());
+
+  if (update.scope != developer::COMMAND_SCOPE_NONE) {
+    command_service->SetScope(update.extension_id, update.command_name,
+                              update.scope == developer::COMMAND_SCOPE_GLOBAL);
+  }
+
+  if (update.keybinding) {
+    command_service->UpdateKeybindingPrefs(
+        update.extension_id, update.command_name, *update.keybinding);
+  }
+
+  return RespondNow(NoArguments());
+}
+
 
 }  // namespace api
 

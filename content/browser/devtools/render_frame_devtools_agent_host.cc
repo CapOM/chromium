@@ -9,7 +9,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/devtools/devtools_frame_trace_recorder.h"
-#include "content/browser/devtools/protocol/devtools_protocol_handler.h"
+#include "content/browser/devtools/devtools_protocol_handler.h"
 #include "content/browser/devtools/protocol/dom_handler.h"
 #include "content/browser/devtools/protocol/emulation_handler.h"
 #include "content/browser/devtools/protocol/input_handler.h"
@@ -145,6 +145,10 @@ RenderFrameDevToolsAgentHost::RenderFrameDevToolsAgentHost(RenderFrameHost* rfh)
           devtools::tracing::TracingHandler::Renderer)),
       emulation_handler_(nullptr),
       frame_trace_recorder_(nullptr),
+      protocol_handler_(new DevToolsProtocolHandler(
+          this,
+          base::Bind(&RenderFrameDevToolsAgentHost::SendMessageToClient,
+                     base::Unretained(this)))),
       reattaching_(false) {
   DevToolsProtocolDispatcher* dispatcher = protocol_handler_->dispatcher();
   dispatcher->SetDOMHandler(dom_handler_.get());
@@ -177,14 +181,42 @@ WebContents* RenderFrameDevToolsAgentHost::GetWebContents() {
   return web_contents();
 }
 
-void RenderFrameDevToolsAgentHost::SendMessageToAgent(IPC::Message* msg) {
-  if (!render_frame_host_)
-    return;
-  msg->set_routing_id(render_frame_host_->GetRoutingID());
-  render_frame_host_->Send(msg);
+void RenderFrameDevToolsAgentHost::Attach() {
+  if (render_frame_host_) {
+    render_frame_host_->Send(new DevToolsAgentMsg_Attach(
+        render_frame_host_->GetRoutingID(), GetId()));
+  }
+  OnClientAttached();
 }
 
-void RenderFrameDevToolsAgentHost::OnClientAttached(bool reattached) {
+void RenderFrameDevToolsAgentHost::Detach() {
+  if (render_frame_host_) {
+    render_frame_host_->Send(new DevToolsAgentMsg_Detach(
+        render_frame_host_->GetRoutingID()));
+  }
+  OnClientDetached();
+}
+
+bool RenderFrameDevToolsAgentHost::DispatchProtocolMessage(
+    const std::string& message) {
+  if (protocol_handler_->HandleOptionalMessage(message))
+    return true;
+
+  if (render_frame_host_) {
+    render_frame_host_->Send(new DevToolsAgentMsg_DispatchOnInspectorBackend(
+        render_frame_host_->GetRoutingID(), message));
+  }
+  return true;
+}
+
+void RenderFrameDevToolsAgentHost::InspectElement(int x, int y) {
+  if (render_frame_host_) {
+    render_frame_host_->Send(new DevToolsAgentMsg_InspectElement(
+        render_frame_host_->GetRoutingID(), GetId(), x, y));
+  }
+}
+
+void RenderFrameDevToolsAgentHost::OnClientAttached() {
   if (!render_frame_host_)
     return;
 
@@ -407,6 +439,7 @@ void RenderFrameDevToolsAgentHost::SetRenderFrameHost(RenderFrameHost* rfh) {
       render_frame_host_->GetRenderWidgetHost());
   network_handler_->SetRenderFrameHost(render_frame_host_);
   service_worker_handler_->SetRenderFrameHost(render_frame_host_);
+  inspector_handler_->SetRenderFrameHost(render_frame_host_);
 
   if (emulation_handler_)
     emulation_handler_->SetRenderFrameHost(render_frame_host_);
@@ -425,6 +458,7 @@ void RenderFrameDevToolsAgentHost::ClearRenderFrameHost() {
   if (page_handler_)
     page_handler_->SetRenderFrameHost(nullptr);
   service_worker_handler_->SetRenderFrameHost(nullptr);
+  inspector_handler_->SetRenderFrameHost(nullptr);
 }
 
 void RenderFrameDevToolsAgentHost::DisconnectWebContents() {
@@ -474,8 +508,11 @@ bool RenderFrameDevToolsAgentHost::Close() {
 void RenderFrameDevToolsAgentHost::ConnectRenderFrameHost(
     RenderFrameHost* rfh) {
   SetRenderFrameHost(rfh);
-  if (IsAttached())
-    Reattach();
+  if (IsAttached() && render_frame_host_) {
+    render_frame_host_->Send(new DevToolsAgentMsg_Reattach(
+        render_frame_host_->GetRoutingID(), GetId(), state_cookie_));
+    OnClientAttached();
+  }
 }
 
 void RenderFrameDevToolsAgentHost::DisconnectRenderFrameHost() {
@@ -493,12 +530,12 @@ void RenderFrameDevToolsAgentHost::OnSwapCompositorFrame(
   if (!ViewHostMsg_SwapCompositorFrame::Read(&message, &param))
     return;
   if (page_handler_)
-    page_handler_->OnSwapCompositorFrame(get<1>(param).metadata);
+    page_handler_->OnSwapCompositorFrame(base::get<1>(param).metadata);
   if (input_handler_)
-    input_handler_->OnSwapCompositorFrame(get<1>(param).metadata);
+    input_handler_->OnSwapCompositorFrame(base::get<1>(param).metadata);
   if (frame_trace_recorder_) {
     frame_trace_recorder_->OnSwapCompositorFrame(
-        render_frame_host_, get<1>(param).metadata);
+        render_frame_host_, base::get<1>(param).metadata);
   }
 }
 

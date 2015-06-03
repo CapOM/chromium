@@ -40,11 +40,11 @@ class SpdyStreamTest;
 
 class SpdyFramer;
 class SpdyFrameBuilder;
-class SpdyFramerTest;
 
 namespace test {
 
 class TestSpdyVisitor;
+class SpdyFramerPeer;
 
 }  // namespace test
 
@@ -107,30 +107,12 @@ struct NET_EXPORT_PRIVATE SpdyAltSvcScratch {
   ~SpdyAltSvcScratch();
 
   void Reset() {
-    max_age = 0;
-    port = 0;
-    pid_len = 0;
-    host_len = 0;
-    origin_len = 0;
-    pid_buf_len = 0;
-    host_buf_len = 0;
-    origin_buf_len = 0;
-    protocol_id.reset();
-    host.reset();
-    origin.reset();
+    buffer.reset();
+    buffer_length = 0;
   }
 
-  uint32 max_age;
-  uint16 port;
-  uint8 pid_len;
-  uint8 host_len;
-  size_t origin_len;
-  size_t pid_buf_len;
-  size_t host_buf_len;
-  size_t origin_buf_len;
-  scoped_ptr<char[]> protocol_id;
-  scoped_ptr<char[]> host;
-  scoped_ptr<char[]> origin;
+  scoped_ptr<char[]> buffer;
+  size_t buffer_length = 0;
 };
 
 // SpdyFramerVisitorInterface is a set of callbacks for the SpdyFramer.
@@ -597,30 +579,6 @@ class NET_EXPORT_PRIVATE SpdyFramer {
   size_t header_table_size_bound() const;
 
  protected:
-  // TODO(jgraettinger): Switch to test peer pattern.
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, BasicCompression);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, ControlFrameSizesAreValidated);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, HeaderCompression);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, DecompressUncompressedFrame);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, ExpandBuffer_HeapSmash);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, HugeHeaderBlock);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, UnclosedStreamDataCompressors);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest,
-                           UnclosedStreamDataCompressorsOneByteAtATime);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest,
-                           UncompressLargerThanFrameBufferInitialSize);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, GetNumberRequiredContinuationFrames);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest,
-                           CreatePushPromiseThenContinuationUncompressed);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, ReadLargeSettingsFrame);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest,
-                           ReadLargeSettingsFrameInSmallChunks);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, ControlFrameAtMaxSizeLimit);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest, ControlFrameTooLarge);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest,
-                           TooLargeHeadersFrameUsesContinuation);
-  FRIEND_TEST_ALL_PREFIXES(SpdyFramerTest,
-                           TooLargePushPromiseFrameUsesContinuation);
   friend class HttpNetworkLayer;  // This is temporary for the server.
   friend class HttpNetworkTransactionTest;
   friend class HttpProxyClientSocketPoolTest;
@@ -630,6 +588,7 @@ class NET_EXPORT_PRIVATE SpdyFramer {
   friend class SpdySessionTest;
   friend class SpdyStreamTest;
   friend class test::TestSpdyVisitor;
+  friend class test::SpdyFramerPeer;
 
  private:
   // Internal breakouts from ProcessInput. Each returns the number of bytes

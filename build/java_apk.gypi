@@ -31,6 +31,8 @@
 #  additional_bundled_libs - Additional libraries what will be stripped and
 #    bundled in the apk.
 #  asset_location - The directory where assets are located.
+#  create_density_splits - Whether to create density-based apk splits. Splits
+#    are supported only for minSdkVersion >= 21.
 #  generated_src_dirs - Same as additional_src_dirs except used for .java files
 #    that are generated at build time. This should be set automatically by a
 #    target's dependencies. The .java files in these directories are not
@@ -51,7 +53,7 @@
 #    R.java files.
 #  use_chromium_linker - Enable the content dynamic linker that allows sharing the
 #    RELRO section of the native libraries between the different processes.
-#  load_library_from_zip_file - When using the dynamic linker, load the library
+#  load_library_from_zip - When using the dynamic linker, load the library
 #    directly out of the zip file.
 #  use_relocation_packer - Enable relocation packing. Relies on the chromium
 #    linker, so use_chromium_linker must also be enabled.
@@ -67,6 +69,7 @@
     'tested_apk_obfuscated_jar_path%': '/',
     'tested_apk_dex_path%': '/',
     'additional_input_paths': [],
+    'create_density_splits%': 0,
     'input_jars_paths': [],
     'library_dexed_jars_paths': [],
     'additional_src_dirs': [],
@@ -132,6 +135,7 @@
     'resource_zip_path': '<(intermediate_dir)/<(_target_name).resources.zip',
     'shared_resources%': 0,
     'final_apk_path%': '<(PRODUCT_DIR)/apks/<(apk_name).apk',
+    'final_apk_path_no_extension%': '<(PRODUCT_DIR)/apks/<(apk_name)',
     'final_abi_split_apk_path%': '<(PRODUCT_DIR)/apks/<(apk_name)-abi-<(android_app_abi).apk',
     'incomplete_apk_path': '<(intermediate_dir)/<(apk_name)-incomplete.apk',
     'apk_install_record': '<(intermediate_dir)/apk_install.record.stamp',
@@ -189,7 +193,7 @@
     'native_lib_target%': '',
     'native_lib_version_name%': '',
     'use_chromium_linker%' : 0,
-    'load_library_from_zip_file%' : 0,
+    'load_library_from_zip%' : 0,
     'use_relocation_packer%' : 0,
     'enable_chromium_linker_tests%': 0,
     'emma_instrument%': '<(emma_instrument)',
@@ -306,7 +310,7 @@
                   'linker_gcc_preprocess_defines': [],
                 },
               }],
-              ['load_library_from_zip_file == 1', {
+              ['load_library_from_zip == 1', {
                 'variables': {
                   'linker_load_from_zip_file_preprocess_defines': [
                     '--defines', 'ENABLE_CHROMIUM_LINKER_LIBRARY_IN_ZIP_FILE',
@@ -542,7 +546,6 @@
             'conditions': [
               ['create_abi_split == 0', {
                 'input_apk_path': '<(unsigned_standalone_apk_path)',
-                'load_library_from_zip': '<(load_library_from_zip_file)',
               }, {
                 'input_apk_path': '<(unsigned_apk_path)',
                 'load_library_from_zip': 0,
@@ -577,6 +580,7 @@
             'apk_name': '<(main_apk_name)-abi-<(android_app_abi)',
             'asset_location': '',
             'android_manifest_path': '<(split_android_manifest_path)',
+            'create_density_splits': 0,
           },
           'includes': [ 'android/package_resources_action.gypi' ],
         },
@@ -597,7 +601,6 @@
         {
           'action_name': 'finalize_split',
           'variables': {
-            'load_library_from_zip': '<(load_library_from_zip_file)',
             'output_apk_path': '<(final_abi_split_apk_path)',
             'conditions': [
               ['gyp_managed_install == 1', {
@@ -639,6 +642,7 @@
             '--build-device-configuration=<(build_device_config_path)',
             '--install-record=<(apk_install_record)',
             '--configuration-name=<(CONFIGURATION_NAME)',
+            '--android-sdk-tools', '<(android_sdk_tools)',
           ],
           'conditions': [
             ['create_abi_split == 1', {
@@ -653,8 +657,33 @@
               'action': [
                 '--apk-path=<(incomplete_apk_path)',
               ],
-            }]
+            }],
+            ['create_density_splits == 1', {
+              'inputs': [
+                '<(final_apk_path_no_extension)-density-hdpi.apk',
+                '<(final_apk_path_no_extension)-density-xhdpi.apk',
+                '<(final_apk_path_no_extension)-density-xxhdpi.apk',
+                '<(final_apk_path_no_extension)-density-tvdpi.apk',
+              ],
+              'action': [
+                '--split-apk-path=<(final_apk_path_no_extension)-density-hdpi.apk',
+                '--split-apk-path=<(final_apk_path_no_extension)-density-xhdpi.apk',
+                '--split-apk-path=<(final_apk_path_no_extension)-density-xxhdpi.apk',
+                '--split-apk-path=<(final_apk_path_no_extension)-density-tvdpi.apk',
+              ],
+            }],
           ],
+        },
+      ],
+    }],
+    ['create_density_splits == 1', {
+      'actions': [
+        {
+          'action_name': 'finalize_density_splits',
+          'variables': {
+            'density_splits': 1,
+          },
+          'includes': [ 'android/finalize_splits_action.gypi']
         },
       ],
     }],

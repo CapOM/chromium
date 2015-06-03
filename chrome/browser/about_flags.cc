@@ -372,30 +372,6 @@ const Experiment::Choice kExtensionContentVerificationChoices[] = {
     switches::kExtensionContentVerificationEnforceStrict },
 };
 
-// Note that the value is specified in seconds (where 0 is equivalent to
-// disabled).
-const Experiment::Choice kRememberCertificateErrorDecisionsChoices[] = {
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
-  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
-    switches::kRememberCertErrorDecisions,
-    "-1" },
-  { IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_ONE_DAY,
-    switches::kRememberCertErrorDecisions,
-    "86400" },
-  { IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_THREE_DAYS,
-    switches::kRememberCertErrorDecisions,
-    "259200" },
-  { IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_ONE_WEEK,
-    switches::kRememberCertErrorDecisions,
-    "604800" },
-  { IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_ONE_MONTH,
-    switches::kRememberCertErrorDecisions,
-    "2592000" },
-  { IDS_REMEMBER_CERTIFICATE_ERROR_DECISION_CHOICE_THREE_MONTHS,
-    switches::kRememberCertErrorDecisions,
-    "7776000" },
-};
-
 const Experiment::Choice kAutofillSyncCredentialChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", ""},
   { IDS_ALLOW_AUTOFILL_SYNC_CREDENTIAL,
@@ -404,16 +380,6 @@ const Experiment::Choice kAutofillSyncCredentialChoices[] = {
     password_manager::switches::kDisallowAutofillSyncCredentialForReauth, ""},
   { IDS_DISALLOW_AUTOFILL_SYNC_CREDENTIAL,
     password_manager::switches::kDisallowAutofillSyncCredential, ""},
-};
-
-const Experiment::Choice kSSLVersionMinChoices[] = {
-  { IDS_FLAGS_SSL_VERSION_DEFAULT, "", "" },
-  { IDS_FLAGS_SSL_VERSION_TLSV1, switches::kSSLVersionMin,
-    switches::kSSLVersionTLSv1 },
-  { IDS_FLAGS_SSL_VERSION_TLSV11, switches::kSSLVersionMin,
-    switches::kSSLVersionTLSv11 },
-  { IDS_FLAGS_SSL_VERSION_TLSV12, switches::kSSLVersionMin,
-    switches::kSSLVersionTLSv12 },
 };
 
 const Experiment::Choice kFillOnAccountSelectChoices[] = {
@@ -600,15 +566,6 @@ const Experiment kExperiments[] = {
     kOsAll,
     SINGLE_VALUE_TYPE(switches::kDisableExperimentalWebGL)
   },
-#if defined(OS_WIN) || defined(OS_MACOSX)
-  {
-    "enable-npapi",
-    IDS_FLAGS_ENABLE_NPAPI_NAME,
-    IDS_FLAGS_ENABLE_NPAPI_DESCRIPTION,
-    kOsWin | kOsMac,
-    SINGLE_VALUE_TYPE(switches::kEnableNpapi)
-  },
-#endif
   {
     "disable-webrtc",
     IDS_FLAGS_DISABLE_WEBRTC_NAME,
@@ -738,7 +695,7 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ENABLE_SMOOTH_SCROLLING_DESCRIPTION,
     // Can't expose the switch unless the code is compiled in.
     // On by default for the Mac (different implementation in WebKit).
-    kOsLinux,
+    kOsLinux | kOsWin,
     SINGLE_VALUE_TYPE(switches::kEnableSmoothScrolling)
   },
 #if defined(USE_AURA) || defined(OS_LINUX)
@@ -860,6 +817,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableExperimentalWebPlatformFeatures)
   },
   {
+    "enable-web-bluetooth",
+    IDS_FLAGS_WEB_BLUETOOTH_NAME,
+    IDS_FLAGS_WEB_BLUETOOTH_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kEnableWebBluetooth)
+  },
+  {
     "enable-devtools-experiments",
     IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_NAME,
     IDS_FLAGS_ENABLE_DEVTOOLS_EXPERIMENTS_DESCRIPTION,
@@ -889,6 +853,17 @@ const Experiment kExperiments[] = {
     kOsDesktop,
     SINGLE_VALUE_TYPE(switches::kEnableScrollPrediction)
   },
+#if defined(ENABLE_TOPCHROME_MD)
+  {
+    "top-chrome-md",
+    IDS_FLAGS_TOP_CHROME_MD,
+    IDS_FLAGS_TOP_CHROME_MD_DESCRIPTION,
+    kOsWin | kOsCrOS,
+    ENABLE_DISABLE_VALUE_TYPE(
+    switches::kTopChromeMDEnabled,
+    switches::kTopChromeMDDisabled)
+  },
+#endif
   {
     "touch-events",
     IDS_TOUCH_EVENTS_NAME,
@@ -999,15 +974,6 @@ const Experiment kExperiments[] = {
   },
 #endif  // defined(USE_ASH)
   {
-    "enable-pinch-virtual-viewport",
-    IDS_FLAGS_ENABLE_PINCH_VIRTUAL_VIEWPORT_NAME,
-    IDS_FLAGS_ENABLE_PINCH_VIRTUAL_VIEWPORT_DESCRIPTION,
-    kOsLinux | kOsWin | kOsCrOS | kOsAndroid,
-    ENABLE_DISABLE_VALUE_TYPE(
-        cc::switches::kEnablePinchVirtualViewport,
-        cc::switches::kDisablePinchVirtualViewport),
-  },
-  {
     "enable-viewport-meta",
     IDS_FLAGS_ENABLE_VIEWPORT_META_NAME,
     IDS_FLAGS_ENABLE_VIEWPORT_META_DESCRIPTION,
@@ -1097,6 +1063,14 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_ASH_ENABLE_SCREEN_ROTATION_ANIMATION_DESCRIPTION,
     kOsCrOS,
     MULTI_VALUE_TYPE(kAshScreenRotationAnimationChoices)
+  },
+  {
+    "ash-stable-overview-order",
+    IDS_FLAGS_ASH_STABLE_OVERVIEW_ORDER_NAME,
+    IDS_FLAGS_ASH_STABLE_OVERVIEW_ORDER_DESCRIPTION,
+    kOsCrOS,
+    ENABLE_DISABLE_VALUE_TYPE(ash::switches::kAshEnableStableOverviewOrder,
+                              ash::switches::kAshDisableStableOverviewOrder),
   },
 #endif  // defined(USE_ASH)
 #if defined(OS_CHROMEOS)
@@ -2021,20 +1995,6 @@ const Experiment kExperiments[] = {
   },
 #endif
   {
-    "enable-website-settings-manager",
-    IDS_FLAGS_ENABLE_WEBSITE_SETTINGS_NAME,
-    IDS_FLAGS_ENABLE_WEBSITE_SETTINGS_DESCRIPTION,
-    kOsDesktop,
-    SINGLE_VALUE_TYPE(switches::kEnableWebsiteSettingsManager)
-  },
-  {
-    "remember-cert-error-decisions",
-    IDS_FLAGS_REMEMBER_CERTIFICATE_ERROR_DECISIONS_NAME,
-    IDS_FLAGS_REMEMBER_CERTIFICATE_ERROR_DECISIONS_DESCRIPTION,
-    kOsAll,
-    MULTI_VALUE_TYPE(kRememberCertificateErrorDecisionsChoices)
-  },
-  {
     "enable-drop-sync-credential",
     IDS_FLAGS_ENABLE_DROP_SYNC_CREDENTIAL_NAME,
     IDS_FLAGS_ENABLE_DROP_SYNC_CREDENTIAL_DESCRIPTION,
@@ -2140,13 +2100,6 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(chromeos::switches::kDisableNewZIPUnpacker)
   },
 #endif  // defined(OS_CHROMEOS)
-  {
-    "ssl-version-min",
-    IDS_FLAGS_SSL_VERSION_MIN_NAME,
-    IDS_FLAGS_SSL_VERSION_MIN_DESCRIPTION,
-    kOsAll,
-    MULTI_VALUE_TYPE(kSSLVersionMinChoices)
-  },
   {
     "enable-credit-card-scan",
     IDS_FLAGS_ENABLE_CREDIT_CARD_SCAN_NAME,
@@ -2290,10 +2243,18 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kAllowInsecureLocalhost)
   },
   {
+    "enable-add-to-shelf",
+    IDS_FLAGS_ENABLE_ADD_TO_SHELF_NAME,
+    IDS_FLAGS_ENABLE_ADD_TO_SHELF_DESCRIPTION,
+    kOsDesktop,
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableAddToShelf,
+                              switches::kDisableAddToShelf)
+  },
+  {
     "bypass-app-banner-engagement-checks",
     IDS_FLAGS_BYPASS_APP_BANNER_ENGAGEMENT_CHECKS_NAME,
     IDS_FLAGS_BYPASS_APP_BANNER_ENGAGEMENT_CHECKS_DESCRIPTION,
-    kOsAndroid,
+    kOsAll,
     SINGLE_VALUE_TYPE(switches::kBypassAppBannerEngagementChecks)
   },
   {
@@ -2418,6 +2379,22 @@ const Experiment kExperiments[] = {
     IDS_FLAGS_TRY_SUPPORTED_CHANNEL_LAYOUTS_DESCRIPTION,
     kOsWin,
     SINGLE_VALUE_TYPE(switches::kTrySupportedChannelLayouts)
+  },
+#endif
+  {
+    "emphasize-titles-in-omnibox-dropdown",
+    IDS_FLAGS_EMPHASIZE_TITLES_IN_OMNIBOX_DROPDOWN_NAME,
+    IDS_FLAGS_EMPHASIZE_TITLES_IN_OMNIBOX_DROPDOWN_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kEmphasizeTitlesInOmniboxDropdown)
+  },
+#if defined(ENABLE_WEBRTC)
+  {
+    "enable-webrtc-dtls12",
+    IDS_FLAGS_ENABLE_WEBRTC_DTLS12_NAME,
+    IDS_FLAGS_ENABLE_WEBRTC_DTLS12_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kEnableWebRtcDtls12)
   },
 #endif
   // NOTE: Adding new command-line switches requires adding corresponding

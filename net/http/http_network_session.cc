@@ -52,8 +52,8 @@ ClientSocketPoolManager* CreateSocketPoolManager(
 }  // unnamed namespace
 
 // The maximum receive window sizes for HTTP/2 sessions and streams.
-const int32 kSpdySessionMaxRecvWindowSize = 10 * 1024 * 1024;  // 10 MB
-const int32 kSpdyStreamMaxRecvWindowSize = 10 * 1024 * 1024;   // 10 MB
+const int32 kSpdySessionMaxRecvWindowSize = 15 * 1024 * 1024;  // 15 MB
+const int32 kSpdyStreamMaxRecvWindowSize = 6 * 1024 * 1024;    //  6 MB
 // QUIC's socket receive buffer size.
 // We should adaptively set this buffer size, but for now, we'll use a size
 // that seems large enough to receive data at line rate for most connections,
@@ -250,34 +250,34 @@ SSLClientSocketPool* HttpNetworkSession::GetSocketPoolForSSLWithProxy(
       proxy_server);
 }
 
-base::Value* HttpNetworkSession::SocketPoolInfoToValue() const {
+scoped_ptr<base::Value> HttpNetworkSession::SocketPoolInfoToValue() const {
   // TODO(yutak): Should merge values from normal pools and WebSocket pools.
   return normal_socket_pool_manager_->SocketPoolInfoToValue();
 }
 
-base::Value* HttpNetworkSession::SpdySessionPoolInfoToValue() const {
+scoped_ptr<base::Value> HttpNetworkSession::SpdySessionPoolInfoToValue() const {
   return spdy_session_pool_.SpdySessionPoolInfoToValue();
 }
 
-base::Value* HttpNetworkSession::QuicInfoToValue() const {
-  base::DictionaryValue* dict = new base::DictionaryValue();
+scoped_ptr<base::Value> HttpNetworkSession::QuicInfoToValue() const {
+  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
   dict->Set("sessions", quic_stream_factory_.QuicStreamFactoryInfoToValue());
   dict->SetBoolean("quic_enabled", params_.enable_quic);
   dict->SetBoolean("quic_enabled_for_proxies", params_.enable_quic_for_proxies);
   dict->SetBoolean("enable_quic_port_selection",
                    params_.enable_quic_port_selection);
-  base::ListValue* connection_options = new base::ListValue;
+  scoped_ptr<base::ListValue> connection_options(new base::ListValue);
   for (QuicTagVector::const_iterator it =
            params_.quic_connection_options.begin();
        it != params_.quic_connection_options.end(); ++it) {
     connection_options->AppendString("'" + QuicUtils::TagToString(*it) + "'");
   }
-  dict->Set("connection_options", connection_options);
+  dict->Set("connection_options", connection_options.Pass());
   dict->SetString("origin_to_force_quic_on",
                   params_.origin_to_force_quic_on.ToString());
   dict->SetDouble("alternative_service_probability_threshold",
                   params_.alternative_service_probability_threshold);
-  return dict;
+  return dict.Pass();
 }
 
 void HttpNetworkSession::CloseAllConnections() {

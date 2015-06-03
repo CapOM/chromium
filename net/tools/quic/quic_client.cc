@@ -76,26 +76,26 @@ QuicClient::QuicClient(IPEndPoint server_address,
 
 QuicClient::~QuicClient() {
   if (connected()) {
-    session()->connection()->SendConnectionClosePacket(
-        QUIC_PEER_GOING_AWAY, "");
+    session()->connection()->SendConnectionClose(QUIC_PEER_GOING_AWAY);
   }
 
-  CleanUpUDPSocket();
+  CleanUpUDPSocketImpl();
 }
 
 bool QuicClient::Initialize() {
   DCHECK(!initialized_);
 
   // If an initial flow control window has not explicitly been set, then use the
-  // same value that Chrome uses: 10 Mb.
-  const uint32 kInitialFlowControlWindow = 10 * 1024 * 1024;  // 10 Mb
+  // same values that Chrome uses.
+  const uint32 kSessionMaxRecvWindowSize = 15 * 1024 * 1024;  // 15 MB
+  const uint32 kStreamMaxRecvWindowSize = 6 * 1024 * 1024;    //  6 MB
   if (config_.GetInitialStreamFlowControlWindowToSend() ==
       kMinimumFlowControlSendWindow) {
-    config_.SetInitialStreamFlowControlWindowToSend(kInitialFlowControlWindow);
+    config_.SetInitialStreamFlowControlWindowToSend(kStreamMaxRecvWindowSize);
   }
   if (config_.GetInitialSessionFlowControlWindowToSend() ==
       kMinimumFlowControlSendWindow) {
-    config_.SetInitialSessionFlowControlWindowToSend(kInitialFlowControlWindow);
+    config_.SetInitialSessionFlowControlWindowToSend(kSessionMaxRecvWindowSize);
   }
 
   epoll_server_->set_timeout_in_us(50 * 1000);
@@ -236,9 +236,14 @@ void QuicClient::Disconnect() {
 }
 
 void QuicClient::CleanUpUDPSocket() {
+  CleanUpUDPSocketImpl();
+}
+
+void QuicClient::CleanUpUDPSocketImpl() {
   if (fd_ > -1) {
     epoll_server_->UnregisterFD(fd_);
-    close(fd_);
+    int rc = close(fd_);
+    DCHECK_EQ(0, rc);
     fd_ = -1;
   }
 }

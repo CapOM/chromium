@@ -62,7 +62,6 @@
       'browser/command_updater_unittest.cc',
       'browser/component_updater/chrome_component_updater_configurator_unittest.cc',
       'browser/component_updater/cld_component_installer_unittest.cc',
-      'browser/component_updater/component_updater_service_unittest.cc',
       'browser/component_updater/supervised_user_whitelist_installer_unittest.cc',
       'browser/content_settings/content_settings_default_provider_unittest.cc',
       'browser/content_settings/content_settings_mock_observer.cc',
@@ -127,6 +126,7 @@
       'browser/mac/keystone_glue_unittest.mm',
       'browser/manifest/manifest_icon_selector_unittest.cc',
       'browser/media/native_desktop_media_list_unittest.cc',
+      'browser/media/midi_permission_context_unittest.cc',
       'browser/metrics/chrome_metrics_service_accessor_unittest.cc',
       'browser/metrics/cloned_install_detector_unittest.cc',
       'browser/metrics/drive_metrics_provider_unittest.cc',
@@ -209,19 +209,6 @@
       'browser/renderer_context_menu/render_view_context_menu_test_util.cc',
       'browser/renderer_context_menu/render_view_context_menu_test_util.h',
       'browser/renderer_host/chrome_render_widget_host_view_mac_history_swiper_unit_test.mm',
-      'browser/resources/google_now/background.js',
-      'browser/resources/google_now/background_test_util.js',
-      'browser/resources/google_now/background_unittest.gtestjs',
-      'browser/resources/google_now/cards.js',
-      'browser/resources/google_now/cards_unittest.gtestjs',
-      'browser/resources/google_now/common_test_util.js',
-      'browser/resources/google_now/utility.js',
-      'browser/resources/google_now/utility_test_util.js',
-      'browser/resources/google_now/utility_unittest.gtestjs',
-      'browser/resources/print_preview/data/measurement_system.js',
-      'browser/resources/print_preview/data/measurement_system_unittest.gtestjs',
-      'browser/resources/print_preview/print_preview_utils.js',
-      'browser/resources/print_preview/print_preview_utils_unittest.gtestjs',
       'browser/resources_util_unittest.cc',
       'browser/rlz/rlz_unittest.cc',
       'browser/search/contextual_search_policy_handler_android_unittest.cc',
@@ -388,7 +375,6 @@
       'browser/ui/cocoa/confirm_bubble_controller_unittest.mm',
       'browser/ui/cocoa/confirm_quit_panel_controller_unittest.mm',
       'browser/ui/cocoa/constrained_window/constrained_window_alert_unittest.mm',
-      'browser/ui/cocoa/constrained_window/constrained_window_animation_unittest.mm',
       'browser/ui/cocoa/constrained_window/constrained_window_button_unittest.mm',
       'browser/ui/cocoa/constrained_window/constrained_window_custom_window_unittest.mm',
       'browser/ui/cocoa/constrained_window/constrained_window_sheet_controller_unittest.mm',
@@ -468,6 +454,7 @@
       'browser/ui/cocoa/passwords/manage_passwords_bubble_manage_view_controller_unittest.mm',
       'browser/ui/cocoa/passwords/manage_passwords_bubble_never_save_view_controller_unittest.mm',
       'browser/ui/cocoa/passwords/manage_passwords_bubble_pending_view_controller_unittest.mm',
+      'browser/ui/cocoa/passwords/manage_passwords_bubble_save_view_controller_unittest.mm',
       'browser/ui/cocoa/passwords/manage_passwords_controller_test.h',
       'browser/ui/cocoa/passwords/manage_passwords_controller_test.mm',
       'browser/ui/cocoa/profiles/avatar_button_controller_unittest.mm',
@@ -565,9 +552,6 @@
       'renderer/instant_restricted_id_cache_unittest.cc',
       'renderer/plugins/plugin_uma_unittest.cc',
       'renderer/prerender/prerender_dispatcher_unittest.cc',
-      'renderer/resources/extensions/notifications_custom_bindings.js',
-      'renderer/resources/extensions/notifications_custom_bindings.gtestjs',
-      'renderer/resources/extensions/notifications_test_util.js',
       'renderer/searchbox/search_bouncer_unittest.cc',
       'renderer/searchbox/searchbox_extension_unittest.cc',
       'renderer/searchbox/searchbox_unittest.cc',
@@ -608,7 +592,6 @@
       '../tools/json_schema_compiler/test/idl_schemas_unittest.cc',
       '../tools/json_schema_compiler/test/objects_unittest.cc',
       '../tools/json_schema_compiler/test/simple_api_unittest.cc',
-      '../ui/webui/resources/js/cr.js',
     ],
     'chrome_unit_tests_spellchecker_sources': [
       'browser/spellchecker/feedback_sender_unittest.cc',
@@ -932,6 +915,7 @@
       'browser/ui/ash/chrome_screenshot_grabber_unittest.cc',
       'browser/ui/ash/ime_controller_chromeos_unittest.cc',
       'browser/ui/ash/launcher/chrome_launcher_controller_unittest.cc',
+      'browser/ui/ash/launcher/launcher_application_menu_item_model_unittest.cc',
       'browser/ui/ash/launcher/launcher_context_menu_unittest.cc',
       'browser/ui/ash/multi_user/multi_user_context_menu_chromeos_unittest.cc',
       'browser/ui/ash/multi_user/multi_user_notification_blocker_chromeos_unittest.cc',
@@ -939,6 +923,12 @@
       'browser/ui/ash/session_state_delegate_chromeos_unittest.cc',
       'browser/ui/ash/window_positioner_unittest.cc',
       'browser/ui/window_sizer/window_sizer_ash_unittest.cc',
+    ],
+    'chrome_test_support_unit_ash_sources': [
+      'browser/ui/ash/launcher/test/test_chrome_launcher_app_menu_item.cc',
+      'browser/ui/ash/launcher/test/test_chrome_launcher_app_menu_item.h',
+      'browser/ui/ash/launcher/test/launcher_application_menu_item_model_test_api.cc',
+      'browser/ui/ash/launcher/test/launcher_application_menu_item_model_test_api.h',
     ],
     'chrome_unit_tests_task_manager_sources': [
       # New Task Manager Tests Sources:
@@ -1110,6 +1100,27 @@
       'browser/media/webrtc_rtp_dump_handler_unittest.cc',
       'browser/media/webrtc_rtp_dump_writer_unittest.cc',
       'renderer/media/chrome_webrtc_log_message_delegate_unittest.cc',
+    ],
+    'chrome_unit_tests_js_sources': [
+      'browser/resources/google_now/background.js',
+      'browser/resources/google_now/background_test_util.js',
+      'browser/resources/google_now/cards.js',
+      'browser/resources/google_now/common_test_util.js',
+      'browser/resources/google_now/utility.js',
+      'browser/resources/google_now/utility_test_util.js',
+      'browser/resources/print_preview/data/measurement_system.js',
+      'browser/resources/print_preview/print_preview_utils.js',
+      'renderer/resources/extensions/notifications_custom_bindings.js',
+      'renderer/resources/extensions/notifications_test_util.js',
+      '../ui/webui/resources/js/cr.js',
+    ],
+    'chrome_unit_tests_gtestjs_sources': [
+      'browser/resources/google_now/background_unittest.gtestjs',
+      'browser/resources/google_now/cards_unittest.gtestjs',
+      'browser/resources/google_now/utility_unittest.gtestjs',
+      'browser/resources/print_preview/data/measurement_system_unittest.gtestjs',
+      'browser/resources/print_preview/print_preview_utils_unittest.gtestjs',
+      'renderer/resources/extensions/notifications_custom_bindings.gtestjs',
     ],
     'chrome_unit_tests_chromeos_sources': [
       'browser/chromeos/accessibility/magnification_manager_unittest.cc',
@@ -1314,8 +1325,6 @@
       'browser/extensions/updater/local_extension_cache_unittest.cc',
       'browser/metrics/chromeos_metrics_provider_unittest.cc',
       'browser/notifications/login_state_notification_blocker_chromeos_unittest.cc',
-      'browser/resources/chromeos/braille_ime/braille_ime.js',
-      'browser/resources/chromeos/braille_ime/braille_ime_unittest.gtestjs',
       # TODO(zturner): Enable this on Windows. See
       # BrowserWithTestWindowTest::SetUp() for a comment explaining why this is
       # broken.
@@ -1329,6 +1338,12 @@
       'browser/ui/webui/options/chromeos/cros_language_options_handler_unittest.cc',
       'common/extensions/api/file_browser_handlers/file_browser_handler_manifest_unittest.cc',
       'common/extensions/api/file_system_provider/file_system_provider_handler_unittest.cc',
+    ],
+    'chrome_unit_tests_chromeos_js_sources': [
+      'browser/resources/chromeos/braille_ime/braille_ime.js',
+    ],
+    'chrome_unit_tests_chromeos_gtestjs_sources': [
+      'browser/resources/chromeos/braille_ime/braille_ime_unittest.gtestjs',
     ],
     'chrome_unit_tests_desktop_linux_sources': [
       'browser/password_manager/native_backend_kwallet_x_unittest.cc',
@@ -1421,12 +1436,14 @@
     'chrome_unit_tests_media_router_sources': [
       'browser/media/router/issue_manager_unittest.cc',
       'browser/media/router/issue_unittest.cc',
+      'browser/media/router/media_router_mojo_impl_unittest.cc',
       'browser/media/router/media_router_type_converters_unittest.cc',
       'browser/media/router/media_route_unittest.cc',
       'browser/media/router/media_sink_unittest.cc',
       'browser/media/router/media_source_helper_unittest.cc',
       'browser/media/router/media_source_unittest.cc',
       'browser/media/router/presentation_media_sinks_observer_unittest.cc',
+      'browser/media/router/presentation_service_delegate_impl_unittest.cc',
       'browser/ui/webui/media_router/media_cast_mode_unittest.cc',
       'browser/ui/webui/media_router/media_router_dialog_controller_unittest.cc',
       'browser/ui/webui/media_router/media_router_test.cc',
@@ -1618,7 +1635,6 @@
         '../components/components.gyp:invalidation_test_support',
         '../components/components.gyp:metrics_test_support',
         '../components/components.gyp:omnibox_test_support',
-        '../components/components.gyp:ownership',
         '../components/components.gyp:password_manager_core_browser_test_support',
         '../components/components.gyp:pref_registry_test_support',
         '../components/components.gyp:rappor_test_support',
@@ -2013,6 +2029,11 @@
             'browser/ui/views/toolbar/browser_action_test_util_views.cc',
           ]
         }],
+        ['chromeos==1', {
+          'dependencies': [
+            '../components/components.gyp:ownership',
+          ],
+        }],
         ['enable_mdns==1', {
           'sources': [
             'browser/local_discovery/test_service_discovery_client.cc',
@@ -2091,7 +2112,10 @@
           'dependencies': [
             'browser/media/router/media_router.gyp:media_router_test_support',
           ],
-        }],         
+        }],
+        ['use_ash==1', {
+          'sources': [ '<@(chrome_test_support_unit_ash_sources)' ],
+        }],
       ],
     },
     {
@@ -2147,7 +2171,11 @@
           ],
         },
       },
-      'sources': [ '<@(chrome_unit_tests_sources)' ],
+      'sources': [
+        '<@(chrome_unit_tests_sources)',
+        '<@(chrome_unit_tests_js_sources)',
+        '<@(chrome_unit_tests_gtestjs_sources)',
+      ],
       'conditions': [
         ['OS!="ios"', {
           'dependencies': [
@@ -2374,7 +2402,11 @@
           'sources': [ '<@(chrome_unit_tests_webrtc_sources)' ],
         }],
         ['chromeos==1', {
-          'sources': [ '<@(chrome_unit_tests_chromeos_sources)' ],
+          'sources': [
+            '<@(chrome_unit_tests_chromeos_sources)',
+            '<@(chrome_unit_tests_chromeos_gtestjs_sources)',
+            '<@(chrome_unit_tests_chromeos_js_sources)',
+          ],
           'dependencies': [
             '../ash/ash_resources.gyp:ash_resources',
             '../ui/chromeos/ui_chromeos.gyp:ui_chromeos_resources',
@@ -2525,6 +2557,11 @@
             ['win_use_allocator_shim==1', {
               'dependencies': [
                 '<(allocator_target)',
+              ],
+            }],
+            ['branding!="Chrome"', {
+              'sources!': [
+                'browser/google/google_update_win_unittest.cc',
               ],
             }],
           ],

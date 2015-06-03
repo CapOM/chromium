@@ -9,6 +9,7 @@
 #include "base/macros.h"
 #include "base/memory/ref_counted.h"
 #include "base/time/time.h"
+#include "chromecast/public/media/stream_id.h"
 
 namespace media {
 class DecryptConfig;
@@ -24,6 +25,10 @@ class DecoderBufferBase
     : public base::RefCountedThreadSafe<DecoderBufferBase> {
  public:
   DecoderBufferBase();
+
+  // Returns the stream id of this decoder buffer belonging to. it's optional
+  // and default value is kPrimary.
+  virtual StreamId stream_id() const = 0;
 
   // Returns the PTS of the frame.
   virtual base::TimeDelta timestamp() const = 0;

@@ -295,6 +295,8 @@
             '../base/base.gyp:chromium_android_linker',
             '../breakpad/breakpad.gyp:dump_syms',
             '../build/android/rezip.gyp:rezip_apk_jar',
+            '../chrome/chrome.gyp:chrome_public_apk',
+            '../chrome/chrome.gyp:chrome_public_test_apk',
             '../chrome/chrome.gyp:chrome_shell_apk',
             '../chrome/chrome.gyp:chromedriver_webview_shell_apk',
             #"//clank" TODO(GYP) - conditional somehow?
@@ -615,8 +617,6 @@
           'dependencies': [
             # TODO(GYP): All of these targets still need to be converted.
             '../base/base.gyp:debug_message',
-            '../chrome/chrome.gyp:app_installer',
-            '../chrome/chrome.gyp:app_installer_unittests',
             '../chrome/chrome.gyp:app_shim',
             '../chrome/chrome.gyp:gcapi_dll',
             '../chrome/chrome.gyp:gcapi_test',

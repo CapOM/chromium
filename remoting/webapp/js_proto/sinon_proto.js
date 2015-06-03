@@ -150,6 +150,11 @@ sinon.FakeXhrCtrl = function() {};
  */
 sinon.FakeXhrCtrl.prototype.onCreate;
 
+/**
+ * @type {function():void}
+ */
+sinon.FakeXhrCtrl.prototype.restore;
+
 /** @return {sinon.FakeXhrCtrl} */
 sinon.useFakeXMLHttpRequest = function() {};
 
@@ -171,12 +176,12 @@ sinon.FakeXhr.prototype.withCredentials;
 /** @type {?string} */
 sinon.FakeXhr.prototype.requestBody;
 
-/** @type {!Object<string,string>} */
+/** @type {!Object<string>} */
 sinon.FakeXhr.prototype.requestHeaders;
 
 /**
  * @param {number} status
- * @param {!Object<string,string>} headers
+ * @param {!Object<string>} headers
  * @param {?string} content
  */
 sinon.FakeXhr.prototype.respond;

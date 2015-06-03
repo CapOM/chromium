@@ -11,10 +11,11 @@ namespace content {
 
 PepperProxyChannelDelegateImpl::~PepperProxyChannelDelegateImpl() {}
 
-base::MessageLoopProxy* PepperProxyChannelDelegateImpl::GetIPCMessageLoop() {
+base::SingleThreadTaskRunner*
+PepperProxyChannelDelegateImpl::GetIPCTaskRunner() {
   // This is called only in the renderer so we know we have a child process.
   DCHECK(ChildProcess::current()) << "Must be in the renderer.";
-  return ChildProcess::current()->io_message_loop_proxy();
+  return ChildProcess::current()->io_task_runner();
 }
 
 base::WaitableEvent* PepperProxyChannelDelegateImpl::GetShutdownEvent() {
@@ -28,6 +29,21 @@ PepperProxyChannelDelegateImpl::ShareHandleWithRemote(
     base::ProcessId remote_pid,
     bool should_close_source) {
   return BrokerGetFileHandleForProcess(handle, remote_pid, should_close_source);
+}
+
+base::SharedMemoryHandle
+PepperProxyChannelDelegateImpl::ShareSharedMemoryHandleWithRemote(
+    const base::SharedMemoryHandle& handle,
+    base::ProcessId remote_pid) {
+  base::PlatformFile local_platform_file =
+#if defined(OS_POSIX)
+      handle.fd;
+#elif defined(OS_WIN)
+      handle;
+#else
+#error Not implemented.
+#endif
+  return ShareHandleWithRemote(local_platform_file, remote_pid, false);
 }
 
 }  // namespace content

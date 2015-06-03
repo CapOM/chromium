@@ -11,13 +11,13 @@
 #include "base/memory/weak_ptr.h"
 #include "base/single_thread_task_runner.h"
 #include "cc/trees/layer_tree_host_client.h"
-#include "components/gpu/public/interfaces/gpu.mojom.h"
-#include "components/surfaces/public/interfaces/surfaces.mojom.h"
+#include "components/view_manager/public/interfaces/gpu.mojom.h"
+#include "components/view_manager/public/interfaces/surfaces.mojom.h"
 #include "mojo/cc/output_surface_mojo.h"
 #include "third_party/WebKit/public/platform/WebLayerTreeView.h"
 
 namespace base {
-class MessageLoopProxy;
+class SingleThreadTaskRunner;
 }
 
 namespace blink {
@@ -39,7 +39,7 @@ class WebLayerTreeViewImpl : public blink::WebLayerTreeView,
                              public mojo::OutputSurfaceMojoClient {
  public:
   WebLayerTreeViewImpl(
-      scoped_refptr<base::MessageLoopProxy> compositor_message_loop_proxy,
+      scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner,
       mojo::SurfacePtr surface,
       mojo::GpuPtr gpu_service);
   ~WebLayerTreeViewImpl() override;
@@ -56,9 +56,6 @@ class WebLayerTreeViewImpl : public blink::WebLayerTreeView,
   void ApplyViewportDeltas(const gfx::Vector2dF& inner_delta,
                            const gfx::Vector2dF& outer_delta,
                            const gfx::Vector2dF& elastic_overscroll_delta,
-                           float page_scale,
-                           float top_controls_delta) override;
-  void ApplyViewportDeltas(const gfx::Vector2d& scroll_delta,
                            float page_scale,
                            float top_controls_delta) override;
   void RequestNewOutputSurface() override;

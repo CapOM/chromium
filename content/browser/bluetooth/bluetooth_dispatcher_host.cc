@@ -10,20 +10,25 @@
 #include "device/bluetooth/bluetooth_adapter_factory.h"
 #include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
+#include "device/bluetooth/bluetooth_gatt_service.h"
 
 using device::BluetoothAdapter;
 using device::BluetoothAdapterFactory;
+using device::BluetoothGattService;
 
 namespace content {
 
-const int kScanTime = 5;  // 5 seconds of scan time
-const int kTestingScanTime = 0;  // No need to scan for tests
+// TODO(ortuno): Once we have a chooser for scanning and the right
+// callback for discovered services we should delete these constants.
+// https://crbug.com/436280 and https://crbug.com/484504
+const int kDelayTime = 5;         // 5 seconds for scanning and discovering
+const int kTestingDelayTime = 0;  // No need to wait during tests
 
 BluetoothDispatcherHost::BluetoothDispatcherHost()
     : BrowserMessageFilter(BluetoothMsgStart),
       weak_ptr_factory_(this) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  current_scan_time_ = kScanTime;
+  current_delay_time_ = kDelayTime;
   if (BluetoothAdapterFactory::IsBluetoothAdapterAvailable())
     BluetoothAdapterFactory::GetAdapter(
         base::Bind(&BluetoothDispatcherHost::set_adapter,
@@ -48,6 +53,7 @@ bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
   IPC_BEGIN_MESSAGE_MAP(BluetoothDispatcherHost, message)
   IPC_MESSAGE_HANDLER(BluetoothHostMsg_RequestDevice, OnRequestDevice)
   IPC_MESSAGE_HANDLER(BluetoothHostMsg_ConnectGATT, OnConnectGATT)
+  IPC_MESSAGE_HANDLER(BluetoothHostMsg_GetPrimaryService, OnGetPrimaryService)
   IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -56,7 +62,7 @@ bool BluetoothDispatcherHost::OnMessageReceived(const IPC::Message& message) {
 void BluetoothDispatcherHost::SetBluetoothAdapterForTesting(
     scoped_refptr<device::BluetoothAdapter> mock_adapter) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  current_scan_time_ = kTestingScanTime;
+  current_delay_time_ = kTestingDelayTime;
   set_adapter(mock_adapter.Pass());
 }
 
@@ -100,10 +106,47 @@ void BluetoothDispatcherHost::OnConnectGATT(
     int request_id,
     const std::string& device_instance_id) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
-  // TODO(ortuno): Add actual implementation of connectGATT. This needs to be
-  // done after the "allowed devices map" is implemented.
-  Send(new BluetoothMsg_ConnectGATTSuccess(thread_id, request_id,
-                                           device_instance_id));
+  // TODO(ortuno): Right now it's pointless to check if the domain has access to
+  // the device, because any domain can connect to any device. But once
+  // permissions are implemented we should check that the domain has access to
+  // the device. https://crbug.com/484745
+  device::BluetoothDevice* device = adapter_->GetDevice(device_instance_id);
+  if (device == NULL) {
+    // Device could have gone out of range so it's no longer in
+    // BluetoothAdapter. Since we can't create a ATT Bearer without a device we
+    // reject with NetworkError.
+    // https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-connectgatt
+    Send(new BluetoothMsg_ConnectGATTError(thread_id, request_id,
+                                           BluetoothError::NETWORK_ERROR));
+    return;
+  }
+  device->CreateGattConnection(
+      base::Bind(&BluetoothDispatcherHost::OnGATTConnectionCreated,
+                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
+                 device_instance_id),
+      base::Bind(&BluetoothDispatcherHost::OnCreateGATTConnectionError,
+                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
+                 device_instance_id));
+}
+
+void BluetoothDispatcherHost::OnGetPrimaryService(
+    int thread_id,
+    int request_id,
+    const std::string& device_instance_id,
+    const std::string& service_uuid) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  // TODO(ortuno): Check if device_instance_id is in "allowed devices"
+  // https://crbug.com/493459
+  // TODO(ortuno): Check if service_uuid is in "allowed services"
+  // https://crbug.com/493460
+  // For now just wait a fixed time and call OnServiceDiscovered.
+  // TODO(ortuno): Use callback once it's implemented http://crbug.com/484504
+  BrowserThread::PostDelayedTask(
+      BrowserThread::UI, FROM_HERE,
+      base::Bind(&BluetoothDispatcherHost::OnServicesDiscovered,
+                 weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
+                 device_instance_id, service_uuid),
+      base::TimeDelta::FromSeconds(current_delay_time_));
 }
 
 void BluetoothDispatcherHost::OnDiscoverySessionStarted(
@@ -116,7 +159,7 @@ void BluetoothDispatcherHost::OnDiscoverySessionStarted(
       base::Bind(&BluetoothDispatcherHost::StopDiscoverySession,
                  weak_ptr_factory_.GetWeakPtr(), thread_id, request_id,
                  base::Passed(&discovery_session)),
-      base::TimeDelta::FromSeconds(current_scan_time_));
+      base::TimeDelta::FromSeconds(current_delay_time_));
 }
 
 void BluetoothDispatcherHost::OnDiscoverySessionStartedError(int thread_id,
@@ -170,6 +213,53 @@ void BluetoothDispatcherHost::OnDiscoverySessionStoppedError(int thread_id,
   DLOG(WARNING) << "BluetoothDispatcherHost::OnDiscoverySessionStoppedError";
   Send(new BluetoothMsg_RequestDeviceError(thread_id, request_id,
                                            BluetoothError::NOT_FOUND));
+}
+
+void BluetoothDispatcherHost::OnGATTConnectionCreated(
+    int thread_id,
+    int request_id,
+    const std::string& device_instance_id,
+    scoped_ptr<device::BluetoothGattConnection> connection) {
+  // TODO(ortuno): Save the BluetoothGattConnection so we can disconnect
+  // from it.
+  Send(new BluetoothMsg_ConnectGATTSuccess(thread_id, request_id,
+                                           device_instance_id));
+}
+
+void BluetoothDispatcherHost::OnCreateGATTConnectionError(
+    int thread_id,
+    int request_id,
+    const std::string& device_instance_id,
+    device::BluetoothDevice::ConnectErrorCode error_code) {
+  // There was an error creating the ATT Bearer so we reject with
+  // NetworkError.
+  // https://webbluetoothcg.github.io/web-bluetooth/#dom-bluetoothdevice-connectgatt
+  Send(new BluetoothMsg_ConnectGATTError(thread_id, request_id,
+                                         BluetoothError::NETWORK_ERROR));
+}
+
+void BluetoothDispatcherHost::OnServicesDiscovered(
+    int thread_id,
+    int request_id,
+    const std::string& device_instance_id,
+    const std::string& service_uuid) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+
+  device::BluetoothDevice* device = adapter_->GetDevice(device_instance_id);
+  if (device == NULL) {
+    Send(new BluetoothMsg_GetPrimaryServiceError(
+        thread_id, request_id, BluetoothError::NETWORK_ERROR));
+    return;
+  }
+  for (BluetoothGattService* service : device->GetGattServices()) {
+    if (service->GetUUID().canonical_value() == service_uuid) {
+      Send(new BluetoothMsg_GetPrimaryServiceSuccess(thread_id, request_id,
+                                                     service->GetIdentifier()));
+      return;
+    }
+  }
+  Send(new BluetoothMsg_GetPrimaryServiceError(thread_id, request_id,
+                                               BluetoothError::NOT_FOUND));
 }
 
 }  // namespace content

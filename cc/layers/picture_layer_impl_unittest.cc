@@ -342,6 +342,7 @@ class PictureLayerImplTest : public testing::Test {
   FakePictureLayerImpl* pending_layer_;
   FakePictureLayerImpl* old_pending_layer_;
   FakePictureLayerImpl* active_layer_;
+  LayerSettings layer_settings_;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(PictureLayerImplTest);
@@ -4613,7 +4614,8 @@ void PictureLayerImplTest::TestQuadsForSolidColor(bool test_for_solid) {
   gfx::Rect layer_rect(layer_bounds);
 
   FakeContentLayerClient client;
-  scoped_refptr<PictureLayer> layer = PictureLayer::Create(&client);
+  scoped_refptr<PictureLayer> layer =
+      PictureLayer::Create(layer_settings_, &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
   scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
   host->SetRootLayer(layer);
@@ -4676,7 +4678,8 @@ TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
   gfx::Rect layer_rect(layer_bounds);
 
   FakeContentLayerClient client;
-  scoped_refptr<PictureLayer> layer = PictureLayer::Create(&client);
+  scoped_refptr<PictureLayer> layer =
+      PictureLayer::Create(layer_settings_, &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
   scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
   host->SetRootLayer(layer);
@@ -4986,6 +4989,50 @@ TEST_F(PictureLayerImplTest, UpdateLCDInvalidatesPendingTree) {
   for (Tile* tile : tiles)
     EXPECT_EQ(pending_layer_->raster_source(),
               prioritized_tiles[tile].raster_source());
+}
+
+TEST_F(PictureLayerImplTest, TilingAllTilesDone) {
+  gfx::Size tile_size = host_impl_.settings().default_tile_size;
+  size_t tile_mem = 4 * tile_size.width() * tile_size.height();
+  gfx::Size layer_bounds(1000, 1000);
+
+  // Create tiles.
+  scoped_refptr<FakePicturePileImpl> pending_pile =
+      FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
+  SetupPendingTree(pending_pile);
+  pending_layer_->SetBounds(layer_bounds);
+  ActivateTree();
+  host_impl_.tile_manager()->InitializeTilesWithResourcesForTesting(
+      active_layer_->HighResTiling()->AllTilesForTesting());
+  host_impl_.SetTreePriority(SAME_PRIORITY_FOR_BOTH_TREES);
+
+  EXPECT_FALSE(active_layer_->HighResTiling()->all_tiles_done());
+
+  {
+    // Set a memory policy that will fit all tiles.
+    size_t max_tiles = 16;
+    size_t memory_limit = max_tiles * tile_mem;
+    ManagedMemoryPolicy policy(memory_limit,
+                               gpu::MemoryAllocation::CUTOFF_ALLOW_EVERYTHING,
+                               max_tiles);
+    host_impl_.SetMemoryPolicy(policy);
+    host_impl_.PrepareTiles();
+
+    EXPECT_TRUE(active_layer_->HighResTiling()->all_tiles_done());
+  }
+
+  {
+    // Set a memory policy that will cause tile eviction.
+    size_t max_tiles = 1;
+    size_t memory_limit = max_tiles * tile_mem;
+    ManagedMemoryPolicy policy(memory_limit,
+                               gpu::MemoryAllocation::CUTOFF_ALLOW_EVERYTHING,
+                               max_tiles);
+    host_impl_.SetMemoryPolicy(policy);
+    host_impl_.PrepareTiles();
+
+    EXPECT_FALSE(active_layer_->HighResTiling()->all_tiles_done());
+  }
 }
 
 class TileSizeSettings : public GpuRasterizationEnabledSettings {

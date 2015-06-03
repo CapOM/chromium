@@ -429,8 +429,6 @@
           'dependencies': [
             '../base/base.gyp:base',
             '../device/battery/battery.gyp:device_battery_java',
-            '../device/bluetooth/bluetooth.gyp:device_bluetooth_java',
-            '../device/vibration/vibration.gyp:device_vibration_java',
             '../media/media.gyp:media_java',
             '../mojo/mojo_base.gyp:mojo_application_bindings',
             '../mojo/mojo_base.gyp:mojo_system_java',
@@ -439,6 +437,7 @@
             '../ui/android/ui_android.gyp:ui_java',
             '../ui/touch_selection/ui_touch_selection.gyp:selection_event_type_java',
             '../ui/touch_selection/ui_touch_selection.gyp:touch_handle_orientation_java',
+            '../third_party/android_tools/android_tools.gyp:android_support_v13_javalib',
             '../third_party/WebKit/public/blink_headers.gyp:blink_headers_java',
             'common_aidl',
             'console_message_level_java',

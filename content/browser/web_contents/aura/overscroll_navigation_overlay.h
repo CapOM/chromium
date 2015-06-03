@@ -19,7 +19,6 @@ namespace content {
 
 class OverscrollWindowDelegate;
 class OverscrollNavigationOverlayTest;
-class ScopedLayerClippingSetting;
 
 // When a history navigation is triggered at the end of an overscroll
 // navigation, it is necessary to show the history-screenshot until the page is
@@ -49,8 +48,6 @@ class CONTENT_EXPORT OverscrollNavigationOverlay
   OverscrollControllerDelegate* relay_delegate() { return owa_.get(); }
 
  private:
-  class ScopedLayerClippingSetting;
-
   friend class OverscrollNavigationOverlayTest;
   FRIEND_TEST_ALL_PREFIXES(OverscrollNavigationOverlayTest, WithScreenshot);
   FRIEND_TEST_ALL_PREFIXES(OverscrollNavigationOverlayTest, WithoutScreenshot);
@@ -59,6 +56,8 @@ class CONTENT_EXPORT OverscrollNavigationOverlay
   FRIEND_TEST_ALL_PREFIXES(OverscrollNavigationOverlayTest,
                            CancelAfterSuccessfulNavigation);
   FRIEND_TEST_ALL_PREFIXES(OverscrollNavigationOverlayTest, OverlayWindowSwap);
+  FRIEND_TEST_ALL_PREFIXES(OverscrollNavigationOverlayTest,
+                           CloseDuringAnimation);
 
   // Resets state and starts observing |web_contents_| for page load/paint
   // updates. This function makes sure that the screenshot window is stacked
@@ -115,10 +114,6 @@ class CONTENT_EXPORT OverscrollNavigationOverlay
 
   // The window that hosts the web contents.
   aura::Window* web_contents_window_;
-
-  // Scoped clipping settings for the contents layer and its parent.
-  scoped_ptr<ScopedLayerClippingSetting> contents_layer_settings_;
-  scoped_ptr<ScopedLayerClippingSetting> contents_layer_parent_settings_;
 
   DISALLOW_COPY_AND_ASSIGN(OverscrollNavigationOverlay);
 };

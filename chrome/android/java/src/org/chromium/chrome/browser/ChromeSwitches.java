@@ -77,17 +77,17 @@ public abstract class ChromeSwitches {
     public static final String ENABLE_CONTEXTUAL_SEARCH_FOR_TESTING =
             "enable-contextual-search-for-testing";
 
-    /**
-     * Enable embedded mode so that embedded activity can be launched.
-     */
-    public static final String ENABLE_EMBEDDED_MODE = "enable-embedded-mode";
-
     // How many thumbnails should we allow in the cache (per tab stack)?
     public static final String THUMBNAILS = "thumbnails";
 
     // How many "approximated" thumbnails should we allow in the cache
     // (per tab stack)?  These take very low memory but have poor quality.
     public static final String APPROXIMATION_THUMBNAILS = "approximation-thumbnails";
+
+    /**
+     * Disable bottom infobar-like Reader Mode panel.
+     */
+    public static final String DISABLE_READER_MODE_BOTTOM_BAR = "disable-reader-mode-bottom-bar";
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     // Native Switches
@@ -137,6 +137,24 @@ public abstract class ChromeSwitches {
      */
     public static final String USE_FAKE_DEVICE_FOR_MEDIA_STREAM =
             "use-fake-device-for-media-stream";
+
+    /**
+     * Disables the new icon-centric NTP design.
+     * Native switch - switches::kDisableIconNtp
+     */
+    public static final String DISABLE_ICON_NTP = "disable-icon-ntp";
+
+    /**
+     * Enables the new icon-centric NTP design.
+     * Native switch - switches::kEnableIconNtp
+     */
+    public static final String ENABLE_ICON_NTP = "enable-icon-ntp";
+
+    /**
+     * Enable Reader Mode button.
+     * Native switch - switches::kEnableReaderModeToolbarIcon
+     */
+    public static final String ENABLE_READER_MODE_BUTTON = "enable-reader-mode-toolbar-icon";
 
     // Prevent instantiation.
     private ChromeSwitches() {}

@@ -354,6 +354,10 @@ class EmbeddedWorkerBrowserTest : public ServiceWorkerBrowserTest,
   void TearDownOnIOThread() override {
     if (worker_) {
       worker_->RemoveListener(this);
+      if (worker_->status() == EmbeddedWorkerInstance::STARTING ||
+          worker_->status() == EmbeddedWorkerInstance::RUNNING) {
+        worker_->Stop();
+      }
       worker_.reset();
     }
   }
@@ -593,8 +597,7 @@ class ServiceWorkerVersionBrowserTest : public ServiceWorkerBrowserTest {
 
   void TimeoutWorkerOnIOThread() {
     ASSERT_TRUE(BrowserThread::CurrentlyOn(BrowserThread::IO));
-    version_->PingWorker();
-    version_->OnPingTimeout();
+    version_->SimulatePingTimeoutForTesting();
   }
 
   void AddControlleeOnIOThread() {
@@ -1311,8 +1314,8 @@ static int CountRenderProcessHosts() {
   return result;
 }
 
-// Flaky timeouts on CrOS and crash on Android: http://crbug.com/387045
-#if defined(OS_CHROMEOS) || defined(ANDROID)
+// Flaky timeouts on CrOS: http://crbug.com/387045
+#if defined(OS_CHROMEOS)
 #define MAYBE_Registration DISABLED_Registration
 #else
 #define MAYBE_Registration Registration

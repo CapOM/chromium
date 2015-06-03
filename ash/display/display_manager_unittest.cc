@@ -904,6 +904,41 @@ TEST_F(DisplayManagerTest, Rotate) {
 
   UpdateDisplay("200x200/l");
   EXPECT_EQ("1 0 0", GetCountSummary());
+
+  // Having the internal display deactivated should restore user rotation. Newly
+  // set rotations should be applied.
+  UpdateDisplay("200x200, 200x200");
+  const int64 internal_display_id =
+      test::DisplayManagerTestApi(display_manager())
+          .SetFirstDisplayAsInternalDisplay();
+
+  display_manager()->SetDisplayRotation(internal_display_id,
+                                        gfx::Display::ROTATE_90,
+                                        gfx::Display::ROTATION_SOURCE_USER);
+  display_manager()->SetDisplayRotation(internal_display_id,
+                                        gfx::Display::ROTATE_0,
+                                        gfx::Display::ROTATION_SOURCE_ACTIVE);
+
+  const DisplayInfo info = GetDisplayInfoForId(internal_display_id);
+  EXPECT_EQ(gfx::Display::ROTATE_0, info.GetActiveRotation());
+
+  // Deactivate internal display to simulate Docked Mode.
+  vector<DisplayInfo> secondary_only;
+  secondary_only.push_back(GetDisplayInfoAt(1));
+  display_manager()->OnNativeDisplaysChanged(secondary_only);
+
+  const DisplayInfo post_removal_info =
+      display_manager()->display_info_[internal_display_id];
+  EXPECT_NE(info.GetActiveRotation(), post_removal_info.GetActiveRotation());
+  EXPECT_EQ(gfx::Display::ROTATE_90, post_removal_info.GetActiveRotation());
+
+  display_manager()->SetDisplayRotation(internal_display_id,
+                                        gfx::Display::ROTATE_180,
+                                        gfx::Display::ROTATION_SOURCE_ACTIVE);
+  const DisplayInfo post_rotation_info =
+      display_manager()->display_info_[internal_display_id];
+  EXPECT_NE(info.GetActiveRotation(), post_rotation_info.GetActiveRotation());
+  EXPECT_EQ(gfx::Display::ROTATE_180, post_rotation_info.GetActiveRotation());
 }
 
 TEST_F(DisplayManagerTest, UIScale) {
@@ -1463,6 +1498,8 @@ TEST_F(DisplayManagerTest, MAYBE_UpdateDisplayWithHostOrigin) {
 TEST_F(DisplayManagerTest, UnifiedDesktopBasic) {
   if (!SupportsMultipleDisplays())
     return;
+  test::DisplayManagerTestApi::EnableUnifiedDesktopForTest();
+
   // Don't check root window destruction in unified mode.
   Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
@@ -1497,9 +1534,28 @@ TEST_F(DisplayManagerTest, UnifiedDesktopBasic) {
   EXPECT_EQ("400x500", ScreenUtil::GetSecondaryDisplay().size().ToString());
 }
 
+// Updating displays again in unified desktop mode should not crash.
+// crbug.com/491094.
+TEST_F(DisplayManagerTest, ConfigureUnifiedTwice) {
+  if (!SupportsMultipleDisplays())
+    return;
+  // Don't check root window destruction in unified mode.
+  Shell::GetPrimaryRootWindow()->RemoveObserver(this);
+
+  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
+  UpdateDisplay("300x200,400x500");
+  // Mirror windows are created in a posted task.
+  RunAllPendingInMessageLoop();
+
+  UpdateDisplay("300x250,400x550");
+  RunAllPendingInMessageLoop();
+}
+
 TEST_F(DisplayManagerTest, RotateUnifiedDesktop) {
   if (!SupportsMultipleDisplays())
     return;
+  test::DisplayManagerTestApi::EnableUnifiedDesktopForTest();
+
   // Don't check root window destruction in unified mode.
   Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
@@ -1527,6 +1583,8 @@ TEST_F(DisplayManagerTest, RotateUnifiedDesktop) {
 TEST_F(DisplayManagerTest, UnifiedWithDockWindows) {
   if (!SupportsMultipleDisplays())
     return;
+  test::DisplayManagerTestApi::EnableUnifiedDesktopForTest();
+
   // Don't check root window destruction in unified mode.
   Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 

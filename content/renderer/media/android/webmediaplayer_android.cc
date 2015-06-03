@@ -179,9 +179,9 @@ WebMediaPlayerAndroid::WebMediaPlayerAndroid(
       has_size_info_(false),
       // Compositor thread does not exist in layout tests.
       compositor_loop_(
-          RenderThreadImpl::current()->compositor_message_loop_proxy().get()
-              ? RenderThreadImpl::current()->compositor_message_loop_proxy()
-              : base::MessageLoopProxy::current()),
+          RenderThreadImpl::current()->compositor_task_runner().get()
+              ? RenderThreadImpl::current()->compositor_task_runner()
+              : base::ThreadTaskRunnerHandle::Get()),
       stream_texture_factory_(factory),
       needs_external_surface_(false),
       is_fullscreen_(false),
@@ -661,9 +661,9 @@ bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
   }
 
   if (!video_frame.get() ||
-      video_frame->format() != media::VideoFrame::NATIVE_TEXTURE)
+      video_frame->storage_type() != media::VideoFrame::STORAGE_TEXTURE)
     return false;
-  DCHECK_EQ(1u, media::VideoFrame::NumTextures(video_frame->texture_format()));
+  DCHECK_EQ(1u, media::VideoFrame::NumPlanes(video_frame->format()));
   const gpu::MailboxHolder& mailbox_holder = video_frame->mailbox_holder(0);
   DCHECK((!is_remote_ &&
           mailbox_holder.texture_target == GL_TEXTURE_EXTERNAL_OES) ||
@@ -902,7 +902,8 @@ void WebMediaPlayerAndroid::OnVideoSizeChanged(int width, int height) {
   // Lazily allocate compositing layer.
   if (!video_weblayer_) {
     video_weblayer_.reset(new cc_blink::WebLayerImpl(
-        cc::VideoLayer::Create(this, media::VIDEO_ROTATION_0)));
+        cc::VideoLayer::Create(cc_blink::WebLayerImpl::LayerSettings(), this,
+                               media::VIDEO_ROTATION_0)));
     client_->setWebLayer(video_weblayer_.get());
   }
 

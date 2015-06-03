@@ -7,7 +7,9 @@
 #include "base/callback_helpers.h"
 #include "chromecast/public/cast_egl_platform.h"
 #include "chromecast/public/graphics_types.h"
+#include "ui/gfx/geometry/quad_f.h"
 #include "ui/ozone/platform/cast/surface_ozone_egl_cast.h"
+#include "ui/ozone/public/native_pixmap.h"
 
 using chromecast::CastEglPlatform;
 
@@ -15,6 +17,11 @@ namespace ui {
 namespace {
 chromecast::Size FromGfxSize(const gfx::Size& size) {
   return chromecast::Size(size.width(), size.height());
+}
+
+// Initial display size to create, needed before first window is created.
+gfx::Size GetInitialDisplaySize() {
+  return gfx::Size(1280, 720);
 }
 
 // Hard lower bound on display resolution
@@ -30,8 +37,8 @@ SurfaceFactoryCast::SurfaceFactoryCast(scoped_ptr<CastEglPlatform> egl_platform)
       display_type_(0),
       have_display_type_(false),
       window_(0),
-      display_size_(0, 0),
-      new_display_size_(0, 0),
+      display_size_(GetInitialDisplaySize()),
+      new_display_size_(GetInitialDisplaySize()),
       egl_platform_(egl_platform.Pass()) {
 }
 
@@ -166,6 +173,40 @@ void SurfaceFactoryCast::SendRelinquishResponse() {
 const int32* SurfaceFactoryCast::GetEGLSurfaceProperties(
     const int32* desired_list) {
   return egl_platform_->GetEGLSurfaceProperties(desired_list);
+}
+
+scoped_refptr<NativePixmap> SurfaceFactoryCast::CreateNativePixmap(
+    gfx::AcceleratedWidget w,
+    gfx::Size size,
+    BufferFormat format,
+    BufferUsage usage) {
+  class CastPixmap : public NativePixmap {
+   public:
+    CastPixmap() {}
+
+    void* GetEGLClientBuffer() override {
+      // TODO(halliwell): try to implement this through CastEglPlatform.
+      return nullptr;
+    }
+    int GetDmaBufFd() override { return 0; }
+    int GetDmaBufPitch() override { return 0; }
+
+   private:
+    ~CastPixmap() override {}
+
+    DISALLOW_COPY_AND_ASSIGN(CastPixmap);
+  };
+  return make_scoped_refptr(new CastPixmap);
+}
+
+bool SurfaceFactoryCast::ScheduleOverlayPlane(
+    gfx::AcceleratedWidget widget,
+    int plane_z_order,
+    gfx::OverlayTransform plane_transform,
+    scoped_refptr<NativePixmap> buffer,
+    const gfx::Rect& display_bounds,
+    const gfx::RectF& crop_rect) {
+  return true;
 }
 
 bool SurfaceFactoryCast::LoadEGLGLES2Bindings(

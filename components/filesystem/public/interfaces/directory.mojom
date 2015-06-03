@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-module mojo.files;
+module filesystem;
 
 import "components/filesystem/public/interfaces/file.mojom";
 import "components/filesystem/public/interfaces/types.mojom";
@@ -19,16 +19,7 @@ interface Directory {
 
   // Reads the contents of this directory.
   // TODO(vtl): Clarify error codes versus |directory_contents|.
-  Read() => (Error error, array<DirectoryEntry>? directory_contents);
-
-  // Gets information about this directory. On success, |file_information| is
-  // non-null and will contain this information.
-  Stat() => (Error error, FileInformation? file_information);
-
-  // Updates this directory's atime and/or mtime to the time specified by
-  // |atime| (or |mtime|, respectively), which may also indicate "now". If
-  // |atime| or |mtime| is null, then the corresponding time is not modified.
-  Touch(TimespecOrNow? atime, TimespecOrNow? mtime) => (Error error);
+  Read() => (FileError error, array<DirectoryEntry>? directory_contents);
 
   // Operations *in* "this" |Directory|:
 
@@ -36,20 +27,20 @@ interface Directory {
   // optional, mainly for consistency with |OpenDirectory()| (but may be useful,
   // together with |kOpenFlagCreate|, for "touching" a file).
   OpenFile(string path, File&? file, uint32 open_flags)
-      => (Error error);
+      => (FileError error);
 
   // Opens the directory specified by |path|. |directory| is optional, so that
   // this may be used as a simple "mkdir()" with |kOpenFlagCreate|.
   OpenDirectory(string path,
                 Directory&? directory,
-                uint32 open_flags) => (Error error);
+                uint32 open_flags) => (FileError error);
 
   // Renames/moves the file/directory given by |path| to |new_path|.
-  Rename(string path, string new_path) => (Error error);
+  Rename(string path, string new_path) => (FileError error);
 
   // Deletes the given path, which may be a file or a directory (see
   // |kDeleteFlag...| for details).
-  Delete(string path, uint32 delete_flags) => (Error error);
+  Delete(string path, uint32 delete_flags) => (FileError error);
 
   // TODO(vtl): directory "streaming"?
   // TODO(vtl): "make root" (i.e., prevent cd-ing, etc., to parent); note that
@@ -58,6 +49,4 @@ interface Directory {
   // even if the opened directory is subsequently moved -- e.g., closer to the
   // "root")
   // TODO(vtl): Add a "watch"?
-  // TODO(vtl): Should we have a "close" method?
-  // TODO(vtl): Add Dup() and Reopen() (like File)?
 };

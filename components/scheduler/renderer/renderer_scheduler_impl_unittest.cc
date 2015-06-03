@@ -78,17 +78,37 @@ void RepostingIdleTestTask(SingleThreadIdleTaskRunner* idle_task_runner,
   (*run_count)++;
 }
 
+void RepostingUpdateClockIdleTestTask(
+    SingleThreadIdleTaskRunner* idle_task_runner,
+    int* run_count,
+    scoped_refptr<cc::TestNowSource> clock,
+    base::TimeDelta advance_time,
+    std::vector<base::TimeTicks>* deadlines,
+    base::TimeTicks deadline) {
+  if ((*run_count + 1) < max_idle_task_reposts) {
+    idle_task_runner->PostIdleTask(
+        FROM_HERE, base::Bind(&RepostingUpdateClockIdleTestTask,
+                              base::Unretained(idle_task_runner), run_count,
+                              clock, advance_time, deadlines));
+  }
+  deadlines->push_back(deadline);
+  (*run_count)++;
+  clock->AdvanceNow(advance_time);
+}
+
+void WillBeginFrameIdleTask(RendererScheduler* scheduler,
+                            scoped_refptr<cc::TestNowSource> clock,
+                            base::TimeTicks deadline) {
+  scheduler->WillBeginFrame(cc::BeginFrameArgs::Create(
+      BEGINFRAME_FROM_HERE, clock->Now(), base::TimeTicks(),
+      base::TimeDelta::FromMilliseconds(1000), cc::BeginFrameArgs::NORMAL));
+}
+
 void UpdateClockToDeadlineIdleTestTask(
     cc::TestNowSource* clock,
-    base::SingleThreadTaskRunner* task_runner,
     int* run_count,
     base::TimeTicks deadline) {
   clock->SetNow(deadline);
-  // Due to the way in which OrderedSimpleTestRunner orders tasks and the fact
-  // that we updated the time within a task, the delayed pending task to call
-  // EndIdlePeriod will not happen until after a TaskQueueManager DoWork, so
-  // post a normal task here to ensure it runs before the next idle task.
-  task_runner->PostTask(FROM_HERE, base::Bind(NullTask));
   (*run_count)++;
 }
 
@@ -123,45 +143,44 @@ class RendererSchedulerImplTest : public testing::Test {
  public:
   using Policy = RendererSchedulerImpl::Policy;
 
-  RendererSchedulerImplTest()
-      : clock_(cc::TestNowSource::Create(5000)),
-        mock_task_runner_(new cc::OrderedSimpleTaskRunner(clock_, false)),
-        nestable_task_runner_(
-            NestableTaskRunnerForTest::Create(mock_task_runner_)),
-        scheduler_(new RendererSchedulerImpl(nestable_task_runner_)),
-        default_task_runner_(scheduler_->DefaultTaskRunner()),
-        compositor_task_runner_(scheduler_->CompositorTaskRunner()),
-        loading_task_runner_(scheduler_->LoadingTaskRunner()),
-        idle_task_runner_(scheduler_->IdleTaskRunner()),
-        timer_task_runner_(scheduler_->TimerTaskRunner()) {
-    scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
-        make_scoped_ptr(new TestTimeSource(clock_)));
-    scheduler_->GetSchedulerHelperForTesting()
-        ->GetTaskQueueManagerForTesting()
-        ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
-  }
+  RendererSchedulerImplTest() : clock_(cc::TestNowSource::Create(5000)) {}
 
   RendererSchedulerImplTest(base::MessageLoop* message_loop)
-      : clock_(cc::TestNowSource::Create(5000)),
-        message_loop_(message_loop),
-        nestable_task_runner_(
-            SchedulerMessageLoopDelegate::Create(message_loop)),
-        scheduler_(new RendererSchedulerImpl(nestable_task_runner_)),
-        default_task_runner_(scheduler_->DefaultTaskRunner()),
-        compositor_task_runner_(scheduler_->CompositorTaskRunner()),
-        loading_task_runner_(scheduler_->LoadingTaskRunner()),
-        idle_task_runner_(scheduler_->IdleTaskRunner()),
-        timer_task_runner_(scheduler_->TimerTaskRunner()) {
+      : clock_(cc::TestNowSource::Create(5000)), message_loop_(message_loop) {}
+
+  ~RendererSchedulerImplTest() override {}
+
+  void SetUp() override {
+    if (message_loop_) {
+      nestable_task_runner_ =
+          SchedulerMessageLoopDelegate::Create(message_loop_.get());
+    } else {
+      mock_task_runner_ =
+          make_scoped_refptr(new cc::OrderedSimpleTaskRunner(clock_, false));
+      nestable_task_runner_ =
+          NestableTaskRunnerForTest::Create(mock_task_runner_);
+    }
+    Initialize(
+        make_scoped_ptr(new RendererSchedulerImpl(nestable_task_runner_)));
+  }
+
+  void Initialize(scoped_ptr<RendererSchedulerImpl> scheduler) {
+    scheduler_ = scheduler.Pass();
+    default_task_runner_ = scheduler_->DefaultTaskRunner();
+    compositor_task_runner_ = scheduler_->CompositorTaskRunner();
+    loading_task_runner_ = scheduler_->LoadingTaskRunner();
+    idle_task_runner_ = scheduler_->IdleTaskRunner();
+    timer_task_runner_ = scheduler_->TimerTaskRunner();
     scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
         make_scoped_ptr(new TestTimeSource(clock_)));
     scheduler_->GetSchedulerHelperForTesting()
         ->GetTaskQueueManagerForTesting()
         ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
   }
-  ~RendererSchedulerImplTest() override {}
 
   void TearDown() override {
     DCHECK(!mock_task_runner_.get() || !message_loop_.get());
+    scheduler_->Shutdown();
     if (mock_task_runner_.get()) {
       // Check that all tests stop posting tasks.
       mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
@@ -170,6 +189,7 @@ class RendererSchedulerImplTest : public testing::Test {
     } else {
       message_loop_->RunUntilIdle();
     }
+    scheduler_.reset();
   }
 
   void RunUntilIdle() {
@@ -191,16 +211,6 @@ class RendererSchedulerImplTest : public testing::Test {
   void EnableIdleTasks() { DoMainFrame(); }
 
   Policy CurrentPolicy() { return scheduler_->current_policy_; }
-
-  void EnsureUrgentPolicyUpdatePostedOnMainThread() {
-    base::AutoLock lock(scheduler_->incoming_signals_lock_);
-    scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread(FROM_HERE);
-  }
-
-  void ScheduleDelayedPolicyUpdate(base::TimeDelta delay) {
-    scheduler_->delayed_update_policy_runner_.SetDeadline(FROM_HERE, delay,
-                                                          clock_->Now());
-  }
 
   // Helper for posting several tasks of specific types. |task_descriptor| is a
   // string with space delimited task identifiers. The first letter of each
@@ -252,12 +262,43 @@ class RendererSchedulerImplTest : public testing::Test {
 
   static base::TimeDelta maximum_idle_period_duration() {
     return base::TimeDelta::FromMilliseconds(
-        SchedulerHelper::kMaximumIdlePeriodMillis);
+        IdleHelper::kMaximumIdlePeriodMillis);
   }
 
   static base::TimeDelta end_idle_when_hidden_delay() {
     return base::TimeDelta::FromMilliseconds(
         RendererSchedulerImpl::kEndIdleWhenHiddenDelayMillis);
+  }
+
+  template <typename E>
+  static void CallForEachEnumValue(E first,
+                                   E last,
+                                   const char* (*function)(E)) {
+    for (E val = first; val < last;
+         val = static_cast<E>(static_cast<int>(val) + 1)) {
+      (*function)(val);
+    }
+  }
+
+  static void CheckAllTaskQueueIdToString() {
+    CallForEachEnumValue<RendererSchedulerImpl::QueueId>(
+        RendererSchedulerImpl::FIRST_QUEUE_ID,
+        RendererSchedulerImpl::TASK_QUEUE_COUNT,
+        &RendererSchedulerImpl::TaskQueueIdToString);
+  }
+
+  static void CheckAllPolicyToString() {
+    CallForEachEnumValue<RendererSchedulerImpl::Policy>(
+        RendererSchedulerImpl::Policy::FIRST_POLICY,
+        RendererSchedulerImpl::Policy::POLICY_COUNT,
+        &RendererSchedulerImpl::PolicyToString);
+  }
+
+  static void CheckAllInputStreamStateToString() {
+    CallForEachEnumValue<RendererSchedulerImpl::InputStreamState>(
+        RendererSchedulerImpl::InputStreamState::FIRST_INPUT_STREAM_STATE,
+        RendererSchedulerImpl::InputStreamState::INPUT_STREAM_STATE_COUNT,
+        &RendererSchedulerImpl::InputStreamStateToString);
   }
 
   scoped_refptr<cc::TestNowSource> clock_;
@@ -365,11 +406,11 @@ TEST_F(RendererSchedulerImplTest, TestIdleTaskExceedsDeadline) {
 
   // Post two UpdateClockToDeadlineIdleTestTask tasks.
   idle_task_runner_->PostIdleTask(
-      FROM_HERE, base::Bind(&UpdateClockToDeadlineIdleTestTask, clock_,
-                            default_task_runner_, &run_count));
+      FROM_HERE,
+      base::Bind(&UpdateClockToDeadlineIdleTestTask, clock_, &run_count));
   idle_task_runner_->PostIdleTask(
-      FROM_HERE, base::Bind(&UpdateClockToDeadlineIdleTestTask, clock_,
-                            default_task_runner_, &run_count));
+      FROM_HERE,
+      base::Bind(&UpdateClockToDeadlineIdleTestTask, clock_, &run_count));
 
   EnableIdleTasks();
   RunUntilIdle();
@@ -937,73 +978,77 @@ class RendererSchedulerImplForTest : public RendererSchedulerImpl {
     RendererSchedulerImpl::UpdatePolicyLocked(update_type);
   }
 
+  void EnsureUrgentPolicyUpdatePostedOnMainThread() {
+    base::AutoLock lock(incoming_signals_lock_);
+    RendererSchedulerImpl::EnsureUrgentPolicyUpdatePostedOnMainThread(
+        FROM_HERE);
+  }
+
+  void ScheduleDelayedPolicyUpdate(base::TimeTicks now, base::TimeDelta delay) {
+    delayed_update_policy_runner_.SetDeadline(FROM_HERE, delay, now);
+  }
+
   int update_policy_count_;
 };
 
-TEST_F(RendererSchedulerImplTest, OnlyOnePendingUrgentPolicyUpdatey) {
-  RendererSchedulerImplForTest* mock_scheduler =
-      new RendererSchedulerImplForTest(nestable_task_runner_);
-  scheduler_.reset(mock_scheduler);
+class RendererSchedulerImplWithMockSchedulerTest
+    : public RendererSchedulerImplTest {
+ public:
+  void SetUp() override {
+    mock_task_runner_ =
+        make_scoped_refptr(new cc::OrderedSimpleTaskRunner(clock_, false));
+    nestable_task_runner_ =
+        NestableTaskRunnerForTest::Create(mock_task_runner_);
+    mock_scheduler_ = new RendererSchedulerImplForTest(nestable_task_runner_);
+    Initialize(make_scoped_ptr(mock_scheduler_));
+  }
 
-  EnsureUrgentPolicyUpdatePostedOnMainThread();
-  EnsureUrgentPolicyUpdatePostedOnMainThread();
-  EnsureUrgentPolicyUpdatePostedOnMainThread();
-  EnsureUrgentPolicyUpdatePostedOnMainThread();
+ protected:
+  RendererSchedulerImplForTest* mock_scheduler_;
+};
+
+TEST_F(RendererSchedulerImplWithMockSchedulerTest,
+       OnlyOnePendingUrgentPolicyUpdatey) {
+  mock_scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread();
+  mock_scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread();
+  mock_scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread();
+  mock_scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread();
 
   RunUntilIdle();
 
-  EXPECT_EQ(1, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(1, mock_scheduler_->update_policy_count_);
 }
 
-TEST_F(RendererSchedulerImplTest, OnePendingDelayedAndOneUrgentUpdatePolicy) {
-  RendererSchedulerImplForTest* mock_scheduler =
-      new RendererSchedulerImplForTest(nestable_task_runner_);
-  scheduler_.reset(mock_scheduler);
-  scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
-      make_scoped_ptr(new TestTimeSource(clock_)));
-  scheduler_->GetSchedulerHelperForTesting()
-      ->GetTaskQueueManagerForTesting()
-      ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
+TEST_F(RendererSchedulerImplWithMockSchedulerTest,
+       OnePendingDelayedAndOneUrgentUpdatePolicy) {
   mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
 
-  ScheduleDelayedPolicyUpdate(base::TimeDelta::FromMilliseconds(1));
-  EnsureUrgentPolicyUpdatePostedOnMainThread();
+  mock_scheduler_->ScheduleDelayedPolicyUpdate(
+      clock_->Now(), base::TimeDelta::FromMilliseconds(1));
+  mock_scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread();
 
   RunUntilIdle();
 
   // We expect both the urgent and the delayed updates to run.
-  EXPECT_EQ(2, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(2, mock_scheduler_->update_policy_count_);
 }
 
-TEST_F(RendererSchedulerImplTest, OneUrgentAndOnePendingDelayedUpdatePolicy) {
-  RendererSchedulerImplForTest* mock_scheduler =
-      new RendererSchedulerImplForTest(nestable_task_runner_);
-  scheduler_.reset(mock_scheduler);
-  scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
-      make_scoped_ptr(new TestTimeSource(clock_)));
-  scheduler_->GetSchedulerHelperForTesting()
-      ->GetTaskQueueManagerForTesting()
-      ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
+TEST_F(RendererSchedulerImplWithMockSchedulerTest,
+       OneUrgentAndOnePendingDelayedUpdatePolicy) {
   mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
 
-  EnsureUrgentPolicyUpdatePostedOnMainThread();
-  ScheduleDelayedPolicyUpdate(base::TimeDelta::FromMilliseconds(1));
+  mock_scheduler_->EnsureUrgentPolicyUpdatePostedOnMainThread();
+  mock_scheduler_->ScheduleDelayedPolicyUpdate(
+      clock_->Now(), base::TimeDelta::FromMilliseconds(1));
 
   RunUntilIdle();
 
   // We expect both the urgent and the delayed updates to run.
-  EXPECT_EQ(2, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(2, mock_scheduler_->update_policy_count_);
 }
 
-TEST_F(RendererSchedulerImplTest, UpdatePolicyCountTriggeredByOneInputEvent) {
-  RendererSchedulerImplForTest* mock_scheduler =
-      new RendererSchedulerImplForTest(nestable_task_runner_);
-  scheduler_.reset(mock_scheduler);
-  scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
-      make_scoped_ptr(new TestTimeSource(clock_)));
-  scheduler_->GetSchedulerHelperForTesting()
-      ->GetTaskQueueManagerForTesting()
-      ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
+TEST_F(RendererSchedulerImplWithMockSchedulerTest,
+       UpdatePolicyCountTriggeredByOneInputEvent) {
   mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
 
   scheduler_->DidReceiveInputEventOnCompositorThread(
@@ -1012,18 +1057,11 @@ TEST_F(RendererSchedulerImplTest, UpdatePolicyCountTriggeredByOneInputEvent) {
   RunUntilIdle();
 
   // We expect an urgent policy update followed by a delayed one 100ms later.
-  EXPECT_EQ(2, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(2, mock_scheduler_->update_policy_count_);
 }
 
-TEST_F(RendererSchedulerImplTest, UpdatePolicyCountTriggeredByTwoInputEvents) {
-  RendererSchedulerImplForTest* mock_scheduler =
-      new RendererSchedulerImplForTest(nestable_task_runner_);
-  scheduler_.reset(mock_scheduler);
-  scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
-      make_scoped_ptr(new TestTimeSource(clock_)));
-  scheduler_->GetSchedulerHelperForTesting()
-      ->GetTaskQueueManagerForTesting()
-      ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
+TEST_F(RendererSchedulerImplWithMockSchedulerTest,
+       UpdatePolicyCountTriggeredByTwoInputEvents) {
   mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
 
   scheduler_->DidReceiveInputEventOnCompositorThread(
@@ -1034,18 +1072,11 @@ TEST_F(RendererSchedulerImplTest, UpdatePolicyCountTriggeredByTwoInputEvents) {
   RunUntilIdle();
 
   // We expect an urgent policy update followed by a delayed one 100ms later.
-  EXPECT_EQ(2, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(2, mock_scheduler_->update_policy_count_);
 }
 
-TEST_F(RendererSchedulerImplTest, EnsureUpdatePolicyNotTriggeredTooOften) {
-  RendererSchedulerImplForTest* mock_scheduler =
-      new RendererSchedulerImplForTest(nestable_task_runner_);
-  scheduler_.reset(mock_scheduler);
-  scheduler_->GetSchedulerHelperForTesting()->SetTimeSourceForTesting(
-      make_scoped_ptr(new TestTimeSource(clock_)));
-  scheduler_->GetSchedulerHelperForTesting()
-      ->GetTaskQueueManagerForTesting()
-      ->SetTimeSourceForTesting(make_scoped_ptr(new TestTimeSource(clock_)));
+TEST_F(RendererSchedulerImplWithMockSchedulerTest,
+       EnsureUpdatePolicyNotTriggeredTooOften) {
   mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
 
   scheduler_->DidReceiveInputEventOnCompositorThread(
@@ -1056,9 +1087,9 @@ TEST_F(RendererSchedulerImplTest, EnsureUpdatePolicyNotTriggeredTooOften) {
   // We expect the first call to IsHighPriorityWorkAnticipated to be called
   // after recieving an input event (but before the UpdateTask was processed) to
   // call UpdatePolicy.
-  EXPECT_EQ(0, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(0, mock_scheduler_->update_policy_count_);
   scheduler_->IsHighPriorityWorkAnticipated();
-  EXPECT_EQ(1, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(1, mock_scheduler_->update_policy_count_);
   // Subsequent calls should not call UpdatePolicy.
   scheduler_->IsHighPriorityWorkAnticipated();
   scheduler_->IsHighPriorityWorkAnticipated();
@@ -1068,12 +1099,12 @@ TEST_F(RendererSchedulerImplTest, EnsureUpdatePolicyNotTriggeredTooOften) {
   scheduler_->ShouldYieldForHighPriorityWork();
   scheduler_->ShouldYieldForHighPriorityWork();
 
-  EXPECT_EQ(1, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(1, mock_scheduler_->update_policy_count_);
 
   RunUntilIdle();
   // We expect both the urgent and the delayed updates to run in addition to the
   // earlier updated cause by IsHighPriorityWorkAnticipated.
-  EXPECT_EQ(3, mock_scheduler->update_policy_count_);
+  EXPECT_EQ(3, mock_scheduler_->update_policy_count_);
 }
 
 class RendererSchedulerImplWithMessageLoopTest
@@ -1199,31 +1230,40 @@ TEST_F(RendererSchedulerImplTest,
 }
 
 TEST_F(RendererSchedulerImplTest, TestLongIdlePeriodRepeating) {
+  mock_task_runner_->SetAutoAdvanceNowToPendingTasks(true);
+  std::vector<base::TimeTicks> actual_deadlines;
   int run_count = 0;
 
   max_idle_task_reposts = 3;
+  base::TimeTicks clock_before(clock_->Now());
+  base::TimeDelta idle_task_runtime(base::TimeDelta::FromMilliseconds(10));
   idle_task_runner_->PostIdleTask(
       FROM_HERE,
-      base::Bind(&RepostingIdleTestTask, idle_task_runner_, &run_count));
-
+      base::Bind(&RepostingUpdateClockIdleTestTask, idle_task_runner_,
+                 &run_count, clock_, idle_task_runtime, &actual_deadlines));
   scheduler_->BeginFrameNotExpectedSoon();
   RunUntilIdle();
-  EXPECT_EQ(1, run_count);  // Should only run once per idle period.
+  EXPECT_EQ(3, run_count);
+  EXPECT_THAT(
+      actual_deadlines,
+      testing::ElementsAre(
+          clock_before + maximum_idle_period_duration(),
+          clock_before + idle_task_runtime + maximum_idle_period_duration(),
+          clock_before + (2 * idle_task_runtime) +
+              maximum_idle_period_duration()));
 
-  // Advance time to start of next long idle period and check task reposted task
-  // gets run.
-  clock_->AdvanceNow(maximum_idle_period_duration());
+  // Check that idle tasks don't run after the idle period ends with a
+  // new BeginMainFrame.
+  max_idle_task_reposts = 5;
+  idle_task_runner_->PostIdleTask(
+      FROM_HERE,
+      base::Bind(&RepostingUpdateClockIdleTestTask, idle_task_runner_,
+                 &run_count, clock_, idle_task_runtime, &actual_deadlines));
+  idle_task_runner_->PostIdleTask(
+      FROM_HERE, base::Bind(&WillBeginFrameIdleTask,
+                            base::Unretained(scheduler_.get()), clock_));
   RunUntilIdle();
-  EXPECT_EQ(2, run_count);
-
-  // Advance time to start of next long idle period then end idle period with a
-  // new BeginMainFrame and check idle task doesn't run.
-  clock_->AdvanceNow(maximum_idle_period_duration());
-  scheduler_->WillBeginFrame(cc::BeginFrameArgs::Create(
-      BEGINFRAME_FROM_HERE, clock_->Now(), base::TimeTicks(),
-      base::TimeDelta::FromMilliseconds(1000), cc::BeginFrameArgs::NORMAL));
-  RunUntilIdle();
-  EXPECT_EQ(2, run_count);
+  EXPECT_EQ(4, run_count);
 }
 
 TEST_F(RendererSchedulerImplTest, TestLongIdlePeriodDoesNotWakeScheduler) {
@@ -1344,6 +1384,7 @@ TEST_F(RendererSchedulerImplTest, CanExceedIdleDeadlineIfRequired) {
 TEST_F(RendererSchedulerImplTest, TestRendererHiddenIdlePeriod) {
   int run_count = 0;
 
+  max_idle_task_reposts = 2;
   idle_task_runner_->PostIdleTask(
       FROM_HERE,
       base::Bind(&RepostingIdleTestTask, idle_task_runner_, &run_count));
@@ -1352,19 +1393,19 @@ TEST_F(RendererSchedulerImplTest, TestRendererHiddenIdlePeriod) {
   RunUntilIdle();
   EXPECT_EQ(0, run_count);
 
-  // When we hide the renderer it should start an idle period.
+  // When we hide the renderer it should start a max deadline idle period, which
+  // will run an idle task and then immediately start a new idle period, which
+  // runs the second idle task.
   scheduler_->OnRendererHidden();
-  RunUntilIdle();
-  EXPECT_EQ(1, run_count);
-
-  // Advance time to start of next long idle period and check task reposted task
-  // gets run.
-  clock_->AdvanceNow(maximum_idle_period_duration());
   RunUntilIdle();
   EXPECT_EQ(2, run_count);
 
   // Advance time by amount of time by the maximum amount of time we execute
   // idle tasks when hidden (plus some slack) - idle period should have ended.
+  max_idle_task_reposts = 3;
+  idle_task_runner_->PostIdleTask(
+      FROM_HERE,
+      base::Bind(&RepostingIdleTestTask, idle_task_runner_, &run_count));
   clock_->AdvanceNow(end_idle_when_hidden_delay() +
                      base::TimeDelta::FromMilliseconds(10));
   RunUntilIdle();
@@ -1415,6 +1456,18 @@ TEST_F(RendererSchedulerImplTest, MultipleSuspendsNeedMultipleResumes) {
   RunUntilIdle();
   EXPECT_THAT(run_order,
               testing::ElementsAre(std::string("T1"), std::string("T2")));
+}
+
+TEST_F(RendererSchedulerImplTest, TaskQueueIdToString) {
+  CheckAllTaskQueueIdToString();
+}
+
+TEST_F(RendererSchedulerImplTest, PolicyToString) {
+  CheckAllTaskQueueIdToString();
+}
+
+TEST_F(RendererSchedulerImplTest, InputStreamStateToString) {
+  CheckAllInputStreamStateToString();
 }
 
 }  // namespace scheduler

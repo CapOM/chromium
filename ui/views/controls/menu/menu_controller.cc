@@ -532,9 +532,13 @@ void MenuController::OnMouseReleased(SubmenuView* source,
       menu = part.parent;
     }
 
-    if (menu != NULL && ShowContextMenu(menu, source, event,
-                                        ui::MENU_SOURCE_MOUSE))
-      return;
+    if (menu != NULL) {
+      gfx::Point screen_location(event.location());
+      View::ConvertPointToScreen(source->GetScrollViewContainer(),
+                                 &screen_location);
+      if (ShowContextMenu(menu, screen_location, ui::MENU_SOURCE_MOUSE))
+        return;
+    }
   }
 
   // We can use Ctrl+click or the middle mouse button to recursively open urls
@@ -608,7 +612,10 @@ void MenuController::OnGestureEvent(SubmenuView* source,
     event->StopPropagation();
   } else if (event->type() == ui::ET_GESTURE_LONG_PRESS) {
     if (part.type == MenuPart::MENU_ITEM && part.menu) {
-      if (ShowContextMenu(part.menu, source, *event, ui::MENU_SOURCE_TOUCH))
+      gfx::Point screen_location(event->location());
+      View::ConvertPointToScreen(source->GetScrollViewContainer(),
+                                 &screen_location);
+      if (ShowContextMenu(part.menu, screen_location, ui::MENU_SOURCE_TOUCH))
         event->StopPropagation();
     }
   } else if (event->type() == ui::ET_GESTURE_TAP) {
@@ -1092,6 +1099,19 @@ bool MenuController::OnKeyDown(ui::KeyboardCode key_code) {
       CloseSubmenu();
       break;
 
+    case ui::VKEY_APPS: {
+      CustomButton* hot_view = GetFirstHotTrackedView(pending_state_.item);
+      if (hot_view) {
+        hot_view->ShowContextMenu(hot_view->GetKeyboardContextMenuLocation(),
+                                  ui::MENU_SOURCE_KEYBOARD);
+      } else if (pending_state_.item->enabled()) {
+        ShowContextMenu(pending_state_.item,
+                        pending_state_.item->GetKeyboardContextMenuLocation(),
+                        ui::MENU_SOURCE_KEYBOARD);
+      }
+      break;
+    }
+
     default:
       break;
   }
@@ -1269,8 +1289,7 @@ bool MenuController::ShowSiblingMenu(SubmenuView* source,
 }
 
 bool MenuController::ShowContextMenu(MenuItemView* menu_item,
-                                     SubmenuView* source,
-                                     const ui::LocatedEvent& event,
+                                     const gfx::Point& screen_location,
                                      ui::MenuSourceType source_type) {
   // Set the selection immediately, making sure the submenu is only open
   // if it already was.
@@ -1278,11 +1297,9 @@ bool MenuController::ShowContextMenu(MenuItemView* menu_item,
   if (state_.item == pending_state_.item && state_.submenu_open)
     selection_types |= SELECTION_OPEN_SUBMENU;
   SetSelection(pending_state_.item, selection_types);
-  gfx::Point loc(event.location());
-  View::ConvertPointToScreen(source->GetScrollViewContainer(), &loc);
 
   if (menu_item->GetDelegate()->ShowContextMenu(
-          menu_item, menu_item->GetCommand(), loc, source_type)) {
+          menu_item, menu_item->GetCommand(), screen_location, source_type)) {
     SendMouseCaptureLostToActiveView();
     return true;
   }
@@ -1885,9 +1902,11 @@ void MenuController::IncrementSelection(int delta) {
   if (pending_state_.submenu_open && item->HasSubmenu() &&
       item->GetSubmenu()->IsShowing()) {
     // A menu is selected and open, but none of its children are selected,
-    // select the first menu item.
+    // select the first menu item that is visible and enabled.
     if (item->GetSubmenu()->GetMenuItemCount()) {
-      SetSelection(item->GetSubmenu()->GetMenuItemAt(0), SELECTION_DEFAULT);
+      MenuItemView* to_select = FindFirstSelectableMenuItem(item);
+      if (to_select)
+        SetSelection(to_select, SELECTION_DEFAULT);
       return;
     }
   }
@@ -1934,19 +1953,27 @@ void MenuController::IncrementSelection(int delta) {
   }
 }
 
+MenuItemView* MenuController::FindFirstSelectableMenuItem(
+    MenuItemView* parent) {
+  MenuItemView* child = parent->GetSubmenu()->GetMenuItemAt(0);
+  if (!child->visible() || !child->enabled())
+    child = FindNextSelectableMenuItem(parent, 0, 1);
+  return child;
+}
+
 MenuItemView* MenuController::FindNextSelectableMenuItem(MenuItemView* parent,
                                                          int index,
                                                          int delta) {
   int start_index = index;
   int parent_count = parent->GetSubmenu()->GetMenuItemCount();
   // Loop through the menu items skipping any invisible menus. The loop stops
-  // when we wrap or find a visible child.
+  // when we wrap or find a visible and enabled child.
   do {
     index = (index + delta + parent_count) % parent_count;
     if (index == start_index)
       return NULL;
     MenuItemView* child = parent->GetSubmenu()->GetMenuItemAt(index);
-    if (child->visible())
+    if (child->visible() && child->enabled())
       return child;
   } while (index != start_index);
   return NULL;
@@ -1954,15 +1981,17 @@ MenuItemView* MenuController::FindNextSelectableMenuItem(MenuItemView* parent,
 
 void MenuController::OpenSubmenuChangeSelectionIfCan() {
   MenuItemView* item = pending_state_.item;
-  if (item->HasSubmenu() && item->enabled()) {
-    if (item->GetSubmenu()->GetMenuItemCount() > 0) {
-      SetSelection(item->GetSubmenu()->GetMenuItemAt(0),
-                   SELECTION_UPDATE_IMMEDIATELY);
-    } else {
-      // No menu items, just show the sub-menu.
-      SetSelection(item, SELECTION_OPEN_SUBMENU | SELECTION_UPDATE_IMMEDIATELY);
-    }
+  if (!item->HasSubmenu() || !item->enabled())
+    return;
+  MenuItemView* to_select = NULL;
+  if (item->GetSubmenu()->GetMenuItemCount() > 0)
+    to_select = FindFirstSelectableMenuItem(item);
+  if (to_select) {
+    SetSelection(to_select, SELECTION_UPDATE_IMMEDIATELY);
+    return;
   }
+  // No menu items, just show the sub-menu.
+  SetSelection(item, SELECTION_OPEN_SUBMENU | SELECTION_UPDATE_IMMEDIATELY);
 }
 
 void MenuController::CloseSubmenu() {

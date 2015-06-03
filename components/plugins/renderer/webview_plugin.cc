@@ -52,7 +52,7 @@ WebViewPlugin::WebViewPlugin(WebViewPlugin::Delegate* delegate,
   // ApplyWebPreferences before making a WebLocalFrame so that the frame sees a
   // consistent view of our preferences.
   content::RenderView::ApplyWebPreferences(preferences, web_view_);
-  web_frame_ = WebLocalFrame::create(this);
+  web_frame_ = WebLocalFrame::create(blink::WebTreeScopeType::Document, this);
   web_view_->setMainFrame(web_frame_);
 }
 
@@ -61,7 +61,6 @@ WebViewPlugin* WebViewPlugin::Create(WebViewPlugin::Delegate* delegate,
                                      const WebPreferences& preferences,
                                      const std::string& html_data,
                                      const GURL& url) {
-  DCHECK(url.is_valid()) << "Blink requires the WebView to have a valid URL.";
   WebViewPlugin* plugin = new WebViewPlugin(delegate, preferences);
   plugin->web_view()->mainFrame()->loadHTMLString(html_data, url);
   return plugin;
@@ -258,7 +257,7 @@ void WebViewPlugin::didChangeCursor(const WebCursorInfo& cursor) {
 
 void WebViewPlugin::scheduleAnimation() {
   if (container_)
-    container_->invalidate();
+    container_->setNeedsLayout();
 }
 
 void WebViewPlugin::didClearWindowObject(WebLocalFrame* frame) {

@@ -7,23 +7,19 @@
 #include "base/bind.h"
 #include "base/location.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "base/thread_task_runner_handle.h"
 #include "components/html_viewer/blink_input_events_type_converters.h"
 #include "components/html_viewer/blink_url_request_type_converters.h"
+#include "components/html_viewer/media_factory.h"
 #include "components/html_viewer/setup.h"
 #include "components/html_viewer/web_layer_tree_view_impl.h"
-#include "components/html_viewer/web_media_player_factory.h"
 #include "components/html_viewer/web_storage_namespace_impl.h"
 #include "components/html_viewer/web_url_loader_impl.h"
-#include "components/surfaces/public/interfaces/surfaces.mojom.h"
 #include "components/view_manager/public/cpp/view.h"
-#include "media/blink/webencryptedmediaclient_impl.h"
-#include "media/cdm/default_cdm_factory.h"
-#include "media/filters/default_media_permission.h"
+#include "components/view_manager/public/interfaces/surfaces.mojom.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/connect.h"
 #include "mojo/application/public/interfaces/shell.mojom.h"
@@ -46,6 +42,7 @@
 #include "ui/gfx/geometry/dip_util.h"
 #include "ui/gfx/geometry/size.h"
 
+using blink::WebString;
 using mojo::AxProvider;
 using mojo::Rect;
 using mojo::ServiceProviderPtr;
@@ -94,26 +91,8 @@ bool CanNavigateLocally(blink::WebFrame* frame,
   if (request.extraData())
     return true;
 
-  // mojo::NavigatorHost doesn't accept POSTs, so for now reuse this instance.
-  // TODO(jam): improve this (and copy logic from RenderFrameImpl's version)
-  // when we have multi-process.
-  if (EqualsASCII(request.httpMethod(), "POST"))
-    return true;
-
-  // Logging into Gmail fails when the referrer isn't sent with a request.
-  // TODO(jam): pass referrer and other HTTP data to NavigatorHost so we can
-  // use a new process in this case.
-  if (!request.httpHeaderField(blink::WebString::fromUTF8("Referer")).isEmpty())
-    return true;
-
   // Otherwise we don't know if we're the right app to handle this request. Ask
   // host to do the navigation for us.
-  return false;
-}
-
-bool AreSecureCodecsSupported() {
-  // Hardware-secure codecs are not currently supported by HTML Viewer on any
-  // platform.
   return false;
 }
 
@@ -122,13 +101,14 @@ bool AreSecureCodecsSupported() {
 HTMLDocument::HTMLDocument(
     mojo::InterfaceRequest<mojo::ServiceProvider> services,
     URLResponsePtr response,
-    mojo::Shell* shell,
+    mojo::ShellPtr shell,
     Setup* setup)
-    : response_(response.Pass()),
-      shell_(shell),
+    : app_refcount_(setup->app()->app_lifetime_helper()->CreateAppRefCount()),
+      response_(response.Pass()),
+      shell_(shell.Pass()),
       web_view_(nullptr),
       root_(nullptr),
-      view_manager_client_factory_(shell_, this),
+      view_manager_client_factory_(shell_.get(), this),
       setup_(setup) {
   exported_services_.AddService(this);
   exported_services_.AddService(&view_manager_client_factory_);
@@ -161,7 +141,7 @@ void HTMLDocument::OnEmbed(
 }
 
 void HTMLDocument::OnViewManagerDisconnected(ViewManager* view_manager) {
-  // TODO(aa): Need to figure out how shutdown works.
+  delete this;
 }
 
 void HTMLDocument::Create(mojo::ApplicationConnection* connection,
@@ -173,7 +153,7 @@ void HTMLDocument::Create(mojo::ApplicationConnection* connection,
     ax_provider_requests_.insert(cached_request);
   } else {
     ax_providers_.insert(
-        WeakBindToRequest(new AxProviderImpl(web_view_), &request));
+        new AxProviderImpl(web_view_, request.Pass()));
   }
 }
 
@@ -183,7 +163,8 @@ void HTMLDocument::Load(URLResponsePtr response) {
   touch_handler_.reset(new TouchHandler(web_view_));
   web_layer_tree_view_impl_->set_widget(web_view_);
   ConfigureSettings(web_view_->settings());
-  web_view_->setMainFrame(blink::WebLocalFrame::create(this));
+  web_view_->setMainFrame(
+      blink::WebLocalFrame::create(blink::WebTreeScopeType::Document, this));
 
   GURL url(response->url);
 
@@ -210,13 +191,15 @@ void HTMLDocument::UpdateWebviewSizeFromViewSize() {
 
 void HTMLDocument::InitSetupAndLoadIfNecessary() {
   DCHECK(root_);
-  if (web_view_ || root_->viewport_metrics().device_pixel_ratio == 0.f)
+  if (root_->viewport_metrics().device_pixel_ratio == 0.f)
     return;
 
-  setup_->InitIfNecessary(gfx::Size(root_->viewport_metrics().size->width,
-                                    root_->viewport_metrics().size->height),
-                          root_->viewport_metrics().device_pixel_ratio);
-  Load(response_.Pass());
+  if (!web_view_) {
+    setup_->InitIfNecessary(gfx::Size(root_->viewport_metrics().size->width,
+                                      root_->viewport_metrics().size->height),
+                            root_->viewport_metrics().device_pixel_ratio);
+    Load(response_.Pass());
+  }
 
   UpdateWebviewSizeFromViewSize();
   web_layer_tree_view_impl_->set_view(root_);
@@ -233,18 +216,16 @@ void HTMLDocument::initializeLayerTreeView() {
     return;
   }
 
-  ServiceProviderPtr surfaces_service_provider;
-  shell_->ConnectToApplication("mojo:surfaces_service",
-                               GetProxy(&surfaces_service_provider), nullptr);
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  request->url = mojo::String::From("mojo:surfaces_service");
   mojo::SurfacePtr surface;
-  ConnectToService(surfaces_service_provider.get(), &surface);
+  setup_->app()->ConnectToService(request.Pass(), &surface);
 
-  ServiceProviderPtr gpu_service_provider;
   // TODO(jamesr): Should be mojo:gpu_service
-  shell_->ConnectToApplication("mojo:native_viewport_service",
-                               GetProxy(&gpu_service_provider), nullptr);
+  mojo::URLRequestPtr request2(mojo::URLRequest::New());
+  request2->url = mojo::String::From("mojo:view_manager");
   mojo::GpuPtr gpu_service;
-  ConnectToService(gpu_service_provider.get(), &gpu_service);
+  setup_->app()->ConnectToService(request2.Pass(), &gpu_service);
   web_layer_tree_view_impl_.reset(new WebLayerTreeViewImpl(
       setup_->compositor_thread(), surface.Pass(), gpu_service.Pass()));
 }
@@ -256,29 +237,18 @@ blink::WebLayerTreeView* HTMLDocument::layerTreeView() {
 blink::WebMediaPlayer* HTMLDocument::createMediaPlayer(
     blink::WebLocalFrame* frame,
     const blink::WebURL& url,
-    blink::WebMediaPlayerClient* client) {
-  return createMediaPlayer(frame, url, client, nullptr);
-}
-
-blink::WebMediaPlayer* HTMLDocument::createMediaPlayer(
-    blink::WebLocalFrame* frame,
-    const blink::WebURL& url,
     blink::WebMediaPlayerClient* client,
     blink::WebContentDecryptionModule* initial_cdm) {
-  blink::WebMediaPlayer* player =
-      setup_->web_media_player_factory()
-          ? setup_->web_media_player_factory()->CreateMediaPlayer(
-                frame, url, client, GetMediaPermission(), GetCdmFactory(),
-                initial_cdm, shell_)
-          : nullptr;
-  return player;
+  return setup_->media_factory()->CreateMediaPlayer(frame, url, client,
+                                                    initial_cdm, shell_.get());
 }
 
 blink::WebFrame* HTMLDocument::createChildFrame(
     blink::WebLocalFrame* parent,
+    blink::WebTreeScopeType scope,
     const blink::WebString& frameName,
     blink::WebSandboxFlags sandboxFlags) {
-  blink::WebLocalFrame* web_frame = blink::WebLocalFrame::create(this);
+  blink::WebLocalFrame* web_frame = blink::WebLocalFrame::create(scope, this);
   parent->appendChild(web_frame);
   return web_frame;
 }
@@ -298,19 +268,15 @@ blink::WebCookieJar* HTMLDocument::cookieJar(blink::WebLocalFrame* frame) {
 }
 
 blink::WebNavigationPolicy HTMLDocument::decidePolicyForNavigation(
-    blink::WebLocalFrame* frame,
-    blink::WebDataSource::ExtraData* data,
-    const blink::WebURLRequest& request,
-    blink::WebNavigationType nav_type,
-    blink::WebNavigationPolicy default_policy,
-    bool is_redirect) {
-  if (CanNavigateLocally(frame, request))
-    return default_policy;
+    const NavigationPolicyInfo& info) {
+  if (CanNavigateLocally(info.frame, info.urlRequest))
+    return info.defaultPolicy;
 
   if (navigator_host_.get()) {
+    mojo::URLRequestPtr url_request = mojo::URLRequest::From(info.urlRequest);
     navigator_host_->RequestNavigate(
-        WebNavigationPolicyToNavigationTarget(default_policy),
-        mojo::URLRequest::From(request).Pass());
+        WebNavigationPolicyToNavigationTarget(info.defaultPolicy),
+        url_request.Pass());
   }
 
   return blink::WebNavigationPolicyIgnore;
@@ -330,7 +296,7 @@ void HTMLDocument::didFinishLoad(blink::WebLocalFrame* frame) {
   did_finish_load_ = true;
   // Bind any pending AxProviderImpl interface requests.
   for (auto it : ax_provider_requests_)
-    ax_providers_.insert(WeakBindToRequest(new AxProviderImpl(web_view_), it));
+    ax_providers_.insert(new AxProviderImpl(web_view_, it->Pass()));
   STLDeleteElements(&ax_provider_requests_);
 }
 
@@ -343,12 +309,7 @@ void HTMLDocument::didNavigateWithinPage(
 }
 
 blink::WebEncryptedMediaClient* HTMLDocument::encryptedMediaClient() {
-  if (!web_encrypted_media_client_) {
-    web_encrypted_media_client_.reset(new media::WebEncryptedMediaClientImpl(
-        base::Bind(&AreSecureCodecsSupported), GetCdmFactory(),
-        GetMediaPermission()));
-  }
-  return web_encrypted_media_client_.get();
+  return setup_->media_factory()->GetEncryptedMediaClient();
 }
 
 void HTMLDocument::OnViewBoundsChanged(View* view,
@@ -368,8 +329,7 @@ void HTMLDocument::OnViewViewportMetricsChanged(
 void HTMLDocument::OnViewDestroyed(View* view) {
   DCHECK_EQ(view, root_);
   root_ = nullptr;
-  delete this;
-  mojo::ApplicationImpl::Terminate();
+  shell_->QuitApplication();
 }
 
 void HTMLDocument::OnViewInputEvent(View* view, const mojo::EventPtr& event) {
@@ -393,18 +353,6 @@ void HTMLDocument::OnViewInputEvent(View* view, const mojo::EventPtr& event) {
       event.To<scoped_ptr<blink::WebInputEvent>>();
   if (web_event)
     web_view_->handleInputEvent(*web_event);
-}
-
-media::MediaPermission* HTMLDocument::GetMediaPermission() {
-  if (!media_permission_)
-    media_permission_.reset(new media::DefaultMediaPermission(true));
-  return media_permission_.get();
-}
-
-media::CdmFactory* HTMLDocument::GetCdmFactory() {
-  if (!cdm_factory_)
-    cdm_factory_.reset(new media::DefaultCdmFactory());
-  return cdm_factory_.get();
 }
 
 }  // namespace html_viewer

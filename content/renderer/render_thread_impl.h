@@ -47,7 +47,6 @@ class WebMediaStreamCenterClient;
 }
 
 namespace base {
-class MessageLoopProxy;
 class SingleThreadTaskRunner;
 class Thread;
 }
@@ -155,7 +154,7 @@ class CONTENT_EXPORT RenderThreadImpl
   IPC::SyncChannel* GetChannel() override;
   std::string GetLocale() override;
   IPC::SyncMessageFilter* GetSyncMessageFilter() override;
-  scoped_refptr<base::MessageLoopProxy> GetIOMessageLoopProxy() override;
+  scoped_refptr<base::SingleThreadTaskRunner> GetIOMessageLoopProxy() override;
   void AddRoute(int32 routing_id, IPC::Listener* listener) override;
   void RemoveRoute(int32 routing_id) override;
   int GenerateRoutingID() override;
@@ -193,7 +192,6 @@ class CONTENT_EXPORT RenderThreadImpl
   bool IsZeroCopyEnabled() override;
   bool IsOneCopyEnabled() override;
   bool IsElasticOverscrollEnabled() override;
-  bool UseSingleThreadScheduler() override;
   uint32 GetImageTextureTarget() override;
   scoped_refptr<base::SingleThreadTaskRunner>
   GetCompositorMainThreadTaskRunner() override;
@@ -245,8 +243,8 @@ class CONTENT_EXPORT RenderThreadImpl
   }
 
   // Will be null if threaded compositing has not been enabled.
-  scoped_refptr<base::MessageLoopProxy> compositor_message_loop_proxy() const {
-    return compositor_message_loop_proxy_;
+  scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner() const {
+    return compositor_task_runner_;
   }
 
   AppCacheDispatcher* appcache_dispatcher() const {
@@ -310,10 +308,10 @@ class CONTENT_EXPORT RenderThreadImpl
   // has been lost.
   GpuChannelHost* GetGpuChannel();
 
-  // Returns a MessageLoopProxy instance corresponding to the message loop
+  // Returns a SingleThreadTaskRunner instance corresponding to the message loop
   // of the thread on which file operations should be run. Must be called
   // on the renderer's main thread.
-  scoped_refptr<base::MessageLoopProxy> GetFileThreadMessageLoopProxy();
+  scoped_refptr<base::SingleThreadTaskRunner> GetFileThreadMessageLoopProxy();
 
   // Returns a SingleThreadTaskRunner instance corresponding to the message loop
   // of the thread on which media operations should be run. Must be called
@@ -561,9 +559,9 @@ class CONTENT_EXPORT RenderThreadImpl
   // Thread for running multimedia operations (e.g., video decoding).
   scoped_ptr<base::Thread> media_thread_;
 
-  // Will point to appropriate MessageLoopProxy after initialization,
+  // Will point to appropriate task runner after initialization,
   // regardless of whether |compositor_thread_| is overriden.
-  scoped_refptr<base::MessageLoopProxy> compositor_message_loop_proxy_;
+  scoped_refptr<base::SingleThreadTaskRunner> compositor_task_runner_;
 
   // Threads used by compositor for rasterization.
   ScopedVector<base::SimpleThread> compositor_raster_threads_;

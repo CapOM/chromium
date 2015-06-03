@@ -15,6 +15,7 @@ if (is_posix) {
 }
 
 import("//build/toolchain/ccache.gni")
+import("//build/config/sanitizers/sanitizers.gni")
 
 declare_args() {
   # Normally, Android builds are lightly optimized, even for debug builds, to
@@ -56,11 +57,6 @@ declare_args() {
     # The patch is preapplied to the internal toolchain and hence all bots.
     msvs_xtree_patched = false
   }
-
-  # Track where uninitialized memory originates from. From fastest to slowest:
-  # 0 - no tracking, 1 - track only the initial allocation site, 2 - track the
-  # chain of stores leading from allocation site to use site.
-  msan_track_origins = 2
 }
 
 # default_include_dirs ---------------------------------------------------------
@@ -174,8 +170,14 @@ config("compiler") {
         "-fsanitize-memory-track-origins=$msan_track_origins",
         "-fsanitize-blacklist=$msan_blacklist_path",
       ]
+    }
 
-      # TODO(GYP): Support instrumented libraries and custom libc++.
+    if (use_custom_libcxx) {
+      cflags_cc += [ "-nostdinc++" ]
+      include_dirs = [
+        "//buildtools/third_party/libc++/trunk/include",
+        "//buildtools/third_party/libc++abi/trunk/include",
+      ]
     }
   }
 
@@ -638,12 +640,25 @@ config("runtime_library") {
       android_libcpp_library = "c++_static"
     }
 
-    libs += [
-      "$android_libcpp_library",
+    libs += [ "$android_libcpp_library" ]
 
-      # Manually link the libgcc.a that the cross compiler uses. This is
-      # absolute because the linker will look inside the sysroot if it's not.
-      rebase_path(android_libgcc_file),
+    if (current_cpu == "mipsel") {
+      libs += [
+        # ld linker is used for mips Android, and ld does not accept library
+        # absolute path prefixed by "-l"; Since libgcc does not exist in mips
+        # sysroot the proper library will be linked.
+        # TODO(gordanac): Remove once gold linker is used for mips Android.
+        "gcc",
+      ]
+    } else {
+      libs += [
+        # Manually link the libgcc.a that the cross compiler uses. This is
+        # absolute because the linker will look inside the sysroot if it's not.
+        rebase_path(android_libgcc_file),
+      ]
+    }
+
+    libs += [
       "c",
       "dl",
       "m",
@@ -851,6 +866,12 @@ config("default_warnings") {
 
     if (is_mac) {
       cflags += [ "-Wnewline-eof" ]
+      if (!is_nacl) {
+        # When compiling Objective-C, warns if a method is used whose
+        # availability is newer than the deployment target. This is not
+        # required when compiling Chrome for iOS.
+        cflags += [ "-Wpartial-availability" ]
+      }
     }
 
     if (is_clang) {

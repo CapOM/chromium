@@ -5,7 +5,17 @@
 #ifndef IOS_PUBLIC_PROVIDER_CHROME_BROWSER_CHROME_BROWSER_PROVIDER_H_
 #define IOS_PUBLIC_PROVIDER_CHROME_BROWSER_CHROME_BROWSER_PROVIDER_H_
 
+#include <CoreGraphics/CoreGraphics.h>
+
+#include <string>
+
+class InfoBarViewDelegate;
 class PrefService;
+
+namespace autofill {
+class CardUnmaskPromptController;
+class CardUnmaskPromptView;
+}
 
 namespace net {
 class URLRequestContextGetter;
@@ -20,9 +30,10 @@ class WebState;
 #ifdef __OBJC__
 @class UIView;
 @protocol InfoBarViewProtocol;
-typedef UIView<InfoBarViewProtocol> InfoBarViewPlaceholder;
+typedef UIView<InfoBarViewProtocol>* InfoBarViewPlaceholder;
 #else
-class InfoBarViewPlaceholder;
+class InfoBarViewPlaceholderClass;
+typedef InfoBarViewPlaceholderClass* InfoBarViewPlaceholder;
 class UIView;
 #endif
 
@@ -30,6 +41,7 @@ namespace ios {
 
 class ChromeBrowserProvider;
 class GeolocationUpdaterProvider;
+class KeyedServiceProvider;
 class StringProvider;
 class UpdatableResourceProvider;
 
@@ -51,9 +63,11 @@ class ChromeBrowserProvider {
   virtual PrefService* GetLocalState();
   // Returns an UpdatableResourceProvider instance.
   virtual UpdatableResourceProvider* GetUpdatableResourceProvider();
-  // Returns an instance of an infobar view. The caller is responsible for
-  // initializing the returned object and releasing it when appropriate.
-  virtual InfoBarViewPlaceholder* CreateInfoBarView();
+  // Returns an infobar view conforming to the InfoBarViewProtocol. The returned
+  // object is retained.
+  virtual InfoBarViewPlaceholder CreateInfoBarView(
+      CGRect frame,
+      InfoBarViewDelegate* delegate);
   // Returns an instance of a string provider.
   virtual StringProvider* GetStringProvider();
   virtual GeolocationUpdaterProvider* GetGeolocationUpdaterProvider();
@@ -65,6 +79,15 @@ class ChromeBrowserProvider {
   virtual const char* GetChromeUIScheme();
   // Sets the alpha property of an UIView with an animation.
   virtual void SetUIViewAlphaWithAnimation(UIView* view, float alpha);
+  // Returns an instance of a CardUnmaskPromptView used to unmask Wallet cards.
+  // The view is responsible for its own lifetime.
+  virtual autofill::CardUnmaskPromptView*
+      CreateCardUnmaskPromptView(
+          autofill::CardUnmaskPromptController* controller);
+  // Returns risk data used in Wallet requests.
+  virtual std::string GetRiskData();
+  // Returns an instance of KeyedServiceProvider.
+  virtual KeyedServiceProvider* GetKeyedServiceProvider();
 };
 
 }  // namespace ios

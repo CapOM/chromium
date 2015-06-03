@@ -10,7 +10,7 @@
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
 #include "base/memory/scoped_ptr.h"
-#include "content/browser/devtools/ipc_devtools_agent_host.h"
+#include "content/browser/devtools/devtools_agent_host_impl.h"
 #include "content/common/content_export.h"
 #include "content/public/browser/web_contents_observer.h"
 
@@ -22,6 +22,7 @@ namespace content {
 
 class BrowserContext;
 class DevToolsFrameTraceRecorder;
+class DevToolsProtocolHandler;
 class RenderFrameHost;
 class RenderFrameHostImpl;
 
@@ -42,7 +43,7 @@ namespace tracing { class TracingHandler; }
 }
 
 class CONTENT_EXPORT RenderFrameDevToolsAgentHost
-    : public IPCDevToolsAgentHost,
+    : public DevToolsAgentHostImpl,
       private WebContentsObserver {
  public:
   static void AddAllAgentHosts(DevToolsAgentHost::List* result);
@@ -65,6 +66,7 @@ class CONTENT_EXPORT RenderFrameDevToolsAgentHost
   GURL GetURL() override;
   bool Activate() override;
   bool Close() override;
+  bool DispatchProtocolMessage(const std::string& message) override;
 
  private:
   friend class DevToolsAgentHost;
@@ -76,10 +78,10 @@ class CONTENT_EXPORT RenderFrameDevToolsAgentHost
       DevToolsAgentHost::List* result,
       RenderFrameHost* host);
 
-  // IPCDevToolsAgentHost overrides.
-  void SendMessageToAgent(IPC::Message* msg) override;
-  void OnClientAttached(bool reattached) override;
-  void OnClientDetached() override;
+  // DevToolsAgentHostImpl overrides.
+  void Attach() override;
+  void Detach() override;
+  void InspectElement(int x, int y) override;
 
   // WebContentsObserver overrides.
   void AboutToNavigateRenderFrame(RenderFrameHost* old_host,
@@ -97,6 +99,9 @@ class CONTENT_EXPORT RenderFrameDevToolsAgentHost
       RenderFrameHost* render_frame_host,
       const GURL& url,
       ui::PageTransition transition_type) override;
+
+  void OnClientAttached();
+  void OnClientDetached();
 
   void DisconnectRenderFrameHost();
   void ConnectRenderFrameHost(RenderFrameHost* rvh);
@@ -134,6 +139,7 @@ class CONTENT_EXPORT RenderFrameDevToolsAgentHost
 #if defined(OS_ANDROID)
   scoped_ptr<PowerSaveBlockerImpl> power_save_blocker_;
 #endif
+  scoped_ptr<DevToolsProtocolHandler> protocol_handler_;
   bool reattaching_;
 
   DISALLOW_COPY_AND_ASSIGN(RenderFrameDevToolsAgentHost);

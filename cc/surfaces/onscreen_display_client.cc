@@ -6,6 +6,9 @@
 
 #include "base/trace_event/trace_event.h"
 #include "cc/output/output_surface.h"
+#include "cc/output/vsync_parameter_observer.h"
+#include "cc/scheduler/begin_frame_source.h"
+#include "cc/surfaces/display_scheduler.h"
 #include "cc/surfaces/surface_display_output_surface.h"
 #include "cc/surfaces/surface_factory.h"
 #include "cc/surfaces/surface_manager.h"
@@ -25,68 +28,54 @@ OnscreenDisplayClient::OnscreenDisplayClient(
                            bitmap_manager,
                            gpu_memory_buffer_manager,
                            settings)),
+      vsync_observer_(nullptr),
       task_runner_(task_runner),
-      scheduled_draw_(false),
       output_surface_lost_(false),
-      deferred_draw_(false),
-      pending_frames_(0),
-      weak_ptr_factory_(this) {
+      disable_gpu_vsync_(settings.disable_gpu_vsync) {
 }
 
 OnscreenDisplayClient::~OnscreenDisplayClient() {
 }
 
 bool OnscreenDisplayClient::Initialize() {
-  return display_->Initialize(output_surface_.Pass());
+  int max_frames_pending =
+      output_surface_ ? output_surface_->capabilities().max_frames_pending : 0;
+  if (max_frames_pending <= 0)
+    max_frames_pending = OutputSurface::DEFAULT_MAX_FRAMES_PENDING;
+
+  if (disable_gpu_vsync_) {
+    begin_frame_source_ =
+        BackToBackBeginFrameSource::Create(task_runner_.get());
+  } else {
+    scoped_ptr<SyntheticBeginFrameSource> synthetic_source =
+        SyntheticBeginFrameSource::Create(task_runner_.get(), base::TimeTicks(),
+                                          BeginFrameArgs::DefaultInterval());
+    vsync_observer_ = synthetic_source.get();
+    begin_frame_source_ = synthetic_source.Pass();
+  }
+
+  scheduler_.reset(new DisplayScheduler(display_.get(),
+                                        begin_frame_source_.get(), task_runner_,
+                                        max_frames_pending));
+
+  return display_->Initialize(output_surface_.Pass(), scheduler_.get());
 }
 
 void OnscreenDisplayClient::CommitVSyncParameters(base::TimeTicks timebase,
                                                   base::TimeDelta interval) {
-  surface_display_output_surface_->ReceivedVSyncParameters(timebase, interval);
-}
-
-void OnscreenDisplayClient::DisplayDamaged() {
-  if (scheduled_draw_ || deferred_draw_)
-    return;
-  TRACE_EVENT0("content", "OnscreenDisplayClient::DisplayDamaged");
-  if (pending_frames_ >= display_->GetMaxFramesPending()) {
-    deferred_draw_ = true;
-  } else {
-    ScheduleDraw();
+  if (interval == base::TimeDelta()) {
+    // TODO(brianderson): We should not be receiving 0 intervals.
+    interval = BeginFrameArgs::DefaultInterval();
   }
-}
 
-void OnscreenDisplayClient::ScheduleDraw() {
-  DCHECK(!deferred_draw_);
-  DCHECK(!scheduled_draw_);
-  scheduled_draw_ = true;
-  task_runner_->PostTask(FROM_HERE, base::Bind(&OnscreenDisplayClient::Draw,
-                                               weak_ptr_factory_.GetWeakPtr()));
+  surface_display_output_surface_->ReceivedVSyncParameters(timebase, interval);
+  if (vsync_observer_)
+    vsync_observer_->OnUpdateVSyncParameters(timebase, interval);
 }
 
 void OnscreenDisplayClient::OutputSurfaceLost() {
   output_surface_lost_ = true;
   surface_display_output_surface_->DidLoseOutputSurface();
-}
-
-void OnscreenDisplayClient::Draw() {
-  TRACE_EVENT0("content", "OnscreenDisplayClient::Draw");
-  if (output_surface_lost_)
-    return;
-  scheduled_draw_ = false;
-  display_->Draw();
-}
-
-void OnscreenDisplayClient::DidSwapBuffers() {
-  pending_frames_++;
-}
-
-void OnscreenDisplayClient::DidSwapBuffersComplete() {
-  pending_frames_--;
-  if ((pending_frames_ < display_->GetMaxFramesPending()) && deferred_draw_) {
-    deferred_draw_ = false;
-    ScheduleDraw();
-  }
 }
 
 void OnscreenDisplayClient::SetMemoryPolicy(const ManagedMemoryPolicy& policy) {

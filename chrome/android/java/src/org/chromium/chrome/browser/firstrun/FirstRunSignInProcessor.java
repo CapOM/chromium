@@ -14,6 +14,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import org.chromium.base.CommandLine;
+import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.preferences.Preferences;
 import org.chromium.chrome.browser.preferences.PreferencesLauncher;
@@ -167,12 +168,16 @@ public class FirstRunSignInProcessor {
             return;
         }
 
+        final boolean delaySync = getFirstRunFlowSignInSetupSync(mActivity);
+        final int delaySyncType = delaySync
+                ? SigninManager.SIGNIN_SYNC_SETUP_IN_PROGRESS
+                : SigninManager.SIGNIN_SYNC_IMMEDIATELY;
         signinManager.signInToSelectedAccount(mActivity, account,
-                mSignInType, SigninManager.SIGNIN_SYNC_IMMEDIATELY, mShowSignInNotification,
+                mSignInType, delaySyncType, mShowSignInNotification,
                 new SignInFlowObserver() {
                     private void completeSignIn() {
                         // Show sync settings if user pressed the "Settings" button.
-                        if (getFirstRunFlowSignInSetupSync(mActivity)) {
+                        if (delaySync) {
                             openSyncSettings(
                                     ChromeSigninController.get(mActivity).getSignedInAccountName());
                         }
@@ -237,7 +242,8 @@ public class FirstRunSignInProcessor {
      * @param context A context
      * @param isComplete Whether there is no pending sign-in requests from the First Run Experience.
      */
-    private static void setFirstRunFlowSignInComplete(Context context, boolean isComplete) {
+    @VisibleForTesting
+    public static void setFirstRunFlowSignInComplete(Context context, boolean isComplete) {
         PreferenceManager.getDefaultSharedPreferences(context)
                 .edit()
                 .putBoolean(FIRST_RUN_FLOW_SIGNIN_COMPLETE, isComplete)
@@ -297,5 +303,17 @@ public class FirstRunSignInProcessor {
                     data.getString(FirstRunActivity.RESULT_SIGNIN_ACCOUNT_NAME));
         setFirstRunFlowSignInSetupSync(context,
                     data.getBoolean(FirstRunActivity.RESULT_SHOW_SYNC_SETTINGS));
+    }
+
+    /**
+     * Allows the user to sign-in if there are no pending FRE sign-in requests.
+     * @param context A context
+     */
+    public static void updateSigninManagerFirstRunCheckDone(Context context) {
+        SigninManager manager = SigninManager.get(context);
+        if (manager.isSignInAllowed()) return;
+        if (!FirstRunStatus.getFirstRunFlowComplete(context)) return;
+        if (!getFirstRunFlowSignInComplete(context)) return;
+        manager.onFirstRunCheckDone();
     }
 }

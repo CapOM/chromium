@@ -20,6 +20,7 @@
 #include "content/test/test_render_view_host.h"
 #include "content/test/test_web_contents.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "third_party/WebKit/public/web/WebSandboxFlags.h"
 
 namespace content {
 
@@ -140,19 +141,22 @@ TEST_F(FrameTreeTest, DISABLED_Shape) {
   ASSERT_EQ("1: []", GetTreeState(frame_tree));
 
   // Simulate attaching a series of frames to build the frame tree.
-  frame_tree->AddFrame(root, process_id, 14, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(root, process_id, 15, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(root, process_id, 16, std::string(),
-                       SandboxFlags::NONE);
+  frame_tree->AddFrame(root, process_id, 14, blink::WebTreeScopeType::Document,
+                       std::string(), blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(root, process_id, 15, blink::WebTreeScopeType::Document,
+                       std::string(), blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(root, process_id, 16, blink::WebTreeScopeType::Document,
+                       std::string(), blink::WebSandboxFlags::None);
 
-  frame_tree->AddFrame(root->child_at(0), process_id, 244, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(root->child_at(1), process_id, 255, no_children_node,
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(root->child_at(0), process_id, 245, std::string(),
-                       SandboxFlags::NONE);
+  frame_tree->AddFrame(root->child_at(0), process_id, 244,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(root->child_at(1), process_id, 255,
+                       blink::WebTreeScopeType::Document, no_children_node,
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(root->child_at(0), process_id, 245,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
 
   ASSERT_EQ("1: [14: [244: [], 245: []], "
                 "15: [255 'no children node': []], "
@@ -160,26 +164,35 @@ TEST_F(FrameTreeTest, DISABLED_Shape) {
             GetTreeState(frame_tree));
 
   FrameTreeNode* child_16 = root->child_at(2);
-  frame_tree->AddFrame(child_16, process_id, 264, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(child_16, process_id, 265, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(child_16, process_id, 266, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(child_16, process_id, 267, deep_subtree,
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(child_16, process_id, 268, std::string(),
-                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_16, process_id, 264,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(child_16, process_id, 265,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(child_16, process_id, 266,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(child_16, process_id, 267,
+                       blink::WebTreeScopeType::Document, deep_subtree,
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(child_16, process_id, 268,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
 
   FrameTreeNode* child_267 = child_16->child_at(3);
-  frame_tree->AddFrame(child_267, process_id, 365, std::string(),
-                       SandboxFlags::NONE);
-  frame_tree->AddFrame(child_267->child_at(0), process_id, 455, std::string(),
-                       SandboxFlags::NONE);
+  frame_tree->AddFrame(child_267, process_id, 365,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
+  frame_tree->AddFrame(child_267->child_at(0), process_id, 455,
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
   frame_tree->AddFrame(child_267->child_at(0)->child_at(0), process_id, 555,
-                       std::string(), SandboxFlags::NONE);
+                       blink::WebTreeScopeType::Document, std::string(),
+                       blink::WebSandboxFlags::None);
   frame_tree->AddFrame(child_267->child_at(0)->child_at(0)->child_at(0),
-                       process_id, 655, std::string(), SandboxFlags::NONE);
+                       process_id, 655, blink::WebTreeScopeType::Document,
+                       std::string(), blink::WebSandboxFlags::None);
 
   // Now that's it's fully built, verify the tree structure is as expected.
   ASSERT_EQ("1: [14: [244: [], 245: []], "
@@ -219,16 +232,22 @@ TEST_F(FrameTreeTest, FindFrames) {
   // Add a few child frames to the main frame.
   FrameTree* frame_tree = contents()->GetFrameTree();
   FrameTreeNode* root = frame_tree->root();
-  main_test_rfh()->OnCreateChildFrame(22, "child0", SandboxFlags::NONE);
-  main_test_rfh()->OnCreateChildFrame(23, "child1", SandboxFlags::NONE);
-  main_test_rfh()->OnCreateChildFrame(24, std::string(), SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(22, blink::WebTreeScopeType::Document,
+                                      "child0", blink::WebSandboxFlags::None);
+  main_test_rfh()->OnCreateChildFrame(23, blink::WebTreeScopeType::Document,
+                                      "child1", blink::WebSandboxFlags::None);
+  main_test_rfh()->OnCreateChildFrame(24, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
   FrameTreeNode* child0 = root->child_at(0);
   FrameTreeNode* child1 = root->child_at(1);
+
   FrameTreeNode* child2 = root->child_at(2);
 
   // Add one grandchild frame.
-  child1->current_frame_host()->OnCreateChildFrame(33, "grandchild",
-                                                   SandboxFlags::NONE);
+  child1->current_frame_host()->OnCreateChildFrame(
+      33, blink::WebTreeScopeType::Document, "grandchild",
+      blink::WebSandboxFlags::None);
   FrameTreeNode* grandchild = child1->child_at(0);
 
   // Ensure they can be found by FTN id.
@@ -262,16 +281,20 @@ TEST_F(FrameTreeTest, PreviousSibling) {
   // Add a few child frames to the main frame.
   FrameTree* frame_tree = contents()->GetFrameTree();
   FrameTreeNode* root = frame_tree->root();
-  main_test_rfh()->OnCreateChildFrame(22, "child0", SandboxFlags::NONE);
-  main_test_rfh()->OnCreateChildFrame(23, "child1", SandboxFlags::NONE);
-  main_test_rfh()->OnCreateChildFrame(24, "child2", SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(22, blink::WebTreeScopeType::Document,
+                                      "child0", blink::WebSandboxFlags::None);
+  main_test_rfh()->OnCreateChildFrame(23, blink::WebTreeScopeType::Document,
+                                      "child1", blink::WebSandboxFlags::None);
+  main_test_rfh()->OnCreateChildFrame(24, blink::WebTreeScopeType::Document,
+                                      "child2", blink::WebSandboxFlags::None);
   FrameTreeNode* child0 = root->child_at(0);
   FrameTreeNode* child1 = root->child_at(1);
   FrameTreeNode* child2 = root->child_at(2);
 
   // Add one grandchild frame.
-  child1->current_frame_host()->OnCreateChildFrame(33, "grandchild",
-                                                   SandboxFlags::NONE);
+  child1->current_frame_host()->OnCreateChildFrame(
+      33, blink::WebTreeScopeType::Document, "grandchild",
+      blink::WebSandboxFlags::None);
   FrameTreeNode* grandchild = child1->child_at(0);
 
   EXPECT_EQ(nullptr, root->PreviousSibling());
@@ -286,18 +309,22 @@ TEST_F(FrameTreeTest, PreviousSibling) {
 TEST_F(FrameTreeTest, ObserverWalksTreeDuringFrameCreation) {
   TreeWalkingWebContentsLogger activity(contents());
   contents()->NavigateAndCommit(GURL("http://www.google.com"));
-  EXPECT_EQ("", activity.GetLog());
+  EXPECT_EQ("RenderFrameCreated(1) -> 1: []", activity.GetLog());
 
   FrameTree* frame_tree = contents()->GetFrameTree();
   FrameTreeNode* root = frame_tree->root();
 
   // Simulate attaching a series of frames to build the frame tree.
-  main_test_rfh()->OnCreateChildFrame(14, std::string(), SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(14, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
   EXPECT_EQ(
       "RenderFrameHostChanged(new)(14) -> 1: []\n"
       "RenderFrameCreated(14) -> 1: [14: []]",
       activity.GetLog());
-  main_test_rfh()->OnCreateChildFrame(18, std::string(), SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(18, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
   EXPECT_EQ(
       "RenderFrameHostChanged(new)(18) -> 1: [14: []]\n"
       "RenderFrameCreated(18) -> 1: [14: [], 18: []]",
@@ -313,14 +340,18 @@ TEST_F(FrameTreeTest, ObserverWalksTreeDuringFrameCreation) {
 TEST_F(FrameTreeTest, ObserverWalksTreeAfterCrash) {
   TreeWalkingWebContentsLogger activity(contents());
   contents()->NavigateAndCommit(GURL("http://www.google.com"));
-  EXPECT_EQ("", activity.GetLog());
+  EXPECT_EQ("RenderFrameCreated(1) -> 1: []", activity.GetLog());
 
-  main_test_rfh()->OnCreateChildFrame(22, std::string(), SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(22, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
   EXPECT_EQ(
       "RenderFrameHostChanged(new)(22) -> 1: []\n"
       "RenderFrameCreated(22) -> 1: [22: []]",
       activity.GetLog());
-  main_test_rfh()->OnCreateChildFrame(23, std::string(), SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(23, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
   EXPECT_EQ(
       "RenderFrameHostChanged(new)(23) -> 1: [22: []]\n"
       "RenderFrameCreated(23) -> 1: [22: [], 23: []]",
@@ -329,10 +360,10 @@ TEST_F(FrameTreeTest, ObserverWalksTreeAfterCrash) {
   // Crash the renderer
   main_test_rfh()->GetProcess()->SimulateCrash();
   EXPECT_EQ(
-      "RenderFrameDeleted(23) -> 1: [22: [], 23*: []]\n"
-      "RenderFrameDeleted(22) -> 1: [22*: [], 23*: []]\n"
-      "RenderFrameDeleted(1) -> 1: []\n"  // TODO(nick): Should be "1*:"
-      "RenderProcessGone -> 1*: []",
+      "RenderProcessGone -> 1*: [22*: [], 23*: []]\n"
+      "RenderFrameDeleted(23) -> 1*: [22*: [], 23*: []]\n"
+      "RenderFrameDeleted(22) -> 1*: [22*: [], 23*: []]\n"
+      "RenderFrameDeleted(1) -> 1*: []",
       activity.GetLog());
 }
 
@@ -347,8 +378,9 @@ TEST_F(FrameTreeTest, FailAddFrameWithWrongProcessId) {
   ASSERT_EQ("1: []", GetTreeState(frame_tree));
 
   // Simulate attaching a frame from mismatched process id.
-  ASSERT_FALSE(frame_tree->AddFrame(root, process_id + 1, 1, std::string(),
-                                    SandboxFlags::NONE));
+  ASSERT_FALSE(frame_tree->AddFrame(
+      root, process_id + 1, 1, blink::WebTreeScopeType::Document, std::string(),
+      blink::WebSandboxFlags::None));
   ASSERT_EQ("1: []", GetTreeState(frame_tree));
 }
 
@@ -358,12 +390,17 @@ TEST_F(FrameTreeTest, ProcessCrashClearsGlobalMap) {
   // Add a couple child frames to the main frame.
   FrameTreeNode* root = contents()->GetFrameTree()->root();
 
-  main_test_rfh()->OnCreateChildFrame(22, std::string(), SandboxFlags::NONE);
-  main_test_rfh()->OnCreateChildFrame(23, std::string(), SandboxFlags::NONE);
+  main_test_rfh()->OnCreateChildFrame(22, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
+  main_test_rfh()->OnCreateChildFrame(23, blink::WebTreeScopeType::Document,
+                                      std::string(),
+                                      blink::WebSandboxFlags::None);
 
   // Add one grandchild frame.
   RenderFrameHostImpl* child1_rfh = root->child_at(0)->current_frame_host();
-  child1_rfh->OnCreateChildFrame(33, std::string(), SandboxFlags::NONE);
+  child1_rfh->OnCreateChildFrame(33, blink::WebTreeScopeType::Document,
+                                 std::string(), blink::WebSandboxFlags::None);
 
   // Ensure they can be found by id.
   int id1 = root->child_at(0)->frame_tree_node_id();

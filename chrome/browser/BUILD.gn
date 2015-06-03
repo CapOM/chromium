@@ -6,6 +6,7 @@ import("//build/config/chrome_build.gni")
 import("//build/config/crypto.gni")
 import("//build/config/features.gni")
 import("//build/config/ui.gni")
+import("//third_party/protobuf/proto_library.gni")
 
 # //build/config/android/rules.gni imports //tools/grit/grit_rule.gni, which
 # produces a conflict for the "grit" template so we have to only include one.
@@ -101,7 +102,7 @@ source_set("browser") {
     "//components/gcm_driver",
     "//components/gcm_driver/instance_id",
     "//components/google/core/browser",
-    "//components/guest_view:guest_view",
+    "//components/guest_view/browser",
     "//components/handoff",
     "//components/history/core/browser",
     "//components/history/core/common",
@@ -400,11 +401,6 @@ source_set("browser") {
                              ".",
                              "//chrome")
     }
-    if (enable_plugins) {
-      sources += rebase_path(gypi_values.chrome_browser_policy_plugin_sources,
-                             ".",
-                             "//chrome")
-    }
     if (is_android || is_ios) {
       sources += rebase_path(gypi_values.chrome_browser_policy_mobile_sources,
                              ".",
@@ -622,14 +618,21 @@ source_set("browser") {
   if (is_android) {
     sources +=
         rebase_path(gypi_values.chrome_browser_android_sources, ".", "//chrome")
+    sources += rebase_path(gypi_values.chrome_browser_bookmark_android_sources,
+                           ".",
+                           "//chrome")
     deps += [
+      ":client_discourse_context_proto",
+      ":delta_file_proto",
       ":jni_headers",
       "//components/cdm/browser",
       "//components/enhanced_bookmarks",
       "//components/resources:components_resources",
+      "//components/resources/enhanced_bookmarks:enhanced_bookmarks_resources",
       "//components/service_tab_launcher",
       "//components/web_contents_delegate_android",
       "//third_party/android_opengl/etc1",
+      "//third_party/android_tools:cpu_features",
       "//third_party/libaddressinput:util",
     ]
     deps -= [
@@ -678,12 +681,6 @@ source_set("browser") {
   if (is_win) {
     sources +=
         rebase_path(gypi_values.chrome_browser_win_sources, ".", "//chrome")
-    if (!is_chrome_branded) {
-      sources -= [
-        "google/did_run_updater_win.cc",
-        "google/did_run_updater_win.h",
-      ]
-    }
     public_deps += [
       "//ui/views",
       "//ui/views/controls/webview",
@@ -708,6 +705,15 @@ source_set("browser") {
       "credui.lib",
       "netapi32.lib",
     ]
+    if (!is_chrome_branded) {
+      deps -= [ "//google_update" ]
+      sources -= [
+        "google/did_run_updater_win.cc",
+        "google/did_run_updater_win.h",
+        "google/google_update_win.cc",
+        "google/google_update_win.h",
+      ]
+    }
   } else {
     # Non-Windows.
     sources +=
@@ -806,6 +812,20 @@ if (is_android) {
         rebase_path(gypi_values.chrome_browser_jni_sources, ".", "//chrome")
     jni_package = "chrome"
   }
+
+  #GYP: '//chrome/chrome_browser.gypi:client_discourse_context_proto'
+  proto_library("client_discourse_context_proto") {
+    sources = [
+      "android/proto/client_discourse_context.proto",
+    ]
+  }
+
+  #GYP: '//chrome/chrome_browser.gypi:delta_file_proto'
+  proto_library("delta_file_proto") {
+    sources = [
+      "android/proto/delta_file.proto",
+    ]
+  }
 }
 
 if (is_win) {
@@ -851,6 +871,10 @@ grit("resources") {
   deps = [
     ":about_credits",
     ":chrome_internal_resources_gen",
+
+    # Depend only on the generated mojo bindings since we read the .mojom.js
+    # file, rather than the whole mojo target which will link the C++ bindings.
+    "//chrome/browser/ui/webui/omnibox:mojo_bindings__generator",
   ]
   inputs = [
     omnibox_mojom_file,

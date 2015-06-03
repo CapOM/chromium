@@ -52,12 +52,15 @@ class PpapiDispatcher : public proxy::PluginDispatcher::PluginDelegate,
                   int renderer_ipc_fd);
 
   // PluginDispatcher::PluginDelegate implementation.
-  base::MessageLoopProxy* GetIPCMessageLoop() override;
+  base::SingleThreadTaskRunner* GetIPCTaskRunner() override;
   base::WaitableEvent* GetShutdownEvent() override;
   IPC::PlatformFileForTransit ShareHandleWithRemote(
       base::PlatformFile handle,
       base::ProcessId peer_pid,
       bool should_close_source) override;
+  base::SharedMemoryHandle ShareSharedMemoryHandleWithRemote(
+      const base::SharedMemoryHandle& handle,
+      base::ProcessId remote_pid) override;
   std::set<PP_Instance>* GetGloballySeenInstanceIDSet() override;
   uint32 Register(proxy::PluginDispatcher* plugin_dispatcher) override;
   void Unregister(uint32 plugin_dispatcher_id) override;

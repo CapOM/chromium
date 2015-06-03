@@ -145,13 +145,31 @@ ShareDialog.prototype.initDom_ = function() {
  * @override
  */
 ShareDialog.prototype.onResized = function(width, height, callback) {
-  if (width && height) {
-    this.webViewWrapper_.style.width = width + 'px';
-    this.webViewWrapper_.style.height = height + 'px';
-    this.webView_.style.width = width + 'px';
-    this.webView_.style.height = height + 'px';
-  }
-  setTimeout(callback, 0);
+  if (!width || !height)
+    return;
+
+  this.webViewWrapper_.style.width = width + 'px';
+  this.webViewWrapper_.style.height = height + 'px';
+  this.webView_.style.width = width + 'px';
+  this.webView_.style.height = height + 'px';
+
+  // Wait sending 'resizeComplete' event until the latest size can be obtained
+  // in the WebView.
+  var checkSize = function() {
+    this.webView_.executeScript({
+      code: "[document.documentElement.clientWidth," +
+            " document.documentElement.clientHeight];"
+    }, function(results) {
+      if (results[0][0] === parseInt(this.webView_.style.width, 10) &&
+          results[0][1] === parseInt(this.webView_.style.height, 10)) {
+        callback();
+      } else {
+        setTimeout(checkSize, 50);
+      }
+    }.bind(this));
+  }.bind(this);
+
+  setTimeout(checkSize, 0);
 };
 
 /**
@@ -256,7 +274,6 @@ ShareDialog.prototype.showEntry = function(entry, callback) {
   // fixed. See: crbug.com/260622.
   this.webView_ = /** @type {WebView} */ (util.createChild(
       this.webViewWrapper_, 'share-dialog-webview', 'webview'));
-  this.webView_.setAttribute('tabIndex', '-1');
   this.webViewAuthorizer_ = new ShareDialog.WebViewAuthorizer(
       !window.IN_TEST ? (ShareClient.SHARE_TARGET + '/*') : '<all_urls>',
       this.webView_);
@@ -265,7 +282,6 @@ ShareDialog.prototype.showEntry = function(entry, callback) {
     // Discard the window object and reopen in an external window.
     e.window.discard();
     util.visitURL(e.targetUrl);
-    e.preventDefault();
   });
   var show = FileManagerDialogBase.prototype.showBlankDialog.call(this);
   if (!show) {

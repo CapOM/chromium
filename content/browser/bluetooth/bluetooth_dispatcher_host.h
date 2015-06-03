@@ -10,6 +10,7 @@
 #include "content/common/bluetooth/bluetooth_error.h"
 #include "content/public/browser/browser_message_filter.h"
 #include "device/bluetooth/bluetooth_adapter.h"
+#include "device/bluetooth/bluetooth_gatt_connection.h"
 
 namespace content {
 
@@ -52,6 +53,10 @@ class CONTENT_EXPORT BluetoothDispatcherHost final
   void OnRequestDevice(int thread_id, int request_id);
   void OnConnectGATT(int thread_id, int request_id,
                      const std::string& device_instance_id);
+  void OnGetPrimaryService(int thread_id,
+                           int request_id,
+                           const std::string& device_instance_id,
+                           const std::string& service_uuid);
 
   // Callbacks for BluetoothAdapter::StartDiscoverySession.
   void OnDiscoverySessionStarted(
@@ -70,8 +75,28 @@ class CONTENT_EXPORT BluetoothDispatcherHost final
   void OnDiscoverySessionStopped(int thread_id, int request_id);
   void OnDiscoverySessionStoppedError(int thread_id, int request_id);
 
-  // Defines how long to scan for.
-  int current_scan_time_;
+  // Callbacks for BluetoothDevice::CreateGattConnection
+  void OnGATTConnectionCreated(
+      int thread_id,
+      int request_id,
+      const std::string& device_instance_id,
+      scoped_ptr<device::BluetoothGattConnection> connection);
+  void OnCreateGATTConnectionError(
+      int thread_id,
+      int request_id,
+      const std::string& device_instance_id,
+      device::BluetoothDevice::ConnectErrorCode error_code);
+
+  // Callback for future BluetoothAdapter::ServicesDiscovered callback:
+  // For now we just post a delayed task.
+  // See: https://crbug.com/484504
+  void OnServicesDiscovered(int thread_id,
+                            int request_id,
+                            const std::string& device_instance_id,
+                            const std::string& service_uuid);
+
+  // Defines how long to scan for and how long to discover services for.
+  int current_delay_time_;
 
   // A BluetoothAdapter instance representing an adapter of the system.
   scoped_refptr<device::BluetoothAdapter> adapter_;

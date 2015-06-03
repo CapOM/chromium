@@ -52,9 +52,10 @@ int LoadFlagFromNavigationType(FrameMsg_Navigate_Type::Value navigation_type) {
 
 // static
 bool NavigationRequest::ShouldMakeNetworkRequest(const GURL& url) {
-  // Data urls should not make network requests.
+  // Data and Javascript urls should not make network requests.
   // TODO(clamy): same document navigations should not make network requests.
-  return !url.SchemeIs(url::kDataScheme);
+  return !url.SchemeIs(url::kDataScheme) && url != GURL(url::kAboutBlankURL) &&
+         !url.SchemeIs(url::kJavaScriptScheme);
 }
 
 // static
@@ -90,7 +91,7 @@ scoped_ptr<NavigationRequest> NavigationRequest::CreateBrowserInitiated(
       BeginNavigationParams(method, headers.ToString(),
                             LoadFlagFromNavigationType(navigation_type), false),
       entry.ConstructRequestNavigationParams(
-          navigation_start,
+          navigation_start, controller->HasCommittedRealLoad(frame_tree_node),
           controller->GetPendingEntryIndex() == -1,
           controller->GetIndexOfEntry(&entry),
           controller->GetLastCommittedEntryIndex(),
@@ -113,6 +114,7 @@ scoped_ptr<NavigationRequest> NavigationRequest::CreateRendererInitiated(
   // TODO(clamy): See if the navigation start time should be measured in the
   // renderer and sent to the browser instead of being measured here.
   // TODO(clamy): The pending history list offset should be properly set.
+  // TODO(clamy): Set has_committed_real_load.
   RequestNavigationParams request_params;
   request_params.current_history_list_offset = current_history_list_offset;
   request_params.current_history_list_length = current_history_list_length;
@@ -154,8 +156,9 @@ NavigationRequest::NavigationRequest(
   bool parent_is_main_frame = !frame_tree_node->parent() ?
       false : frame_tree_node->parent()->IsMainFrame();
   info_.reset(new NavigationRequestInfo(
-        common_params, begin_params, first_party_for_cookies,
-        frame_tree_node->IsMainFrame(), parent_is_main_frame, body));
+      common_params, begin_params, first_party_for_cookies,
+      frame_tree_node->IsMainFrame(), parent_is_main_frame,
+      frame_tree_node->frame_tree_node_id(), body));
 }
 
 NavigationRequest::~NavigationRequest() {

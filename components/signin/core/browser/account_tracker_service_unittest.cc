@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <vector>
 
-#include "base/message_loop/message_loop.h"
 #include "base/prefs/pref_registry_simple.h"
 #include "base/prefs/testing_pref_service.h"
 #include "base/strings/stringprintf.h"
@@ -260,8 +259,7 @@ class AccountTrackerServiceTest : public testing::Test {
         AccountTrackerService::kAccountTrackerServiceLastUpdate, 0);
     signin_client_.reset(new TestSigninClient(&pref_service_));
     signin_client_.get()->SetURLRequestContext(
-        new net::TestURLRequestContextGetter(
-            message_loop_.message_loop_proxy()));
+        new net::TestURLRequestContextGetter(message_loop_.task_runner()));
 
     account_tracker_.reset(new AccountTrackerService());
     account_tracker_->Initialize(fake_oauth2_token_service_.get(),
@@ -751,6 +749,40 @@ TEST_F(AccountTrackerServiceTest, TimerRefresh) {
 
     tracker.EnableNetworkFetches();
     ASSERT_FALSE(tracker.IsAllUserInfoFetched());
+    tracker.Shutdown();
+  }
+}
+
+TEST_F(AccountTrackerServiceTest, LegacyDottedAccountIds) {
+  // Start by creating a tracker and adding an account with a dotted account id
+  // because of an old bug in token service.  The token service would also add
+  // a correct non-dotted account id for the same account.
+  {
+    AccountTrackerService tracker;
+    tracker.Initialize(token_service(), signin_client());
+    tracker.EnableNetworkFetches();
+    SimulateTokenAvailable("foo.bar@gmail.com");
+    SimulateTokenAvailable("foobar@gmail.com");
+    ReturnOAuthUrlFetchSuccess("foo.bar@gmail.com");
+    ReturnOAuthUrlFetchSuccess("foobar@gmail.com");
+    tracker.Shutdown();
+  }
+
+  // Remove the bad account now from the token service to simulate that it
+  // has been "fixed".
+  SimulateTokenRevoked("foo.bar@gmail.com");
+
+  // Instantiate a new tracker and validate that it has only one account, and
+  // it is the correct non dotted one.
+  {
+    AccountTrackerService tracker;
+    tracker.Initialize(token_service(), signin_client());
+
+    ASSERT_TRUE(tracker.IsAllUserInfoFetched());
+    std::vector<AccountTrackerService::AccountInfo> infos =
+        tracker.GetAccounts();
+    ASSERT_EQ(1u, infos.size());
+    ASSERT_STREQ("foobar@gmail.com", infos[0].account_id.c_str());
     tracker.Shutdown();
   }
 }
