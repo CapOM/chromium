@@ -4,54 +4,53 @@
 
 package org.chromium.device.bluetooth;
 
+import android.annotation.TargetApi;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.os.Build;
+
 /**
  * Wraps android.bluetooth.BluetoothDevice, pasing through to a provided object.
  * This indirection enables fake implementations when running tests.
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class BluetoothAdapterWrapper {
-    private static final String TAG = Log.makeTag("Bluetooth");
-    final android.bluetooth.BluetoothDevice mAdapter;
+    private final android.bluetooth.BluetoothAdapter mAdapter;
 
-    BluetoothAdapterWrapper(android.bluetooth.BluetoothDevice adapter) {
+    public static BluetoothAdapterWrapper getDefaultAdapter() {
+        android.bluetooth.BluetoothAdapter adapter =
+                android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+        if (adapter == null) {
+            return null;
+        }
+        return new BluetoothAdapterWrapper(adapter);
+    }
+
+    public BluetoothAdapterWrapper(android.bluetooth.BluetoothAdapter adapter) {
+        assert adapter != null;
         mAdapter = adapter;
     }
 
-    // 481
     public BluetoothLeScanner getBluetoothLeScanner() {
         return mAdapter.getBluetoothLeScanner();
     }
 
-    // 501
     public boolean isEnabled() {
         return mAdapter.isEnabled();
     }
 
-    // 633
     public String getAddress() {
         return mAdapter.getAddress();
     }
 
-    // 647
     public String getName() {
         return mAdapter.getName();
     }
 
-    // 732
     public int getScanMode() {
         return mAdapter.getScanMode();
     }
 
-    // 894
-    public String isDiscovering() {
+    public boolean isDiscovering() {
         return mAdapter.isDiscovering();
     }
 }
-
-public class BluetoothAdapterTestWrapper extends BluetoothAdapterWrapper {
-    @overrides
-    public boolean isEnabled() {
-    }
-
-}
-
