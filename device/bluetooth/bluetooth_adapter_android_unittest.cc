@@ -5,11 +5,20 @@
 #include "base/memory/ref_counted.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "jni/FakeBluetoothAdapter_jni.h"
+
+using base::android::AttachCurrentThread;
+using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
 class BluetoothAdapterAndroidTest : public testing::Test {
  protected:
+  void SetUp() override {
+    ASSERT_TRUE(AttachCurrentThread());
+    ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
+  }
+
   void InitWithPermission() {
     adapter_ = BluetoothAdapterAndroid::Create(false, NULL).get();
   }
@@ -19,11 +28,11 @@ class BluetoothAdapterAndroidTest : public testing::Test {
   }
 
   void InitWithFakeAdapter() {
-    // TODO USE FAKEBLUETOOTHADAPTER
-    // TODO USE FAKEBLUETOOTHADAPTER
-    // TODO USE FAKEBLUETOOTHADAPTER
-    // TODO USE FAKEBLUETOOTHADAPTER
-    adapter_ = BluetoothAdapterAndroid::Create(false, NULL).get();
+    ScopedJavaLocalRef<jobject> javaFakeBluetoothAdapter =
+        Java_FakeBluetoothAdapter_create(AttachCurrentThread());
+
+    adapter_ = BluetoothAdapterAndroid::Create(
+                   false, javaFakeBluetoothAdapter.obj()).get();
   }
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_;
@@ -61,6 +70,7 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
   ASSERT_TRUE(adapter_.get());
   EXPECT_GT(adapter_->GetAddress().length(), 0u);
+  LOG(INFO) << "Bluetooth: " << adapter_->GetAddress();
   EXPECT_GT(adapter_->GetName().length(), 0u);
   EXPECT_TRUE(adapter_->IsPresent());
   EXPECT_TRUE(adapter_->IsPowered());
