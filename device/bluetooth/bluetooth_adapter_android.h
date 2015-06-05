@@ -29,21 +29,17 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
     : public BluetoothAdapter {
  public:
   // Create a BluetoothAdapterAndroid instance.
-  static base::WeakPtr<BluetoothAdapterAndroid> CreateAdapter();
-
-  // Create a BluetoothAdapterAndroid instance without Bluetooth permission.
-  static base::WeakPtr<BluetoothAdapterAndroid>
-  CreateAdapterWithoutPermissionForTesting();
-
-  // Create a BluetoothAdapterAndroid instance with a fake adapter for testing.
-  static base::WeakPtr<BluetoothAdapterAndroid>
-  CreateAdapterWithFakeAdapterForTesting();
+  //
+  // For testing |assume_no_bluetooth_support_for_testing| or
+  // |java_bluetooth_adapter_wrapper_for_testing| can be set. The
+  // BluetoothAdapterAndroid instance will indirectly hold a Java reference to
+  // |java_bluetooth_adapter_wrapper_for_testing|.
+  static base::WeakPtr<BluetoothAdapterAndroid> Create(
+      bool assume_no_bluetooth_support_for_testing,
+      jobject java_bluetooth_adapter_wrapper_for_testing);
 
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
-
-  // True if this app has android permissions necessary for Bluetooth.
-  bool HasBluetoothCapability() const;
 
   // BluetoothAdapter:
   std::string GetAddress() const override;

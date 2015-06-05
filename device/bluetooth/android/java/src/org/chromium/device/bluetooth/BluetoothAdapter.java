@@ -31,7 +31,6 @@ final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
     private long mNativeBluetoothAdapterAndroid;
-    private final boolean mHasBluetoothCapability;
     private BluetoothAdapterWrapper mAdapter;
     private int mNumDiscoverySessions;
     private ScanCallback mLeScanCallback;
@@ -43,43 +42,61 @@ final class BluetoothAdapter {
      * Constructs a BluetoothAdapter.
      * @param nativeBluetoothAdapterAndroid Pointer value for C++
      *                                      BluetoothAdapterAndroid instance.
-     * @param hasPermissions      True if package has necessary bluetooth 
-     *                            permissions. (A parameter to enable testing.)
-     * @param hasLowEnergyFeature True if hasSystemFeature(FEATURE_BLUETOOTH_LE). (A
-     *                            parameter to enable testing.)
-     * @param adapter             null to use the default system Bluetooth adapter. 
-     *                            Enables tests to provide a fake
-     *                            BluetoothAdapterWrapper.
+     * @param assumeNoBluetoothSupportForTesting Causes initialization presuming no
+     *                                           Bluetooth support, for testing
+     *                                           situations where permissions, SDK
+     *                                           version, or feature isn't
+     *                                           available.
+     * @param adapterWrapperForTesting null to use the default system Bluetooth
+     *                                 adapter. Enables tests to provide a fake
+     *                                 BluetoothAdapterWrapper.
      */
-    private BluetoothAdapter(long nativeBluetoothAdapterAndroid, boolean hasPermissions,
-            boolean hasLowEnergyFeature, BluetoothAdapterWrapper adapter) {
+    public BluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid,
+            boolean assumeNoBluetoothSupportForTesting,
+            BluetoothAdapterWrapper adapterWrapperForTesting) {
         mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
-        final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
-        // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
-        mHasBluetoothCapability = hasMinAPI && hasPermissions && hasLowEnergyFeature;
-        if (!mHasBluetoothCapability) {
+
+        if (assumeNoBluetoothSupportForTesting) {
+            Log.i(TAG, "BluetoothAdapter initialized with assumeNoBluetoothSupportForTesting");
+            return;
+        } else if (adapterWrapperForTesting != null) {
+            mAdapter = adapterWrapperForTesting;
+            Log.i(TAG, "BluetoothAdapter initialized with provided adapterWrapperForTesting.");
+        } else {
+            final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
             if (!hasMinAPI) {
                 Log.i(TAG, "Bluetooth API disabled; SDK version (%d) too low.",
                         Build.VERSION.SDK_INT);
-            } else if (!hasPermissions) {
+                return;
+            }
+
+            final boolean hasPermissions =
+                    context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
+                            == PackageManager.PERMISSION_GRANTED
+                    && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
+                            == PackageManager.PERMISSION_GRANTED;
+            if (!hasPermissions) {
                 Log.w(TAG, "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions "
                                 + "required.");
-            } else if (!hasLowEnergyFeature) {
-                Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
+                return;
             }
-            return;
-        }
 
-        if (adapter == null) {
+            // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
+            final boolean hasLowEnergyFeature =
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
+                    && context.getPackageManager().hasSystemFeature(
+                               PackageManager.FEATURE_BLUETOOTH_LE);
+            if (!hasLowEnergyFeature) {
+                Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
+                return;
+            }
+
             mAdapter = BluetoothAdapterWrapper.getDefaultAdapter();
             if (mAdapter == null) {
                 Log.i(TAG, "BluetoothAdapter initialized, but default adapter not found.");
             } else {
                 Log.i(TAG, "BluetoothAdapter initialized with default adapter.");
             }
-        } else {
-            mAdapter = adapter;
-            Log.i(TAG, "BluetoothAdapter initialized with provided adapter.");
         }
     }
 
@@ -100,47 +117,11 @@ final class BluetoothAdapter {
 
     // Implements BluetoothAdapterAndroid::CreateAdapter.
     @CalledByNative
-    private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid) {
-        final boolean hasPermissions =
-                context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
-                        == PackageManager.PERMISSION_GRANTED
-                && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
-                        == PackageManager.PERMISSION_GRANTED;
-        final boolean hasLowEnergyFeature =
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
-                && context.getPackageManager().hasSystemFeature(
-                           PackageManager.FEATURE_BLUETOOTH_LE);
-        return new BluetoothAdapter(nativeBluetoothAdapterAndroid, hasPermissions,
-                hasLowEnergyFeature, /* null adapter, get default */ null);
-    }
-
-    // Implements BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting.
-    @CalledByNative
-    private static BluetoothAdapter createWithoutPermissionForTesting(
-            Context context, long nativeBluetoothAdapterAndroid) {
-        return new BluetoothAdapter(nativeBluetoothAdapterAndroid, /* hasPermissions */ false,
-                /* hasLowEnergyFeature */ true, /* adapter */ null);
-    }
-
-    // Implements BluetoothAdapterAndroid::CreateAdapterWithFakeAdapterForTesting.
-    @CalledByNative
-    private static BluetoothAdapter createWithFakeAdapterForTesting(
-            Context context, long nativeBluetoothAdapterAndroid) {
-        // TODO:  A real testing adapter.
-        // TODO:  A real testing adapter.
-        // TODO:  A real testing adapter.
-        // TODO:  A real testing adapter.
-        // TODO:  A real testing adapter.
-        BluetoothAdapterWrapper testingAdapter = BluetoothAdapterWrapper.getDefaultAdapter();
-        BluetoothAdapter adapter = new BluetoothAdapter(nativeBluetoothAdapterAndroid,
-                /* hasPermissions */ true, /* hasLowEnergyFeature */ true, testingAdapter);
-        return adapter;
-    }
-
-    // Implements BluetoothAdapterAndroid::HasBluetoothCapability.
-    @CalledByNative
-    private boolean hasBluetoothCapability() {
-        return mHasBluetoothCapability;
+    private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid,
+            boolean assumeNoBluetoothSupportForTesting,
+            BluetoothAdapterWrapper adapterWrapperForTesting) {
+        return new BluetoothAdapter(context, nativeBluetoothAdapterAndroid,
+                assumeNoBluetoothSupportForTesting, adapterWrapperForTesting);
     }
 
     // Implements BluetoothAdapterAndroid::GetAddress.

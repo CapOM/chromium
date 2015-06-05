@@ -11,18 +11,19 @@ namespace device {
 class BluetoothAdapterAndroidTest : public testing::Test {
  protected:
   void InitWithPermission() {
-    adapter_ = BluetoothAdapterAndroid::CreateAdapter().get();
+    adapter_ = BluetoothAdapterAndroid::Create(false, NULL).get();
   }
 
   void InitWithoutPermission() {
-    adapter_ =
-        BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting()
-            .get();
+    adapter_ = BluetoothAdapterAndroid::Create(true, NULL).get();
   }
 
   void InitWithFakeAdapter() {
-    adapter_ =
-        BluetoothAdapterAndroid::CreateAdapterWithFakeAdapterForTesting().get();
+    // TODO USE FAKEBLUETOOTHADAPTER
+    // TODO USE FAKEBLUETOOTHADAPTER
+    // TODO USE FAKEBLUETOOTHADAPTER
+    // TODO USE FAKEBLUETOOTHADAPTER
+    adapter_ = BluetoothAdapterAndroid::Create(false, NULL).get();
   }
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_;
@@ -31,7 +32,6 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
   InitWithPermission();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_TRUE(adapter_->HasBluetoothCapability());
   if (!adapter_->IsPresent()) {
     LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
     return;
@@ -49,7 +49,6 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
 TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
   InitWithoutPermission();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_FALSE(adapter_->HasBluetoothCapability());
   EXPECT_EQ(adapter_->GetAddress().length(), 0u);
   EXPECT_EQ(adapter_->GetName().length(), 0u);
   EXPECT_FALSE(adapter_->IsPresent());
@@ -61,7 +60,6 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
 TEST_F(BluetoothAdapterAndroidTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_TRUE(adapter_->HasBluetoothCapability());
   EXPECT_GT(adapter_->GetAddress().length(), 0u);
   EXPECT_GT(adapter_->GetName().length(), 0u);
   EXPECT_TRUE(adapter_->IsPresent());

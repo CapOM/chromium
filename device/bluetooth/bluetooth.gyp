@@ -255,6 +255,9 @@
           'dependencies': [
             '../../base/base.gyp:base',
           ],
+          'sources': [
+            'android/java/src/org/chromium/device/bluetooth/BluetoothAdapterWrapper.java',
+          ],
           'variables': {
             'java_in_dir': '../../device/bluetooth/android/java',
           },

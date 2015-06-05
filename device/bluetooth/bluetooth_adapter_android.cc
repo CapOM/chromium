@@ -14,53 +14,36 @@
 
 using base::android::AttachCurrentThread;
 using base::android::ConvertJavaStringToUTF8;
+using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
 // static
 base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
     const InitCallback& init_callback) {
-  return BluetoothAdapterAndroid::CreateAdapter();
+  return BluetoothAdapterAndroid::Create(false, NULL);
 }
 
 // static
-base::WeakPtr<BluetoothAdapterAndroid>
-BluetoothAdapterAndroid::CreateAdapter() {
+base::WeakPtr<BluetoothAdapterAndroid> BluetoothAdapterAndroid::Create(
+    bool assume_no_bluetooth_support_for_testing,
+    jobject java_bluetooth_adapter_wrapper_for_testing) {
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
-  adapter->j_bluetooth_adapter_.Reset(Java_BluetoothAdapter_create(
-      AttachCurrentThread(), base::android::GetApplicationContext(),
-      reinterpret_cast<jlong>(adapter)));
-  return adapter->weak_ptr_factory_.GetWeakPtr();
-}
 
-base::WeakPtr<BluetoothAdapterAndroid>
-BluetoothAdapterAndroid::CreateAdapterWithoutPermissionForTesting() {
-  BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
-  adapter->j_bluetooth_adapter_.Reset(
-      Java_BluetoothAdapter_createWithoutPermissionForTesting(
-          AttachCurrentThread(), base::android::GetApplicationContext(),
-          reinterpret_cast<jlong>(adapter)));
-  return adapter->weak_ptr_factory_.GetWeakPtr();
-}
+  ScopedJavaLocalRef<jobject> javaBluetoothAdapter =
+      Java_BluetoothAdapter_create(AttachCurrentThread(),
+                                   base::android::GetApplicationContext(),
+                                   reinterpret_cast<jlong>(adapter),
+                                   assume_no_bluetooth_support_for_testing,
+                                   java_bluetooth_adapter_wrapper_for_testing);
 
-base::WeakPtr<BluetoothAdapterAndroid>
-BluetoothAdapterAndroid::CreateAdapterWithFakeAdapterForTesting() {
-  BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
-  adapter->j_bluetooth_adapter_.Reset(
-      Java_BluetoothAdapter_createWithFakeAdapterForTesting(
-          AttachCurrentThread(), base::android::GetApplicationContext(),
-          reinterpret_cast<jlong>(adapter)));
+  adapter->j_bluetooth_adapter_.Reset(javaBluetoothAdapter);
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }
 
 // static
 bool BluetoothAdapterAndroid::RegisterJNI(JNIEnv* env) {
   return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
-}
-
-bool BluetoothAdapterAndroid::HasBluetoothCapability() const {
-  return Java_BluetoothAdapter_hasBluetoothCapability(
-      AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
 std::string BluetoothAdapterAndroid::GetAddress() const {
