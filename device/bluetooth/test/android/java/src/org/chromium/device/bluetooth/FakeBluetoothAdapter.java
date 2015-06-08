@@ -9,7 +9,6 @@ import android.bluetooth.le.BluetoothLeScanner;
 import android.os.Build;
 
 import org.chromium.base.CalledByNative;
-import org.chromium.device.bluetooth.BluetoothAdapterWrapper;
 
 /**
  * Fakes android.bluetooth.BluetoothDevice.
