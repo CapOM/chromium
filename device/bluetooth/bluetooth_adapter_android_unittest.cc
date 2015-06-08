@@ -4,8 +4,8 @@
 
 #include "base/memory/ref_counted.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
-#include "testing/gtest/include/gtest/gtest.h"
 #include "jni/FakeBluetoothAdapter_jni.h"
+#include "testing/gtest/include/gtest/gtest.h"
 
 using base::android::AttachCurrentThread;
 using base::android::ScopedJavaLocalRef;
