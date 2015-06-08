@@ -4,10 +4,6 @@
 
 package org.chromium.device.bluetooth;
 
-import org.chromium.base.CalledByNative;
-import org.chromium.base.JNINamespace;
-import org.chromium.base.Log;
-
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.bluetooth.le.ScanCallback;
@@ -16,6 +12,10 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+
+import org.chromium.base.CalledByNative;
+import org.chromium.base.JNINamespace;
+import org.chromium.base.Log;
 
 import java.util.List;
 
