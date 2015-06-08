@@ -58,8 +58,8 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
 TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
   InitWithoutPermission();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_EQ(adapter_->GetAddress().length(), 0u);
-  EXPECT_EQ(adapter_->GetName().length(), 0u);
+  EXPECT_EQ(adapter_->GetAddress(), "");
+  EXPECT_EQ(adapter_->GetName(), "");
   EXPECT_FALSE(adapter_->IsPresent());
   EXPECT_FALSE(adapter_->IsPowered());
   EXPECT_FALSE(adapter_->IsDiscoverable());
@@ -69,8 +69,8 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
 TEST_F(BluetoothAdapterAndroidTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
   ASSERT_TRUE(adapter_.get());
-  EXPECT_GT(adapter_->GetAddress().length(), 0u);
-  EXPECT_GT(adapter_->GetName().length(), 0u);
+  EXPECT_EQ(adapter_->GetAddress(), "A1:B2:C3:D4:E5:F6");
+  EXPECT_EQ(adapter_->GetName(), "FakeBluetoothAdapter");
   EXPECT_TRUE(adapter_->IsPresent());
   EXPECT_TRUE(adapter_->IsPowered());
   EXPECT_FALSE(adapter_->IsDiscoverable());
