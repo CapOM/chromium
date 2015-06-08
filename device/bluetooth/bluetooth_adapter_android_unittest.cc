@@ -70,7 +70,6 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
   ASSERT_TRUE(adapter_.get());
   EXPECT_GT(adapter_->GetAddress().length(), 0u);
-  LOG(INFO) << "Bluetooth: " << adapter_->GetAddress();
   EXPECT_GT(adapter_->GetName().length(), 0u);
   EXPECT_TRUE(adapter_->IsPresent());
   EXPECT_TRUE(adapter_->IsPowered());
