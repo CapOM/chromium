@@ -183,9 +183,6 @@
             '../base/base.gyp:base',
             'bluetooth/bluetooth.gyp:device_bluetooth_java',
           ],
-          'sources': [
-            'bluetooth/test/android/java/src/org/chromium/device/bluetooth/FakeBluetoothAdapter.java',
-          ],
           'variables': {
             'java_in_dir': 'bluetooth/test/android/java',
           },
