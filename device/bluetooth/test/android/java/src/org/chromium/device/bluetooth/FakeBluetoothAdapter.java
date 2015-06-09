@@ -11,7 +11,7 @@ import android.os.Build;
 import org.chromium.base.CalledByNative;
 
 /**
- * Fakes android.bluetooth.BluetoothDevice.
+ * Fakes android.bluetooth.BluetoothAdapter.
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {

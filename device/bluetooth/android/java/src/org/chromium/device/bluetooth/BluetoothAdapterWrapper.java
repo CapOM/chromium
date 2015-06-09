@@ -9,8 +9,8 @@ import android.bluetooth.le.BluetoothLeScanner;
 import android.os.Build;
 
 /**
- * Wraps android.bluetooth.BluetoothDevice, pasing through to a provided object.
- * This indirection enables fake implementations when running tests.
+ * Wraps android.bluetooth.BluetoothAdapter, pasing through to a provided
+ * object. This indirection enables fake implementations when running tests.
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class BluetoothAdapterWrapper {
