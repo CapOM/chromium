@@ -28,14 +28,14 @@ class BluetoothAdapterAndroidTest : public testing::Test {
   }
 
   void InitWithFakeAdapter() {
-    ScopedJavaLocalRef<jobject> javaFakeBluetoothAdapter =
-        Java_FakeBluetoothAdapter_create(AttachCurrentThread());
+    j_fake_bluetooth_adapter_.Reset(Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
 
     adapter_ = BluetoothAdapterAndroid::Create(
-                   false, javaFakeBluetoothAdapter.obj()).get();
+                   false, j_fake_bluetooth_adapter_.obj()).get();
   }
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_;
+  base::android::ScopedJavaGlobalRef<jobject> j_fake_bluetooth_adapter_;
 };
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
