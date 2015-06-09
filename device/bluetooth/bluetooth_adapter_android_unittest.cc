@@ -28,7 +28,8 @@ class BluetoothAdapterAndroidTest : public testing::Test {
   }
 
   void InitWithFakeAdapter() {
-    j_fake_bluetooth_adapter_.Reset(Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
+    j_fake_bluetooth_adapter_.Reset(
+        Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
 
     adapter_ = BluetoothAdapterAndroid::Create(
                    false, j_fake_bluetooth_adapter_.obj()).get();
