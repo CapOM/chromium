@@ -135,7 +135,7 @@ BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
-  Java_BluetoothAdapter_onBluetoothAdapterAndroidDestruction(
+  Java_ChromeBluetoothAdapter_onBluetoothAdapterAndroidDestruction(
       AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
@@ -144,7 +144,7 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
   // TODO(scheib): Support filters crbug.com/490401
-  if (Java_BluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
+  if (Java_ChromeBluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
                                                 j_bluetooth_adapter_.obj())) {
     callback.Run();
   } else {
@@ -156,7 +156,7 @@ void BluetoothAdapterAndroid::RemoveDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  if (Java_BluetoothAdapter_removeDiscoverySession(
+  if (Java_ChromeBluetoothAdapter_removeDiscoverySession(
           AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
     callback.Run();
   } else {
