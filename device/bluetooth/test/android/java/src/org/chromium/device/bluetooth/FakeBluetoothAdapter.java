@@ -13,7 +13,6 @@ import org.chromium.base.CalledByNative;
 /**
  * Fakes android.bluetooth.BluetoothDevice.
  */
-@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     /**
      * Creates a FakeBluetoothAdapter.
@@ -25,10 +24,6 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
 
     public FakeBluetoothAdapter() {
         super(null);
-    }
-
-    public BluetoothLeScanner getBluetoothLeScanner() {
-        return null;
     }
 
     public boolean isEnabled() {
