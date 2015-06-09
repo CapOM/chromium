@@ -130,9 +130,7 @@ test("device_unittests") {
   }
 
   if (is_android) {
-    apk_deps = [
-      ":bluetooth_test_java",
-    ]
+    apk_deps = [ ":bluetooth_test_java" ]
   }
 
   if (is_mac) {
@@ -149,8 +147,7 @@ test("device_unittests") {
 }
 
 if (is_android) {
-  bluetooth_java_sources_needing_jni =
-      [ "bluetooth/test/android/java/src/org/chromium/device/bluetooth/FakeBluetoothAdapter.java" ]
+  bluetooth_java_sources_needing_jni = [ "bluetooth/test/android/java/src/org/chromium/device/bluetooth/FakeBluetoothAdapter.java" ]
 
   generate_jni("bluetooth_test_jni_headers") {
     sources = bluetooth_java_sources_needing_jni
@@ -159,9 +156,9 @@ if (is_android) {
 
   android_library("bluetooth_test_java") {
     java_files = bluetooth_java_sources_needing_jni
-    deps = [ 
+    deps = [
       "//base:base_java",
       "//device/bluetooth:java",
-     ]
- }
+    ]
+  }
 }

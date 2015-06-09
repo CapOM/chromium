@@ -256,6 +256,8 @@ if (is_android) {
 
   android_library("java") {
     java_files = java_sources_needing_jni + [ "android/java/src/org/chromium/device/bluetooth/BluetoothAdapterWrapper.java" ]
-    deps = [ "//base:base_java" ]
+    deps = [
+      "//base:base_java",
+    ]
   }
 }
