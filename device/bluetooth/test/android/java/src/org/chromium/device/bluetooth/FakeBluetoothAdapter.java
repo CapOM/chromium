@@ -7,7 +7,7 @@ package org.chromium.device.bluetooth;
 import org.chromium.base.CalledByNative;
 
 /**
- * Fakes android.bluetooth.BluetoothDevice.
+ * Fakes android.bluetooth.BluetoothAdapter.
  */
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     /**

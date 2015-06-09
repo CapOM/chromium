@@ -242,7 +242,7 @@
           'target_name': 'device_bluetooth_jni_headers',
           'type': 'none',
           'sources': [
-            'android/java/src/org/chromium/device/bluetooth/BluetoothAdapter.java',
+            'android/java/src/org/chromium/device/bluetooth/ChromeBluetoothAdapter.java',
           ],
           'variables': {
             'jni_gen_package': 'device_bluetooth',

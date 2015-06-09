@@ -5,6 +5,7 @@
 package org.chromium.device.bluetooth;
 
 import android.Manifest;
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.pm.PackageManager;
 
@@ -17,7 +18,7 @@ import org.chromium.base.Log;
  * device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
-final class BluetoothAdapter {
+final class ChromeBluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
     private long mNativeBluetoothAdapterAndroid;
@@ -25,7 +26,7 @@ final class BluetoothAdapter {
     private int mNumDiscoverySessions;
 
     /**
-     * Constructs a BluetoothAdapter.
+     * Constructs a ChromeBluetoothAdapter.
      * @param nativeBluetoothAdapterAndroid Pointer value for C++
      *                                      BluetoothAdapterAndroid instance.
      * @param assumeNoBluetoothSupportForTesting Causes initialization presuming no
@@ -37,17 +38,17 @@ final class BluetoothAdapter {
      *                                 adapter. Enables tests to provide a fake
      *                                 BluetoothAdapterWrapper.
      */
-    public BluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid,
+    public ChromeBluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid,
             boolean assumeNoBluetoothSupportForTesting,
             BluetoothAdapterWrapper adapterWrapperForTesting) {
         mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
 
         if (assumeNoBluetoothSupportForTesting) {
-            Log.i(TAG, "BluetoothAdapter initialized with assumeNoBluetoothSupportForTesting");
+            Log.i(TAG, "ChromeBluetoothAdapter initialized for test with no Bluetooth support.");
             return;
         } else if (adapterWrapperForTesting != null) {
             mAdapter = adapterWrapperForTesting;
-            Log.i(TAG, "BluetoothAdapter initialized with provided adapterWrapperForTesting.");
+            Log.i(TAG, "ChromeBluetoothAdapter initialized for test with fake Android adapter.");
         } else {
             final boolean hasPermissions =
                     context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
@@ -55,16 +56,15 @@ final class BluetoothAdapter {
                     && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
                             == PackageManager.PERMISSION_GRANTED;
             if (!hasPermissions) {
-                Log.w(TAG, "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions "
-                                + "required.");
+                Log.w(TAG, "ChromeBluetoothAdapter disabled, lacking Bluetooth permissions.");
                 return;
             }
 
             mAdapter = BluetoothAdapterWrapper.getDefaultAdapter();
             if (mAdapter == null) {
-                Log.i(TAG, "BluetoothAdapter initialized, but default adapter not found.");
+                Log.i(TAG, "ChromeBluetoothAdapter initialized, but default adapter not found.");
             } else {
-                Log.i(TAG, "BluetoothAdapter initialized with default adapter.");
+                Log.i(TAG, "ChromeBluetoothAdapter initialized with default adapter.");
             }
         }
     }
@@ -74,10 +74,10 @@ final class BluetoothAdapter {
 
     // Implements BluetoothAdapterAndroid::Create.
     @CalledByNative
-    private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid,
-            boolean assumeNoBluetoothSupportForTesting,
+    private static ChromeBluetoothAdapter create(Context context,
+            long nativeBluetoothAdapterAndroid, boolean assumeNoBluetoothSupportForTesting,
             BluetoothAdapterWrapper adapterWrapperForTesting) {
-        return new BluetoothAdapter(context, nativeBluetoothAdapterAndroid,
+        return new ChromeBluetoothAdapter(context, nativeBluetoothAdapterAndroid,
                 assumeNoBluetoothSupportForTesting, adapterWrapperForTesting);
     }
 
@@ -117,8 +117,7 @@ final class BluetoothAdapter {
     @CalledByNative
     private boolean isDiscoverable() {
         return isPresent()
-                && mAdapter.getScanMode()
-                == android.bluetooth.BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE;
+                && mAdapter.getScanMode() == BluetoothAdapter.SCAN_MODE_CONNECTABLE_DISCOVERABLE;
     }
 
     // Implements BluetoothAdapterAndroid::IsDiscovering.

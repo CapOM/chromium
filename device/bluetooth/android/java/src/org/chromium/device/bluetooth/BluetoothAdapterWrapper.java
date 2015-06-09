@@ -5,8 +5,8 @@
 package org.chromium.device.bluetooth;
 
 /**
- * Wraps android.bluetooth.BluetoothDevice, pasing through to a provided object.
- * This indirection enables fake implementations when running tests.
+ * Wraps android.bluetooth.BluetoothAdapter, pasing through to a provided
+ * object. This indirection enables fake implementations when running tests.
  */
 public class BluetoothAdapterWrapper {
     private final android.bluetooth.BluetoothAdapter mAdapter;
