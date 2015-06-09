@@ -132,8 +132,6 @@ test("device_unittests") {
   if (is_android) {
     apk_deps = [
       ":bluetooth_test_java",
-      ":bluetooth_test_jni_headers", # TODO !!!!!!!!!!!!!!!!!!!!!!!!! not needed?
-      "//device/bluetooth:java", # TODO !!!!!!!!!!!!!!!!!!!!!!!!! not needed?
     ]
   }
 
