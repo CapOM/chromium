@@ -45,7 +45,6 @@ test("device_unittests") {
   ]
 
   deps = [
-    ":bluetooth_test_jni_headers",
     "//base/test:test_support",
     "//device/battery",
     "//device/battery:mojo_bindings",
@@ -114,6 +113,11 @@ test("device_unittests") {
     ]
   }
 
+  if (is_android) {
+    deps += [ ":bluetooth_test_jni_headers" ]
+    apk_deps = [ ":bluetooth_test_java" ]
+  }
+
   if (is_chromeos) {
     configs += [ "//build/config/linux:dbus" ]
 
@@ -127,10 +131,6 @@ test("device_unittests") {
 
   if (is_posix && !is_android && !is_mac) {
     libs = [ "rt" ]
-  }
-
-  if (is_android) {
-    apk_deps = [ ":bluetooth_test_java" ]
   }
 
   if (is_mac) {

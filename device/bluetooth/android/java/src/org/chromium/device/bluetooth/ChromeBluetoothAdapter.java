@@ -113,7 +113,7 @@ final class ChromeBluetoothAdapter {
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
 
-    // Implements BluetoothAdapterAndroid::CreateAdapter.
+    // Implements BluetoothAdapterAndroid::Create.
     @CalledByNative
     private static ChromeBluetoothAdapter create(Context context,
             long nativeBluetoothAdapterAndroid, boolean assumeNoBluetoothSupportForTesting,
