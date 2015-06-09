@@ -161,7 +161,7 @@ if (is_android) {
     java_files = bluetooth_java_sources_needing_jni
     deps = [ 
       "//base:base_java",
-      "//device/bluetooth:java", # TODO !!!!!!!!!!!!!!!!!!!!!!!!! check this fails without
+      "//device/bluetooth:java",
      ]
  }
 }
