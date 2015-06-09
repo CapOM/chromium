@@ -5,24 +5,36 @@
 package org.chromium.device.bluetooth;
 
 import android.Manifest;
+import android.annotation.TargetApi;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanResult;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
+
+import java.util.List;
 
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
  * device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
+@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 final class BluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
     private long mNativeBluetoothAdapterAndroid;
     private BluetoothAdapterWrapper mAdapter;
     private int mNumDiscoverySessions;
+    private ScanCallback mLeScanCallback;
+
+    // ---------------------------------------------------------------------------------------------
+    // Construction and handler for C++ object destruction.
 
     /**
      * Constructs a BluetoothAdapter.
@@ -49,6 +61,13 @@ final class BluetoothAdapter {
             mAdapter = adapterWrapperForTesting;
             Log.i(TAG, "BluetoothAdapter initialized with provided adapterWrapperForTesting.");
         } else {
+            final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
+            if (!hasMinAPI) {
+                Log.i(TAG, "Bluetooth API disabled; SDK version (%d) too low.",
+                        Build.VERSION.SDK_INT);
+                return;
+            }
+
             final boolean hasPermissions =
                     context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
                             == PackageManager.PERMISSION_GRANTED
@@ -57,6 +76,16 @@ final class BluetoothAdapter {
             if (!hasPermissions) {
                 Log.w(TAG, "Bluetooth API disabled; BLUETOOTH and BLUETOOTH_ADMIN permissions "
                                 + "required.");
+                return;
+            }
+
+            // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
+            final boolean hasLowEnergyFeature =
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
+                    && context.getPackageManager().hasSystemFeature(
+                               PackageManager.FEATURE_BLUETOOTH_LE);
+            if (!hasLowEnergyFeature) {
+                Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
                 return;
             }
 
@@ -69,10 +98,22 @@ final class BluetoothAdapter {
         }
     }
 
+    /**
+     * Shuts down any ongoing scan, removes reference to the C++ object.
+     */
+    @CalledByNative
+    private void onBluetoothAdapterAndroidDestruction() {
+        stopScan();
+        mNativeBluetoothAdapterAndroid = 0;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterAndroid Methods exposed :
+
     // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
 
-    // Implements BluetoothAdapterAndroid::Create.
+    // Implements BluetoothAdapterAndroid::CreateAdapter.
     @CalledByNative
     private static BluetoothAdapter create(Context context, long nativeBluetoothAdapterAndroid,
             boolean assumeNoBluetoothSupportForTesting,
@@ -124,6 +165,117 @@ final class BluetoothAdapter {
     // Implements BluetoothAdapterAndroid::IsDiscovering.
     @CalledByNative
     private boolean isDiscovering() {
-        return isPresent() && mAdapter.isDiscovering();
+        return isPresent() && (mAdapter.isDiscovering() || mLeScanCallback != null);
     }
+
+    // Implements BluetoothAdapterAndroid::AddDiscoverySession.
+    @CalledByNative
+    private boolean addDiscoverySession() {
+        if (!isPowered()) {
+            Log.d(TAG, "addDiscoverySession: Fails: !isPowered");
+            return false;
+        }
+
+        mNumDiscoverySessions++;
+        Log.d(TAG, "addDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
+        if (mNumDiscoverySessions > 1) {
+            return true;
+        }
+
+        if (startScan()) {
+            return true;
+        } else {
+            mNumDiscoverySessions--;
+            return false;
+        }
+    }
+
+    // Implements BluetoothAdapterAndroid::RemoveDiscoverySession.
+    @CalledByNative
+    private boolean removeDiscoverySession() {
+        if (mNumDiscoverySessions == 0) {
+            assert false;
+            Log.w(TAG, "removeDiscoverySession: No scan in progress.");
+            return false;
+        }
+
+        --mNumDiscoverySessions;
+
+        if (mNumDiscoverySessions == 0) {
+            Log.d(TAG, "removeDiscoverySession: Now 0 sessions. Stopping scan.");
+            return stopScan();
+        } else {
+            Log.d(TAG, "removeDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
+        }
+        return true;
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Implementation details:
+
+    /**
+     * Starts a Low Energy scan.
+     * @return True on success.
+     */
+    private boolean startScan() {
+        // ScanSettings Note: SCAN_FAILED_FEATURE_UNSUPPORTED is caused (at least on some devices)
+        // if setReportDelay() is used or if SCAN_MODE_LOW_LATENCY isn't used.
+        ScanSettings scanSettings =
+                new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
+
+        assert mLeScanCallback == null;
+        mLeScanCallback = new DiscoveryScanCallback();
+
+        try {
+            mAdapter.getBluetoothLeScanner().startScan(
+                    null /* filters */, scanSettings, mLeScanCallback);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Cannot start scan: " + e);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Stops the Low Energy scan.
+     * @return True if a scan was in progress.
+     */
+    private boolean stopScan() {
+        if (mLeScanCallback == null) {
+            return false;
+        }
+        mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        mLeScanCallback = null;
+        return true;
+    }
+
+    /**
+     * Implements callbacks used during a Low Energy scan by notifying upon
+     * devices discovered or detecting a scan failure.
+     */
+    private class DiscoveryScanCallback extends ScanCallback {
+        @Override
+        public void onBatchScanResults(List<ScanResult> results) {
+            Log.v(TAG, "onBatchScanResults");
+        }
+
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            Log.v(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
+                    result.getDevice().getName());
+        }
+
+        @Override
+        public void onScanFailed(int errorCode) {
+            Log.w(TAG, "onScanFailed: %d", errorCode);
+            nativeOnScanFailed(mNativeBluetoothAdapterAndroid);
+            mNumDiscoverySessions = 0;
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterAndroid C++ methods declared for access from java:
+
+    // Binds to BluetoothAdapterAndroid::OnScanFailed.
+    private native void nativeOnScanFailed(long nativeBluetoothAdapterAndroid);
 }

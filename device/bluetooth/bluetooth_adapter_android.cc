@@ -131,30 +131,49 @@ void BluetoothAdapterAndroid::RegisterAdvertisement(
   error_callback.Run(BluetoothAdvertisement::ERROR_UNSUPPORTED_PLATFORM);
 }
 
+void BluetoothAdapterAndroid::OnScanFailed(JNIEnv* env, jobject obj) {
+  MarkDiscoverySessionsAsInactive();
+}
+
 BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
+  Java_BluetoothAdapter_onBluetoothAdapterAndroidDestruction(
+      AttachCurrentThread(), j_bluetooth_adapter_.obj());
 }
 
 void BluetoothAdapterAndroid::AddDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  error_callback.Run();
+  // TODO(scheib): Support filters crbug.com/490401
+  if (Java_BluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
+                                                j_bluetooth_adapter_.obj())) {
+    callback.Run();
+  } else {
+    error_callback.Run();
+  }
 }
 
 void BluetoothAdapterAndroid::RemoveDiscoverySession(
     BluetoothDiscoveryFilter* discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
-  error_callback.Run();
+  if (Java_BluetoothAdapter_removeDiscoverySession(
+          AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
+    callback.Run();
+  } else {
+    error_callback.Run();
+  }
 }
 
 void BluetoothAdapterAndroid::SetDiscoveryFilter(
     scoped_ptr<BluetoothDiscoveryFilter> discovery_filter,
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
+  // TODO(scheib): Support filters crbug.com/490401
+  NOTIMPLEMENTED();
   error_callback.Run();
 }
 

@@ -12,6 +12,7 @@ import android.os.Build;
  * Wraps android.bluetooth.BluetoothDevice, pasing through to a provided object.
  * This indirection enables fake implementations when running tests.
  */
+@TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class BluetoothAdapterWrapper {
     private final android.bluetooth.BluetoothAdapter mAdapter;
 
@@ -27,6 +28,10 @@ public class BluetoothAdapterWrapper {
     public BluetoothAdapterWrapper(android.bluetooth.BluetoothAdapter adapter) {
         assert adapter != null;
         mAdapter = adapter;
+    }
+
+    public BluetoothLeScanner getBluetoothLeScanner() {
+        return mAdapter.getBluetoothLeScanner();
     }
 
     public boolean isEnabled() {
