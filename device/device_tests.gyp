@@ -180,7 +180,6 @@
           'target_name': 'device_bluetooth_test_java',
           'type': 'none',
           'dependencies': [
-            '../base/base.gyp:base',
             'bluetooth/bluetooth.gyp:device_bluetooth_java',
           ],
           'variables': {
