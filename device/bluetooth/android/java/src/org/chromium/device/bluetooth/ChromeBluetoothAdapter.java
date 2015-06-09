@@ -23,7 +23,6 @@ final class ChromeBluetoothAdapter {
 
     private long mNativeBluetoothAdapterAndroid;
     private BluetoothAdapterWrapper mAdapter;
-    private int mNumDiscoverySessions;
 
     /**
      * Constructs a ChromeBluetoothAdapter.
