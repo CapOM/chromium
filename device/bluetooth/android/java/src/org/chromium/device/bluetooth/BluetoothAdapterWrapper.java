@@ -4,10 +4,6 @@
 
 package org.chromium.device.bluetooth;
 
-import android.annotation.TargetApi;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.os.Build;
-
 /**
  * Wraps android.bluetooth.BluetoothDevice, pasing through to a provided object.
  * This indirection enables fake implementations when running tests.
