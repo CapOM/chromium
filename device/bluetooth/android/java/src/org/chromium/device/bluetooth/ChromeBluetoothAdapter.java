@@ -21,13 +21,10 @@ import org.chromium.base.Log;
 final class ChromeBluetoothAdapter {
     private static final String TAG = Log.makeTag("Bluetooth");
 
-    private long mNativeBluetoothAdapterAndroid;
     private BluetoothAdapterWrapper mAdapter;
 
     /**
      * Constructs a ChromeBluetoothAdapter.
-     * @param nativeBluetoothAdapterAndroid Pointer value for C++
-     *                                      BluetoothAdapterAndroid instance.
      * @param assumeNoBluetoothSupportForTesting Causes initialization presuming no
      *                                           Bluetooth support, for testing
      *                                           situations where permissions, SDK
@@ -37,11 +34,8 @@ final class ChromeBluetoothAdapter {
      *                                 adapter. Enables tests to provide a fake
      *                                 BluetoothAdapterWrapper.
      */
-    public ChromeBluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid,
-            boolean assumeNoBluetoothSupportForTesting,
+    public ChromeBluetoothAdapter(Context context, boolean assumeNoBluetoothSupportForTesting,
             BluetoothAdapterWrapper adapterWrapperForTesting) {
-        mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
-
         if (assumeNoBluetoothSupportForTesting) {
             Log.i(TAG, "ChromeBluetoothAdapter initialized for test with no Bluetooth support.");
             return;
@@ -74,10 +68,10 @@ final class ChromeBluetoothAdapter {
     // Implements BluetoothAdapterAndroid::Create.
     @CalledByNative
     private static ChromeBluetoothAdapter create(Context context,
-            long nativeBluetoothAdapterAndroid, boolean assumeNoBluetoothSupportForTesting,
+            boolean assumeNoBluetoothSupportForTesting,
             BluetoothAdapterWrapper adapterWrapperForTesting) {
-        return new ChromeBluetoothAdapter(context, nativeBluetoothAdapterAndroid,
-                assumeNoBluetoothSupportForTesting, adapterWrapperForTesting);
+        return new ChromeBluetoothAdapter(
+                context, assumeNoBluetoothSupportForTesting, adapterWrapperForTesting);
     }
 
     // Implements BluetoothAdapterAndroid::GetAddress.
