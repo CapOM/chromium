@@ -4,6 +4,10 @@
 
 package org.chromium.device.bluetooth;
 
+import android.annotation.TargetApi;
+import android.bluetooth.le.BluetoothLeScanner;
+import android.os.Build;
+
 import org.chromium.base.CalledByNative;
 
 /**
