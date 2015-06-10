@@ -12,7 +12,8 @@ import org.chromium.base.Log;
 
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
- * device::BluetoothAdapterAndroid.
+ * device::BluetoothAdapterAndroid, which implements the cross platform
+ * device::BluetoothAdapter.
  */
 @JNINamespace("device")
 final class ChromeBluetoothAdapter {
@@ -22,9 +23,9 @@ final class ChromeBluetoothAdapter {
 
     /**
      * Constructs a ChromeBluetoothAdapter.
-     * @param adapterWrapperForTesting null to use the default system Bluetooth
-     *                                 adapter. Enables tests to provide a fake
-     *                                 BluetoothAdapterWrapper.
+     * @param adapterWrapper Wraps the default android.bluetooth.BluetoothAdapter,
+     *                       but may be either null if an adapter is not available
+     *                       or a fake for testing.
      */
     public ChromeBluetoothAdapter(BluetoothAdapterWrapper adapterWrapper) {
         if (adapterWrapper == null) {
