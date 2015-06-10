@@ -12,7 +12,8 @@ using base::android::AttachCurrentThread;
 namespace device {
 
 // static
-ScopedJavaLocalRef<jobject> BluetoothAdapterWrapper::CreateWithDefaultAdapter() {
+ScopedJavaLocalRef<jobject>
+BluetoothAdapterWrapper::CreateWithDefaultAdapter() {
   return Java_BluetoothAdapterWrapper_createWithDefaultAdapter(
       AttachCurrentThread(), base::android::GetApplicationContext());
 }
