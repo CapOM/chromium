@@ -12,6 +12,7 @@
 #include "base/containers/hash_tables.h"
 #include "base/containers/small_map.h"
 #include "base/logging.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/trace_event_argument.h"
 #include "cc/base/math_util.h"
@@ -877,8 +878,9 @@ TilePriority PictureLayerTiling::ComputePriorityForTile(
   DCHECK_EQ(ComputePriorityRectTypeForTile(tile), priority_rect_type);
   DCHECK_EQ(TileAt(tile->tiling_i_index(), tile->tiling_j_index()), tile);
 
-  TilePriority::PriorityBin priority_bin = client_->GetMaxTilePriorityBin();
-
+  TilePriority::PriorityBin priority_bin = client_->HasValidTilePriorities()
+                                               ? TilePriority::NOW
+                                               : TilePriority::EVENTUALLY;
   switch (priority_rect_type) {
     case VISIBLE_RECT:
       return TilePriority(resolution_, priority_bin, 0);
@@ -939,7 +941,7 @@ void PictureLayerTiling::GetAllPrioritizedTilesForTracing(
 
 void PictureLayerTiling::AsValueInto(
     base::trace_event::TracedValue* state) const {
-  state->SetInteger("num_tiles", tiles_.size());
+  state->SetInteger("num_tiles", base::saturated_cast<int>(tiles_.size()));
   state->SetDouble("content_scale", contents_scale_);
   MathUtil::AddToTracedValue("visible_rect", current_visible_rect_, state);
   MathUtil::AddToTracedValue("skewport_rect", current_skewport_rect_, state);

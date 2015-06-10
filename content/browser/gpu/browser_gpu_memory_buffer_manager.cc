@@ -165,7 +165,8 @@ void BrowserGpuMemoryBufferManager::AllocateGpuMemoryBufferForChildProcess(
       new_id, size, format, usage, child_client_id, 0,
       base::Bind(&BrowserGpuMemoryBufferManager::
                      GpuMemoryBufferAllocatedForChildProcess,
-                 weak_ptr_factory_.GetWeakPtr(), child_client_id, callback));
+                 weak_ptr_factory_.GetWeakPtr(), new_id, child_client_id,
+                 callback));
 }
 
 gfx::GpuMemoryBuffer*
@@ -203,7 +204,7 @@ bool BrowserGpuMemoryBufferManager::OnMemoryDump(
           buffer.second.size, buffer.second.format, &buffer_size_in_bytes);
       DCHECK(valid_size);
 
-      dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameOuterSize,
+      dump->AddScalar(base::trace_event::MemoryAllocatorDump::kNameSize,
                       base::trace_event::MemoryAllocatorDump::kUnitsBytes,
                       buffer_size_in_bytes);
     }
@@ -297,12 +298,9 @@ void BrowserGpuMemoryBufferManager::GpuMemoryBufferAllocatedOnIO(
 
   DCHECK_NE(handle.type, gfx::SHARED_MEMORY_BUFFER);
   request->result = GpuMemoryBufferImpl::CreateFromHandle(
-      handle,
-      request->size,
-      request->format,
+      handle, request->size, request->format, request->usage,
       base::Bind(&BrowserGpuMemoryBufferManager::GpuMemoryBufferDeleted,
-                 weak_ptr_factory_.GetWeakPtr(),
-                 handle.id,
+                 weak_ptr_factory_.GetWeakPtr(), handle.id,
                  request->client_id));
   request->event.Signal();
 }
@@ -317,6 +315,7 @@ void BrowserGpuMemoryBufferManager::GpuMemoryBufferDeleted(
 }
 
 void BrowserGpuMemoryBufferManager::GpuMemoryBufferAllocatedForChildProcess(
+    gfx::GpuMemoryBufferId id,
     int child_client_id,
     const AllocationCallback& callback,
     const gfx::GpuMemoryBufferHandle& handle) {
@@ -337,18 +336,20 @@ void BrowserGpuMemoryBufferManager::GpuMemoryBufferAllocatedForChildProcess(
 
   BufferMap& buffers = client_it->second;
 
-  BufferMap::iterator buffer_it = buffers.find(handle.id);
+  BufferMap::iterator buffer_it = buffers.find(id);
   DCHECK(buffer_it != buffers.end());
   DCHECK_EQ(buffer_it->second.type, gfx::EMPTY_BUFFER);
 
-  if (handle.is_null()) {
+  // If the handle isn't valid, that means that the GPU process crashed or is
+  // misbehaving so we remove the buffer entry and run the allocation callback
+  // with an empty handle to indicate failure.
+  bool valid_handle = !handle.is_null() && handle.id == id &&
+                      handle.type != gfx::SHARED_MEMORY_BUFFER;
+  if (!valid_handle) {
     buffers.erase(buffer_it);
     callback.Run(gfx::GpuMemoryBufferHandle());
     return;
   }
-
-  // The factory should never return a shared memory backed buffer.
-  DCHECK_NE(handle.type, gfx::SHARED_MEMORY_BUFFER);
 
   // Store the type of this buffer so it can be cleaned up if the child
   // process is removed.

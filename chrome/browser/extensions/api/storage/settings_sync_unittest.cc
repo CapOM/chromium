@@ -19,6 +19,8 @@
 #include "extensions/browser/api/storage/settings_storage_factory.h"
 #include "extensions/browser/api/storage/settings_test_util.h"
 #include "extensions/browser/api/storage/storage_frontend.h"
+#include "extensions/browser/event_router.h"
+#include "extensions/browser/event_router_factory.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/browser/mock_extension_system.h"
 #include "extensions/browser/value_store/testing_value_store.h"
@@ -193,6 +195,15 @@ class TestingValueStoreFactory : public SettingsStorageFactory {
   std::map<std::string, TestingValueStore*> created_;
 };
 
+scoped_ptr<KeyedService> MockExtensionSystemFactoryFunction(
+    content::BrowserContext* context) {
+  return make_scoped_ptr(new MockExtensionSystem(context));
+}
+
+scoped_ptr<KeyedService> BuildEventRouter(content::BrowserContext* profile) {
+  return make_scoped_ptr(new extensions::EventRouter(profile, nullptr));
+}
+
 }  // namespace
 
 class ExtensionSettingsSyncTest : public testing::Test {
@@ -209,13 +220,16 @@ class ExtensionSettingsSyncTest : public testing::Test {
     ASSERT_TRUE(temp_dir_.CreateUniqueTempDir());
     profile_.reset(new TestingProfile(temp_dir_.path()));
     storage_factory_->Reset(new LeveldbSettingsStorageFactory());
-    frontend_.reset(
-        StorageFrontend::CreateForTesting(storage_factory_, profile_.get()));
+    frontend_ = StorageFrontend::CreateForTesting(storage_factory_,
+                                                  profile_.get()).Pass();
 
     ExtensionsBrowserClient::Get()
         ->GetExtensionSystemFactory()
-        ->SetTestingFactoryAndUse(
-            profile_.get(), &util::MockExtensionSystemWithEventRouter::Build);
+        ->SetTestingFactoryAndUse(profile_.get(),
+                                  &MockExtensionSystemFactoryFunction);
+
+    EventRouterFactory::GetInstance()->SetTestingFactory(profile_.get(),
+                                                         &BuildEventRouter);
   }
 
   void TearDown() override {

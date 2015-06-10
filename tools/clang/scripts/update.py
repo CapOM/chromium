@@ -32,6 +32,10 @@ use_head_revision = 'LLVM_FORCE_HEAD_REVISION' in os.environ
 if use_head_revision:
   LLVM_WIN_REVISION = 'HEAD'
 
+# This is incremented when pushing a new build of Clang at the same revision.
+CLANG_SUB_REVISION=1
+
+PACKAGE_VERSION = "%s-%s" % (LLVM_WIN_REVISION, CLANG_SUB_REVISION)
 
 # Path constants. (All of these should be absolute paths.)
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -51,6 +55,7 @@ COMPILER_RT_DIR = os.path.join(LLVM_DIR, 'projects', 'compiler-rt')
 LLVM_BUILD_TOOLS_DIR = os.path.abspath(
     os.path.join(LLVM_DIR, '..', 'llvm-build-tools'))
 STAMP_FILE = os.path.join(LLVM_DIR, '..', 'llvm-build', 'cr_build_revision')
+BINUTILS_DIR = os.path.join(THIRD_PARTY_DIR, 'binutils')
 VERSION = '3.7.0'
 
 # URL for pre-built binaries.
@@ -198,15 +203,25 @@ def CreateChromeToolsShim():
 
 def AddCMakeToPath():
   """Download CMake and add it to PATH."""
-  cmake_dir = os.path.join(LLVM_BUILD_TOOLS_DIR, 'cmake-3.2.2-win32-x86', 'bin')
+  if sys.platform == 'win32':
+    zip_name = 'cmake-3.2.2-win32-x86.zip'
+    cmake_dir = os.path.join(LLVM_BUILD_TOOLS_DIR,
+                             'cmake-3.2.2-win32-x86', 'bin')
+  else:
+    suffix = 'Darwin' if sys.platform == 'darwin' else 'Linux'
+    zip_name = 'cmake310_%s.tgz' % suffix
+    cmake_dir = os.path.join(LLVM_BUILD_TOOLS_DIR, 'cmake310', 'bin')
   if not os.path.exists(cmake_dir):
     if not os.path.exists(LLVM_BUILD_TOOLS_DIR):
       os.makedirs(LLVM_BUILD_TOOLS_DIR)
     # The cmake archive is smaller than 20 MB, small enough to keep in memory:
     with contextlib.closing(cStringIO.StringIO()) as f:
-      DownloadUrl(CDS_URL + '/tools/cmake-3.2.2-win32-x86.zip', f)
+      DownloadUrl(CDS_URL + '/tools/' + zip_name, f)
       f.seek(0)
-      zipfile.ZipFile(f).extractall(path=LLVM_BUILD_TOOLS_DIR)
+      if zip_name.endswith('.zip'):
+        zipfile.ZipFile(f).extractall(path=LLVM_BUILD_TOOLS_DIR)
+      else:
+        tarfile.open(mode='r:gz', fileobj=f).extractall(path=LLVM_BUILD_DIR)
   os.environ['PATH'] = cmake_dir + os.pathsep + os.environ.get('PATH', '')
 
 vs_version = None
@@ -230,8 +245,8 @@ def GetVSVersion():
 
 
 def UpdateClang(args):
-  print 'Updating Clang to %s...' % (LLVM_WIN_REVISION)
-  if LLVM_WIN_REVISION != 'HEAD' and ReadStampFile() == LLVM_WIN_REVISION:
+  print 'Updating Clang to %s...' % PACKAGE_VERSION
+  if ReadStampFile() == PACKAGE_VERSION:
     print 'Already up to date.'
     return 0
 
@@ -239,9 +254,7 @@ def UpdateClang(args):
   WriteStampFile('')
 
   if not args.force_local_build:
-    # TODO(thakis): To make this work on posix, add a -1 suffix and use some
-    # PACKAGE_VERSION-like thing here instead. Also, don't hardcode Win.
-    cds_file = "clang-%s.tgz" %  LLVM_WIN_REVISION
+    cds_file = "clang-%s.tgz" %  PACKAGE_VERSION
     cds_full_url = CDS_URL + '/Win/' + cds_file
 
     # Check if there's a prebuilt binary and if so just fetch that. That's
@@ -255,8 +268,8 @@ def UpdateClang(args):
         DownloadUrl(cds_full_url, f)
         f.seek(0)
         tarfile.open(mode='r:gz', fileobj=f).extractall(path=LLVM_BUILD_DIR)
-        print 'clang %s unpacked' % LLVM_WIN_REVISION
-        WriteStampFile(LLVM_WIN_REVISION)
+        print 'clang %s unpacked' % PACKAGE_VERSION
+        WriteStampFile(PACKAGE_VERSION)
         return 0
       except urllib2.HTTPError:
         print 'Did not find prebuilt clang %s, building locally' % cds_file
@@ -274,14 +287,17 @@ def UpdateClang(args):
   # out code that builds at head, but not at CLANG_REVISION or vice versa.
   cflags = cxxflags = ''
 
-  # TODO(thakis): Set this only conditionally if use_head_revision once posix
-  # and win clang are in sync. At the moment, the plugins only build at clang
-  # head on posix, but they build at both head and the pinned win version :-/
-  cflags += ' -DLLVM_FORCE_HEAD_REVISION'
-  cxxflags += ' -DLLVM_FORCE_HEAD_REVISION'
+  # If building at head, define a macro that plugins can use for #ifdefing
+  # out code that builds at head, but not at LLVM_WIN_REVISION or vice versa.
+  if use_head_revision:
+    cflags += ' -DLLVM_FORCE_HEAD_REVISION'
+    cxxflags += ' -DLLVM_FORCE_HEAD_REVISION'
 
-  base_cmake_args = ['-GNinja', '-DCMAKE_BUILD_TYPE=Release',
-                      '-DLLVM_ENABLE_ASSERTIONS=ON']
+  base_cmake_args = ['-GNinja',
+                     '-DCMAKE_BUILD_TYPE=Release',
+                     '-DLLVM_ENABLE_ASSERTIONS=ON',
+                     '-DLLVM_ENABLE_THREADS=OFF',
+                     ]
 
   cc, cxx = None, None
   if args.bootstrap:
@@ -291,7 +307,6 @@ def UpdateClang(args):
     os.chdir(LLVM_BOOTSTRAP_DIR)
     bootstrap_args = base_cmake_args + [
         '-DLLVM_TARGETS_TO_BUILD=host',
-        '-DLLVM_ENABLE_THREADS=OFF',
         '-DCMAKE_INSTALL_PREFIX=' + LLVM_BOOTSTRAP_INSTALL_DIR,
         '-DCMAKE_C_FLAGS=' + cflags,
         '-DCMAKE_CXX_FLAGS=' + cxxflags,
@@ -315,7 +330,13 @@ def UpdateClang(args):
     cxx = cxx.replace('\\', '/')
     print 'Building final compiler'
 
+  # Build clang.
+  binutils_incdir = ''
+  if sys.platform.startswith('linux'):
+    binutils_incdir = os.path.join(BINUTILS_DIR, 'Linux_x64/Release/include')
+
   cmake_args = base_cmake_args + [
+      '-DLLVM_BINUTILS_INCDIR=' + binutils_incdir,
       '-DCMAKE_C_FLAGS=' + cflags,
       '-DCMAKE_CXX_FLAGS=' + cxxflags,
       '-DCHROMIUM_TOOLS_SRC=%s' % os.path.join(CHROMIUM_DIR, 'tools', 'clang'),
@@ -378,6 +399,7 @@ def UpdateClang(args):
       CopyFile(os.path.join(sanitizer_include_dir, f),
                aux_sanitizer_include_dir)
 
+  # Run tests.
   if args.run_tests or use_head_revision:
     os.chdir(LLVM_BUILD_DIR)
     RunCommand(GetVSVersion().SetupScript('x64') +
@@ -387,7 +409,7 @@ def UpdateClang(args):
     RunCommand(GetVSVersion().SetupScript('x64') +
                ['&&', 'ninja', 'check-all'])
 
-  WriteStampFile(LLVM_WIN_REVISION)
+  WriteStampFile(PACKAGE_VERSION)
   print 'Clang update was successful.'
   return 0
 
@@ -438,27 +460,38 @@ def main():
 
   args = parser.parse_args()
 
+  if re.search(r'\b(make_clang_dir)=', os.environ.get('GYP_DEFINES', '')):
+    print 'Skipping Clang update (make_clang_dir= was set in GYP_DEFINES).'
+    return 0
   if args.if_needed:
-    if not re.search(r'\b(clang|asan)=1', os.environ.get('GYP_DEFINES', '')):
-      print 'Skipping Clang update (clang=1 was not set in GYP_DEFINES).'
+    is_clang_required = False
+    # clang is always used on Mac and Linux.
+    if sys.platform == 'darwin' or sys.platform.startswith('linux'):
+      is_clang_required = True
+    # clang requested via $GYP_DEFINES.
+    if re.search(r'\b(clang|asan|lsan|msan|tsan)=1',
+                 os.environ.get('GYP_DEFINES', '')):
+      is_clang_required = True
+    # clang previously downloaded, keep it up-to-date.
+    # If you don't want this, delete third_party/llvm-build on your machine.
+    if os.path.isdir(LLVM_BUILD_DIR):
+      is_clang_required = True
+    if not is_clang_required:
       return 0
 
-    if re.search(r'\b(make_clang_dir)=', os.environ.get('GYP_DEFINES', '')):
-      print 'Skipping Clang update (make_clang_dir= was set in GYP_DEFINES).'
-      return 0
-
-  global LLVM_WIN_REVISION
+  global LLVM_WIN_REVISION, PACKAGE_VERSION
   if args.print_revision:
     if use_head_revision:
       print GetSvnRevision(LLVM_DIR)
     else:
-      print LLVM_WIN_REVISION
+      print PACKAGE_VERSION
     return 0
 
   if LLVM_WIN_REVISION == 'HEAD':
     # Use a real revision number rather than HEAD to make sure that the stamp
     # file logic works.
     LLVM_WIN_REVISION = GetSvnRevision(LLVM_REPO_URL)
+    PACKAGE_VERSION = LLVM_WIN_REVISION + '-0'
 
   return UpdateClang(args)
 

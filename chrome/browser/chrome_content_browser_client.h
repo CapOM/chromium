@@ -112,6 +112,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
       const std::string& alias_name) override;
   void AppendExtraCommandLineSwitches(base::CommandLine* command_line,
                                       int child_process_id) override;
+  void AppendMappedFileCommandLineSwitches(
+      base::CommandLine* command_line) override;
   std::string GetApplicationLocale() override;
   std::string GetAcceptLangs(content::BrowserContext* context) override;
   const gfx::ImageSkia* GetDefaultFavicon() override;
@@ -194,7 +196,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
                        bool opener_suppressed,
                        content::ResourceContext* context,
                        int render_process_id,
-                       int opener_id,
+                       int opener_render_view_id,
+                       int opener_render_frame_id,
                        bool* no_javascript_access) override;
   void ResourceDispatcherHostCreated() override;
   content::SpeechRecognitionManagerDelegate*
@@ -256,6 +259,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
                const content::OpenURLParams& params,
                const base::Callback<void(content::WebContents*)>& callback)
       override;
+  content::PresentationServiceDelegate* GetPresentationServiceDelegate(
+      content::WebContents* web_contents) override;
 
   void RecordURLMetric(const std::string& metric, const GURL& url) override;
 
@@ -304,6 +309,8 @@ class ChromeContentBrowserClient : public content::ContentBrowserClient {
 #if defined(OS_POSIX) && !defined(OS_MACOSX)
   base::ScopedFD v8_natives_fd_;
   base::ScopedFD v8_snapshot_fd_;
+  bool natives_fd_exists() { return v8_natives_fd_ != -1; }
+  bool snapshot_fd_exists() { return v8_snapshot_fd_ != -1; }
 #endif  // OS_POSIX && !OS_MACOSX
 
   // Vector of additional ChromeContentBrowserClientParts.

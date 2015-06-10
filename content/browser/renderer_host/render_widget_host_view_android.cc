@@ -211,6 +211,7 @@ GLHelperHolder::CreateContext3D() {
           0,  // offscreen
           url, gpu_channel_host.get(), attrs, lose_context_when_out_of_memory,
           limits, nullptr));
+  context->SetContextType(BROWSER_OFFSCREEN_MAINTHREAD_CONTEXT);
   if (context->InitializeOnCurrentThread()) {
     context->traceBeginCHROMIUM(
         "gpu_toplevel",
@@ -343,6 +344,8 @@ RenderWidgetHostViewAndroid::RenderWidgetHostViewAndroid(
       locks_on_frame_count_(0),
       observing_root_window_(false),
       weak_ptr_factory_(this) {
+  if (CompositorImpl::GetSurfaceManager())
+    id_allocator_ = CompositorImpl::CreateSurfaceIdAllocator();
   host_->SetView(this);
   SetContentViewCore(content_view_core);
 }
@@ -751,10 +754,11 @@ bool RenderWidgetHostViewAndroid::OnTouchEvent(
       ui::CreateWebTouchEventFromMotionEvent(event, result.did_generate_scroll);
   host_->ForwardTouchEventWithLatencyInfo(web_event, ui::LatencyInfo());
 
-  // Send a proactive BeginFrame on the next vsync to reduce latency.
-  // This is good enough as long as the first touch event has Begin semantics
-  // and the actual scroll happens on the next vsync.
-  if (observing_root_window_)
+  // Send a proactive BeginFrame for this vsync to reduce scroll latency for
+  // scroll-inducing touch events. Note that Android's Choreographer ensures
+  // that BeginFrame requests made during ACTION_MOVE dispatch will be honored
+  // in the same vsync phase.
+  if (observing_root_window_&& result.did_generate_scroll)
     RequestVSyncUpdate(BEGIN_FRAME);
 
   return true;
@@ -954,7 +958,7 @@ void RenderWidgetHostViewAndroid::ShowDisambiguationPopup(
 scoped_ptr<SyntheticGestureTarget>
 RenderWidgetHostViewAndroid::CreateSyntheticGestureTarget() {
   return scoped_ptr<SyntheticGestureTarget>(new SyntheticGestureTargetAndroid(
-      host_, content_view_core_->CreateTouchEventSynthesizer()));
+      host_, content_view_core_->CreateMotionEventSynthesizer()));
 }
 
 void RenderWidgetHostViewAndroid::SendDelegatedFrameAck(
@@ -1037,7 +1041,6 @@ void RenderWidgetHostViewAndroid::SubmitFrame(
   cc::SurfaceManager* manager = CompositorImpl::GetSurfaceManager();
   if (manager) {
     if (!surface_factory_) {
-      id_allocator_ = CompositorImpl::CreateSurfaceIdAllocator();
       surface_factory_ = make_scoped_ptr(new cc::SurfaceFactory(manager, this));
     }
     if (surface_id_.is_null() ||
@@ -1757,6 +1760,12 @@ void RenderWidgetHostViewAndroid::DidOverscroll(
 void RenderWidgetHostViewAndroid::DidStopFlinging() {
   if (content_view_core_)
     content_view_core_->DidStopFlinging();
+}
+
+uint32_t RenderWidgetHostViewAndroid::GetSurfaceIdNamespace() {
+  if (id_allocator_)
+    return id_allocator_->id_namespace();
+  return 0;
 }
 
 void RenderWidgetHostViewAndroid::SetContentViewCore(

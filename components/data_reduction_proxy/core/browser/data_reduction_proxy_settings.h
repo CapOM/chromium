@@ -99,8 +99,21 @@ class DataReductionProxySettings : public DataReductionProxyServiceObserver {
   // Enables or disables the alternative data reduction proxy configuration.
   void SetDataReductionProxyAlternativeEnabled(bool enabled);
 
-  // Returns true if both LoFi and the proxy are enabled.
-  bool IsLoFiEnabled() const;
+  // Sets |lo_fi_mode_active_| to true if Lo-Fi is currently active, meaning
+  // requests are being sent with "q=low" headers. Set from the IO thread only
+  // on main frame requests.
+  void SetLoFiModeActiveOnMainFrame(bool lo_fi_mode_active);
+
+  // Returns true if Lo-Fi was active on the main frame request.
+  bool WasLoFiModeActiveOnMainFrame() const;
+
+  // Returns true if a "Show image" context menu request has not been made since
+  // the last main frame request.
+  bool WasLoFiShowImageRequestedBefore();
+
+  // Sets |lo_fi_show_image_requested_| to true, which means a "Show image"
+  // context menu request has been made since the last main frame request.
+  void SetLoFiShowImageRequested();
 
   // Returns the time in microseconds that the last update was made to the
   // daily original and received content lengths.
@@ -143,7 +156,7 @@ class DataReductionProxySettings : public DataReductionProxyServiceObserver {
   }
 
   // Returns true if the data reduction proxy promo may be shown.
-  // This is idependent of whether the data reduction proxy is allowed.
+  // This is independent of whether the data reduction proxy is allowed.
   bool PromoAllowed() const {
     return promo_allowed_;
   }
@@ -213,11 +226,12 @@ class DataReductionProxySettings : public DataReductionProxyServiceObserver {
   void RegisterDataReductionProxyFieldTrial();
 
   // Registers the trial "SyntheticDataReductionProxyLoFiSetting" with the group
-  // "Enabled" or "Disabled". Indicates whether LoFi is turned on or not.
-  // The group won't be reported if it changes while compiling the report. LoFi
-  // has its own field trial because it is expected that the user will be
-  // switching states often. It can be assumed that when no LoFi group is
-  // reported, the user was in a mixed LoFi state.
+  // "Enabled" or "Disabled". Indicates whether Lo-Fi is turned on or not.
+  // The group won't be reported if it changes while compiling the report. It
+  // can be assumed that when no Lo-Fi group is reported, the user was in a
+  // mixed Lo-Fi state.
+  // TODO(tbansal): State of the Lo-Fi synthetic field trial should change
+  // based on Auto Lo-Fi status.
   void RegisterLoFiFieldTrial();
 
   void OnProxyEnabledPrefChange();
@@ -243,6 +257,13 @@ class DataReductionProxySettings : public DataReductionProxyServiceObserver {
   bool allowed_;
   bool alternative_allowed_;
   bool promo_allowed_;
+
+  // True if Lo-Fi is active.
+  bool lo_fi_mode_active_;
+
+  // True if a "Show image" context menu request has not been made since the
+  // last main frame request.
+  bool lo_fi_show_image_requested_;
 
   BooleanPrefMember spdy_proxy_auth_enabled_;
   BooleanPrefMember data_reduction_proxy_alternative_enabled_;

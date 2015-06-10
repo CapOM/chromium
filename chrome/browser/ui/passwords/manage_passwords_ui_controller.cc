@@ -36,6 +36,9 @@ using password_manager::PasswordFormManager;
 
 namespace {
 
+// Minimal time span the bubble should survive implicit navigations.
+const int kBubbleMinTime = 5;
+
 password_manager::PasswordStore* GetPasswordStore(
     content::WebContents* web_contents) {
   return PasswordStoreFactory::GetForProfile(
@@ -218,16 +221,16 @@ void ManagePasswordsUIController::ChooseCredential(
   // a FederatedCredential in order to prevent password information leaking
   // cross-origin.
   //
-  // If |credential_type| is local, the credential MIGHT be a LocalCredential
+  // If |credential_type| is local, the credential MIGHT be a PasswordCredential
   // or it MIGHT be a FederatedCredential. We inspect the |federation_url|
   // field to determine which we should return.
   //
   // TODO(mkwst): Clean this up. It is confusing.
   password_manager::CredentialType type_to_return;
   if (credential_type ==
-          password_manager::CredentialType::CREDENTIAL_TYPE_LOCAL &&
+          password_manager::CredentialType::CREDENTIAL_TYPE_PASSWORD &&
       form.federation_url.is_empty()) {
-    type_to_return = password_manager::CredentialType::CREDENTIAL_TYPE_LOCAL;
+    type_to_return = password_manager::CredentialType::CREDENTIAL_TYPE_PASSWORD;
   } else if (credential_type ==
              password_manager::CredentialType::CREDENTIAL_TYPE_EMPTY) {
     type_to_return = password_manager::CredentialType::CREDENTIAL_TYPE_EMPTY;
@@ -298,7 +301,7 @@ void ManagePasswordsUIController::DidNavigateMainFrame(
 
   // Don't do anything if a navigation occurs before a user could reasonably
   // interact with the password bubble.
-  if (Elapsed() < base::TimeDelta::FromSeconds(1))
+  if (Elapsed() < base::TimeDelta::FromSeconds(kBubbleMinTime))
     return;
 
   // Otherwise, reset the password manager and the timer.

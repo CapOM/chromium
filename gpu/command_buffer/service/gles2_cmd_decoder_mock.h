@@ -89,6 +89,7 @@ class MockGLES2Decoder : public GLES2Decoder {
   MOCK_METHOD1(SetAsyncPixelTransferManagerForTest,
       void(AsyncPixelTransferManager*));
   MOCK_METHOD1(SetIgnoreCachedStateForTest, void(bool ignore));
+  MOCK_METHOD1(SetAllowExit, void(bool allow));
   MOCK_METHOD3(DoCommand, error::Error(unsigned int command,
                                        unsigned int arg_count,
                                        const void* cmd_data));
@@ -101,16 +102,16 @@ class MockGLES2Decoder : public GLES2Decoder {
                                          uint32* service_texture_id));
   MOCK_METHOD0(GetContextLostReason, error::ContextLostReason());
   MOCK_CONST_METHOD1(GetCommandName, const char*(unsigned int command_id));
-  MOCK_METHOD9(ClearLevel, bool(
-      Texture* texture,
-      unsigned target,
-      int level,
-      unsigned internal_format,
-      unsigned format,
-      unsigned type,
-      int width,
-      int height,
-      bool is_texture_immutable));
+  MOCK_METHOD9(ClearLevel,
+               bool(Texture* texture,
+                    unsigned target,
+                    int level,
+                    unsigned format,
+                    unsigned type,
+                    int x_offset,
+                    int y_offset,
+                    int width,
+                    int height));
   MOCK_METHOD0(GetErrorState, ErrorState *());
 
   MOCK_METHOD0(GetLogger, Logger*());

@@ -129,11 +129,8 @@ class View {
   void SetFocus();
 
   // Embedding. See view_manager.mojom for details.
-  void Embed(const String& url);
-  void Embed(mojo::URLRequestPtr request,
-             InterfaceRequest<ServiceProvider> services,
-             ServiceProviderPtr exposed_services);
   void Embed(ViewManagerClientPtr client);
+  void EmbedAllowingReembed(mojo::URLRequestPtr request);
 
  protected:
   // This class is subclassed only by test classes that provide a public ctor.
@@ -187,7 +184,7 @@ class View {
   View* parent_;
   Children children_;
 
-  ObserverList<ViewObserver> observers_;
+  base::ObserverList<ViewObserver> observers_;
 
   Rect bounds_;
   ViewportMetricsPtr viewport_metrics_;

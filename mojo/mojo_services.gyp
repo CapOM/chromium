@@ -20,6 +20,7 @@
         'services/network/public/interfaces/tcp_server_socket.mojom',
         'services/network/public/interfaces/udp_socket.mojom',
         'services/network/public/interfaces/url_loader.mojom',
+        'services/network/public/interfaces/url_loader_factory.mojom',
         'services/network/public/interfaces/web_socket.mojom',
       ],
       'mojom_include_path': '<(DEPTH)/mojo/services',
@@ -29,8 +30,17 @@
     ],
   }, {
     # GN version: //mojo/services/network/public/interfaces
-    'target_name': 'network_service_bindings_libs',
+    'target_name': 'network_service_bindings_lib',
     'type': 'static_library',
+    'dependencies': [
+      'network_service_bindings_mojom',
+    ],
+  }, {
+    # Target used to depend only on the bindings generation action, not on any
+    # outputs.
+    'target_name': 'network_service_bindings_generation',
+    'type': 'none',
+    'hard_dependency': 1,
     'dependencies': [
       'network_service_bindings_mojom',
     ],

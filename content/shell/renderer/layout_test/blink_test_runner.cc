@@ -13,14 +13,24 @@
 #include "base/compiler_specific.h"
 #include "base/debug/debugger.h"
 #include "base/files/file_path.h"
+#include "base/location.h"
 #include "base/md5.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/message_loop/message_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/sys_string_conversions.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
+#include "components/test_runner/app_banner_client.h"
+#include "components/test_runner/gamepad_controller.h"
+#include "components/test_runner/mock_screen_orientation_client.h"
+#include "components/test_runner/test_interfaces.h"
+#include "components/test_runner/web_task.h"
+#include "components/test_runner/web_test_interfaces.h"
+#include "components/test_runner/web_test_proxy.h"
+#include "components/test_runner/web_test_runner.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
 #include "content/public/common/web_preferences.h"
@@ -37,14 +47,6 @@
 #include "content/shell/renderer/layout_test/layout_test_render_process_observer.h"
 #include "content/shell/renderer/layout_test/leak_detector.h"
 #include "content/shell/renderer/layout_test/test_plugin_placeholder.h"
-#include "content/shell/renderer/test_runner/app_banner_client.h"
-#include "content/shell/renderer/test_runner/gamepad_controller.h"
-#include "content/shell/renderer/test_runner/mock_screen_orientation_client.h"
-#include "content/shell/renderer/test_runner/test_interfaces.h"
-#include "content/shell/renderer/test_runner/web_task.h"
-#include "content/shell/renderer/test_runner/web_test_interfaces.h"
-#include "content/shell/renderer/test_runner/web_test_proxy.h"
-#include "content/shell/renderer/test_runner/web_test_runner.h"
 #include "net/base/filename_util.h"
 #include "net/base/net_errors.h"
 #include "skia/ext/platform_canvas.h"
@@ -107,13 +109,14 @@ namespace {
 
 class InvokeTaskHelper : public WebThread::Task {
  public:
-  InvokeTaskHelper(scoped_ptr<WebTask> task) : task_(task.Pass()) {}
+  InvokeTaskHelper(scoped_ptr<test_runner::WebTask> task)
+      : task_(task.Pass()) {}
 
   // WebThread::Task implementation:
   void run() override { task_->run(); }
 
  private:
-  scoped_ptr<WebTask> task_;
+  scoped_ptr<test_runner::WebTask> task_;
 };
 
 class SyncNavigationStateVisitor : public RenderViewVisitor {
@@ -131,7 +134,7 @@ class SyncNavigationStateVisitor : public RenderViewVisitor {
 
 class ProxyToRenderViewVisitor : public RenderViewVisitor {
  public:
-  explicit ProxyToRenderViewVisitor(WebTestProxyBase* proxy)
+  explicit ProxyToRenderViewVisitor(test_runner::WebTestProxyBase* proxy)
       : proxy_(proxy),
         render_view_(NULL) {
   }
@@ -153,7 +156,7 @@ class ProxyToRenderViewVisitor : public RenderViewVisitor {
   }
 
  private:
-  WebTestProxyBase* proxy_;
+  test_runner::WebTestProxyBase* proxy_;
   RenderView* render_view_;
 
   DISALLOW_COPY_AND_ASSIGN(ProxyToRenderViewVisitor);
@@ -195,7 +198,7 @@ class UseSynchronousResizeModeVisitor : public RenderViewVisitor {
 
 class MockGamepadProvider : public RendererGamepadProvider {
  public:
-  explicit MockGamepadProvider(GamepadController* controller)
+  explicit MockGamepadProvider(test_runner::GamepadController* controller)
       : RendererGamepadProvider(nullptr), controller_(controller) {}
   ~MockGamepadProvider() override {
     StopIfObserving();
@@ -213,7 +216,7 @@ class MockGamepadProvider : public RendererGamepadProvider {
   void SendStopMessage() override {}
 
  private:
-  scoped_ptr<GamepadController> controller_;
+  scoped_ptr<test_runner::GamepadController> controller_;
 
   DISALLOW_COPY_AND_ASSIGN(MockGamepadProvider);
 };
@@ -245,7 +248,7 @@ void BlinkTestRunner::SetEditCommand(const std::string& name,
 }
 
 void BlinkTestRunner::SetGamepadProvider(
-    GamepadController* controller) {
+    test_runner::GamepadController* controller) {
   scoped_ptr<MockGamepadProvider> provider(new MockGamepadProvider(controller));
   SetMockGamepadProvider(provider.Pass());
 }
@@ -265,14 +268,14 @@ void BlinkTestRunner::SetDeviceOrientationData(
 
 void BlinkTestRunner::SetScreenOrientation(
     const WebScreenOrientationType& orientation) {
-  MockScreenOrientationClient* mock_client =
+  test_runner::MockScreenOrientationClient* mock_client =
       proxy()->GetScreenOrientationClientMock();
   mock_client->UpdateDeviceOrientation(
       render_view()->GetWebView()->mainFrame()->toWebLocalFrame(), orientation);
 }
 
 void BlinkTestRunner::ResetScreenOrientation() {
-  MockScreenOrientationClient* mock_client =
+  test_runner::MockScreenOrientationClient* mock_client =
       proxy()->GetScreenOrientationClientMock();
   mock_client->ResetData();
 }
@@ -286,13 +289,14 @@ void BlinkTestRunner::PrintMessage(const std::string& message) {
   Send(new ShellViewHostMsg_PrintMessage(routing_id(), message));
 }
 
-void BlinkTestRunner::PostTask(WebTask* task) {
+void BlinkTestRunner::PostTask(test_runner::WebTask* task) {
   Platform::current()->currentThread()->postTask(
       WebTraceLocation(__FUNCTION__, __FILE__),
       new InvokeTaskHelper(make_scoped_ptr(task)));
 }
 
-void BlinkTestRunner::PostDelayedTask(WebTask* task, long long ms) {
+void BlinkTestRunner::PostDelayedTask(test_runner::WebTask* task,
+                                      long long ms) {
   Platform::current()->currentThread()->postDelayedTask(
       WebTraceLocation(__FUNCTION__, __FILE__),
       new InvokeTaskHelper(make_scoped_ptr(task)), ms);
@@ -364,7 +368,7 @@ WebURL BlinkTestRunner::RewriteLayoutTestsURL(const std::string& utf8_url) {
   return WebURL(GURL(new_url));
 }
 
-TestPreferences* BlinkTestRunner::Preferences() {
+test_runner::TestPreferences* BlinkTestRunner::Preferences() {
   return &prefs_;
 }
 
@@ -484,7 +488,8 @@ void BlinkTestRunner::SetGeofencingMockPosition(double latitude,
   content::SetGeofencingMockPosition(latitude, longitude);
 }
 
-void BlinkTestRunner::SetFocus(WebTestProxyBase* proxy, bool focus) {
+void BlinkTestRunner::SetFocus(test_runner::WebTestProxyBase* proxy,
+                               bool focus) {
   ProxyToRenderViewVisitor visitor(proxy);
   RenderView::ForEach(&visitor);
   if (!visitor.render_view()) {
@@ -543,7 +548,7 @@ void BlinkTestRunner::TestFinished() {
     Send(new ShellViewHostMsg_TestFinishedInSecondaryWindow(routing_id()));
     return;
   }
-  WebTestInterfaces* interfaces =
+  test_runner::WebTestInterfaces* interfaces =
       LayoutTestRenderProcessObserver::GetInstance()->test_interfaces();
   interfaces->SetTestIsRunning(false);
   if (interfaces->TestRunner()->ShouldDumpBackForwardList()) {
@@ -587,7 +592,8 @@ bool BlinkTestRunner::AllowExternalPages() {
   return test_config_.allow_external_pages;
 }
 
-std::string BlinkTestRunner::DumpHistoryForWindow(WebTestProxyBase* proxy) {
+std::string BlinkTestRunner::DumpHistoryForWindow(
+    test_runner::WebTestProxyBase* proxy) {
   size_t pos = 0;
   std::vector<int>::iterator id;
   for (id = routing_ids_.begin(); id != routing_ids_.end(); ++id, ++pos) {
@@ -675,16 +681,16 @@ void BlinkTestRunner::DispatchBeforeInstallPromptEvent(
 
 void BlinkTestRunner::ResolveBeforeInstallPromptPromise(
       int request_id, const std::string& platform) {
-  WebTestInterfaces* interfaces =
+  test_runner::WebTestInterfaces* interfaces =
       LayoutTestRenderProcessObserver::GetInstance()->test_interfaces();
-  interfaces->GetTestInterfaces()->GetAppBannerClient()->ResolvePromise(
-      request_id, platform);
+  interfaces->GetAppBannerClient()->ResolvePromise(request_id, platform);
 }
 
 blink::WebPlugin* BlinkTestRunner::CreatePluginPlaceholder(
     blink::WebLocalFrame* frame, const blink::WebPluginParams& params) {
   if (params.mimeType == "application/x-plugin-placeholder-test")
-    return (new TestPluginPlaceholder(frame, params))->plugin();
+    return (new TestPluginPlaceholder(render_view()->GetMainRenderFrame(),
+                                      frame, params))->plugin();
   return 0;
 }
 
@@ -717,7 +723,7 @@ void BlinkTestRunner::Navigate(const GURL& url) {
   if (!is_main_window_ &&
       LayoutTestRenderProcessObserver::GetInstance()->main_test_runner() ==
           this) {
-    WebTestInterfaces* interfaces =
+    test_runner::WebTestInterfaces* interfaces =
         LayoutTestRenderProcessObserver::GetInstance()->test_interfaces();
     interfaces->SetTestIsRunning(true);
     interfaces->ConfigureForTestWithURL(GURL(), false);
@@ -766,7 +772,7 @@ void BlinkTestRunner::Reset() {
 // Private methods  -----------------------------------------------------------
 
 void BlinkTestRunner::CaptureDump() {
-  WebTestInterfaces* interfaces =
+  test_runner::WebTestInterfaces* interfaces =
       LayoutTestRenderProcessObserver::GetInstance()->test_interfaces();
   TRACE_EVENT0("shell", "BlinkTestRunner::CaptureDump");
 
@@ -827,7 +833,7 @@ void BlinkTestRunner::CaptureDumpPixels(const SkBitmap& snapshot) {
 void BlinkTestRunner::CaptureDumpComplete() {
   render_view()->GetWebView()->mainFrame()->stopLoading();
 
-  base::MessageLoop::current()->PostTask(
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
       FROM_HERE, base::Bind(base::IgnoreResult(&BlinkTestRunner::Send),
                             base::Unretained(this),
                             new ShellViewHostMsg_TestFinished(routing_id())));
@@ -843,7 +849,7 @@ void BlinkTestRunner::OnSetTestConfiguration(
       WebSize(params.initial_size.width(), params.initial_size.height()));
   SetFocus(proxy_, true);
 
-  WebTestInterfaces* interfaces =
+  test_runner::WebTestInterfaces* interfaces =
       LayoutTestRenderProcessObserver::GetInstance()->test_interfaces();
   interfaces->SetTestIsRunning(true);
   interfaces->ConfigureForTestWithURL(params.test_url,

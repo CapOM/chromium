@@ -75,7 +75,7 @@ Setup::Setup(mojo::ApplicationImpl* app)
       discardable_memory_allocator_(kDesiredMaxMemory),
       compositor_thread_("compositor thread") {
   if (is_headless_)
-    InitHeadless();
+    InitIfNecessary(gfx::Size(1024, 1024), 1.f);
 }
 
 Setup::~Setup() {
@@ -83,12 +83,6 @@ Setup::~Setup() {
     renderer_scheduler_->Shutdown();
     blink::shutdown();
   }
-}
-
-void Setup::InitHeadless() {
-  DCHECK(!did_init_);
-  is_headless_ = true;
-  InitIfNecessary(gfx::Size(1024, 1024), 1.f);
 }
 
 void Setup::InitIfNecessary(const gfx::Size& screen_size_in_pixels,
@@ -114,11 +108,12 @@ void Setup::InitIfNecessary(const gfx::Size& screen_size_in_pixels,
   renderer_scheduler_ = scheduler::RendererScheduler::Create();
   blink_platform_.reset(new BlinkPlatformImpl(app_, renderer_scheduler_.get()));
 #if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  CHECK(gin::V8Initializer::LoadV8SnapshotFromFD(
-      resource_loader_.ReleaseFile(kResourceNativesBlob).TakePlatformFile(), 0u,
-      0u,
+  gin::V8Initializer::LoadV8SnapshotFromFD(
       resource_loader_.ReleaseFile(kResourceSnapshotBlob).TakePlatformFile(),
-      0u, 0u));
+      0u, 0u);
+  gin::V8Initializer::LoadV8NativesFromFD(
+      resource_loader_.ReleaseFile(kResourceNativesBlob).TakePlatformFile(), 0u,
+      0u);
 #endif
   blink::initialize(blink_platform_.get());
   base::i18n::InitializeICUWithFileDescriptor(
@@ -150,7 +145,7 @@ void Setup::InitIfNecessary(const gfx::Size& screen_size_in_pixels,
   compositor_thread_.Start();
 
   media_factory_.reset(
-      new MediaFactory(compositor_thread_.message_loop_proxy()));
+      new MediaFactory(compositor_thread_.message_loop_proxy(), app_->shell()));
 
   if (command_line->HasSwitch(kJavaScriptFlags)) {
     std::string flags(command_line->GetSwitchValueASCII(kJavaScriptFlags));

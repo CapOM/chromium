@@ -10,6 +10,7 @@
 #include "base/logging.h"
 #include "base/memory/scoped_vector.h"
 #include "base/message_loop/message_loop.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/run_loop.h"
 #include "base/time/time.h"
 #include "base/trace_event/trace_event.h"
@@ -84,7 +85,7 @@ class FakeSchedulerClient : public SchedulerClient {
   int ActionIndex(const char* action) const {
     for (size_t i = 0; i < actions_.size(); i++)
       if (!strcmp(actions_[i], action))
-        return i;
+        return base::checked_cast<int>(i);
     return -1;
   }
 
@@ -2914,6 +2915,70 @@ TEST_F(SchedulerTest, SynchronousCompositorDoubleCommitWithoutDraw) {
   client_->Reset();
 }
 
+class SchedulerClientSetNeedsPrepareTilesOnDraw : public FakeSchedulerClient {
+ public:
+  SchedulerClientSetNeedsPrepareTilesOnDraw() : FakeSchedulerClient() {}
+
+ protected:
+  DrawResult ScheduledActionDrawAndSwapIfPossible() override {
+    scheduler_->SetNeedsPrepareTiles();
+    return FakeSchedulerClient::ScheduledActionDrawAndSwapIfPossible();
+  }
+
+  void ScheduledActionPrepareTiles() override {
+    FakeSchedulerClient::ScheduledActionPrepareTiles();
+    scheduler_->DidPrepareTiles();
+  }
+};
+
+TEST_F(SchedulerTest, SynchronousCompositorPrepareTilesOnDraw) {
+  scheduler_settings_.using_synchronous_renderer_compositor = true;
+  scheduler_settings_.use_external_begin_frame_source = true;
+  scheduler_settings_.impl_side_painting = true;
+
+  scoped_ptr<FakeSchedulerClient> client =
+      make_scoped_ptr(new SchedulerClientSetNeedsPrepareTilesOnDraw);
+  SetUpScheduler(client.Pass(), true);
+
+  scheduler_->SetNeedsRedraw();
+  EXPECT_SINGLE_ACTION("SetNeedsBeginFrames(true)", client_);
+  client_->Reset();
+
+  // Next vsync.
+  EXPECT_SCOPED(AdvanceFrame());
+  EXPECT_ACTION("WillBeginImplFrame", client_, 0, 3);
+  EXPECT_ACTION("ScheduledActionAnimate", client_, 1, 3);
+  EXPECT_ACTION("ScheduledActionInvalidateOutputSurface", client_, 2, 3);
+  client_->Reset();
+
+  // Android onDraw.
+  scheduler_->SetNeedsRedraw();
+  scheduler_->OnDrawForOutputSurface();
+  EXPECT_ACTION("ScheduledActionDrawAndSwapIfPossible", client_, 0, 2);
+  EXPECT_ACTION("ScheduledActionPrepareTiles", client_, 1, 2);
+  EXPECT_FALSE(scheduler_->BeginImplFrameDeadlinePending());
+  EXPECT_FALSE(scheduler_->PrepareTilesPending());
+  client_->Reset();
+
+  // Android onDraw.
+  scheduler_->SetNeedsRedraw();
+  scheduler_->OnDrawForOutputSurface();
+  EXPECT_ACTION("ScheduledActionDrawAndSwapIfPossible", client_, 0, 2);
+  EXPECT_ACTION("ScheduledActionPrepareTiles", client_, 1, 2);
+  EXPECT_FALSE(scheduler_->BeginImplFrameDeadlinePending());
+  EXPECT_FALSE(scheduler_->PrepareTilesPending());
+  client_->Reset();
+
+  // Next vsync.
+  EXPECT_SCOPED(AdvanceFrame());
+  EXPECT_FALSE(scheduler_->PrepareTilesPending());
+  EXPECT_ACTION("WillBeginImplFrame", client_, 0, 3);
+  EXPECT_ACTION("SetNeedsBeginFrames(false)", client_, 1, 3);
+  EXPECT_ACTION("SendBeginMainFrameNotExpectedSoon", client_, 2, 3);
+  EXPECT_FALSE(client_->needs_begin_frames());
+  client_->Reset();
+}
+
 TEST_F(SchedulerTest, AuthoritativeVSyncInterval) {
   SetUpScheduler(true);
   base::TimeDelta initial_interval = scheduler_->BeginImplFrameInterval();
@@ -2937,6 +3002,39 @@ TEST_F(SchedulerTest, AuthoritativeVSyncInterval) {
   // interval.
   EXPECT_NE(initial_interval, scheduler_->BeginImplFrameInterval());
   EXPECT_EQ(authoritative_interval, scheduler_->BeginImplFrameInterval());
+}
+
+TEST_F(SchedulerTest, ImplLatencyTakesPriority) {
+  SetUpScheduler(true);
+  scheduler_->SetImplLatencyTakesPriority(true);
+  EXPECT_TRUE(scheduler_->ImplLatencyTakesPriority());
+
+  scheduler_->SetImplLatencyTakesPriority(false);
+  EXPECT_FALSE(scheduler_->ImplLatencyTakesPriority());
+}
+
+TEST_F(SchedulerTest, BeginFrameArgs_OnCriticalPath) {
+  scheduler_settings_.use_external_begin_frame_source = true;
+  SetUpScheduler(true);
+
+  scheduler_->SetImplLatencyTakesPriority(false);
+  scheduler_->SetChildrenNeedBeginFrames(true);
+
+  EXPECT_SCOPED(AdvanceFrame());
+  EXPECT_TRUE(client_->begin_frame_is_sent_to_children());
+  EXPECT_TRUE(client_->begin_frame_args_sent_to_children().on_critical_path);
+}
+
+TEST_F(SchedulerTest, BeginFrameArgs_NotOnCriticalPath) {
+  scheduler_settings_.use_external_begin_frame_source = true;
+  SetUpScheduler(true);
+
+  scheduler_->SetImplLatencyTakesPriority(true);
+  scheduler_->SetChildrenNeedBeginFrames(true);
+
+  EXPECT_SCOPED(AdvanceFrame());
+  EXPECT_TRUE(client_->begin_frame_is_sent_to_children());
+  EXPECT_FALSE(client_->begin_frame_args_sent_to_children().on_critical_path);
 }
 
 }  // namespace

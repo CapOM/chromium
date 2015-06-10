@@ -8,13 +8,15 @@
 #include "base/bind.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
+#include "base/location.h"
 #include "base/memory/scoped_vector.h"
 #include "base/memory/shared_memory.h"
-#include "base/message_loop/message_loop.h"
 #include "base/pickle.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/browser/browser_thread_impl.h"
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/loader/cross_site_resource_handler.h"
@@ -69,7 +71,7 @@ void GetResponseHead(const std::vector<IPC::Message>& messages,
   // The first messages should be received response.
   ASSERT_EQ(ResourceMsg_ReceivedResponse::ID, messages[0].type());
 
-  PickleIterator iter(messages[0]);
+  base::PickleIterator iter(messages[0]);
   int request_id;
   ASSERT_TRUE(IPC::ReadParam(&messages[0], &iter, &request_id));
   ASSERT_TRUE(IPC::ReadParam(&messages[0], &iter, response_head));
@@ -92,7 +94,7 @@ void GenerateIPCMessage(
 // ref-counted core that closes them if not extracted.
 void ReleaseHandlesInMessage(const IPC::Message& message) {
   if (message.type() == ResourceMsg_SetDataBuffer::ID) {
-    PickleIterator iter(message);
+    base::PickleIterator iter(message);
     int request_id;
     CHECK(iter.ReadInt(&request_id));
     base::SharedMemoryHandle shm_handle;
@@ -117,7 +119,7 @@ static int RequestIDForMessage(const IPC::Message& msg) {
     case ResourceMsg_DataReceived::ID:
     case ResourceMsg_DataDownloaded::ID:
     case ResourceMsg_RequestComplete::ID: {
-      bool result = PickleIterator(msg).ReadInt(&request_id);
+      bool result = base::PickleIterator(msg).ReadInt(&request_id);
       DCHECK(result);
       break;
     }
@@ -442,7 +444,7 @@ class URLRequestBigJob : public net::URLRequestSimpleJob {
   }
 
   base::TaskRunner* GetTaskRunner() const override {
-    return base::MessageLoopProxy::current().get();
+    return base::ThreadTaskRunnerHandle::Get().get();
   }
 
  private:
@@ -917,12 +919,12 @@ class ResourceDispatcherHostTest : public testing::Test,
     EXPECT_EQ(ResourceMsg_DataReceived::ID, msg.type());
 
     int request_id = -1;
-    bool result = PickleIterator(msg).ReadInt(&request_id);
+    bool result = base::PickleIterator(msg).ReadInt(&request_id);
     DCHECK(result);
     scoped_ptr<IPC::Message> ack(
         new ResourceHostMsg_DataReceived_ACK(request_id));
 
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&GenerateIPCMessage, filter_, base::Passed(&ack)));
   }
@@ -1007,7 +1009,7 @@ void CheckRequestCompleteErrorCode(const IPC::Message& message,
 
   ASSERT_EQ(ResourceMsg_RequestComplete::ID, message.type());
 
-  PickleIterator iter(message);
+  base::PickleIterator iter(message);
   ASSERT_TRUE(IPC::ReadParam(&message, &iter, &request_id));
   ASSERT_TRUE(IPC::ReadParam(&message, &iter, &error_code));
   ASSERT_EQ(expected_error_code, error_code);
@@ -1016,7 +1018,7 @@ void CheckRequestCompleteErrorCode(const IPC::Message& message,
 testing::AssertionResult ExtractDataOffsetAndLength(const IPC::Message& message,
                                                     int* data_offset,
                                                     int* data_length) {
-  PickleIterator iter(message);
+  base::PickleIterator iter(message);
   int request_id;
   if (!IPC::ReadParam(&message, &iter, &request_id))
     return testing::AssertionFailure() << "Could not read request_id";
@@ -1047,7 +1049,7 @@ void CheckSuccessfulRequestWithErrorCode(
 
   ASSERT_EQ(ResourceMsg_SetDataBuffer::ID, messages[1].type());
 
-  PickleIterator iter(messages[1]);
+  base::PickleIterator iter(messages[1]);
   int request_id;
   ASSERT_TRUE(IPC::ReadParam(&messages[1], &iter, &request_id));
   base::SharedMemoryHandle shm_handle;
@@ -3013,7 +3015,7 @@ TEST_F(ResourceDispatcherHostTest, DownloadToFile) {
   size_t total_len = 0;
   for (size_t i = 1; i < messages.size() - 1; i++) {
     ASSERT_EQ(ResourceMsg_DataDownloaded::ID, messages[i].type());
-    PickleIterator iter(messages[i]);
+    base::PickleIterator iter(messages[i]);
     int request_id, data_len;
     ASSERT_TRUE(IPC::ReadParam(&messages[i], &iter, &request_id));
     ASSERT_TRUE(IPC::ReadParam(&messages[i], &iter, &data_len));

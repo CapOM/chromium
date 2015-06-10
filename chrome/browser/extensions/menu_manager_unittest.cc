@@ -6,6 +6,7 @@
 
 #include "base/files/scoped_temp_dir.h"
 #include "base/json/json_reader.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "base/message_loop/message_loop.h"
 #include "base/prefs/pref_service.h"
@@ -24,6 +25,7 @@
 #include "content/public/common/context_menu_params.h"
 #include "content/public/test/test_browser_thread.h"
 #include "extensions/browser/event_router.h"
+#include "extensions/browser/event_router_factory.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/extension_system.h"
 #include "extensions/common/extension.h"
@@ -481,26 +483,10 @@ class MockEventRouter : public EventRouter {
   DISALLOW_COPY_AND_ASSIGN(MockEventRouter);
 };
 
-// A mock ExtensionSystem to serve our MockEventRouter.
-class MockExtensionSystem : public TestExtensionSystem {
- public:
-  explicit MockExtensionSystem(Profile* profile)
-      : TestExtensionSystem(profile) {}
-
-  EventRouter* event_router() override {
-    if (!mock_event_router_)
-      mock_event_router_.reset(new MockEventRouter(profile_));
-    return mock_event_router_.get();
-  }
-
- private:
-  scoped_ptr<MockEventRouter> mock_event_router_;
-
-  DISALLOW_COPY_AND_ASSIGN(MockExtensionSystem);
-};
-
-KeyedService* BuildMockExtensionSystem(content::BrowserContext* profile) {
-  return new MockExtensionSystem(static_cast<Profile*>(profile));
+// MockEventRouter factory function
+scoped_ptr<KeyedService> MockEventRouterFactoryFunction(
+    content::BrowserContext* context) {
+  return make_scoped_ptr(new MockEventRouter(static_cast<Profile*>(context)));
 }
 
 }  // namespace
@@ -561,12 +547,9 @@ TEST_F(MenuManagerTest, RemoveOneByOne) {
 
 TEST_F(MenuManagerTest, ExecuteCommand) {
   TestingProfile profile;
-
-  MockExtensionSystem* mock_extension_system =
-      static_cast<MockExtensionSystem*>(ExtensionSystemFactory::GetInstance()->
-          SetTestingFactoryAndUse(&profile, &BuildMockExtensionSystem));
-  MockEventRouter* mock_event_router =
-      static_cast<MockEventRouter*>(mock_extension_system->event_router());
+  MockEventRouter* mock_event_router = static_cast<MockEventRouter*>(
+      EventRouterFactory::GetInstance()->SetTestingFactoryAndUse(
+          &profile, &MockEventRouterFactoryFunction));
 
   content::ContextMenuParams params;
   params.media_type = blink::WebContextMenuData::MediaTypeImage;

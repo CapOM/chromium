@@ -18,7 +18,6 @@ import android.os.PowerManager;
 import android.provider.Browser;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.widget.ListView;
 
@@ -37,7 +36,6 @@ import org.chromium.chrome.browser.ChromeMobileApplication;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
 import org.chromium.chrome.browser.DeferredStartupHandler;
-import org.chromium.chrome.browser.EmptyTabObserver;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.document.ChromeLauncherActivity;
 import org.chromium.chrome.browser.document.DocumentActivity;
@@ -68,13 +66,11 @@ import org.chromium.chrome.test.util.ApplicationData;
 import org.chromium.chrome.test.util.ChromeTabUtils;
 import org.chromium.chrome.test.util.MenuUtils;
 import org.chromium.chrome.test.util.NewTabPageTestUtils;
-import org.chromium.chrome.test.util.OmniboxTestUtils;
 import org.chromium.chrome.test.util.TestHttpServerClient;
 import org.chromium.content.browser.test.util.CallbackHelper;
 import org.chromium.content.browser.test.util.Criteria;
 import org.chromium.content.browser.test.util.CriteriaHelper;
 import org.chromium.content.browser.test.util.JavaScriptUtils;
-import org.chromium.content.browser.test.util.KeyUtils;
 import org.chromium.content.browser.test.util.RenderProcessLimit;
 import org.chromium.content.browser.test.util.TestTouchUtils;
 import org.chromium.content.browser.test.util.TouchCommon;
@@ -90,7 +86,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -117,6 +112,8 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
     private static final String PERF_OUTPUT_FILE = "PerfTestData.txt";
 
     private static final long OMNIBOX_FIND_SUGGESTION_TIMEOUT_MS = 10 * 1000;
+
+    private static final float FLOAT_EPSILON = 0.001f;
 
     public ChromeActivityTestCaseBase(Class<T> activityClass) {
         super(activityClass);
@@ -692,67 +689,6 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
     }
 
     /**
-     * Types the passed text in the omnibox to trigger a navigation. You can pass a URL or a search
-     * term.
-     * <p>
-     * Note that this code triggers suggestions and prerendering.  Unless you are testing these
-     * features specifically, you should use loadUrl() which is less prone to flakyness.
-     * @param url The Url to navigate to.
-     * @return the url in the UrlBar.
-     * @throws InterruptedException
-     */
-    public String typeInOmniboxAndNavigate(final String url) throws InterruptedException {
-        final UrlBar urlBar = (UrlBar) getActivity().findViewById(R.id.url_bar);
-        assertNotNull("urlBar is null", urlBar);
-        getInstrumentation().runOnMainSync(new Runnable() {
-            @Override
-            public void run() {
-                urlBar.requestFocus();
-                urlBar.setText(url);
-            }
-        });
-        final LocationBarLayout locationBar =
-                (LocationBarLayout) getActivity().findViewById(R.id.location_bar);
-        assertTrue("Omnibox Suggestions never shown.",
-                OmniboxTestUtils.waitForOmniboxSuggestions(locationBar));
-
-        Tab currentTab = getActivity().getActivityTab();
-        final CallbackHelper loadedCallback = new CallbackHelper();
-        final AtomicBoolean tabCrashReceived = new AtomicBoolean();
-        currentTab.addObserver(new EmptyTabObserver() {
-            @Override
-            public void onPageLoadFinished(Tab tab) {
-                loadedCallback.notifyCalled();
-                tab.removeObserver(this);
-            }
-
-            @Override
-            public void onCrash(Tab tab, boolean sadTabShown) {
-                tabCrashReceived.set(true);
-                tab.removeObserver(this);
-            }
-        });
-
-        // Loads the url.
-        KeyUtils.singleKeyEventView(getInstrumentation(), urlBar, KeyEvent.KEYCODE_ENTER);
-
-        boolean pageLoadReceived = true;
-        try {
-            loadedCallback.waitForCallback(0);
-        } catch (TimeoutException ex) {
-            pageLoadReceived = false;
-        }
-
-        assertTrue("Neither PAGE_LOAD_FINISHED nor a TAB_CRASHED event was received",
-                pageLoadReceived || tabCrashReceived.get());
-        getInstrumentation().waitForIdleSync();
-
-        // The title has been set before the page notification was broadcast, so it is safe to
-        // access the title.
-        return urlBar.getText().toString();
-    }
-
-    /**
      * Looks up the Omnibox in the view hierarchy and types the specified
      * text into it, requesting focus and using an inter-character delay of
      * 200ms.
@@ -941,8 +877,8 @@ public abstract class ChromeActivityTestCaseBase<T extends ChromeActivity>
         boolean scaleFactorMatch = CriteriaHelper.pollForCriteria(new Criteria() {
             @Override
             public boolean isSatisfied() {
-                return getActivity().getCurrentContentViewCore().getScale()
-                        == expectedScale;
+                return Math.abs(getActivity().getCurrentContentViewCore().getScale()
+                        - expectedScale) < FLOAT_EPSILON;
             }
         });
         assertTrue("Expecting scale factor of: " + expectedScale + ", got: "

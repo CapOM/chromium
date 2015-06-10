@@ -551,7 +551,7 @@ class VisitRelayingRenderProcessHost : public MockRenderProcessHost {
             GetBrowserContext());
 
     if (msg->type() == ChromeViewMsg_VisitedLink_Add::ID) {
-      PickleIterator iter(*msg);
+      base::PickleIterator iter(*msg);
       std::vector<uint64> fingerprints;
       CHECK(IPC::ReadParam(msg, &iter, &fingerprints));
       counting_context->CountAddEvent(fingerprints.size());
@@ -680,7 +680,7 @@ TEST_F(VisitedLinkEventsTest, Coalescense) {
 }
 
 TEST_F(VisitedLinkEventsTest, Basics) {
-  RenderViewHostTester::For(rvh())->CreateRenderView(
+  RenderViewHostTester::For(rvh())->CreateTestRenderView(
       base::string16(), MSG_ROUTING_NONE, MSG_ROUTING_NONE, -1, false);
 
   // Add a few URLs.
@@ -704,7 +704,7 @@ TEST_F(VisitedLinkEventsTest, Basics) {
 }
 
 TEST_F(VisitedLinkEventsTest, TabVisibility) {
-  RenderViewHostTester::For(rvh())->CreateRenderView(
+  RenderViewHostTester::For(rvh())->CreateTestRenderView(
       base::string16(), MSG_ROUTING_NONE, MSG_ROUTING_NONE, -1, false);
 
   // Simulate tab becoming inactive.

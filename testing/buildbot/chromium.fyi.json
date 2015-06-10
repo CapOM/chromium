@@ -4,7 +4,7 @@
       {
         "args": [
           "--enable-browser-side-navigation",
-          "--gtest_filter=-BookmarkletTest.DocumentWrite:BookmarkletTest.NonEmptyResult:BookmarkletTest.Redirect:BookmarkletTest.RedirectVoided:CrossSiteRedirectorBrowserTest.VerifyCrossSiteRedirectURL:CrossSiteTransferTest.NoLeakOnCrossSiteCancel:CrossSiteTransferTest.ReplaceEntryCrossProcessThenTransfer:CrossSiteTransferTest.ReplaceEntryCrossProcessTwice:CrossSiteTransferTest.ReplaceEntryInProcessThenTranfers:DatabaseTest.ReloadPage:NavigationControllerBrowserTest.CorrectLengthWithCurrentItemReplacement:NavigationControllerBrowserTest.FrameNavigationEntry_BlankAutoSubframe:NavigationControllerBrowserTest.NavigationTypeClassification_ClientSideRedirect:NavigationControllerBrowserTest.NavigationTypeClassification_ExistingPage:NavigationControllerBrowserTest.NavigationTypeClassification_InPage:NavigationControllerBrowserTest.NavigationTypeClassification_NewAndAutoSubframe:NavigationControllerBrowserTest.NavigationTypeClassification_NewPage:NavigationControllerBrowserTest.PreventSpoofFromSubframeAndReplace:NavigationControllerBrowserTest.StopCausesFailureDespiteJavaScriptURL:NavigationControllerBrowserTest.SubframeBackFromReplaceState:RFHMProcessPerTabTest.BackFromWebUI:RenderFrameHostManagerTest.BackForwardNotStale:RenderFrameHostManagerTest.DisownOpener:RenderFrameHostManagerTest.RendererDebugURLsDontSwap:RenderFrameHostManagerTest.RestoreFileAccessForHistoryNavigation:RenderFrameHostManagerTest.RestoreSubframeFileAccessForHistoryNavigation:RenderFrameHostManagerTest.SwappedOutViewHasCorrectVisibilityState:RenderViewImplTest.DecideNavigationPolicy:RenderViewImplTest.NavigationStartOverride:RenderViewImplTest.OnNavigationHttpPost:RenderViewImplTest.ReloadWhileSwappedOut:RenderViewImplTest.StaleNavigationsIgnored:RenderViewImplTest.TestBackForward:SecurityExploitBrowserTest.AttemptDuplicateRenderViewHost:SecurityExploitBrowserTest.AttemptDuplicateRenderWidgetHost:SecurityExploitBrowserTest.InterstitialCommandFromUnderlyingContent:ServiceWorkerBrowserTest.CrossSiteTransfer:ServiceWorkerBrowserTest.ImportsBustMemcache:ServiceWorkerBrowserTest.Reload:ServiceWorkerBrowserTest.ResponseFromHTTPServiceWorkerIsNotMarkedAsSecure:ServiceWorkerBrowserTest.ResponseFromHTTPSServiceWorkerIsMarkedAsSecure:SessionHistoryTest.BasicBackForward:SessionHistoryTest.CrossFrameFormBackForward:SessionHistoryTest.FragmentBackForward:SessionHistoryTest.FrameBackForward:SessionHistoryTest.FrameFormBackForward:SessionHistoryTest.HistoryLength:SessionHistoryTest.JavascriptHistory:SessionHistoryTest.LocationChangeInSubframe:SitePerProcessBrowserTest.CompositorFrameSwapped:SitePerProcessBrowserTest.CreateChildFrameAfterKillingProcess:SitePerProcessBrowserTest.CreateProxiesForNewFrames:SitePerProcessBrowserTest.CrossSiteDidStopLoading:SitePerProcessBrowserTest.DynamicSandboxFlags:SitePerProcessBrowserTest.KillingRendererClearsDescendantProxies:SitePerProcessBrowserTest.NavigateRemoteFrameToKilledProcess:SitePerProcessBrowserTest.NavigateRemoteFrameToKilledProcessWithSubtree:SitePerProcessBrowserTest.NavigateWithSiblingRemoteFrame:SitePerProcessBrowserTest.NavigatingToKilledProcessRestoresAllProxies:SitePerProcessBrowserTest.OriginUpdatesReachProxies:SitePerProcessBrowserTest.ProxyCreationSkipsSubtree:SitePerProcessBrowserTest.SubframePostMessage:WebContentsImplBrowserTest.ClearNonVisiblePendingOnFail:WebContentsImplBrowserTest.GetSizeForNewRenderView:WebContentsViewAuraTest.OverscrollScreenshot:WebContentsViewAuraTest.ReplaceStateReloadPushState:WebUIMojoTest.EndToEndPing"
+          "--gtest_filter=-CrossSiteRedirectorBrowserTest.VerifyCrossSiteRedirectURL:CrossSiteTransferTest.NoLeakOnCrossSiteCancel:CrossSiteTransferTest.ReplaceEntryCrossProcessThenTransfer:CrossSiteTransferTest.ReplaceEntryCrossProcessTwice:CrossSiteTransferTest.ReplaceEntryInProcessThenTranfers:DevToolsProtocolTest.NavigationPreservesMessages:NavigationControllerBrowserTest.CorrectLengthWithCurrentItemReplacement:NavigationControllerBrowserTest.FrameNavigationEntry_BlankAutoSubframe:NavigationControllerBrowserTest.NavigationTypeClassification_ClientSideRedirect:NavigationControllerBrowserTest.NavigationTypeClassification_ExistingPage:NavigationControllerBrowserTest.NavigationTypeClassification_InPage:NavigationControllerBrowserTest.NavigationTypeClassification_NewAndAutoSubframe:NavigationControllerBrowserTest.NavigationTypeClassification_NewPage:NavigationControllerBrowserTest.PreventSpoofFromSubframeAndReplace:NavigationControllerBrowserTest.StopCausesFailureDespiteJavaScriptURL:RenderViewImplTest.DecideNavigationPolicy:RenderViewImplTest.NavigationStartOverride:RenderViewImplTest.OnNavigationHttpPost:RenderViewImplTest.ReloadWhileSwappedOut:RenderViewImplTest.TestBackForward:SecurityExploitBrowserTest.AttemptDuplicateRenderViewHost:SecurityExploitBrowserTest.AttemptDuplicateRenderWidgetHost:SecurityExploitBrowserTest.InterstitialCommandFromUnderlyingContent:ServiceWorkerBrowserTest.CrossSiteTransfer:ServiceWorkerBrowserTest.ImportsBustMemcache:ServiceWorkerBrowserTest.Reload:ServiceWorkerBrowserTest.ResponseFromHTTPServiceWorkerIsNotMarkedAsSecure:ServiceWorkerBrowserTest.ResponseFromHTTPSServiceWorkerIsMarkedAsSecure:SessionHistoryTest.CrossFrameFormBackForward:SessionHistoryTest.FrameBackForward:SessionHistoryTest.FrameFormBackForward:SessionHistoryTest.LocationChangeInSubframe:SitePerProcessBrowserTest.CrossSiteDidStopLoading:WebContentsImplBrowserTest.ClearNonVisiblePendingOnFail:WebContentsViewAuraTest.ReplaceStateReloadPushState:WebRtcBrowserTest.CallInsideIframe:WebUIMojoTest.EndToEndPing"
         ],
         "test": "content_browsertests"
       },
@@ -282,6 +282,9 @@
       },
       {
         "test": "mojo_system_unittests"
+      },
+      {
+        "test": "nacl_helper_nonsfi_unittests"
       },
       {
         "test": "nacl_loader_unittests"
@@ -2366,16 +2369,9 @@
         "test": "angle_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "base_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true,
-          "shards": 10
-        },
         "test": "browser_tests"
       },
       {
@@ -2388,27 +2384,15 @@
         "test": "components_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "content_browsertests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "content_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "courgette_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "crypto_unittests"
       },
       {
@@ -2442,9 +2426,6 @@
         "test": "midi_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "net_unittests"
       },
       {
@@ -2478,9 +2459,6 @@
         "test": "ui_base_unittests"
       },
       {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
         "test": "unit_tests"
       },
       {
@@ -2880,6 +2858,9 @@
         "test": "mojo_system_unittests"
       },
       {
+        "test": "nacl_helper_nonsfi_unittests"
+      },
+      {
         "test": "nacl_loader_unittests"
       },
       {
@@ -3049,6 +3030,9 @@
       },
       {
         "test": "mojo_system_unittests"
+      },
+      {
+        "test": "nacl_helper_nonsfi_unittests"
       },
       {
         "test": "nacl_loader_unittests"
@@ -3228,6 +3212,9 @@
         "test": "mojo_system_unittests"
       },
       {
+        "test": "nacl_helper_nonsfi_unittests"
+      },
+      {
         "test": "nacl_loader_unittests"
       },
       {
@@ -3399,6 +3386,9 @@
         "test": "mojo_system_unittests"
       },
       {
+        "test": "nacl_helper_nonsfi_unittests"
+      },
+      {
         "test": "nacl_loader_unittests"
       },
       {
@@ -3464,14 +3454,14 @@
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-AppApiTest.*:BlockedAppApiTest.*:BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeAppAPITest.*:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExecuteScriptApiTest.ExecuteScriptPermissions:ExtensionApiTest.ActiveTab:ExtensionApiTest.ChromeRuntimeOpenOptionsPage:ExtensionApiTest.ContentScriptExtensionIframe:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionBrowserTest.LoadChromeExtensionsWithOptionsParamWhenEmbedded:ExtensionCrxInstallerTest.InstallDelayedUntilNextUpdate:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionWebUITest.CanEmbedExtensionOptions:ExtensionWebUITest.ReceivesExtensionOptionsOnClose:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.Load*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PlatformAppUrlRedirectorBrowserTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewCommonTest.*:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
+          "--gtest_filter=-AppApiTest.*:BlockedAppApiTest.*:BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeAppAPITest.*:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExecuteScriptApiTest.ExecuteScriptPermissions:ExtensionApiTest.ActiveTab:ExtensionApiTest.ChromeRuntimeOpenOptionsPage:ExtensionApiTest.ContentScriptExtensionIframe:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionBrowserTest.LoadChromeExtensionsWithOptionsParamWhenEmbedded:ExtensionCrxInstallerTest.InstallDelayedUntilNextUpdate:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionWebUITest.CanEmbedExtensionOptions:ExtensionWebUITest.ReceivesExtensionOptionsOnClose:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PlatformAppUrlRedirectorBrowserTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewCommonTest.*:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
         ],
         "test": "browser_tests"
       },
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-*.DontPreemptNavigationWithFrameTreeUpdate:*.ProcessExitWithSwappedOutViews:*.SupportCrossProcessPostMessageWithMessagePort"
+          "--gtest_filter=-*.AllowTargetedNavigationsAfterSwap:*.DisownOpener:*.SupportCrossProcessPostMessageWithMessagePort"
         ],
         "test": "content_browsertests"
       },
@@ -3494,14 +3484,14 @@
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-AppApiTest.*:BlockedAppApiTest.*:BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeAppAPITest.*:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExecuteScriptApiTest.ExecuteScriptPermissions:ExtensionApiTest.ActiveTab:ExtensionApiTest.ChromeRuntimeOpenOptionsPage:ExtensionApiTest.ContentScriptExtensionIframe:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionBrowserTest.LoadChromeExtensionsWithOptionsParamWhenEmbedded:ExtensionCrxInstallerTest.InstallDelayedUntilNextUpdate:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionWebUITest.CanEmbedExtensionOptions:ExtensionWebUITest.ReceivesExtensionOptionsOnClose:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.Load*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PlatformAppUrlRedirectorBrowserTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewCommonTest.*:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
+          "--gtest_filter=-AppApiTest.*:BlockedAppApiTest.*:BrowserTest.ClearPendingOnFailUnlessNTP:BrowserTest.OtherRedirectsDontForkProcess:BrowserTest.WindowOpenClose:ChromeAppAPITest.*:ChromeRenderProcessHostTest.*:ChromeRenderProcessHostTestWithCommandLine.*:DevToolsExperimentalExtensionTest.*:DevToolsExtensionTest.*:DnsProbeBrowserTest.*:ErrorPageTest.*:ExecuteScriptApiTest.ExecuteScriptPermissions:ExtensionApiTest.ActiveTab:ExtensionApiTest.ChromeRuntimeOpenOptionsPage:ExtensionApiTest.ContentScriptExtensionIframe:ExtensionApiTest.ContentScriptOtherExtensions:ExtensionApiTest.ContentScriptExtensionProcess:ExtensionApiTest.Tabs2:ExtensionApiTest.TabsOnUpdated:ExtensionApiTest.WindowOpenPopupIframe:ExtensionBrowserTest.LoadChromeExtensionsWithOptionsParamWhenEmbedded:ExtensionCrxInstallerTest.InstallDelayedUntilNextUpdate:ExtensionOptionsApiTest.ExtensionCanEmbedOwnOptions:ExtensionWebUITest.CanEmbedExtensionOptions:ExtensionWebUITest.ReceivesExtensionOptionsOnClose:InlineLoginUISafeIframeBrowserTest.*:IsolatedAppTest.*:LaunchWebAuthFlowFunctionTest.*:MimeHandlerViewTest.*:*.NewAvatarMenuEnabledInGuestMode:OptionsUIBrowserTest.*:*PDFExtensionTest.*:PhishingClassifierTest.*:PhishingDOMFeatureExtractorTest.*:PlatformAppUrlRedirectorBrowserTest.*:PopupBlockerBrowserTest.*:PrerenderBrowserTest.*:ProcessManagementTest.*:RedirectTest.*:ReferrerPolicyTest.*:SSLUITest.*:WebNavigationApiTest.CrossProcessFragment:WebNavigationApiTest.ServerRedirectSingleProcess:WebNavigationApiTest.CrossProcessHistory:WebViewCommonTest.*:WebViewDPITest.*:WebViewPluginTest.*:WebViewTest.*:ZoomControllerBrowserTest.*:*.NavigateFromNTPToOptionsInSameTab:*.ProfilesWithoutPagesNotLaunched:*.TabMove:*.WhitelistedExtension:*.NewTabPageURL:*.HomepageLocation:RestoreOnStartupPolicyTest*:PhishingClassifierDelegateTest.*:WebUIWebViewBrowserTest*:WebRtcBrowserTest.RunsAudioVideoWebRTCCallInTwoTabs"
         ],
         "test": "browser_tests"
       },
       {
         "args": [
           "--site-per-process",
-          "--gtest_filter=-*.DontPreemptNavigationWithFrameTreeUpdate:*.ProcessExitWithSwappedOutViews:*.SupportCrossProcessPostMessageWithMessagePort"
+          "--gtest_filter=-*.AllowTargetedNavigationsAfterSwap:*.DisownOpener:*.SupportCrossProcessPostMessageWithMessagePort"
         ],
         "test": "content_browsertests"
       },

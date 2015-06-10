@@ -27,6 +27,7 @@
 #include "base/time/time.h"
 #include "content/browser/appcache/appcache_interceptor.h"
 #include "content/browser/appcache/chrome_appcache_service.h"
+#include "content/browser/bad_message.h"
 #include "content/browser/cert_store_impl.h"
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/download/download_resource_handler.h"
@@ -981,14 +982,14 @@ bool ResourceDispatcherHostImpl::OnMessageReceived(
   IPC_END_MESSAGE_MAP()
 
   if (!handled && IPC_MESSAGE_ID_CLASS(message.type()) == ResourceMsgStart) {
-    PickleIterator iter(message);
+    base::PickleIterator iter(message);
     int request_id = -1;
     bool ok = iter.ReadInt(&request_id);
     DCHECK(ok);
     GlobalRequestID id(filter_->child_id(), request_id);
     DelegateMap::iterator it = delegate_map_.find(id);
     if (it != delegate_map_.end()) {
-      ObserverList<ResourceMessageDelegate>::Iterator del_it(it->second);
+      base::ObserverList<ResourceMessageDelegate>::Iterator del_it(it->second);
       ResourceMessageDelegate* delegate;
       while (!handled && (delegate = del_it.GetNext()) != NULL) {
         handled = delegate->OnMessageReceived(message);
@@ -1095,7 +1096,7 @@ void ResourceDispatcherHostImpl::UpdateRequestForTransfer(
     DelegateMap::iterator it = delegate_map_.find(old_request_id);
     if (it != delegate_map_.end()) {
       // Tell each delegate that the request ID has changed.
-      ObserverList<ResourceMessageDelegate>::Iterator del_it(it->second);
+      base::ObserverList<ResourceMessageDelegate>::Iterator del_it(it->second);
       ResourceMessageDelegate* delegate;
       while ((delegate = del_it.GetNext()) != NULL) {
         delegate->set_request_id(new_request_id);
@@ -1133,8 +1134,7 @@ void ResourceDispatcherHostImpl::BeginRequest(
   // Reject invalid priority.
   if (request_data.priority < net::MINIMUM_PRIORITY ||
       request_data.priority > net::MAXIMUM_PRIORITY) {
-    RecordAction(base::UserMetricsAction("BadMessageTerminate_RDH"));
-    filter_->BadMessageReceived();
+    bad_message::ReceivedBadMessage(filter_, bad_message::RDH_INVALID_PRIORITY);
     return;
   }
 
@@ -1159,8 +1159,8 @@ void ResourceDispatcherHostImpl::BeginRequest(
 
       deferred_loader->CompleteTransfer();
     } else {
-      RecordAction(base::UserMetricsAction("BadMessageTerminate_RDH"));
-      filter_->BadMessageReceived();
+      bad_message::ReceivedBadMessage(
+          filter_, bad_message::RDH_REQUEST_NOT_TRANSFERRING);
     }
     return;
   }
@@ -1354,8 +1354,7 @@ scoped_ptr<ResourceHandler> ResourceDispatcherHostImpl::CreateResourceHandler(
   if (sync_result) {
     // download_to_file is not supported for synchronous requests.
     if (request_data.download_to_file) {
-      RecordAction(base::UserMetricsAction("BadMessageTerminate_RDH"));
-      filter_->BadMessageReceived();
+      bad_message::ReceivedBadMessage(filter_, bad_message::RDH_BAD_DOWNLOAD);
       return scoped_ptr<ResourceHandler>();
     }
 
@@ -2311,7 +2310,10 @@ void ResourceDispatcherHostImpl::RegisterResourceMessageDelegate(
   DelegateMap::iterator it = delegate_map_.find(id);
   if (it == delegate_map_.end()) {
     it = delegate_map_.insert(
-        std::make_pair(id, new ObserverList<ResourceMessageDelegate>)).first;
+                           std::make_pair(
+                               id,
+                               new base::ObserverList<ResourceMessageDelegate>))
+             .first;
   }
   it->second->AddObserver(delegate);
 }
@@ -2350,11 +2352,6 @@ int ResourceDispatcherHostImpl::BuildLoadFlagsForRequest(
 
   ChildProcessSecurityPolicyImpl* policy =
       ChildProcessSecurityPolicyImpl::GetInstance();
-  if (!policy->CanSendCookiesForOrigin(child_id, request_data.url)) {
-    load_flags |= (net::LOAD_DO_NOT_SEND_COOKIES |
-                   net::LOAD_DO_NOT_SEND_AUTH_DATA |
-                   net::LOAD_DO_NOT_SAVE_COOKIES);
-  }
 
   // Raw headers are sensitive, as they include Cookie/Set-Cookie, so only
   // allow requesting them if requester has ReadRawCookies permission.

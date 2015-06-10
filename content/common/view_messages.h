@@ -42,7 +42,7 @@
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
 #include "third_party/WebKit/public/platform/WebFloatRect.h"
 #include "third_party/WebKit/public/platform/WebScreenInfo.h"
-#include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
+#include "third_party/WebKit/public/platform/modules/screen_orientation/WebScreenOrientationType.h"
 #include "third_party/WebKit/public/web/WebDeviceEmulationParams.h"
 #include "third_party/WebKit/public/web/WebFindOptions.h"
 #include "third_party/WebKit/public/web/WebMediaPlayerAction.h"
@@ -758,11 +758,6 @@ IPC_MESSAGE_ROUTED2(ViewMsg_SetWebUIProperty,
 //     false Stop sending IPC message ViewHostMsg_ImeUpdateTextInputState.
 IPC_MESSAGE_ROUTED1(ViewMsg_SetInputMethodActive,
                     bool /* is_active */)
-
-// IME API oncandidatewindow* events for InputMethodContext.
-IPC_MESSAGE_ROUTED0(ViewMsg_CandidateWindowShown)
-IPC_MESSAGE_ROUTED0(ViewMsg_CandidateWindowUpdated)
-IPC_MESSAGE_ROUTED0(ViewMsg_CandidateWindowHidden)
 
 // Used to notify the render-view that we have received a target URL. Used
 // to prevent target URLs spamming the browser.

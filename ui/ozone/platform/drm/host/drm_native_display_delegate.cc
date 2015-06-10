@@ -35,12 +35,14 @@ void DrmNativeDisplayDelegate::GrabServer() {
 void DrmNativeDisplayDelegate::UngrabServer() {
 }
 
-bool DrmNativeDisplayDelegate::TakeDisplayControl() {
-  return display_manager_->TakeDisplayControl();
+void DrmNativeDisplayDelegate::TakeDisplayControl(
+    const DisplayControlCallback& callback) {
+  display_manager_->TakeDisplayControl(callback);
 }
 
-bool DrmNativeDisplayDelegate::RelinquishDisplayControl() {
-  return display_manager_->RelinquishDisplayControl();
+void DrmNativeDisplayDelegate::RelinquishDisplayControl(
+    const DisplayControlCallback& callback) {
+  display_manager_->RelinquishDisplayControl(callback);
 }
 
 void DrmNativeDisplayDelegate::SyncWithServer() {

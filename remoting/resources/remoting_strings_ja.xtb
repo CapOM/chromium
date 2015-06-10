@@ -7,7 +7,6 @@
 <translation id="2676780859508944670">処理しています...</translation>
 <translation id="6062854958530969723">ホストを初期化できませんでした。</translation>
 <translation id="5843054235973879827">この操作が安全な理由</translation>
-<translation id="5895138241574237353">再起動</translation>
 <translation id="5619148062500147964">このパソコンへの接続</translation>
 <translation id="4068946408131579958">すべての接続</translation>
 <translation id="2208514473086078157">ポリシー設定により、Chrome リモート デスクトップのホストとしてこのパソコンを共有することはできません。詳しくはシステム管理者にお問い合わせください。</translation>
@@ -255,8 +254,6 @@ US英語以外のキーボードを使用しているリモートパソコンで
 <translation id="6570205395680337606">アプリケーションをリセットします。保存されていない作業は失われます。</translation>
 <translation id="6284412385303060032">コンソールのログイン画面で実行されるホストは、カーテンモードをサポートするために終了されました（ユーザー固有のセッションで実行されるホストに切り替えられました）。</translation>
 <translation id="3596628256176442606">このサービスにより、Chromoting クライアントからの着信接続が有効になります。</translation>
-<translation id="1978866438647250517">• ユーザー インターフェースが改善されました。
-• バックグラウンド実行時のネットワーク使用量が削減されました。</translation>
 <translation id="4741792197137897469">認証できませんでした。Chrome にもう一度ログインしてください。</translation>
 <translation id="4277463233460010382">このパソコンは、1 つ以上のクライアントが PIN の入力なしで接続できるように設定されています。</translation>
 <translation id="837021510621780684">このパソコンからの接続</translation>

@@ -5,7 +5,7 @@
 #ifndef NET_CERT_CERT_DATABASE_H_
 #define NET_CERT_CERT_DATABASE_H_
 
-#include "base/basictypes.h"
+#include "base/macros.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "net/base/net_export.h"
@@ -14,7 +14,8 @@
 template <typename T> struct DefaultSingletonTraits;
 
 namespace base {
-template <class ObserverType> class ObserverListThreadSafe;
+template <class ObserverType>
+class ObserverListThreadSafe;
 }
 
 namespace net {

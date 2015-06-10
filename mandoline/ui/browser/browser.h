@@ -15,7 +15,6 @@
 #include "mojo/application/public/cpp/application_delegate.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/connect.h"
-#include "mojo/application/public/cpp/service_provider_impl.h"
 #include "mojo/common/weak_binding_set.h"
 #include "ui/mojo/events/input_events.mojom.h"
 #include "url/gurl.h"
@@ -27,7 +26,7 @@ class ViewManagerInit;
 namespace mandoline {
 
 class BrowserUI;
-class MergedServiceProvider;
+class FrameTree;
 
 class Browser : public mojo::ApplicationDelegate,
                 public mojo::ViewManagerDelegate,
@@ -56,10 +55,11 @@ class Browser : public mojo::ApplicationDelegate,
       mojo::ApplicationConnection* connection) override;
 
   // Overridden from mojo::ViewManagerDelegate:
-  void OnEmbed(mojo::View* root,
-               mojo::InterfaceRequest<mojo::ServiceProvider> services,
-               mojo::ServiceProviderPtr exposed_services) override;
-  void OnViewManagerDisconnected(mojo::ViewManager* view_manager) override;
+  void OnEmbed(mojo::View* root) override;
+  void OnEmbedForDescendant(mojo::View* view,
+                            mojo::URLRequestPtr request,
+                            mojo::ViewManagerClientPtr* client) override;
+  void OnViewManagerDestroyed(mojo::ViewManager* view_manager) override;
 
   // Overridden from ViewManagerRootClient:
   void OnAccelerator(mojo::EventPtr event) override;
@@ -68,9 +68,7 @@ class Browser : public mojo::ApplicationDelegate,
   void OpenURL(const mojo::String& url) override;
 
   // Overridden from ViewEmbedder:
-  void Embed(mojo::URLRequestPtr request,
-             mojo::InterfaceRequest<mojo::ServiceProvider> services,
-             mojo::ServiceProviderPtr exposed_services) override;
+  void Embed(mojo::URLRequestPtr request) override;
 
   // Overridden from mojo::InterfaceFactory<mojo::NavigatorHost>:
   void Create(mojo::ApplicationConnection* connection,
@@ -80,9 +78,7 @@ class Browser : public mojo::ApplicationDelegate,
   void Create(mojo::ApplicationConnection* connection,
               mojo::InterfaceRequest<ViewEmbedder> request) override;
 
-  void ShowOmnibox(mojo::URLRequestPtr request,
-                   mojo::InterfaceRequest<mojo::ServiceProvider> services,
-                   mojo::ServiceProviderPtr exposed_services);
+  void ShowOmnibox(mojo::URLRequestPtr request);
 
   scoped_ptr<mojo::ViewManagerInit> view_manager_init_;
 
@@ -94,9 +90,6 @@ class Browser : public mojo::ApplicationDelegate,
   std::string default_url_;
   mojo::URLRequestPtr pending_request_;
 
-  mojo::ServiceProviderImpl exposed_services_impl_;
-  scoped_ptr<MergedServiceProvider> merged_service_provider_;
-
   mojo::WeakBindingSet<ViewEmbedder> view_embedder_bindings_;
 
   NavigatorHostImpl navigator_host_;
@@ -105,6 +98,8 @@ class Browser : public mojo::ApplicationDelegate,
 
   scoped_ptr<BrowserUI> ui_;
   mojo::ApplicationImpl* app_;
+
+  scoped_ptr<FrameTree> frame_tree_;
 
   DISALLOW_COPY_AND_ASSIGN(Browser);
 };

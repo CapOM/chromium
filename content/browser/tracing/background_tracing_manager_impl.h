@@ -15,13 +15,15 @@
 
 namespace content {
 
+class TracingDelegate;
+
 class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
  public:
   static BackgroundTracingManagerImpl* GetInstance();
 
   bool SetActiveScenario(scoped_ptr<BackgroundTracingConfig>,
                          const ReceiveCallback&,
-                         bool) override;
+                         DataFiltering data_filtering) override;
   void WhenIdle(IdleCallback idle_callback) override;
 
   void TriggerNamedEvent(TriggerHandle, StartedFinalizingCallback) override;
@@ -29,12 +31,15 @@ class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
   void GetTriggerNameList(std::vector<std::string>* trigger_names) override;
 
   void InvalidateTriggerHandlesForTesting() override;
+  void SetTracingEnabledCallbackForTesting(
+      const base::Closure& callback) override;
+  void FireTimerForTesting() override;
 
  private:
   BackgroundTracingManagerImpl();
   ~BackgroundTracingManagerImpl() override;
 
-  void EnableRecording(base::trace_event::CategoryFilter);
+  void EnableRecording(std::string, base::trace_event::TraceRecordMode);
   void EnableRecordingIfConfigNeedsIt();
   void OnFinalizeStarted(scoped_refptr<base::RefCountedString>);
   void OnFinalizeComplete();
@@ -46,7 +51,7 @@ class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
   bool IsAbleToTriggerTracing(TriggerHandle handle) const;
   bool IsSupportedConfig(BackgroundTracingConfig* config);
 
-  base::trace_event::CategoryFilter GetCategoryFilterForCategoryPreset(
+  std::string GetCategoryFilterStringForCategoryPreset(
       BackgroundTracingConfig::CategoryPreset) const;
 
   class TraceDataEndpointWrapper
@@ -63,9 +68,28 @@ class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
     base::Callback<void(scoped_refptr<base::RefCountedString>)> done_callback_;
   };
 
+  class TracingTimer {
+   public:
+    explicit TracingTimer(StartedFinalizingCallback);
+    ~TracingTimer();
+
+    void StartTimer();
+    void CancelTimer();
+
+    void FireTimerForTesting();
+
+   private:
+    void TracingTimerFired();
+
+    base::OneShotTimer<TracingTimer> tracing_timer_;
+    StartedFinalizingCallback callback_;
+  };
+
+  scoped_ptr<TracingDelegate> delegate_;
   scoped_ptr<content::BackgroundTracingConfig> config_;
   scoped_refptr<TraceDataEndpointWrapper> data_endpoint_wrapper_;
   std::map<TriggerHandle, std::string> trigger_handles_;
+  scoped_ptr<TracingTimer> tracing_timer_;
   ReceiveCallback receive_callback_;
 
   bool is_gathering_;
@@ -74,6 +98,7 @@ class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
   int trigger_handle_ids_;
 
   IdleCallback idle_callback_;
+  base::Closure tracing_enabled_callback_for_testing_;
 
   friend struct base::DefaultLazyInstanceTraits<BackgroundTracingManagerImpl>;
 

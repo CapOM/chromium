@@ -36,8 +36,8 @@
 #include "ui/views/widget/widget_hwnd_utils.h"
 #include "ui/views/win/fullscreen_handler.h"
 #include "ui/views/win/hwnd_message_handler.h"
+#include "ui/views/win/hwnd_util.h"
 #include "ui/wm/core/compound_event_filter.h"
-#include "ui/wm/core/input_method_event_filter.h"
 #include "ui/wm/core/window_animations.h"
 #include "ui/wm/public/scoped_tooltip_disabler.h"
 
@@ -207,11 +207,15 @@ aura::WindowTreeHost* DesktopWindowTreeHostWin::AsWindowTreeHost() {
 
 void DesktopWindowTreeHostWin::ShowWindowWithState(
     ui::WindowShowState show_state) {
+  if (compositor())
+    compositor()->SetVisible(true);
   message_handler_->ShowWindowWithState(show_state);
 }
 
 void DesktopWindowTreeHostWin::ShowMaximizedWithBounds(
     const gfx::Rect& restored_bounds) {
+  if (compositor())
+    compositor()->SetVisible(true);
   gfx::Rect pixel_bounds = gfx::win::DIPToScreenRect(restored_bounds);
   message_handler_->ShowMaximizedWithBounds(pixel_bounds);
 }
@@ -228,6 +232,12 @@ void DesktopWindowTreeHostWin::SetSize(const gfx::Size& size) {
       gfx::Vector2d(expanded.width() - size_in_pixels.width(),
                     expanded.height() - size_in_pixels.height());
   message_handler_->SetSize(expanded);
+}
+
+void DesktopWindowTreeHostWin::StackAbove(aura::Window* window) {
+  HWND hwnd = HWNDForNativeView(window);
+  if (hwnd)
+    message_handler_->StackAbove(hwnd);
 }
 
 void DesktopWindowTreeHostWin::StackAtTop() {
@@ -410,8 +420,11 @@ void DesktopWindowTreeHostWin::SetFullscreen(bool fullscreen) {
   // TODO(sky): workaround for ScopedFullscreenVisibility showing window
   // directly. Instead of this should listen for visibility changes and then
   // update window.
-  if (message_handler_->IsVisible() && !content_window_->TargetVisibility())
+  if (message_handler_->IsVisible() && !content_window_->TargetVisibility()) {
+    if (compositor())
+      compositor()->SetVisible(true);
     content_window_->Show();
+  }
   SetWindowTransparency();
 }
 
@@ -469,11 +482,11 @@ gfx::AcceleratedWidget DesktopWindowTreeHostWin::GetAcceleratedWidget() {
   return message_handler_->hwnd();
 }
 
-void DesktopWindowTreeHostWin::Show() {
+void DesktopWindowTreeHostWin::ShowImpl() {
   message_handler_->Show();
 }
 
-void DesktopWindowTreeHostWin::Hide() {
+void DesktopWindowTreeHostWin::HideImpl() {
   if (!pending_close_)
     message_handler_->Hide();
 }
@@ -550,13 +563,6 @@ void DesktopWindowTreeHostWin::MoveCursorToNative(const gfx::Point& location) {
   POINT cursor_location = location.ToPOINT();
   ::ClientToScreen(GetHWND(), &cursor_location);
   ::SetCursorPos(cursor_location.x, cursor_location.y);
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// DesktopWindowTreeHostWin, ui::EventSource implementation:
-
-ui::EventProcessor* DesktopWindowTreeHostWin::GetEventProcessor() {
-  return dispatcher();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -671,16 +677,8 @@ void DesktopWindowTreeHostWin::ResetWindowControls() {
   GetWidget()->non_client_view()->ResetWindowControls();
 }
 
-void DesktopWindowTreeHostWin::PaintLayeredWindow(gfx::Canvas* canvas) {
-  GetWidget()->GetRootView()->Paint(ui::PaintContext(canvas));
-}
-
 gfx::NativeViewAccessible DesktopWindowTreeHostWin::GetNativeViewAccessible() {
   return GetWidget()->GetRootView()->GetNativeViewAccessible();
-}
-
-InputMethod* DesktopWindowTreeHostWin::GetInputMethod() {
-  return GetWidget()->GetInputMethodDirect();
 }
 
 bool DesktopWindowTreeHostWin::ShouldHandleSystemCommands() const {
@@ -856,15 +854,13 @@ bool DesktopWindowTreeHostWin::HandleIMEMessage(UINT message,
   msg.message = message;
   msg.wParam = w_param;
   msg.lParam = l_param;
-  return desktop_native_widget_aura_->input_method_event_filter()->
-      input_method()->OnUntranslatedIMEMessage(msg, result);
+  return GetInputMethod()->OnUntranslatedIMEMessage(msg, result);
 }
 
 void DesktopWindowTreeHostWin::HandleInputLanguageChange(
     DWORD character_set,
     HKL input_language_id) {
-  desktop_native_widget_aura_->input_method_event_filter()->
-      input_method()->OnInputLocaleChanged();
+  GetInputMethod()->OnInputLocaleChanged();
 }
 
 void DesktopWindowTreeHostWin::HandlePaintAccelerated(

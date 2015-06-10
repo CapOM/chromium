@@ -7,11 +7,13 @@
 #include <string>
 
 #include "base/bind.h"
+#include "base/location.h"
 #include "base/logging.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/metrics/sparse_histogram.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/browser/byte_stream.h"
 #include "content/browser/download/download_create_info.h"
 #include "content/browser/download/download_interrupt_reasons_impl.h"
@@ -191,7 +193,7 @@ bool DownloadResourceHandler::OnResponseStarted(
   // Create the ByteStream for sending data to the download sink.
   scoped_ptr<ByteStreamReader> stream_reader;
   CreateByteStream(
-      base::MessageLoopProxy::current(),
+      base::ThreadTaskRunnerHandle::Get(),
       BrowserThread::GetMessageLoopProxyForThread(BrowserThread::FILE),
       kDownloadByteStreamSize, &stream_writer_, &stream_reader);
   stream_writer_->RegisterCallback(
@@ -419,6 +421,10 @@ void DownloadResourceHandler::OnResponseCompleted(
       case net::HTTP_UNAUTHORIZED:
         // Server didn't authorize this request.
         reason = DOWNLOAD_INTERRUPT_REASON_SERVER_UNAUTHORIZED;
+        break;
+      case net::HTTP_FORBIDDEN:
+        // Server forbids access to this resource.
+        reason = DOWNLOAD_INTERRUPT_REASON_SERVER_FORBIDDEN;
         break;
       default:    // All other errors.
         // Redirection and informational codes should have been handled earlier

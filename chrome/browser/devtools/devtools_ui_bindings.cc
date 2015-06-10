@@ -337,6 +337,9 @@ void DevToolsUIBindings::FrontendWebContentsObserver::RenderProcessGone(
   switch (status) {
     case base::TERMINATION_STATUS_ABNORMAL_TERMINATION:
     case base::TERMINATION_STATUS_PROCESS_WAS_KILLED:
+#if defined(OS_CHROMEOS)
+    case base::TERMINATION_STATUS_PROCESS_WAS_KILLED_BY_OOM:
+#endif
     case base::TERMINATION_STATUS_PROCESS_CRASHED:
       if (devtools_bindings_->agent_host_.get())
         devtools_bindings_->Detach();
@@ -775,6 +778,7 @@ void DevToolsUIBindings::RecordEnumeratedHistogram(const std::string& name,
                                                    int boundary_value) {
   if (!(boundary_value >= 0 && boundary_value <= 100 && sample >= 0 &&
         sample < boundary_value)) {
+    // TODO(nick): Replace with chrome::bad_message::ReceivedBadMessage().
     frontend_host_->BadMessageRecieved();
     return;
   }

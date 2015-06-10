@@ -76,3 +76,7 @@ Local Modifications:
 
 - Correct fix for crbug/479220 (replace IsSystemLibrary() with caller flags).
 
+- Fix link_map_.l_addr (was load address, should be load bias).
+
+- Convert packed relocation code to handle Android packed relocations.
+

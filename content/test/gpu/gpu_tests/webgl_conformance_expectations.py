@@ -32,9 +32,13 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     # Fails on all platforms
     self.Fail('deqp/data/gles2/shaders/constant_expressions.html',
         bug=478572)
+    self.Fail('deqp/data/gles2/shaders/constants.html',
+        bug=478572)
     self.Fail('deqp/data/gles2/shaders/fragdata.html',
         bug=478572)
     self.Fail('deqp/data/gles2/shaders/functions.html',
+        bug=478572)
+    self.Fail('deqp/data/gles2/shaders/linkage.html',
         bug=478572)
     self.Fail('deqp/data/gles2/shaders/preprocessor.html',
         bug=478572)
@@ -46,9 +50,6 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         bug=485634)
 
     # Win failures
-    self.Fail('conformance/glsl/misc/' +
-              'ternary-operators-in-global-initializers.html',
-        ['win'], bug=415694)
     self.Fail('conformance/glsl/bugs/' +
               'pow-of-small-constant-in-user-defined-function.html',
         ['win'], bug=485641)
@@ -64,8 +65,6 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['win7', 'intel'])
     self.Fail('conformance/rendering/gl-viewport-test.html',
         ['win7', 'intel'], bug=372511)
-    self.Fail('conformance/glsl/misc/shader-with-array-of-structs-uniform.html',
-        ['win7', 'intel', 'nvidia'], bug=373972)
 
     # Win / AMD flakiness seen on new tryservers (affecting most tests
     # randomly, must investigate ASAP)
@@ -105,6 +104,59 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['win', 'd3d9'], bug=896) # angle bug ID
     self.Skip('conformance/extensions/oes-texture-half-float-with-canvas.html',
         ['win', 'd3d9'], bug=896) # angle bug ID
+
+    # Win / OpenGL failures
+    self.Fail('conformance/attribs/gl-disabled-vertex-attrib.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/attribs/gl-disabled-vertex-attrib.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/canvas/canvas-test.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/canvas/draw-webgl-to-canvas-test.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/canvas/' +
+        'draw-static-webgl-to-multiple-canvas-test.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/canvas/to-data-url-test.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/context/' +
+        'context-attribute-preserve-drawing-buffer.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/context/'+
+        'context-attributes-alpha-depth-stencil-antialias.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/context/premultiplyalpha-test.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/extensions/ext-sRGB.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/extensions/oes-texture-float-with-canvas.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/extensions/oes-texture-float.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/extensions/oes-texture-half-float.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/extensions/oes-texture-half-float-with-canvas.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/glsl/variables/gl-pointcoord.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/reading/read-pixels-pack-alignment.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/renderbuffers/framebuffer-object-attachment.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/textures/gl-pixelstorei.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/textures/tex-image-canvas-corruption.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('deqp/data/gles2/shaders/conditionals.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('deqp/data/gles2/shaders/conversions.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('deqp/data/gles2/shaders/qualification_order.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+
+    # Skip all WebGL CTS on OpenGL+AMD/Intel
+    self.Skip('*', ['win', 'opengl', 'amd'], bug=1007) # angle bug ID
+    self.Skip('*', ['win', 'opengl', 'intel'], bug=1007) # angle bug ID
 
     # Mac failures
     self.Fail('conformance/glsl/misc/shaders-with-invariance.html',
@@ -264,6 +316,20 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['android'], bug=478572)
     self.Fail('deqp/data/gles2/shaders/linkage.html',
         ['android'], bug=478572)
+    self.Fail('conformance/textures/tex-image-and-sub-image-2d-with-video.html',
+        ['android', 'android-webview-shell'], bug=352645)
+    self.Fail('conformance/textures/' +
+        'tex-image-and-sub-image-2d-with-video-rgb565.html',
+        ['android', 'android-webview-shell'], bug=352645)
+    self.Fail('conformance/textures/' +
+        'tex-image-and-sub-image-2d-with-video-rgba4444.html',
+        ['android', 'android-webview-shell'], bug=352645)
+    self.Fail('conformance/textures/' +
+        'tex-image-and-sub-image-2d-with-video-rgba5551.html',
+        ['android', 'android-webview-shell'], bug=352645)
+    self.Fail('conformance/textures/texture-npot-video.html',
+        ['android', 'android-webview-shell'], bug=352645)
+
 
     # The following test is very slow and therefore times out on Android bot.
     self.Skip('conformance/rendering/multisample-corruption.html',
@@ -275,20 +341,6 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['android'], bug=315976)
     self.Fail('conformance/glsl/misc/gl_position_unset.vert.html',
         ['android'], bug=315976)
-    # The following tests are disabled due to security issues.
-    self.Fail('conformance/textures/tex-image-and-sub-image-2d-with-video.html',
-        ['android'], bug=334204)
-    self.Fail('conformance/textures/' +
-        'tex-image-and-sub-image-2d-with-video-rgb565.html',
-        ['android'], bug=334204)
-    self.Fail('conformance/textures/' +
-        'tex-image-and-sub-image-2d-with-video-rgba4444.html',
-        ['android'], bug=334204)
-    self.Fail('conformance/textures/' +
-        'tex-image-and-sub-image-2d-with-video-rgba5551.html',
-        ['android'], bug=334204)
-    self.Fail('conformance/textures/texture-npot-video.html',
-        ['android'], bug=334204)
 
     # ChromeOS: affecting all devices.
     self.Fail('conformance/extensions/webgl-depth-texture.html',
@@ -397,9 +449,7 @@ class WebGLConformanceExpectations(GpuTestExpectations):
 
     self.Fail('deqp/data/gles3/shaders/arrays.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/constants.html', bug=483282)
-    self.Fail('deqp/data/gles3/shaders/constant_expressions.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/conversions.html', bug=483282)
-    self.Fail('deqp/data/gles3/shaders/fragdata.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/functions.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/linkage.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/preprocessor.html', bug=483282)
@@ -415,26 +465,44 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Fail('conformance2/attribs/gl-vertexattribipointer.html', bug=483282)
     self.Fail('conformance2/attribs/gl-vertexattribipointer-offsets.html',
         bug=483282)
-
-    self.Fail('conformance2/context/constants-and-properties-2.html',
-        bug=483282)
-
-    self.Fail('conformance2/core/draw-buffers.html', bug=483282)
-    self.Fail('conformance2/core/frag-depth.html', bug=483282)
-    self.Fail('conformance2/core/tex-mipmap-levels.html', bug=483282)
-
-    self.Fail('conformance2/core/tex-new-formats.html', bug=483282)
-    self.Fail('conformance2/core/tex-storage-2d.html', bug=483282)
-    self.Fail('conformance2/core/tex-storage-and-subimage-3d.html', bug=483282)
-    self.Fail('conformance2/core/texture-npot.html', bug=483282)
-
-    self.Fail('conformance2/glsl3/misplaced-version-directive.html', bug=483282)
-
-    self.Fail('conformance2/state/gl-get-calls.html', bug=483282)
-    self.Fail('conformance2/state/gl-object-get-calls.html', bug=483282)
-
     self.Fail('conformance2/buffers/buffer-copying-contents.html', bug=483282)
     self.Fail('conformance2/buffers/buffer-copying-restrictions.html',
         bug=483282)
     self.Fail('conformance2/buffers/buffer-type-restrictions.html', bug=483282)
     self.Fail('conformance2/buffers/getBufferSubData.html', bug=483282)
+    self.Fail('conformance2/context/constants-and-properties-2.html',
+        bug=483282)
+
+    self.Fail('conformance2/glsl3/array-complex-indexing.html', bug=483282)
+    self.Fail('conformance2/glsl3/frag-depth.html', bug=483282)
+    self.Fail('conformance2/glsl3/invalid-default-precision.html', bug=483282)
+    self.Fail('conformance2/glsl3/sequence-operator-returns-non-constant.html',
+        bug=483282)
+    self.Fail('conformance2/glsl3/ternary-operator-on-arrays-glsl3.html',
+        bug=483282)
+    self.Fail('conformance2/misc/instanceof-test.html', bug=483282)
+    self.Fail('conformance2/renderbuffers/framebuffer-test.html', bug=483282)
+    self.Fail('conformance2/rendering/draw-buffers.html', bug=483282)
+    self.Fail('conformance2/state/gl-get-calls.html', bug=483282)
+    self.Fail('conformance2/state/gl-object-get-calls.html', bug=483282)
+    self.Fail('conformance2/textures/gl-get-tex-parameter.html', bug=483282)
+    self.Fail('conformance2/textures/tex-input-validation.html', bug=483282)
+    self.Fail('conformance2/textures/tex-mipmap-levels.html', bug=483282)
+    self.Fail('conformance2/textures/tex-new-formats.html', bug=483282)
+    self.Fail('conformance2/textures/tex-storage-2d.html', bug=483282)
+    self.Fail('conformance2/textures/texture-npot.html', bug=483282)
+    self.Fail('conformance2/transform_feedback/transform_feedback.html',
+        bug=483282)
+
+    # Mac only.
+    self.Fail('conformance2/renderbuffers/' +
+        'multisampled-renderbuffer-initialization.html',
+        ['mac'], bug=483282)
+    self.Fail('conformance2/rendering/instanced-arrays.html',
+        ['mac'], bug=483282)
+    self.Fail('conformance2/textures/tex-storage-and-subimage-3d.html',
+        ['mac'], bug=483282)
+
+    # Win only (using OpenGL).
+    self.Fail('conformance2/textures/tex-storage-and-subimage-3d.html',
+        ['win'], bug=483282)

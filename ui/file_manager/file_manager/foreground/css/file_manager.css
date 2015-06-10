@@ -268,7 +268,9 @@ body.check-select .dialog-header {
 
 .dialog-header button {
   cursor: pointer;
+  position: relative;
   text-transform: uppercase;
+  z-index: 1;
 }
 
 .dialog-header button,
@@ -316,7 +318,7 @@ body.check-select .dialog-header
   display: none !important;
 }
 
-.dialog-header core-icon,
+.dialog-header iron-icon,
 .dialog-header .icon {
   height: 16px;
   width: 16px;
@@ -342,7 +344,7 @@ body.check-select .dialog-header
   width: 32px;
 }
 
-.dialog-header button.icon-button > core-icon {
+.dialog-header button.icon-button > iron-icon {
   margin: 8px;
 }
 
@@ -427,7 +429,7 @@ body.check-select #gear-button {
   width: 24px;
 }
 
-#cloud-import-details-button core-icon {
+#cloud-import-details-button iron-icon {
   margin: 8px 4px;
 }
 
@@ -480,7 +482,7 @@ html[dir='rtl'] #cloud-import-details {
   margin-top: .2em;
 }
 
-#cloud-import-details .status core-icon {
+#cloud-import-details .status iron-icon {
   display: block;
   height: 16px;
   opacity: .6;
@@ -501,6 +503,22 @@ html[dir='rtl'] #cloud-import-details {
 #cloud-import-details .status .destination-link {
   color: #1BA8F3;
   cursor: pointer;
+}
+
+#cloud-import-details .progress {
+  height: 4px;
+  background-color: #E0E0E0;
+  border-radius: 2px;
+  margin-top: 14px;
+  width: 100%;
+}
+
+#cloud-import-details .progress .value {
+  background-color: #1AC222;
+  border-radius: 2px;
+  height: 4px;
+  transition: width 0.1s linear;
+  width: 0%;
 }
 
 #cloud-import-details paper-button {
@@ -547,7 +565,7 @@ body.check-select #files-selected-label {
   width: 240px;  /* initial value, same as .dialog-navigation-list's width. */
 }
 
-#cancel-selection-button > core-icon {
+#cancel-selection-button > iron-icon {
   -webkit-margin-end: 6px;
 }
 
@@ -582,21 +600,28 @@ body.check-select #search-box {
   -webkit-appearance: none;
 }
 
-#search-box paper-input-decorator {
+#search-box paper-input-container {
   margin-top: -4px;
 }
 
-#search-box paper-input-decorator /deep/ ::-webkit-input-placeholder {
+#search-box paper-input-container /deep/ ::-webkit-input-placeholder {
   color: rgba(255, 255, 255, 0.5);
 }
 
-#search-box paper-input-decorator /deep/ .unfocused-underline {
+#search-box paper-input-container /deep/ .unfocused-line {
   background-color: rgba(255, 255, 255, 0.3);
 }
 
-#search-box paper-input-decorator /deep/ .focused-underline {
+#search-box paper-input-container /deep/ .focused-line {
   background-color: white;
   height: 1px;
+}
+
+#search-box paper-input-container /deep/ .input-content ::content input {
+  color: inherit;
+  font: inherit;
+  margin: 0.5em 0 0.25em;
+  padding: 0;
 }
 
 #search-box.has-cursor,
@@ -740,18 +765,26 @@ html[dir='rtl'] #search-box .clear {
   margin: 3px 0 !important;
 }
 
-.dialog-footer paper-input-decorator {
+.dialog-footer select {
+  min-height: 21px;
+}
+
+.dialog-footer paper-input-container {
   color: rgb(51, 51, 51);
   padding: 4px 0;
   width: 100%;
 }
 
-.dialog-footer paper-input-decorator /deep/ .unfocused-underline {
+.dialog-footer paper-input-container /deep/ .unfocused-line {
   background-color: rgb(207, 207, 207);
 }
 
-.dialog-footer paper-input-decorator /deep/ .focused-underline {
+.dialog-footer paper-input-container /deep/ .focused-line {
   background-color: rgb(33, 150, 243);
+}
+
+.dialog-footer paper-input-container /deep/ .input-content ::content input {
+  font: inherit;
 }
 
 .dialog-footer select {
@@ -1290,7 +1323,7 @@ html[dir='rtl'] .badge {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre;
 }
 
 /* Text box used for renaming in the detail list. */
@@ -1790,7 +1823,7 @@ list.autocomplete-suggestions {
   flex: none;
   margin-top: 10px;
   overflow: hidden;
-  padding: 0;
+  padding: 8px 0;
   position: fixed;
   width: 260px !important; /* This overrides the value specified by script. */
   z-index: 550;
@@ -1799,17 +1832,17 @@ list.autocomplete-suggestions {
 list.autocomplete-suggestions > li {
   align-items: center;
   display: flex;
-  height: 40px;
+  height: 32px;
 }
 
 list.autocomplete-suggestions > li > div.detail-icon {
-  margin: 0 3px;
+  height: 32px;
+  width: 32px;
   flex: none;
 }
 
 list.autocomplete-suggestions > li > div.detail-text {
   flex: auto;
-  margin: 0 4px;
   overflow-x: hidden;
   text-overflow: ellipsis;
 }
@@ -1827,7 +1860,7 @@ list.autocomplete-suggestions > li > div[search-icon] {
 
 list.autocomplete-suggestions > [selected],
 list.autocomplete-suggestions > [lead] {
-  background-color: rgb(222, 243, 254);
+  background-color: rgba(0, 0, 0, 0.08);
 }
 
 #gear-menu {

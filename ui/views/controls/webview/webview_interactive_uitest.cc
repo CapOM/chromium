@@ -44,8 +44,7 @@ class WebViewInteractiveUiTest : public views::test::WidgetTest {
 
   void SetUp() override {
     gfx::GLSurface::InitializeOneOffForTests();
-    // The ViewsDelegate is deleted when the ViewsTestBase class is torn down.
-    WidgetTest::set_views_delegate(new WebViewTestViewsDelegate);
+    set_views_delegate(make_scoped_ptr(new WebViewTestViewsDelegate));
     WidgetTest::SetUp();
   }
 
@@ -92,8 +91,8 @@ TEST_F(WebViewInteractiveUiTest, TextInputClientIsUpToDate) {
   content::WebContents* web_contents1 = webview->GetWebContents();
   web_contents1->GetRenderViewHost()->GetProcess()->Init();
   content::RenderViewHostTester::For(web_contents1->GetRenderViewHost())
-      ->CreateRenderView(base::string16(), MSG_ROUTING_NONE, MSG_ROUTING_NONE,
-                         -1, false);
+      ->CreateTestRenderView(base::string16(), MSG_ROUTING_NONE,
+                             MSG_ROUTING_NONE, -1, false);
   webview->RequestFocus();
   ui::TextInputClient* client1 = webview->GetTextInputClient();
   EXPECT_NE(nullptr, client1);
@@ -105,8 +104,8 @@ TEST_F(WebViewInteractiveUiTest, TextInputClientIsUpToDate) {
                                                         nullptr));
   web_contents2->GetRenderViewHost()->GetProcess()->Init();
   content::RenderViewHostTester::For(web_contents2->GetRenderViewHost())
-      ->CreateRenderView(base::string16(), MSG_ROUTING_NONE, MSG_ROUTING_NONE,
-                         -1, false);
+      ->CreateTestRenderView(base::string16(), MSG_ROUTING_NONE,
+                             MSG_ROUTING_NONE, -1, false);
   webview->SetWebContents(web_contents2.get());
   ui::TextInputClient* client2 = webview->GetTextInputClient();
   EXPECT_NE(nullptr, client2);

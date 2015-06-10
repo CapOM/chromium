@@ -68,8 +68,8 @@ void BrowserPluginManager::Detach(int browser_plugin_instance_id) {
 
 BrowserPlugin* BrowserPluginManager::CreateBrowserPlugin(
     RenderFrame* render_frame,
-    scoped_ptr<BrowserPluginDelegate> delegate) {
-  return new BrowserPlugin(render_frame, delegate.Pass());
+    BrowserPluginDelegate* delegate) {
+  return new BrowserPlugin(render_frame, delegate);
 }
 
 void BrowserPluginManager::DidCommitCompositorFrame(
@@ -92,7 +92,7 @@ bool BrowserPluginManager::OnControlMessageReceived(
   int browser_plugin_instance_id = browser_plugin::kInstanceIDNone;
   // All allowed messages must have |browser_plugin_instance_id| as their
   // first parameter.
-  PickleIterator iter(message);
+  base::PickleIterator iter(message);
   bool success = iter.ReadInt(&browser_plugin_instance_id);
   DCHECK(success);
   BrowserPlugin* plugin = GetBrowserPlugin(browser_plugin_instance_id);

@@ -815,6 +815,10 @@ const size_t kMaxMessageQueueSize = 262144;
   self.webScrollView.zoomScale = zoomScale;
 }
 
+-(BOOL)shouldAbortLoadForCancelledURL:(const GURL&)cancelledURL {
+  return YES;
+}
+
 #pragma mark - JS to ObjC messaging
 
 - (void)respondToJSInvoke {
@@ -1353,6 +1357,10 @@ const size_t kMaxMessageQueueSize = 262144;
 
 - (void)wasRedirectedToRequest:(NSURLRequest*)request
               redirectResponse:(NSURLResponse*)response {
+  // This callback can be received after -close is called; ignore it.
+  if (self.isBeingDestroyed)
+    return;
+
   // Register the redirected load request if it originated from the main page
   // load.
   GURL redirectedURL = net::GURLWithNSURL(response.URL);

@@ -21,8 +21,8 @@
 #include "base/strings/string_util.h"
 #include "crypto/openssl_util.h"
 #include "crypto/scoped_openssl_types.h"
+#include "net/base/ip_address_number.h"
 #include "net/base/net_errors.h"
-#include "net/base/net_util.h"
 #include "net/cert/x509_util_openssl.h"
 
 #if defined(OS_ANDROID)
@@ -343,8 +343,8 @@ bool X509Certificate::IsSameOSCert(X509Certificate::OSCertHandle a,
 }
 
 // static
-X509Certificate::OSCertHandle
-X509Certificate::ReadOSCertHandleFromPickle(PickleIterator* pickle_iter) {
+X509Certificate::OSCertHandle X509Certificate::ReadOSCertHandleFromPickle(
+    base::PickleIterator* pickle_iter) {
   const char* data;
   int length;
   if (!pickle_iter->ReadData(&data, &length))
@@ -355,7 +355,7 @@ X509Certificate::ReadOSCertHandleFromPickle(PickleIterator* pickle_iter) {
 
 // static
 bool X509Certificate::WriteOSCertHandleToPickle(OSCertHandle cert_handle,
-                                                Pickle* pickle) {
+                                                base::Pickle* pickle) {
   base::StringPiece der;
   if (!x509_util::GetDER(cert_handle, &der))
     return false;

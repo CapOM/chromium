@@ -429,6 +429,16 @@ const Experiment::Choice kFloatingVirtualKeyboardChoices[] = {
     keyboard::switches::kFloatingVirtualKeyboardEnabled},
 };
 
+const Experiment::Choice kSmartVirtualKeyboardChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
+    keyboard::switches::kSmartVirtualKeyboard,
+    keyboard::switches::kSmartVirtualKeyboardDisabled},
+  { IDS_GENERIC_EXPERIMENT_CHOICE_ENABLED,
+    keyboard::switches::kSmartVirtualKeyboard,
+    keyboard::switches::kSmartVirtualKeyboardEnabled},
+};
+
 const Experiment::Choice kGestureTypingChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
   { IDS_GENERIC_EXPERIMENT_CHOICE_DISABLED,
@@ -1137,14 +1147,6 @@ const Experiment kExperiments[] = {
         password_manager::switches::kDisablePasswordLink)
   },
   {
-     "enable-password-save-in-page-navigation",
-     IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_NAME,
-     IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_DESCRIPTION,
-     kOsAll,
-     SINGLE_VALUE_TYPE(
-             autofill::switches::kEnablePasswordSaveOnInPageNavigation)
-  },
-  {
     "enable-affiliation-based-matching",
     IDS_FLAGS_ENABLE_AFFILIATION_BASED_MATCHING_NAME,
     IDS_FLAGS_ENABLE_AFFILIATION_BASED_MATCHING_DESCRIPTION,
@@ -1410,6 +1412,13 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kFloatingVirtualKeyboardChoices)
   },
   {
+    "smart-virtual-keyboard",
+    IDS_FLAGS_SMART_VIRTUAL_KEYBOARD_NAME,
+    IDS_FLAGS_SMART_VIRTUAL_KEYBOARD_DESCRIPTION,
+    kOsCrOS,
+    MULTI_VALUE_TYPE(kSmartVirtualKeyboardChoices)
+  },
+  {
     "gesture-typing",
     IDS_FLAGS_GESTURE_TYPING_NAME,
     IDS_FLAGS_GESTURE_TYPING_DESCRIPTION,
@@ -1424,11 +1433,11 @@ const Experiment kExperiments[] = {
     MULTI_VALUE_TYPE(kGestureEditingChoices)
   },
   {
-    "disable-smart-virtual-keyboard",
-    IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_NAME,
-    IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_DESCRIPTION,
+    "enable-fullscreen-app-list",
+    IDS_FLAGS_FULLSCREEN_APP_LIST_NAME,
+    IDS_FLAGS_FULLSCREEN_APP_LIST_DESCRIPTION,
     kOsCrOS,
-    SINGLE_VALUE_TYPE(keyboard::switches::kDisableSmartVirtualKeyboard)
+    SINGLE_VALUE_TYPE(ash::switches::kAshEnableFullscreenAppList)
   },
 #endif
   {
@@ -1861,6 +1870,13 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kDisableThreadedScrolling)
   },
   {
+    "invert-viewport-scroll-order",
+    IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_NAME,
+    IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_DESCRIPTION,
+    kOsAll,
+    SINGLE_VALUE_TYPE(switches::kInvertViewportScrollOrder)
+  },
+  {
     "bleeding-edge-renderer-mode",
     IDS_FLAGS_BLEEDING_RENDERER_NAME,
     IDS_FLAGS_BLEEDING_RENDERER_DESCRIPTION,
@@ -1967,6 +1983,14 @@ const Experiment kExperiments[] = {
     kOsAndroid,
     SINGLE_VALUE_TYPE(
         data_reduction_proxy::switches::kEnableDataReductionProxyAlt)
+  },
+  {
+    "enable-data-reduction-proxy-carrier-test",
+    IDS_FLAGS_ENABLE_DATA_REDUCTION_PROXY_CARRIER_TEST_NAME,
+    IDS_FLAGS_ENABLE_DATA_REDUCTION_PROXY_CARRIER_TEST_DESCRIPTION,
+    kOsAndroid,
+    SINGLE_VALUE_TYPE(
+        data_reduction_proxy::switches::kEnableDataReductionProxyCarrierTest)
   },
 #endif
   {
@@ -2397,6 +2421,24 @@ const Experiment kExperiments[] = {
     SINGLE_VALUE_TYPE(switches::kEnableWebRtcDtls12)
   },
 #endif
+#if defined(OS_MACOSX)
+  {
+    "app-info-dialog",
+    IDS_FLAGS_APP_INFO_DIALOG_NAME,
+    IDS_FLAGS_APP_INFO_DIALOG_DESCRIPTION,
+    kOsMac,
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableAppInfoDialogMac,
+                              switches::kDisableAppInfoDialogMac)
+  },
+  {
+    "mac-views-native-app-windows",
+    IDS_FLAGS_MAC_VIEWS_NATIVE_APP_WINDOWS_NAME,
+    IDS_FLAGS_MAC_VIEWS_NATIVE_APP_WINDOWS_DESCRIPTION,
+    kOsMac,
+    ENABLE_DISABLE_VALUE_TYPE(switches::kEnableMacViewsNativeAppWindows,
+                              switches::kDisableMacViewsNativeAppWindows)
+  },
+#endif
   // NOTE: Adding new command-line switches requires adding corresponding
   // entries to enum "LoginCustomFlags" in histograms.xml. See note in
   // histograms.xml and don't forget to run AboutFlagsHistogramTest unit test.
@@ -2521,6 +2563,15 @@ bool SkipConditionalExperiment(const Experiment& experiment,
   // enable-data-reduction-proxy-lo-fi is only available for Chromium builds and
   // the Canary/Dev channel.
   if (!strcmp("enable-data-reduction-proxy-lo-fi", experiment.internal_name) &&
+      channel != chrome::VersionInfo::CHANNEL_DEV &&
+      channel != chrome::VersionInfo::CHANNEL_CANARY &&
+      channel != chrome::VersionInfo::CHANNEL_UNKNOWN) {
+    return true;
+  }
+  // enable-data-reduction-proxy-carrier-test is only available for Chromium
+  // builds and the Canary/Dev channel.
+  if (!strcmp("enable-data-reduction-proxy-carrier-test",
+              experiment.internal_name) &&
       channel != chrome::VersionInfo::CHANNEL_DEV &&
       channel != chrome::VersionInfo::CHANNEL_CANARY &&
       channel != chrome::VersionInfo::CHANNEL_UNKNOWN) {

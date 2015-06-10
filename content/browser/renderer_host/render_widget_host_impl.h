@@ -310,11 +310,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   // display input method windows under the cursor.)
   void SetInputMethodActive(bool activate);
 
-  // Notifies the renderer changes of IME candidate window state.
-  void CandidateWindowShown();
-  void CandidateWindowUpdated();
-  void CandidateWindowHidden();
-
   // Update the composition node of the renderer (or WebKit).
   // WebKit has a special node (a composition node) for input method to change
   // its text without affecting any other DOM nodes. When the input method
@@ -483,6 +478,10 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   gfx::NativeViewAccessible GetParentNativeViewAccessible();
 #endif
 
+  void set_renderer_initialized(bool renderer_initialized) {
+    renderer_initialized_ = renderer_initialized;
+  }
+
  protected:
   RenderWidgetHostImpl* AsRenderWidgetHostImpl() override;
 
@@ -556,10 +555,6 @@ class CONTENT_EXPORT RenderWidgetHostImpl
   int decrement_in_flight_event_count() {
     DCHECK_GT(in_flight_event_count_, 0);
     return --in_flight_event_count_;
-  }
-
-  void set_renderer_initialized(bool renderer_initialized) {
-    renderer_initialized_ = renderer_initialized;
   }
 
   bool renderer_initialized() const { return renderer_initialized_; }

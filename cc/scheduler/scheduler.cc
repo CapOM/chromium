@@ -7,6 +7,7 @@
 #include <algorithm>
 
 #include "base/auto_reset.h"
+#include "base/debug/stack_trace.h"
 #include "base/logging.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/single_thread_task_runner.h"
@@ -226,6 +227,8 @@ void Scheduler::DidSwapBuffers() {
 }
 
 void Scheduler::DidSwapBuffersComplete() {
+  DCHECK_GT(state_machine_.pending_swaps(), 0)
+      << AsValue()->ToString() << base::debug::StackTrace().ToString();
   state_machine_.DidSwapBuffersComplete();
   ProcessScheduledActions();
 }
@@ -353,6 +356,7 @@ bool Scheduler::OnBeginFrameMixInDelegate(const BeginFrameArgs& args) {
   // TODO(brianderson): Adjust deadline in the DisplayScheduler.
   BeginFrameArgs adjusted_args(args);
   adjusted_args.deadline -= EstimatedParentDrawTime();
+  adjusted_args.on_critical_path = !ImplLatencyTakesPriority();
 
   // Deliver BeginFrames to children.
   // TODO(brianderson): Move this responsibility to the DisplayScheduler.
@@ -772,13 +776,16 @@ void Scheduler::AsValueInto(base::trace_event::TracedValue* state) const {
                    estimated_parent_draw_time_.InMillisecondsF());
   state->SetBoolean("last_set_needs_begin_frame_",
                     frame_source_->NeedsBeginFrames());
-  state->SetInteger("begin_retro_frame_args_", begin_retro_frame_args_.size());
-  state->SetBoolean("begin_retro_frame_task_",
+  state->SetInteger("begin_retro_frame_args",
+                    static_cast<int>(begin_retro_frame_args_.size()));
+  state->SetBoolean("begin_retro_frame_task",
                     !begin_retro_frame_task_.IsCancelled());
-  state->SetBoolean("begin_impl_frame_deadline_task_",
+  state->SetBoolean("begin_impl_frame_deadline_task",
                     !begin_impl_frame_deadline_task_.IsCancelled());
-  state->SetBoolean("advance_commit_state_task_",
+  state->SetBoolean("advance_commit_state_task",
                     !advance_commit_state_task_.IsCancelled());
+  state->SetString("inside_action",
+                   SchedulerStateMachine::ActionToString(inside_action_));
   state->BeginDictionary("begin_impl_frame_args");
   begin_impl_frame_tracker_.AsValueInto(Now(), state);
   state->EndDictionary();

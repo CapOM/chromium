@@ -6,7 +6,7 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:paddingTop="18dp" >
+    android:paddingTop="12dp" >
 
     <ImageView
         android:id="@+id/website_settings_permission_icon"
@@ -16,26 +16,10 @@
         android:contentDescription="@null" />
 
     <TextView
-        android:id="@+id/website_settings_permission_name"
+        android:id="@+id/website_settings_permission_status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_toEndOf="@id/website_settings_permission_icon"
         android:textColor="@color/website_settings_popup_text"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <Spinner
-        android:id="@+id/website_settings_permission_spinner"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_toEndOf="@id/website_settings_permission_icon"
-        android:layout_below="@id/website_settings_permission_name" />
-
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_toEndOf="@id/website_settings_permission_icon"
-        android:layout_below="@id/website_settings_permission_spinner"
-        android:background="#e5e5e5" />
-
+        android:textSize="14sp" />
 </RelativeLayout>

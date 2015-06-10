@@ -46,6 +46,12 @@ class PresentationServiceDelegateImpl
     : public content::WebContentsUserData<PresentationServiceDelegateImpl>,
       public content::PresentationServiceDelegate {
  public:
+  // Retrieves the instance of PresentationServiceDelegateImpl that was attached
+  // to the specified WebContents.  If no instance was attached, creates one,
+  // and attaches it to the specified WebContents.
+  static PresentationServiceDelegateImpl* GetOrCreateForWebContents(
+      content::WebContents* web_contents);
+
   ~PresentationServiceDelegateImpl() override;
 
   // content::PresentationServiceDelegate implementation.
@@ -100,6 +106,9 @@ class PresentationServiceDelegateImpl
   // Returns an empty MediaSource otherwise.
   MediaSource default_source() const { return default_source_; }
 
+  content::WebContents* web_contents() const { return web_contents_; }
+  const GURL& default_frame_url() const { return default_frame_url_; }
+
   // Observer interface for listening to default MediaSource changes for the
   // WebContents.
   class DefaultMediaSourceObserver {
@@ -109,11 +118,11 @@ class PresentationServiceDelegateImpl
     // Called when default media source for the corresponding WebContents has
     // changed.
     // |source|: New default MediaSource, or empty if default was removed.
-    // |frame_display_name|: Display Name of the frame that contains the default
-    // media source, or empty if there is no default media source.
+    // |frame_url|: URL of the frame that contains the default
+    //     media source, or empty if there is no default media source.
     virtual void OnDefaultMediaSourceChanged(
         const MediaSource& source,
-        const std::string& frame_display_name) = 0;
+        const GURL& frame_url) = 0;
   };
 
   // Adds / removes an observer for listening to default MediaSource changes.
@@ -124,7 +133,7 @@ class PresentationServiceDelegateImpl
   bool HasScreenAvailabilityListenerForTest(
       int render_process_id,
       int render_frame_id,
-      const MediaSourceId& source_id) const;
+      const MediaSource::Id& source_id) const;
 
   base::WeakPtr<PresentationServiceDelegateImpl> GetWeakPtr();
 
@@ -147,13 +156,14 @@ class PresentationServiceDelegateImpl
   // changed, notify the observers.
   void UpdateDefaultMediaSourceAndNotifyObservers(
       const MediaSource& new_default_source,
-      const std::string& new_default_source_host);
+      const GURL& new_default_frame_url);
 
   MediaSource default_source_;
-  std::string default_frame_display_name_;
+  GURL default_frame_url_;
 
   // References to the observers listening for changes to default media source.
-  ObserverList<DefaultMediaSourceObserver> default_media_source_observers_;
+  base::ObserverList<
+      DefaultMediaSourceObserver> default_media_source_observers_;
 
   // References to the WebContents that owns this instance, and associated
   // browser profile's MediaRouter instance.

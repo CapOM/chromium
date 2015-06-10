@@ -273,7 +273,7 @@ class SYNC_EXPORT_PRIVATE SyncManagerImpl
   // OpenDirectory() and ShutdownOnSyncThread().
   WeakHandle<SyncManager::ChangeObserver> change_observer_;
 
-  ObserverList<SyncManager::Observer> observers_;
+  base::ObserverList<SyncManager::Observer> observers_;
 
   // The ServerConnectionManager used to abstract communication between the
   // client (the Syncer) and the sync server.
@@ -330,7 +330,7 @@ class SYNC_EXPORT_PRIVATE SyncManagerImpl
   ProtocolEventBuffer protocol_event_buffer_;
 
   scoped_ptr<UnrecoverableErrorHandler> unrecoverable_error_handler_;
-  ReportUnrecoverableErrorFunction report_unrecoverable_error_function_;
+  base::Closure report_unrecoverable_error_function_;
 
   // Sync's encryption handler. It tracks the set of encrypted types, manages
   // changing passphrases, and in general handles sync-specific interactions

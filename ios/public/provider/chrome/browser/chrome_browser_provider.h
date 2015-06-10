@@ -73,6 +73,8 @@ class ChromeBrowserProvider {
   virtual GeolocationUpdaterProvider* GetGeolocationUpdaterProvider();
   // Displays the Translate settings screen.
   virtual void ShowTranslateSettings();
+  // Returns whether the new bookmark collection experience is enabled.
+  virtual bool IsBookmarkCollectionEnabled();
   // Returns the chrome UI scheme.
   // TODO(droger): Remove this method once chrome no longer needs to match
   // content.
@@ -86,6 +88,8 @@ class ChromeBrowserProvider {
           autofill::CardUnmaskPromptController* controller);
   // Returns risk data used in Wallet requests.
   virtual std::string GetRiskData();
+  // Returns product version with prefix.
+  virtual std::string GetProductVersionWithPrefix(const std::string& prefix);
   // Returns an instance of KeyedServiceProvider.
   virtual KeyedServiceProvider* GetKeyedServiceProvider();
 };

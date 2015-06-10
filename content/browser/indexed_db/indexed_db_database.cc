@@ -424,10 +424,8 @@ void IndexedDBDatabase::CreateIndexAbortOperation(
     int64 object_store_id,
     int64 index_id,
     IndexedDBTransaction* transaction) {
-  IDB_TRACE1("IndexedDBDatabase::CreateIndexAbortOperation",
-             "txn.id",
-             transaction->id());
   DCHECK(!transaction);
+  IDB_TRACE("IndexedDBDatabase::CreateIndexAbortOperation");
   RemoveIndex(object_store_id, index_id);
 }
 
@@ -491,9 +489,7 @@ void IndexedDBDatabase::DeleteIndexAbortOperation(
     const IndexedDBIndexMetadata& index_metadata,
     IndexedDBTransaction* transaction) {
   DCHECK(!transaction);
-  IDB_TRACE1("IndexedDBDatabase::DeleteIndexAbortOperation",
-             "txn.id",
-             transaction->id());
+  IDB_TRACE("IndexedDBDatabase::DeleteIndexAbortOperation");
   AddIndex(object_store_id, index_metadata, IndexedDBIndexMetadata::kInvalidId);
 }
 
@@ -762,21 +758,32 @@ void IndexedDBDatabase::GetAllOperation(
 
   scoped_ptr<IndexedDBBackingStore::Cursor> cursor;
 
-  if (index_id == IndexedDBIndexMetadata::kInvalidId) {
-    // Object Store Retrieval Operation
-    cursor = backing_store_->OpenObjectStoreCursor(
-        transaction->BackingStoreTransaction(), id(), object_store_id,
-        *key_range, blink::WebIDBCursorDirectionNext, &s);
-  } else if (cursor_type == indexed_db::CURSOR_KEY_ONLY) {
-    // Index Value Retrieval Operation
-    cursor = backing_store_->OpenIndexKeyCursor(
-        transaction->BackingStoreTransaction(), id(), object_store_id, index_id,
-        *key_range, blink::WebIDBCursorDirectionNext, &s);
+  if (cursor_type == indexed_db::CURSOR_KEY_ONLY) {
+    // Retrieving keys
+    if (index_id == IndexedDBIndexMetadata::kInvalidId) {
+      // Object Store: Key Retrieval Operation
+      cursor = backing_store_->OpenObjectStoreKeyCursor(
+          transaction->BackingStoreTransaction(), id(), object_store_id,
+          *key_range, blink::WebIDBCursorDirectionNext, &s);
+    } else {
+      // Index Value: (Primary Key) Retrieval Operation
+      cursor = backing_store_->OpenIndexKeyCursor(
+          transaction->BackingStoreTransaction(), id(), object_store_id,
+          index_id, *key_range, blink::WebIDBCursorDirectionNext, &s);
+    }
   } else {
-    // Index Referenced Value Retrieval Operation
-    cursor = backing_store_->OpenIndexCursor(
-        transaction->BackingStoreTransaction(), id(), object_store_id, index_id,
-        *key_range, blink::WebIDBCursorDirectionNext, &s);
+    // Retrieving values
+    if (index_id == IndexedDBIndexMetadata::kInvalidId) {
+      // Object Store: Value Retrieval Operation
+      cursor = backing_store_->OpenObjectStoreCursor(
+          transaction->BackingStoreTransaction(), id(), object_store_id,
+          *key_range, blink::WebIDBCursorDirectionNext, &s);
+    } else {
+      // Object Store: Referenced Value Retrieval Operation
+      cursor = backing_store_->OpenIndexCursor(
+          transaction->BackingStoreTransaction(), id(), object_store_id,
+          index_id, *key_range, blink::WebIDBCursorDirectionNext, &s);
+    }
   }
 
   if (!s.ok()) {
@@ -830,23 +837,14 @@ void IndexedDBDatabase::GetAllOperation(
     IndexedDBReturnValue return_value;
     IndexedDBKey return_key;
 
-    if (index_id == IndexedDBIndexMetadata::kInvalidId) {
-      // Object Store Retrieval Operation
-      return_value.swap(*cursor->value());
-
-      if (generated_key)
-        return_value.primary_key = cursor->primary_key();
+    if (cursor_type == indexed_db::CURSOR_KEY_ONLY) {
+      return_key = cursor->primary_key();
     } else {
-      // Dealing with indexes
-      if (cursor_type == indexed_db::CURSOR_KEY_ONLY) {
-        return_key = cursor->primary_key();
-      } else {
-        // Index Referenced Value Retrieval Operation
-        return_value.swap(*cursor->value());
-        if (!return_value.empty() && generated_key) {
-          return_value.primary_key = cursor->primary_key();
-          return_value.key_path = object_store_metadata.key_path;
-        }
+      // Retrieving values
+      return_value.swap(*cursor->value());
+      if (!return_value.empty() && generated_key) {
+        return_value.primary_key = cursor->primary_key();
+        return_value.key_path = object_store_metadata.key_path;
       }
     }
 
@@ -1947,9 +1945,7 @@ void IndexedDBDatabase::CreateObjectStoreAbortOperation(
     int64 object_store_id,
     IndexedDBTransaction* transaction) {
   DCHECK(!transaction);
-  IDB_TRACE1("IndexedDBDatabase::CreateObjectStoreAbortOperation",
-             "txn.id",
-             transaction->id());
+  IDB_TRACE("IndexedDBDatabase::CreateObjectStoreAbortOperation");
   RemoveObjectStore(object_store_id);
 }
 
@@ -1957,9 +1953,7 @@ void IndexedDBDatabase::DeleteObjectStoreAbortOperation(
     const IndexedDBObjectStoreMetadata& object_store_metadata,
     IndexedDBTransaction* transaction) {
   DCHECK(!transaction);
-  IDB_TRACE1("IndexedDBDatabase::DeleteObjectStoreAbortOperation",
-             "txn.id",
-             transaction->id());
+  IDB_TRACE("IndexedDBDatabase::DeleteObjectStoreAbortOperation");
   AddObjectStore(object_store_metadata,
                  IndexedDBObjectStoreMetadata::kInvalidId);
 }
@@ -1969,9 +1963,7 @@ void IndexedDBDatabase::VersionChangeAbortOperation(
     int64 previous_int_version,
     IndexedDBTransaction* transaction) {
   DCHECK(!transaction);
-  IDB_TRACE1("IndexedDBDatabase::VersionChangeAbortOperation",
-             "txn.id",
-             transaction->id());
+  IDB_TRACE("IndexedDBDatabase::VersionChangeAbortOperation");
   metadata_.version = previous_version;
   metadata_.int_version = previous_int_version;
 }

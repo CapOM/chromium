@@ -14,9 +14,10 @@
 #include "base/containers/hash_tables.h"
 #include "base/i18n/rtl.h"
 #include "base/lazy_instance.h"
-#include "base/message_loop/message_loop.h"
+#include "base/location.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/thread_task_runner_handle.h"
@@ -1269,18 +1270,6 @@ void RenderWidgetHostImpl::SetInputMethodActive(bool activate) {
   Send(new ViewMsg_SetInputMethodActive(GetRoutingID(), activate));
 }
 
-void RenderWidgetHostImpl::CandidateWindowShown() {
-  Send(new ViewMsg_CandidateWindowShown(GetRoutingID()));
-}
-
-void RenderWidgetHostImpl::CandidateWindowUpdated() {
-  Send(new ViewMsg_CandidateWindowUpdated(GetRoutingID()));
-}
-
-void RenderWidgetHostImpl::CandidateWindowHidden() {
-  Send(new ViewMsg_CandidateWindowHidden(GetRoutingID()));
-}
-
 void RenderWidgetHostImpl::ImeSetComposition(
     const base::string16& text,
     const std::vector<blink::WebCompositionUnderline>& underlines,
@@ -1546,10 +1535,9 @@ void RenderWidgetHostImpl::OnUpdateRect(
     bool post_callback = new_auto_size_.IsEmpty();
     new_auto_size_ = params.view_size;
     if (post_callback) {
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&RenderWidgetHostImpl::DelayedAutoResized,
-                     weak_factory_.GetWeakPtr()));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&RenderWidgetHostImpl::DelayedAutoResized,
+                                weak_factory_.GetWeakPtr()));
     }
   }
 

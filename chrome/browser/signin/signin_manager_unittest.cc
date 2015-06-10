@@ -9,6 +9,7 @@
 #include "base/bind.h"
 #include "base/bind_helpers.h"
 #include "base/compiler_specific.h"
+#include "base/memory/scoped_ptr.h"
 #include "base/prefs/pref_service.h"
 #include "base/prefs/testing_pref_service.h"
 #include "base/run_loop.h"
@@ -48,16 +49,15 @@
 
 namespace {
 
-KeyedService* SigninManagerBuild(content::BrowserContext* context) {
-  SigninManager* service = NULL;
+scoped_ptr<KeyedService> SigninManagerBuild(content::BrowserContext* context) {
   Profile* profile = static_cast<Profile*>(context);
-  service = new SigninManager(
+  scoped_ptr<SigninManager> service(new SigninManager(
       ChromeSigninClientFactory::GetInstance()->GetForProfile(profile),
       ProfileOAuth2TokenServiceFactory::GetForProfile(profile),
       AccountTrackerServiceFactory::GetForProfile(profile),
-      GaiaCookieManagerServiceFactory::GetForProfile(profile));
+      GaiaCookieManagerServiceFactory::GetForProfile(profile)));
   service->Initialize(NULL);
-  return service;
+  return service.Pass();
 }
 
 class TestSigninManagerObserver : public SigninManagerBase::Observer {
@@ -443,4 +443,28 @@ TEST_F(SigninManagerTest, UpgradeToNewPrefs) {
       manager_->GetAuthenticatedAccountId());
   EXPECT_EQ("user@gmail.com", info.email);
   EXPECT_EQ("account_id", info.gaia);
+}
+
+TEST_F(SigninManagerTest, CanonicalizesPrefs) {
+  profile()->GetPrefs()->SetString(prefs::kGoogleServicesUsername,
+                                   "user.C@gmail.com");
+  CreateNakedSigninManager();
+  manager_->Initialize(g_browser_process->local_state());
+  EXPECT_EQ("user.C@gmail.com", manager_->GetAuthenticatedUsername());
+
+  // TODO(rogerta): until the migration to gaia id, the account id will remain
+  // the old username.
+  EXPECT_EQ("userc@gmail.com", manager_->GetAuthenticatedAccountId());
+  EXPECT_EQ("userc@gmail.com",
+            profile()->GetPrefs()->GetString(prefs::kGoogleServicesAccountId));
+  EXPECT_EQ("",
+            profile()->GetPrefs()->GetString(prefs::kGoogleServicesUsername));
+
+  // Make sure account tracker has a canonicalized username.
+  AccountTrackerService* service =
+      AccountTrackerServiceFactory::GetForProfile(profile());
+  AccountTrackerService::AccountInfo info = service->GetAccountInfo(
+      manager_->GetAuthenticatedAccountId());
+  EXPECT_EQ("user.C@gmail.com", info.email);
+  EXPECT_EQ("userc@gmail.com", info.account_id);
 }

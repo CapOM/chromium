@@ -6,9 +6,10 @@
 
 #include "base/files/file_path.h"
 #include "base/files/scoped_temp_dir.h"
-#include "base/message_loop/message_loop_proxy.h"
+#include "base/memory/ref_counted.h"
 #include "base/run_loop.h"
 #include "base/strings/string_split.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/browser/fileapi/chrome_blob_storage_context.h"
 #include "content/browser/fileapi/mock_url_request_delegate.h"
 #include "content/browser/quota/mock_quota_manager_proxy.h"
@@ -38,10 +39,10 @@ const char kTestData[] = "Hello World";
 // the memory.
 storage::BlobProtocolHandler* CreateMockBlobProtocolHandler(
     storage::BlobStorageContext* blob_storage_context) {
-  // The FileSystemContext and MessageLoopProxy are not actually used but a
-  // MessageLoopProxy is needed to avoid a DCHECK in BlobURLRequestJob ctor.
+  // The FileSystemContext and thread task runner are not actually used but a
+  // task runner is needed to avoid a DCHECK in BlobURLRequestJob ctor.
   return new storage::BlobProtocolHandler(
-      blob_storage_context, NULL, base::MessageLoopProxy::current().get());
+      blob_storage_context, NULL, base::ThreadTaskRunnerHandle::Get().get());
 }
 
 // A disk_cache::Backend wrapper that can delay operations.
@@ -128,12 +129,12 @@ class TestCacheStorageCache : public CacheStorageCache {
   TestCacheStorageCache(
       const GURL& origin,
       const base::FilePath& path,
-      net::URLRequestContext* request_context,
+      const scoped_refptr<net::URLRequestContextGetter>& request_context_getter,
       const scoped_refptr<storage::QuotaManagerProxy>& quota_manager_proxy,
       base::WeakPtr<storage::BlobStorageContext> blob_context)
       : CacheStorageCache(origin,
                           path,
-                          request_context,
+                          request_context_getter,
                           quota_manager_proxy,
                           blob_context),
         delay_backend_creation_(false) {}
@@ -186,7 +187,7 @@ class CacheStorageCacheTest : public testing::Test {
     blob_storage_context_ = blob_storage_context->context();
 
     quota_manager_proxy_ = new MockQuotaManagerProxy(
-        nullptr, base::MessageLoopProxy::current().get());
+        nullptr, base::ThreadTaskRunnerHandle::Get().get());
 
     url_request_job_factory_.reset(new net::URLRequestJobFactoryImpl);
     url_request_job_factory_->SetProtocolHandler(
@@ -204,7 +205,7 @@ class CacheStorageCacheTest : public testing::Test {
     base::FilePath path = MemoryOnly() ? base::FilePath() : temp_dir_.path();
 
     cache_ = make_scoped_refptr(new TestCacheStorageCache(
-        GURL("http://example.com"), path, url_request_context,
+        GURL("http://example.com"), path, browser_context_.GetRequestContext(),
         quota_manager_proxy_, blob_storage_context->context()->AsWeakPtr()));
   }
 
@@ -261,8 +262,7 @@ class CacheStorageCacheTest : public testing::Test {
         base::Bind(&CacheStorageCacheTest::ErrorTypeCallback,
                    base::Unretained(this), base::Unretained(loop.get())));
     // TODO(jkarlin): These functions should use base::RunLoop().RunUntilIdle()
-    // once the cache uses a passed in MessageLoopProxy instead of the CACHE
-    // thread.
+    // once the cache uses a passed in task runner instead of the CACHE thread.
     loop->Run();
 
     return callback_error_;

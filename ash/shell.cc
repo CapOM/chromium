@@ -108,7 +108,6 @@
 #include "ui/wm/core/accelerator_filter.h"
 #include "ui/wm/core/compound_event_filter.h"
 #include "ui/wm/core/focus_controller.h"
-#include "ui/wm/core/input_method_event_filter.h"
 #include "ui/wm/core/nested_accelerator_controller.h"
 #include "ui/wm/core/shadow_controller.h"
 #include "ui/wm/core/visibility_controller.h"
@@ -660,6 +659,8 @@ Shell::Shell(ShellDelegate* delegate)
 Shell::~Shell() {
   TRACE_EVENT0("shutdown", "ash::Shell::Destructor");
 
+  user_metrics_recorder_->OnShellShuttingDown();
+
   delegate_->PreShutdown();
 
   views::FocusManagerFactory::Install(NULL);
@@ -680,7 +681,6 @@ Shell::~Shell() {
   speech_feedback_handler_.reset();
 #endif
   RemovePreTargetHandler(overlay_filter_.get());
-  RemovePreTargetHandler(input_method_filter_.get());
   RemovePreTargetHandler(accelerator_filter_.get());
   RemovePreTargetHandler(event_transformation_handler_.get());
   RemovePreTargetHandler(toplevel_window_event_handler_.get());
@@ -809,7 +809,7 @@ Shell::~Shell() {
   new_window_delegate_.reset();
   media_delegate_.reset();
 
-  keyboard::KeyboardController::ResetInstance(NULL);
+  keyboard::KeyboardController::ResetInstance(nullptr);
 
 #if defined(OS_CHROMEOS)
   display_color_manager_.reset();
@@ -934,10 +934,6 @@ void Shell::Init(const ShellInitParams& init_params) {
   overlay_filter_.reset(new OverlayEventFilter);
   AddPreTargetHandler(overlay_filter_.get());
   AddShellObserver(overlay_filter_.get());
-
-  input_method_filter_.reset(new ::wm::InputMethodEventFilter(
-      root_window->GetHost()->GetAcceleratedWidget()));
-  AddPreTargetHandler(input_method_filter_.get());
 
   accelerator_filter_.reset(new ::wm::AcceleratorFilter(
       scoped_ptr< ::wm::AcceleratorDelegate>(new AcceleratorDelegate).Pass(),
@@ -1085,6 +1081,8 @@ void Shell::Init(const ShellInitParams& init_params) {
   // order to create mirror window. Run it after the main message loop
   // is started.
   display_manager_->CreateMirrorWindowAsyncIfAny();
+
+  user_metrics_recorder_->OnShellInitialized();
 }
 
 void Shell::InitKeyboard() {
@@ -1110,7 +1108,6 @@ void Shell::InitRootWindow(aura::Window* root_window) {
   DCHECK(drag_drop_controller_.get());
 
   aura::client::SetFocusClient(root_window, focus_client_.get());
-  input_method_filter_->SetInputMethodPropertyInRootWindow(root_window);
   aura::client::SetActivationClient(root_window, activation_client_);
   ::wm::FocusController* focus_controller =
       static_cast< ::wm::FocusController*>(activation_client_);
@@ -1177,8 +1174,10 @@ void Shell::OnEvent(ui::Event* event) {
 ////////////////////////////////////////////////////////////////////////////////
 // Shell, aura::client::ActivationChangeObserver implementation:
 
-void Shell::OnWindowActivated(aura::Window* gained_active,
-                              aura::Window* lost_active) {
+void Shell::OnWindowActivated(
+    aura::client::ActivationChangeObserver::ActivationReason reason,
+    aura::Window* gained_active,
+    aura::Window* lost_active) {
   if (gained_active)
     target_root_window_ = gained_active->GetRootWindow();
 }

@@ -12,9 +12,8 @@
 namespace cc {
 
 OverlayStrategySingleOnTop::OverlayStrategySingleOnTop(
-    OverlayCandidateValidator* capability_checker,
-    ResourceProvider* resource_provider)
-    : OverlayStrategyCommon(capability_checker, resource_provider) {
+    OverlayCandidateValidator* capability_checker)
+    : capability_checker_(capability_checker) {
 }
 
 bool OverlayStrategySingleOnTop::Attempt(
@@ -36,11 +35,13 @@ bool OverlayStrategySingleOnTop::Attempt(
       // Check that no prior quads overlap it.
       bool intersects = false;
       gfx::RectF rect = draw_quad->rect;
-      draw_quad->quadTransform().TransformRect(&rect);
+      draw_quad->shared_quad_state->content_to_target_transform.TransformRect(
+          &rect);
       for (auto overlap_iter = quad_list.cbegin(); overlap_iter != it;
            ++overlap_iter) {
         gfx::RectF overlap_rect = overlap_iter->rect;
-        overlap_iter->quadTransform().TransformRect(&overlap_rect);
+        overlap_iter->shared_quad_state->content_to_target_transform
+            .TransformRect(&overlap_rect);
         if (rect.Intersects(overlap_rect) && !IsInvisibleQuad(*overlap_iter)) {
           intersects = true;
           break;

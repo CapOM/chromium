@@ -247,7 +247,7 @@
             'enable_app_list%': 0,
           }],
 
-          ['use_aura==1 or (OS!="win" and OS!="mac" and OS!="ios" and OS!="android")', {
+          ['use_aura==1 and OS!="android"', {
             'use_default_render_theme%': 1,
           }, {
             'use_default_render_theme%': 0,
@@ -306,7 +306,6 @@
 
           ['OS=="linux" and target_arch=="mipsel"', {
             'sysroot%': '<!(cd <(DEPTH) && pwd -P)/mipsel-sysroot/sysroot',
-            'CXX%': '<!(cd <(DEPTH) && pwd -P)/mipsel-sysroot/bin/mipsel-linux-gnu-gcc',
           }],
         ],
       },
@@ -416,6 +415,9 @@
 
       # Web speech is enabled by default. Set to 0 to disable.
       'enable_web_speech%': 1,
+
+      # 'Ok Google' hotwording is enabled by default. Set to 0 to disable.
+      'enable_hotwording%': 1,
 
       # Notifications are compiled in by default. Set to 0 to disable.
       'notifications%' : 1,
@@ -639,9 +641,6 @@
       # with one of those tools.
       'build_for_tool%': '',
 
-      # If no directory is specified then a temporary directory will be used.
-      'test_isolation_outdir%': '',
-
       'wix_path%': '<(DEPTH)/third_party/wix',
 
       # Supervised users are enabled by default.
@@ -650,8 +649,6 @@
       # Platform sends memory pressure signals natively.
       'native_memory_pressure_signals%': 0,
 
-      'spdy_proxy_auth_property%' : '',
-      'spdy_proxy_auth_value%' : '',
       'enable_mdns%' : 0,
       'enable_service_discovery%': 0,
       'enable_wifi_bootstrapping%': 0,
@@ -689,9 +686,6 @@
       # which would lead to all code be optimized with -O2. See crbug.com/407544
       'use_lto%': 0,
       'use_lto_o2%': 0,
-
-      # Allowed level of identical code folding in the gold linker.
-      'gold_icf_level%': 'safe',
 
       # Libxkbcommon usage.
       'use_xkbcommon%': 0,
@@ -836,12 +830,10 @@
         # Enable autofill dialog when not on iOS.
         ['OS!="ios"', {
           'enable_autofill_dialog%': 1,
+        }],
 
-          'conditions': [
-            ['buildtype=="Official"', {
-              'enable_prod_wallet_service%': 1,
-            }],
-          ]
+        ['buildtype=="Official"', {
+          'enable_prod_wallet_service%': 1,
         }],
 
         ['OS=="android"', {
@@ -1152,6 +1144,7 @@
     'configuration_policy%': '<(configuration_policy)',
     'safe_browsing%': '<(safe_browsing)',
     'enable_web_speech%': '<(enable_web_speech)',
+    'enable_hotwording%': '<(enable_hotwording)',
     'notifications%': '<(notifications)',
     'clang_use_chrome_plugins%': '<(clang_use_chrome_plugins)',
     'mac_want_real_dsym%': '<(mac_want_real_dsym)',
@@ -1195,7 +1188,6 @@
     'linux_use_debug_fission%': '<(linux_use_debug_fission)',
     'use_canvas_skia%': '<(use_canvas_skia)',
     'test_isolation_mode%': '<(test_isolation_mode)',
-    'test_isolation_outdir%': '<(test_isolation_outdir)',
     'enable_basic_printing%': '<(enable_basic_printing)',
     'enable_print_preview%': '<(enable_print_preview)',
     'enable_spellcheck%': '<(enable_spellcheck)',
@@ -1223,8 +1215,6 @@
     'google_default_client_secret%': '<(google_default_client_secret)',
     'enable_supervised_users%': '<(enable_supervised_users)',
     'native_memory_pressure_signals%': '<(native_memory_pressure_signals)',
-    'spdy_proxy_auth_property%': '<(spdy_proxy_auth_property)',
-    'spdy_proxy_auth_value%': '<(spdy_proxy_auth_value)',
     'enable_mdns%' : '<(enable_mdns)',
     'enable_service_discovery%' : '<(enable_service_discovery)',
     'enable_wifi_bootstrapping%': '<(enable_wifi_bootstrapping)',
@@ -1235,7 +1225,6 @@
     'gomadir%': '<(gomadir)',
     'use_lto%': '<(use_lto)',
     'use_lto_o2%': '<(use_lto_o2)',
-    'gold_icf_level%': '<(gold_icf_level)',
     'video_hole%': '<(video_hole)',
     'v8_use_external_startup_data%': '<(v8_use_external_startup_data)',
     'cfi_vptr%': '<(cfi_vptr)',
@@ -1615,10 +1604,6 @@
             'nacl_untrusted_build%': 0,
             'use_allocator%': 'none',
           }],
-          ['OS=="linux" and target_arch=="mipsel"', {
-            'sysroot%': '<(sysroot)',
-            'CXX%': '<(CXX)',
-          }],
           # Use a 64-bit linker to avoid running out of address space. The
           # buildbots should have a 64-bit kernel and a 64-bit libc installed.
           ['host_arch=="ia32" and target_arch=="ia32"', {
@@ -1709,7 +1694,7 @@
           'host_os%': '<(host_os)',
 
           'android_sdk%': '<(android_sdk_root)/platforms/android-<(android_sdk_version)',
-          # Android SDK build tools (e.g. dx, aapt, aidl)
+          # Android SDK build tools (e.g. dx, aidl)
           'android_sdk_tools%': '<(android_sdk_root)/build-tools/<(android_sdk_build_tools_version)',
 
           # Android API level 16 is JB (Android 4.1) which is the minimum
@@ -1778,6 +1763,7 @@
         'android_ndk_include': '<(android_ndk_sysroot)/usr/include',
         'android_ndk_lib': '<(android_ndk_sysroot)/<(android_ndk_lib_dir)',
         'android_sdk_tools%': '<(android_sdk_tools)',
+        'android_aapt_path%': '<(android_sdk_tools)/aapt',
         'android_sdk%': '<(android_sdk)',
         'android_sdk_jar%': '<(android_sdk)/android.jar',
 
@@ -1991,7 +1977,7 @@
         'use_cups%': 0,
       }],
 
-      ['enable_plugins==1 and (OS=="linux" or OS=="mac" or OS=="win")', {
+      ['enable_plugins==1 and (OS=="linux" or OS=="mac" or OS=="win") and chromecast==0', {
         'enable_pepper_cdms%': 1,
       }, {
         'enable_pepper_cdms%': 0,
@@ -2209,9 +2195,21 @@
         'clang%': 1,
         'use_allocator%': 'none',
         'use_sanitizer_options%': 1,
-        # Disable ICF in the linker to avoid debug info loss.
-        'gold_icf_level%': 'none',
       }],
+
+      # Allowed level of identical code folding in the gold linker.
+      ['OS=="linux" and target_arch=="x64"', {
+        # --icf=safe disables much more folding on x86_64 than elsewhere, see
+        # http://crbug.com/492177.  Turning it on saves over 12 MB of binary
+        # size, but it seems to regress cold startup time by over a second
+        # (see http://crbug.com/492809).
+        # TODO(thakis): Check if disabling ICF would inmprove android cold start
+        # times by several seconds too.
+        'gold_icf_level%': 'safe',
+      }, {
+        'gold_icf_level%': 'all',
+      }],
+
       ['OS=="linux" and asan==0 and msan==0 and lsan==0 and tsan==0', {
         # PNaCl toolchain Non-SFI build only supports linux OS build.
         # Also, it does not support sanitizers.
@@ -3009,12 +3007,6 @@
       }],
       ['enable_supervised_users==1', {
         'defines': ['ENABLE_SUPERVISED_USERS=1'],
-      }],
-      ['spdy_proxy_auth_property != ""', {
-        'defines': ['SPDY_PROXY_AUTH_PROPERTY="<(spdy_proxy_auth_property)"'],
-      }],
-      ['spdy_proxy_auth_value != ""', {
-        'defines': ['SPDY_PROXY_AUTH_VALUE="<(spdy_proxy_auth_value)"'],
       }],
       ['enable_mdns==1', {
         'defines': ['ENABLE_MDNS=1'],
@@ -3893,17 +3885,6 @@
                       '-fuse-ld=gold',
                     ],
                   }],
-                  # Install packages have started cropping up with
-                  # different headers between the 32-bit and 64-bit
-                  # versions, so we have to shadow those differences off
-                  # and make sure a 32-bit-on-64-bit build picks up the
-                  # right files.
-                  # For android build, use NDK headers instead of host headers
-                  ['host_arch!="ia32" and OS!="android"', {
-                    'include_dirs+': [
-                      '/usr/include32',
-                    ],
-                  }],
                 ],
               }],
             ],
@@ -4172,6 +4153,9 @@
                           ['OS=="android"', {
                             'cflags': [ '-target mipsel-linux-android', '-march=mipsel', '-mcpu=mips32r2'],
                             'ldflags': [ '-target mipsel-linux-android', ],
+                          }, {
+                            'cflags': [ '-target mipsel-linux-gnu', '-march=mipsel', '-mcpu=mips32r2'],
+                            'ldflags': [ '-target mipsel-linux-gnu', ],
                           }],
                          ],
                       }, { # clang==0
@@ -4186,6 +4170,9 @@
                           ['OS=="android"', {
                             'cflags': [ '-target mipsel-linux-android', '-march=mipsel', '-mcpu=mips32'],
                             'ldflags': [ '-target mipsel-linux-android', ],
+                          }, {
+                            'cflags': [ '-target mipsel-linux-gnu', '-march=mipsel', '-mcpu=mips32'],
+                            'ldflags': [ '-target mipsel-linux-gnu', ],
                           }],
                         ],
                       }, { # clang==0
@@ -4201,6 +4188,10 @@
                     'cflags': [
                       # TODO(gordanac) Enable integrated-as.
                       '-no-integrated-as',
+                    ],
+                  }],
+                  ['clang==1 and OS=="android"', {
+                    'cflags': [
                       '-B<(android_toolchain)',  # Else /usr/bin/as gets picked up.
                     ],
                     'ldflags': [
@@ -4602,7 +4593,7 @@
               }],
             ],
             'conditions': [
-              ['release_valgrind_build==0 and order_profiling==0', {
+              ['release_valgrind_build==0 and order_profiling==0 and asan==0 and msan==0 and lsan==0 and tsan==0', {
                 'target_conditions': [
                   ['_toolset=="target"', {
                     'ldflags': [
@@ -5701,11 +5692,10 @@
           'conditions': [
             # Building with Clang on Windows is a work in progress and very
             # experimental. See crbug.com/82385.
+            # Keep this in sync with the similar blocks in build/config/compiler/BUILD.gn
             ['clang==1', {
               'VCCLCompilerTool': {
                 'AdditionalOptions': [
-                  '-fmsc-version=1800',
-
                   # Many files use intrinsics without including this header.
                   # TODO(hans): Fix those files, or move this to sub-GYPs.
                   '/FIIntrin.h',
@@ -5759,6 +5749,20 @@
               'VCCLCompilerTool': {
                 'AdditionalOptions': [
                   '<@(clang_chrome_plugins_flags)',
+                ],
+              },
+            }],
+            ['clang==1 and MSVS_VERSION == "2013"', {
+              'VCCLCompilerTool': {
+                'AdditionalOptions': [
+                  '-fmsc-version=1800',
+                ],
+              },
+            }],
+            ['clang==1 and MSVS_VERSION == "2015"', {
+              'VCCLCompilerTool': {
+                'AdditionalOptions': [
+                  '-fmsc-version=1900',
                 ],
               },
             }],
@@ -5946,7 +5950,7 @@
         ['CXX.host', '<(host_cxx)'],
       ],
     }],
-    ['OS=="linux" and target_arch=="mipsel"', {
+    ['OS=="linux" and target_arch=="mipsel" and clang==0', {
       'make_global_settings': [
         ['CC', '<(sysroot)/../bin/mipsel-linux-gnu-gcc'],
         ['CXX', '<(sysroot)/../bin/mipsel-linux-gnu-g++'],

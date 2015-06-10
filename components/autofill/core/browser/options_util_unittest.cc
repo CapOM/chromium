@@ -22,7 +22,7 @@ namespace {
 class SyncServiceMock : public sync_driver::SyncService {
  public:
   MOCK_CONST_METHOD0(HasSyncSetupCompleted, bool());
-  MOCK_CONST_METHOD0(SyncActive, bool());
+  MOCK_CONST_METHOD0(IsSyncActive, bool());
   MOCK_CONST_METHOD0(GetActiveDataTypes, syncer::ModelTypeSet());
   MOCK_METHOD1(AddObserver, void(sync_driver::SyncServiceObserver*));
   MOCK_METHOD1(RemoveObserver, void(sync_driver::SyncServiceObserver*));
@@ -30,8 +30,8 @@ class SyncServiceMock : public sync_driver::SyncService {
                      bool(const sync_driver::SyncServiceObserver*));
   MOCK_METHOD0(IsSyncEnabledAndLoggedIn, bool());
   MOCK_METHOD0(DisableForUser, void());
-  MOCK_METHOD0(StopAndSuppress, void());
-  MOCK_METHOD0(UnsuppressAndStart, void());
+  MOCK_METHOD0(RequestStop, void());
+  MOCK_METHOD0(RequestStart, void());
   MOCK_CONST_METHOD0(GetPreferredDataTypes, syncer::ModelTypeSet());
   MOCK_METHOD2(OnUserChoseDatatypes,
                void(bool sync_everything, syncer::ModelTypeSet chosen_types));

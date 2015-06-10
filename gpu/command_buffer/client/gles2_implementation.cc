@@ -4103,6 +4103,21 @@ void GLES2Implementation::GetVertexAttribIuiv(
   CheckGLError();
 }
 
+GLenum GLES2Implementation::GetGraphicsResetStatusKHR() {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glGetGraphicsResetStatusKHR()");
+  // If we can't make command buffers then the context is lost.
+  if (gpu_control_->IsGpuChannelLost())
+    return GL_UNKNOWN_CONTEXT_RESET_KHR;
+  // Otherwise, check the command buffer if it is lost.
+  if (helper_->IsContextLost()) {
+    // TODO(danakj): We could GetLastState() off the CommandBuffer and return
+    // the actual reason here if we cared to.
+    return GL_UNKNOWN_CONTEXT_RESET_KHR;
+  }
+  return GL_NO_ERROR;
+}
+
 void GLES2Implementation::Swap() {
   SwapBuffers();
 }
@@ -5682,6 +5697,51 @@ void GLES2Implementation::WaitSync(
   uint32_t v32_0 = 0, v32_1 = 0;
   GLES2Util::MapUint64ToTwoUint32(timeout, &v32_0, &v32_1);
   helper_->WaitSync(ToGLuint(sync), flags, v32_0, v32_1);
+  CheckGLError();
+}
+
+void GLES2Implementation::GetInternalformativ(
+    GLenum target, GLenum format, GLenum pname,
+    GLsizei buf_size, GLint* params) {
+  GPU_CLIENT_SINGLE_THREAD_CHECK();
+  GPU_CLIENT_VALIDATE_DESTINATION_INITALIZATION(GLint, params);
+  GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glGetInternalformativ("
+                     << GLES2Util::GetStringRenderBufferTarget(target) << ", "
+                     << GLES2Util::GetStringRenderBufferFormat(format) << ", "
+                     << GLES2Util::GetStringInternalFormatParameter(pname)
+                     << ", " << buf_size << ", "
+                     << static_cast<const void*>(params) << ")");
+  if (buf_size < 0) {
+    SetGLError(GL_INVALID_VALUE, "glGetInternalformativ", "bufSize < 0");
+    return;
+  }
+  TRACE_EVENT0("gpu", "GLES2Implementation::GetInternalformativ");
+  if (GetInternalformativHelper(target, format, pname, buf_size, params)) {
+    return;
+  }
+  typedef cmds::GetInternalformativ::Result Result;
+  Result* result = GetResultAs<Result*>();
+  if (!result) {
+    return;
+  }
+  result->SetNumResults(0);
+  helper_->GetInternalformativ(target, format, pname,
+                               GetResultShmId(), GetResultShmOffset());
+  WaitForCmd();
+  GPU_CLIENT_LOG_CODE_BLOCK({
+    for (int32_t i = 0; i < result->GetNumResults(); ++i) {
+      GPU_CLIENT_LOG("  " << i << ": " << result->GetData()[i]);
+    }
+  });
+  if (buf_size > 0 && params) {
+    GLint* data = result->GetData();
+    if (buf_size >= result->GetNumResults()) {
+      buf_size = result->GetNumResults();
+    }
+    for (GLsizei ii = 0; ii < buf_size; ++ii) {
+      params[ii] = data[ii];
+    }
+  }
   CheckGLError();
 }
 

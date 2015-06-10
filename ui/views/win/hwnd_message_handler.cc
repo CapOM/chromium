@@ -533,7 +533,10 @@ void HWNDMessageHandler::SetRegion(HRGN region) {
 }
 
 void HWNDMessageHandler::StackAbove(HWND other_hwnd) {
-  SetWindowPos(hwnd(), other_hwnd, 0, 0, 0, 0,
+  // Windows API allows to stack behind another windows only.
+  DCHECK(other_hwnd);
+  HWND next_window = GetNextWindow(other_hwnd, GW_HWNDPREV);
+  SetWindowPos(hwnd(), next_window ? next_window : HWND_TOP, 0, 0, 0, 0,
                SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE);
 }
 
@@ -857,16 +860,16 @@ void HWNDMessageHandler::DispatchKeyEventPostIME(const ui::KeyEvent& key) {
 HICON HWNDMessageHandler::GetDefaultWindowIcon() const {
   if (use_system_default_icon_)
     return nullptr;
-  return ViewsDelegate::views_delegate
-             ? ViewsDelegate::views_delegate->GetDefaultWindowIcon()
+  return ViewsDelegate::GetInstance()
+             ? ViewsDelegate::GetInstance()->GetDefaultWindowIcon()
              : nullptr;
 }
 
 HICON HWNDMessageHandler::GetSmallWindowIcon() const {
   if (use_system_default_icon_)
     return nullptr;
-  return ViewsDelegate::views_delegate
-             ? ViewsDelegate::views_delegate->GetSmallWindowIcon()
+  return ViewsDelegate::GetInstance()
+             ? ViewsDelegate::GetInstance()->GetSmallWindowIcon()
              : nullptr;
 }
 
@@ -992,17 +995,24 @@ LRESULT HWNDMessageHandler::HandleNcHitTestMessage(unsigned int message,
   return ret;
 }
 
+void HWNDMessageHandler::HandleParentChanged() {
+  // If the forwarder window's parent is changed then we need to reset our
+  // context as we will not receive touch releases if the touch was initiated
+  // in the forwarder window.
+  touch_ids_.clear();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // HWNDMessageHandler, private:
 
 int HWNDMessageHandler::GetAppbarAutohideEdges(HMONITOR monitor) {
   autohide_factory_.InvalidateWeakPtrs();
-  return ViewsDelegate::views_delegate ?
-      ViewsDelegate::views_delegate->GetAppbarAutohideEdges(
-          monitor,
-          base::Bind(&HWNDMessageHandler::OnAppbarAutohideEdgesChanged,
-                     autohide_factory_.GetWeakPtr())) :
-      ViewsDelegate::EDGE_BOTTOM;
+  return ViewsDelegate::GetInstance()
+             ? ViewsDelegate::GetInstance()->GetAppbarAutohideEdges(
+                   monitor,
+                   base::Bind(&HWNDMessageHandler::OnAppbarAutohideEdgesChanged,
+                              autohide_factory_.GetWeakPtr()))
+             : ViewsDelegate::EDGE_BOTTOM;
 }
 
 void HWNDMessageHandler::OnAppbarAutohideEdgesChanged() {
@@ -2301,6 +2311,9 @@ LRESULT HWNDMessageHandler::OnTouchEvent(UINT message,
   if (ui::GetTouchInputInfoWrapper(reinterpret_cast<HTOUCHINPUT>(l_param),
                                    num_points, input.get(),
                                    sizeof(TOUCHINPUT))) {
+    // input[i].dwTime doesn't necessarily relate to the system time at all,
+    // so use base::TimeTicks::Now().
+    const base::TimeTicks event_time = base::TimeTicks::Now();
     int flags = ui::GetModifiersFromKeyState();
     TouchEvents touch_events;
     for (int i = 0; i < num_points; ++i) {
@@ -2341,20 +2354,16 @@ LRESULT HWNDMessageHandler::OnTouchEvent(UINT message,
         touch_event_type = ui::ET_TOUCH_MOVED;
       }
       if (touch_event_type != ui::ET_UNKNOWN) {
-        // input[i].dwTime doesn't necessarily relate to the system time at all,
-        // so use base::TimeTicks::Now()
-        const base::TimeTicks now = base::TimeTicks::Now();
         ui::TouchEvent event(touch_event_type,
                              gfx::Point(point.x, point.y),
                              id_generator_.GetGeneratedID(input[i].dwID),
-                             now - base::TimeTicks());
+                             event_time - base::TimeTicks());
         event.set_flags(flags);
         event.latency()->AddLatencyNumberWithTimestamp(
             ui::INPUT_EVENT_LATENCY_ORIGINAL_COMPONENT,
             0,
             0,
-            base::TimeTicks::FromInternalValue(
-                event.time_stamp().ToInternalValue()),
+            event_time,
             1);
 
         touch_events.push_back(event);

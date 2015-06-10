@@ -81,6 +81,7 @@ class NET_EXPORT HttpServerPropertiesManager : public HttpServerProperties {
   base::WeakPtr<HttpServerProperties> GetWeakPtr() override;
   void Clear() override;
   bool SupportsRequestPriority(const HostPortPair& server) override;
+  bool GetSupportsSpdy(const HostPortPair& server) override;
   void SetSupportsSpdy(const HostPortPair& server, bool support_spdy) override;
   bool RequiresHTTP11(const HostPortPair& server) override;
   void SetHTTP11Required(const HostPortPair& server) override;
@@ -102,7 +103,7 @@ class NET_EXPORT HttpServerPropertiesManager : public HttpServerProperties {
       const AlternativeService& alternative_service) override;
   void ClearAlternativeService(const HostPortPair& origin) override;
   const AlternativeServiceMap& alternative_service_map() const override;
-  base::Value* GetAlternativeServiceInfoAsValue() const override;
+  scoped_ptr<base::Value> GetAlternativeServiceInfoAsValue() const override;
   void SetAlternativeServiceProbabilityThreshold(double threshold) override;
   const SettingsMap& GetSpdySettings(
       const HostPortPair& host_port_pair) override;
@@ -172,8 +173,8 @@ class NET_EXPORT HttpServerPropertiesManager : public HttpServerProperties {
   // These are used to delay updating the preferences when cached data in
   // |http_server_properties_impl_| is changing, and execute only one update per
   // simultaneous spdy_servers or spdy_settings or alternative_service changes.
-  // |location| specifies where this method is called from.
-  void ScheduleUpdatePrefsOnNetworkThread(Location location);
+  // |location| specifies where this method is called from. Virtual for testing.
+  virtual void ScheduleUpdatePrefsOnNetworkThread(Location location);
 
   // Starts the timers to update the prefs from cache. This are overridden in
   // tests to prevent the delay.

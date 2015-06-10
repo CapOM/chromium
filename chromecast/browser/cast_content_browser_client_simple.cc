@@ -4,11 +4,18 @@
 
 #include "chromecast/browser/cast_content_browser_client.h"
 
+#include "base/memory/scoped_ptr.h"
+#include "chromecast/media/cma/backend/media_pipeline_device.h"
 #include "content/public/browser/browser_message_filter.h"
 #include "media/audio/audio_manager_factory.h"
 
 namespace chromecast {
 namespace shell {
+
+// static
+scoped_ptr<CastContentBrowserClient> CastContentBrowserClient::Create() {
+  return make_scoped_ptr(new CastContentBrowserClient());
+}
 
 void CastContentBrowserClient::PlatformAppendExtraCommandLineSwitches(
     base::CommandLine* command_line) {
@@ -25,6 +32,14 @@ CastContentBrowserClient::PlatformCreateAudioManagerFactory() {
   // implementation of AudioManager will be used.
   return scoped_ptr<::media::AudioManagerFactory>();
 }
+
+#if !defined(OS_ANDROID)
+scoped_ptr<media::MediaPipelineDevice>
+CastContentBrowserClient::PlatformCreateMediaPipelineDevice(
+    const media::MediaPipelineDeviceParams& params) {
+  return media::CreateMediaPipelineDevice(params);
+}
+#endif
 
 }  // namespace shell
 }  // namespace chromecast

@@ -469,6 +469,8 @@ class CONTENT_EXPORT RenderThreadImpl
   void OnRendererHidden();
   void OnRendererVisible();
 
+  void ReleaseFreeMemory();
+
   scoped_ptr<WebGraphicsContext3DCommandBufferImpl> CreateOffscreenContext3d();
 
   // These objects live solely on the render thread.
@@ -574,7 +576,7 @@ class CONTENT_EXPORT RenderThreadImpl
   scoped_refptr<cc_blink::ContextProviderWebContext>
       shared_main_thread_contexts_;
 
-  ObserverList<RenderProcessObserver> observers_;
+  base::ObserverList<RenderProcessObserver> observers_;
 
   scoped_refptr<ContextProviderCommandBuffer> gpu_va_context_provider_;
 

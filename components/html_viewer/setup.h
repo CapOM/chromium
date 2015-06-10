@@ -39,17 +39,12 @@ class Setup {
   explicit Setup(mojo::ApplicationImpl* app);
   ~Setup();
 
-  // Use to explicitly create headless regardless of command line switches.
-  // This must be invoked before InitIfNecessary().
-  void InitHeadless();
-
   // Inits with the specified screen size and device pixel ratio.
   // NOTE: we wait to complete setup until the device pixel ratio is available
   // as ResourceBundle uses the device pixel ratio during initialization.
   void InitIfNecessary(const gfx::Size& screen_size_in_pixels,
                        float device_pixel_ratio);
 
-  mojo::ApplicationImpl* app() const { return app_; }
   bool is_headless() const { return is_headless_; }
   bool did_init() const { return did_init_; }
 
@@ -66,11 +61,14 @@ class Setup {
   MediaFactory* media_factory() { return media_factory_.get(); }
 
  private:
+  // App for HTMLViewer, not the document's app.
+  // WARNING: do not expose this. It's too easy to use the wrong one.
+  // HTMLDocument should be using the application it creates, not this one.
   mojo::ApplicationImpl* app_;
 
   resource_provider::ResourceLoader resource_loader_;
 
-  bool is_headless_;
+  const bool is_headless_;
 
   // True once we've completed init.
   bool did_init_;

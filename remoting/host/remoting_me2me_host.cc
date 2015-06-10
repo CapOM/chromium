@@ -23,6 +23,7 @@
 #include "ipc/ipc_channel_proxy.h"
 #include "ipc/ipc_listener.h"
 #include "media/base/media.h"
+#include "net/base/net_util.h"
 #include "net/base/network_change_notifier.h"
 #include "net/socket/client_socket_factory.h"
 #include "net/socket/ssl_server_socket.h"
@@ -44,6 +45,8 @@
 #include "remoting/host/desktop_environment.h"
 #include "remoting/host/desktop_session_connector.h"
 #include "remoting/host/dns_blackhole_checker.h"
+#include "remoting/host/gcd_rest_client.h"
+#include "remoting/host/gcd_state_updater.h"
 #include "remoting/host/heartbeat_sender.h"
 #include "remoting/host/host_change_notification_listener.h"
 #include "remoting/host/host_config.h"
@@ -51,6 +54,7 @@
 #include "remoting/host/host_exit_codes.h"
 #include "remoting/host/host_main.h"
 #include "remoting/host/host_status_logger.h"
+#include "remoting/host/input_injector.h"
 #include "remoting/host/ipc_constants.h"
 #include "remoting/host/ipc_desktop_environment.h"
 #include "remoting/host/ipc_host_event_logger.h"
@@ -73,6 +77,7 @@
 #include "remoting/protocol/pairing_registry.h"
 #include "remoting/protocol/port_range.h"
 #include "remoting/protocol/token_validator.h"
+#include "remoting/signaling/push_notification_subscriber.h"
 #include "remoting/signaling/xmpp_signal_strategy.h"
 
 #if defined(OS_POSIX)
@@ -305,6 +310,8 @@ class HostProcess : public ConfigWatcher::Delegate,
                const std::string& file_name,
                const int& line_number);
 
+  bool using_gcd() { return !gcd_device_id_.empty(); }
+
   scoped_ptr<ChromotingHostContext> context_;
 
   // Accessed on the UI thread.
@@ -357,12 +364,17 @@ class HostProcess : public ConfigWatcher::Delegate,
   // Used to specify which window to stream, if enabled.
   webrtc::WindowId window_id_;
 
-  // |heartbeat_sender_| and |signaling_connector_| have to be destroyed before
-  // |signal_strategy_| because their destructors need to call
-  // signal_strategy_->RemoveListener(this)
+  // Must outlive |gcd_state_updater_| and |signaling_connector_|.
+  scoped_ptr<OAuthTokenGetter> oauth_token_getter_;
+
+  // Must outlive |signaling_connector_|, |gcd_subscriber_|, and
+  // |heartbeat_sender_|.
   scoped_ptr<SignalStrategy> signal_strategy_;
+
   scoped_ptr<SignalingConnector> signaling_connector_;
   scoped_ptr<HeartbeatSender> heartbeat_sender_;
+  scoped_ptr<GcdStateUpdater> gcd_state_updater_;
+  scoped_ptr<PushNotificationSubscriber> gcd_subscriber_;
 
   scoped_ptr<HostChangeNotificationListener> host_change_notification_listener_;
   scoped_ptr<HostStatusLogger> host_status_logger_;
@@ -803,7 +815,7 @@ void HostProcess::StartOnUiThread() {
           daemon_channel_.get());
   desktop_session_connector_ = desktop_environment_factory;
 #else  // !defined(OS_WIN)
-  DesktopEnvironmentFactory* desktop_environment_factory;
+  BasicDesktopEnvironmentFactory* desktop_environment_factory;
   if (enable_window_capture_) {
     desktop_environment_factory =
       new SingleWindowDesktopEnvironmentFactory(
@@ -819,6 +831,8 @@ void HostProcess::StartOnUiThread() {
           context_->ui_task_runner());
   }
 #endif  // !defined(OS_WIN)
+  desktop_environment_factory->set_supports_touch_events(
+      InputInjector::SupportsTouchEvents());
 
   desktop_environment_factory_.reset(desktop_environment_factory);
   desktop_environment_factory_->SetEnableGnubbyAuth(enable_gnubby_auth_);
@@ -1305,8 +1319,13 @@ bool HostProcess::OnGnubbyAuthPolicyUpdate(base::DictionaryValue* policies) {
 }
 
 void HostProcess::InitializeSignaling() {
-  DCHECK(!host_id_.empty());  // |ApplyConfig| should already have been run.
+  DCHECK(!host_id_.empty());  // ApplyConfig() should already have been run.
   DCHECK(!signal_strategy_);
+  DCHECK(!oauth_token_getter_);
+  DCHECK(!signaling_connector_);
+  DCHECK(!gcd_state_updater_);
+  DCHECK(!gcd_subscriber_);
+  DCHECK(!heartbeat_sender_);
 
   // Create SignalStrategy.
   XmppSignalStrategy* xmpp_signal_strategy = new XmppSignalStrategy(
@@ -1321,19 +1340,40 @@ void HostProcess::InitializeSignaling() {
       new OAuthTokenGetter::OAuthCredentials(xmpp_server_config_.username,
                                              oauth_refresh_token_,
                                              use_service_account_));
-  scoped_ptr<OAuthTokenGetter> oauth_token_getter(new OAuthTokenGetterImpl(
+  oauth_token_getter_.reset(new OAuthTokenGetterImpl(
       oauth_credentials.Pass(), context_->url_request_context_getter(), false,
-      gcd_device_id_.empty()));
+      !using_gcd()));
   signaling_connector_.reset(new SignalingConnector(
       xmpp_signal_strategy, dns_blackhole_checker.Pass(),
-      oauth_token_getter.Pass(),
+      oauth_token_getter_.get(),
       base::Bind(&HostProcess::OnAuthFailed, base::Unretained(this))));
 
-  // Create HeartbeatSender.
-  heartbeat_sender_.reset(new HeartbeatSender(
-      base::Bind(&HostProcess::OnHeartbeatSuccessful, base::Unretained(this)),
-      base::Bind(&HostProcess::OnUnknownHostIdError, base::Unretained(this)),
-      host_id_, xmpp_signal_strategy, key_pair_, directory_bot_jid_));
+  if (using_gcd()) {
+    // Create objects to manage GCD state.
+    ServiceUrls* service_urls = ServiceUrls::GetInstance();
+    scoped_ptr<GcdRestClient> gcd_rest_client(new GcdRestClient(
+        service_urls->gcd_base_url(), gcd_device_id_,
+        context_->url_request_context_getter(), oauth_token_getter_.get()));
+    gcd_state_updater_.reset(
+        new GcdStateUpdater(base::Bind(&HostProcess::OnHeartbeatSuccessful,
+                                       base::Unretained(this)),
+                            base::Bind(&HostProcess::OnUnknownHostIdError,
+                                       base::Unretained(this)),
+                            signal_strategy_.get(), gcd_rest_client.Pass()));
+
+    PushNotificationSubscriber::Subscription sub;
+    sub.channel = "cloud_devices";
+    PushNotificationSubscriber::SubscriptionList subs;
+    subs.push_back(sub);
+    gcd_subscriber_.reset(
+        new PushNotificationSubscriber(signal_strategy_.get(), subs));
+  } else {
+    // Create HeartbeatSender.
+    heartbeat_sender_.reset(new HeartbeatSender(
+        base::Bind(&HostProcess::OnHeartbeatSuccessful, base::Unretained(this)),
+        base::Bind(&HostProcess::OnUnknownHostIdError, base::Unretained(this)),
+        host_id_, signal_strategy_.get(), key_pair_, directory_bot_jid_));
+  }
 }
 
 void HostProcess::StartHostIfReady() {
@@ -1409,9 +1449,14 @@ void HostProcess::StartHost() {
   host_change_notification_listener_.reset(new HostChangeNotificationListener(
       this, host_id_, signal_strategy_.get(), directory_bot_jid_));
 
-  host_status_logger_.reset(
-      new HostStatusLogger(host_->AsWeakPtr(), ServerLogEntry::ME2ME,
-                           signal_strategy_.get(), directory_bot_jid_));
+  if (using_gcd()) {
+    // TODO(jrw): Implement logging for GCD hosts.
+    HOST_LOG << "Logging not implemented for GCD hosts.";
+  } else {
+    host_status_logger_.reset(new HostStatusLogger(
+        host_->AsWeakPtr(), ServerLogEntry::ME2ME,
+        signal_strategy_.get(), directory_bot_jid_));
+  }
 
   // Set up reporting the host status notifications.
 #if defined(REMOTING_MULTI_PROCESS)
@@ -1485,10 +1530,18 @@ void HostProcess::GoOffline(const std::string& host_offline_reason) {
       InitializeSignaling();
 
     HOST_LOG << "SendHostOfflineReason: sending " << host_offline_reason << ".";
-    heartbeat_sender_->SetHostOfflineReason(
-        host_offline_reason,
-        base::TimeDelta::FromSeconds(kHostOfflineReasonTimeoutSeconds),
-        base::Bind(&HostProcess::OnHostOfflineReasonAck, this));
+    if (heartbeat_sender_) {
+      heartbeat_sender_->SetHostOfflineReason(
+          host_offline_reason,
+          base::TimeDelta::FromSeconds(kHostOfflineReasonTimeoutSeconds),
+          base::Bind(&HostProcess::OnHostOfflineReasonAck, this));
+    }
+    if (gcd_state_updater_) {
+      gcd_state_updater_->SetHostOfflineReason(
+          host_offline_reason,
+          base::TimeDelta::FromSeconds(kHostOfflineReasonTimeoutSeconds),
+          base::Bind(&HostProcess::OnHostOfflineReasonAck, this));
+    }
     return;  // Shutdown will resume after OnHostOfflineReasonAck.
   }
 
@@ -1504,8 +1557,11 @@ void HostProcess::OnHostOfflineReasonAck(bool success) {
 
   HOST_LOG << "SendHostOfflineReason " << (success ? "succeeded." : "failed.");
   heartbeat_sender_.reset();
+  oauth_token_getter_.reset();
   signaling_connector_.reset();
   signal_strategy_.reset();
+  gcd_state_updater_.reset();
+  gcd_subscriber_.reset();
 
   if (state_ == HOST_GOING_OFFLINE_TO_RESTART) {
     SetState(HOST_STARTING);
@@ -1554,8 +1610,8 @@ int HostProcessMain() {
   // single-threaded.
   net::EnableSSLServerSockets();
 
-  // Ensures runtime specific CPU features are initialized.
-  media::InitializeCPUSpecificMediaFeatures();
+  // Ensures that media library and specific CPU features are initialized.
+  media::InitializeMediaLibrary();
 
   // Create the main message loop and start helper threads.
   base::MessageLoopForUI message_loop;

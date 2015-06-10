@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//third_party/mojo/src/mojo/public/mojo_application.gni")
+import("//mojo/public/mojo_application.gni")
 
 if (is_android) {
   import("//build/config/android/rules.gni")
@@ -76,6 +76,8 @@ source_set("lib") {
     "tcp_server_socket_impl.h",
     "udp_socket_impl.cc",
     "udp_socket_impl.h",
+    "url_loader_factory_impl.cc",
+    "url_loader_factory_impl.h",
     "url_loader_impl.cc",
     "url_loader_impl.h",
     "web_socket_impl.cc",

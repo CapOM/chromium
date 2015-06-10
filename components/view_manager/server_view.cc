@@ -18,10 +18,11 @@ ServerView::ServerView(ServerViewDelegate* delegate, const ViewId& id)
       parent_(nullptr),
       visible_(false),
       opacity_(1),
+      allows_reembed_(false),
       // Don't notify newly added observers during notification. This causes
       // problems for code that adds an observer as part of an observer
       // notification (such as ServerViewDrawTracker).
-      observers_(ObserverList<ServerViewObserver>::NOTIFY_EXISTING_ONLY) {
+      observers_(base::ObserverList<ServerViewObserver>::NOTIFY_EXISTING_ONLY) {
   DCHECK(delegate);  // Must provide a delegate.
 }
 

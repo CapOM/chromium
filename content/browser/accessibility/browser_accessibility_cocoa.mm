@@ -111,6 +111,8 @@ AccessibilityMatchPredicate PredicateForSearchKey(NSString* searchKey) {
     return [](BrowserAccessibility* start, BrowserAccessibility* current) {
       if (current->IsWebAreaForPresentationalIframe())
         return false;
+      if (!current->GetParent())
+        return false;
       return (current->GetRole() == ui::AX_ROLE_WEB_AREA ||
               current->GetRole() == ui::AX_ROLE_ROOT_WEB_AREA);
     };
@@ -1890,12 +1892,8 @@ bool InitializeAccessibilityTreeSearch(
     [self delegate]->AccessibilityDoDefaultAction(
         browserAccessibility_->GetId());
   } else if ([action isEqualToString:NSAccessibilityShowMenuAction]) {
-    NSPoint objOrigin = [self origin];
-    NSSize size = [[self size] sizeValue];
-    gfx::Point origin = [self delegate]->AccessibilityOriginInScreen(
-        gfx::Rect(objOrigin.x, objOrigin.y, size.width, size.height));
-    origin.Offset(size.width / 2, size.height / 2);
-    [self delegate]->AccessibilityShowMenu(origin);
+    [self delegate]->AccessibilityShowContextMenu(
+        browserAccessibility_->GetId());
   }
 }
 

@@ -6,9 +6,12 @@
 
 #include "base/command_line.h"
 #include "base/json/json_reader.h"
+#include "base/location.h"
 #include "base/memory/ref_counted.h"
 #include "base/path_service.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 #include "content/browser/child_process_security_policy_impl.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
@@ -1160,6 +1163,12 @@ IN_PROC_BROWSER_TEST_F(RenderFrameHostManagerTest, MAYBE_BackForwardNotStale) {
 // Swapping out a render view should update its visiblity state.
 IN_PROC_BROWSER_TEST_F(RenderFrameHostManagerTest,
                        SwappedOutViewHasCorrectVisibilityState) {
+  // This test is invalid in --site-per-process mode, as swapped-out is no
+  // longer used.
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSitePerProcess)) {
+    return;
+  }
   StartServer();
 
   // Load a page with links that open in a new window.
@@ -1760,7 +1769,7 @@ class RenderFrameHostDestructionObserver : public WebContentsObserver {
     }
 
     if (deleted_ && message_loop_runner_->loop_running()) {
-      base::MessageLoop::current()->PostTask(
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
           FROM_HERE, message_loop_runner_->QuitClosure());
     }
   }

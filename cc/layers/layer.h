@@ -269,7 +269,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
            draw_properties_.render_target->render_surface());
     return draw_properties_.render_target;
   }
-  int num_unclipped_descendants() const {
+  size_t num_unclipped_descendants() const {
     return draw_properties_.num_unclipped_descendants;
   }
 
@@ -671,9 +671,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   // trigger a Commit.
   void SetHasRenderSurface(bool has_render_surface);
 
-  // Returns the index of the child or -1 if not found.
-  int IndexOfChild(const Layer* reference);
-
   // This should only be called from RemoveFromParent().
   void RemoveChildOrDependent(Layer* child);
 
@@ -695,6 +692,10 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   // If this layer has a clip parent, it removes |this| from its list of clip
   // children.
   void RemoveFromClipTree();
+
+  // When we detach or attach layer to new LayerTreeHost, all property trees'
+  // indices becomes invalid.
+  void InvalidatePropertyTreesIndices();
 
   void UpdateNumCopyRequestsForSubtree(bool add);
   void UpdateNumInputHandlersForSubtree(bool add);

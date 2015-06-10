@@ -5,11 +5,14 @@
 #include "content/browser/service_worker/service_worker_version.h"
 
 #include "base/command_line.h"
+#include "base/location.h"
 #include "base/memory/ref_counted.h"
 #include "base/metrics/histogram_macros.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string16.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
 #include "content/browser/bad_message.h"
 #include "content/browser/child_process_security_policy_impl.h"
@@ -72,7 +75,7 @@ const char kClaimClientsShutdownErrorMesage[] =
 
 void RunSoon(const base::Closure& callback) {
   if (!callback.is_null())
-    base::MessageLoop::current()->PostTask(FROM_HERE, callback);
+    base::ThreadTaskRunnerHandle::Get()->PostTask(FROM_HERE, callback);
 }
 
 template <typename CallbackArray, typename Arg>
@@ -552,11 +555,13 @@ void ServiceWorkerVersion::StartWorker(
     bool pause_after_download,
     const StatusCallback& callback) {
   if (!context_) {
+    RecordStartWorkerResult(SERVICE_WORKER_ERROR_ABORT);
     RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_ABORT));
     return;
   }
-  if (status_ == REDUNDANT) {
-    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_START_WORKER_FAILED));
+  if (is_redundant()) {
+    RecordStartWorkerResult(SERVICE_WORKER_ERROR_REDUNDANT);
+    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_REDUNDANT));
     return;
   }
   prestart_status_ = status_;
@@ -639,6 +644,10 @@ void ServiceWorkerVersion::DispatchMessageEventInternal(
                    callback)));
     return;
   }
+
+  // TODO(kinuko): Cleanup this (and corresponding unit test) when message
+  // event becomes extendable, round-trip event. (crbug.com/498596)
+  RestartTick(&idle_time_);
 
   MessagePortMessageFilter* filter =
       embedded_worker_->message_port_message_filter();
@@ -1328,7 +1337,8 @@ void ServiceWorkerVersion::OnFetchEventFinished(
 }
 
 void ServiceWorkerVersion::OnSyncEventFinished(
-    int request_id) {
+    int request_id,
+    blink::WebServiceWorkerEventResult result) {
   TRACE_EVENT1("ServiceWorker",
                "ServiceWorkerVersion::OnSyncEventFinished",
                "Request id", request_id);
@@ -1338,8 +1348,18 @@ void ServiceWorkerVersion::OnSyncEventFinished(
     return;
   }
 
+  ServiceWorkerStatusCode status = SERVICE_WORKER_OK;
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableServiceWorkerSync)) {
+    // Avoid potential race condition where flag is disabled after a sync event
+    // was dispatched
+    status = SERVICE_WORKER_ERROR_ABORT;
+  } else if (result == blink::WebServiceWorkerEventResultRejected) {
+    status = SERVICE_WORKER_ERROR_EVENT_WAITUNTIL_REJECTED;
+  }
+
   scoped_refptr<ServiceWorkerVersion> protect(this);
-  callback->Run(SERVICE_WORKER_OK);
+  callback->Run(status);
   RemoveCallbackAndStopIfRedundant(&sync_callbacks_, request_id);
 }
 
@@ -1689,8 +1709,8 @@ void ServiceWorkerVersion::DidEnsureLiveRegistrationForStartWorker(
     return;
   }
   if (is_redundant()) {
-    RecordStartWorkerResult(SERVICE_WORKER_ERROR_NOT_FOUND);
-    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_START_WORKER_FAILED));
+    RecordStartWorkerResult(SERVICE_WORKER_ERROR_REDUNDANT);
+    RunSoon(base::Bind(callback, SERVICE_WORKER_ERROR_REDUNDANT));
     return;
   }
 

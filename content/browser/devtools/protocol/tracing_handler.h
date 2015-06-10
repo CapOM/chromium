@@ -50,16 +50,14 @@ class TracingHandler {
   void OnCategoriesReceived(DevToolsCommandId command_id,
                             const std::set<std::string>& category_set);
 
-  base::trace_event::TraceOptions TraceOptionsFromString(
-      const std::string* options);
-
   void SetupTimer(double usage_reporting_interval);
 
   void DisableRecording(bool abort);
 
+  bool IsRecording() const;
+
   scoped_ptr<base::Timer> buffer_usage_poll_timer_;
   Target target_;
-  bool is_recording_;
 
   scoped_ptr<Client> client_;
   base::WeakPtrFactory<TracingHandler> weak_factory_;

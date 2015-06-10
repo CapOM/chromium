@@ -81,7 +81,7 @@ class SessionStorageNamespace;
 }
 
 namespace extensions {
-class BookmarkAppBrowserController;
+class HostedAppBrowserController;
 class Extension;
 class ExtensionRegistry;
 class WindowController;
@@ -283,8 +283,8 @@ class Browser : public TabStripModelObserver,
   BrowserInstantController* instant_controller() {
     return instant_controller_.get();
   }
-  extensions::BookmarkAppBrowserController* bookmark_app_controller() {
-    return bookmark_app_controller_.get();
+  extensions::HostedAppBrowserController* hosted_app_controller() {
+    return hosted_app_controller_.get();
   }
 
   // Get the FindBarController for this browser, creating it if it does not
@@ -462,6 +462,8 @@ class Browser : public TabStripModelObserver,
   bool CanDragEnter(content::WebContents* source,
                     const content::DropData& data,
                     blink::WebDragOperationsMask operations_allowed) override;
+  content::SecurityStyle GetSecurityStyle(
+      const content::WebContents* web_contents) override;
 
   bool is_type_tabbed() const { return type_ == TYPE_TABBED; }
   bool is_type_popup() const { return type_ == TYPE_POPUP; }
@@ -963,7 +965,7 @@ class Browser : public TabStripModelObserver,
   scoped_ptr<BrowserInstantController> instant_controller_;
 
   // Helper which handles bookmark app specific browser configuration.
-  scoped_ptr<extensions::BookmarkAppBrowserController> bookmark_app_controller_;
+  scoped_ptr<extensions::HostedAppBrowserController> hosted_app_controller_;
 
   BookmarkBar::State bookmark_bar_state_;
 

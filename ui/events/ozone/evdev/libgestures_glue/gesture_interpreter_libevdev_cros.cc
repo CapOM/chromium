@@ -398,7 +398,8 @@ void GestureInterpreterLibevdevCros::OnGestureMetrics(
                                  metrics->data[0],
                                  metrics->data[1],
                                  metrics->type);
-  NOTIMPLEMENTED();
+
+  // TODO(spang): Hook up metrics.
 }
 
 void GestureInterpreterLibevdevCros::DispatchChangedMouseButtons(
@@ -451,7 +452,8 @@ void GestureInterpreterLibevdevCros::DispatchChangedKeys(
 
       // Dispatch key press or release to keyboard.
       dispatcher_->DispatchKeyEvent(
-          KeyEventParams(id_, key, value, StimeToTimedelta(timestamp)));
+          KeyEventParams(id_, key, value, false /* suppress_auto_repeat */,
+                         StimeToTimedelta(timestamp)));
     }
   }
 

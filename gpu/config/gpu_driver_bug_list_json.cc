@@ -19,7 +19,7 @@ const char kGpuDriverBugListJson[] = LONG_STRING_CONST(
 {
   "name": "gpu driver bug list",
   // Please update the version number whenever you change this file.
-  "version": "8.07",
+  "version": "8.12",
   "entries": [
     {
       "id": 1,
@@ -1174,8 +1174,7 @@ LONG_STRING_CONST(
           "value": "5.0.2"
         }
       },
-      "gl_vendor": "Qualcomm.*",
-      "gl_renderer": ".*420",
+      "gl_renderer": "Adreno \\(TM\\) 4.*",
       "features": [
         "unbind_attachments_on_bound_render_fbo_delete"
       ]
@@ -1187,8 +1186,7 @@ LONG_STRING_CONST(
       "os": {
         "type": "android"
       },
-      "gl_vendor": "Qualcomm.*",
-      "gl_renderer": ".*420",
+      "gl_renderer": "Adreno \\(TM\\) 4.*",
       "features": [
         "disable_discard_framebuffer"
       ]
@@ -1334,8 +1332,7 @@ LONG_STRING_CONST(
       "os": {
         "type": "android"
       },
-      "gl_vendor": "Qualcomm.*",
-      "gl_renderer": ".*420",
+      "gl_renderer": "Adreno \\(TM\\) 4.*",
       "disabled_extensions": [
         "GL_EXT_disjoint_timer_query"
       ]
@@ -1381,8 +1378,7 @@ LONG_STRING_CONST(
           "value": "5.1"
         }
       },
-      "gl_vendor": "Qualcomm.*",
-      "gl_renderer": ".*420",
+      "gl_renderer": "Adreno \\(TM\\) 4.*",
       "features": [
         "disable_multisampled_render_to_texture"
       ]
@@ -1398,6 +1394,52 @@ LONG_STRING_CONST(
       "gl_renderer": ".*4\\d\\d",
       "features": [
         "disable_blend_equation_advanced"
+      ]
+    },
+    {
+      "id": 118,
+      "cr_bugs": [477306],
+      "description": "NVIDIA 331 series drivers shader compiler may crash when attempting to optimize pow()",
+      "os": {
+        "type": "linux"
+      },
+      "driver_version": {
+        "op": "<=",
+        "value": "331"
+      },
+      "vendor_id": "0x10de",
+      "features": [
+        "remove_pow_with_constant_exponent"
+      ]
+    },
+    {
+      "id": 119,
+      "description": "Context lost recovery often fails on Mali-400/450 on Android.",
+      "cr_bugs": [496438],
+      "os": {
+        "type": "android"
+      },
+      "gl_vendor": "ARM.*",
+      "gl_renderer": ".*Mali-4.*",
+      "features": [
+        "exit_on_context_lost"
+      ]
+    },
+    {
+      "id": 120,
+      "description": "CHROMIUM_copy_texture is slow on Mali pre-Lollipop",
+      "cr_bugs": [498443],
+      "os": {
+        "type": "android",
+        "version": {
+          "op": "<",
+          "value": "5.0.0"
+        }
+      },
+      "gl_vendor": "ARM.*",
+      "gl_renderer": "Mali.*",
+      "features": [
+        "max_copy_texture_chromium_size_262144"
       ]
     }
   ]

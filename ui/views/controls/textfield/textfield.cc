@@ -14,7 +14,7 @@
 #include "ui/base/dragdrop/drag_utils.h"
 #include "ui/base/touch/selection_bound.h"
 #include "ui/base/ui_base_switches_util.h"
-#include "ui/compositor/paint_context.h"
+#include "ui/compositor/canvas_painter.h"
 #include "ui/compositor/scoped_animation_duration_scale_mode.h"
 #include "ui/events/event.h"
 #include "ui/events/keycodes/keyboard_codes.h"
@@ -284,9 +284,10 @@ Textfield::Textfield()
   SetBorder(scoped_ptr<Border>(new FocusableBorder()));
   SetFocusable(true);
 
-  if (ViewsDelegate::views_delegate) {
-    password_reveal_duration_ = ViewsDelegate::views_delegate->
-        GetDefaultTextfieldObscuredRevealDuration();
+  if (ViewsDelegate::GetInstance()) {
+    password_reveal_duration_ =
+        ViewsDelegate::GetInstance()
+            ->GetDefaultTextfieldObscuredRevealDuration();
   }
 }
 
@@ -1082,7 +1083,7 @@ void Textfield::WriteDragDataForView(View* sender,
   // Desktop Linux Aura does not yet support transparency in drag images.
   canvas->DrawColor(GetBackgroundColor());
 #endif
-  label.Paint(ui::PaintContext(canvas.get()));
+  label.Paint(ui::CanvasPainter(canvas.get(), 1.f).context());
   const gfx::Vector2d kOffset(-15, 0);
   drag_utils::SetDragImageOnDataObject(*canvas, kOffset, data);
   if (controller_)
@@ -1614,12 +1615,6 @@ void Textfield::ExtendSelectionAndDelete(size_t before, size_t after) {
 }
 
 void Textfield::EnsureCaretInRect(const gfx::Rect& rect) {}
-
-void Textfield::OnCandidateWindowShown() {}
-
-void Textfield::OnCandidateWindowUpdated() {}
-
-void Textfield::OnCandidateWindowHidden() {}
 
 bool Textfield::IsEditCommandEnabled(int command_id) {
   return IsCommandIdEnabled(command_id);

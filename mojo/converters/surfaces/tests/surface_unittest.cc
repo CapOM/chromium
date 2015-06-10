@@ -111,18 +111,11 @@ TEST_F(SurfaceLibQuadTest, TextureQuad) {
   float vertex_opacity[4] = {0.1f, 0.5f, 0.4f, 0.8f};
   bool y_flipped = false;
   bool nearest_neighbor = false;
-  texture_quad->SetAll(sqs,
-                       rect,
-                       opaque_rect,
-                       visible_rect,
-                       needs_blending,
-                       resource_id,
-                       premultiplied_alpha,
-                       uv_top_left,
-                       uv_bottom_right,
-                       background_color,
-                       vertex_opacity,
-                       y_flipped,
+  bool allow_overlay = false;
+  texture_quad->SetAll(sqs, rect, opaque_rect, visible_rect, needs_blending,
+                       resource_id, gfx::Size(), allow_overlay,
+                       premultiplied_alpha, uv_top_left, uv_bottom_right,
+                       background_color, vertex_opacity, y_flipped,
                        nearest_neighbor);
 
   QuadPtr mojo_quad = Quad::From<cc::DrawQuad>(*texture_quad);
@@ -151,7 +144,7 @@ TEST_F(SurfaceLibQuadTest, TextureQuadEmptyVertexOpacity) {
   PassPtr mojo_pass = Pass::New();
   mojo_pass->id = RenderPassId::New();
   mojo_pass->id->layer_id = 1;
-  mojo_pass->id->index = 1;
+  mojo_pass->id->index = 1u;
   mojo_pass->quads.push_back(mojo_texture_quad.Pass());
   SharedQuadStatePtr mojo_sqs = SharedQuadState::New();
   mojo_pass->shared_quad_states.push_back(mojo_sqs.Pass());
@@ -170,7 +163,7 @@ TEST_F(SurfaceLibQuadTest, TextureQuadEmptyBackgroundColor) {
   PassPtr mojo_pass = Pass::New();
   mojo_pass->id = RenderPassId::New();
   mojo_pass->id->layer_id = 1;
-  mojo_pass->id->index = 1;
+  mojo_pass->id->index = 1u;
   mojo_pass->quads.push_back(mojo_texture_quad.Pass());
   SharedQuadStatePtr mojo_sqs = SharedQuadState::New();
   mojo_pass->shared_quad_states.push_back(mojo_sqs.Pass());
@@ -278,23 +271,16 @@ TEST(SurfaceLibTest, RenderPass) {
   float vertex_opacity[4] = {0.1f, 0.5f, 0.4f, 0.8f};
   bool y_flipped = false;
   bool nearest_neighbor = false;
-  texture_quad->SetAll(sqs,
-                       rect,
-                       opaque_rect,
-                       visible_rect,
-                       needs_blending,
-                       resource_id,
-                       premultiplied_alpha,
-                       uv_top_left,
-                       uv_bottom_right,
-                       background_color,
-                       vertex_opacity,
-                       y_flipped,
+  bool allow_overlay = false;
+  texture_quad->SetAll(sqs, rect, opaque_rect, visible_rect, needs_blending,
+                       resource_id, gfx::Size(), allow_overlay,
+                       premultiplied_alpha, uv_top_left, uv_bottom_right,
+                       background_color, vertex_opacity, y_flipped,
                        nearest_neighbor);
 
   PassPtr mojo_pass = Pass::From(*pass);
   ASSERT_FALSE(mojo_pass.is_null());
-  EXPECT_EQ(6, mojo_pass->id->index);
+  EXPECT_EQ(6u, mojo_pass->id->index);
   EXPECT_EQ(Rect::From(output_rect), mojo_pass->output_rect);
   EXPECT_EQ(Rect::From(damage_rect), mojo_pass->damage_rect);
   EXPECT_EQ(Transform::From(transform_to_root_target),
@@ -354,7 +340,7 @@ TEST(SurfaceLibTest, RenderPass) {
   ASSERT_EQ(cc::DrawQuad::TEXTURE_CONTENT, round_trip_quad->material);
   const cc::TextureDrawQuad* round_trip_texture_quad =
       cc::TextureDrawQuad::MaterialCast(round_trip_quad);
-  EXPECT_EQ(resource_id, round_trip_texture_quad->resource_id);
+  EXPECT_EQ(resource_id, round_trip_texture_quad->resource_id());
   EXPECT_EQ(premultiplied_alpha, round_trip_texture_quad->premultiplied_alpha);
   EXPECT_EQ(uv_top_left, round_trip_texture_quad->uv_top_left);
   EXPECT_EQ(uv_bottom_right, round_trip_texture_quad->uv_bottom_right);

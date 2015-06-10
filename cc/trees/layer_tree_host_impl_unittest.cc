@@ -100,7 +100,7 @@ class LayerTreeHostImplTest : public testing::Test,
         reduce_memory_result_(true),
         current_limit_bytes_(0),
         current_priority_cutoff_value_(0) {
-    media::InitializeMediaLibraryForTesting();
+    media::InitializeMediaLibrary();
   }
 
   LayerTreeSettings DefaultSettings() {
@@ -166,6 +166,10 @@ class LayerTreeHostImplTest : public testing::Test,
     did_complete_page_scale_animation_ = true;
   }
   void OnDrawForOutputSurface() override {}
+  void PostFrameTimingEventsOnImplThread(
+      scoped_ptr<FrameTimingTracker::CompositeTimingSet> composite_events,
+      scoped_ptr<FrameTimingTracker::MainFrameTimingSet> main_frame_events)
+      override {}
 
   void set_reduce_memory_result(bool reduce_memory_result) {
     reduce_memory_result_ = reduce_memory_result;
@@ -1130,6 +1134,50 @@ TEST_F(LayerTreeHostImplTest, ImplPinchZoom) {
     ExpectContains(*scroll_info.get(), scroll_layer->id(),
                    gfx::Vector2d(0, scroll_delta.y() / page_scale_delta));
   }
+}
+
+TEST_F(LayerTreeHostImplTest, ScrollDuringPinchScrollsInnerViewport) {
+  LayerTreeSettings settings = DefaultSettings();
+  settings.invert_viewport_scroll_order = true;
+  CreateHostImpl(settings,
+                 CreateOutputSurface());
+
+  LayerImpl* inner_scroll_layer =
+      SetupScrollAndContentsLayers(gfx::Size(100, 100));
+
+  // Adjust the content layer to be larger than the outer viewport container so
+  // that we get scrolling in both viewports.
+  LayerImpl* content_layer =
+      host_impl_->OuterViewportScrollLayer()->children().back();
+  LayerImpl* outer_scroll_layer = host_impl_->OuterViewportScrollLayer();
+  LayerImpl* inner_clip_layer =
+      host_impl_->InnerViewportScrollLayer()->parent()->parent();
+  inner_clip_layer->SetBounds(gfx::Size(100, 100));
+  inner_clip_layer->SetContentBounds(gfx::Size(100, 100));
+  outer_scroll_layer->SetBounds(gfx::Size(200, 200));
+  outer_scroll_layer->SetContentBounds(gfx::Size(200, 200));
+  content_layer->SetBounds(gfx::Size(200, 200));
+  content_layer->SetContentBounds(gfx::Size(200, 200));
+
+  host_impl_->SetViewportSize(gfx::Size(100, 100));
+
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(100, 100),
+      outer_scroll_layer->MaxScrollOffset());
+
+  host_impl_->ScrollBegin(gfx::Point(99, 99), InputHandler::GESTURE);
+  host_impl_->PinchGestureBegin();
+  host_impl_->PinchGestureUpdate(2, gfx::Point(99, 99));
+  host_impl_->ScrollBy(gfx::Point(99, 99), gfx::Vector2dF(10.f, 10.f));
+  host_impl_->PinchGestureEnd();
+  host_impl_->ScrollEnd();
+
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(0, 0),
+      outer_scroll_layer->CurrentScrollOffset());
+  EXPECT_VECTOR_EQ(
+      gfx::Vector2dF(50, 50),
+      inner_scroll_layer->CurrentScrollOffset());
 }
 
 TEST_F(LayerTreeHostImplTest, ImplPinchZoomWheelBubbleBetweenViewports) {
@@ -3946,7 +3994,8 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
   TestScrollOffsetDelegate()
       : page_scale_factor_(0.f),
         min_page_scale_factor_(-1.f),
-        max_page_scale_factor_(-1.f) {}
+        max_page_scale_factor_(-1.f),
+        needs_animate_(false) {}
 
   ~TestScrollOffsetDelegate() override {}
 
@@ -3954,7 +4003,11 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
     return getter_return_value_;
   }
 
-  bool IsExternalFlingActive() const override { return false; }
+  bool IsExternalScrollActive() const override { return false; }
+
+  void SetNeedsAnimate(const AnimationCallback&) override {
+    needs_animate_ = true;
+  }
 
   void UpdateRootLayerState(const gfx::ScrollOffset& total_scroll_offset,
                             const gfx::ScrollOffset& max_scroll_offset,
@@ -3972,6 +4025,12 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
     max_page_scale_factor_ = max_page_scale_factor;
 
     set_getter_return_value(last_set_scroll_offset_);
+  }
+
+  bool GetAndResetNeedsAnimate() {
+    bool needs_animate = needs_animate_;
+    needs_animate_ = false;
+    return needs_animate;
   }
 
   gfx::ScrollOffset last_set_scroll_offset() {
@@ -4010,8 +4069,10 @@ class TestScrollOffsetDelegate : public LayerScrollOffsetDelegate {
   float page_scale_factor_;
   float min_page_scale_factor_;
   float max_page_scale_factor_;
+  bool needs_animate_;
 };
 
+// TODO(jdduke): Test root fling animation.
 TEST_F(LayerTreeHostImplTest, RootLayerScrollOffsetDelegation) {
   TestScrollOffsetDelegate scroll_delegate;
   host_impl_->SetViewportSize(gfx::Size(10, 20));
@@ -5829,7 +5890,7 @@ TEST_F(LayerTreeHostImplTest, FarAwayQuadsDontNeedAA) {
 
   bool antialiased =
       GLRendererWithSetupQuadForAntialiasing::ShouldAntialiasQuad(
-          quad->quadTransform(), quad, false);
+          quad->shared_quad_state->content_to_target_transform, quad, false);
   EXPECT_FALSE(antialiased);
 
   host_impl_->DrawLayers(&frame);

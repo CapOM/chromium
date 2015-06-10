@@ -140,10 +140,6 @@ remoting.ClientSession.State = {
   UNKNOWN: 0,
   INITIALIZING: 1,
   CONNECTING: 2,
-  // We don't currently receive AUTHENTICATED from the host - it comes through
-  // as 'CONNECTING' instead.
-  // TODO(garykac) Update chromoting_instance.cc to send this once we've
-  // shipped a webapp release with support for AUTHENTICATED.
   AUTHENTICATED: 3,
   CONNECTED: 4,
   CLOSED: 5,
@@ -229,6 +225,11 @@ remoting.ClientSession.Capability = {
   // TODO(kelvinp): This has been supported since M-29.  Currently we only have
   // <1000 users on M-29 or below. Remove this and the capability on the host.
   RATE_LIMIT_RESIZE_REQUESTS: 'rateLimitResizeRequests',
+
+  // Indicates native touch input support. If the host does not support
+  // touch then the client will let Chrome synthesize mouse events from touch
+  // input, for compatibility with non-touch-aware systems.
+  TOUCH_EVENTS: 'touchEvents',
 
   // Indicates that host/client supports Google Drive integration, and that the
   // client should send to the host the OAuth tokens to be used by Google Drive
@@ -526,6 +527,10 @@ remoting.ClientSession.prototype.setState_ = function(newState) {
   if (newState == remoting.ClientSession.State.CONNECTED) {
     this.connectedDisposables_.add(
         new base.RepeatingTimer(this.reportStatistics.bind(this), 1000));
+    if (this.plugin_.hasCapability(
+          remoting.ClientSession.Capability.TOUCH_EVENTS)) {
+      this.plugin_.enableTouchEvents(true);
+    }
   } else if (this.isFinished()) {
     base.dispose(this.connectedDisposables_);
     this.connectedDisposables_ = null;

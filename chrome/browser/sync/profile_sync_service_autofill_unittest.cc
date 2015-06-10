@@ -337,10 +337,10 @@ class WebDataServiceFake : public AutofillWebDataService {
   DISALLOW_COPY_AND_ASSIGN(WebDataServiceFake);
 };
 
-KeyedService* BuildMockWebDataServiceWrapper(content::BrowserContext* profile) {
-  return new MockWebDataServiceWrapper(
-      new WebDataServiceFake(),
-      new TokenWebDataServiceFake());
+scoped_ptr<KeyedService> BuildMockWebDataServiceWrapper(
+    content::BrowserContext* profile) {
+  return make_scoped_ptr(new MockWebDataServiceWrapper(
+      new WebDataServiceFake(), new TokenWebDataServiceFake()));
 }
 
 ACTION_P(MakeAutocompleteSyncComponents, wds) {
@@ -425,8 +425,8 @@ class MockPersonalDataManager : public PersonalDataManager {
   MOCK_METHOD0(LoadCreditCards, void());
   MOCK_METHOD0(Refresh, void());
 
-  static KeyedService* Build(content::BrowserContext* profile) {
-    return new MockPersonalDataManager();
+  static scoped_ptr<KeyedService> Build(content::BrowserContext* profile) {
+    return make_scoped_ptr(new MockPersonalDataManager());
   }
 };
 
@@ -568,7 +568,7 @@ class ProfileSyncServiceAutofillTest
 
     // It's possible this test triggered an unrecoverable error, in which case
     // we can't get the sync count.
-    if (sync_service_->SyncActive()) {
+    if (sync_service_->IsSyncActive()) {
       EXPECT_EQ(GetSyncCount(type),
                 association_stats_.num_sync_items_after_association);
     }
@@ -596,9 +596,7 @@ class ProfileSyncServiceAutofillTest
 
     sync_pb::EntitySpecifics specifics;
     AutocompleteSyncableService::WriteAutofillEntry(entry, &specifics);
-    sync_pb::AutofillSpecifics* autofill_specifics =
-        specifics.mutable_autofill();
-    node.SetAutofillSpecifics(*autofill_specifics);
+    node.SetEntitySpecifics(specifics);
     return true;
   }
 
@@ -618,9 +616,7 @@ class ProfileSyncServiceAutofillTest
 
     sync_pb::EntitySpecifics specifics;
     AutofillProfileSyncableService::WriteAutofillProfile(profile, &specifics);
-    sync_pb::AutofillProfileSpecifics* profile_specifics =
-        specifics.mutable_autofill_profile();
-    node.SetAutofillProfileSpecifics(*profile_specifics);
+    node.SetEntitySpecifics(specifics);
     return true;
   }
 
@@ -639,7 +635,7 @@ class ProfileSyncServiceAutofillTest
         return false;
 
       const sync_pb::AutofillSpecifics& autofill(
-          child_node.GetAutofillSpecifics());
+          child_node.GetEntitySpecifics().autofill());
       if (autofill.has_value()) {
         AutofillKey key(base::UTF8ToUTF16(autofill.name()),
                         base::UTF8ToUTF16(autofill.value()));
@@ -678,7 +674,7 @@ class ProfileSyncServiceAutofillTest
         return false;
 
       const sync_pb::AutofillProfileSpecifics& autofill(
-          child_node.GetAutofillProfileSpecifics());
+          child_node.GetEntitySpecifics().autofill_profile());
         AutofillProfile p;
         p.set_guid(autofill.guid());
         AutofillProfileSyncableService::OverwriteProfileWithServerData(
@@ -1088,7 +1084,7 @@ TEST_F(ProfileSyncServiceAutofillTest, HasNativeHasSyncMergeProfileCombine) {
       "91601", "US", "19482937549");
 
   AutofillProfile expected_profile(sync_profile);
-  expected_profile.OverwriteWithOrAddTo(*native_profile, "en-US");
+  expected_profile.OverwriteWith(*native_profile, "en-US");
 
   std::vector<AutofillProfile*> native_profiles;
   native_profiles.push_back(native_profile);

@@ -22,6 +22,7 @@
 #include "cc/debug/benchmark_instrumentation.h"
 #include "cc/output/output_surface.h"
 #include "cc/trees/layer_tree_host.h"
+#include "components/scheduler/renderer/renderer_scheduler.h"
 #include "content/child/npapi/webplugin.h"
 #include "content/common/gpu/client/context_provider_command_buffer.h"
 #include "content/common/gpu/client/webgraphicscontext3d_command_buffer_impl.h"
@@ -64,7 +65,6 @@
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebNode.h"
 #include "third_party/WebKit/public/web/WebPagePopup.h"
-#include "third_party/WebKit/public/web/WebPopupMenu.h"
 #include "third_party/WebKit/public/web/WebPopupMenuInfo.h"
 #include "third_party/WebKit/public/web/WebRange.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
@@ -103,8 +103,6 @@ using blink::WebNavigationPolicy;
 using blink::WebNode;
 using blink::WebPagePopup;
 using blink::WebPoint;
-using blink::WebPopupMenu;
-using blink::WebPopupMenuInfo;
 using blink::WebPopupType;
 using blink::WebRange;
 using blink::WebRect;
@@ -576,9 +574,6 @@ blink::WebWidget* RenderWidget::CreateWebWidget(RenderWidget* render_widget) {
   switch (render_widget->popup_type_) {
     case blink::WebPopupTypeNone:  // Nothing to create.
       break;
-    case blink::WebPopupTypeSelect:
-    case blink::WebPopupTypeSuggestion:
-      return WebPopupMenu::create(render_widget);
     case blink::WebPopupTypePage:
       return WebPagePopup::create(render_widget);
     default:
@@ -739,10 +734,6 @@ bool RenderWidget::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ViewMsg_WasHidden, OnWasHidden)
     IPC_MESSAGE_HANDLER(ViewMsg_WasShown, OnWasShown)
     IPC_MESSAGE_HANDLER(ViewMsg_SetInputMethodActive, OnSetInputMethodActive)
-    IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowShown, OnCandidateWindowShown)
-    IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowUpdated,
-                        OnCandidateWindowUpdated)
-    IPC_MESSAGE_HANDLER(ViewMsg_CandidateWindowHidden, OnCandidateWindowHidden)
     IPC_MESSAGE_HANDLER(ViewMsg_Repaint, OnRepaint)
     IPC_MESSAGE_HANDLER(ViewMsg_SetTextDirection, OnSetTextDirection)
     IPC_MESSAGE_HANDLER(ViewMsg_Move_ACK, OnRequestMoveAck)
@@ -1267,6 +1258,11 @@ void RenderWidget::OnHandleInputEvent(const blink::WebInputEvent* input_event,
       Send(response.release());
     }
   }
+  if (!no_ack && RenderThreadImpl::current()) {
+    RenderThreadImpl::current()
+        ->GetRendererScheduler()
+        ->DidHandleInputEventOnMainThread(*input_event);
+  }
   if (input_event->type == WebInputEvent::MouseMove)
     ignore_ack_for_mouse_move_from_debugger_ = false;
 
@@ -1657,15 +1653,6 @@ void RenderWidget::OnSetInputMethodActive(bool is_active) {
   // a browser process, we permit the renderer process to send IPC messages
   // only during the input method attached to the browser process is active.
   input_method_is_active_ = is_active;
-}
-
-void RenderWidget::OnCandidateWindowShown() {
-}
-
-void RenderWidget::OnCandidateWindowUpdated() {
-}
-
-void RenderWidget::OnCandidateWindowHidden() {
 }
 
 void RenderWidget::OnImeSetComposition(
@@ -2227,6 +2214,24 @@ void RenderWidget::didHandleGestureEvent(
       UpdateTextInputState(SHOW_IME_IF_NEEDED, FROM_NON_IME);
   }
 #endif
+}
+
+void RenderWidget::didOverscroll(
+    const blink::WebFloatSize& unusedDelta,
+    const blink::WebFloatSize& accumulatedRootOverScroll,
+    const blink::WebFloatPoint& position,
+    const blink::WebFloatSize& velocity) {
+  DidOverscrollParams params;
+  // TODO(jdduke): Consider bundling the overscroll with the input event ack to
+  // save an IPC.
+  params.accumulated_overscroll = gfx::Vector2dF(
+      accumulatedRootOverScroll.width, accumulatedRootOverScroll.height);
+  params.latest_overscroll_delta =
+      gfx::Vector2dF(unusedDelta.width, unusedDelta.height);
+  params.current_fling_velocity =
+      gfx::Vector2dF(velocity.width, velocity.height);
+  params.causal_event_viewport_point = gfx::PointF(position.x, position.y);
+  Send(new InputHostMsg_DidOverscroll(routing_id_, params));
 }
 
 void RenderWidget::StartCompositor() {

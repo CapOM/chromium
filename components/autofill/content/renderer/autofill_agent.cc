@@ -296,8 +296,8 @@ void AutofillAgent::didRequestAutocomplete(
   content::SSLStatus ssl_status =
       render_frame()->GetRenderView()->GetSSLStatusOfFrame(
           form.document().frame());
-  bool is_safe = url.SchemeIs(url::kHttpsScheme) &&
-      !net::IsCertStatusError(ssl_status.cert_status);
+  bool is_safe = url.SchemeIsCryptographic() &&
+                 !net::IsCertStatusError(ssl_status.cert_status);
   bool allow_unsafe = base::CommandLine::ForCurrentProcess()->HasSwitch(
       ::switches::kReduceSecurityForTesting);
   FormData form_data;
@@ -411,6 +411,10 @@ void AutofillAgent::TextFieldDidChangeImpl(
 
   const WebInputElement* input_element = toWebInputElement(&element);
   if (input_element) {
+    // |password_autofill_agent_| keeps track of all text changes even if
+    // it isn't displaying UI.
+    password_autofill_agent_->UpdateStateForTextChange(*input_element);
+
     if (password_generation_agent_ &&
         password_generation_agent_->TextDidChangeInTextField(*input_element)) {
       is_popup_possibly_visible_ = true;

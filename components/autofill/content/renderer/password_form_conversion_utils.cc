@@ -100,8 +100,8 @@ PasswordForm::Layout SequenceToLayout(base::StringPiece layout_sequence) {
 // |element| is present and has the specified |value_in_lowercase|.
 bool HasAutocompleteAttributeValue(const WebInputElement& element,
                                    const char* value_in_lowercase) {
-  return LowerCaseEqualsASCII(element.getAttribute("autocomplete"),
-                              value_in_lowercase);
+  return base::LowerCaseEqualsASCII(element.getAttribute("autocomplete"),
+                                    value_in_lowercase);
 }
 
 // Helper to determine which password is the main (current) one, and which is
@@ -427,6 +427,10 @@ void GetPasswordForm(
     UMA_HISTOGRAM_COUNTS_100(
         "PasswordManager.EmptyUsernames.TextAndPasswordFieldCount",
         layout_sequence.size());
+    // For comparison, also report the number of password fields.
+    UMA_HISTOGRAM_COUNTS_100(
+        "PasswordManager.EmptyUsernames.PasswordFieldCount",
+        std::count(layout_sequence.begin(), layout_sequence.end(), 'P'));
   }
 
   password_form->scheme = PasswordForm::SCHEME_HTML;

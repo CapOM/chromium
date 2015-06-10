@@ -12,11 +12,9 @@
 #include "chrome/browser/banners/app_banner_settings_helper.h"
 #include "chrome/browser/bitmap_fetcher/bitmap_fetcher.h"
 #include "chrome/browser/browser_process.h"
-#include "chrome/browser/infobars/infobar_service.h"
 #include "chrome/browser/manifest/manifest_icon_selector.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/common/render_messages.h"
-#include "components/infobars/core/infobar.h"
 #include "components/rappor/rappor_utils.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/browser_thread.h"
@@ -37,7 +35,7 @@ int gCurrentRequestID = -1;
 const int kIconMinimumSize = 144;
 bool DoesManifestContainRequiredIcon(const content::Manifest& manifest) {
   for (const auto& icon : manifest.icons) {
-    if (!EqualsASCII(icon.type.string(), "image/png"))
+    if (!base::EqualsASCII(icon.type.string(), "image/png"))
       continue;
 
     for (const auto& size : icon.sizes) {
@@ -158,11 +156,7 @@ void AppBannerDataFetcher::OnBannerPromptReply(
   FOR_EACH_OBSERVER(Observer, observer_list_,
                     OnDecidedWhetherToShow(this, true));
 
-  infobars::InfoBar* infobar = CreateBanner(app_icon_.get(), app_title_);
-  if (infobar) {
-    InfoBarService::FromWebContents(web_contents)->AddInfoBar(
-        make_scoped_ptr(infobar));
-  }
+  ShowBanner(app_icon_.get(), app_title_);
   is_active_ = false;
 }
 
@@ -203,18 +197,6 @@ bool AppBannerDataFetcher::FetchIcon(const GURL& image_url) {
       net::URLRequest::CLEAR_REFERRER_ON_TRANSITION_FROM_SECURE_TO_INSECURE,
       net::LOAD_NORMAL);
   return true;
-}
-
-infobars::InfoBar* AppBannerDataFetcher::CreateBanner(
-    const SkBitmap* icon,
-    const base::string16& title) {
-  content::WebContents* web_contents = GetWebContents();
-  DCHECK(web_contents && !web_app_data_.IsEmpty());
-
-  // TODO(dfalcantara): Desktop doesn't display app banners, yet.  Just pretend
-  //                    that a banner was shown for testing purposes.
-  RecordDidShowBanner("AppBanner.WebApp.Shown");
-  return nullptr;
 }
 
 void AppBannerDataFetcher::RecordDidShowBanner(const std::string& event_name) {
@@ -310,12 +292,12 @@ void AppBannerDataFetcher::OnDidCheckHasServiceWorker(
 void AppBannerDataFetcher::OnFetchComplete(const GURL& url,
                                            const SkBitmap* icon) {
   if (is_active_)
-    ShowBanner(icon);
+    RequestShowBanner(icon);
 
   Release();
 }
 
-void AppBannerDataFetcher::ShowBanner(const SkBitmap* icon) {
+void AppBannerDataFetcher::RequestShowBanner(const SkBitmap* icon) {
   content::WebContents* web_contents = GetWebContents();
   if (!CheckFetcherIsStillAlive(web_contents)) {
     Cancel();

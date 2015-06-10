@@ -190,6 +190,11 @@ class CONTENT_EXPORT RenderWidget
   virtual void resetInputMethod();
   virtual void didHandleGestureEvent(const blink::WebGestureEvent& event,
                                      bool event_cancelled);
+  virtual void didOverscroll(
+      const blink::WebFloatSize& unusedDelta,
+      const blink::WebFloatSize& accumulatedRootOverScroll,
+      const blink::WebFloatPoint& position,
+      const blink::WebFloatSize& velocity);
   virtual void showImeIfNeeded();
 
 #if defined(OS_ANDROID)
@@ -426,9 +431,6 @@ class CONTENT_EXPORT RenderWidget
   void OnUpdateVideoAck(int32 video_id);
   void OnRequestMoveAck();
   void OnSetInputMethodActive(bool is_active);
-  void OnCandidateWindowShown();
-  void OnCandidateWindowUpdated();
-  void OnCandidateWindowHidden();
   virtual void OnImeSetComposition(
       const base::string16& text,
       const std::vector<blink::WebCompositionUnderline>& underlines,
@@ -799,15 +801,15 @@ class CONTENT_EXPORT RenderWidget
 
   // Lists of RenderFrameProxy objects that need to be notified of
   // compositing-related events (e.g. DidCommitCompositorFrame).
-  ObserverList<RenderFrameProxy> render_frame_proxies_;
+  base::ObserverList<RenderFrameProxy> render_frame_proxies_;
 #if defined(VIDEO_HOLE)
-  ObserverList<RenderFrameImpl> video_hole_frames_;
+  base::ObserverList<RenderFrameImpl> video_hole_frames_;
 #endif  // defined(VIDEO_HOLE)
 
   // A list of RenderFrames associated with this RenderWidget. Notifications
   // are sent to each frame in the list for events such as changing
   // visibility state for example.
-  ObserverList<RenderFrameImpl> render_frames_;
+  base::ObserverList<RenderFrameImpl> render_frames_;
 
   ui::MenuSourceType context_menu_source_type_;
   bool has_host_context_menu_location_;

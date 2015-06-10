@@ -27,6 +27,8 @@
   'variables': {
     'public_child_sources': [
       'public/child/child_thread.h',
+      'public/child/fixed_received_data.cc',
+      'public/child/fixed_received_data.h',
       'public/child/image_decoder_utils.h',
       'public/child/request_peer.h',
       'public/child/resource_dispatcher_delegate.h',
@@ -64,6 +66,8 @@
       'child/child_gpu_memory_buffer_manager.h',
       'child/child_histogram_message_filter.cc',
       'child/child_histogram_message_filter.h',
+      'child/child_io_surface_manager_mac.cc',
+      'child/child_io_surface_manager_mac.h',
       'child/child_message_filter.cc',
       'child/child_message_filter.h',
       'child/child_process.cc',
@@ -205,6 +209,10 @@
       'child/runtime_features.h',
       'child/scoped_child_process_reference.cc',
       'child/scoped_child_process_reference.h',
+      'child/shared_memory_data_consumer_handle.cc',
+      'child/shared_memory_data_consumer_handle.h',
+      'child/shared_memory_received_data_factory.cc',
+      'child/shared_memory_received_data_factory.h',
       'child/service_worker/service_worker_dispatcher.cc',
       'child/service_worker/service_worker_dispatcher.h',
       'child/service_worker/service_worker_handle_reference.cc',

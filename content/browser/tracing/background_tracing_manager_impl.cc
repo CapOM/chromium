@@ -5,9 +5,13 @@
 #include "content/browser/tracing/background_tracing_manager_impl.h"
 
 #include "base/macros.h"
+#include "base/time/time.h"
 #include "content/public/browser/background_tracing_preemptive_config.h"
 #include "content/public/browser/background_tracing_reactive_config.h"
 #include "content/public/browser/browser_thread.h"
+#include "content/public/browser/content_browser_client.h"
+#include "content/public/browser/tracing_delegate.h"
+#include "content/public/common/content_client.h"
 
 namespace content {
 
@@ -38,6 +42,32 @@ void BackgroundTracingManagerImpl::TraceDataEndpointWrapper::
                           base::Bind(done_callback_, contents_ptr));
 }
 
+BackgroundTracingManagerImpl::TracingTimer::TracingTimer(
+    StartedFinalizingCallback callback) : callback_(callback) {
+}
+
+BackgroundTracingManagerImpl::TracingTimer::~TracingTimer() {
+}
+
+void BackgroundTracingManagerImpl::TracingTimer::StartTimer() {
+  const int kTimeoutSecs = 10;
+  tracing_timer_.Start(FROM_HERE, base::TimeDelta::FromSeconds(kTimeoutSecs),
+      this, &BackgroundTracingManagerImpl::TracingTimer::TracingTimerFired);
+}
+
+void BackgroundTracingManagerImpl::TracingTimer::CancelTimer() {
+  tracing_timer_.Stop();
+}
+
+void BackgroundTracingManagerImpl::TracingTimer::TracingTimerFired() {
+  BackgroundTracingManagerImpl::GetInstance()->BeginFinalizing(callback_);
+}
+
+void BackgroundTracingManagerImpl::TracingTimer::FireTimerForTesting() {
+  CancelTimer();
+  TracingTimerFired();
+}
+
 BackgroundTracingManager* BackgroundTracingManager::GetInstance() {
   return BackgroundTracingManagerImpl::GetInstance();
 }
@@ -47,7 +77,8 @@ BackgroundTracingManagerImpl* BackgroundTracingManagerImpl::GetInstance() {
 }
 
 BackgroundTracingManagerImpl::BackgroundTracingManagerImpl()
-    : is_gathering_(false),
+    : delegate_(GetContentClient()->browser()->GetTracingDelegate()),
+      is_gathering_(false),
       is_tracing_(false),
       requires_anonymized_data_(true),
       trigger_handle_ids_(0) {
@@ -72,19 +103,29 @@ bool BackgroundTracingManagerImpl::IsSupportedConfig(
   if (!config)
     return true;
 
-  // TODO(simonhatch): Implement reactive tracing path.
-  if (config->mode != BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE)
-    return false;
+  if (config->mode == BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE) {
+    BackgroundTracingPreemptiveConfig* preemptive_config =
+        static_cast<BackgroundTracingPreemptiveConfig*>(config);
+    const std::vector<BackgroundTracingPreemptiveConfig::MonitoringRule>&
+        configs = preemptive_config->configs;
+    for (size_t i = 0; i < configs.size(); ++i) {
+      if (configs[i].type !=
+          BackgroundTracingPreemptiveConfig::
+              MONITOR_AND_DUMP_WHEN_TRIGGER_NAMED)
+        return false;
+    }
+  }
 
-  // TODO(fmeawad): Implement uma triggers.
-  BackgroundTracingPreemptiveConfig* preemptive_config =
-      static_cast<BackgroundTracingPreemptiveConfig*>(config);
-  const std::vector<BackgroundTracingPreemptiveConfig::MonitoringRule>&
-      configs = preemptive_config->configs;
-  for (size_t i = 0; i < configs.size(); ++i) {
-    if (configs[i].type !=
-        BackgroundTracingPreemptiveConfig::MONITOR_AND_DUMP_WHEN_TRIGGER_NAMED)
-      return false;
+  if (config->mode == BackgroundTracingConfig::REACTIVE_TRACING_MODE) {
+    BackgroundTracingReactiveConfig* reactive_config =
+        static_cast<BackgroundTracingReactiveConfig*>(config);
+    const std::vector<BackgroundTracingReactiveConfig::TracingRule>&
+        configs = reactive_config->configs;
+    for (size_t i = 0; i < configs.size(); ++i) {
+      if (configs[i].type !=
+          BackgroundTracingReactiveConfig::TRACE_FOR_10S_OR_TRIGGER_OR_FULL)
+        return false;
+    }
   }
 
   return true;
@@ -93,10 +134,19 @@ bool BackgroundTracingManagerImpl::IsSupportedConfig(
 bool BackgroundTracingManagerImpl::SetActiveScenario(
     scoped_ptr<BackgroundTracingConfig> config,
     const BackgroundTracingManager::ReceiveCallback& receive_callback,
-    bool requires_anonymized_data) {
+    DataFiltering data_filtering) {
   CHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
   if (is_tracing_)
     return false;
+
+  bool requires_anonymized_data = (data_filtering == ANONYMIZE_DATA);
+
+  // TODO(oysteine): Retry when time_until_allowed has elapsed.
+  if (config && delegate_ &&
+      !delegate_->IsAllowedToBeginBackgroundScenario(
+          *config.get(), requires_anonymized_data)) {
+    return false;
+  }
 
   if (!IsSupportedConfig(config.get()))
     return false;
@@ -118,14 +168,20 @@ void BackgroundTracingManagerImpl::EnableRecordingIfConfigNeedsIt() {
   if (!config_)
     return;
 
-  if (config_->mode == BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE) {
-    EnableRecording(GetCategoryFilterForCategoryPreset(
-        static_cast<BackgroundTracingPreemptiveConfig*>(config_.get())
-            ->category_preset));
-  } else {
-    // TODO(simonhatch): Implement reactive tracing path.
-    NOTREACHED();
+  // TODO(oysteine): Retry later.
+  if (delegate_ &&
+      !delegate_->IsAllowedToBeginBackgroundScenario(
+          *config_.get(), requires_anonymized_data_)) {
+    return;
   }
+
+  if (config_->mode == BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE) {
+    EnableRecording(GetCategoryFilterStringForCategoryPreset(
+        static_cast<BackgroundTracingPreemptiveConfig*>(config_.get())
+            ->category_preset),
+        base::trace_event::RECORD_CONTINUOUSLY);
+  }
+  // There is nothing to do in case of reactive tracing.
 }
 
 bool BackgroundTracingManagerImpl::IsAbleToTriggerTracing(
@@ -160,10 +216,22 @@ bool BackgroundTracingManagerImpl::IsAbleToTriggerTracing(
       }
     }
   } else {
-    // TODO(simonhatch): Implement reactive path.
-    NOTREACHED();
-  }
+    BackgroundTracingReactiveConfig* reactive_config =
+        static_cast<BackgroundTracingReactiveConfig*>(config_.get());
 
+    const std::vector<BackgroundTracingReactiveConfig::TracingRule>&
+        configs = reactive_config->configs;
+
+    for (size_t i = 0; i < configs.size(); ++i) {
+      if (configs[i].type !=
+              BackgroundTracingReactiveConfig::
+                  TRACE_FOR_10S_OR_TRIGGER_OR_FULL)
+        continue;
+      if (trigger_name == configs[i].trigger_name) {
+        return true;
+      }
+    }
+  }
   return false;
 }
 
@@ -187,8 +255,29 @@ void BackgroundTracingManagerImpl::TriggerNamedEvent(
   if (config_->mode == BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE) {
     BeginFinalizing(callback);
   } else {
-    // TODO(simonhatch): Implement reactive tracing path.
-    NOTREACHED();
+    if (is_tracing_) {
+      tracing_timer_->CancelTimer();
+      BeginFinalizing(callback);
+      return;
+    }
+
+    // It was not already tracing, start a new trace.
+    BackgroundTracingReactiveConfig* reactive_config =
+        static_cast<BackgroundTracingReactiveConfig*>(config_.get());
+    const std::vector<BackgroundTracingReactiveConfig::TracingRule>&
+        configs = reactive_config->configs;
+    std::string trigger_name = GetTriggerNameFromHandle(handle);
+    for (size_t i = 0; i < configs.size(); ++i) {
+      if (configs[i].trigger_name == trigger_name) {
+        EnableRecording(
+            GetCategoryFilterStringForCategoryPreset(
+                configs[i].category_preset),
+            base::trace_event::RECORD_UNTIL_FULL);
+        tracing_timer_.reset(new TracingTimer(callback));
+        tracing_timer_->StartTimer();
+        break;
+      }
+    }
   }
 }
 
@@ -227,12 +316,24 @@ void BackgroundTracingManagerImpl::InvalidateTriggerHandlesForTesting() {
   trigger_handles_.clear();
 }
 
+void BackgroundTracingManagerImpl::SetTracingEnabledCallbackForTesting(
+    const base::Closure& callback) {
+  tracing_enabled_callback_for_testing_ = callback;
+};
+
+void BackgroundTracingManagerImpl::FireTimerForTesting() {
+  tracing_timer_->FireTimerForTesting();
+}
+
 void BackgroundTracingManagerImpl::EnableRecording(
-    base::trace_event::CategoryFilter category_filter) {
+    std::string category_filter_str,
+    base::trace_event::TraceRecordMode record_mode) {
+  base::trace_event::TraceConfig trace_config(category_filter_str, record_mode);
+  if (requires_anonymized_data_)
+    trace_config.EnableArgumentFilter();
+
   is_tracing_ = TracingController::GetInstance()->EnableRecording(
-      category_filter,
-      base::trace_event::TraceOptions(base::trace_event::RECORD_CONTINUOUSLY),
-      TracingController::EnableRecordingDoneCallback());
+      trace_config, tracing_enabled_callback_for_testing_);
 }
 
 void BackgroundTracingManagerImpl::OnFinalizeStarted(
@@ -241,7 +342,7 @@ void BackgroundTracingManagerImpl::OnFinalizeStarted(
 
   if (!receive_callback_.is_null())
     receive_callback_.Run(
-        file_contents.get(),
+        file_contents,
         base::Bind(&BackgroundTracingManagerImpl::OnFinalizeComplete,
                    base::Unretained(this)));
 }
@@ -271,42 +372,36 @@ void BackgroundTracingManagerImpl::BeginFinalizing(
   is_gathering_ = true;
   is_tracing_ = false;
 
-  content::TracingController::GetInstance()->DisableRecording(
-      content::TracingController::CreateCompressedStringSink(
-          data_endpoint_wrapper_));
+  bool is_allowed_finalization =
+      !delegate_ || (config_ &&
+                     delegate_->IsAllowedToEndBackgroundScenario(
+                         *config_.get(), requires_anonymized_data_));
+
+  scoped_refptr<TracingControllerImpl::TraceDataSink> trace_data_sink;
+  if (is_allowed_finalization) {
+    trace_data_sink = content::TracingController::CreateCompressedStringSink(
+        data_endpoint_wrapper_);
+  }
+
+  content::TracingController::GetInstance()->DisableRecording(trace_data_sink);
 
   if (!callback.is_null())
-    callback.Run(true);
+    callback.Run(is_allowed_finalization);
 }
 
-base::trace_event::CategoryFilter
-BackgroundTracingManagerImpl::GetCategoryFilterForCategoryPreset(
+std::string
+BackgroundTracingManagerImpl::GetCategoryFilterStringForCategoryPreset(
     BackgroundTracingConfig::CategoryPreset preset) const {
   switch (preset) {
     case BackgroundTracingConfig::CategoryPreset::BENCHMARK:
-      return base::trace_event::CategoryFilter(
-          "benchmark,"
-          "disabled-by-default-toplevel.flow,"
-          "disabled-by-default-ipc.flow");
+      return "benchmark,"
+             "disabled-by-default-toplevel.flow,"
+             "disabled-by-default-ipc.flow";
     case BackgroundTracingConfig::CategoryPreset::BENCHMARK_DEEP:
-      return base::trace_event::CategoryFilter(
-          "*,disabled-by-default-blink.debug.layout");
+      return "*,disabled-by-default-blink.debug.layout";
   }
   NOTREACHED();
-  return base::trace_event::CategoryFilter();
-}
-
-scoped_ptr<BackgroundTracingConfig> BackgroundTracingConfig::FromDict(
-    const base::DictionaryValue* dict) {
-  // TODO(simonhatch): Implement this.
-  CHECK(false);
-  return NULL;
-}
-
-void BackgroundTracingConfig::IntoDict(const BackgroundTracingConfig* config,
-                                       base::DictionaryValue* dict) {
-  // TODO(simonhatch): Implement this.
-  CHECK(false);
+  return "";
 }
 
 }  // namspace content

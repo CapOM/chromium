@@ -83,6 +83,18 @@ bool WaitForBoundsToChange(View* view) {
   return DoRunLoopWithTimeout();
 }
 
+// Increments the width of |view| and waits for a bounds change in |other_vm|s
+// root.
+bool IncrementWidthAndWaitForChange(View* view, ViewManager* other_vm) {
+  mojo::Rect bounds = view->bounds();
+  bounds.width++;
+  view->SetBounds(bounds);
+  View* view_in_vm = other_vm->GetRoot();
+  if (view_in_vm == view || view_in_vm->id() != view->id())
+    return false;
+  return WaitForBoundsToChange(view_in_vm);
+}
+
 // Spins a run loop until the tree beginning at |root| has |tree_size| views
 // (including |root|).
 class TreeSizeMatchesObserver : public ViewObserver {
@@ -185,7 +197,18 @@ class ViewManagerTest : public test::ApplicationTestBase,
   ViewManagerTest()
       : most_recent_view_manager_(nullptr),
         window_manager_(nullptr),
-        got_disconnect_(false) {}
+        got_disconnect_(false),
+        on_will_embed_count_(0u),
+        on_will_embed_return_value_(true) {}
+
+  void clear_on_will_embed_count() { on_will_embed_count_ = 0u; }
+  size_t on_will_embed_count() const { return on_will_embed_count_; }
+
+  void set_on_will_embed_return_value(bool value) {
+    on_will_embed_return_value_ = value;
+  }
+
+  ViewManager* most_recent_view_manager() { return most_recent_view_manager_; }
 
   // Overridden from ApplicationDelegate:
   void Initialize(ApplicationImpl* app) override {
@@ -201,16 +224,29 @@ class ViewManagerTest : public test::ApplicationTestBase,
 
   ViewManager* window_manager() { return window_manager_; }
 
-  // Embeds another version of the test app @ view; returns nullptr on timeout.
-  ViewManager* Embed(ViewManager* view_manager, View* view) {
-    DCHECK_EQ(view_manager, view->view_manager());
-    most_recent_view_manager_ = nullptr;
-    view->Embed(application_impl()->url());
-    if (!DoRunLoopWithTimeout())
-      return nullptr;
-    ViewManager* vm = nullptr;
-    std::swap(vm, most_recent_view_manager_);
-    return vm;
+  // Embeds another version of the test app @ view. This runs a run loop until
+  // a response is received, or a timeout. On success the new ViewManager is
+  // returned.
+  ViewManager* Embed(View* view) {
+    return EmbedImpl(view, EmbedType::NO_REEMBED);
+  }
+
+  // Same as Embed(), but uses EmbedAllowingReembed().
+  ViewManager* EmbedAllowingReembed(View* view) {
+    return EmbedImpl(view, EmbedType::ALLOW_REEMBED);
+  }
+
+  // Establishes a connection to this application and asks for a
+  // ViewManagerClient. The ViewManagerClient is then embedded in |view|.
+  // This does *not* wait for the connection to complete.
+  void ConnectToApplicationAndEmbed(View* view) {
+    mojo::URLRequestPtr request(mojo::URLRequest::New());
+    request->url = mojo::String::From(application_impl()->url());
+    ApplicationConnection* connection =
+        application_impl()->ConnectToApplication(request.Pass());
+    mojo::ViewManagerClientPtr client;
+    connection->ConnectToService(&client);
+    view->Embed(client.Pass());
   }
 
   bool got_disconnect() const { return got_disconnect_; }
@@ -218,17 +254,48 @@ class ViewManagerTest : public test::ApplicationTestBase,
   ApplicationDelegate* GetApplicationDelegate() override { return this; }
 
   // Overridden from ViewManagerDelegate:
-  void OnEmbed(View* root,
-               InterfaceRequest<ServiceProvider> services,
-               ServiceProviderPtr exposed_services) override {
+  void OnEmbed(View* root) override {
     most_recent_view_manager_ = root->view_manager();
     QuitRunLoop();
   }
-  void OnViewManagerDisconnected(ViewManager* view_manager) override {
+  void OnEmbedForDescendant(View* view,
+                            mojo::URLRequestPtr request,
+                            mojo::ViewManagerClientPtr* client) override {
+    on_will_embed_count_++;
+    if (on_will_embed_return_value_) {
+      ApplicationConnection* connection =
+          application_impl()->ConnectToApplication(request.Pass());
+      connection->ConnectToService(client);
+    } else {
+      QuitRunLoop();
+    }
+  }
+  void OnViewManagerDestroyed(ViewManager* view_manager) override {
     got_disconnect_ = true;
   }
 
  private:
+  enum class EmbedType {
+    ALLOW_REEMBED,
+    NO_REEMBED,
+  };
+
+  ViewManager* EmbedImpl(View* view, EmbedType type) {
+    most_recent_view_manager_ = nullptr;
+    if (type == EmbedType::ALLOW_REEMBED) {
+      mojo::URLRequestPtr request(mojo::URLRequest::New());
+      request->url = mojo::String::From(application_impl()->url());
+      view->EmbedAllowingReembed(request.Pass());
+    } else {
+      ConnectToApplicationAndEmbed(view);
+    }
+    if (!DoRunLoopWithTimeout())
+      return nullptr;
+    ViewManager* vm = nullptr;
+    std::swap(vm, most_recent_view_manager_);
+    return vm;
+  }
+
   // Overridden from testing::Test:
   void SetUp() override {
     ApplicationTestBase::SetUp();
@@ -257,14 +324,18 @@ class ViewManagerTest : public test::ApplicationTestBase,
 
   bool got_disconnect_;
 
+  // Number of times OnWillEmbed() has been called.
+  size_t on_will_embed_count_;
+
+  // Value OnWillEmbed() should return.
+  bool on_will_embed_return_value_;
+
   MOJO_DISALLOW_COPY_AND_ASSIGN(ViewManagerTest);
 };
 
 TEST_F(ViewManagerTest, RootView) {
   ASSERT_NE(nullptr, window_manager());
   EXPECT_NE(nullptr, window_manager()->GetRoot());
-  // No one embedded the window_manager(), so it has no url.
-  EXPECT_TRUE(window_manager()->GetEmbedderURL().empty());
 }
 
 TEST_F(ViewManagerTest, Embed) {
@@ -272,7 +343,7 @@ TEST_F(ViewManagerTest, Embed) {
   ASSERT_NE(nullptr, view);
   view->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view);
-  ViewManager* embedded = Embed(window_manager(), view);
+  ViewManager* embedded = Embed(view);
   ASSERT_NE(nullptr, embedded);
 
   View* view_in_embedded = embedded->GetRoot();
@@ -294,7 +365,7 @@ TEST_F(ViewManagerTest, EmbeddedDoesntSeeChild) {
   nested->SetVisible(true);
   view->AddChild(nested);
 
-  ViewManager* embedded = Embed(window_manager(), view);
+  ViewManager* embedded = Embed(view);
   ASSERT_NE(nullptr, embedded);
   View* view_in_embedded = embedded->GetRoot();
   EXPECT_EQ(view->id(), view_in_embedded->id());
@@ -320,7 +391,7 @@ TEST_F(ViewManagerTest, SetBounds) {
   View* view = window_manager()->CreateView();
   view->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view);
-  ViewManager* embedded = Embed(window_manager(), view);
+  ViewManager* embedded = Embed(view);
   ASSERT_NE(nullptr, embedded);
 
   View* view_in_embedded = embedded->GetViewById(view->id());
@@ -339,7 +410,7 @@ TEST_F(ViewManagerTest, SetBoundsSecurity) {
   View* view = window_manager()->CreateView();
   view->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view);
-  ViewManager* embedded = Embed(window_manager(), view);
+  ViewManager* embedded = Embed(view);
   ASSERT_NE(nullptr, embedded);
 
   View* view_in_embedded = embedded->GetViewById(view->id());
@@ -361,7 +432,7 @@ TEST_F(ViewManagerTest, DestroySecurity) {
   View* view = window_manager()->CreateView();
   view->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view);
-  ViewManager* embedded = Embed(window_manager(), view);
+  ViewManager* embedded = Embed(view);
   ASSERT_NE(nullptr, embedded);
 
   View* view_in_embedded = embedded->GetViewById(view->id());
@@ -383,20 +454,11 @@ TEST_F(ViewManagerTest, MultiRoots) {
   View* view2 = window_manager()->CreateView();
   view2->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view2);
-  ViewManager* embedded1 = Embed(window_manager(), view1);
+  ViewManager* embedded1 = Embed(view1);
   ASSERT_NE(nullptr, embedded1);
-  ViewManager* embedded2 = Embed(window_manager(), view2);
+  ViewManager* embedded2 = Embed(view2);
   ASSERT_NE(nullptr, embedded2);
   EXPECT_NE(embedded1, embedded2);
-}
-
-TEST_F(ViewManagerTest, EmbeddingIdentity) {
-  View* view = window_manager()->CreateView();
-  view->SetVisible(true);
-  window_manager()->GetRoot()->AddChild(view);
-  ViewManager* embedded = Embed(window_manager(), view);
-  ASSERT_NE(nullptr, embedded);
-  EXPECT_EQ(application_impl()->url(), embedded->GetEmbedderURL());
 }
 
 // TODO(alhaad): Currently, the RunLoop gets stuck waiting for order change.
@@ -406,7 +468,7 @@ TEST_F(ViewManagerTest, DISABLED_Reorder) {
   view1->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view1);
 
-  ViewManager* embedded = Embed(window_manager(), view1);
+  ViewManager* embedded = Embed(view1);
   ASSERT_NE(nullptr, embedded);
 
   View* view11 = embedded->CreateView();
@@ -470,7 +532,7 @@ TEST_F(ViewManagerTest, Visible) {
   window_manager()->GetRoot()->AddChild(view1);
 
   // Embed another app and verify initial state.
-  ViewManager* embedded = Embed(window_manager(), view1);
+  ViewManager* embedded = Embed(view1);
   ASSERT_NE(nullptr, embedded);
   ASSERT_NE(nullptr, embedded->GetRoot());
   View* embedded_root = embedded->GetRoot();
@@ -534,7 +596,7 @@ TEST_F(ViewManagerTest, Drawn) {
   window_manager()->GetRoot()->AddChild(view1);
 
   // Embed another app and verify initial state.
-  ViewManager* embedded = Embed(window_manager(), view1);
+  ViewManager* embedded = Embed(view1);
   ASSERT_NE(nullptr, embedded);
   ASSERT_NE(nullptr, embedded->GetRoot());
   View* embedded_root = embedded->GetRoot();
@@ -595,7 +657,7 @@ TEST_F(ViewManagerTest, Focus) {
   view1->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view1);
 
-  ViewManager* embedded = Embed(window_manager(), view1);
+  ViewManager* embedded = Embed(view1);
   ASSERT_NE(nullptr, embedded);
   View* view11 = embedded->CreateView();
   view11->SetVisible(true);
@@ -659,7 +721,7 @@ TEST_F(ViewManagerTest, DeleteViewManager) {
   ASSERT_NE(nullptr, view);
   view->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view);
-  ViewManager* view_manager = Embed(window_manager(), view);
+  ViewManager* view_manager = Embed(view);
   ASSERT_TRUE(view_manager);
   bool got_destroy = false;
   DestroyedChangedObserver observer(view_manager->GetRoot(), &got_destroy);
@@ -675,14 +737,14 @@ TEST_F(ViewManagerTest, DisconnectTriggersDelete) {
   ASSERT_NE(nullptr, view);
   view->SetVisible(true);
   window_manager()->GetRoot()->AddChild(view);
-  ViewManager* view_manager = Embed(window_manager(), view);
+  ViewManager* view_manager = Embed(view);
   EXPECT_NE(view_manager, window_manager());
   View* embedded_view = view_manager->CreateView();
   // Embed again, this should trigger disconnect and deletion of view_manager.
   bool got_destroy;
   DestroyedChangedObserver observer(embedded_view, &got_destroy);
   EXPECT_FALSE(got_disconnect());
-  Embed(window_manager(), view);
+  Embed(view);
   EXPECT_TRUE(got_disconnect());
 }
 
@@ -716,7 +778,7 @@ TEST_F(ViewManagerTest, EmbedRemovesChildren) {
   view1->AddChild(view2);
 
   ViewRemovedFromParentObserver observer(view2);
-  view1->Embed(application_impl()->url());
+  ConnectToApplicationAndEmbed(view1);
   EXPECT_TRUE(observer.was_removed());
   EXPECT_EQ(nullptr, view2->parent());
   EXPECT_TRUE(view1->children().empty());
@@ -725,6 +787,98 @@ TEST_F(ViewManagerTest, EmbedRemovesChildren) {
   // we may end up reconnecting to the test and rerunning the test, which is
   // problematic since the other services don't shut down.
   ASSERT_TRUE(DoRunLoopWithTimeout());
+}
+
+TEST_F(ViewManagerTest, OnWillEmbed) {
+  window_manager()->SetEmbedRoot();
+
+  View* view1 = window_manager()->CreateView();
+  window_manager()->GetRoot()->AddChild(view1);
+
+  ViewManager* view_manager = EmbedAllowingReembed(view1);
+  View* view2 = view_manager->CreateView();
+  view_manager->GetRoot()->AddChild(view2);
+
+  EmbedAllowingReembed(view2);
+  EXPECT_EQ(1u, on_will_embed_count());
+}
+
+// Verifies Embed() doesn't succeed if OnWillEmbed() returns false.
+TEST_F(ViewManagerTest, OnWillEmbedFails) {
+  window_manager()->SetEmbedRoot();
+
+  View* view1 = window_manager()->CreateView();
+  window_manager()->GetRoot()->AddChild(view1);
+
+  ViewManager* view_manager = Embed(view1);
+  View* view2 = view_manager->CreateView();
+  view_manager->GetRoot()->AddChild(view2);
+
+  clear_on_will_embed_count();
+  set_on_will_embed_return_value(false);
+  mojo::URLRequestPtr request(mojo::URLRequest::New());
+  request->url = application_impl()->url();
+  view2->EmbedAllowingReembed(request.Pass());
+
+  EXPECT_TRUE(DoRunLoopWithTimeout());
+  EXPECT_EQ(1u, on_will_embed_count());
+
+  // The run loop above quits when OnWillEmbed() returns, which means it's
+  // possible there is still an OnEmbed() message in flight. Sets the bounds of
+  // |view1| and wait for it to the change in |view_manager|, that way we know
+  // |view_manager| has processed all messages for it.
+  EXPECT_TRUE(IncrementWidthAndWaitForChange(view1, view_manager));
+
+  EXPECT_EQ(1u, on_will_embed_count());
+}
+
+// Verify an Embed() from an ancestor is not allowed.
+TEST_F(ViewManagerTest, ReembedFails) {
+  window_manager()->SetEmbedRoot();
+
+  View* view1 = window_manager()->CreateView();
+  window_manager()->GetRoot()->AddChild(view1);
+
+  ViewManager* view_manager = Embed(view1);
+  ASSERT_TRUE(view_manager);
+  View* view2 = view_manager->CreateView();
+  view_manager->GetRoot()->AddChild(view2);
+  Embed(view2);
+
+  // Try to embed in view2 from the window_manager. This should fail as the
+  // Embed() didn't grab reembed.
+  View* view2_in_wm = window_manager()->GetViewById(view2->id());
+  ConnectToApplicationAndEmbed(view2_in_wm);
+
+  // The Embed() call above returns immediately. To ensure the server has
+  // processed it nudge the bounds and wait for it to be processed.
+  EXPECT_TRUE(IncrementWidthAndWaitForChange(view1, view_manager));
+
+  EXPECT_EQ(nullptr, most_recent_view_manager());
+}
+
+// Verify an Embed() from an ancestor is allowed if the ancestor is an embed
+// root and Embed was done by way of EmbedAllowingReembed().
+TEST_F(ViewManagerTest, ReembedSucceeds) {
+  window_manager()->SetEmbedRoot();
+
+  View* view1 = window_manager()->CreateView();
+  window_manager()->GetRoot()->AddChild(view1);
+
+  ViewManager* view_manager = Embed(view1);
+  View* view2 = view_manager->CreateView();
+  view_manager->GetRoot()->AddChild(view2);
+  EmbedAllowingReembed(view2);
+
+  View* view2_in_wm = window_manager()->GetViewById(view2->id());
+  ViewManager* view_manager2 = Embed(view2_in_wm);
+  ASSERT_TRUE(view_manager2);
+
+  // The Embed() call above returns immediately. To ensure the server has
+  // processed it nudge the bounds and wait for it to be processed.
+  EXPECT_TRUE(IncrementWidthAndWaitForChange(view1, view_manager));
+
+  EXPECT_EQ(nullptr, most_recent_view_manager());
 }
 
 }  // namespace mojo

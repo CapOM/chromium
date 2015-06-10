@@ -11,6 +11,7 @@
 #include "base/trace_event/trace_event.h"
 #include "third_party/skia/include/core/SkCanvas.h"
 #include "ui/accelerated_widget_mac/io_surface_layer.h"
+#include "ui/accelerated_widget_mac/io_surface_ns_gl_surface.h"
 #include "ui/accelerated_widget_mac/surface_handle_types.h"
 #include "ui/base/cocoa/animation_utils.h"
 #include "ui/gfx/geometry/dip_util.h"
@@ -93,6 +94,7 @@ void AcceleratedWidgetMac::ResetNSView() {
   [flipped_layer_ removeFromSuperlayer];
   DestroyIOSurfaceLayer(io_surface_layer_);
   DestroyCAContextLayer(ca_context_layer_);
+  DestroyIOSurfaceNSGLSurface();
   DestroySoftwareLayer();
 
   last_swap_size_dip_ = gfx::Size();
@@ -107,6 +109,8 @@ bool AcceleratedWidgetMac::HasFrameOfSize(
 int AcceleratedWidgetMac::GetRendererID() const {
   if (io_surface_layer_)
     return [io_surface_layer_ rendererID];
+  if (io_surface_ns_gl_surface_)
+    return io_surface_ns_gl_surface_->GetRendererID();
   return 0;
 }
 
@@ -127,7 +131,9 @@ void AcceleratedWidgetMac::EndPumpingFrames() {
 void AcceleratedWidgetMac::GotAcceleratedFrame(
     uint64 surface_handle,
     const std::vector<ui::LatencyInfo>& latency_info,
-    gfx::Size pixel_size, float scale_factor,
+    const gfx::Size& pixel_size,
+    float scale_factor,
+    const gfx::Rect& pixel_damage_rect,
     const base::Closure& drawn_callback) {
   // Record the surface and latency info to use when acknowledging this frame.
   DCHECK(accelerated_frame_drawn_callback_.is_null());
@@ -148,7 +154,13 @@ void AcceleratedWidgetMac::GotAcceleratedFrame(
   switch (GetSurfaceHandleType(surface_handle)) {
     case kSurfaceHandleTypeIOSurface: {
       IOSurfaceID io_surface_id = IOSurfaceIDFromSurfaceHandle(surface_handle);
-      GotAcceleratedIOSurfaceFrame(io_surface_id, pixel_size, scale_factor);
+      if (IOSurfaceNSGLSurface::CanUseNSGLSurfaceForView(
+              view_->AcceleratedWidgetGetNSView())) {
+        GotAcceleratedIOSurfaceFrameNSGL(
+            io_surface_id, pixel_size, scale_factor, pixel_damage_rect);
+      } else {
+        GotAcceleratedIOSurfaceFrame(io_surface_id, pixel_size, scale_factor);
+      }
       break;
     }
     case kSurfaceHandleTypeCAContext: {
@@ -164,7 +176,7 @@ void AcceleratedWidgetMac::GotAcceleratedFrame(
 
 void AcceleratedWidgetMac::GotAcceleratedCAContextFrame(
     CAContextID ca_context_id,
-    gfx::Size pixel_size,
+    const gfx::Size& pixel_size,
     float scale_factor) {
   // In the layer is replaced, keep the old one around until after the new one
   // is installed to avoid flashes.
@@ -192,12 +204,42 @@ void AcceleratedWidgetMac::GotAcceleratedCAContextFrame(
 
   // Remove any different-type layers that this is replacing.
   DestroyIOSurfaceLayer(io_surface_layer_);
+  DestroyIOSurfaceNSGLSurface();
+  DestroySoftwareLayer();
+}
+
+void AcceleratedWidgetMac::GotAcceleratedIOSurfaceFrameNSGL(
+    IOSurfaceID io_surface_id,
+    const gfx::Size& pixel_size,
+    float scale_factor,
+    const gfx::Rect& pixel_damage_rect) {
+  if (!io_surface_ns_gl_surface_ ||
+      io_surface_ns_gl_surface_->NeedsToBeRecreated()) {
+    io_surface_ns_gl_surface_.reset(
+        IOSurfaceNSGLSurface::Create(
+            this,
+            view_->AcceleratedWidgetGetNSView(),
+            needs_gl_finish_workaround_));
+  }
+
+  if (!io_surface_ns_gl_surface_) {
+    LOG(ERROR) << "Failed to create IOSurfaceNSGLSurface";
+    AcknowledgeAcceleratedFrame();
+    return;
+  }
+
+  io_surface_ns_gl_surface_->GotFrame(
+      io_surface_id, pixel_size, scale_factor, pixel_damage_rect);
+
+  // Remove any different-type layers that this is replacing.
+  DestroyCAContextLayer(ca_context_layer_);
+  DestroyIOSurfaceLayer(io_surface_layer_);
   DestroySoftwareLayer();
 }
 
 void AcceleratedWidgetMac::GotAcceleratedIOSurfaceFrame(
     IOSurfaceID io_surface_id,
-    gfx::Size pixel_size,
+    const gfx::Size& pixel_size,
     float scale_factor) {
   // In the layer is replaced, keep the old one around until after the new one
   // is installed to avoid flashes.
@@ -263,6 +305,7 @@ void AcceleratedWidgetMac::GotAcceleratedIOSurfaceFrame(
 
   // Remove any different-type layers that this is replacing.
   DestroyCAContextLayer(ca_context_layer_);
+  DestroyIOSurfaceNSGLSurface();
   DestroySoftwareLayer();
 }
 
@@ -294,6 +337,7 @@ void AcceleratedWidgetMac::GotSoftwareFrame(float scale_factor,
   // Remove any different-type layers that this is replacing.
   DestroyCAContextLayer(ca_context_layer_);
   DestroyIOSurfaceLayer(io_surface_layer_);
+  DestroyIOSurfaceNSGLSurface();
 }
 
 void AcceleratedWidgetMac::DestroyCAContextLayer(
@@ -315,6 +359,10 @@ void AcceleratedWidgetMac::DestroyIOSurfaceLayer(
     io_surface_layer_.reset();
 }
 
+void AcceleratedWidgetMac::DestroyIOSurfaceNSGLSurface() {
+  io_surface_ns_gl_surface_.reset();
+}
+
 void AcceleratedWidgetMac::DestroySoftwareLayer() {
   if (!software_layer_)
     return;
@@ -331,6 +379,10 @@ bool AcceleratedWidgetMac::IOSurfaceLayerShouldAckImmediately() const {
 }
 
 void AcceleratedWidgetMac::IOSurfaceLayerDidDrawFrame() {
+  AcknowledgeAcceleratedFrame();
+}
+
+void AcceleratedWidgetMac::IOSurfaceNSGLSurfaceDidDrawFrame() {
   AcknowledgeAcceleratedFrame();
 }
 
@@ -359,14 +411,17 @@ void AcceleratedWidgetMac::IOSurfaceLayerHitError() {
 void AcceleratedWidgetMacGotAcceleratedFrame(
     gfx::AcceleratedWidget widget, uint64 surface_handle,
     const std::vector<ui::LatencyInfo>& latency_info,
-    gfx::Size pixel_size, float scale_factor,
+    const gfx::Size& pixel_size,
+    float scale_factor,
+    const gfx::Rect& pixel_damage_rect,
     const base::Closure& drawn_callback,
     bool* disable_throttling, int* renderer_id) {
   AcceleratedWidgetMac* accelerated_widget_mac =
       GetHelperFromAcceleratedWidget(widget);
   if (accelerated_widget_mac) {
     accelerated_widget_mac->GotAcceleratedFrame(
-        surface_handle, latency_info, pixel_size, scale_factor, drawn_callback);
+        surface_handle, latency_info, pixel_size, scale_factor,
+        pixel_damage_rect, drawn_callback);
     *disable_throttling =
         accelerated_widget_mac->IsRendererThrottlingDisabled();
     *renderer_id = accelerated_widget_mac->GetRendererID();

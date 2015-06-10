@@ -227,7 +227,6 @@
       'browser/services/gcm/gcm_account_tracker_unittest.cc',
       'browser/shell_integration_win_unittest.cc',
       'browser/signin/account_reconcilor_unittest.cc',
-      'browser/signin/account_service_flag_fetcher_unittest.cc',
       'browser/signin/chrome_signin_client_unittest.cc',
       'browser/signin/local_auth_unittest.cc',
       'browser/signin/signin_global_error_unittest.cc',
@@ -657,6 +656,7 @@
       'browser/extensions/api/declarative_content/chrome_content_rules_registry_unittest.cc',
       'browser/extensions/api/declarative_content/content_action_unittest.cc',
       'browser/extensions/api/declarative_content/content_condition_unittest.cc',
+      'browser/extensions/api/declarative_content/declarative_content_css_condition_tracker_unittest.cc',
       'browser/extensions/api/declarative_webrequest/webrequest_action_unittest.cc',
       'browser/extensions/api/declarative_webrequest/webrequest_rules_registry_unittest.cc',
       'browser/extensions/api/developer_private/developer_private_api_unittest.cc',
@@ -2791,6 +2791,7 @@
           ],
           'variables': {
             'test_suite_name': 'unit_tests',
+            'isolate_file': 'unit_tests.isolate',
             'android_manifest_path': 'test/android/unit_tests_apk/AndroidManifest.xml',
             'conditions': [
               ['v8_use_external_startup_data==1', {

@@ -240,6 +240,10 @@
 #include "chrome/browser/media/webrtc_logging_handler_host.h"
 #endif
 
+#if defined(ENABLE_MEDIA_ROUTER)
+#include "chrome/browser/media/router/presentation_service_delegate_impl.h"
+#endif
+
 using base::FileDescriptor;
 using blink::WebWindowFeatures;
 using content::AccessTokenStore;
@@ -494,15 +498,17 @@ void SetApplicationLocaleOnIOThread(const std::string& locale) {
 }
 
 void HandleBlockedPopupOnUIThread(const BlockedWindowParams& params) {
-  // TODO(jochen): This code path should use RenderFrameHosts. See
-  // http://crbug.com/431769 for details.
-  RenderViewHost* render_view_host =
-      RenderViewHost::FromID(params.render_process_id(), params.opener_id());
-  if (!render_view_host)
+  RenderFrameHost* render_frame_host = RenderFrameHost::FromID(
+      params.render_process_id(), params.opener_render_frame_id());
+  if (!render_frame_host)
     return;
-  WebContents* tab = WebContents::FromRenderViewHost(render_view_host);
-  // The tab might already have navigated away.
-  if (!tab || tab->GetRenderViewHost() != render_view_host)
+  WebContents* tab = WebContents::FromRenderFrameHost(render_frame_host);
+  // The tab might already have navigated away.  We only need to do this check
+  // for main frames, since the RenderFrameHost for a subframe opener will have
+  // already been deleted if the main frame navigates away.
+  if (!tab ||
+      (!render_frame_host->GetParent() &&
+       tab->GetMainFrame() != render_frame_host))
     return;
 
   prerender::PrerenderContents* prerender_contents =
@@ -545,9 +551,8 @@ class SafeBrowsingSSLCertReporter : public SSLCertReporter {
 #if defined(OS_ANDROID)
 
 void HandleSingleTabModeBlockOnUIThread(const BlockedWindowParams& params) {
-  WebContents* web_contents =
-      tab_util::GetWebContentsByID(params.render_process_id(),
-                                   params.opener_id());
+  WebContents* web_contents = tab_util::GetWebContentsByFrameID(
+      params.render_process_id(), params.opener_render_frame_id());
   if (!web_contents)
     return;
 
@@ -1168,6 +1173,32 @@ bool IsAutoReloadVisibleOnlyEnabled() {
 
 }  // namespace
 
+// When Chrome is updated on non-Windows platforms, the new files (like
+// V8 natives and snapshot) can have the same names as the previous
+// versions. Since the renderers for an existing Chrome browser process
+// are likely not compatible with the new files, the browser keeps hold
+// of the old files using an open fd. This fd is passed to subprocesses
+// like renderers.  Here we add the flag to tell the subprocesses where
+// to find these file descriptors.
+void ChromeContentBrowserClient::AppendMappedFileCommandLineSwitches(
+    base::CommandLine* command_line) {
+#if defined(OS_POSIX) && !defined(OS_MACOSX)
+#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
+  std::string process_type =
+      command_line->GetSwitchValueASCII(switches::kProcessType);
+  if (process_type != switches::kZygoteProcess) {
+    // We want to pass the natives by fd because after an update the file may
+    // be updated, but we want the newly launched renderers to get the old one,
+    // opened by the browser when it started.
+    DCHECK(natives_fd_exists());
+    command_line->AppendSwitch(::switches::kV8NativesPassedByFD);
+    if (snapshot_fd_exists())
+      command_line->AppendSwitch(::switches::kV8SnapshotPassedByFD);
+  }
+#endif  // V8_USE_EXTERNAL_STARTUP_DATA
+#endif  // OS_POSIX && !OS_MACOSX
+}
+
 void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
     int child_process_id) {
@@ -1225,15 +1256,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
   command_line->AppendSwitchASCII(chromeos::switches::kHomedir,
                                   homedir.value().c_str());
 #endif
-
-#if defined(OS_POSIX) && !defined(OS_MACOSX)
-#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  if (process_type != switches::kZygoteProcess) {
-    command_line->AppendSwitch(::switches::kV8NativesPassedByFD);
-    command_line->AppendSwitch(::switches::kV8SnapshotPassedByFD);
-  }
-#endif  // V8_USE_EXTERNAL_STARTUP_DATA
-#endif  // OS_POSIX && !OS_MACOSX
 
   if (process_type == switches::kRendererProcess) {
     content::RenderProcessHost* process =
@@ -1346,7 +1368,6 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
       autofill::switches::kEnableFillOnAccountSelect,
       autofill::switches::kEnableFillOnAccountSelectNoHighlighting,
       autofill::switches::kEnablePasswordGeneration,
-      autofill::switches::kEnablePasswordSaveOnInPageNavigation,
       autofill::switches::kEnableSingleClickAutofill,
       autofill::switches::kIgnoreAutocompleteOffForAutofill,
       autofill::switches::kLocalHeuristicsOnlyForPasswordGeneration,
@@ -1480,9 +1501,6 @@ bool ChromeContentBrowserClient::AllowServiceWorker(
     int render_process_id,
     int render_frame_id) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
-  DCHECK(scope.is_valid());
-  DCHECK(first_party_url.is_valid());
-
   ProfileIOData* io_data = ProfileIOData::FromResourceContext(context);
   bool allow = io_data->GetCookieSettings()->IsSettingCookieAllowed(
       scope, first_party_url);
@@ -1851,7 +1869,8 @@ bool ChromeContentBrowserClient::CanCreateWindow(
     bool opener_suppressed,
     content::ResourceContext* context,
     int render_process_id,
-    int opener_id,
+    int opener_render_view_id,
+    int opener_render_frame_id,
     bool* no_javascript_access) {
   DCHECK(BrowserThread::CurrentlyOn(BrowserThread::IO));
 
@@ -1900,7 +1919,7 @@ bool ChromeContentBrowserClient::CanCreateWindow(
                                      user_gesture,
                                      opener_suppressed,
                                      render_process_id,
-                                     opener_id);
+                                     opener_render_frame_id);
 
   if (!user_gesture &&
       !base::CommandLine::ForCurrentProcess()->HasSwitch(
@@ -1919,7 +1938,8 @@ bool ChromeContentBrowserClient::CanCreateWindow(
   }
 
 #if defined(OS_ANDROID)
-  if (SingleTabModeTabHelper::IsRegistered(render_process_id, opener_id)) {
+  if (SingleTabModeTabHelper::IsRegistered(render_process_id,
+                                           opener_render_view_id)) {
     BrowserThread::PostTask(BrowserThread::UI,
                             FROM_HERE,
                             base::Bind(&HandleSingleTabModeBlockOnUIThread,
@@ -2225,7 +2245,7 @@ void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
     int child_process_id,
     FileDescriptorInfo* mappings) {
 #if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  if (v8_natives_fd_.get() == -1 || v8_snapshot_fd_.get() == -1) {
+  if (!natives_fd_exists()) {
     int v8_natives_fd = -1;
     int v8_snapshot_fd = -1;
     if (gin::V8Initializer::OpenV8FilesForChildProcesses(&v8_natives_fd,
@@ -2234,9 +2254,12 @@ void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
       v8_snapshot_fd_.reset(v8_snapshot_fd);
     }
   }
-  DCHECK(v8_natives_fd_.get() != -1 && v8_snapshot_fd_.get() != -1);
+  // V8 can't start up without the source of the natives, but it can
+  // start up (slower) without the snapshot.
+  DCHECK(natives_fd_exists());
   mappings->Share(kV8NativesDataDescriptor, v8_natives_fd_.get());
-  mappings->Share(kV8SnapshotDataDescriptor, v8_snapshot_fd_.get());
+  if (snapshot_fd_exists())
+    mappings->Share(kV8SnapshotDataDescriptor, v8_snapshot_fd_.get());
 #endif  // V8_USE_EXTERNAL_STARTUP_DATA
 
 #if defined(OS_ANDROID)
@@ -2363,6 +2386,18 @@ void ChromeContentBrowserClient::OpenURL(
 #else
   NOTIMPLEMENTED();
 #endif
+}
+
+content::PresentationServiceDelegate*
+ChromeContentBrowserClient::GetPresentationServiceDelegate(
+      content::WebContents* web_contents) {
+#if defined(ENABLE_MEDIA_ROUTER)
+  if (switches::MediaRouterEnabled()) {
+    return media_router::PresentationServiceDelegateImpl::
+        GetOrCreateForWebContents(web_contents);
+  }
+#endif
+  return nullptr;
 }
 
 void ChromeContentBrowserClient::RecordURLMetric(const std::string& metric,

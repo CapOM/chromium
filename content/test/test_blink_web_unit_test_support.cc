@@ -12,8 +12,9 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/threading/platform_thread.h"
-#include "components/scheduler/renderer/renderer_scheduler.h"
+#include "components/scheduler/renderer/renderer_scheduler_impl.h"
 #include "components/scheduler/renderer/webthread_impl_for_renderer_scheduler.h"
+#include "components/scheduler/test/lazy_scheduler_message_loop_delegate_for_tests.h"
 #include "content/test/mock_webclipboard_impl.h"
 #include "content/test/web_gesture_curve_mock.h"
 #include "content/test/web_layer_tree_view_impl_for_testing.h"
@@ -24,7 +25,7 @@
 #include "storage/browser/database/vfs_backend.h"
 #include "third_party/WebKit/public/platform/WebData.h"
 #include "third_party/WebKit/public/platform/WebFileSystem.h"
-#include "third_party/WebKit/public/platform/WebScheduler.h"
+#include "third_party/WebKit/public/platform/WebPluginListBuilder.h"
 #include "third_party/WebKit/public/platform/WebStorageArea.h"
 #include "third_party/WebKit/public/platform/WebStorageNamespace.h"
 #include "third_party/WebKit/public/platform/WebString.h"
@@ -77,35 +78,6 @@ class DummyTaskRunner : public base::SingleThreadTaskRunner {
   DISALLOW_COPY_AND_ASSIGN(DummyTaskRunner);
 };
 
-class DummyWebThread : public blink::WebThread {
- public:
-  DummyWebThread()
-      : thread_id_(base::PlatformThread::CurrentId()),
-        m_dummyScheduler(new blink::WebScheduler()) {}
-
-  virtual void postTask(const blink::WebTraceLocation&, Task*) { NOTREACHED(); }
-
-  virtual void postDelayedTask(const blink::WebTraceLocation&,
-                               Task*,
-                               long long delayMs) {
-    NOTREACHED();
-  }
-
-  virtual bool isCurrentThread() const {
-    return thread_id_ == base::PlatformThread::CurrentId();
-  }
-
-  virtual blink::WebScheduler* scheduler() const {
-    return m_dummyScheduler.get();
-  }
-
- private:
-  base::PlatformThreadId thread_id_;
-  scoped_ptr<blink::WebScheduler> m_dummyScheduler;
-
-  DISALLOW_COPY_AND_ASSIGN(DummyWebThread);
-};
-
 }  // namespace
 
 namespace content {
@@ -120,15 +92,12 @@ TestBlinkWebUnitTestSupport::TestBlinkWebUnitTestSupport() {
 
 #ifdef V8_USE_EXTERNAL_STARTUP_DATA
   gin::V8Initializer::LoadV8Snapshot();
+  gin::V8Initializer::LoadV8Natives();
 #endif
 
   scoped_refptr<base::SingleThreadTaskRunner> dummy_task_runner;
   scoped_ptr<base::ThreadTaskRunnerHandle> dummy_task_runner_handle;
-  if (base::MessageLoopProxy::current()) {
-    renderer_scheduler_ = scheduler::RendererScheduler::Create();
-    web_thread_.reset(new scheduler::WebThreadImplForRendererScheduler(
-        renderer_scheduler_.get()));
-  } else {
+  if (!base::ThreadTaskRunnerHandle::IsSet()) {
     // Dummy task runner is initialized here because the blink::initialize
     // creates IsolateHolder which needs the current task runner handle. There
     // should be no task posted to this task runner. The message loop is not
@@ -139,8 +108,11 @@ TestBlinkWebUnitTestSupport::TestBlinkWebUnitTestSupport() {
     dummy_task_runner = make_scoped_refptr(new DummyTaskRunner());
     dummy_task_runner_handle.reset(
         new base::ThreadTaskRunnerHandle(dummy_task_runner));
-    web_thread_.reset(new DummyWebThread());
   }
+  renderer_scheduler_ = make_scoped_ptr(new scheduler::RendererSchedulerImpl(
+      scheduler::LazySchedulerMessageLoopDelegateForTests::Create()));
+  web_thread_.reset(new scheduler::WebThreadImplForRendererScheduler(
+      renderer_scheduler_.get()));
 
   blink::initialize(this);
   blink::setLayoutTestMode(true);
@@ -157,19 +129,9 @@ TestBlinkWebUnitTestSupport::TestBlinkWebUnitTestSupport() {
   blink::WebRuntimeFeatures::enableNotifications(true);
   blink::WebRuntimeFeatures::enableTouch(true);
 
-  // Load libraries for media and enable the media player.
-  bool enable_media = false;
-  base::FilePath module_path;
-  if (PathService::Get(base::DIR_MODULE, &module_path)) {
-#if defined(OS_MACOSX)
-    if (base::mac::AmIBundled())
-      module_path = module_path.DirName().DirName().DirName();
-#endif
-    if (media::InitializeMediaLibrary(module_path))
-      enable_media = true;
-  }
-  blink::WebRuntimeFeatures::enableMediaPlayer(enable_media);
-  LOG_IF(WARNING, !enable_media) << "Failed to initialize the media library.\n";
+  // Initialize libraries for media and enable the media player.
+  media::InitializeMediaLibrary();
+  blink::WebRuntimeFeatures::enableMediaPlayer(true);
 
   file_utilities_.set_sandbox_enabled(false);
 
@@ -408,6 +370,12 @@ void TestBlinkWebUnitTestSupport::enterRunLoop() {
 
 void TestBlinkWebUnitTestSupport::exitRunLoop() {
   base::MessageLoop::current()->Quit();
+}
+
+void TestBlinkWebUnitTestSupport::getPluginList(
+    bool refresh, blink::WebPluginListBuilder* builder) {
+  builder->addPlugin("pdf", "pdf", "pdf-files");
+  builder->addMediaTypeToLastPlugin("application/pdf", "pdf");
 }
 
 }  // namespace content

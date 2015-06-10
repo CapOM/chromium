@@ -85,6 +85,7 @@ remoting_webapp_unittests_js_files = [
   "base/js/identity_unittest.js",
   "base/js/ipc_unittest.js",
   "base/js/l10n_unittest.js",
+  "base/js/platform_unittest.js",
   "base/js/protocol_extension_manager_unittest.js",
   "base/js/typecheck_unittest.js",
   "base/js/viewport_unittest.js",
@@ -250,6 +251,7 @@ remoting_webapp_js_gnubby_auth_files = [ "crd/js/gnubby_auth_handler.js" ]
 # Files for controlling the local machine as a host.
 # Includes both it2me and me2me files.
 remoting_webapp_js_host_control_files = [
+  "crd/js/buffered_signal_strategy.js",
   "crd/js/host_controller.js",
   "crd/js/host_daemon_facade.js",
   "crd/js/host_screen.js",
@@ -265,10 +267,15 @@ remoting_webapp_js_host_control_files = [
 remoting_webapp_js_host_display_files = [
   "crd/js/host_list.js",
   "crd/js/host_list_api.js",
-  "crd/js/host_list_api_gcd_impl.js",
-  "crd/js/host_list_api_impl.js",
   "crd/js/host_table_entry.js",
   "crd/js/local_host_section.js",
+
+  # Must come after host_list_api.js because of an issue with
+  # JSCompiler.  If an implementation of an interface occurs in a
+  # file processed before the interface itself, the @override tag
+  # doesn't always work correctly.
+  "crd/js/gcd_host_list_api.js",
+  "crd/js/legacy_host_list_api.js",
 ]
 
 # The CRD-specific JavaScript files required by main.html.
@@ -537,8 +544,10 @@ ar_main_js_files = [
                      "app_remoting/js/context_menu_chrome.js",
                      "app_remoting/js/context_menu_dom.js",
                      "app_remoting/js/drag_and_drop.js",
+                     "app_remoting/js/gaia_license_manager.js",
                      "app_remoting/js/idle_detector.js",
                      "app_remoting/js/keyboard_layouts_menu.js",
+                     "app_remoting/js/license_manager.js",
                      "app_remoting/js/loading_window.js",
                      "app_remoting/js/submenu_manager.js",
                      "app_remoting/js/window_activation_menu.js",

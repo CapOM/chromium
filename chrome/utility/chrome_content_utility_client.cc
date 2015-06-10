@@ -6,13 +6,13 @@
 
 #include "base/command_line.h"
 #include "base/files/file_path.h"
-#include "base/json/json_reader.h"
 #include "base/memory/ref_counted.h"
 #include "base/time/time.h"
 #include "chrome/common/chrome_utility_messages.h"
 #include "chrome/common/safe_browsing/zip_analyzer.h"
 #include "chrome/common/safe_browsing/zip_analyzer_results.h"
 #include "chrome/utility/chrome_content_utility_ipc_whitelist.h"
+#include "chrome/utility/safe_json_parser_handler.h"
 #include "chrome/utility/utility_message_handler.h"
 #include "content/public/child/image_decoder_utils.h"
 #include "content/public/common/content_switches.h"
@@ -36,10 +36,6 @@
 #include "net/proxy/mojo_proxy_resolver_factory_impl.h"
 #include "net/proxy/proxy_resolver_v8.h"
 #include "third_party/mojo/src/mojo/public/cpp/bindings/strong_binding.h"
-#endif
-
-#if defined(OS_ANDROID) && defined(USE_SECCOMP_BPF)
-#include "sandbox/linux/seccomp-bpf/sandbox_bpf.h"
 #endif
 
 #if defined(OS_WIN)
@@ -154,6 +150,8 @@ ChromeContentUtilityClient::ChromeContentUtilityClient()
   handlers_.push_back(new ShellHandler());
   handlers_.push_back(new FontCacheHandler());
 #endif
+
+  handlers_.push_back(new SafeJsonParserHandler());
 }
 
 ChromeContentUtilityClient::~ChromeContentUtilityClient() {
@@ -186,7 +184,6 @@ bool ChromeContentUtilityClient::OnMessageReceived(
     IPC_MESSAGE_HANDLER(ChromeUtilityMsg_RobustJPEGDecodeImage,
                         OnRobustJPEGDecodeImage)
 #endif  // defined(OS_CHROMEOS)
-    IPC_MESSAGE_HANDLER(ChromeUtilityMsg_ParseJSON, OnParseJSON)
     IPC_MESSAGE_HANDLER(ChromeUtilityMsg_PatchFileBsdiff,
                         OnPatchFileBsdiff)
     IPC_MESSAGE_HANDLER(ChromeUtilityMsg_PatchFileCourgette,
@@ -202,10 +199,6 @@ bool ChromeContentUtilityClient::OnMessageReceived(
 #endif
 #if defined(OS_CHROMEOS)
     IPC_MESSAGE_HANDLER(ChromeUtilityMsg_CreateZipFile, OnCreateZipFile)
-#endif
-#if defined(OS_ANDROID) && defined(USE_SECCOMP_BPF)
-    IPC_MESSAGE_HANDLER(ChromeUtilityMsg_DetectSeccompSupport,
-                        OnDetectSeccompSupport)
 #endif
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
@@ -333,21 +326,6 @@ void ChromeContentUtilityClient::OnCreateZipFile(
 }
 #endif  // defined(OS_CHROMEOS)
 
-#if defined(OS_ANDROID) && defined(USE_SECCOMP_BPF)
-void ChromeContentUtilityClient::OnDetectSeccompSupport() {
-  bool supports_prctl = sandbox::SandboxBPF::SupportsSeccompSandbox(
-      sandbox::SandboxBPF::SeccompLevel::SINGLE_THREADED);
-  Send(new ChromeUtilityHostMsg_DetectSeccompSupport_ResultPrctl(
-      supports_prctl));
-
-  // Probing for the seccomp syscall can provoke kernel panics in certain LGE
-  // devices. For now, this data will not be collected. In the future, this
-  // should detect SeccompLevel::MULTI_THREADED. http://crbug.com/478478
-
-  ReleaseProcessIfNeeded();
-}
-#endif  // defined(OS_ANDROID) && defined(USE_SECCOMP_BPF)
-
 #if defined(OS_CHROMEOS)
 void ChromeContentUtilityClient::OnRobustJPEGDecodeImage(
     const std::vector<unsigned char>& encoded_data,
@@ -368,21 +346,6 @@ void ChromeContentUtilityClient::OnRobustJPEGDecodeImage(
   ReleaseProcessIfNeeded();
 }
 #endif  // defined(OS_CHROMEOS)
-
-void ChromeContentUtilityClient::OnParseJSON(const std::string& json) {
-  int error_code;
-  std::string error;
-  scoped_ptr<base::Value> value = base::JSONReader::ReadAndReturnError(
-      json, base::JSON_PARSE_RFC, &error_code, &error);
-  if (value) {
-    base::ListValue wrapper;
-    wrapper.Append(value.Pass());
-    Send(new ChromeUtilityHostMsg_ParseJSON_Succeeded(wrapper));
-  } else {
-    Send(new ChromeUtilityHostMsg_ParseJSON_Failed(error));
-  }
-  ReleaseProcessIfNeeded();
-}
 
 void ChromeContentUtilityClient::OnPatchFileBsdiff(
     const base::FilePath& input_file,

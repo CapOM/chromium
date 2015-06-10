@@ -26,6 +26,7 @@ namespace chrome {
 void ChromeContentPluginClient::PreSandboxInitialization() {
 #ifdef V8_USE_EXTERNAL_STARTUP_DATA
   gin::V8Initializer::LoadV8Snapshot();
+  gin::V8Initializer::LoadV8Natives();
 #endif
 
 #if defined(ENABLE_REMOTING)
@@ -43,11 +44,8 @@ void ChromeContentPluginClient::PreSandboxInitialization() {
     LOG(ERROR) << "Failed to load crypto32.dll: " << error.ToString();
 #endif // defined(OS_WIN)
 
-  // Load media libraries for the Chromoting client plugin.
-  base::FilePath media_path;
-  PathService::Get(content::DIR_MEDIA_LIBS, &media_path);
-  if (!media_path.empty())
-    media::InitializeMediaLibrary(media_path);
+  // Initialize media libraries for the Chromoting client plugin.
+  media::InitializeMediaLibrary();
 
 #endif // defined(ENABLE_REMOTING)
 }
