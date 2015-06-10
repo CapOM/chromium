@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "base/memory/ref_counted.h"
+#include "device/bluetooth/android/bluetooth_adapter_wrapper.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "jni/FakeBluetoothAdapter_jni.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -19,20 +20,22 @@ class BluetoothAdapterAndroidTest : public testing::Test {
     ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
   }
 
-  void InitWithPermission() {
-    adapter_ = BluetoothAdapterAndroid::Create(false, NULL).get();
+  void InitWithDefaultAdapter() {
+    adapter_ =
+        BluetoothAdapterAndroid::Create(
+            BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj()).get();
   }
 
-  void InitWithoutPermission() {
-    adapter_ = BluetoothAdapterAndroid::Create(true, NULL).get();
+  void InitWithoutDefaultAdapter() {
+    adapter_ = BluetoothAdapterAndroid::Create(NULL).get();
   }
 
   void InitWithFakeAdapter() {
     j_fake_bluetooth_adapter_.Reset(
         Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
 
-    adapter_ = BluetoothAdapterAndroid::Create(
-                   false, j_fake_bluetooth_adapter_.obj()).get();
+    adapter_ =
+        BluetoothAdapterAndroid::Create(j_fake_bluetooth_adapter_.obj()).get();
   }
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_;
@@ -40,7 +43,7 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 };
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
-  InitWithPermission();
+  InitWithDefaultAdapter();
   ASSERT_TRUE(adapter_.get());
   if (!adapter_->IsPresent()) {
     LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
@@ -56,8 +59,8 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
 
-TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
-  InitWithoutPermission();
+TEST_F(BluetoothAdapterAndroidTest, ConstructWithoutDefaultAdapter) {
+  InitWithoutDefaultAdapter();
   ASSERT_TRUE(adapter_.get());
   EXPECT_EQ(adapter_->GetAddress(), "");
   EXPECT_EQ(adapter_->GetName(), "");

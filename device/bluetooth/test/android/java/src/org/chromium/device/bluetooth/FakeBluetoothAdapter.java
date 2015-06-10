@@ -9,17 +9,21 @@ import android.bluetooth.le.BluetoothLeScanner;
 import android.os.Build;
 
 import org.chromium.base.CalledByNative;
+import org.chromium.base.Log;
 
 /**
  * Fakes android.bluetooth.BluetoothAdapter.
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
+    private static final String TAG = Log.makeTag("Bluetooth");
+
     /**
      * Creates a FakeBluetoothAdapter.
      */
     @CalledByNative
     public static FakeBluetoothAdapter create() {
+        Log.i(TAG, "FakeBluetoothAdapter created.");
         return new FakeBluetoothAdapter();
     }
 

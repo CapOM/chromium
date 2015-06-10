@@ -4,14 +4,11 @@
 
 package org.chromium.device.bluetooth;
 
-import android.Manifest;
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
-import android.content.Context;
-import android.content.pm.PackageManager;
 import android.os.Build;
 
 import org.chromium.base.CalledByNative;
@@ -39,63 +36,17 @@ final class ChromeBluetoothAdapter {
 
     /**
      * Constructs a ChromeBluetoothAdapter.
-     * @param nativeBluetoothAdapterAndroid Pointer value for C++
-     *                                      BluetoothAdapterAndroid instance.
-     * @param assumeNoBluetoothSupportForTesting Causes initialization presuming no
-     *                                           Bluetooth support, for testing
-     *                                           situations where permissions, SDK
-     *                                           version, or feature isn't
-     *                                           available.
      * @param adapterWrapperForTesting null to use the default system Bluetooth
      *                                 adapter. Enables tests to provide a fake
      *                                 BluetoothAdapterWrapper.
      */
-    public ChromeBluetoothAdapter(Context context, long nativeBluetoothAdapterAndroid,
-            boolean assumeNoBluetoothSupportForTesting,
-            BluetoothAdapterWrapper adapterWrapperForTesting) {
-        mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
-
-        if (assumeNoBluetoothSupportForTesting) {
-            Log.i(TAG, "ChromeBluetoothAdapter initialized for test with no Bluetooth support.");
-            return;
-        } else if (adapterWrapperForTesting != null) {
-            mAdapter = adapterWrapperForTesting;
-            Log.i(TAG, "ChromeBluetoothAdapter initialized for test with fake Android adapter.");
+    public ChromeBluetoothAdapter(BluetoothAdapterWrapper adapterWrapper) {
+        if (adapterWrapper == null) {
+            Log.i(TAG, "ChromeBluetoothAdapter created with no adapterWrapper.");
         } else {
-            final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
-            if (!hasMinAPI) {
-                Log.i(TAG, "Bluetooth API disabled; SDK version (%d) too low.",
-                        Build.VERSION.SDK_INT);
-                return;
-            }
-
-            final boolean hasPermissions =
-                    context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH)
-                            == PackageManager.PERMISSION_GRANTED
-                    && context.checkCallingOrSelfPermission(Manifest.permission.BLUETOOTH_ADMIN)
-                            == PackageManager.PERMISSION_GRANTED;
-            if (!hasPermissions) {
-                Log.w(TAG, "ChromeBluetoothAdapter disabled, lacking Bluetooth permissions.");
-                return;
-            }
-
-            // Only Low Energy currently supported, see BluetoothAdapterAndroid class note.
-            final boolean hasLowEnergyFeature =
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2
-                    && context.getPackageManager().hasSystemFeature(
-                               PackageManager.FEATURE_BLUETOOTH_LE);
-            if (!hasLowEnergyFeature) {
-                Log.i(TAG, "Bluetooth API disabled; Low Energy not supported on system.");
-                return;
-            }
-
-            mAdapter = BluetoothAdapterWrapper.getDefaultAdapter();
-            if (mAdapter == null) {
-                Log.i(TAG, "ChromeBluetoothAdapter initialized, but default adapter not found.");
-            } else {
-                Log.i(TAG, "ChromeBluetoothAdapter initialized with default adapter.");
-            }
+            Log.i(TAG, "ChromeBluetoothAdapter created with provided adapterWrapper.");
         }
+        mAdapter = adapterWrapper;
     }
 
     /**
@@ -108,18 +59,12 @@ final class ChromeBluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // BluetoothAdapterAndroid Methods exposed :
-
-    // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
 
     // Implements BluetoothAdapterAndroid::Create.
     @CalledByNative
-    private static ChromeBluetoothAdapter create(Context context,
-            long nativeBluetoothAdapterAndroid, boolean assumeNoBluetoothSupportForTesting,
-            BluetoothAdapterWrapper adapterWrapperForTesting) {
-        return new ChromeBluetoothAdapter(context, nativeBluetoothAdapterAndroid,
-                assumeNoBluetoothSupportForTesting, adapterWrapperForTesting);
+    private static ChromeBluetoothAdapter create(BluetoothAdapterWrapper adapterWrapper) {
+        return new ChromeBluetoothAdapter(adapterWrapper);
     }
 
     // Implements BluetoothAdapterAndroid::GetAddress.
