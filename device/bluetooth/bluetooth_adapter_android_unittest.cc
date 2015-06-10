@@ -20,13 +20,13 @@ class BluetoothAdapterAndroidTest : public testing::Test {
     ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
   }
 
-  void InitWithPermission() {
+  void InitWithDefaultAdapter() {
     adapter_ =
         BluetoothAdapterAndroid::Create(
             BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj()).get();
   }
 
-  void InitWithoutPermission() {
+  void InitWithoutDefaultAdapter() {
     adapter_ = BluetoothAdapterAndroid::Create(NULL).get();
   }
 
@@ -43,7 +43,7 @@ class BluetoothAdapterAndroidTest : public testing::Test {
 };
 
 TEST_F(BluetoothAdapterAndroidTest, Construct) {
-  InitWithPermission();
+  InitWithDefaultAdapter();
   ASSERT_TRUE(adapter_.get());
   if (!adapter_->IsPresent()) {
     LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
@@ -59,8 +59,8 @@ TEST_F(BluetoothAdapterAndroidTest, Construct) {
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
 
-TEST_F(BluetoothAdapterAndroidTest, ConstructNoPermision) {
-  InitWithoutPermission();
+TEST_F(BluetoothAdapterAndroidTest, ConstructWithoutDefaultAdapter) {
+  InitWithoutDefaultAdapter();
   ASSERT_TRUE(adapter_.get());
   EXPECT_EQ(adapter_->GetAddress(), "");
   EXPECT_EQ(adapter_->GetName(), "");

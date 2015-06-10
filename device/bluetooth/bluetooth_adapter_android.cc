@@ -21,9 +21,8 @@ namespace device {
 // static
 base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
     const InitCallback& init_callback) {
-  ScopedJavaLocalRef<jobject> j_bluetooth_adapter_wrapper =
-      BluetoothAdapterWrapper::CreateWithDefaultAdapter();
-  return BluetoothAdapterAndroid::Create(j_bluetooth_adapter_wrapper.obj());
+  return BluetoothAdapterAndroid::Create(
+      BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj());
 }
 
 // static
