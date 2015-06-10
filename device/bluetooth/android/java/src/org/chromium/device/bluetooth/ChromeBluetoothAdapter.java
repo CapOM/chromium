@@ -27,6 +27,11 @@ final class ChromeBluetoothAdapter {
      *                                 BluetoothAdapterWrapper.
      */
     public ChromeBluetoothAdapter(BluetoothAdapterWrapper adapterWrapper) {
+        if (adapterWrapper == null) {
+            Log.i(TAG, "ChromeBluetoothAdapter created with no adapterWrapper.");
+        } else {
+            Log.i(TAG, "ChromeBluetoothAdapter created with provided adapterWrapper.");
+        }
         mAdapter = adapterWrapper;
     }
 
