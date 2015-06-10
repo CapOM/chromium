@@ -4,23 +4,24 @@
 
 package org.chromium.device.bluetooth;
 
+import android.bluetooth.BluetoothAdapter;
+
 /**
  * Wraps android.bluetooth.BluetoothAdapter, pasing through to a provided
  * object. This indirection enables fake implementations when running tests.
  */
 public class BluetoothAdapterWrapper {
-    private final android.bluetooth.BluetoothAdapter mAdapter;
+    private final BluetoothAdapter mAdapter;
 
     public static BluetoothAdapterWrapper getDefaultAdapter() {
-        android.bluetooth.BluetoothAdapter adapter =
-                android.bluetooth.BluetoothAdapter.getDefaultAdapter();
+        BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
         if (adapter == null) {
             return null;
         }
         return new BluetoothAdapterWrapper(adapter);
     }
 
-    public BluetoothAdapterWrapper(android.bluetooth.BluetoothAdapter adapter) {
+    private BluetoothAdapterWrapper(BluetoothAdapter adapter) {
         assert adapter != null;
         mAdapter = adapter;
     }
