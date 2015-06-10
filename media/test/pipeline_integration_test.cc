@@ -631,8 +631,7 @@ class PipelineIntegrationTestHost : public mojo::test::ApplicationTestBase,
 
   void SetUp() override {
     ApplicationTestBase::SetUp();
-    if (!IsMediaLibraryInitialized())
-      InitializeMediaLibraryForTesting();
+    InitializeMediaLibrary();
   }
 
  protected:
@@ -663,7 +662,9 @@ class PipelineIntegrationTest : public PipelineIntegrationTestHost {
         .Times(AtMost(1))
         .WillRepeatedly(SaveArg<0>(&metadata_));
     EXPECT_CALL(*this, OnBufferingStateChanged(BUFFERING_HAVE_ENOUGH))
-        .Times(AtMost(1));
+        .Times(AnyNumber());
+    EXPECT_CALL(*this, OnBufferingStateChanged(BUFFERING_HAVE_NOTHING))
+        .Times(AnyNumber());
 
     // Encrypted content not used, so this is never called.
     EXPECT_CALL(*this, OnWaitingForDecryptionKey()).Times(0);
@@ -700,7 +701,9 @@ class PipelineIntegrationTest : public PipelineIntegrationTestHost {
         .Times(AtMost(1))
         .WillRepeatedly(SaveArg<0>(&metadata_));
     EXPECT_CALL(*this, OnBufferingStateChanged(BUFFERING_HAVE_ENOUGH))
-        .Times(AtMost(1));
+        .Times(AnyNumber());
+    EXPECT_CALL(*this, OnBufferingStateChanged(BUFFERING_HAVE_NOTHING))
+        .Times(AnyNumber());
     EXPECT_CALL(*this, DecryptorAttached(true));
 
     // Encrypted content used but keys provided in advance, so this is

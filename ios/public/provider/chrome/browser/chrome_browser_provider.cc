@@ -4,6 +4,8 @@
 
 #include "ios/public/provider/chrome/browser/chrome_browser_provider.h"
 
+#include "base/logging.h"
+
 namespace ios {
 
 namespace {
@@ -58,6 +60,10 @@ ChromeBrowserProvider::GetGeolocationUpdaterProvider() {
 void ChromeBrowserProvider::ShowTranslateSettings() {
 }
 
+bool ChromeBrowserProvider::IsBookmarkCollectionEnabled() {
+  return false;
+}
+
 const char* ChromeBrowserProvider::GetChromeUIScheme() {
   return nullptr;
 }
@@ -73,6 +79,12 @@ ChromeBrowserProvider::CreateCardUnmaskPromptView(
 }
 
 std::string ChromeBrowserProvider::GetRiskData() {
+  return std::string();
+}
+
+std::string ChromeBrowserProvider::GetProductVersionWithPrefix(
+    const std::string& prefix) {
+  NOTREACHED();
   return std::string();
 }
 

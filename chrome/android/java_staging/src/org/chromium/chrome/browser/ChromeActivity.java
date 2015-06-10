@@ -15,6 +15,7 @@ import android.graphics.Rect;
 import android.os.Build;
 import android.os.Looper;
 import android.os.MessageQueue;
+import android.os.StrictMode;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
@@ -96,8 +97,8 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
 
     private TabModelSelector mTabModelSelector;
     private TabModelSelectorTabObserver mTabModelSelectorTabObserver;
-    private ChromeTabCreator mRegularTabCreator;
-    private ChromeTabCreator mIncognitoTabCreator;
+    private TabCreatorManager.TabCreator mRegularTabCreator;
+    private TabCreatorManager.TabCreator mIncognitoTabCreator;
     private TabContentManager mTabContentManager;
     private UmaSessionStats mUmaSessionStats;
     private ContextReporter mContextReporter;
@@ -176,7 +177,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
     }
 
     @Override
-    public ChromeTabCreator getTabCreator(boolean incognito) {
+    public TabCreatorManager.TabCreator getTabCreator(boolean incognito) {
         return incognito ? mIncognitoTabCreator : mRegularTabCreator;
     }
 
@@ -184,8 +185,8 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
      * Sets the {@link ChromeTabCreator}s owned by this {@link ChromeActivity}.
      * @param regularTabCreator A {@link ChromeTabCreator} instance.
      */
-    public void setTabCreators(ChromeTabCreator regularTabCreator,
-            ChromeTabCreator incognitoTabCreator) {
+    public void setTabCreators(TabCreatorManager.TabCreator regularTabCreator,
+            TabCreatorManager.TabCreator incognitoTabCreator) {
         mRegularTabCreator = regularTabCreator;
         mIncognitoTabCreator = incognitoTabCreator;
     }
@@ -194,7 +195,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
      * Convenience method that returns a tab creator for the currently selected {@link TabModel}.
      * @return A tab creator for the currently selected {@link TabModel}.
      */
-    public ChromeTabCreator getCurrentTabCreator() {
+    public TabCreatorManager.TabCreator getCurrentTabCreator() {
         return getTabCreator(getTabModelSelector().isIncognitoSelected());
     }
 
@@ -284,8 +285,14 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
         // Low end device UI should be allowed only after a fresh install or when the data has
         // been cleared. This must happen before anyone calls SysUtils.isLowEndDevice() or
         // SysUtils.isLowEndDevice() will always return the wrong value.
-        if (OmahaClient.isFreshInstallOrDataHasBeenCleared(this)) {
-            ChromePreferenceManager.getInstance(this).setAllowLowEndDeviceUi();
+        // Temporarily allowing disk access. TODO: Fix. See http://crbug.com/473352
+        StrictMode.ThreadPolicy oldPolicy = StrictMode.allowThreadDiskReads();
+        try {
+            if (OmahaClient.isFreshInstallOrDataHasBeenCleared(this)) {
+                ChromePreferenceManager.getInstance(this).setAllowLowEndDeviceUi();
+            }
+        } finally {
+            StrictMode.setThreadPolicy(oldPolicy);
         }
 
         if (!ChromePreferenceManager.getInstance(this).getAllowLowEndDeviceUi()) {
@@ -737,6 +744,7 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
         });
 
         getChromeApplication().getUpdateInfoBarHelper().checkForUpdateOnBackgroundThread(this);
+
         removeSnapshotDatabase();
     }
 
@@ -779,10 +787,17 @@ public abstract class ChromeActivity extends AsyncInitializationActivity impleme
      * in Chrome M41.
      */
     private void removeSnapshotDatabase() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        if (!prefs.getBoolean(SNAPSHOT_DATABASE_REMOVED, false)) {
-            deleteDatabase(SNAPSHOT_DATABASE_NAME);
-            prefs.edit().putBoolean(SNAPSHOT_DATABASE_REMOVED, true).apply();
+        // Temporarily allowing disk access. TODO: Fix. See http://crbug.com/493181
+        StrictMode.ThreadPolicy oldPolicy = StrictMode.allowThreadDiskReads();
+        StrictMode.allowThreadDiskWrites();
+        try {
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+            if (!prefs.getBoolean(SNAPSHOT_DATABASE_REMOVED, false)) {
+                deleteDatabase(SNAPSHOT_DATABASE_NAME);
+                prefs.edit().putBoolean(SNAPSHOT_DATABASE_REMOVED, true).apply();
+            }
+        } finally {
+            StrictMode.setThreadPolicy(oldPolicy);
         }
     }
 

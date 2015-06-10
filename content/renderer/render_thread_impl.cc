@@ -109,8 +109,8 @@
 #include "content/renderer/render_view_impl.h"
 #include "content/renderer/renderer_blink_platform_impl.h"
 #include "content/renderer/scheduler/resource_dispatch_throttler.h"
-#include "content/renderer/service_worker/embedded_worker_context_message_filter.h"
 #include "content/renderer/service_worker/embedded_worker_dispatcher.h"
+#include "content/renderer/service_worker/service_worker_context_message_filter.h"
 #include "content/renderer/shared_worker/embedded_shared_worker_stub.h"
 #include "gin/public/debug.h"
 #include "gpu/GLES2/gl2extchromium.h"
@@ -135,7 +135,6 @@
 #include "third_party/WebKit/public/web/WebImageCache.h"
 #include "third_party/WebKit/public/web/WebKit.h"
 #include "third_party/WebKit/public/web/WebNetworkStateNotifier.h"
-#include "third_party/WebKit/public/web/WebPopupMenu.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 #include "third_party/WebKit/public/web/WebScriptController.h"
 #include "third_party/WebKit/public/web/WebSecurityPolicy.h"
@@ -270,8 +269,9 @@ class RenderViewZoomer : public RenderViewVisitor {
 class CompositorRasterThread : public base::SimpleThread {
  public:
   CompositorRasterThread(cc::TaskGraphRunner* task_graph_runner,
-                         const std::string& name_prefix)
-      : base::SimpleThread(name_prefix),
+                         const std::string& name_prefix,
+                         base::SimpleThread::Options options)
+      : base::SimpleThread(name_prefix, options),
         task_graph_runner_(task_graph_runner) {}
 
   // Overridden from base::SimpleThread:
@@ -566,7 +566,7 @@ void RenderThreadImpl::Init() {
 
   AddFilter((new CacheStorageMessageFilter(thread_safe_sender()))->GetFilter());
 
-  AddFilter((new EmbeddedWorkerContextMessageFilter())->GetFilter());
+  AddFilter((new ServiceWorkerContextMessageFilter())->GetFilter());
 
   GetContentClient()->renderer()->RenderThreadStarted();
 
@@ -647,10 +647,7 @@ void RenderThreadImpl::Init() {
 
   // Note that under Linux, the media library will normally already have
   // been initialized by the Zygote before this instance became a Renderer.
-  base::FilePath media_path;
-  PathService::Get(DIR_MEDIA_LIBS, &media_path);
-  if (!media_path.empty())
-    media::InitializeMediaLibrary(media_path);
+  media::InitializeMediaLibrary();
 
   memory_pressure_listener_.reset(new base::MemoryPressureListener(
       base::Bind(&RenderThreadImpl::OnMemoryPressure, base::Unretained(this))));
@@ -674,6 +671,13 @@ void RenderThreadImpl::Init() {
     // Picture::Create.
     is_gather_pixel_refs_enabled_ = num_raster_threads > 1;
 
+    base::SimpleThread::Options thread_options;
+#if defined(OS_ANDROID) || defined(OS_LINUX)
+    if (!command_line.HasSwitch(
+            switches::kUseNormalPriorityForTileTaskWorkerThreads)) {
+      thread_options.set_priority(base::ThreadPriority::BACKGROUND);
+    }
+#endif
     while (compositor_raster_threads_.size() <
            static_cast<size_t>(num_raster_threads)) {
       scoped_ptr<CompositorRasterThread> raster_thread(
@@ -682,14 +686,9 @@ void RenderThreadImpl::Init() {
               base::StringPrintf(
                   "CompositorTileWorker%u",
                   static_cast<unsigned>(compositor_raster_threads_.size() + 1))
-                  .c_str()));
+                  .c_str(),
+              thread_options));
       raster_thread->Start();
-#if defined(OS_ANDROID) || defined(OS_LINUX)
-      if (!command_line.HasSwitch(
-              switches::kUseNormalPriorityForTileTaskWorkerThreads)) {
-        raster_thread->SetThreadPriority(base::ThreadPriority::BACKGROUND);
-      }
-#endif
       compositor_raster_threads_.push_back(raster_thread.Pass());
     }
   }
@@ -1107,10 +1106,6 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
   EnableBlinkPlatformLogChannels(
       command_line.GetSwitchValueASCII(switches::kBlinkPlatformLogChannels));
 
-  if (!media::IsMediaLibraryInitialized()) {
-    WebRuntimeFeatures::enableWebAudio(false);
-  }
-
   RenderMediaClient::Initialize();
 
   FOR_EACH_OBSERVER(RenderProcessObserver, observers_, WebKitInitialized());
@@ -1208,15 +1203,13 @@ void RenderThreadImpl::IdleHandler() {
     if (idle_notifications_to_skip_ > 0) {
       --idle_notifications_to_skip_;
     } else {
-      base::allocator::ReleaseFreeMemory();
-      discardable_shared_memory_manager()->ReleaseFreeMemory();
+      ReleaseFreeMemory();
     }
     ScheduleIdleHandler(kLongIdleHandlerDelayMs);
     return;
   }
 
-  base::allocator::ReleaseFreeMemory();
-  discardable_shared_memory_manager()->ReleaseFreeMemory();
+  ReleaseFreeMemory();
 
   // Continue the idle timer if the webkit shared timer is not suspended or
   // something is left to do.
@@ -1880,6 +1873,14 @@ void RenderThreadImpl::OnRendererVisible() {
     return;
 
   ScheduleIdleHandler(kLongIdleHandlerDelayMs);
+}
+
+void RenderThreadImpl::ReleaseFreeMemory() {
+  base::allocator::ReleaseFreeMemory();
+  discardable_shared_memory_manager()->ReleaseFreeMemory();
+
+  if (blink_platform_impl_)
+    blink::decommitFreeableMemory();
 }
 
 RenderThreadImpl::PendingRenderFrameConnect::PendingRenderFrameConnect(

@@ -7,11 +7,13 @@
 #include "base/base_paths.h"
 #include "base/command_line.h"
 #include "base/files/file_util.h"
-#include "base/message_loop/message_loop_proxy.h"
+#include "base/location.h"
 #include "base/path_service.h"
 #include "base/prefs/testing_pref_store.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
 #include "chrome/browser/autocomplete/in_memory_url_index.h"
 #include "chrome/browser/autocomplete/in_memory_url_index_factory.h"
@@ -100,6 +102,9 @@
 #include "chrome/browser/extensions/extension_system_factory.h"
 #include "chrome/browser/extensions/test_extension_system.h"
 #include "components/guest_view/browser/guest_view_manager.h"
+#include "extensions/browser/event_router_factory.h"
+#include "extensions/browser/extension_prefs.h"
+#include "extensions/browser/extension_prefs_factory.h"
 #include "extensions/browser/extension_system.h"
 #endif
 
@@ -177,65 +182,68 @@ class TestExtensionURLRequestContextGetter
 };
 
 #if defined(ENABLE_NOTIFICATIONS)
-KeyedService* CreateTestDesktopNotificationService(
+scoped_ptr<KeyedService> CreateTestDesktopNotificationService(
     content::BrowserContext* profile) {
-  return new DesktopNotificationService(static_cast<Profile*>(profile));
+  return make_scoped_ptr(
+      new DesktopNotificationService(static_cast<Profile*>(profile)));
 }
 #endif
 
-KeyedService* BuildFaviconService(content::BrowserContext* context) {
+scoped_ptr<KeyedService> BuildFaviconService(content::BrowserContext* context) {
   Profile* profile = Profile::FromBrowserContext(context);
-  return new favicon::FaviconService(
+  return make_scoped_ptr(new favicon::FaviconService(
       ChromeFaviconClientFactory::GetForProfile(profile),
-      HistoryServiceFactory::GetForProfile(profile,
-                                           ServiceAccessType::EXPLICIT_ACCESS));
+      HistoryServiceFactory::GetForProfile(
+          profile, ServiceAccessType::EXPLICIT_ACCESS)));
 }
 
-KeyedService* BuildHistoryService(content::BrowserContext* context) {
+scoped_ptr<KeyedService> BuildHistoryService(content::BrowserContext* context) {
   Profile* profile = Profile::FromBrowserContext(context);
-  history::HistoryService* history_service = new history::HistoryService(
+  return make_scoped_ptr(new history::HistoryService(
       ChromeHistoryClientFactory::GetForProfile(profile),
       scoped_ptr<history::VisitDelegate>(
-          new history::ContentVisitDelegate(profile)));
-  return history_service;
+          new history::ContentVisitDelegate(profile))));
 }
 
-KeyedService* BuildInMemoryURLIndex(content::BrowserContext* context) {
+scoped_ptr<KeyedService> BuildInMemoryURLIndex(
+    content::BrowserContext* context) {
   Profile* profile = Profile::FromBrowserContext(context);
-  InMemoryURLIndex* in_memory_url_index = new InMemoryURLIndex(
+  scoped_ptr<InMemoryURLIndex> in_memory_url_index(new InMemoryURLIndex(
       BookmarkModelFactory::GetForProfile(profile),
       HistoryServiceFactory::GetForProfile(profile,
                                            ServiceAccessType::IMPLICIT_ACCESS),
       profile->GetPath(),
-      profile->GetPrefs()->GetString(prefs::kAcceptLanguages));
+      profile->GetPrefs()->GetString(prefs::kAcceptLanguages)));
   in_memory_url_index->Init();
-  return in_memory_url_index;
+  return in_memory_url_index.Pass();
 }
 
-KeyedService* BuildBookmarkModel(content::BrowserContext* context) {
+scoped_ptr<KeyedService> BuildBookmarkModel(content::BrowserContext* context) {
   Profile* profile = static_cast<Profile*>(context);
   ChromeBookmarkClient* bookmark_client =
       ChromeBookmarkClientFactory::GetForProfile(profile);
-  BookmarkModel* bookmark_model = new BookmarkModel(bookmark_client);
-  bookmark_client->Init(bookmark_model);
+  scoped_ptr<BookmarkModel> bookmark_model(new BookmarkModel(bookmark_client));
+  bookmark_client->Init(bookmark_model.get());
   bookmark_model->Load(profile->GetPrefs(),
                        profile->GetPrefs()->GetString(prefs::kAcceptLanguages),
                        profile->GetPath(),
                        profile->GetIOTaskRunner(),
                        content::BrowserThread::GetMessageLoopProxyForThread(
                            content::BrowserThread::UI));
-  return bookmark_model;
+  return bookmark_model.Pass();
 }
 
-KeyedService* BuildChromeBookmarkClient(
+scoped_ptr<KeyedService> BuildChromeBookmarkClient(
     content::BrowserContext* context) {
-  return new ChromeBookmarkClient(static_cast<Profile*>(context));
+  return make_scoped_ptr(
+      new ChromeBookmarkClient(static_cast<Profile*>(context)));
 }
 
-KeyedService* BuildChromeHistoryClient(
+scoped_ptr<KeyedService> BuildChromeHistoryClient(
     content::BrowserContext* context) {
   Profile* profile = static_cast<Profile*>(context);
-  return new ChromeHistoryClient(BookmarkModelFactory::GetForProfile(profile));
+  return make_scoped_ptr(
+      new ChromeHistoryClient(BookmarkModelFactory::GetForProfile(profile)));
 }
 
 void TestProfileErrorCallback(WebDataServiceWrapper::ErrorType error_type,
@@ -243,14 +251,14 @@ void TestProfileErrorCallback(WebDataServiceWrapper::ErrorType error_type,
   NOTREACHED();
 }
 
-KeyedService* BuildWebDataService(content::BrowserContext* context) {
+scoped_ptr<KeyedService> BuildWebDataService(content::BrowserContext* context) {
   const base::FilePath& context_path = context->GetPath();
-  return new WebDataServiceWrapper(
+  return make_scoped_ptr(new WebDataServiceWrapper(
       context_path, g_browser_process->GetApplicationLocale(),
       BrowserThread::GetMessageLoopProxyForThread(BrowserThread::UI),
       BrowserThread::GetMessageLoopProxyForThread(BrowserThread::DB),
       sync_start_util::GetFlareForSyncableService(context_path),
-      &TestProfileErrorCallback);
+      &TestProfileErrorCallback));
 }
 
 }  // namespace
@@ -313,7 +321,7 @@ TestingProfile::TestingProfile(const base::FilePath& path,
       delegate_(delegate) {
   Init();
   if (delegate_) {
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&TestingProfile::FinishInit, base::Unretained(this)));
   } else {
@@ -370,7 +378,7 @@ TestingProfile::TestingProfile(
   // TODO(atwilson): See if this is still required once we convert the current
   // users of the constructor that takes a Delegate* param.
   if (delegate_) {
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&TestingProfile::FinishInit, base::Unretained(this)));
   } else {
@@ -441,9 +449,23 @@ void TestingProfile::Init() {
   if (!IsOffTheRecord())
     CreateProfilePolicyConnector();
 
+  extensions_path_ = profile_path_.AppendASCII("Extensions");
+
 #if defined(ENABLE_EXTENSIONS)
   extensions::ExtensionSystemFactory::GetInstance()->SetTestingFactory(
       this, extensions::TestExtensionSystem::Build);
+
+  extensions::TestExtensionSystem* test_extension_system =
+      static_cast<extensions::TestExtensionSystem*>(
+          extensions::ExtensionSystem::Get(this));
+  scoped_ptr<extensions::ExtensionPrefs> extension_prefs =
+      test_extension_system->CreateExtensionPrefs(
+          base::CommandLine::ForCurrentProcess(), extensions_path_);
+  extensions::ExtensionPrefsFactory::GetInstance()->SetInstanceForTesting(
+      this, extension_prefs.Pass());
+
+  extensions::EventRouterFactory::GetInstance()->SetTestingFactory(this,
+                                                                   nullptr);
 #endif
 
   // Prefs for incognito profiles are set in CreateIncognitoPrefService() by
@@ -576,8 +598,8 @@ void TestingProfile::DestroyHistoryService() {
 
   // Make sure we don't have any event pending that could disrupt the next
   // test.
-  base::MessageLoop::current()->PostTask(FROM_HERE,
-                                         base::MessageLoop::QuitClosure());
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE, base::MessageLoop::QuitClosure());
   base::MessageLoop::current()->Run();
 }
 
@@ -634,7 +656,7 @@ scoped_ptr<content::ZoomLevelDelegate> TestingProfile::CreateZoomLevelDelegate(
 }
 
 scoped_refptr<base::SequencedTaskRunner> TestingProfile::GetIOTaskRunner() {
-  return base::MessageLoop::current()->message_loop_proxy();
+  return base::MessageLoop::current()->task_runner();
 }
 
 TestingPrefServiceSyncable* TestingProfile::GetTestingPrefService() {

@@ -391,7 +391,7 @@ bool PersonalDataManager::ImportFormData(
     types_seen.insert(server_field_type);
 
     if (group == CREDIT_CARD) {
-      if (LowerCaseEqualsASCII(field->form_control_type, "month")) {
+      if (base::LowerCaseEqualsASCII(field->form_control_type, "month")) {
         DCHECK_EQ(CREDIT_CARD_EXP_DATE_4_DIGIT_YEAR, server_field_type);
         local_imported_credit_card->SetInfoForMonthInputType(value);
       } else {
@@ -997,19 +997,14 @@ std::string PersonalDataManager::MergeProfile(
   // If we have already saved this address, merge in any missing values.
   // Only merge with the first match.
   for (AutofillProfile* existing_profile : existing_profiles) {
-    if (!matching_profile_found &&
-        !new_profile.PrimaryValue().empty() &&
-        AutofillProfile::AreProfileStringsSimilar(
-            existing_profile->PrimaryValue(),
-            new_profile.PrimaryValue())) {
+    if (!matching_profile_found && !new_profile.PrimaryValue().empty() &&
+        existing_profile->SaveAdditionalInfo(new_profile, app_locale)) {
       // Unverified profiles should always be updated with the newer data,
       // whereas verified profiles should only ever be overwritten by verified
       // data.  If an automatically aggregated profile would overwrite a
       // verified profile, just drop it.
       matching_profile_found = true;
       guid = existing_profile->guid();
-      if (!existing_profile->IsVerified() || new_profile.IsVerified())
-        existing_profile->OverwriteWithOrAddTo(new_profile, app_locale);
     }
     merged_profiles->push_back(*existing_profile);
   }
@@ -1280,7 +1275,7 @@ std::string PersonalDataManager::MostCommonCountryCodeFromProfiles() const {
   std::vector<std::string> country_codes;
   AutofillCountry::GetAvailableCountries(&country_codes);
   for (size_t i = 0; i < profiles.size(); ++i) {
-    std::string country_code = StringToUpperASCII(base::UTF16ToASCII(
+    std::string country_code = base::StringToUpperASCII(base::UTF16ToASCII(
         profiles[i]->GetRawInfo(ADDRESS_HOME_COUNTRY)));
 
     if (std::find(country_codes.begin(), country_codes.end(), country_code) !=

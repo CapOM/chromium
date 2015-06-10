@@ -8,8 +8,11 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/location.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/browser/frame_host/cross_process_frame_connector.h"
 #include "content/browser/frame_host/frame_tree.h"
 #include "content/browser/frame_host/navigator.h"
@@ -59,8 +62,6 @@ void PostMessageAndWaitForReply(FrameTreeNode* sender_ftn,
       break;
   }
 }
-
-}  // anonymous namespace
 
 class RedirectNotificationObserver : public NotificationObserver {
  public:
@@ -240,6 +241,8 @@ bool ConsoleObserverDelegate::AddMessageToConsole(
   }
   return false;
 }
+
+}  // namespace
 
 //
 // SitePerProcessBrowserTest
@@ -431,7 +434,7 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
     // TODO(lazyboy): Find a better way to avoid sleeping like this. See
     // http://crbug.com/405282 for details.
     base::RunLoop run_loop;
-    base::MessageLoop::current()->PostDelayedTask(
+    base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
         FROM_HERE, run_loop.QuitClosure(),
         base::TimeDelta::FromMilliseconds(10));
     run_loop.Run();
@@ -1007,8 +1010,6 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest,
   FrameTreeNode* root =
       static_cast<WebContentsImpl*>(shell()->web_contents())->
           GetFrameTree()->root();
-  TestNavigationObserver observer(shell()->web_contents());
-
   ASSERT_EQ(2U, root->child_count());
 
   GURL site_b_url(
@@ -1080,10 +1081,6 @@ IN_PROC_BROWSER_TEST_F(SitePerProcessBrowserTest, DISABLED_CrashSubframe) {
   NavigateToURL(shell(), main_url);
 
   StartFrameAtDataURL();
-
-  // These must stay in scope with replace_host.
-  GURL::Replacements replace_host;
-  std::string foo_com("foo.com");
 
   // Load cross-site page into iframe.
   EXPECT_TRUE(NavigateIframeToURL(

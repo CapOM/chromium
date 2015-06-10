@@ -21,10 +21,10 @@ namespace mandoline {
 // DesktopUI, public:
 
 DesktopUI::DesktopUI(Browser* browser, mojo::ApplicationImpl* application_impl)
-    : browser_(browser),
+    : aura_init_(application_impl->shell()),
+      browser_(browser),
       application_impl_(application_impl),
-      omnibox_launcher_(
-          new views::LabelButton(this, base::ASCIIToUTF16("Open Omnibox"))),
+      omnibox_launcher_(nullptr),
       root_(nullptr),
       client_binding_(browser) {
 }
@@ -40,6 +40,8 @@ void DesktopUI::Init(mojo::View* root) {
   views::WidgetDelegateView* widget_delegate = new views::WidgetDelegateView;
   widget_delegate->GetContentsView()->set_background(
     views::Background::CreateSolidBackground(0xFFDDDDDD));
+  omnibox_launcher_ =
+      new views::LabelButton(this, base::ASCIIToUTF16("Open Omnibox"));
   widget_delegate->GetContentsView()->AddChildView(omnibox_launcher_);
   widget_delegate->GetContentsView()->SetLayoutManager(this);
 

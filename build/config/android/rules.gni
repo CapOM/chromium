@@ -5,8 +5,8 @@
 import("//base/android/linker/config.gni")
 import("//build/config/android/config.gni")
 import("//build/config/android/internal_rules.gni")
+import("//third_party/android_platform/config.gni")
 import("//tools/grit/grit_rule.gni")
-import("//tools/relocation_packer/config.gni")
 
 assert(is_android)
 
@@ -402,6 +402,9 @@ template("java_cpp_enum") {
     inputs = generate_enum_outputs
     output = srcjar_path
     base_dir = base_gen_dir
+    deps = [
+      ":$generate_enum_target_name",
+    ]
   }
 
   group(final_target_name) {
@@ -586,7 +589,13 @@ template("android_resources") {
   r_text_path = base_path + "_R.txt"
   build_config = base_path + ".build_config"
 
-  write_build_config("${target_name}__build_config") {
+  build_config_target_name = "${target_name}__build_config"
+  process_resources_target_name = "${target_name}__process_resources"
+  final_target_name = target_name
+
+  write_build_config(build_config_target_name) {
+    visibility = [ ":$process_resources_target_name" ]
+
     type = "android_resources"
     resources_zip = zip_path
     srcjar = srcjar_path
@@ -607,7 +616,9 @@ template("android_resources") {
     android_manifest = invoker.android_manifest
   }
 
-  process_resources("${target_name}__process_resources") {
+  process_resources(process_resources_target_name) {
+    visibility = [ ":$final_target_name" ]
+
     resource_dirs = invoker.resource_dirs
     if (defined(invoker.custom_package)) {
       custom_package = invoker.custom_package
@@ -620,11 +631,21 @@ template("android_resources") {
     if (defined(invoker.shared_resources)) {
       shared_resources = invoker.shared_resources
     }
+
+    deps = [
+      ":$build_config_target_name",
+    ]
+    if (defined(invoker.deps)) {
+      # Invoker may have added deps that generate the input resources.
+      deps += invoker.deps
+    }
   }
 
-  group(target_name) {
+  group(final_target_name) {
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
     deps = [
-      ":${target_name}__build_config",
       ":${target_name}__process_resources",
     ]
   }
@@ -685,6 +706,9 @@ template("java_strings_grd") {
     base_dir = grit_output_dir
     inputs = generate_strings_outputs
     output = resources_zip
+    deps = [
+      ":$grit_target_name",
+    ]
   }
 
   group(target_name) {
@@ -721,23 +745,35 @@ template("java_strings_grd_prebuilt") {
   resources_zip = base_path + ".resources.zip"
   build_config = base_path + ".build_config"
 
-  write_build_config("${target_name}__build_config") {
+  build_config_target_name = "${target_name}__build_config"
+  zip_target_name = "${target_name}__zip"
+  final_target_name = target_name
+
+  write_build_config(build_config_target_name) {
+    visibility = [ ":$zip_target_name" ]
     type = "android_resources"
-    if (defined(invoker.deps)) {
-      deps = invoker.deps
-    }
   }
 
-  zip("${target_name}__zip") {
+  zip(zip_target_name) {
+    visibility = [ ":$final_target_name" ]
+
     base_dir = invoker.grit_output_dir
     inputs = rebase_path(invoker.generated_files, ".", base_dir)
     output = resources_zip
+    deps = [
+      ":$build_config_target_name",
+    ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
   }
 
-  group(target_name) {
+  group(final_target_name) {
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
     deps = [
-      ":${target_name}__build_config",
-      ":${target_name}__zip",
+      ":$zip_target_name",
     ]
   }
 }
@@ -1386,6 +1422,9 @@ template("android_apk") {
     deps = [
       ":$build_config_target",
     ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
   }
   _srcjar_deps += [ ":$process_resources_target" ]
 
@@ -1446,6 +1485,10 @@ template("android_apk") {
     }
     srcjar_deps = _srcjar_deps
     dex_path = base_path + ".dex.jar"
+
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
   }
 
   if (_dist_jar_path != "") {
@@ -1529,12 +1572,9 @@ template("android_apk") {
         "--depfile",
         rebase_path(depfile, root_build_dir),
         "--enable-packing=$enable_packing_arg",
-        "--has-relocations-with-addends=$relocations_have_addends",
         "--exclude-packing-list=$skip_packing_list",
         "--android-pack-relocations",
         rebase_path(relocation_packer_exe, root_build_dir),
-        "--android-objcopy",
-        rebase_path(android_objcopy, root_build_dir),
         "--stripped-libraries-dir",
         rebase_path(root_build_dir, root_build_dir),
         "--packed-libraries-dir",
@@ -1582,6 +1622,9 @@ template("android_apk") {
       ":$process_resources_target",
       ":$final_dex_target_name",
     ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
 
     if (defined(invoker.asset_location)) {
       asset_location = invoker.asset_location
@@ -1640,6 +1683,111 @@ template("android_apk") {
     deps = final_deps
     if (defined(invoker.data_deps)) {
       data_deps = invoker.data_deps
+    }
+  }
+}
+
+# Declare an Android instrumentation test apk
+#
+# This target creates an Android instrumentation test apk.
+#
+# Variables
+#   android_manifest: Path to AndroidManifest.xml.
+#   data_deps: List of dependencies needed at runtime. These will be built but
+#     won't change the generated .apk in any way (in fact they may be built
+#     after the .apk is).
+#   deps: List of dependencies. All Android java resources and libraries in the
+#     "transitive closure" of these dependencies will be included in the apk.
+#     Note: this "transitive closure" actually only includes such targets if
+#     they are depended on through android_library or android_resources targets
+#     (and so not through builtin targets like 'action', 'group', etc).
+#   java_files: List of .java files to include in the apk.
+#   srcjar_deps: List of srcjar dependencies. The .java files in the srcjars
+#      will be added to java_files and be included in this apk.
+#   apk_name: Name for final apk.
+#   final_apk_path: Path to final built apk. Default is
+#     $root_out_dir/apks/$apk_name.apk. Setting this will override apk_name.
+#   native_libs: List paths of native libraries to include in this apk. If these
+#     libraries depend on other shared_library targets, those dependencies will
+#     also be included in the apk.
+#   apk_under_test: The apk being tested.
+#   isolate_file: Isolate file containing the list of test data dependencies.
+#
+#   DEPRECATED_java_in_dir: Directory containing java files. All .java files in
+#     this directory will be included in the library. This is only supported to
+#     ease the gyp->gn conversion and will be removed in the future.
+#
+# Example
+#   instrumentation_test_apk("foo_test_apk") {
+#     android_manifest = "AndroidManifest.xml"
+#     apk_name = "FooTest"
+#     apk_under_test = "Foo"
+#     java_files = [
+#       "android/org/chromium/foo/FooTestCase.java",
+#       "android/org/chromium/foo/FooExampleTest.java",
+#     ]
+#     deps = [
+#       ":foo_test_support_java"
+#     ]
+#   }
+template("instrumentation_test_apk") {
+  set_sources_assignment_filter([])
+  testonly = true
+  _template_name = target_name
+
+  if (defined(invoker.apk_name)) {
+    test_runner_data_dep = [ ":${_template_name}__test_runner_script" ]
+    test_runner_script("${_template_name}__test_runner_script") {
+      test_name = invoker.target_name
+      test_type = "instrumentation"
+      test_apk = invoker.apk_name
+      if (defined(invoker.isolate_file)) {
+        isolate_file = invoker.isolate_file
+      }
+    }
+  }
+
+  android_apk(target_name) {
+    if (defined(invoker.android_manifest)) {
+      android_manifest = invoker.android_manifest
+    }
+    data_deps = [
+      "//testing/android/driver:driver_apk",
+      "//tools/android/forwarder2",
+      "//tools/android/md5sum",
+    ]
+    if (defined(test_runner_data_dep)) {
+      data_deps += test_runner_data_dep
+    }
+    if (defined(invoker.data_deps)) {
+      data_deps += invoker.data_deps
+    }
+    deps = [
+      "//testing/android/broker:broker_java",
+    ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+    if (defined(invoker.java_files)) {
+      java_files = invoker.java_files
+    }
+    if (defined(invoker.srcjar_deps)) {
+      srcjar_deps = invoker.srcjar_deps
+    }
+    if (defined(invoker.apk_name)) {
+      apk_name = invoker.apk_name
+    }
+    if (defined(invoker.final_apk_path)) {
+      final_apk_path = invoker.final_apk_path
+    }
+    if (defined(invoker.native_libs)) {
+      native_libs = invoker.native_libs
+    }
+    if (defined(invoker.apk_under_test)) {
+      apk_under_test = invoker.apk_under_test
+    }
+    if (defined(invoker.DEPRECATED_java_in_dir)) {
+      DEPRECATED_java_in_dir = invoker.DEPRECATED_java_in_dir
     }
   }
 }
@@ -1816,6 +1964,7 @@ template("android_aidl") {
 #   create_native_executable_dist("foo_dist") {
 #     dist_dir = "$root_build_dir/foo_dist"
 #     binary = "$root_build_dir/exe.stripped/foo"
+#     deps = [ ":the_thing_that_makes_foo" ]
 #   }
 template("create_native_executable_dist") {
   set_sources_assignment_filter([])
@@ -1825,7 +1974,6 @@ template("create_native_executable_dist") {
 
   dist_dir = invoker.dist_dir
   binary = invoker.binary
-  final_deps = []
   template_name = target_name
 
   libraries_list =
@@ -1836,9 +1984,13 @@ template("create_native_executable_dist") {
   #'<(DEPTH)/build/android/setup.gyp:copy_system_libraries',
   #],
 
+  find_deps_target_name = "${template_name}__find_library_dependencies"
+  copy_target_name = "${template_name}__copy_libraries_and_exe"
+
   stripped_libraries_dir = "$root_build_dir/lib.stripped"
-  final_deps += [ ":${template_name}__find_library_dependencies" ]
-  action("${template_name}__find_library_dependencies") {
+  action(find_deps_target_name) {
+    visibility = [ ":$copy_target_name" ]
+
     script = "//build/android/gyp/write_ordered_libraries.py"
     depfile = "$target_gen_dir/$target_name.d"
     inputs = [
@@ -1861,10 +2013,14 @@ template("create_native_executable_dist") {
       "--readelf",
       rebase_path(android_readelf, root_build_dir),
     ]
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
   }
 
-  final_deps += [ ":${template_name}__copy_libraries_and_exe" ]
-  copy_ex("${template_name}__copy_libraries_and_exe") {
+  copy_ex(copy_target_name) {
+    visibility = [ ":$template_name" ]
+
     clear_dir = true
     inputs = [
       binary,
@@ -1877,10 +2033,22 @@ template("create_native_executable_dist") {
       "--files=$rebased_binaries_list",
       "--files=@FileArg($rebased_libraries_list:libraries)",
     ]
+
+    deps = [
+      ":$find_deps_target_name",
+    ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
   }
 
-  group(target_name) {
-    deps = final_deps
+  group(template_name) {
+    if (defined(invoker.visibility)) {
+      visibility = invoker.visibility
+    }
+    deps = [
+      ":$copy_target_name",
+    ]
   }
 }
 

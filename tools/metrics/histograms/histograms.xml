@@ -61,6 +61,9 @@ The complete list of histograms will be:
 When 'ordering="prefix"' is present in the histogram_suffixes tag, the suffix
 will be inserted after the first dot separator of the affected-histogram name.
 Therefore, the affected-histogram name has to have at least one dot in it.
+
+Goolgers: There are also a small number of private internal histograms found at
+http://cs/file:chrome/histograms.xml - but prefer this file for new entries.
 -->
 
 <histogram-configuration>
@@ -623,6 +626,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Ash.Desktop.TimeBetweenNavigateToTaskSwitches" units="seconds">
+  <owner>bruthig@chromium.org</owner>
+  <owner>tdanderson@chromium.org</owner>
+  <summary>
+    The number of seconds between task window activations triggered by users
+    clicking or tapping on a window, as recorded by the Desktop_SwitchTask user
+    action. Recorded on ChromeOS only. Task switches from other sources are
+    ignored and do not affect this metric. In other words, if a user performs
+    the following steps (1) click on task window 'A' (2) Alt+Tab to task 'Z'(3)
+    click on task window 'B', then this will result in a sample recorded for the
+    time delta between activating task window 'A'and 'B'.
+  </summary>
+</histogram>
+
 <histogram name="Ash.Dock.Action" enum="DockedAction">
   <owner>kuscher@google.com</owner>
   <owner>varkha@chromium.org</owner>
@@ -840,6 +857,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The number of seconds between tab switches triggered by a user gesture (e.g.
     Ctrl+T, Ctrl+1, tapping or clicking the tab strip, etc).
+  </summary>
+</histogram>
+
+<histogram name="Ash.TimeBetweenTaskSwitches" units="seconds">
+  <owner>bruthig@google.com</owner>
+  <owner>tdanderson@google.com</owner>
+  <summary>
+    The number of seconds between contiguous task switch user actions triggered
+    by any of the other task switch actions that are tracked. (e.g.,
+    Ash.Shelf.TimeBetweenNavigateToTaskSwitches,
+    Ash.Tab.TimeBetweenSwitchToExistingTabUserActions,
+    Ash.WindowCycleController.TimeBetweenTaskSwitches,
+    Ash.AppList.TimeBetweenTaskSwitches,
+    Ash.WindowSelector.TimeBetweenActiveWindowChanges, etc).
   </summary>
 </histogram>
 
@@ -2563,6 +2594,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Count of renderer process kills grouped by type.</summary>
 </histogram>
 
+<histogram name="BrowserRenderProcessHost.ChildKills.OOM" enum="RendererType">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    Out of BrowserRenderProcessHost.ChildKills, numer of kills due to SIGKILL,
+    which is a strong signal of out of memory on ChromeOS, grouped by renderer
+    type.
+  </summary>
+</histogram>
+
 <histogram name="BrowserRenderProcessHost.DisconnectedAlive"
     enum="RendererType">
   <owner>wfh@chromium.org</owner>
@@ -3020,6 +3060,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="ChildProcess.Killed2" enum="ProcessType2">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Count of child process kills grouped by process type.</summary>
+</histogram>
+
+<histogram name="ChildProcess.Killed2.OOM" enum="ProcessType2">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    Out of ChildProcess.Killled, number of kills due to SIGKILL, which is a
+    strong signal of out of memory on ChromeOS, grouped by process type.
+  </summary>
 </histogram>
 
 <histogram name="ChildProcess.KilledByExtensionAPI">
@@ -4403,6 +4451,33 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="CustomTabs.PredictionStatus" enum="PredictionStatus">
+  <owner>lizeb@chromium.org</owner>
+  <summary>
+    For Custom Tabs, records whether mayLaunchUrl() has been called, and if so,
+    whether the call was later matched by a URL launch.
+  </summary>
+</histogram>
+
+<histogram name="CustomTabs.PredictionToLaunch" units="ms">
+  <owner>lizeb@chromium.org</owner>
+  <summary>
+    When a URL prediction succeeds, time in ms between the prediction and the
+    actual launch.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.AutoLoFiRequestHeaderState"
+    enum="DataReductionProxyAutoLoFiRequestHeaderState">
+  <owner>tbansal@chromium.org</owner>
+  <summary>
+    Counts the changes in the state of Lo-Fi request header (q=low) being added
+    to the Chrome proxy request header. Counters are incremented when a main
+    frame URL request is handled by Data Reduction Proxy and session was in Auto
+    Lo-Fi enabled field trial.
+  </summary>
+</histogram>
+
 <histogram name="DataReductionProxy.BlockTypeFallback"
     enum="DataReductionProxyBypassType">
   <owner>bengr@chromium.org</owner>
@@ -4645,6 +4720,20 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     name) have been tampered with. This assumes the data reduction proxy
     injected fingerprints have not been tampered with. Only the data reduction
     proxy responses with 200 OK response code are checked.
+  </summary>
+</histogram>
+
+<histogram name="DataReductionProxy.LoFi.UIAction"
+    enum="DataReductionProxyLoFiUIAction">
+  <owner>bengr@chromium.org</owner>
+  <owner>megjablon@chromium.org</owner>
+  <summary>
+    Samples of user interactions with the Lo-Fi snackbar and context menu
+    option. These samples include:
+
+    Displays and clicks on the &quot;Load images&quot; snackbar. Displays and
+    clicks on the &quot;Load image&quot; context menu option. Count of pages
+    where the user has clicked &quot;Load image&quot; at least once
   </summary>
 </histogram>
 
@@ -6415,6 +6504,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>yfriedman@chromium.org</owner>
   <summary>
     Time spent in DomDistiller's processing of article metadata.
+  </summary>
+</histogram>
+
+<histogram name="DomDistiller.Time.RunJavaScript" units="milliseconds">
+  <owner>wychen@chromium.org</owner>
+  <summary>
+    Time spent in ExecuteJavaScript() in DomDistiller. It includes JavaScript
+    code transmission through IPC, parsing, compilation, execution, and
+    returning the JSON back through IPC.
   </summary>
 </histogram>
 
@@ -9417,6 +9515,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     Simiar to Extensions.CorruptExtensionBecameDisabled, but fires when we're in
     a bootstrapping mode and would have disabled an extension.
+  </summary>
+</histogram>
+
+<histogram name="Extensions.CorruptPolicyExtensionWouldBeDisabled"
+    enum="BooleanHit">
+  <owner>asargent@chromium.org</owner>
+  <summary>
+    Fires when we detect corruption in an enterprise policy forced install
+    extension. See http://crbug.com/447040 for more background on why we don't
+    yet disable these. A useful comparison can be made between this value and
+    the number of policy forced extensions loaded at startup, which is logged in
+    the EXTERNAL_POLICY_DOWNLOAD bucket of the Extensions.ExtensionLocation
+    histogram.
   </summary>
 </histogram>
 
@@ -13726,11 +13837,65 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="InstanceID.DeleteToken.CompleteTime" units="milliseconds">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    Length of time taken to complete the DeleteToken request successfully. If
+    the request is retried multiple times, the length of time is counted for the
+    last successful retry.
+  </summary>
+</histogram>
+
+<histogram name="InstanceID.DeleteToken.RequestStatus"
+    enum="GCMUnregistrationRequestStatus">
+  <owner>juyik@chromium.org</owner>
+  <summary>Status code of the outcome of DeleteToken request.</summary>
+</histogram>
+
+<histogram name="InstanceID.DeleteToken.RetryCount">
+  <owner>jianli@chromium.org</owner>
+  <summary>Number of retries before DeleteToken succeeds.</summary>
+</histogram>
+
 <histogram name="InstanceID.Enabled" enum="BooleanEnabled">
   <owner>jianli@chromium.org</owner>
   <summary>
     Whether the Instance ID API is enabled. Checked when a chrome.instanceID
     function is called.
+  </summary>
+</histogram>
+
+<histogram name="InstanceID.GetToken.CompleteTime" units="milliseconds">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    Length of time taken to complete the GetToken request successfully. If the
+    request is retried multiple times, the length of time is counted for the
+    last successful retry.
+  </summary>
+</histogram>
+
+<histogram name="InstanceID.GetToken.RequestStatus"
+    enum="GCMUnregistrationRequestStatus">
+  <owner>juyik@chromium.org</owner>
+  <summary>Status code of the outcome of GetToken request.</summary>
+</histogram>
+
+<histogram name="InstanceID.GetToken.RetryCount">
+  <owner>jianli@chromium.org</owner>
+  <summary>Number of retries before GetToken succeeds.</summary>
+</histogram>
+
+<histogram name="InstanceID.RestoredIDCount">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    Number of Instance IDs restored from the persistent store at startup.
+  </summary>
+</histogram>
+
+<histogram name="InstanceID.RestoredTokenCount">
+  <owner>jianli@chromium.org</owner>
+  <summary>
+    Number of InstanceID tokens restored from the persistent store at startup.
   </summary>
 </histogram>
 
@@ -14553,6 +14718,79 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="LevelDBEnv.ServiceWorker.IOError" enum="LevelDBIOErrorMethods">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Methods where leveldb's Chromium environment has IO errors when being used
+    by ServiceWorker.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.IOError." enum="PlatformFileError">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    PlatformFileErrors encountered by a single leveldb env method.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.IOError.BFE" enum="PlatformFileError">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Errors (base::File::Error) encountered by a single leveldb env method.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.LockFileAncestorsNotFound"
+    units="directories">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Number of directories missing when ServiceWorker LevelDBEnv tries to create
+    a Lock file.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.MaxFDs" units="files">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    File descriptor limit recorded every time LevelDB calls NewRandomAccessFile
+    for ServiceWorker.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.MissingFiles" units="files">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Number of backup files found without corresponding ldb files. As measured by
+    GetChildren when used in ServiceWorker.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.RetryRecoveredFromErrorIn"
+    enum="PlatformFileError">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    When ServiceWorker LevelDBEnv successfully retries an operation that had
+    failed, record the error from the most recent failed attempt.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.Table" enum="BooleanSuccess">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Success indicates a successful backup or restore operation for .ldb table
+    files when used in ServiceWorker.
+  </summary>
+</histogram>
+
+<histogram name="LevelDBEnv.ServiceWorker.TimeUntilSuccessFor"
+    units="milliseconds">
+  <owner>nhiroki@chromium.org</owner>
+  <summary>
+    Time ServiceWorker LevelDBEnv slept before successfully completing this
+    operation. 0 means success on the first try.
+  </summary>
+</histogram>
+
 <histogram name="LevelDBEnv.Table" enum="BooleanSuccess">
   <owner>dgrogan@chromium.org</owner>
   <summary>
@@ -15201,13 +15439,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>cancelKeyRequest result using the Clear Key key system.</summary>
 </histogram>
 
-<histogram name="Media.EME.ClearKey.DecryptError">
-  <owner>xhwang@chromium.org</owner>
-  <summary>
-    Decryption error event count using the Clear Key key system.
-  </summary>
-</histogram>
-
 <histogram name="Media.EME.ClearKey.generateKeyRequest"
     enum="MediaKeyException">
   <owner>xhwang@chromium.org</owner>
@@ -15274,11 +15505,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>cancelKeyRequest result using an unknown key system.</summary>
 </histogram>
 
-<histogram name="Media.EME.Unknown.DecryptError">
-  <owner>xhwang@chromium.org</owner>
-  <summary>Decryption error event count using an unknown key system.</summary>
-</histogram>
-
 <histogram name="Media.EME.Unknown.generateKeyRequest" enum="MediaKeyException">
   <owner>xhwang@chromium.org</owner>
   <summary>generateKeyRequest result using an unknown key system.</summary>
@@ -15315,11 +15541,6 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Media.EME.Widevine.cancelKeyRequest" enum="MediaKeyException">
   <owner>xhwang@chromium.org</owner>
   <summary>cancelKeyRequest result using the Widevine key system.</summary>
-</histogram>
-
-<histogram name="Media.EME.Widevine.DecryptError">
-  <owner>xhwang@chromium.org</owner>
-  <summary>Decryption error event count using the Widevine key system.</summary>
 </histogram>
 
 <histogram name="Media.EME.Widevine.generateKeyRequest"
@@ -15471,6 +15692,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Media.Initialize.Windows" units="GetLastError">
+  <obsolete>
+    Deprecated 05/2015 in Issue 1141703002. FFmpeg is now statically linked.
+  </obsolete>
   <owner>scherkus@chromium.org</owner>
   <summary>
     Errors returned by LoadLibraryEx on Windows while attempting to load
@@ -15768,6 +15992,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Media.VideoCapture.FramesReceived" enum="BooleanReceived">
+  <obsolete>
+    Deprecated as of 10/2014 in issue 422822. Replaced by
+    Media.VideoCaptureManager.Event and the two new values 3 and 4 in the enum
+    VideoCaptureEvent.
+  </obsolete>
   <owner>grunell@chromium.org</owner>
   <owner>mcasas@chromium.org</owner>
   <summary>
@@ -15820,7 +16049,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Media.VideoCaptureManager.Event" enum="VideoCaptureEvent">
   <owner>grunell@chromium.org</owner>
   <owner>mcasas@chromium.org</owner>
-  <summary>Counts video capture event, such as start and stop capture.</summary>
+  <summary>
+    Counts video capture event, such as start and stop capture. Note that the
+    ideal case is 50% start events and 50% normal stop events.
+  </summary>
 </histogram>
 
 <histogram name="Media.VideoCodec" enum="VideoCodec">
@@ -16160,6 +16392,80 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>
     The private working set used by each Native Client broker process.  Each
     process provides one sample.  Recorded once per UMA ping.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Contents.MemAllocatedMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    System-wide memory allocation right after a renderer was killed by
+    oom-killer, roughly equivalent to the sum of memory allocated with malloc()
+    in userspace plus graphics driver memory.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Contents.MemAvailableMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    System-wide file-backed memory plus free memory right after a renderer was
+    killed by oom-killer, which should be smaller than or close to what the
+    kernel uses to trigger low-memory notifications for tab discards. If this is
+    higher than the kernel's threshold for tab discards, renderers may be killed
+    due to reasons other than out-of-memory.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Contents.MemGraphicsMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    Graphics driver (GEM object) memory right after a renderer was killed by
+    oom-killer.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Contents.MemShmemMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    System-wide shared memory right after a renderer was killed by oom-killer.
+    Used primarily for shared buffers in the graphics system. Tracked because
+    it's a historical source of leaks on Chrome OS.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Extensions.MemAllocatedMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    System-wide memory allocation right after a renderer was killed by
+    oom-killer, roughly equivalent to the sum of memory allocated with malloc()
+    in userspace plus graphics driver memory.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Extensions.MemAvailableMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    System-wide file-backed memory plus free memory right after a renderer was
+    killed by oom-killer, which should be smaller than or close to what the
+    kernel uses to trigger low-memory notifications for tab discards. If this is
+    higher than the kernel's threshold for tab discards, renderers may be killed
+    due to reasons other than out-of-memory.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Extensions.MemGraphicsMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    Graphics driver (GEM object) memory right after a renderer was killed by
+    oom-killer.
+  </summary>
+</histogram>
+
+<histogram name="Memory.OOMKill.Extensions.MemShmemMB" units="MB">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    System-wide shared memory right after a renderer was killed by oom-killer.
+    Used primarily for shared buffers in the graphics system. Tracked because
+    it's a historical source of leaks on Chrome OS.
   </summary>
 </histogram>
 
@@ -19392,6 +19698,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Net.DailyUserVisibleSavingsPercent_DataRedictionProxyEnabled"
+    units="Percent">
+  <owner>kundaji@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The percentage of data savings in past
+    |DataReductionProxy::kNumDaysInHistorySummary| days. This number is
+    displayed to users as their data savings.
+  </summary>
+</histogram>
+
+<histogram name="Net.DailyUserVisibleSavingsSize_DataRedictionProxyEnabled"
+    units="KB">
+  <owner>kundaji@chromium.org</owner>
+  <owner>bengr@chromium.org</owner>
+  <summary>
+    The total data saved in KB in past
+    |DataReductionProxy::kNumDaysInHistorySummary| days. This number is used to
+    compute the data savings displayed to the user.
+  </summary>
+</histogram>
+
 <histogram name="Net.DhcpWpadCancelTime" units="milliseconds">
   <obsolete>
     Removed in Chrome 39.
@@ -21002,12 +21330,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
-<histogram name="Net.ProxyService.ScriptTerminated" enum="Boolean">
+<histogram name="Net.ProxyService.ScriptTerminated" enum="BooleanTerminated">
   <owner>eroman@chromium.org</owner>
   <summary>
     Whether a proxy resolution resulted in the PAC script terminating
-    unexpectedly. This only happens when the resolver process crashes when using
-    out-of-process PAC.
+    unexpectedly. This does not include terminations that occured during
+    initialization of a new proxy resolver. This only happens when the resolver
+    process crashes when using out-of-process PAC.
+  </summary>
+</histogram>
+
+<histogram name="Net.ProxyService.ScriptTerminatedOnInit"
+    enum="BooleanTerminated">
+  <owner>eroman@chromium.org</owner>
+  <summary>
+    Whether the creation of a new proxy resolver resulted in the PAC script
+    terminating unexpectedly. This only happens when the resolver process
+    crashes when using out-of-process PAC.
   </summary>
 </histogram>
 
@@ -25550,6 +25889,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Histogram for NTP notification promo activity.</summary>
 </histogram>
 
+<histogram name="NewTabPage.RecentTabsPage.TimeVisibleAndroid"
+    units="milliseconds">
+  <owner>pkotwicz@chromium.org</owner>
+  <summary>
+    Records the amount of time that the &quot;Recent Tabs&quot; page is visible
+    and Chrome is in the foreground on Android. The metric is recorded whenever
+    the &quot;Recent Tabs&quot; page moves out of the foreground. The metric is
+    recorded when the &quot;Recent Tabs&quot; page is closed, when the user
+    switches from the &quot;Recent Tabs&quot; page to a different tab and when
+    Chrome is backgrounded.
+  </summary>
+</histogram>
+
 <histogram name="NewTabPage.SearchURLs.Total">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>TBD.</summary>
@@ -26592,6 +26944,43 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Ozone.TouchNoiseFilter.FarApartTapDistance"
+    units="squared pixels">
+  <owner>pkotwicz@google.com</owner>
+  <summary>
+    The squared distance between taps which occur in quick succession. Only
+    reported when the taps are far apart and touch noise filtering is enabled.
+  </summary>
+</histogram>
+
+<histogram name="Ozone.TouchNoiseFilter.HorizontallyAlignedDistance"
+    units="pixels">
+  <owner>pkotwicz@google.com</owner>
+  <summary>
+    The horizontal distance from a &quot;touch press&quot; to the closest other
+    touch. Only reported if there are two or more fingers onscreen and touch
+    noise filtering is enabled.
+  </summary>
+</histogram>
+
+<histogram name="Ozone.TouchNoiseFilter.TimeSinceLastNoiseOccurrence"
+    units="ms">
+  <owner>pkotwicz@google.com</owner>
+  <summary>
+    The amount of time between noisy touches. The amount of time since Chrome
+    startup is recorded for the first noisy touch after startup.
+  </summary>
+</histogram>
+
+<histogram name="Ozone.TouchNoiseFilter.TouchesAtSinglePositionDuration"
+    units="ms">
+  <owner>pkotwicz@google.com</owner>
+  <summary>
+    The time between taps which occur in quick succession at the same screen
+    location. Only reported when touch noise filtering is enabled.
+  </summary>
+</histogram>
+
 <histogram name="P2P.Client.Canceled.WaitingTimeSeconds" units="seconds">
   <owner>zeuthen@chromium.org</owner>
   <summary>
@@ -26965,6 +27354,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <owner>vasilii@chromium.org</owner>
   <summary>
     When parsing a password form, whether a username field is detected.
+  </summary>
+</histogram>
+
+<histogram name="PasswordManager.EmptyUsernames.PasswordFieldCount">
+  <owner>msramek@chromium.org</owner>
+  <owner>vasilii@chromium.org</owner>
+  <summary>
+    The number of password fields for password forms that do not have a username
+    field. This is recorded every time such a password form is successfully
+    parsed. Note that the parsing is attempted when the form is encountered (i.e
+    when the document is loaded) and also when it is submitted.
   </summary>
 </histogram>
 
@@ -34216,6 +34616,28 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="SadTab.Created" enum="SadTabKind">
+  <obsolete>
+    Replaced with Tabs.SadTab.* in R20.
+  </obsolete>
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <summary>
+    Track number of times we built a sad tab page for a renderer crash or kill.
+    The user may not have seen the page if it was not the frontmost tab.
+  </summary>
+</histogram>
+
+<histogram name="SadTab.Displayed" enum="SadTabKind">
+  <obsolete>
+    Replaced with Tabs.SadTab.* in R20.
+  </obsolete>
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <summary>
+    Track number of times the user actually saw a sad tab page for a renderer
+    crash or kill.
+  </summary>
+</histogram>
+
 <histogram name="SafeBrowsing.EnabledSettingChanged" enum="BooleanEnabled">
   <owner>feng@chromium.org</owner>
   <summary>
@@ -37418,6 +37840,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="SharedMemory.TimeSpentMakingAnonymousMemory"
     units="milliseconds">
+  <obsolete>
+    Deprecated 2015-06 because the Finch experiment SharedMemoryCreateStrategy
+    has finished running.
+  </obsolete>
   <owner>erikchen@chromium.org</owner>
   <summary>
     The time spent making a new region of shared, anonymous memory. This metric
@@ -37472,6 +37898,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Tracks user interactions as they sign in through a flow. The suffix of the
     histogram indicates what UI widget or application flow triggered the signin
     flow.
+  </summary>
+</histogram>
+
+<histogram name="Signin.AccountReconcilorState.OnGaiaResponse"
+    enum="SigninAccountReconcilorState">
+  <owner>bzanotti@chromium.org</owner>
+  <summary>
+    Records the state of the account reconcilor when GAIA returns a specific
+    response.
   </summary>
 </histogram>
 
@@ -40637,9 +41072,22 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Error codes returned by sqlite for the appcache db.</summary>
 </histogram>
 
+<histogram name="Sqlite.AutoCommitTime" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Record times for INSERT/UPDATE/DELETE statements run outside of an explicit
+    transaction.
+  </summary>
+</histogram>
+
 <histogram name="Sqlite.CloseFailure" enum="SqliteErrorCode">
   <owner>shess@chromium.org</owner>
   <summary>Error which prevented database close.</summary>
+</histogram>
+
+<histogram name="Sqlite.CommitTime" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>Record time spent in explicit COMMIT statements.</summary>
 </histogram>
 
 <histogram name="Sqlite.Cookie.Error" enum="SqliteErrorCode">
@@ -40715,6 +41163,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Error from first read of the database.</summary>
 </histogram>
 
+<histogram name="Sqlite.QueryTime" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>Record times for all statements run against the database.</summary>
+</histogram>
+
 <histogram name="Sqlite.Quota.Error" enum="SqliteErrorCode">
   <obsolete>
     Moved to Sqlite.Error.Quota in M-27.
@@ -40763,6 +41216,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <summary>Size in kilobytes of pre-existing database at startup.</summary>
 </histogram>
 
+<histogram name="Sqlite.Stats" enum="SqliteStatsEnum">
+  <owner>shess@chromium.org</owner>
+  <summary>Stats for different API calls in sql/.</summary>
+</histogram>
+
 <histogram name="Sqlite.Text.Error" enum="SqliteErrorCode">
   <obsolete>
     Moved to Sqlite.Error.Text in M-27.
@@ -40777,6 +41235,14 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </obsolete>
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <summary>Error codes returned by sqlite for the thumbnail db.</summary>
+</histogram>
+
+<histogram name="Sqlite.UpdateTime" units="milliseconds">
+  <owner>shess@chromium.org</owner>
+  <summary>
+    Record times for statements which could update the database file.  Includes
+    commit and autocommit time.
+  </summary>
 </histogram>
 
 <histogram name="Sqlite.Version">
@@ -40800,6 +41266,17 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Stability.BadMessageTerminated.Chrome"
+    enum="BadMessageReasonChrome">
+  <owner>nick@chromium.org</owner>
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Count of processes killed by chrome/browser because they sent an IPC that
+    couldn't be properly handled. Categories are the reasons (code locations)
+    for the kills.
+  </summary>
+</histogram>
+
 <histogram name="Stability.BadMessageTerminated.Content"
     enum="BadMessageReasonContent">
   <owner>jam@chromium.org</owner>
@@ -40818,6 +41295,16 @@ Therefore, the affected-histogram name has to have at least one dot in it.
     Count of extension processes killed because they sent an IPC that couldn't
     be properly handled. Categories are the reasons (code locations) for the
     kills.
+  </summary>
+</histogram>
+
+<histogram name="Stability.BadMessageTerminated.NaCl"
+    enum="BadMessageReasonNaCl">
+  <owner>nick@chromium.org</owner>
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Count of processes killed because they sent a NaCl IPC that couldn't be
+    properly handled. Categories are the reasons (code locations) for the kills.
   </summary>
 </histogram>
 
@@ -41185,20 +41672,27 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 <histogram name="Startup.LoadTime.ExeMainToDllMain">
   <owner>jeremy@chromium.org</owner>
   <summary>
-    Time from the main() function in chrome.exe to chrome.dll's main().
+    Time from the main() function in chrome.exe to chrome.dll's main(). This
+    stat is only recorded after 7 minutes of OS uptime to try to mitigate the
+    variance resulting from Chrome being autostarted.
   </summary>
 </histogram>
 
 <histogram name="Startup.LoadTime.ProcessCreateToDllMain">
   <owner>jeremy@chromium.org</owner>
-  <summary>Time from the process creation to chrome.dll's main().</summary>
+  <summary>
+    Time from the process creation to chrome.dll's main(). This stat is only
+    recorded after 7 minutes of OS uptime to try to mitigate the variance
+    resulting from Chrome being autostarted.
+  </summary>
 </histogram>
 
 <histogram name="Startup.LoadTime.ProcessCreateToExeMain">
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time from the process creation to executing the main() function in
-    chrome.exe.
+    chrome.exe. This stat is only recorded after 7 minutes of OS uptime to try
+    to mitigate the variance resulting from Chrome being autostarted.
   </summary>
 </histogram>
 
@@ -41328,6 +41822,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Startup.SlowStartupBookmarksLoad" units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to load bookmarks from disk. This measurement is only sent for
@@ -41337,6 +41834,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Startup.SlowStartupExtensionServiceInitAfterImport"
     units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to finish initialization of the extension service including
@@ -41346,6 +41846,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Startup.SlowStartupFinalProfileInit" units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time the final stages of profile initialization taking including
@@ -41355,6 +41858,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Startup.SlowStartupNSSInit" units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to load the NSS libraries and initialize it. This measurement
@@ -41364,6 +41870,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Startup.SlowStartupPreferenceLoading" units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to load preferences from disk. This measurement is only sent
@@ -41372,6 +41881,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </histogram>
 
 <histogram name="Startup.SlowStartupProfileIODataInit" units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to initialize the ProfileIOData object - this includes
@@ -41382,6 +41894,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Startup.SlowStartupSafeBrowsingGetDatabase"
     units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to load the safe browsing database from disk. This measurement
@@ -41392,6 +41907,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Startup.SlowStartupSafeBrowsingServiceInitialize"
     units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes to initialize the safe browsing service. This measurement is
@@ -41402,6 +41920,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 
 <histogram name="Startup.SlowStartupSessionServiceCreateTabsAndWindows"
     units="milliseconds">
+  <obsolete>
+    Deprecated 06/2015.
+  </obsolete>
   <owner>jeremy@chromium.org</owner>
   <summary>
     Time it takes for session restore to finish initiating creation of restored
@@ -43391,11 +43912,261 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="Tabs.CountAtResume" units="tabs">
+  <owner>lliabraa@chromium.org</owner>
+  <summary>
+    The number of tabs open when the app comes out of the background.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.CountAtStartup" units="tabs">
+  <owner>lliabraa@chromium.org</owner>
+  <owner>ppi@chromium.org</owner>
+  <summary>The number of tabs open at cold launch.</summary>
+</histogram>
+
+<histogram name="Tabs.Discard.DiscardCount">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Cumulative number of tabs discarded due to low memory conditions, recorded
+    once per tab discard event.  For example, a user who had 3 tabs discarded
+    records a count in the 1 bin, 2 bin and 3 bin.  Thus each bin N is the
+    number of sessions where users experienced N or more tab discard events.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.DiscardInLastMinute" enum="BooleanTabDiscard">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Whether or not a tab was discarded in the last minute of usage. Total count
+    is number of minutes of device usage. 100 / discard percentage gives the
+    average number of minutes between discard events.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.InitialTime" units="seconds">
+  <obsolete>
+    Deprecated May 4, 2012.  Replaced by Tabs.Discard.InitialTime2 because this
+    stat had too low of a range maximum.  No longer tracked.
+  </obsolete>
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Time in seconds between system startup and when the first tab is discarded
+    due to low memory conditions.  Higher is better.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.InitialTime2" units="seconds">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Time in seconds between system startup and when the first tab is discarded
+    due to low memory conditions.  Higher is better.  Range maximum is
+    approximately one day.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.IntervalTime" units="seconds">
+  <obsolete>
+    Deprecated May 4, 2012.  Replaced by Tabs.Discard.IntervalTime2 because this
+    stat had too low of a range maximum.  No longer tracked.
+  </obsolete>
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Time in seconds between tab discard events after the first one, recorded
+    once per discard event.  Higher is better.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.IntervalTime2" units="ms">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Time in milliseconds between tab discard events after the first one,
+    recorded once per discard event.  Should occur no faster than once every 750
+    ms.  Higher is better.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.MemAllocatedMB" units="MB">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    System-wide memory allocation at the time a tab was discarded, roughly
+    equivalent to the sum of memory allocated with malloc() in userspace plus
+    graphics driver memory.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.MemAnonymousMB" units="MB">
+  <obsolete>
+    Deprecated December 7, 2012.  Replaced by Tabs.Discard.MemAllocatedMB
+    because this stat has insufficient precision in the 2-4 GB range and does
+    not properly account for graphics memory on ARM.
+  </obsolete>
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    System-wide anonymous memory allocation at the time a tab was discarded,
+    roughly equivalent to memory allocated with malloc().
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.MemAvailableMB" units="MB">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    System-wide file-backed memory plus free memory, roughly equivalent to what
+    the kernel uses to trigger low-memory notifications for tab discards. If
+    lower than the kernel's threshold then we are not effectively freeing memory
+    in response to the initial notification and are repeatedly being notified.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.MemGraphicsMB" units="MB">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Graphics driver (GEM object) memory at the time of a tab discard.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.MemShmemMB" units="MB">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    System-wide shared memory at the time of a tab discard. Used primarily for
+    shared buffers in the graphics system. Tracked because it's a historical
+    source of leaks on Chrome OS.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.ReloadCount">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab was reloaded because it was discarded and
+    the user clicked on it later, recorded once per reload event.  For example,
+    a user who clicks on 3 discarded tabs will record a count in the 1 bin, 2
+    bin, and 3 bin.  Thus each bin N is the number of sessions where users
+    experienced N or more reload events.  Compare to Tabs.Discard.DiscardCount.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.Discard.TabCount" units="tabs">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    The number of tabs open across all browser windows when a tab was discarded
+    due to low memory conditions.
+  </summary>
+</histogram>
+
 <histogram name="Tabs.ForegroundTabAgeAtStartup" units="minutes">
   <owner>lliabraa@chromium.org</owner>
   <summary>
     Age (time since the last display in previous sessions) of the foreground tab
     being restored on the browser cold start.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.iOS_PostRedirectPLT" units="milliseconds">
+  <owner>pauljensen@chromium.org</owner>
+  <summary>
+    Page load time (PLT) for iOS that does not include time spent following
+    redirects. On other platforms this is calculated from Navigation Timings but
+    on iOS Navigation Timings are not available so we're recreating a
+    calculation similar to PLT.PT_RequestToFinish but not including time spent
+    following redirects. This metric represents the time between when navigation
+    is initiated (prior to DNS, TCP connect, etc but after following redirects)
+    until loading ends (i.e. JS onload event). On non-iOS Chrome this is
+    (performance.timing.loadEventEnd - performance.timing.redirectEnd). On
+    Chrome for iOS we're calculating the time between the creation of the
+    top-level URLRequest and when webDidFinishWithURL is called.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.CrashCreated">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab crashed with &quot;Aw, Snap!&quot;,
+    recorded once per tab crash event.  For example, a user who crashed 3 tabs
+    will record a count in the 1 bin, 2 bin, and 3 bin.  Thus each bin N is the
+    number of sessions where users experienced N or more crash events.  The user
+    may not have actually seen the sad tab page, as it might have been an
+    inactive tab. Compare to Tabs.SadTab.CrashDisplayed.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.CrashDisplayed">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab crashed with &quot;Aw, Snap!&quot; and the
+    user saw the page, recorded once per tab crash event.  For example, a user
+    who crashed 3 tabs will record a count in the 1 bin, 2 bin, and 3 bin.  Thus
+    each bin N is the number of sessions where users experienced N or more crash
+    events.  Compare to Tabs.SadTab.CrashCreated.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.KillCreated">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab was killed with a &quot;He's dead,
+    Jim!&quot; page, which is usually due to the renderer being killed, recorded
+    once per tab kill event.  For example, a user who loses 3 tabs will record a
+    count in the 1 bin, 2 bin, and 3 bin.  Thus each bin N is the number of
+    sessions where users experienced N or more kill events.  The user may not
+    have actually seen the sad tab page, as it might have been an inactive tab.
+    Compare to Tabs.SadTab.KillDisplayed. This can happen due to out of memory,
+    malformed IPC messages, or a SIGINT/TERM/KILL signal sent by a user.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.KillCreated.OOM">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab was killed with a &quot;He's dead,
+    Jim!&quot; page due to the kernel out-of-memory killer, recorded once per
+    tab kill event.  For example, a user who loses 3 tabs will record a count in
+    the 1 bin, 2 bin, and 3 bin.  Thus each bin N is the number of sessions
+    where users experienced N or more kill events.  The user may not have
+    actually seen the sad tab page, as it might have been an inactive tab.
+    Compare to Tabs.SadTab.KillDisplayed.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.KillDisplayed">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab was killed with a &quot;He's dead,
+    Jim!&quot; page and the user saw the page, recorded once per tab kill event.
+    For example, a user who loses 3 tabs will record a count in the 1 bin, 2
+    bin, and 3 bin. Thus each bin N is the number of sessions where users
+    experienced N or more kill events.  Compare to Tabs.SadTab.CrashCreated.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.KillDisplayed.OOM">
+  <owner>oshima@chromium.org</owner>
+  <summary>
+    Cumulative number of times a tab was killed with a &quot;He's dead,
+    Jim!&quot; page due to the kernel out-of-memory killer and the user saw the
+    page, recorded once per tab kill event.  For example, a user who loses 3
+    tabs will record a count in the 1 bin, 2 bin, and 3 bin. Thus each bin N is
+    the number of sessions where users experienced N or more kill events.
+    Compare to Tabs.SadTab.CrashCreated.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.SadTab.ReloadCount">
+  <owner>jamescook@chromium.org</owner>
+  <summary>
+    The number of times a tab was reloaded because it was killed (usually by the
+    kernel OOM killer) and the user clicked on it later, recorded once per
+    reload event.  For example, a user who clicks on 3 discarded tabs will
+    record a count in the 1 bin, 2 bin, and 3 bin.  Thus each bin N is the
+    number of sessions where users experienced N or more reload events.  Compare
+    to Tabs.Discard.DiscardCount.
+  </summary>
+</histogram>
+
+<histogram name="Tabs.ScrubDistance" units="tabs">
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <summary>
+    The distance a user 3 finger scrubbed to change tabs. Always positive
+    (ignores left / right).
   </summary>
 </histogram>
 
@@ -47759,6 +48530,18 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   </summary>
 </histogram>
 
+<histogram name="websql.Async.OpenTime.Error" units="milliseconds">
+  <owner>cmumford@chromium.org</owner>
+  <summary>
+    The time required to try (and fail) to open a Web SQL database.
+  </summary>
+</histogram>
+
+<histogram name="websql.Async.OpenTime.Success" units="milliseconds">
+  <owner>cmumford@chromium.org</owner>
+  <summary>The time required to successfully open a Web SQL database.</summary>
+</histogram>
+
 <histogram name="Webstore.ExtensionInstallResult" enum="BooleanSuccess">
   <owner>jackhou@chromium.org</owner>
   <summary>
@@ -48798,7 +49581,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="2" label="Failure"/>
 </enum>
 
+<enum name="BadMessageReasonChrome" type="int">
+<!-- Generated from chrome/browser/bad_message.h -->
+
+  <int value="0" label="WRLHH_LOGGING_STOPPED_BAD_STATE"/>
+</enum>
+
 <enum name="BadMessageReasonContent" type="int">
+<!-- Generated from content/browser/bad_message.h -->
+
   <int value="0" label="NC_IN_PAGE_NAVIGATION"/>
   <int value="1" label="RFH_CAN_COMMIT_URL_BLOCKED"/>
   <int value="2" label="RFH_CAN_ACCESS_FILES_OF_PAGE_STATE"/>
@@ -48819,13 +49610,83 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="17" label="RFPH_DETACH"/>
   <int value="18" label="DFH_BAD_EMBEDDER_MESSAGE"/>
   <int value="19" label="NC_AUTO_SUBFRAME"/>
+  <int value="20" label="CSDH_NOT_RECOGNIZED"/>
+  <int value="21" label="DSMF_OPEN_STORAGE"/>
+  <int value="22" label="DSMF_LOAD_STORAGE"/>
+  <int value="23" label="DBMF_INVALID_ORIGIN_ON_OPEN"/>
+  <int value="24" label="DBMF_DB_NOT_OPEN_ON_MODIFY"/>
+  <int value="25" label="DBMF_DB_NOT_OPEN_ON_CLOSE"/>
+  <int value="26" label="DBMF_INVALID_ORIGIN_ON_SQLITE_ERROR"/>
+  <int value="27" label="RDH_INVALID_PRIORITY"/>
+  <int value="28" label="RDH_REQUEST_NOT_TRANSFERRING"/>
+  <int value="29" label="RDH_BAD_DOWNLOAD"/>
+  <int value="30" label="NMF_NO_PERMISSION_SHOW"/>
+  <int value="31" label="NMF_NO_PERMISSION_CLOSE"/>
+  <int value="32" label="NMF_NO_PERMISSION_VERIFY"/>
+  <int value="33" label="MH_INVALID_MIDI_PORT"/>
+  <int value="34" label="MH_SYS_EX_PERMISSION"/>
+  <int value="35" label="ACDH_REGISTER"/>
+  <int value="36" label="ACDH_UNREGISTER"/>
+  <int value="37" label="ACDH_SET_SPAWNING"/>
+  <int value="38" label="ACDH_SELECT_CACHE"/>
+  <int value="39" label="ACDH_SELECT_CACHE_FOR_WORKER"/>
+  <int value="40" label="ACDH_SELECT_CACHE_FOR_SHARED_WORKER"/>
+  <int value="41" label="ACDH_MARK_AS_FOREIGN_ENTRY"/>
+  <int value="42" label="ACDH_PENDING_REPLY_IN_GET_STATUS"/>
+  <int value="43" label="ACDH_GET_STATUS"/>
+  <int value="44" label="ACDH_PENDING_REPLY_IN_START_UPDATE"/>
+  <int value="45" label="ACDH_START_UPDATE"/>
+  <int value="46" label="ACDH_PENDING_REPLY_IN_SWAP_CACHE"/>
+  <int value="47" label="ACDH_SWAP_CACHE"/>
+  <int value="48" label="SWDH_NOT_HANDLED"/>
+  <int value="49" label="SWDH_REGISTER_BAD_URL"/>
+  <int value="50" label="SWDH_REGISTER_NO_HOST"/>
+  <int value="51" label="SWDH_REGISTER_CANNOT"/>
+  <int value="52" label="SWDH_UNREGISTER_BAD_URL"/>
+  <int value="53" label="SWDH_UNREGISTER_NO_HOST"/>
+  <int value="54" label="SWDH_UNREGISTER_CANNOT"/>
+  <int value="55" label="SWDH_GET_REGISTRATION_BAD_URL"/>
+  <int value="56" label="SWDH_GET_REGISTRATION_NO_HOST"/>
+  <int value="57" label="SWDH_GET_REGISTRATION_CANNOT"/>
+  <int value="58" label="SWDH_GET_REGISTRATION_FOR_READY_NO_HOST"/>
+  <int value="59" label="SWDH_GET_REGISTRATION_FOR_READY_ALREADY_IN_PROGRESS"/>
+  <int value="60" label="SWDH_POST_MESSAGE"/>
+  <int value="61" label="SWDH_PROVIDER_CREATED_NO_HOST"/>
+  <int value="62" label="SWDH_PROVIDER_DESTROYED_NO_HOST"/>
+  <int value="63" label="SWDH_SET_HOSTED_VERSION_NO_HOST"/>
+  <int value="64" label="SWDH_SET_HOSTED_VERSION"/>
+  <int value="65" label="SWDH_WORKER_SCRIPT_LOAD_NO_HOST"/>
+  <int value="66" label="SWDH_INCREMENT_WORKER_BAD_HANDLE"/>
+  <int value="67" label="SWDH_DECREMENT_WORKER_BAD_HANDLE"/>
+  <int value="68" label="SWDH_INCREMENT_REGISTRATION_BAD_HANDLE"/>
+  <int value="69" label="SWDH_DECREMENT_REGISTRATION_BAD_HANDLE"/>
+  <int value="70" label="SWDH_TERMINATE_BAD_HANDLE"/>
+  <int value="71" label="FAMF_APPEND_ITEM_TO_BLOB"/>
+  <int value="72" label="FAMF_APPEND_SHARED_MEMORY_TO_BLOB"/>
+  <int value="73" label="FAMF_MALFORMED_STREAM_URL"/>
+  <int value="74" label="FAMF_APPEND_ITEM_TO_STREAM"/>
+  <int value="75" label="FAMF_APPEND_SHARED_MEMORY_TO_STREAM"/>
+  <int value="76" label="IDBDH_CAN_READ_FILE"/>
+  <int value="77" label="IDBDH_GET_OR_TERMINATE"/>
+  <int value="78" label="RMF_SET_COOKIE_BAD_ORIGIN"/>
+  <int value="79" label="RMF_GET_COOKIES_BAD_ORIGIN"/>
 </enum>
 
 <enum name="BadMessageReasonExtensions" type="int">
+<!-- Generated from extensions/browser/bad_message.h -->
+
   <int value="0" label="EOG_BAD_ORIGIN"/>
   <int value="1" label="EVG_BAD_ORIGIN"/>
   <int value="2" label="BH_BLOB_NOT_OWNED"/>
   <int value="3" label="EH_BAD_EVENT_ID"/>
+</enum>
+
+<enum name="BadMessageReasonNaCl" type="int">
+<!-- Generated from components/nacl/browser/bad_message.h -->
+
+  <int value="0" label="NFH_OPEN_EXECUTABLE_BAD_ROUTING_ID"/>
+  <int value="1" label="NHMF_LAUNCH_CONTINUATION_BAD_ROUTING_ID"/>
+  <int value="2" label="NHMF_GET_NEXE_FD_BAD_URL"/>
 </enum>
 
 <enum name="BadSyncDataReason" type="int">
@@ -48833,6 +49694,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Bad version"/>
   <int value="2" label="Bad update URL"/>
   <int value="3" label="No ExtensionSpecifics"/>
+  <int value="4" label="Bad disable reasons"/>
 </enum>
 
 <enum name="BaseRelocationType" type="int">
@@ -49259,6 +50121,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1" label="Tablet"/>
 </enum>
 
+<enum name="BooleanTerminated" type="int">
+  <int value="0" label="Not terminated"/>
+  <int value="1" label="Terminated"/>
+</enum>
+
 <enum name="BooleanTimedOut" type="int">
   <int value="0" label="Did not time out"/>
   <int value="1" label="Timed out"/>
@@ -49660,7 +50527,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="CombinedHttpResponseAndNetErrorCode" type="int">
-<!-- Generated from ../../../net/base/net_error_list.h -->
+<!-- Generated from net/base/net_error_list.h -->
 
   <int value="-806" label="DNS_SORT_ERROR"/>
   <int value="-805" label="DNS_SEARCH_EMPTY"/>
@@ -50434,6 +51301,13 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="4" label="Channel is negotiated."/>
 </enum>
 
+<enum name="DataReductionProxyAutoLoFiRequestHeaderState" type="int">
+  <int value="0" label="Empty to Empty"/>
+  <int value="1" label="Empty to Low"/>
+  <int value="2" label="Low to Empty"/>
+  <int value="3" label="Low to Low"/>
+</enum>
+
 <enum name="DataReductionProxyBypassEventType_Deprecated" type="int">
   <int value="0" label="Short bypass"/>
   <int value="1" label="Long bypass"/>
@@ -50465,6 +51339,15 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="10" label="Bypass due to any network error"/>
 </enum>
 
+<enum name="DataReductionProxyLoFiUIAction" type="int">
+  <int value="0" label="'Load images' snackbar shown"/>
+  <int value="1" label="'Load images' snackbar clicked"/>
+  <int value="2" label="'Load image' context menu item shown"/>
+  <int value="3" label="'Load image' context menu item clicked"/>
+  <int value="4"
+      label="Pages where the user has clicked 'Load image' at least once"/>
+</enum>
+
 <enum name="DataReductionProxyNetworkChangeEvent" type="int">
   <int value="0" label="IP Address Change"/>
   <int value="1" label="Proxy disabled on VPN"/>
@@ -50493,6 +51376,9 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="3" label="Proxy pref containing a DRP was cleared"/>
   <int value="4"
       label="Proxy pref containing a *.googlezip.net proxy was cleared"/>
+  <int value="5"
+      label="Proxy pref of an embedded PAC script containing a
+             *.googlezip.net proxy was cleared"/>
 </enum>
 
 <enum name="DataReductionProxyResponseProxyServerStatus" type="int">
@@ -51646,11 +52532,11 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="EnterprisePolicies" type="int">
-<!-- Generated from ../../../components/policy/resources/policy_templates.json -->
+<!-- Generated from components/policy/resources/policy_templates.json -->
 
   <int value="1" label="Configure the home page URL"/>
   <int value="2" label="Use New Tab Page as homepage"/>
-  <int value="3" label="Set Chrome as Default Browser"/>
+  <int value="3" label="Set Google Chrome as Default Browser"/>
   <int value="4" label="Application locale"/>
   <int value="5" label="Enable alternate error pages"/>
   <int value="6" label="Enable search suggestions"/>
@@ -51778,7 +52664,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="115"
       label="Enable reporting memory info (JS heap size) to page (deprecated)"/>
   <int value="116" label="Proxy settings"/>
-  <int value="117" label="Disable Print Preview"/>
+  <int value="117" label="Disable Print Preview (deprecated)"/>
   <int value="118" label="Disable SSL record splitting"/>
   <int value="119" label="Report OS and firmware version"/>
   <int value="120" label="Report device activity times"/>
@@ -51805,10 +52691,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="137" label="Load specified urls on demo login"/>
   <int value="138"
       label="Continue running background apps when Google Chrome is closed"/>
-  <int value="139" label="Disables Drive in the Chrome OS Files app"/>
+  <int value="139" label="Disables Drive in the Google Chrome OS Files app"/>
   <int value="140"
-      label="Disables Google Drive over Cellular connections in the Chrome OS
-             Files app"/>
+      label="Disables Google Drive over cellular connections in the Google
+             Chrome OS Files app"/>
   <int value="141"
       label="Additional command line parameters for Google Chrome"/>
   <int value="142" label="Target Auto Update Version"/>
@@ -51873,9 +52759,10 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="187" label="Enable deleting browser and download history"/>
   <int value="188" label="Show accessibility options in system tray menu"/>
   <int value="189"
-      label="Hide the web store from the new tab page and app launcher"/>
-  <int value="190" label="Allows sign in to Chrome"/>
-  <int value="191" label="System wide flags to be applied on Chrome start-up"/>
+      label="Hide the web store from the New Tab Page and app launcher"/>
+  <int value="190" label="Allows sign in to Google Chrome"/>
+  <int value="191"
+      label="System wide flags to be applied on Google Chrome start-up"/>
   <int value="192" label="Limit device uptime by automatically rebooting"/>
   <int value="193" label="Automatically reboot after update"/>
   <int value="194" label="Public session for auto-login"/>
@@ -51992,23 +52879,23 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="267" label="Show the apps shortcut in the bookmark bar"/>
   <int value="268" label="Register protocol handlers"/>
   <int value="269" label="Enable virtual keyboard"/>
-  <int value="270" label="Enable deprecated web platform features"/>
+  <int value="270"
+      label="Enable deprecated web platform features for a limited time"/>
   <int value="271" label="Transfer SAML IdP cookies during login"/>
-  <int value="272" label="Enable EasyUnlock"/>
+  <int value="272" label="Allows Smart Lock to be used"/>
   <int value="273" label="Enable network prediction"/>
   <int value="274" label="Set the recommended locales for a public session"/>
-  <int value="275" label="Enable guest mode in the browser"/>
-  <int value="276" label="Enable add person in the user manager"/>
+  <int value="275" label="Enable guest mode in browser"/>
+  <int value="276" label="Enable add person in profile manager"/>
   <int value="277"
       label="Import autofill form data from default browser on first run"/>
-  <int value="278" label="Extension Settings"/>
-  <int value="279" label="SSL minimum version"/>
-  <int value="280" label="SSL fallback minimum version"/>
-  <int value="281"
-      label="Control the availability of the Contextual Search feature."/>
+  <int value="278" label="Extension management settings"/>
+  <int value="279" label="Minimum SSL version enabled"/>
+  <int value="280" label="Minimum SSL version to fallback to"/>
+  <int value="281" label="Enable Touch to Search"/>
   <int value="282" label="Force Google SafeSearch"/>
   <int value="283" label="Force YouTube Safety Mode"/>
-  <int value="284" label="Allow device shutdown"/>
+  <int value="284" label="Automatic reboot on device shutdown"/>
   <int value="285"
       label="Requires that the name of the local user and the remote access
              host owner match"/>
@@ -52022,22 +52909,19 @@ Therefore, the affected-histogram name has to have at least one dot in it.
              RemoteAccessHostTokenValidationUrl"/>
   <int value="289"
       label="Policy overrides for Debug builds of the remote access host"/>
-  <int value="290" label="Report hardware statistics such as CPU/RAM usage."/>
-  <int value="291"
-      label="Report session statistics such as which app was run."/>
-  <int value="292" label="How often the device status reports are uploaded."/>
-  <int value="293"
-      label="Send monitoring heartbeats to the management server."/>
-  <int value="294" label="How often the monitoring heartbeats are sent."/>
+  <int value="290" label="Report hardware status"/>
+  <int value="291" label="Report information about active kiosk sessions"/>
+  <int value="292" label="Frequency of device status report uploads"/>
+  <int value="293" label="Send monitoring heartbeats to the management server"/>
+  <int value="294" label="Frequency of monitoring heartbeats"/>
   <int value="295" label="Captive portal authentication ignores proxy"/>
   <int value="296" label="Set Apps and Extensions cache size (in bytes)"/>
-  <int value="297"
-      label="Show an autocomplete option during user sign-in flow"/>
+  <int value="297" label="Enable domain name autocomplete during user sign in"/>
   <int value="298" label="Maximize the first browser window on first run"/>
   <int value="299"
       label="Allow users to opt in to Safe Browsing extended reporting"/>
   <int value="300" label="Allow proceeding from the SSL warning page"/>
-  <int value="301" label="Allow QUIC protocol"/>
+  <int value="301" label="Allows QUIC protocol"/>
 </enum>
 
 <enum name="EnterprisePolicyInvalidations" type="int">
@@ -52320,7 +53204,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="ExtensionFunctions" type="int">
-<!-- Generated from ../../../extensions/browser/extension_function_histogram_value.h -->
+<!-- Generated from extensions/browser/extension_function_histogram_value.h -->
 
   <int value="0" label="UNKNOWN"/>
   <int value="1" label="WEBNAVIGATION_GETALLFRAMES"/>
@@ -53393,6 +54277,8 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="1048" label="USERSPRIVATE_ISCURRENTUSEROWNER"/>
   <int value="1049" label="USERSPRIVATE_ISWHITELISTMANAGED"/>
   <int value="1050" label="PRINTERPROVIDERINTERNAL_REPORTUSBPRINTERINFO"/>
+  <int value="1051" label="WEBCAMPRIVATE_OPENSERIALWEBCAM"/>
+  <int value="1052" label="WEBCAMPRIVATE_CLOSEWEBCAM"/>
 </enum>
 
 <enum name="ExtensionInstallCause" type="int">
@@ -53509,7 +54395,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="ExtensionPermission2" type="int">
-<!-- Generated from ../../../extensions/common/permissions/permission_message.h -->
+<!-- Generated from extensions/common/permissions/permission_message.h -->
 
   <int value="0" label="kUnknown"/>
   <int value="1" label="kNone"/>
@@ -53599,7 +54485,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="ExtensionPermission3" type="int">
-<!-- Generated from ../../../extensions/common/permissions/api_permission.h -->
+<!-- Generated from extensions/common/permissions/api_permission.h -->
 
   <int value="0" label="kInvalid"/>
   <int value="1" label="kUnknown"/>
@@ -53971,7 +54857,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
 </enum>
 
 <enum name="FeatureObserver" type="int">
-<!-- Generated from ../../../third_party/WebKit/Source/core/frame/UseCounter.h -->
+<!-- Generated from third_party/WebKit/Source/core/frame/UseCounter.h -->
 
   <int value="0" label="PageDestruction"/>
   <int value="1" label="LegacyNotifications"/>
@@ -54780,6 +55666,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
       label="ElementCreateShadowRootMultipleWithUserAgentShadowRoot"/>
   <int value="801" label="InputTypeFileSecureOrigin"/>
   <int value="802" label="InputTypeFileInsecureOrigin"/>
+  <int value="803" label="V8HashChangeEvent_InitHashChangeEvent_Method"/>
 </enum>
 
 <enum name="FFmpegCodecs" type="int">
@@ -56613,6 +57500,7 @@ Therefore, the affected-histogram name has to have at least one dot in it.
   <int value="33" label="SERVER_BAD_CONTENT"/>
   <int value="34" label="SERVER_UNAUTHORIZED"/>
   <int value="35" label="SERVER_CERT_PROBLEM"/>
+  <int value="36" label="SERVER_FORBIDDEN"/>
   <int value="40" label="USER_CANCELED"/>
   <int value="41" label="USER_SHUTDOWN"/>
   <int value="50" label="CRASH"/>
@@ -57576,6 +58464,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-2132591642" label="enable-input-view"/>
   <int value="-2119827860" label="ash-disable-maximize-mode-window-backdrop"/>
   <int value="-2119530966" label="enable-webrtc-dtls12"/>
+  <int value="-2119493239" label="enable-app-info-dialog-mac"/>
   <int value="-2117201726" label="disable-gpu-rasterization"/>
   <int value="-2114831248" label="disable-new-ntp"/>
   <int value="-2099035488" label="enable-data-reduction-proxy-bypass-warning"/>
@@ -57587,6 +58476,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-2063014275" label="enable-web-bluetooth"/>
   <int value="-2047822258" label="enable-avfoundation"/>
   <int value="-2025367104" label="enable-material-design-ntp"/>
+  <int value="-2020721975" label="smart-virtual-keyboard"/>
   <int value="-2020024440" label="scroll-end-effect"/>
   <int value="-2017953534" label="enable-hosted-app-shim-creation"/>
   <int value="-2008272679" label="disable-webrtc-hw-encoding"/>
@@ -57654,12 +58544,14 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-1433719718" label="enable-webrtc-stun-origin"/>
   <int value="-1433087548" label="enable-app-install-alerts"/>
   <int value="-1419788257" label="enable-experimental-hotwording"/>
+  <int value="-1416754663" label="enable-mac-views-native-app-windows"/>
   <int value="-1411003295" label="disable-encrypted-media"/>
   <int value="-1409643943" label="enable-child-account-detection"/>
   <int value="-1408288176" label="enable-account-consistency"/>
   <int value="-1399753480" label="disable-harfbuzz-rendertext"/>
   <int value="-1399419572" label="enable-app-list"/>
   <int value="-1392562498" label="disable-origin-chip"/>
+  <int value="-1386966873" label="disable-mac-views-native-app-windows"/>
   <int value="-1375111024" label="enable-fixed-position-compositing"/>
   <int value="-1358669137" label="enable-supervised-user-blacklist"/>
   <int value="-1357655121" label="enable-iframe-based-signin"/>
@@ -57741,6 +58633,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-610411643" label="enable-printer-app-search"/>
   <int value="-604814313" label="enable-pinch"/>
   <int value="-601384286" label="disable-contextual-search"/>
+  <int value="-589096918" label="ash-enable-fullscreen-app-list"/>
   <int value="-579192400" label="disable-input-view"/>
   <int value="-567920515" label="disable-experimental-hotwording"/>
   <int value="-563980787" label="disable-webrtc"/>
@@ -57761,6 +58654,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="-385337473" label="enable-fast-unload"/>
   <int value="-384589459" label="disable-supervised-user-safesites"/>
   <int value="-378033324" label="disable-win32k-renderer-lockdown"/>
+  <int value="-360038744" label="invert-viewport-scroll-order"/>
   <int value="-349057743" label="extensions-on-chrome-urls"/>
   <int value="-344343842" label="disable-experimental-app-list"/>
   <int value="-340622848" label="disable-javascript-harmony-shipping"/>
@@ -57873,6 +58767,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="838887742" label="manual-enhanced-bookmarks"/>
   <int value="841343322" label="disable-new-korean-ime"/>
   <int value="851085848" label="enable-settings-window"/>
+  <int value="854730848" label="disable-app-info-dialog-mac"/>
   <int value="855746780" label="disable-physical-keyboard-autocorrect"/>
   <int value="857445869" label="enable-captive-portal-bypass-proxy"/>
   <int value="867512869" label="mark-non-secure-as"/>
@@ -57896,6 +58791,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1033597574" label="disable-layer-squashing"/>
   <int value="1050321458" label="new-profile-management"/>
   <int value="1054910800" label="enable-timezone-tracking-option"/>
+  <int value="1060319397" label="enable-data-reduction-proxy-carrier-test"/>
   <int value="1062357243" label="remember-cert-error-decisions"/>
   <int value="1067618884" label="enable-experimental-input-view-features"/>
   <int value="1070300488" label="disable-webgl"/>
@@ -58209,7 +59105,7 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="MappedCSSProperties" type="int">
-<!-- Generated from ../../../third_party/WebKit/Source/core/frame/UseCounter.cpp -->
+<!-- Generated from third_party/WebKit/Source/core/frame/UseCounter.cpp -->
 
 <!-- See http://src.chromium.org/viewvc/blink/trunk/Source/core/page/UseCounter.cpp -->
 
@@ -58378,22 +59274,22 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="163" label="word-spacing"/>
   <int value="164" label="word-wrap"/>
   <int value="165" label="z-index"/>
-  <int value="166" label="webkit-animation"/>
-  <int value="167" label="webkit-animation-delay"/>
-  <int value="168" label="webkit-animation-direction"/>
-  <int value="169" label="webkit-animation-duration"/>
-  <int value="170" label="webkit-animation-fill-mode"/>
-  <int value="171" label="webkit-animation-iteration-count"/>
-  <int value="172" label="webkit-animation-name"/>
-  <int value="173" label="webkit-animation-play-state"/>
-  <int value="174" label="webkit-animation-timing-function"/>
+  <int value="166" label="alias-webkit-animation"/>
+  <int value="167" label="alias-webkit-animation-delay"/>
+  <int value="168" label="alias-webkit-animation-direction"/>
+  <int value="169" label="alias-webkit-animation-duration"/>
+  <int value="170" label="alias-webkit-animation-fill-mode"/>
+  <int value="171" label="alias-webkit-animation-iteration-count"/>
+  <int value="172" label="alias-webkit-animation-name"/>
+  <int value="173" label="alias-webkit-animation-play-state"/>
+  <int value="174" label="alias-webkit-animation-timing-function"/>
   <int value="175" label="webkit-appearance"/>
   <int value="176" label="webkit-aspect-ratio"/>
-  <int value="177" label="webkit-backface-visibility"/>
+  <int value="177" label="alias-webkit-backface-visibility"/>
   <int value="178" label="webkit-background-clip"/>
   <int value="179" label="webkit-background-composite"/>
   <int value="180" label="webkit-background-origin"/>
-  <int value="181" label="webkit-background-size"/>
+  <int value="181" label="alias-webkit-background-size"/>
   <int value="182" label="webkit-border-after"/>
   <int value="183" label="webkit-border-after-color"/>
   <int value="184" label="webkit-border-after-style"/>
@@ -58409,7 +59305,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="194" label="webkit-border-fit"/>
   <int value="195" label="webkit-border-horizontal-spacing"/>
   <int value="196" label="webkit-border-image"/>
-  <int value="197" label="webkit-border-radius"/>
+  <int value="197" label="alias-webkit-border-radius"/>
   <int value="198" label="webkit-border-start"/>
   <int value="199" label="webkit-border-start-color"/>
   <int value="200" label="webkit-border-start-style"/>
@@ -58424,7 +59320,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="209" label="webkit-box-orient"/>
   <int value="210" label="webkit-box-pack"/>
   <int value="211" label="webkit-box-reflect"/>
-  <int value="212" label="webkit-box-shadow"/>
+  <int value="212" label="alias-webkit-box-shadow"/>
   <int value="213" label="webkit-color-correction"/>
   <int value="214" label="webkit-column-axis"/>
   <int value="215" label="webkit-column-break-after"/>
@@ -58520,8 +59416,8 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="305" label="webkit-padding-before"/>
   <int value="306" label="webkit-padding-end"/>
   <int value="307" label="webkit-padding-start"/>
-  <int value="308" label="webkit-perspective"/>
-  <int value="309" label="webkit-perspective-origin"/>
+  <int value="308" label="alias-webkit-perspective"/>
+  <int value="309" label="alias-webkit-perspective-origin"/>
   <int value="310" label="webkit-perspective-origin-x"/>
   <int value="311" label="webkit-perspective-origin-y"/>
   <int value="312" label="webkit-print-color-adjust"/>
@@ -58538,17 +59434,17 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="323" label="webkit-text-stroke"/>
   <int value="324" label="webkit-text-stroke-color"/>
   <int value="325" label="webkit-text-stroke-width"/>
-  <int value="326" label="webkit-transform"/>
-  <int value="327" label="webkit-transform-origin"/>
+  <int value="326" label="alias-webkit-transform"/>
+  <int value="327" label="alias-webkit-transform-origin"/>
   <int value="328" label="webkit-transform-origin-x"/>
   <int value="329" label="webkit-transform-origin-y"/>
   <int value="330" label="webkit-transform-origin-z"/>
-  <int value="331" label="webkit-transform-style"/>
-  <int value="332" label="webkit-transition"/>
-  <int value="333" label="webkit-transition-delay"/>
-  <int value="334" label="webkit-transition-duration"/>
-  <int value="335" label="webkit-transition-property"/>
-  <int value="336" label="webkit-transition-timing-function"/>
+  <int value="331" label="alias-webkit-transform-style"/>
+  <int value="332" label="alias-webkit-transition"/>
+  <int value="333" label="alias-webkit-transition-delay"/>
+  <int value="334" label="alias-webkit-transition-duration"/>
+  <int value="335" label="alias-webkit-transition-property"/>
+  <int value="336" label="alias-webkit-transition-timing-function"/>
   <int value="337" label="webkit-user-drag"/>
   <int value="338" label="webkit-user-modify"/>
   <int value="339" label="webkit-user-select"/>
@@ -58681,10 +59577,45 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="466" label="cx"/>
   <int value="467" label="cy"/>
   <int value="468" label="r"/>
+  <int value="469" label="alias-epub-caption-side"/>
+  <int value="470" label="alias-epub-text-combine"/>
+  <int value="471" label="alias-epub-text-emphasis"/>
+  <int value="472" label="alias-epub-text-emphasis-color"/>
+  <int value="473" label="alias-epub-text-emphasis-style"/>
+  <int value="474" label="alias-epub-text-orientation"/>
+  <int value="475" label="alias-epub-text-transform"/>
+  <int value="476" label="alias-epub-word-break"/>
+  <int value="477" label="alias-epub-writing-mode"/>
+  <int value="478" label="alias-webkit-align-content"/>
+  <int value="479" label="alias-webkit-align-items"/>
+  <int value="480" label="alias-webkit-align-self"/>
+  <int value="481" label="alias-webkit-border-bottom-left-radius"/>
+  <int value="482" label="alias-webkit-border-bottom-right-radius"/>
+  <int value="483" label="alias-webkit-border-top-left-radius"/>
+  <int value="484" label="alias-webkit-border-top-right-radius"/>
+  <int value="485" label="alias-webkit-box-sizing"/>
+  <int value="486" label="alias-webkit-flex"/>
+  <int value="487" label="alias-webkit-flex-basis"/>
+  <int value="488" label="alias-webkit-flex-direction"/>
+  <int value="489" label="alias-webkit-flex-flow"/>
+  <int value="490" label="alias-webkit-flex-grow"/>
+  <int value="491" label="alias-webkit-flex-shrink"/>
+  <int value="492" label="alias-webkit-flex-wrap"/>
+  <int value="493" label="alias-webkit-justify-content"/>
+  <int value="494" label="alias-webkit-opacity"/>
+  <int value="495" label="alias-webkit-order"/>
+  <int value="496" label="alias-webkit-shape-image-threshold"/>
+  <int value="497" label="alias-webkit-shape-margin"/>
+  <int value="498" label="alias-webkit-shape-outside"/>
+  <int value="499" label="scroll-snap-type"/>
+  <int value="500" label="scroll-snap-points-x"/>
+  <int value="501" label="scroll-snap-points-y"/>
+  <int value="502" label="scroll-snap-coordinate"/>
+  <int value="503" label="scroll-snap-destination"/>
 </enum>
 
 <enum name="MappedEditingCommands" type="int">
-<!-- Generated from ../../../third_party/WebKit/Source/core/editing/EditorCommand.cpp -->
+<!-- Generated from third_party/WebKit/Source/core/editing/EditorCommand.cpp -->
 
   <int value="1" label="AlignJustified"/>
   <int value="2" label="AlignLeft"/>
@@ -59307,6 +60238,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="6" label="javascript"/>
   <int value="7" label="about"/>
   <int value="8" label="chrome"/>
+  <int value="9" label="blob"/>
 </enum>
 
 <enum name="NetCacheState" type="int">
@@ -59354,7 +60286,7 @@ To add a new entry, add it with any value and run test to compute valid value.
 </enum>
 
 <enum name="NetErrorCodes" type="int">
-<!-- Generated from ../../../net/base/net_error_list.h -->
+<!-- Generated from net/base/net_error_list.h -->
 
   <int value="0" label="OK"/>
   <int value="1" label="IO_PENDING"/>
@@ -61457,7 +62389,6 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="PIPELINE_ERROR_URL_NOT_FOUND"/>
   <int value="2" label="PIPELINE_ERROR_NETWORK"/>
   <int value="3" label="PIPELINE_ERROR_DECODE"/>
-  <int value="4" label="PIPELINE_ERROR_DECRYPT"/>
   <int value="5" label="PIPELINE_ERROR_ABORT"/>
   <int value="6" label="PIPELINE_ERROR_INITIALIZATION_FAILED"/>
   <int value="7" label="PIPELINE_ERROR_REQUIRED_FILTER_MISSING"/>
@@ -61559,6 +62490,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Unthrottled by Click"/>
   <int value="2" label="Unthrottled by Retroactive Whitelist"/>
   <int value="3" label="Unthrottled by Audio Playback"/>
+  <int value="4" label="Unthrottled by Size Change"/>
 </enum>
 
 <enum name="PNaClOptionsOptLevelEnum" type="int">
@@ -61675,6 +62607,12 @@ To add a new entry, add it with any value and run test to compute valid value.
 <enum name="PreconnectTriggerUsed" type="int">
   <int value="0" label="The pre-connect triggered host was not accessed"/>
   <int value="1" label="The pre-connect triggered host was accessed"/>
+</enum>
+
+<enum name="PredictionStatus" type="int">
+  <int value="0" label="No prediction"/>
+  <int value="1" label="Successful prediction"/>
+  <int value="2" label="Wrong prediction"/>
 </enum>
 
 <enum name="PrefetchStatus" type="int">
@@ -63363,6 +64301,11 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Tabbed Mode"/>
 </enum>
 
+<enum name="SadTabKind" type="int">
+  <int value="0" label="Crash (Aw, Snap!)"/>
+  <int value="1" label="Kill (He's dead, Jim!)"/>
+</enum>
+
 <enum name="SavePasswordPromptResponseType" type="int">
   <int value="0" label="NO_RESPONSE"/>
   <int value="1" label="REMEMBER_PASSWORD"/>
@@ -63998,6 +64941,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="14" label="SERVICE_WORKER_ERROR_TIMEOUT"/>
   <int value="15" label="SERVICE_WORKER_ERROR_SCRIPT_EVALUATE_FAILED"/>
   <int value="16" label="SERVICE_WORKER_ERROR_DISK_CACHE"/>
+  <int value="17" label="SERVICE_WORKER_ERROR_REDUNDANT"/>
 </enum>
 
 <enum name="ServiceWorkerWriteResponseResult" type="int">
@@ -64109,6 +65053,18 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="0" label="Learn more"/>
   <int value="1" label="Settings page"/>
   <int value="2" label="Dismiss"/>
+</enum>
+
+<enum name="SigninAccountReconcilorState" type="int">
+  <int value="0" label="OK">
+    The account reconcilor has finished running and is up-to-date.
+  </int>
+  <int value="1" label="Running">
+    The account reconcilor is running and gathering informations.
+  </int>
+  <int value="2" label="Error">
+    The account reconcilor has encountered an error and stopped.
+  </int>
 </enum>
 
 <enum name="SigninChoice" type="int">
@@ -64830,6 +65786,29 @@ To add a new entry, add it with any value and run test to compute valid value.
   </int>
 </enum>
 
+<enum name="SqliteStatsEnum" type="int">
+  <summary/>
+  <int value="0" label="EVENT_STATEMENT_RUN">
+    Count statements initiated by Step(), Run(), or Execute*().
+  </int>
+  <int value="1" label="EVENT_STATEMENT_ROWS">
+    Count steps which returned SQLITE_ROW.
+  </int>
+  <int value="2" label="EVENT_STATEMENT_SUCCESS">
+    Count statements which ran to completion with no errors.
+  </int>
+  <int value="3" label="EVENT_EXECUTE">Count calls to Execute*().</int>
+  <int value="4" label="EVENT_CHANGES_AUTOCOMMIT">
+    Count rows changed without an explicit transaction.
+  </int>
+  <int value="5" label="EVENT_CHANGES">
+    Count rows changed in an explicit transaction.
+  </int>
+  <int value="6" label="EVENT_BEGIN">Explicit transactions begun.</int>
+  <int value="7" label="EVENT_COMMIT">Explicit transactions committed.</int>
+  <int value="8" label="EVENT_ROLLBACK">Explicit transactions rolled back.</int>
+</enum>
+
 <enum name="SqliteVersionDeprecation" type="int">
   <summary>Sqlite database version deprecation status</summary>
   <int value="0" label="DEPRECATION_DATABASE_NOT_EMPTY">
@@ -64859,6 +65838,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <int value="1" label="Accepted"/>
   <int value="2" label="Denied"/>
   <int value="3" label="Fell back to download page"/>
+  <int value="4" label="SRT download unavailable, no prompt shown."/>
 </enum>
 
 <enum name="SSLCaptivePortal" type="int">
@@ -67705,6 +68685,15 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="PLT.PT_StartToFinish"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="DataReductionProxy.WithValidOCL.LoFiOn" separator=".">
+  <suffix name="LoFiOn"
+      label="Only page loads through the data reduction proxy with Lo-Fi On
+             are considered."/>
+  <affected-histogram name="Net.HttpContentLengthDifferenceWithValidOCL"/>
+  <affected-histogram name="Net.HttpContentLengthWithValidOCL"/>
+  <affected-histogram name="Net.HttpOriginalContentLengthWithValidOCL"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="DataReductionProxy_AutoLoFi" separator="_">
   <suffix name="DataReductionProxy_AutoLoFiOn"
       label="Only page loads through the data reduction proxy with auto LoFi
@@ -68623,6 +69612,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="Net.QuicSession.PacketWriteTime"/>
 </histogram_suffixes>
 
+<histogram_suffixes name="iOS_PLT" separator="">
+  <owner>pauljensen@chromium.org</owner>
+  <suffix name="" label="not using Data Reduction Proxy"/>
+  <suffix name="_DataReductionProxy" label="using Data Reduction Proxy"/>
+  <affected-histogram name="Tabs.iOS_PostRedirectPLT"/>
+</histogram_suffixes>
+
 <histogram_suffixes name="IPProtocolType" separator="_">
   <suffix name="UDP"/>
   <suffix name="TCP"/>
@@ -68689,6 +69685,7 @@ To add a new entry, add it with any value and run test to compute valid value.
       label="ChromiumWritableFile::SyncParent"/>
   <affected-histogram name="LevelDBEnv.IDB.IOError.BFE"/>
   <affected-histogram name="LevelDBEnv.IOError.BFE"/>
+  <affected-histogram name="LevelDBEnv.ServiceWorker.IOError.BFE"/>
   <affected-histogram name="WebCore.IndexedDB.LevelDBOpenErrors.BFE"/>
   <affected-histogram name="WebCore.IndexedDB.LevelDBReadErrors.BFE"/>
   <affected-histogram name="WebCore.IndexedDB.LevelDBWriteErrors.BFE"/>
@@ -68698,6 +69695,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Backup" label="Backing up an ldb file."/>
   <suffix name="Restore" label="Restoring an ldb file."/>
   <affected-histogram name="LevelDBEnv.IDB.Table"/>
+  <affected-histogram name="LevelDBEnv.ServiceWorker.Table"/>
   <affected-histogram name="LevelDBEnv.Table"/>
 </histogram_suffixes>
 
@@ -68712,6 +69710,7 @@ To add a new entry, add it with any value and run test to compute valid value.
              other than exceeding the limit."/>
   <affected-histogram name="LevelDBEnv.IDB.MaxFDs"/>
   <affected-histogram name="LevelDBEnv.MaxFDs"/>
+  <affected-histogram name="LevelDBEnv.ServiceWorker.MaxFDs"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="LevelDBEnvPlatformFileErrors" separator="">
@@ -68722,6 +69721,7 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="RenameFile" label="ChromiumEnv::RenameFile"/>
   <affected-histogram name="LevelDBEnv.IDB.IOError."/>
   <affected-histogram name="LevelDBEnv.IOError."/>
+  <affected-histogram name="LevelDBEnv.ServiceWorker.IOError."/>
 </histogram_suffixes>
 
 <histogram_suffixes name="LevelDBEnvRetry" separator="">
@@ -68731,6 +69731,9 @@ To add a new entry, add it with any value and run test to compute valid value.
   <affected-histogram name="LevelDBEnv.IDB.RetryRecoveredFromErrorIn"/>
   <affected-histogram name="LevelDBEnv.IDB.TimeUntilSuccessFor"/>
   <affected-histogram name="LevelDBEnv.RetryRecoveredFromErrorIn"/>
+  <affected-histogram
+      name="LevelDBEnv.ServiceWorker.RetryRecoveredFromErrorIn"/>
+  <affected-histogram name="LevelDBEnv.ServiceWorker.TimeUntilSuccessFor"/>
   <affected-histogram name="LevelDBEnv.TimeUntilSuccessFor"/>
 </histogram_suffixes>
 
@@ -68750,6 +69753,24 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="1MBTo5MB" label="DB size between 1MB and 5MB"/>
   <affected-histogram name="LocalStorage.BrowserTimeToPrimeLocalStorage"/>
   <affected-histogram name="LocalStorage.RendererTimeToPrimeLocalStorage"/>
+</histogram_suffixes>
+
+<histogram_suffixes name="LowMemoryMargin">
+  <suffix name="default" label="Low memory margin set to the system default"/>
+  <suffix name="off" label="Low memory notification disabled"/>
+  <suffix name="0mb" label="Low memory margin set to 0MB"/>
+  <suffix name="25mb" label="Low memory margin set to 25MB"/>
+  <suffix name="50mb" label="Low memory margin set to 50MB"/>
+  <suffix name="100mb" label="Low memory margin set to 100MB"/>
+  <suffix name="200mb" label="Low memory margin set to 200MB"/>
+  <affected-histogram name="Tabs.Discard.DiscardCount"/>
+  <affected-histogram name="Tabs.Discard.InitialTime2"/>
+  <affected-histogram name="Tabs.Discard.IntervalTime2"/>
+  <affected-histogram name="Tabs.Discard.MemAnonymousMB"/>
+  <affected-histogram name="Tabs.Discard.MemAvailableMB"/>
+  <affected-histogram name="Tabs.Discard.TabCount"/>
+  <affected-histogram name="Tabs.SadTab.CrashCreated"/>
+  <affected-histogram name="Tabs.SadTab.KillCreated"/>
 </histogram_suffixes>
 
 <histogram_suffixes name="ManifestProperties" separator=".">
@@ -71497,8 +72518,13 @@ To add a new entry, add it with any value and run test to compute valid value.
   <suffix name="Thumbnail" label="Thumbnail"/>
   <suffix name="TopSites" label="TopSites"/>
   <suffix name="Web" label="Web"/>
+  <affected-histogram name="Sqlite.AutoCommitTime"/>
+  <affected-histogram name="Sqlite.CommitTime"/>
   <affected-histogram name="Sqlite.Error"/>
+  <affected-histogram name="Sqlite.QueryTime"/>
   <affected-histogram name="Sqlite.SizeKB"/>
+  <affected-histogram name="Sqlite.Stats"/>
+  <affected-histogram name="Sqlite.UpdateTime"/>
   <affected-histogram name="Sqlite.Version"/>
 </histogram_suffixes>
 

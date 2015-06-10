@@ -12,6 +12,7 @@ enum class ServiceAccessType;
 
 class KeyedServiceBaseFactory;
 class ProfileOAuth2TokenService;
+class ProfileOAuth2TokenServiceIOS;
 class SigninManager;
 
 namespace autofill {
@@ -19,8 +20,8 @@ class AutofillWebDataService;
 class PersonalDataManager;
 }
 
-namespace enhanced_bookmarks {
-class EnhancedBookmarkModel;
+namespace bookmarks {
+class BookmarkModel;
 }
 
 namespace sync_driver {
@@ -38,12 +39,28 @@ class KeyedServiceProvider {
   KeyedServiceProvider();
   virtual ~KeyedServiceProvider();
 
+  // Returns the bookmarks::BookmarkModel factory for dependencies.
+  virtual KeyedServiceBaseFactory* GetBookmarkModelFactory();
+
+  // Returns an instance of bookmarks::BookmarkModel tied to |browser_state|.
+  virtual bookmarks::BookmarkModel* GetBookmarkModelForBrowserState(
+      ios::ChromeBrowserState* browser_state);
+
   // Returns the ProfileOAuth2TokenService factory for dependencies.
   virtual KeyedServiceBaseFactory* GetProfileOAuth2TokenServiceFactory();
 
   // Returns an instance of ProfileOAuth2TokenService tied to |browser_state|.
   virtual ProfileOAuth2TokenService*
   GetProfileOAuth2TokenServiceForBrowserState(
+      ChromeBrowserState* browser_state);
+
+  // Returns the ProfileOAuth2TokenServiceIOS factory for dependencies.
+  virtual KeyedServiceBaseFactory* GetProfileOAuth2TokenServiceIOSFactory();
+
+  // Returns an instance of ProfileOAuth2TokenServiceIOS tied to
+  // |browser_state|.
+  virtual ProfileOAuth2TokenServiceIOS*
+  GetProfileOAuth2TokenServiceIOSForBrowserState(
       ChromeBrowserState* browser_state);
 
   // Returns the SigninManager factory for dependencies.
@@ -69,15 +86,6 @@ class KeyedServiceProvider {
   // |browser_state|.
   virtual autofill::PersonalDataManager* GetPersonalDataManagerForBrowserState(
       ChromeBrowserState* browser_state);
-
-  // Returns the enhanced_bookmarks::EnhancedBookmarkModel factory for
-  // dependencies.
-  virtual KeyedServiceBaseFactory* GetEnhancedBookmarkModelFactory();
-
-  // Returns an instance of enhanced_bookmarks::EnhancedBookmarkModel tied to
-  // |browser_state|.
-  virtual enhanced_bookmarks::EnhancedBookmarkModel*
-  GetEnhancedBookmarkModelForBrowserState(ChromeBrowserState* browser_state);
 
   // Returns the sync_driver::SyncService factory for dependencies.
   virtual KeyedServiceBaseFactory* GetSyncServiceFactory();

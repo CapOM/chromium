@@ -335,7 +335,14 @@ IN_PROC_BROWSER_TEST_F(BrowserActionsBarRedesignBrowserTest,
   EXPECT_FALSE(browser_actions_bar()->OverflowedActionButtonWantsToRun());
 }
 
-IN_PROC_BROWSER_TEST_F(BrowserActionsBarBrowserTest, BrowserActionPopupTest) {
+// Flaky on Mac ASan 64 bot. See http://crbug.com/498665.
+#if defined(OS_MACOSX) && defined(ADDRESS_SANITIZER)
+#define MAYBE_BrowserActionPopupTest DISABLED_BrowserActionPopupTest
+#else
+#define MAYBE_BrowserActionPopupTest BrowserActionPopupTest
+#endif
+IN_PROC_BROWSER_TEST_F(BrowserActionsBarBrowserTest,
+                       MAYBE_BrowserActionPopupTest) {
   // Load up two extensions that have browser action popups.
   base::FilePath data_dir =
       test_data_dir_.AppendASCII("api_test").AppendASCII("browser_action");
@@ -496,15 +503,9 @@ IN_PROC_BROWSER_TEST_F(BrowserActionsBarRedesignBrowserTest,
             browser_actions_bar()->GetExtensionId(1));
 }
 
-// http://crbug.com/495678
-#if defined(OS_MACOSX)
-#define MAYBE_PageActionPopupsTest DISABLED_PageActionPopupsTest
-#else
-#define MAYBE_PageActionPopupsTest PageActionPopupsTest
-#endif
 // Test that page action popups work with the toolbar redesign.
 IN_PROC_BROWSER_TEST_F(BrowserActionsBarRedesignBrowserTest,
-                       MAYBE_PageActionPopupsTest) {
+                       PageActionPopupsTest) {
   ExtensionTestMessageListener listener("ready", false);
   const extensions::Extension* page_action_extension =
       LoadExtension(test_data_dir_.AppendASCII("trigger_actions").
@@ -517,4 +518,8 @@ IN_PROC_BROWSER_TEST_F(BrowserActionsBarRedesignBrowserTest,
   browser_actions_bar()->Press(0);
   base::RunLoop().RunUntilIdle();
   EXPECT_TRUE(browser_actions_bar()->HasPopup());
+  // Cleanup the popup (to avoid having windows open at tear down).
+  browser_actions_bar()->HidePopup();
+  content::RunAllBlockingPoolTasksUntilIdle();
+  EXPECT_FALSE(browser_actions_bar()->HasPopup());
 }

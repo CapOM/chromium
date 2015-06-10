@@ -74,15 +74,15 @@ class OutputSurfaceWithoutParent : public cc::OutputSurface {
  public:
   OutputSurfaceWithoutParent(
       const scoped_refptr<ContextProviderCommandBuffer>& context_provider,
-      base::WeakPtr<CompositorImpl> compositor_impl)
+      const base::Callback<void(gpu::Capabilities)>&
+          populate_gpu_capabilities_callback)
       : cc::OutputSurface(context_provider),
+        populate_gpu_capabilities_callback_(populate_gpu_capabilities_callback),
         swap_buffers_completion_callback_(
             base::Bind(&OutputSurfaceWithoutParent::OnSwapBuffersCompleted,
                        base::Unretained(this))) {
     capabilities_.adjust_deadline_for_parent = false;
     capabilities_.max_frames_pending = 2;
-    compositor_impl_ = compositor_impl;
-    main_thread_ = base::MessageLoopProxy::current();
   }
 
   void SwapBuffers(cc::CompositorFrame* frame) override {
@@ -100,11 +100,8 @@ class OutputSurfaceWithoutParent : public cc::OutputSurface {
     GetCommandBufferProxy()->SetSwapBuffersCompletionCallback(
         swap_buffers_completion_callback_.callback());
 
-    main_thread_->PostTask(
-        FROM_HERE,
-        base::Bind(&CompositorImpl::PopulateGpuCapabilities,
-                   compositor_impl_,
-                   context_provider_->ContextCapabilities().gpu));
+    populate_gpu_capabilities_callback_.Run(
+        context_provider_->ContextCapabilities().gpu);
 
     return true;
   }
@@ -126,12 +123,10 @@ class OutputSurfaceWithoutParent : public cc::OutputSurface {
     OutputSurface::OnSwapBuffersComplete();
   }
 
+  base::Callback<void(gpu::Capabilities)> populate_gpu_capabilities_callback_;
   base::CancelableCallback<void(const std::vector<ui::LatencyInfo>&,
                                 gfx::SwapResult)>
       swap_buffers_completion_callback_;
-
-  scoped_refptr<base::MessageLoopProxy> main_thread_;
-  base::WeakPtr<CompositorImpl> compositor_impl_;
 };
 
 static bool g_initialized = false;
@@ -210,14 +205,20 @@ cc::SurfaceManager* CompositorImpl::GetSurfaceManager() {
 
 // static
 scoped_ptr<cc::SurfaceIdAllocator> CompositorImpl::CreateSurfaceIdAllocator() {
-  return make_scoped_ptr(new cc::SurfaceIdAllocator(++g_surface_id_namespace));
+  scoped_ptr<cc::SurfaceIdAllocator> allocator(
+      new cc::SurfaceIdAllocator(++g_surface_id_namespace));
+  cc::SurfaceManager* manager = GetSurfaceManager();
+  DCHECK(manager);
+  allocator->RegisterSurfaceIdNamespace(manager);
+  return allocator.Pass();
 }
 
 CompositorImpl::CompositorImpl(CompositorClient* client,
                                gfx::NativeWindow root_window)
     : root_layer_(cc::Layer::Create(Compositor::LayerSettings())),
       resource_manager_(&ui_resource_provider_),
-      surface_id_allocator_(CreateSurfaceIdAllocator()),
+      surface_id_allocator_(GetSurfaceManager() ? CreateSurfaceIdAllocator()
+                                                : nullptr),
       has_transparent_background_(false),
       device_scale_factor_(1),
       window_(NULL),
@@ -301,7 +302,7 @@ void CompositorImpl::PostComposite(CompositingTrigger trigger) {
   // Unretained because we cancel the task on shutdown.
   current_composite_task_.reset(new base::CancelableClosure(
       base::Bind(&CompositorImpl::Composite, base::Unretained(this), trigger)));
-  base::MessageLoop::current()->PostDelayedTask(
+  base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
       FROM_HERE, current_composite_task_->callback(), delay);
 }
 
@@ -642,8 +643,9 @@ void CompositorImpl::CreateOutputSurface() {
   DCHECK(context_provider.get());
 
   scoped_ptr<cc::OutputSurface> real_output_surface(
-      new OutputSurfaceWithoutParent(context_provider,
-                                     weak_factory_.GetWeakPtr()));
+      new OutputSurfaceWithoutParent(
+          context_provider, base::Bind(&CompositorImpl::PopulateGpuCapabilities,
+                                       base::Unretained(this))));
 
   cc::SurfaceManager* manager = GetSurfaceManager();
   if (manager) {
@@ -651,7 +653,7 @@ void CompositorImpl::CreateOutputSurface() {
         real_output_surface.Pass(), manager, HostSharedBitmapManager::current(),
         BrowserGpuMemoryBufferManager::current(),
         host_->settings().renderer_settings,
-        base::MessageLoopProxy::current()));
+        base::ThreadTaskRunnerHandle::Get()));
     scoped_ptr<cc::SurfaceDisplayOutputSurface> surface_output_surface(
         new cc::SurfaceDisplayOutputSurface(
             manager, surface_id_allocator_.get(), context_provider));

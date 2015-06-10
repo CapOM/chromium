@@ -349,8 +349,12 @@ extern const char kMigrateDataDirForSxS[];
 #if defined(OS_MACOSX)
 extern const char kAppsKeepChromeAliveInTests[];
 extern const char kHostedAppQuitNotification[];
+extern const char kDisableAppInfoDialogMac[];
 extern const char kDisableHostedAppShimCreation[];
+extern const char kDisableMacViewsNativeAppWindows[];
 extern const char kDisableSystemFullscreenForTesting[];
+extern const char kEnableAppInfoDialogMac[];
+extern const char kEnableMacViewsNativeAppWindows[];
 extern const char kEnableTranslateNewUX[];
 extern const char kMetricsClientID[];
 extern const char kRelauncherProcess[];

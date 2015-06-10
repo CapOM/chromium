@@ -320,7 +320,7 @@ BrowserPluginGuest* BrowserPluginGuest::Create(
     WebContentsImpl* web_contents,
     BrowserPluginGuestDelegate* delegate) {
   return new BrowserPluginGuest(
-      web_contents->opener() != nullptr, web_contents, delegate);
+      web_contents->HasOpener(), web_contents, delegate);
 }
 
 // static
@@ -542,6 +542,9 @@ void BrowserPluginGuest::RenderProcessGone(base::TerminationStatus status) {
   SendMessageToEmbedder(
       new BrowserPluginMsg_GuestGone(browser_plugin_instance_id()));
   switch (status) {
+#if defined(OS_CHROMEOS)
+    case base::TERMINATION_STATUS_PROCESS_WAS_KILLED_BY_OOM:
+#endif
     case base::TERMINATION_STATUS_PROCESS_WAS_KILLED:
       RecordAction(base::UserMetricsAction("BrowserPlugin.Guest.Killed"));
       break;

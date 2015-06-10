@@ -34,6 +34,7 @@ class BookmarkServerClusterServiceFactory
   BookmarkServerClusterServiceFactory();
   ~BookmarkServerClusterServiceFactory() override;
 
+  // BrowserStateKeyedServiceFactory implementation.
   KeyedService* BuildServiceInstanceFor(
       web::BrowserState* context) const override;
   web::BrowserState* GetBrowserStateToUse(
@@ -42,6 +43,6 @@ class BookmarkServerClusterServiceFactory
   DISALLOW_COPY_AND_ASSIGN(BookmarkServerClusterServiceFactory);
 };
 
-}  // namespace enhanced_bookmarsk
+}  // namespace enhanced_bookmarks
 
 #endif  // IOS_CHROME_BROWSER_ENHANCED_BOOKMARKS_BOOKMARK_SERVER_CLUSTER_SERVICE_FACTORY_H_

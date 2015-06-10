@@ -4,7 +4,6 @@
 
 assert(is_android)
 
-import("//third_party/mojo/src/mojo/public/mojo.gni")
 import("//build/config/android/config.gni")
 import("//build/config/android/rules.gni")
 import("//mojo/generate_mojo_shell_assets_list.gni")
@@ -60,12 +59,26 @@ copy_ex("copy_mandoline_assets") {
   ]
   sources = [
     "$root_out_dir/core_services.mojo",
-    "$root_out_dir/html_viewer",
     "$root_out_dir/lib.stripped/libbootstrap.so",
     "$root_out_dir/network_service.mojo",
     "$root_out_dir/obj/mojo/runner/bootstrap_java.dex.jar",
     "$root_out_dir/surfaces_service.mojo",
   ]
+
+  # Directories can't be specified as sources so pass manually to the script.
+  args =
+      [ "--files=" + rebase_path("$root_out_dir/html_viewer", root_build_dir) ]
+
+  if (use_aura) {
+    deps += [
+      "//mandoline/ui/browser",
+      "//mandoline/ui/omnibox",
+    ]
+
+    args +=
+        [ "--files=" + rebase_path("$root_out_dir/browser", root_build_dir) ] +
+        [ "--files=" + rebase_path("$root_out_dir/omnibox", root_build_dir) ]
+  }
 }
 
 generate_mojo_shell_assets_list("build_mandoline_assets") {
@@ -73,6 +86,11 @@ generate_mojo_shell_assets_list("build_mandoline_assets") {
     ":copy_mandoline_assets",
   ]
   dir = mandoline_assets_dir
+}
+
+android_resources("mandoline_apk_resources") {
+  custom_package = "org.chromium.mandoline"
+  resource_dirs = [ "apk/res" ]
 }
 
 android_apk("mandoline_apk") {
@@ -87,6 +105,7 @@ android_apk("mandoline_apk") {
   deps = [
     ":build_mandoline_assets",
     ":copy_mandoline_runner",
+    ":mandoline_apk_resources",
     "//mojo/runner:java",
     "//mojo/runner:resources",
     "//base:base_java",

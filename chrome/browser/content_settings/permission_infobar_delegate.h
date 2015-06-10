@@ -6,8 +6,8 @@
 #define CHROME_BROWSER_CONTENT_SETTINGS_PERMISSION_INFOBAR_DELEGATE_H_
 
 #include "chrome/browser/infobars/infobar_service.h"
+#include "chrome/browser/permissions/permission_request_id.h"
 #include "components/content_settings/core/common/content_settings_types.h"
-#include "components/content_settings/core/common/permission_request_id.h"
 #include "components/infobars/core/confirm_infobar_delegate.h"
 #include "content/public/browser/web_contents.h"
 
@@ -20,6 +20,9 @@ class PermissionQueueController;
 // provide an icon and a message text to the infobar.
 class PermissionInfobarDelegate : public ConfirmInfoBarDelegate {
 
+ public:
+  ContentSettingsType content_setting() const { return type_; }
+
  protected:
   PermissionInfobarDelegate(PermissionQueueController* controller,
                             const PermissionRequestID& id,
@@ -31,6 +34,7 @@ class PermissionInfobarDelegate : public ConfirmInfoBarDelegate {
   // ConfirmInfoBarDelegate:
   Type GetInfoBarType() const override;
   void InfoBarDismissed() override;
+  PermissionInfobarDelegate* AsPermissionInfobarDelegate() override;
   base::string16 GetButtonLabel(InfoBarButton button) const override;
   bool Accept() override;
   bool Cancel() override;

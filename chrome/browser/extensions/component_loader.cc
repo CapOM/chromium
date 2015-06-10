@@ -18,17 +18,21 @@
 #include "chrome/browser/extensions/component_extensions_whitelist/whitelist.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/pdf/pdf_extension_util.h"
+#include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/search/hotword_service.h"
 #include "chrome/browser/search/hotword_service_factory.h"
+#include "chrome/browser/signin/signin_manager_factory.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/extensions/extension_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/crx_file/id_util.h"
-#include "content/public/browser/browser_context.h"
+#include "components/signin/core/browser/signin_manager.h"
+#include "components/signin/core/browser/signin_manager_base.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/plugin_service.h"
+#include "extensions/common/constants.h"
 #include "extensions/common/extension.h"
 #include "extensions/common/extension_l10n_util.h"
 #include "extensions/common/file_util.h"
@@ -87,14 +91,20 @@ std::string GenerateId(const base::DictionaryValue* manifest,
 #if defined(OS_CHROMEOS)
 scoped_ptr<base::DictionaryValue>
 LoadManifestOnFileThread(
-    const base::FilePath& chromevox_path, const char* manifest_filename) {
+    const base::FilePath& root_directory,
+    const base::FilePath::CharType* manifest_filename) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::FILE);
   std::string error;
   scoped_ptr<base::DictionaryValue> manifest(
-      file_util::LoadManifest(chromevox_path, manifest_filename, &error));
-  CHECK(manifest) << error;
+      file_util::LoadManifest(root_directory, manifest_filename, &error));
+  if (!manifest) {
+    LOG(ERROR) << "Can't load "
+               << root_directory.Append(manifest_filename).AsUTF8Unsafe()
+               << ": " << error;
+    return nullptr;
+  }
   bool localized = extension_l10n_util::LocalizeExtension(
-      chromevox_path, manifest.get(), &error);
+      root_directory, manifest.get(), &error);
   CHECK(localized) << error;
   return manifest.Pass();
 }
@@ -123,10 +133,10 @@ ComponentLoader::ComponentExtensionInfo::ComponentExtensionInfo(
 ComponentLoader::ComponentLoader(ExtensionServiceInterface* extension_service,
                                  PrefService* profile_prefs,
                                  PrefService* local_state,
-                                 content::BrowserContext* browser_context)
+                                 Profile* profile)
     : profile_prefs_(profile_prefs),
       local_state_(local_state),
-      browser_context_(browser_context),
+      profile_(profile),
       extension_service_(extension_service),
       ignore_whitelist_for_testing_(false),
       weak_factory_(this) {}
@@ -374,7 +384,7 @@ void ComponentLoader::AddHotwordAudioVerificationApp() {
 }
 
 void ComponentLoader::AddHotwordHelperExtension() {
-  if (HotwordServiceFactory::IsHotwordAllowed(browser_context_)) {
+  if (HotwordServiceFactory::IsHotwordAllowed(profile_)) {
     Add(IDR_HOTWORD_MANIFEST,
         base::FilePath(FILE_PATH_LITERAL("hotword")));
   }
@@ -392,48 +402,72 @@ void ComponentLoader::AddNetworkSpeechSynthesisExtension() {
       base::FilePath(FILE_PATH_LITERAL("network_speech_synthesis")));
 }
 
+void ComponentLoader::AddGoogleNowExtension() {
+#if defined(ENABLE_GOOGLE_NOW)
+  const char kEnablePrefix[] = "Enable";
+  const char kFieldTrialName[] = "GoogleNow";
+  std::string enable_prefix(kEnablePrefix);
+  std::string field_trial_result =
+      base::FieldTrialList::FindFullName(kFieldTrialName);
+
+  bool enabled_via_field_trial =
+      field_trial_result.compare(0, enable_prefix.length(), enable_prefix) == 0;
+
+  // Enable the feature on trybots and trunk builds.
+  bool enabled_via_trunk_build =
+      chrome::VersionInfo::GetChannel() == chrome::VersionInfo::CHANNEL_UNKNOWN;
+
+  bool is_authenticated =
+      SigninManagerFactory::GetForProfile(profile_)->IsAuthenticated();
+
+  bool enabled =
+      (enabled_via_field_trial && is_authenticated) || enabled_via_trunk_build;
+
+#if defined(ENABLE_APP_LIST) && defined(OS_CHROMEOS)
+  // Don't load if newer trial is running (== new extension id is available).
+  std::string ignored_extension_id;
+  if (GetGoogleNowExtensionId(&ignored_extension_id)) {
+    enabled = false;
+  }
+#endif  // defined(ENABLE_APP_LIST) && defined(OS_CHROMEOS)
+
+  if (enabled) {
+    Add(IDR_GOOGLE_NOW_MANIFEST,
+        base::FilePath(FILE_PATH_LITERAL("google_now")));
+  }
+#endif  // defined(ENABLE_GOOGLE_NOW)
+}
+
 #if defined(OS_CHROMEOS)
 void ComponentLoader::AddChromeVoxExtension(
     const base::Closure& done_cb) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   base::FilePath resources_path;
-  PathService::Get(chrome::DIR_RESOURCES, &resources_path);
+  CHECK(PathService::Get(chrome::DIR_RESOURCES, &resources_path));
 
   base::FilePath chromevox_path =
       resources_path.Append(extension_misc::kChromeVoxExtensionPath);
 
-  const char* manifest_filename =
-      IsNormalSession() ? extension_misc::kChromeVoxManifestFilename
-                        : extension_misc::kChromeVoxGuestManifestFilename;
+  const base::FilePath::CharType* manifest_filename =
+      IsNormalSession() ? extensions::kManifestFilename
+                        : extension_misc::kGuestManifestFilename;
+  AddWithManifestFile(
+      manifest_filename,
+      chromevox_path,
+      extension_misc::kChromeVoxExtensionId,
+      done_cb);
+}
 
-  BrowserThread::PostTaskAndReplyWithResult(
-      BrowserThread::FILE,
-      FROM_HERE,
-      base::Bind(&LoadManifestOnFileThread, chromevox_path, manifest_filename),
-      base::Bind(&ComponentLoader::AddChromeVoxExtensionWithManifest,
+void ComponentLoader::AddChromeOsSpeechSynthesisExtension() {
+  const base::FilePath::CharType* manifest_filename =
+      IsNormalSession() ? extensions::kManifestFilename
+                        : extension_misc::kGuestManifestFilename;
+  AddWithManifestFile(
+      manifest_filename,
+      base::FilePath(extension_misc::kSpeechSynthesisExtensionPath),
+      extension_misc::kSpeechSynthesisExtensionId,
+      base::Bind(&ComponentLoader::EnableFileSystemInGuestMode,
                  weak_factory_.GetWeakPtr(),
-                 chromevox_path,
-                 done_cb));
-}
-
-void ComponentLoader::AddChromeVoxExtensionWithManifest(
-    const base::FilePath& chromevox_path,
-    const base::Closure& done_cb,
-    scoped_ptr<base::DictionaryValue> manifest) {
-  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
-  std::string extension_id = Add(manifest.release(), chromevox_path, false);
-  CHECK_EQ(extension_misc::kChromeVoxExtensionId, extension_id);
-  if (!done_cb.is_null())
-    done_cb.Run();
-}
-
-std::string ComponentLoader::AddChromeOsSpeechSynthesisExtension() {
-  int idr = IsNormalSession() ? IDR_SPEECH_SYNTHESIS_MANIFEST
-                              : IDR_SPEECH_SYNTHESIS_GUEST_MANIFEST;
-  std::string id = Add(idr,
-      base::FilePath(extension_misc::kSpeechSynthesisExtensionPath));
-  EnableFileSystemInGuestMode(id);
-  return id;
+                 extension_misc::kChromeVoxExtensionId));
 }
 #endif
 
@@ -597,6 +631,7 @@ void ComponentLoader::AddDefaultComponentExtensionsWithBackgroundPages(
     AddHotwordAudioVerificationApp();
     AddHotwordHelperExtension();
     AddImageLoaderExtension();
+    AddGoogleNowExtension();
 
     bool install_feedback = enable_background_extensions_during_testing;
 #if defined(GOOGLE_CHROME_BUILD)
@@ -649,36 +684,6 @@ void ComponentLoader::AddDefaultComponentExtensionsWithBackgroundPages(
   }
 #endif  // defined(OS_CHROMEOS)
 
-#if defined(ENABLE_GOOGLE_NOW)
-  const char kEnablePrefix[] = "Enable";
-  const char kFieldTrialName[] = "GoogleNow";
-  std::string enable_prefix(kEnablePrefix);
-  std::string field_trial_result =
-      base::FieldTrialList::FindFullName(kFieldTrialName);
-
-  bool enabled_via_field_trial =
-      field_trial_result.compare(0, enable_prefix.length(), enable_prefix) == 0;
-
-  // Enable the feature on trybots and trunk builds.
-  bool enabled_via_trunk_build =
-      chrome::VersionInfo::GetChannel() == chrome::VersionInfo::CHANNEL_UNKNOWN;
-
-  bool enabled = enabled_via_field_trial || enabled_via_trunk_build;
-
-#if defined(ENABLE_APP_LIST) && defined(OS_CHROMEOS)
-  // Don't load if newer trial is running (== new extension id is available).
-  std::string ignored_extension_id;
-  if (GetGoogleNowExtensionId(&ignored_extension_id)) {
-    enabled = false;
-  }
-#endif
-
-  if (!skip_session_components && enabled) {
-    Add(IDR_GOOGLE_NOW_MANIFEST,
-        base::FilePath(FILE_PATH_LITERAL("google_now")));
-  }
-#endif
-
 #if defined(GOOGLE_CHROME_BUILD)
 #if !defined(OS_CHROMEOS)  // http://crbug.com/314799
   AddNetworkSpeechSynthesisExtension();
@@ -706,8 +711,7 @@ void ComponentLoader::EnableFileSystemInGuestMode(const std::string& id) {
     // file system access. Make sure temporary file system is enabled in the off
     // the record browser context (as that is the one used in guest session).
     content::BrowserContext* off_the_record_context =
-        ExtensionsBrowserClient::Get()->GetOffTheRecordContext(
-            browser_context_);
+        ExtensionsBrowserClient::Get()->GetOffTheRecordContext(profile_);
     GURL site = content::SiteInstance::GetSiteForURL(
         off_the_record_context, Extension::GetBaseURLFromExtensionId(id));
     storage::FileSystemContext* file_system_context =
@@ -717,5 +721,41 @@ void ComponentLoader::EnableFileSystemInGuestMode(const std::string& id) {
   }
 #endif
 }
+
+#if defined(OS_CHROMEOS)
+void ComponentLoader::AddWithManifestFile(
+    const base::FilePath::CharType* manifest_filename,
+    const base::FilePath& root_directory,
+    const char* extension_id,
+    const base::Closure& done_cb) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  BrowserThread::PostTaskAndReplyWithResult(
+      BrowserThread::FILE,
+      FROM_HERE,
+      base::Bind(&LoadManifestOnFileThread, root_directory, manifest_filename),
+      base::Bind(&ComponentLoader::FinishAddWithManifestFile,
+                 weak_factory_.GetWeakPtr(),
+                 root_directory,
+                 extension_id,
+                 done_cb));
+}
+
+void ComponentLoader::FinishAddWithManifestFile(
+    const base::FilePath& root_directory,
+    const char* extension_id,
+    const base::Closure& done_cb,
+    scoped_ptr<base::DictionaryValue> manifest) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  if (!manifest)
+    return;  // Error already logged.
+  std::string actual_extension_id = Add(
+      manifest.release(),
+      root_directory,
+      false);
+  CHECK_EQ(extension_id, actual_extension_id);
+  if (!done_cb.is_null())
+    done_cb.Run();
+}
+#endif
 
 }  // namespace extensions

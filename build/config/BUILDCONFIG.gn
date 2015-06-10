@@ -361,7 +361,6 @@ _native_compiler_configs = [
   "//build/config/compiler:compiler_arm_fpu",
   "//build/config/compiler:chromium_code",
   "//build/config/compiler:default_include_dirs",
-  "//build/config/compiler:default_warnings",
   "//build/config/compiler:no_rtti",
   "//build/config/compiler:runtime_library",
 ]
@@ -524,11 +523,10 @@ set_defaults("test") {
 
 if (is_win) {
   # On windows we use the same toolchain for host and target by default.
-  # TODO(dpranke): rename the toolchains to x64 and x86 to match current_cpu.
-  if (current_cpu == "x64") {
-    host_toolchain = "//build/toolchain/win:64"
-  } else if (current_cpu == "x86") {
-    host_toolchain = "//build/toolchain/win:32"
+  if (is_clang) {
+    host_toolchain = "//build/toolchain/win:clang_$current_cpu"
+  } else {
+    host_toolchain = "//build/toolchain/win:$current_cpu"
   }
   set_default_toolchain("$host_toolchain")
 } else if (is_android) {

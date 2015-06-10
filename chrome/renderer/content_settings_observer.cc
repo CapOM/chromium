@@ -170,11 +170,15 @@ ContentSettingsObserver::ContentSettingsObserver(
   ClearBlockedContentSettings();
   render_frame->GetWebFrame()->setContentSettingsClient(this);
 
-  if (render_frame->GetRenderView()->GetMainRenderFrame() != render_frame) {
+  content::RenderFrame* main_frame =
+      render_frame->GetRenderView()->GetMainRenderFrame();
+  // TODO(nasko): The main frame is not guaranteed to be in the same process
+  // with this frame with --site-per-process. This code needs to be updated
+  // to handle this case. See https://crbug.com/496670.
+  if (main_frame && main_frame != render_frame) {
     // Copy all the settings from the main render frame to avoid race conditions
-    // when initializing this data. See http://crbug.com/333308.
-    ContentSettingsObserver* parent = ContentSettingsObserver::Get(
-        render_frame->GetRenderView()->GetMainRenderFrame());
+    // when initializing this data. See https://crbug.com/333308.
+    ContentSettingsObserver* parent = ContentSettingsObserver::Get(main_frame);
     allow_displaying_insecure_content_ =
         parent->allow_displaying_insecure_content_;
     allow_running_insecure_content_ = parent->allow_running_insecure_content_;
@@ -659,7 +663,7 @@ bool ContentSettingsObserver::IsPlatformApp() {
 #if defined(ENABLE_EXTENSIONS)
 const extensions::Extension* ContentSettingsObserver::GetExtension(
     const WebSecurityOrigin& origin) const {
-  if (!EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
+  if (!base::EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
     return NULL;
 
   const std::string extension_id = origin.host().utf8().data();
@@ -693,14 +697,14 @@ bool ContentSettingsObserver::IsWhitelistedForContentSettings(
   if (origin.isUnique())
     return false;  // Uninitialized document?
 
-  if (EqualsASCII(origin.protocol(), content::kChromeUIScheme))
+  if (base::EqualsASCII(origin.protocol(), content::kChromeUIScheme))
     return true;  // Browser UI elements should still work.
 
-  if (EqualsASCII(origin.protocol(), content::kChromeDevToolsScheme))
+  if (base::EqualsASCII(origin.protocol(), content::kChromeDevToolsScheme))
     return true;  // DevTools UI elements should still work.
 
 #if defined(ENABLE_EXTENSIONS)
-  if (EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
+  if (base::EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
     return true;
 #endif
 
@@ -711,7 +715,7 @@ bool ContentSettingsObserver::IsWhitelistedForContentSettings(
 
   // If the scheme is file:, an empty file name indicates a directory listing,
   // which requires JavaScript to function properly.
-  if (EqualsASCII(origin.protocol(), url::kFileScheme)) {
+  if (base::EqualsASCII(origin.protocol(), url::kFileScheme)) {
     return document_url.SchemeIs(url::kFileScheme) &&
            document_url.ExtractFileName().empty();
   }

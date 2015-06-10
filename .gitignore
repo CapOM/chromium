@@ -251,7 +251,6 @@ v8.log
 /sync_testserver.log
 /testing/gmock
 /testing/gtest
-/testing/iossim/third_party/
 /testserver.log
 /tools/luci-go/linux64/isolate
 /tools/luci-go/mac64/isolate
@@ -278,10 +277,10 @@ v8.log
 /third_party/bison
 /third_party/boringssl/src
 /third_party/cacheinvalidation/cacheinvalidation_unittests_run.xml
-/third_party/cacheinvalidation/src
 /third_party/chromeos_login_manager
 /third_party/chromeos_text_input
 /third_party/chromite
+/third_party/class-dump/src
 /third_party/cld_2/src
 /third_party/colorama/src
 /third_party/crashpad/crashpad
@@ -298,7 +297,7 @@ v8.log
 /third_party/findbugs
 /third_party/flac
 /third_party/fontconfig/src
-/third_party/freetype
+/third_party/freetype-android/src
 /third_party/freetype2/src
 /third_party/gles2_conform
 /third_party/gnu_binutils/

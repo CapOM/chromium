@@ -274,7 +274,9 @@ void SynchronousCompositorImpl::OnNeedsBeginFramesChange(
 }
 
 void SynchronousCompositorImpl::BeginFrame(const cc::BeginFrameArgs& args) {
-  if (!registered_with_client_) {
+  if (!registered_with_client_ && is_active_ && renderer_needs_begin_frames_) {
+    // Make sure this is a BeginFrame that renderer side explicitly requested.
+    // Otherwise it is possible renderer objects not initialized.
     RegisterWithClient();
     DCHECK(registered_with_client_);
   }
@@ -343,12 +345,21 @@ gfx::ScrollOffset SynchronousCompositorImpl::GetTotalScrollOffset() {
       compositor_client_->GetTotalRootLayerScrollOffset());
 }
 
-bool SynchronousCompositorImpl::IsExternalFlingActive() const {
+bool SynchronousCompositorImpl::IsExternalScrollActive() const {
   DCHECK(CalledOnValidThread());
   DCHECK(compositor_client_);
   if (!registered_with_client_)
     return false;
-  return compositor_client_->IsExternalFlingActive();
+  return compositor_client_->IsExternalScrollActive();
+}
+
+void SynchronousCompositorImpl::SetNeedsAnimate(
+    const AnimationCallback& animation) {
+  DCHECK(CalledOnValidThread());
+  DCHECK(compositor_client_);
+  if (!registered_with_client_)
+    return;
+  compositor_client_->SetNeedsAnimateScroll(animation);
 }
 
 void SynchronousCompositorImpl::UpdateRootLayerState(

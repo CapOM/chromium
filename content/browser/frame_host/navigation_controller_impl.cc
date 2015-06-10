@@ -6,6 +6,7 @@
 
 #include "base/bind.h"
 #include "base/command_line.h"
+#include "base/debug/crash_logging.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
 #include "base/strings/string_number_conversions.h"  // Temporary
@@ -104,43 +105,6 @@ void ConfigureEntriesForRestore(
     // NOTE(darin): This code is only needed for backwards compat.
     SetPageStateIfEmpty((*entries)[i].get());
   }
-}
-
-// There are two general cases where a navigation is in page:
-// 1. A fragment navigation, in which the url is kept the same except for the
-//    reference fragment.
-// 2. A history API navigation (pushState and replaceState). This case is
-//    always in-page, but the urls are not guaranteed to match excluding the
-//    fragment. The relevant spec allows pushState/replaceState to any URL on
-//    the same origin.
-// However, due to reloads, even identical urls are *not* guaranteed to be
-// in-page navigations, we have to trust the renderer almost entirely.
-// The one thing we do know is that cross-origin navigations will *never* be
-// in-page. Therefore, trust the renderer if the URLs are on the same origin,
-// and assume the renderer is malicious if a cross-origin navigation claims to
-// be in-page.
-bool AreURLsInPageNavigation(const GURL& existing_url,
-                             const GURL& new_url,
-                             bool renderer_says_in_page,
-                             RenderFrameHost* rfh) {
-  WebPreferences prefs = rfh->GetRenderViewHost()->GetWebkitPreferences();
-  bool is_same_origin = existing_url.is_empty() ||
-                        // TODO(japhet): We should only permit navigations
-                        // originating from about:blank to be in-page if the
-                        // about:blank is the first document that frame loaded.
-                        // We don't have sufficient information to identify
-                        // that case at the moment, so always allow about:blank
-                        // for now.
-                        existing_url == GURL(url::kAboutBlankURL) ||
-                        existing_url.GetOrigin() == new_url.GetOrigin() ||
-                        !prefs.web_security_enabled ||
-                        (prefs.allow_universal_access_from_file_urls &&
-                         existing_url.SchemeIs(url::kFileScheme));
-  if (!is_same_origin && renderer_says_in_page) {
-    bad_message::ReceivedBadMessage(rfh->GetProcess(),
-                                    bad_message::NC_IN_PAGE_NAVIGATION);
-  }
-  return is_same_origin && renderer_says_in_page;
 }
 
 // Determines whether or not we should be carrying over a user agent override
@@ -829,6 +793,11 @@ bool NavigationControllerImpl::RendererDidNavigate(
   // Do navigation-type specific actions. These will make and commit an entry.
   details->type = ClassifyNavigation(rfh, params);
   NavigationType new_type = ClassifyNavigationWithoutPageID(rfh, params);
+  if (details->type == NAVIGATION_TYPE_NAV_IGNORE &&
+      new_type == NAVIGATION_TYPE_NAV_IGNORE) {
+    base::debug::SetCrashKeyValue("369661-doubleignore",
+                                  rfh->CommitCountString());
+  }
   bool ignore_mismatch = false;
   // There are disagreements on some Android bots over SAME_PAGE between the two
   // classifiers so ignore disagreements if that's the case.
@@ -853,11 +822,26 @@ bool NavigationControllerImpl::RendererDidNavigate(
     ignore_mismatch = true;
   }
   if (!ignore_mismatch) {
-    DCHECK_EQ(details->type, new_type);
+    base::debug::SetCrashKeyValue("369661-oldtype",
+                                  base::IntToString(details->type));
+    base::debug::SetCrashKeyValue("369661-newtype",
+                                  base::IntToString(new_type));
+    base::debug::SetCrashKeyValue("369661-navurl", params.url.spec());
+    base::debug::SetCrashKeyValue("369661-naventryid",
+                                  base::IntToString(params.nav_entry_id));
+    base::debug::SetCrashKeyValue("369661-didcreatenew",
+                                  params.did_create_new_entry ? "yes" : "no");
+    base::debug::SetCrashKeyValue("369661-pageid",
+                                  base::IntToString(params.page_id));
+    base::debug::SetCrashKeyValue(
+        "369661-maxpageid",
+        base::IntToString(delegate_->GetMaxPageIDForSiteInstance(
+            rfh->GetSiteInstance())));
+    CHECK_EQ(details->type, new_type);
   }
 
   // is_in_page must be computed before the entry gets committed.
-  details->is_in_page = AreURLsInPageNavigation(rfh->GetLastCommittedURL(),
+  details->is_in_page = IsURLInPageNavigation(
       params.url, params.was_within_same_page, rfh);
 
   switch (details->type) {
@@ -914,6 +898,8 @@ bool NavigationControllerImpl::RendererDidNavigate(
   NavigationEntryImpl* active_entry = GetLastCommittedEntry();
   active_entry->SetTimestamp(timestamp);
   active_entry->SetHttpStatusCode(params.http_status_code);
+  // TODO(creis): Do this on the frame entry instead, once we have them for
+  // manual subframe navigations in --site-per-process.
   active_entry->SetPageState(params.page_state);
   active_entry->SetRedirectChain(params.redirects);
 
@@ -932,7 +918,7 @@ bool NavigationControllerImpl::RendererDidNavigate(
   // The active entry's SiteInstance should match our SiteInstance.
   // TODO(creis): This check won't pass for subframes until we create entries
   // for subframe navigations.
-  if (ui::PageTransitionIsMainFrame(params.transition))
+  if (!rfh->GetParent())
     CHECK(active_entry->site_instance() == rfh->GetSiteInstance());
 
   // Remember the bindings the renderer process has at this point, so that
@@ -941,8 +927,7 @@ bool NavigationControllerImpl::RendererDidNavigate(
 
   // Now prep the rest of the details for the notification and broadcast.
   details->entry = active_entry;
-  details->is_main_frame =
-      ui::PageTransitionIsMainFrame(params.transition);
+  details->is_main_frame = !rfh->GetParent();
   details->serialized_security_info = params.security_info;
   details->http_status_code = params.http_status_code;
   NotifyNavigationEntryCommitted(details);
@@ -972,6 +957,9 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
     //   list.
     //
     // In these cases, there's nothing we can do with them, so ignore.
+    base::debug::SetCrashKeyValue("369661-oldignore",
+                                  rfh->CommitCountString() +
+                                  " no page id");
     return NAVIGATION_TYPE_NAV_IGNORE;
   }
 
@@ -980,7 +968,7 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
     // Greater page IDs than we've ever seen before are new pages. We may or may
     // not have a pending entry for the page, and this may or may not be the
     // main frame.
-    if (ui::PageTransitionIsMainFrame(params.transition))
+    if (!rfh->GetParent())
       return NAVIGATION_TYPE_NEW_PAGE;
 
     // When this is a new subframe navigation, we should have a committed page
@@ -988,8 +976,12 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
     // navigated on a popup navigated to about:blank (the iframe would be
     // written into the popup by script on the main page). For these cases,
     // there isn't any navigation stuff we can do, so just ignore it.
-    if (!GetLastCommittedEntry())
+    if (!GetLastCommittedEntry()) {
+      base::debug::SetCrashKeyValue("369661-oldignore",
+                                    rfh->CommitCountString() +
+                                    " new subframe no last committed");
       return NAVIGATION_TYPE_NAV_IGNORE;
+    }
 
     // Valid subframe navigation.
     return NAVIGATION_TYPE_NEW_SUBFRAME;
@@ -1040,11 +1032,14 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
     }
     GURL url(temp);
     rfh->render_view_host()->Send(new ViewMsg_TempCrashWithData(url));
+    base::debug::SetCrashKeyValue("369661-oldignore",
+                                  rfh->CommitCountString() +
+                                  " renderer smoking crack");
     return NAVIGATION_TYPE_NAV_IGNORE;
   }
   NavigationEntryImpl* existing_entry = entries_[existing_entry_index].get();
 
-  if (!ui::PageTransitionIsMainFrame(params.transition)) {
+  if (rfh->GetParent()) {
     // All manual subframes would get new IDs and were handled above, so we
     // know this is auto. Since the current page was found in the navigation
     // entry list, we're guaranteed to have a last committed entry.
@@ -1089,10 +1084,8 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
   // the time this doesn't matter since WebKit doesn't tell us about subframe
   // navigations that don't actually navigate, but it can happen when there is
   // an encoding override (it always sends a navigation request).
-  if (AreURLsInPageNavigation(existing_entry->GetURL(), params.url,
-                              params.was_within_same_page, rfh)) {
+  if (IsURLInPageNavigation(params.url, params.was_within_same_page, rfh))
     return NAVIGATION_TYPE_IN_PAGE;
-  }
 
   // Since we weeded out "new" navigations above, we know this is an existing
   // (back/forward) navigation.
@@ -1105,10 +1098,7 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
   if (params.did_create_new_entry) {
     // A new entry. We may or may not have a pending entry for the page, and
     // this may or may not be the main frame.
-    if (ui::PageTransitionIsMainFrame(params.transition)) {
-      // TODO(avi): I want to use |if (!rfh->GetParent())| here but lots of unit
-      // tests fake auto subframe commits by sending the main frame a
-      // PAGE_TRANSITION_AUTO_SUBFRAME transition. Fix those, and adjust here.
+    if (!rfh->GetParent()) {
       return NAVIGATION_TYPE_NEW_PAGE;
     }
 
@@ -1117,8 +1107,12 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
     // navigated on a popup navigated to about:blank (the iframe would be
     // written into the popup by script on the main page). For these cases,
     // there isn't any navigation stuff we can do, so just ignore it.
-    if (!GetLastCommittedEntry())
+    if (!GetLastCommittedEntry()) {
+      base::debug::SetCrashKeyValue("369661-newignore",
+                                    rfh->CommitCountString() +
+                                    " new subframe no last committed");
       return NAVIGATION_TYPE_NAV_IGNORE;
+    }
 
     // Valid subframe navigation.
     return NAVIGATION_TYPE_NEW_SUBFRAME;
@@ -1127,7 +1121,7 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
   // We only clear the session history when navigating to a new page.
   DCHECK(!params.history_list_was_cleared);
 
-  if (!ui::PageTransitionIsMainFrame(params.transition)) {
+  if (rfh->GetParent()) {
     // All manual subframes would be did_create_new_entry and handled above, so
     // we know this is auto.
     if (GetLastCommittedEntry()) {
@@ -1135,6 +1129,9 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
     } else {
       // We ignore subframes created in non-committed pages; we'd appreciate if
       // people stopped doing that.
+      base::debug::SetCrashKeyValue("369661-newignore",
+                                    rfh->CommitCountString() +
+                                    " auto subframe no last committed");
       return NAVIGATION_TYPE_NAV_IGNORE;
     }
   }
@@ -1147,11 +1144,14 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
     // scribble onto an uncommitted page. Again, there isn't any navigation
     // stuff that we can do, so ignore it here as well.
     NavigationEntry* last_committed = GetLastCommittedEntry();
-    if (!last_committed)
+    if (!last_committed) {
+      base::debug::SetCrashKeyValue("369661-newignore",
+                                    rfh->CommitCountString() +
+                                    " renderer-initiated no last committed");
       return NAVIGATION_TYPE_NAV_IGNORE;
+    }
 
-    if (AreURLsInPageNavigation(last_committed->GetURL(), params.url,
-                                params.was_within_same_page, rfh)) {
+    if (IsURLInPageNavigation(params.url, params.was_within_same_page, rfh)) {
       // This is history.replaceState(), which is renderer-initiated yet within
       // the same page.
       return NAVIGATION_TYPE_IN_PAGE;
@@ -1197,6 +1197,9 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
     // to such entries). It could also mean that the renderer is smoking crack.
     // TODO(avi): Crash the renderer like we do in the old ClassifyNavigation?
     NOTREACHED() << "Could not find nav entry with id " << params.nav_entry_id;
+    base::debug::SetCrashKeyValue("369661-newignore",
+                                  rfh->CommitCountString() +
+                                  " renderer smoking crack");
     return NAVIGATION_TYPE_NAV_IGNORE;
   }
 
@@ -1205,11 +1208,8 @@ NavigationType NavigationControllerImpl::ClassifyNavigationWithoutPageID(
   // of the time this doesn't matter since Blink doesn't tell us about subframe
   // navigations that don't actually navigate, but it can happen when there is
   // an encoding override (it always sends a navigation request).
-  NavigationEntryImpl* existing_entry = entries_[existing_entry_index].get();
-  if (AreURLsInPageNavigation(existing_entry->GetURL(), params.url,
-                              params.was_within_same_page, rfh)) {
+  if (IsURLInPageNavigation(params.url, params.was_within_same_page, rfh))
     return NAVIGATION_TYPE_IN_PAGE;
-  }
 
   // Since we weeded out "new" navigations above, we know this is an existing
   // (back/forward) navigation.
@@ -1293,7 +1293,7 @@ void NavigationControllerImpl::RendererDidNavigateToExistingPage(
     RenderFrameHostImpl* rfh,
     const FrameHostMsg_DidCommitProvisionalLoad_Params& params) {
   // We should only get here for main frame navigations.
-  DCHECK(ui::PageTransitionIsMainFrame(params.transition));
+  DCHECK(!rfh->GetParent());
 
   // This is a back/forward navigation. The existing page for the ID is
   // guaranteed to exist by ClassifyNavigation, and we just need to update it
@@ -1377,8 +1377,8 @@ void NavigationControllerImpl::RendererDidNavigateInPage(
     RenderFrameHostImpl* rfh,
     const FrameHostMsg_DidCommitProvisionalLoad_Params& params,
     bool* did_replace_entry) {
-  DCHECK(ui::PageTransitionIsMainFrame(params.transition)) <<
-      "WebKit should only tell us about in-page navs for the main frame.";
+  DCHECK(!rfh->GetParent()) <<
+      "Blink should only tell us about in-page navs for the main frame.";
   // We're guaranteed to have an entry for this one.
   NavigationEntryImpl* existing_entry = GetEntryWithPageID(
       rfh->GetSiteInstance(), params.page_id);
@@ -1488,7 +1488,7 @@ bool NavigationControllerImpl::RendererDidNavigateAutoSubframe(
     NavigationEntryImpl* last_committed = GetLastCommittedEntry();
     last_committed->AddOrUpdateFrameEntry(rfh->frame_tree_node(),
                                           rfh->GetSiteInstance(), params.url,
-                                          params.referrer);
+                                          params.referrer, params.page_state);
 
     // Cross-process subframe navigations may leave a pending entry around.
     // Clear it if it's actually for the subframe.
@@ -1515,13 +1515,54 @@ int NavigationControllerImpl::GetIndexOfEntry(
   return (i == entries_.end()) ? -1 : static_cast<int>(i - entries_.begin());
 }
 
+// There are two general cases where a navigation is "in page":
+// 1. A fragment navigation, in which the url is kept the same except for the
+//    reference fragment.
+// 2. A history API navigation (pushState and replaceState). This case is
+//    always in-page, but the urls are not guaranteed to match excluding the
+//    fragment. The relevant spec allows pushState/replaceState to any URL on
+//    the same origin.
+// However, due to reloads, even identical urls are *not* guaranteed to be
+// in-page navigations, we have to trust the renderer almost entirely.
+// The one thing we do know is that cross-origin navigations will *never* be
+// in-page. Therefore, trust the renderer if the URLs are on the same origin,
+// and assume the renderer is malicious if a cross-origin navigation claims to
+// be in-page.
 bool NavigationControllerImpl::IsURLInPageNavigation(
     const GURL& url,
     bool renderer_says_in_page,
     RenderFrameHost* rfh) const {
-  NavigationEntry* last_committed = GetLastCommittedEntry();
-  return last_committed && AreURLsInPageNavigation(
-      last_committed->GetURL(), url, renderer_says_in_page, rfh);
+  GURL last_committed_url;
+  if (rfh->GetParent()) {
+    last_committed_url = rfh->GetLastCommittedURL();
+  } else {
+    NavigationEntry* last_committed = GetLastCommittedEntry();
+    // There must be a last-committed entry to compare URLs to. TODO(avi): When
+    // might Blink say that a navigation is in-page yet there be no last-
+    // committed entry?
+    if (!last_committed)
+      return false;
+    last_committed_url = last_committed->GetURL();
+  }
+
+  WebPreferences prefs = rfh->GetRenderViewHost()->GetWebkitPreferences();
+  bool is_same_origin = last_committed_url.is_empty() ||
+                        // TODO(japhet): We should only permit navigations
+                        // originating from about:blank to be in-page if the
+                        // about:blank is the first document that frame loaded.
+                        // We don't have sufficient information to identify
+                        // that case at the moment, so always allow about:blank
+                        // for now.
+                        last_committed_url == GURL(url::kAboutBlankURL) ||
+                        last_committed_url.GetOrigin() == url.GetOrigin() ||
+                        !prefs.web_security_enabled ||
+                        (prefs.allow_universal_access_from_file_urls &&
+                         last_committed_url.SchemeIs(url::kFileScheme));
+  if (!is_same_origin && renderer_says_in_page) {
+    bad_message::ReceivedBadMessage(rfh->GetProcess(),
+                                    bad_message::NC_IN_PAGE_NAVIGATION);
+  }
+  return is_same_origin && renderer_says_in_page;
 }
 
 void NavigationControllerImpl::CopyStateFrom(

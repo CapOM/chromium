@@ -166,35 +166,6 @@ void my_uint64tos(char* output, uint64_t i, unsigned i_len) {
     output[index - 1] = '0' + (i % 10);
 }
 
-#if defined(OS_ANDROID)
-char* my_strncpy(char* dst, const char* src, size_t len) {
-  int i = len;
-  char* p = dst;
-  if (!dst || !src)
-    return dst;
-  while (i != 0 && *src != '\0') {
-    *p++ = *src++;
-    i--;
-  }
-  while (i != 0) {
-    *p++ = '\0';
-    i--;
-  }
-  return dst;
-}
-
-char* my_strncat(char *dest, const char* src, size_t len) {
-  char* ret = dest;
-  while (*dest)
-      dest++;
-  while (len--)
-    if (!(*dest++ = *src++))
-      return ret;
-  *dest = 0;
-  return ret;
-}
-#endif
-
 #if !defined(OS_CHROMEOS)
 bool my_isxdigit(char c) {
   return (c >= '0' && c <= '9') || ((c | 0x20) >= 'a' && (c | 0x20) <= 'f');
@@ -1093,30 +1064,80 @@ void ExecUploadProcessOrTerminate(const BreakpadInfo& info,
   static const char msg[] = "Cannot upload crash dump: cannot exec "
                             "/sbin/crash_reporter\n";
 #else
+  // Compress |dumpfile| with gzip.
+  const pid_t gzip_child = sys_fork();
+  if (gzip_child < 0) {
+    static const char msg[] = "sys_fork() for gzip process failed.\n";
+    WriteLog(msg, sizeof(msg) - 1);
+    sys__exit(1);
+  }
+  if (!gzip_child) {
+    // gzip process.
+    const char* args[] = {
+      "/bin/gzip",
+      "-f",  // Do not prompt to verify before overwriting.
+      dumpfile,
+      nullptr,
+    };
+    execve(args[0], const_cast<char**>(args), environ);
+    static const char msg[] = "Cannot exec gzip.\n";
+    WriteLog(msg, sizeof(msg) - 1);
+    sys__exit(1);
+  }
+  // Wait for gzip process.
+  int status = 0;
+  if (sys_waitpid(gzip_child, &status, 0) != gzip_child ||
+      !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+    static const char msg[] = "sys_waitpid() for gzip process failed.\n";
+    WriteLog(msg, sizeof(msg) - 1);
+    sys_kill(gzip_child, SIGKILL);
+    sys__exit(1);
+  }
+
+  static const char kGzipExtension[] = ".gz";
+  const size_t gzip_file_size = my_strlen(dumpfile) + sizeof(kGzipExtension);
+  char* const gzip_file = reinterpret_cast<char*>(allocator->Alloc(
+      gzip_file_size));
+  my_strlcpy(gzip_file, dumpfile, gzip_file_size);
+  my_strlcat(gzip_file, kGzipExtension, gzip_file_size);
+
+  // Rename |gzip_file| to |dumpfile| (the original file was deleted by gzip).
+  if (rename(gzip_file, dumpfile)) {
+    static const char msg[] = "Failed to rename gzipped file.\n";
+    WriteLog(msg, sizeof(msg) - 1);
+    sys__exit(1);
+  }
+
   // The --header argument to wget looks like:
+  //   --header=Content-Encoding: gzip
   //   --header=Content-Type: multipart/form-data; boundary=XYZ
   // where the boundary has two fewer leading '-' chars
+  static const char header_content_encoding[] =
+      "--header=Content-Encoding: gzip";
   static const char header_msg[] =
       "--header=Content-Type: multipart/form-data; boundary=";
-  char* const header = reinterpret_cast<char*>(allocator->Alloc(
-      sizeof(header_msg) - 1 + strlen(mime_boundary) - 2 + 1));
-  memcpy(header, header_msg, sizeof(header_msg) - 1);
-  memcpy(header + sizeof(header_msg) - 1, mime_boundary + 2,
-         strlen(mime_boundary) - 2);
-  // We grab the NUL byte from the end of |mime_boundary|.
+  const size_t header_content_type_size =
+      sizeof(header_msg) - 1 + my_strlen(mime_boundary) - 2 + 1;
+  char* const header_content_type = reinterpret_cast<char*>(allocator->Alloc(
+      header_content_type_size));
+  my_strlcpy(header_content_type, header_msg, header_content_type_size);
+  my_strlcat(header_content_type, mime_boundary + 2, header_content_type_size);
 
   // The --post-file argument to wget looks like:
   //   --post-file=/tmp/...
   static const char post_file_msg[] = "--post-file=";
+  const size_t post_file_size =
+      sizeof(post_file_msg) - 1 + my_strlen(dumpfile) + 1;
   char* const post_file = reinterpret_cast<char*>(allocator->Alloc(
-       sizeof(post_file_msg) - 1 + strlen(dumpfile) + 1));
-  memcpy(post_file, post_file_msg, sizeof(post_file_msg) - 1);
-  memcpy(post_file + sizeof(post_file_msg) - 1, dumpfile, strlen(dumpfile));
+      post_file_size));
+  my_strlcpy(post_file, post_file_msg, post_file_size);
+  my_strlcat(post_file, dumpfile, post_file_size);
 
   static const char kWgetBinary[] = "/usr/bin/wget";
   const char* args[] = {
     kWgetBinary,
-    header,
+    header_content_encoding,
+    header_content_type,
     post_file,
     kUploadURL,
     "--timeout=10",  // Set a timeout so we don't hang forever.
@@ -1341,7 +1362,7 @@ void HandleCrashDump(const BreakpadInfo& info) {
     }
   } else {
     if (info.upload) {
-      memcpy(temp_file, temp_file_template, sizeof(temp_file_template));
+      my_memcpy(temp_file, temp_file_template, sizeof(temp_file_template));
 
       for (unsigned i = 0; i < 10; ++i) {
         uint64_t t;
@@ -1542,36 +1563,33 @@ void HandleCrashDump(const BreakpadInfo& info) {
 
 #if defined(OS_ANDROID)
   if (info.filename) {
-    int filename_length = my_strlen(info.filename);
+    size_t filename_length = my_strlen(info.filename);
 
     // If this was a file, we need to copy it to the right place and use the
     // right file name so it gets uploaded by the browser.
     const char msg[] = "Output crash dump file:";
     WriteLog(msg, sizeof(msg) - 1);
-    WriteLog(info.filename, filename_length - 1);
+    WriteLog(info.filename, filename_length);
 
     char pid_buf[kUint64StringSize];
-    uint64_t pid_str_length = my_uint64_len(info.pid);
+    size_t pid_str_length = my_uint64_len(info.pid);
     my_uint64tos(pid_buf, info.pid, pid_str_length);
+    pid_buf[pid_str_length] = 0;  // my_uint64tos() doesn't null-terminate.
 
-    // -1 because we won't need the null terminator on the original filename.
-    unsigned done_filename_len = filename_length - 1 + pid_str_length;
+    size_t done_filename_len = filename_length + pid_str_length + 1;
     char* done_filename = reinterpret_cast<char*>(
         allocator.Alloc(done_filename_len));
     // Rename the file such that the pid is the suffix in order signal to other
     // processes that the minidump is complete. The advantage of using the pid
     // as the suffix is that it is trivial to associate the minidump with the
     // crashed process.
-    // Finally, note strncpy prevents null terminators from
-    // being copied. Pad the rest with 0's.
-    my_strncpy(done_filename, info.filename, done_filename_len);
-    // Append the suffix a null terminator should be added.
-    my_strncat(done_filename, pid_buf, pid_str_length);
+    my_strlcpy(done_filename, info.filename, done_filename_len);
+    my_strlcat(done_filename, pid_buf, done_filename_len);
     // Rename the minidump file to signal that it is complete.
     if (rename(info.filename, done_filename)) {
       const char failed_msg[] = "Failed to rename:";
       WriteLog(failed_msg, sizeof(failed_msg) - 1);
-      WriteLog(info.filename, filename_length - 1);
+      WriteLog(info.filename, filename_length);
       const char to_msg[] = "to";
       WriteLog(to_msg, sizeof(to_msg) - 1);
       WriteLog(done_filename, done_filename_len - 1);

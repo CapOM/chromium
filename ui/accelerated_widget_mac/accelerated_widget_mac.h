@@ -10,6 +10,7 @@
 
 #include "ui/accelerated_widget_mac/accelerated_widget_mac_export.h"
 #include "ui/events/latency_info.h"
+#include "ui/gfx/geometry/rect.h"
 #include "ui/gfx/geometry/size.h"
 #include "ui/gfx/native_widget_types.h"
 
@@ -17,6 +18,7 @@
 #import <Cocoa/Cocoa.h>
 #import "base/mac/scoped_nsobject.h"
 #import "ui/accelerated_widget_mac/io_surface_layer.h"
+#import "ui/accelerated_widget_mac/io_surface_ns_gl_surface.h"
 #import "ui/accelerated_widget_mac/software_layer.h"
 #include "ui/base/cocoa/remote_layer_api.h"
 #endif  // __OBJC__
@@ -30,6 +32,7 @@ class SoftwareFrameData;
 namespace ui {
 
 class AcceleratedWidgetMac;
+class IOSurfaceNSGLSurface;
 
 // A class through which an AcceleratedWidget may be bound to draw the contents
 // of an NSView. An AcceleratedWidget may be bound to multiple different views
@@ -50,7 +53,7 @@ class AcceleratedWidgetMacNSView {
 // GotAcceleratedFrame and GotSoftwareFrame. The CALayers may be installed
 // in an NSView by setting the AcceleratedWidgetMacNSView for the helper.
 class ACCELERATED_WIDGET_MAC_EXPORT AcceleratedWidgetMac
-    : public IOSurfaceLayerClient {
+    : public IOSurfaceLayerClient, public IOSurfaceNSGLSurfaceClient {
  public:
   explicit AcceleratedWidgetMac(bool needs_gl_finish_workaround);
   virtual ~AcceleratedWidgetMac();
@@ -77,8 +80,9 @@ class ACCELERATED_WIDGET_MAC_EXPORT AcceleratedWidgetMac
   void GotAcceleratedFrame(
       uint64 surface_handle,
       const std::vector<ui::LatencyInfo>& latency_info,
-      gfx::Size pixel_size,
+      const gfx::Size& pixel_size,
       float scale_factor,
+      const gfx::Rect& pixel_damage_rect,
       const base::Closure& drawn_callback);
 
   void GotSoftwareFrame(float scale_factor, SkCanvas* canvas);
@@ -89,11 +93,20 @@ class ACCELERATED_WIDGET_MAC_EXPORT AcceleratedWidgetMac
   void IOSurfaceLayerDidDrawFrame() override;
   void IOSurfaceLayerHitError() override;
 
-  void GotAcceleratedCAContextFrame(
-      CAContextID ca_context_id, gfx::Size pixel_size, float scale_factor);
+  // IOSurfaceNSGLSurfaceClient implementation:
+  void IOSurfaceNSGLSurfaceDidDrawFrame() override;
 
-  void GotAcceleratedIOSurfaceFrame(
-      IOSurfaceID io_surface_id, gfx::Size pixel_size, float scale_factor);
+  void GotAcceleratedCAContextFrame(CAContextID ca_context_id,
+                                    const gfx::Size& pixel_size,
+                                    float scale_factor);
+
+  void GotAcceleratedIOSurfaceFrame(IOSurfaceID io_surface_id,
+                                    const gfx::Size& pixel_size,
+                                    float scale_factor);
+
+  void GotAcceleratedIOSurfaceFrameNSGL(
+      IOSurfaceID io_surface_id, const gfx::Size& pixel_size,
+      float scale_factor, const gfx::Rect& pixel_damage_rect);
 
   void AcknowledgeAcceleratedFrame();
 
@@ -105,6 +118,7 @@ class ACCELERATED_WIDGET_MAC_EXPORT AcceleratedWidgetMac
       base::scoped_nsobject<CALayerHost> ca_context_layer);
   void DestroyIOSurfaceLayer(
       base::scoped_nsobject<IOSurfaceLayer> io_surface_layer);
+  void DestroyIOSurfaceNSGLSurface();
   void DestroySoftwareLayer();
 
   // The AcceleratedWidgetMacNSView that is using this as its internals.
@@ -131,6 +145,9 @@ class ACCELERATED_WIDGET_MAC_EXPORT AcceleratedWidgetMac
   // The locally drawn software layer.
   base::scoped_nsobject<SoftwareLayer> software_layer_;
 
+  // The locally drawn NSOpenGLContext.
+  scoped_ptr<IOSurfaceNSGLSurface> io_surface_ns_gl_surface_;
+
   // If an accelerated frame has come in which has not yet been drawn and acked
   // then this is the latency info and the callback to make when the frame is
   // drawn. If there is no such frame then the callback is null.
@@ -153,7 +170,9 @@ ACCELERATED_WIDGET_MAC_EXPORT
 void AcceleratedWidgetMacGotAcceleratedFrame(
     gfx::AcceleratedWidget widget, uint64 surface_handle,
     const std::vector<ui::LatencyInfo>& latency_info,
-    gfx::Size pixel_size, float scale_factor,
+    const gfx::Size& pixel_size,
+    float scale_factor,
+    const gfx::Rect& pixel_damage_rect,
     const base::Closure& drawn_callback,
     bool* disable_throttling, int* renderer_id);
 

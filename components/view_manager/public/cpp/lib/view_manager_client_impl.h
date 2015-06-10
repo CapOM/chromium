@@ -59,6 +59,7 @@ class ViewManagerClientImpl : public ViewManager,
              InterfaceRequest<ServiceProvider> services,
              ServiceProviderPtr exposed_services);
   void Embed(Id view_id, ViewManagerClientPtr client);
+  void EmbedAllowingReembed(mojo::URLRequestPtr request, Id view_id);
 
   void set_change_acked_callback(const Callback<void(void)>& callback) {
     change_acked_callback_ = callback;
@@ -72,6 +73,8 @@ class ViewManagerClientImpl : public ViewManager,
 
   void SetViewManagerService(ViewManagerServicePtr service);
 
+  bool is_embed_root() const { return is_embed_root_; }
+
  private:
   class RootObserver;
 
@@ -80,20 +83,21 @@ class ViewManagerClientImpl : public ViewManager,
   Id CreateViewOnServer();
 
   // Overridden from ViewManager:
-  const std::string& GetEmbedderURL() const override;
   View* GetRoot() override;
   View* GetViewById(Id id) override;
   View* GetFocusedView() override;
   View* CreateView() override;
+  void SetEmbedRoot() override;
 
   // Overridden from ViewManagerClient:
   void OnEmbed(ConnectionSpecificId connection_id,
-               const String& creator_url,
                ViewDataPtr root,
                ViewManagerServicePtr view_manager_service,
-               InterfaceRequest<ServiceProvider> services,
-               ServiceProviderPtr exposed_services,
                Id focused_view_id) override;
+  void OnEmbedForDescendant(
+      Id view,
+      mojo::URLRequestPtr request,
+      const OnEmbedForDescendantCallback& callback) override;
   void OnEmbeddedAppDisconnected(Id view_id) override;
   void OnViewBoundsChanged(Id view_id,
                            RectPtr old_bounds,
@@ -130,8 +134,6 @@ class ViewManagerClientImpl : public ViewManager,
   ConnectionSpecificId connection_id_;
   ConnectionSpecificId next_id_;
 
-  std::string creator_url_;
-
   Callback<void(void)> change_acked_callback_;
 
   ViewManagerDelegate* delegate_;
@@ -148,6 +150,8 @@ class ViewManagerClientImpl : public ViewManager,
   ViewManagerServicePtr service_;
 
   scoped_ptr<RootObserver> root_observer_;
+
+  bool is_embed_root_;
 
   MOJO_DISALLOW_COPY_AND_ASSIGN(ViewManagerClientImpl);
 };

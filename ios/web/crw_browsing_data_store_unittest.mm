@@ -22,6 +22,7 @@
 // Designated init. |browsingDataStore| cannot be null.
 - (instancetype)initWithBrowsingDataStore:
         (CRWBrowsingDataStore*)browsingDataStore NS_DESIGNATED_INITIALIZER;
+- (instancetype)init NS_UNAVAILABLE;
 // The number of times that the mode of the underlying CRWBrowsingDataStore
 // changed.
 @property(nonatomic, assign) NSUInteger modeChangeCount;
@@ -46,6 +47,11 @@
     _browsingDataStore = browsingDataStore;
   }
   return self;
+}
+
+- (instancetype)init {
+  NOTREACHED();
+  return nil;
 }
 
 - (void)observeValueForKeyPath:(NSString*)keyPath
@@ -150,6 +156,7 @@ TEST_F(BrowsingDataStoreTest, MakeActiveAndInactiveOperations) {
     return;
   }
 
+  MakeInactive();
   base::scoped_nsobject<CRWTestBrowsingDataStoreObserver> observer(
       [[CRWTestBrowsingDataStoreObserver alloc]
           initWithBrowsingDataStore:browsing_data_store_]);
@@ -157,29 +164,29 @@ TEST_F(BrowsingDataStoreTest, MakeActiveAndInactiveOperations) {
 
   id unsucessfullCallback = ^(BOOL success) {
     ASSERT_TRUE([NSThread isMainThread]);
-    CRWBrowsingDataStoreMode mode = [browsing_data_store_ mode];
+    BrowsingDataStoreMode mode = [browsing_data_store_ mode];
     EXPECT_FALSE(success);
-    EXPECT_EQ(SYNCHRONIZING, mode);
+    EXPECT_EQ(CHANGING, mode);
   };
   [browsing_data_store_ makeActiveWithCompletionHandler:unsucessfullCallback];
-  EXPECT_EQ(SYNCHRONIZING, [browsing_data_store_ mode]);
+  EXPECT_EQ(CHANGING, [browsing_data_store_ mode]);
   EXPECT_EQ(1U, [observer modeChangeCount]);
 
   [browsing_data_store_ makeInactiveWithCompletionHandler:unsucessfullCallback];
-  EXPECT_EQ(SYNCHRONIZING, [browsing_data_store_ mode]);
+  EXPECT_EQ(CHANGING, [browsing_data_store_ mode]);
 
   [browsing_data_store_ makeActiveWithCompletionHandler:unsucessfullCallback];
-  EXPECT_EQ(SYNCHRONIZING, [browsing_data_store_ mode]);
+  EXPECT_EQ(CHANGING, [browsing_data_store_ mode]);
 
   __block BOOL block_was_called = NO;
   [browsing_data_store_ makeInactiveWithCompletionHandler:^(BOOL success) {
     ASSERT_TRUE([NSThread isMainThread]);
-    CRWBrowsingDataStoreMode mode = [browsing_data_store_ mode];
+    BrowsingDataStoreMode mode = [browsing_data_store_ mode];
     EXPECT_TRUE(success);
     EXPECT_EQ(INACTIVE, mode);
     block_was_called = YES;
   }];
-  EXPECT_EQ(SYNCHRONIZING, [browsing_data_store_ mode]);
+  EXPECT_EQ(CHANGING, [browsing_data_store_ mode]);
 
   base::test::ios::WaitUntilCondition(^bool{
     return block_was_called;

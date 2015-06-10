@@ -535,6 +535,7 @@ void ChromeContentRendererClient::RenderFrameCreated(
 #if defined(ENABLE_EXTENSIONS)
   new extensions::ExtensionsRenderFrameObserver(render_frame);
   new extensions::ExtensionFrameHelper(render_frame, ext_dispatcher);
+  ext_dispatcher->OnRenderFrameCreated(render_frame);
 #endif
 
 #if defined(ENABLE_PLUGINS)
@@ -562,10 +563,10 @@ void ChromeContentRendererClient::RenderFrameCreated(
     new NetErrorHelper(render_frame);
   }
 
-  PasswordGenerationAgent* password_generation_agent =
-      new PasswordGenerationAgent(render_frame);
   PasswordAutofillAgent* password_autofill_agent =
       new PasswordAutofillAgent(render_frame);
+  PasswordGenerationAgent* password_generation_agent =
+      new PasswordGenerationAgent(render_frame, password_autofill_agent);
   new AutofillAgent(render_frame, password_autofill_agent,
                     password_generation_agent);
 }
@@ -575,7 +576,6 @@ void ChromeContentRendererClient::RenderViewCreated(
 
 #if defined(ENABLE_EXTENSIONS)
   new extensions::ExtensionHelper(render_view, extension_dispatcher_.get());
-  extension_dispatcher_->OnRenderViewCreated(render_view);
 #endif
   new PageLoadHistograms(render_view);
 #if defined(ENABLE_PRINTING)
@@ -615,7 +615,7 @@ SkBitmap* ChromeContentRendererClient::GetSadWebViewBitmap() {
 #if defined(ENABLE_EXTENSIONS)
 const Extension* ChromeContentRendererClient::GetExtensionByOrigin(
     const WebSecurityOrigin& origin) const {
-  if (!EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
+  if (!base::EqualsASCII(origin.protocol(), extensions::kExtensionScheme))
     return NULL;
 
   const std::string extension_id = origin.host().utf8().data();
@@ -1155,7 +1155,7 @@ void ChromeContentRendererClient::GetNavigationErrorStrings(
   }
 #endif
 
-  bool is_post = EqualsASCII(failed_request.httpMethod(), "POST");
+  bool is_post = base::EqualsASCII(failed_request.httpMethod(), "POST");
 
   if (error_html) {
     bool extension_but_not_bookmark_app = false;
@@ -1234,7 +1234,7 @@ bool ChromeContentRendererClient::AllowPopup() {
   return false;
 }
 
-bool ChromeContentRendererClient::ShouldFork(blink::WebFrame* frame,
+bool ChromeContentRendererClient::ShouldFork(blink::WebLocalFrame* frame,
                                              const GURL& url,
                                              const std::string& http_method,
                                              bool is_initial_navigation,
@@ -1305,8 +1305,11 @@ bool ChromeContentRendererClient::ShouldFork(blink::WebFrame* frame,
   // If this is a reload, check whether it has the wrong process type.  We
   // should send it to the browser if it's an extension URL (e.g., hosted app)
   // in a normal process, or if it's a process for an extension that has been
-  // uninstalled.
-  if (frame->top()->document().url() == url) {
+  // uninstalled.  Without --site-per-process mode, we never fork processes for
+  // subframes, so this check only makes sense for top-level frames.
+  // TODO(alexmos,nasko): Figure out how this check should work when reloading
+  // subframes in --site-per-process mode.
+  if (!frame->parent() && frame->document().url() == url) {
     if (is_extension_url != IsStandaloneExtensionProcess())
       return true;
   }

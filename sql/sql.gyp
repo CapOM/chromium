@@ -27,6 +27,8 @@
         'init_status.h',
         'meta_table.cc',
         'meta_table.h',
+        'proxy.cc',
+        'proxy.h',
         'recovery.cc',
         'recovery.h',
         'statement.cc',
@@ -132,6 +134,7 @@
           ],
           'variables': {
             'test_suite_name': 'sql_unittests',
+            'isolate_file': 'sql_unittests.isolate',
           },
           'includes': [ '../build/apk_test.gypi' ],
         },

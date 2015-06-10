@@ -1036,17 +1036,17 @@ void IOThread::ConfigureSpdyGlobals(
   }
   if (spdy_trial_group.starts_with(kSpdyFieldTrialParametrizedPrefix)) {
     bool spdy_enabled = false;
-    if (LowerCaseEqualsASCII(
+    if (base::LowerCaseEqualsASCII(
             GetVariationParam(spdy_trial_params, "enable_spdy31"), "true")) {
       globals->next_protos.push_back(net::kProtoSPDY31);
       spdy_enabled = true;
     }
-    if (LowerCaseEqualsASCII(
+    if (base::LowerCaseEqualsASCII(
             GetVariationParam(spdy_trial_params, "enable_http2_14"), "true")) {
       globals->next_protos.push_back(net::kProtoSPDY4_14);
       spdy_enabled = true;
     }
-    if (LowerCaseEqualsASCII(
+    if (base::LowerCaseEqualsASCII(
             GetVariationParam(spdy_trial_params, "enable_http2"), "true")) {
       globals->next_protos.push_back(net::kProtoSPDY4);
       spdy_enabled = true;
@@ -1174,6 +1174,7 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
       &params->quic_enable_connection_racing);
   globals.quic_enable_non_blocking_io.CopyToIfSet(
       &params->quic_enable_non_blocking_io);
+  globals.quic_prefer_aes.CopyToIfSet(&params->quic_prefer_aes);
   globals.quic_disable_disk_cache.CopyToIfSet(
       &params->quic_disable_disk_cache);
   globals.quic_max_number_of_lossy_connections.CopyToIfSet(
@@ -1321,6 +1322,8 @@ void IOThread::ConfigureQuicGlobals(
         ShouldQuicEnableNonBlockingIO(quic_trial_params));
     globals->quic_disable_disk_cache.set(
         ShouldQuicDisableDiskCache(quic_trial_params));
+    globals->quic_prefer_aes.set(
+        ShouldQuicPreferAes(quic_trial_params));
     int max_number_of_lossy_connections = GetQuicMaxNumberOfLossyConnections(
         quic_trial_params);
     if (max_number_of_lossy_connections != 0) {
@@ -1412,7 +1415,7 @@ bool IOThread::ShouldEnableQuicForDataReductionProxy() {
 // static
 bool IOThread::ShouldDisableInsecureQuic(
     const VariationParameters& quic_trial_params) {
-  return LowerCaseEqualsASCII(
+  return base::LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params, "disable_insecure_quic"),
       "true");
 }
@@ -1482,7 +1485,7 @@ double IOThread::GetAlternativeProtocolProbabilityThreshold(
 // static
 bool IOThread::ShouldQuicAlwaysRequireHandshakeConfirmation(
     const VariationParameters& quic_trial_params) {
-  return LowerCaseEqualsASCII(
+  return base::LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params,
                         "always_require_handshake_confirmation"),
       "true");
@@ -1491,7 +1494,7 @@ bool IOThread::ShouldQuicAlwaysRequireHandshakeConfirmation(
 // static
 bool IOThread::ShouldQuicDisableConnectionPooling(
     const VariationParameters& quic_trial_params) {
-  return LowerCaseEqualsASCII(
+  return base::LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params, "disable_connection_pooling"),
       "true");
 }
@@ -1511,7 +1514,7 @@ float IOThread::GetQuicLoadServerInfoTimeoutSrttMultiplier(
 // static
 bool IOThread::ShouldQuicEnableConnectionRacing(
     const VariationParameters& quic_trial_params) {
-  return LowerCaseEqualsASCII(
+  return base::LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params, "enable_connection_racing"),
       "true");
 }
@@ -1519,7 +1522,7 @@ bool IOThread::ShouldQuicEnableConnectionRacing(
 // static
 bool IOThread::ShouldQuicEnableNonBlockingIO(
     const VariationParameters& quic_trial_params) {
-  return LowerCaseEqualsASCII(
+  return base::LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params, "enable_non_blocking_io"),
       "true");
 }
@@ -1527,8 +1530,15 @@ bool IOThread::ShouldQuicEnableNonBlockingIO(
 // static
 bool IOThread::ShouldQuicDisableDiskCache(
     const VariationParameters& quic_trial_params) {
-  return LowerCaseEqualsASCII(
+  return base::LowerCaseEqualsASCII(
       GetVariationParam(quic_trial_params, "disable_disk_cache"), "true");
+}
+
+// static
+bool IOThread::ShouldQuicPreferAes(
+    const VariationParameters& quic_trial_params) {
+  return base::LowerCaseEqualsASCII(
+      GetVariationParam(quic_trial_params, "prefer_aes"), "true");
 }
 
 // static

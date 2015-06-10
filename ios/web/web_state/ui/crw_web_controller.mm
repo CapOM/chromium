@@ -49,12 +49,12 @@
 #include "ios/web/public/user_metrics.h"
 #include "ios/web/public/web_client.h"
 #include "ios/web/public/web_state/credential.h"
-#import "ios/web/public/web_state/crw_native_content.h"
-#import "ios/web/public/web_state/crw_native_content_provider.h"
 #import "ios/web/public/web_state/crw_web_controller_observer.h"
 #import "ios/web/public/web_state/crw_web_view_scroll_view_proxy.h"
 #import "ios/web/public/web_state/js/crw_js_injection_manager.h"
 #import "ios/web/public/web_state/js/crw_js_injection_receiver.h"
+#import "ios/web/public/web_state/ui/crw_native_content.h"
+#import "ios/web/public/web_state/ui/crw_native_content_provider.h"
 #include "ios/web/public/web_state/url_verification_constants.h"
 #include "ios/web/public/web_state/web_state.h"
 #include "ios/web/web_state/blocked_popup_info.h"
@@ -107,6 +107,17 @@ NewWindowInfo::NewWindowInfo(GURL target_url,
 
 NewWindowInfo::~NewWindowInfo() {
 }
+
+// Struct to capture data about a user interaction. Records the time of the
+// interaction and the main document URL at that time.
+struct UserInteractionEvent {
+  UserInteractionEvent(GURL url)
+      : main_document_url(url), time(CFAbsoluteTimeGetCurrent()) {}
+  // Main document URL at the time the interaction occurred.
+  GURL main_document_url;
+  // Time that the interaction occured, measured in seconds since Jan 1 2001.
+  CFAbsoluteTime time;
+};
 
 }  // namespace web
 
@@ -204,8 +215,8 @@ void CancelAllTouches(UIScrollView* web_scroll_view) {
   scoped_ptr<base::DictionaryValue> _DOMElementForLastTouch;
   // Whether a click is in progress.
   BOOL _clickInProgress;
-  // The time of the last click, measured in seconds since Jan 1 2001.
-  CFAbsoluteTime _lastClickTimeInSeconds;
+  // Data on the recorded last user interaction.
+  scoped_ptr<web::UserInteractionEvent> _lastUserInteraction;
   // The time of the last page transfer start, measured in seconds since Jan 1
   // 2001.
   CFAbsoluteTime _lastTransferTimeInSeconds;
@@ -298,6 +309,11 @@ void CancelAllTouches(UIScrollView* web_scroll_view) {
 - (NSString*)javascriptToReplaceWebViewURL:(const GURL&)url
                            stateObjectJSON:(NSString*)stateObject;
 - (BOOL)isLoaded;
+// Called by NSNotificationCenter upon orientation changes.
+- (void)orientationDidChange;
+// Queries the web view for the user-scalable meta tag and calls
+// |-applyPageScrollState:userScalable:| with the result.
+- (void)applyPageScrollState:(const web::PageScrollState&)scrollState;
 // Restores state of the web view's scroll view from |scrollState|.
 // |isUserScalable| represents the value of user-scalable meta tag.
 - (void)applyPageScrollState:(const web::PageScrollState&)scrollState
@@ -377,8 +393,9 @@ void CancelAllTouches(UIScrollView* web_scroll_view) {
 // Returns YES if the url was succesfully opened in the native app.
 - (BOOL)urlTriggersNativeAppLaunch:(const GURL&)url
                          sourceURL:(const GURL&)sourceURL;
-// Returns whether external |url| should be opened.
-- (BOOL)shouldOpenExternalURL:(const GURL&)url;
+// Returns whether external URL request should be opened.
+- (BOOL)shouldOpenExternalURLRequest:(NSURLRequest*)request
+                         targetFrame:(const web::FrameInfo*)targetFrame;
 // Called when a page updates its history stack using pushState or replaceState.
 - (void)didUpdateHistoryStateWithPageURL:(const GURL&)url;
 
@@ -580,6 +597,11 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
     _gestureRecognizers.reset([[NSMutableArray alloc] init]);
     _webViewToolbars.reset([[NSMutableArray alloc] init]);
     _pendingLoadCompleteActions.reset([[NSMutableArray alloc] init]);
+    [[NSNotificationCenter defaultCenter]
+        addObserver:self
+           selector:@selector(orientationDidChange)
+               name:UIApplicationDidChangeStatusBarOrientationNotification
+             object:nil];
   }
   return self;
 }
@@ -678,6 +700,7 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   DCHECK(_isBeingDestroyed);  // 'close' must have been called already.
   DCHECK(!self.webView);
   _touchTrackingRecognizer.get().touchTrackingDelegate = nil;
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
   [super dealloc];
 }
 
@@ -2560,9 +2583,8 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
 }
 
 - (void)resetDocumentSpecificState {
-  _lastClickTimeInSeconds = -DBL_MAX;
+  _lastUserInteraction.reset();
   _clickInProgress = NO;
-
   _lastSeenWindowID.reset([[_windowIDJSManager windowId] copy]);
 }
 
@@ -2725,7 +2747,7 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   // TODO(droger):  Check transition type before opening an external
   // application? For example, only allow it for TYPED and LINK transitions.
   if (![CRWWebController webControllerCanShow:requestURL]) {
-    if (![self shouldOpenExternalURL:requestURL]) {
+    if (![self shouldOpenExternalURLRequest:request targetFrame:targetFrame]) {
       return NO;
     }
 
@@ -2741,7 +2763,8 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
       // Record the URL so that errors reported following the 'NO' reply can be
       // safely ignored.
       [_openedApplicationURL addObject:request.URL];
-      return NO;
+      if ([self cancellable])
+        [_delegate webPageOrderedClose];
     }
     return NO;
   }
@@ -2790,20 +2813,20 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   NSTimeInterval requestCreationDate =
       [[userInfo objectForKey:@"CreationDate"] timeIntervalSinceReferenceDate];
   bool userInteracted = false;
-  if (requestCreationDate != 0.0) {
+  if (requestCreationDate != 0.0 && _lastUserInteraction) {
     NSTimeInterval timeSinceInteraction =
-        requestCreationDate - _lastClickTimeInSeconds;
+        requestCreationDate - _lastUserInteraction->time;
     // The error is considered to be the result of a user interaction if any
     // interaction happened just before the request was made.
     // TODO(droger): If the user interacted with the page after the request was
     // made (i.e. creationTimeSinceLastInteraction < 0), then
-    // |_lastClickTimeInSeconds| has been overridden. The current behavior is to
+    // |_lastUserInteraction| has been overridden. The current behavior is to
     // discard the interstitial in that case. A better decision could be made if
     // we had a history of all the user interactions instead of just the last
     // one.
     userInteracted =
         timeSinceInteraction < kMaximumDelayForUserInteractionInSeconds &&
-        _lastClickTimeInSeconds > _lastTransferTimeInSeconds &&
+        _lastUserInteraction->time > _lastTransferTimeInSeconds &&
         timeSinceInteraction >= 0.0;
   } else {
     // If the error does not have timing information, check if the user
@@ -2861,10 +2884,13 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
     return;
   }
 
+  // TODO(ios): Audit comments and behavior below regarding error origin. The
+  // error has been translated and may appear to have originated in the Chrome
+  // network stack when that is not true (crbug.com/496972)
   // Ignore cancelled errors.
   if ([error code] == NSURLErrorCancelled) {
     NSError* underlyingError = [userInfo objectForKey:NSUnderlyingErrorKey];
-    if (underlyingError) {
+    if (underlyingError && [self shouldAbortLoadForCancelledURL:errorGURL]) {
       DCHECK([underlyingError isKindOfClass:[NSError class]]);
 
       // The Error contains an NSUnderlyingErrorKey so it's being generated
@@ -2894,6 +2920,12 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
 
   [self loadCompleteWithSuccess:NO];
   [self loadErrorInNativeView:error];
+}
+
+- (BOOL)shouldAbortLoadForCancelledURL:(const GURL &)cancelledURL {
+  // Subclasses must implement this method.
+  NOTREACHED();
+  return YES;
 }
 
 #pragma mark -
@@ -3069,7 +3101,15 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
   _clickInProgress = touched;
   if (touched) {
     _userInteractionRegistered = YES;
-    _lastClickTimeInSeconds = CFAbsoluteTimeGetCurrent();
+    if (_isBeingDestroyed)
+      return;
+    const web::NavigationManagerImpl& navigationManager =
+        self.webStateImpl->GetNavigationManagerImpl();
+    GURL mainDocumentURL =
+        navigationManager.GetEntryCount()
+            ? navigationManager.GetLastCommittedItem()->GetURL()
+            : [self currentURL];
+    _lastUserInteraction.reset(new web::UserInteractionEvent(mainDocumentURL));
   }
 }
 
@@ -3084,14 +3124,18 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
 - (BOOL)userIsInteracting {
   // If page transfer started after last click, user is deemed to be no longer
   // interacting.
-  if (_lastTransferTimeInSeconds > _lastClickTimeInSeconds)
+  if (!_lastUserInteraction ||
+      _lastTransferTimeInSeconds > _lastUserInteraction->time) {
     return NO;
+  }
   return [self userClickedRecently];
 }
 
 - (BOOL)userClickedRecently {
+  if (!_lastUserInteraction)
+    return NO;
   return _clickInProgress ||
-         ((CFAbsoluteTimeGetCurrent() - _lastClickTimeInSeconds) <
+         ((CFAbsoluteTimeGetCurrent() - _lastUserInteraction->time) <
           kMaximumDelayForUserInteractionInSeconds);
 }
 
@@ -3204,8 +3248,9 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
 #pragma mark Session Information
 
 - (CRWSessionController*)sessionController {
-  DCHECK(_webStateImpl);
-  return _webStateImpl->GetNavigationManagerImpl().GetSessionController();
+  return _webStateImpl
+      ? _webStateImpl->GetNavigationManagerImpl().GetSessionController()
+      : nil;
 }
 
 - (CRWSessionEntry*)currentSessionEntry {
@@ -3300,18 +3345,60 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
             _scrollStateOnStartLoading.scroll_offset_y() &&
         [self absoluteZoomScaleForScrollState:currentScrollState] ==
             [self absoluteZoomScaleForScrollState:_scrollStateOnStartLoading]) {
-      base::WeakNSObject<CRWWebController> weakSelf(self);
-      [self queryUserScalableProperty:^(BOOL isUserScalable) {
-        base::scoped_nsobject<CRWWebController> strongSelf([weakSelf retain]);
-        [strongSelf applyPageScrollState:pageScrollState
-                            userScalable:isUserScalable];
-      }];
+      [self applyPageScrollState:pageScrollState];
     }
   }
 }
 
+- (void)orientationDidChange {
+  // When rotating, the available zoom scale range may change, zoomScale's
+  // percentage into this range should remain constant.  However, there are
+  // two known bugs with respect to adjusting the zoomScale on rotation:
+  // - WKWebView sometimes erroneously resets the scroll view's zoom scale to
+  // an incorrect value ( rdar://20100815 ).
+  // - After zooming occurs in a UIWebView that's displaying a page with a hard-
+  // coded viewport width, the zoom will not be updated upon rotation
+  // ( crbug.com/485055 ).
+  if (!self.webView)
+    return;
+  web::NavigationItem* currentItem = self.currentNavItem;
+  if (!currentItem)
+    return;
+  web::PageScrollState scrollState = currentItem->GetPageScrollState();
+  if (!scrollState.IsValid())
+    return;
+  CGFloat zoomPercentage =
+      (scrollState.zoom_scale() - scrollState.minimum_zoom_scale()) /
+      scrollState.GetMinMaxZoomDifference();
+  scrollState.set_minimum_zoom_scale(self.webScrollView.minimumZoomScale);
+  scrollState.set_maximum_zoom_scale(self.webScrollView.maximumZoomScale);
+  scrollState.set_zoom_scale(scrollState.minimum_zoom_scale() +
+                             zoomPercentage *
+                                 scrollState.GetMinMaxZoomDifference());
+  currentItem->SetPageScrollState(scrollState);
+  [self applyPageScrollState:currentItem->GetPageScrollState()];
+}
+
+- (void)applyPageScrollState:(const web::PageScrollState&)scrollState {
+  if (!scrollState.IsValid())
+    return;
+  base::WeakNSObject<CRWWebController> weakSelf(self);
+  web::PageScrollState scrollStateCopy = scrollState;
+  [self queryUserScalableProperty:^(BOOL isUserScalable) {
+    base::scoped_nsobject<CRWWebController> strongSelf([weakSelf retain]);
+    [strongSelf applyPageScrollState:scrollStateCopy
+                        userScalable:isUserScalable];
+  }];
+}
+
 - (void)applyPageScrollState:(const web::PageScrollState&)scrollState
                 userScalable:(BOOL)isUserScalable {
+  // Early return if |scrollState| doesn't match the current NavigationItem.
+  // This can sometimes occur in tests, as navigation occurs programmatically
+  // and |-applyPageScrollState:| is asynchronous.
+  web::NavigationItem* currentItem = [self currentSessionEntry].navigationItem;
+  if (currentItem && currentItem->GetPageScrollState() != scrollState)
+    return;
   DCHECK(scrollState.IsValid());
   if (isUserScalable) {
     [self prepareToApplyWebViewScrollZoomScale];
@@ -3517,10 +3604,27 @@ const NSTimeInterval kSnapshotOverlayTransition = 0.5;
                       linkClicked:linkClicked];
 }
 
-- (BOOL)shouldOpenExternalURL:(const GURL&)url {
+- (BOOL)shouldOpenExternalURLRequest:(NSURLRequest*)request
+                         targetFrame:(const web::FrameInfo*)targetFrame {
+  // Prevent subrequests from opening an external URL if the main document URL
+  // has changed since the last user interaction.
+  BOOL isMainFrame = targetFrame
+                         ? targetFrame->is_main_frame
+                         : [request.URL isEqual:request.mainDocumentURL];
+  BOOL documentChangedAfterUserInteraction =
+      _lastUserInteraction &&
+      net::GURLWithNSURL(request.mainDocumentURL) !=
+          _lastUserInteraction->main_document_url;
+  if (!isMainFrame && documentChangedAfterUserInteraction)
+    return NO;
+
+  GURL requestURL = net::GURLWithNSURL(request.URL);
   return [_delegate respondsToSelector:@selector(webController:
-                                           shouldOpenExternalURL:)] &&
-         [_delegate webController:self shouldOpenExternalURL:url];
+                                           shouldOpenExternalURL:
+                                               userIsInteracting:)] &&
+         [_delegate webController:self
+             shouldOpenExternalURL:requestURL
+                 userIsInteracting:[self userIsInteracting]];
 }
 
 - (BOOL)urlTriggersNativeAppLaunch:(const GURL&)url

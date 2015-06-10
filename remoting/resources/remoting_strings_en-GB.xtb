@@ -7,7 +7,6 @@ Host</translation>
 <translation id="2676780859508944670">Working…</translation>
 <translation id="6062854958530969723">Host initialisation failed.</translation>
 <translation id="5843054235973879827">Why is this safe?</translation>
-<translation id="5895138241574237353">Restart</translation>
 <translation id="5619148062500147964">To this computer</translation>
 <translation id="4068946408131579958">All connections</translation>
 <translation id="2208514473086078157">Policy settings do not permit sharing this computer as a Chrome Remote Desktop host. Contact your system administrator for assistance.</translation>
@@ -255,8 +254,6 @@ Desktop Host</translation>
 <translation id="6570205395680337606">Reset the application. You will lose any unsaved work.</translation>
 <translation id="6284412385303060032">Host running at the console logic screen has shut down to support curtain mode by switching to a host running in a user-specific session.</translation>
 <translation id="3596628256176442606">This service enables incoming connections from Chromoting clients.</translation>
-<translation id="1978866438647250517">• User interface improvements.
-• Reduced network usage when running in the background.</translation>
 <translation id="4741792197137897469">Authentication failed. Please sign in to Chrome again.</translation>
 <translation id="4277463233460010382">This computer is configured to allow one or more clients to connect without entering a PIN.</translation>
 <translation id="837021510621780684">From this computer</translation>

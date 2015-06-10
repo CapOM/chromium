@@ -18,7 +18,6 @@ namespace base {
 
 SharedMemory::SharedMemory()
     : mapped_file_(-1),
-      inode_(0),
       mapped_size_(0),
       memory_(NULL),
       read_only_(false),
@@ -27,7 +26,6 @@ SharedMemory::SharedMemory()
 
 SharedMemory::SharedMemory(SharedMemoryHandle handle, bool read_only)
     : mapped_file_(handle.fd),
-      inode_(0),
       mapped_size_(0),
       memory_(NULL),
       read_only_(read_only),
@@ -37,7 +35,6 @@ SharedMemory::SharedMemory(SharedMemoryHandle handle, bool read_only)
 SharedMemory::SharedMemory(SharedMemoryHandle handle, bool read_only,
                            ProcessHandle process)
     : mapped_file_(handle.fd),
-      inode_(0),
       mapped_size_(0),
       memory_(NULL),
       read_only_(read_only),
@@ -65,6 +62,15 @@ void SharedMemory::CloseHandle(const SharedMemoryHandle& handle) {
   DCHECK_GE(handle.fd, 0);
   if (close(handle.fd) < 0)
     DPLOG(ERROR) << "close";
+}
+
+// static
+SharedMemoryHandle SharedMemory::DuplicateHandle(
+    const SharedMemoryHandle& handle) {
+  int duped_handle = HANDLE_EINTR(dup(handle.fd));
+  if (duped_handle < 0)
+    return base::SharedMemory::NULLHandle();
+  return base::FileDescriptor(duped_handle, true);
 }
 
 bool SharedMemory::CreateAndMapAnonymous(size_t size) {

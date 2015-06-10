@@ -8,6 +8,7 @@
 #include "base/callback.h"
 #include "base/logging.h"
 #include "base/pickle.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/browser/web_contents_observer.h"
@@ -32,52 +33,93 @@ const char* kRendererDestroyed = "The tab was closed.";
 // corresponding response comes from the renderer, or the renderer is destroyed.
 class Handler : public content::WebContentsObserver {
  public:
-  Handler(ObserverList<ScriptExecutionObserver>* script_observers,
+  Handler(base::ObserverList<ScriptExecutionObserver>* script_observers,
           content::WebContents* web_contents,
           const ExtensionMsg_ExecuteCode_Params& params,
+          ScriptExecutor::FrameScope scope,
           const ScriptExecutor::ExecuteScriptCallback& callback)
       : content::WebContentsObserver(web_contents),
         script_observers_(AsWeakPtr(script_observers)),
         host_id_(params.host_id),
         request_id_(params.request_id),
+        num_pending_(0),
         callback_(callback) {
-    content::RenderViewHost* rvh = web_contents->GetRenderViewHost();
-    rvh->Send(new ExtensionMsg_ExecuteCode(rvh->GetRoutingID(), params));
+    if (scope == ScriptExecutor::ALL_FRAMES) {
+      web_contents->ForEachFrame(base::Bind(&Handler::SendExecuteCode,
+                                            base::Unretained(this), params));
+    } else {
+      SendExecuteCode(params, web_contents->GetMainFrame());
+    }
   }
 
+ private:
+  // This class manages its own lifetime.
   ~Handler() override {}
 
-  bool OnMessageReceived(const IPC::Message& message) override {
+  // content::WebContentsObserver:
+  void WebContentsDestroyed() override {
+    Finish(kRendererDestroyed, GURL(), base::ListValue());
+  }
+
+  bool OnMessageReceived(const IPC::Message& message,
+                         content::RenderFrameHost* render_frame_host) override {
     // Unpack by hand to check the request_id, since there may be multiple
     // requests in flight but only one is for this.
     if (message.type() != ExtensionHostMsg_ExecuteCodeFinished::ID)
       return false;
 
     int message_request_id;
-    PickleIterator iter(message);
+    base::PickleIterator iter(message);
     CHECK(iter.ReadInt(&message_request_id));
 
     if (message_request_id != request_id_)
       return false;
 
-    IPC_BEGIN_MESSAGE_MAP(Handler, message)
+    IPC_BEGIN_MESSAGE_MAP_WITH_PARAM(Handler, message, render_frame_host)
       IPC_MESSAGE_HANDLER(ExtensionHostMsg_ExecuteCodeFinished,
                           OnExecuteCodeFinished)
     IPC_END_MESSAGE_MAP()
     return true;
   }
 
-  void WebContentsDestroyed() override {
-    base::ListValue val;
-    callback_.Run(kRendererDestroyed, GURL(std::string()), val);
-    delete this;
+  // Sends an ExecuteCode message to the given frame host, and increments
+  // the number of pending messages.
+  void SendExecuteCode(const ExtensionMsg_ExecuteCode_Params& params,
+                       content::RenderFrameHost* frame) {
+    ++num_pending_;
+    frame->Send(new ExtensionMsg_ExecuteCode(frame->GetRoutingID(), params));
   }
 
- private:
-  void OnExecuteCodeFinished(int request_id,
+  // Handles the ExecuteCodeFinished message.
+  void OnExecuteCodeFinished(content::RenderFrameHost* render_frame_host,
+                             int request_id,
                              const std::string& error,
                              const GURL& on_url,
-                             const base::ListValue& script_result) {
+                             const base::ListValue& result_list) {
+    DCHECK_EQ(request_id_, request_id);
+    DCHECK_GT(num_pending_, 0);
+    bool is_main_frame = web_contents()->GetMainFrame() == render_frame_host;
+
+    // Set the result, if there is one.
+    const base::Value* script_value = nullptr;
+    if (result_list.Get(0u, &script_value)) {
+      // If this is the main result, we put it at index 0. Otherwise, we just
+      // append it at the end.
+      if (is_main_frame && !results_.empty())
+        CHECK(results_.Insert(0u, script_value->DeepCopy()));
+      else
+        results_.Append(script_value->DeepCopy());
+    }
+
+    if (is_main_frame) {  // Only use the main frame's error and url.
+      error_ = error;
+      url_ = on_url;
+    }
+
+    // Wait until the final request finishes before reporting back.
+    if (--num_pending_ > 0)
+      return;
+
     if (script_observers_.get() && error.empty() &&
         host_id_.type() == HostID::EXTENSIONS) {
       ScriptExecutionObserver::ExecutingScriptsMap id_map;
@@ -87,14 +129,41 @@ class Handler : public content::WebContentsObserver {
                         OnScriptsExecuted(web_contents(), id_map, on_url));
     }
 
-    callback_.Run(error, on_url, script_result);
+    Finish(error_, url_, results_);
+  }
+
+  void Finish(const std::string& error,
+              const GURL& url,
+              const base::ListValue& result) {
+    if (!callback_.is_null())
+      callback_.Run(error, url, result);
     delete this;
   }
 
-  base::WeakPtr<ObserverList<ScriptExecutionObserver> > script_observers_;
+  base::WeakPtr<base::ObserverList<ScriptExecutionObserver>> script_observers_;
+
+  // The id of the host (the extension or the webui) doing the injection.
   HostID host_id_;
+
+  // The request id of the injection.
   int request_id_;
+
+  // The number of still-running injections.
+  int num_pending_;
+
+  // The results of the injection.
+  base::ListValue results_;
+
+  // The error from injecting into the main frame.
+  std::string error_;
+
+  // The url of the main frame.
+  GURL url_;
+
+  // The callback to run after all injections complete.
   ScriptExecutor::ExecuteScriptCallback callback_;
+
+  DISALLOW_COPY_AND_ASSIGN(Handler);
 };
 
 }  // namespace
@@ -104,7 +173,7 @@ ScriptExecutionObserver::~ScriptExecutionObserver() {
 
 ScriptExecutor::ScriptExecutor(
     content::WebContents* web_contents,
-    ObserverList<ScriptExecutionObserver>* script_observers)
+    base::ObserverList<ScriptExecutionObserver>* script_observers)
     : next_request_id_(0),
       web_contents_(web_contents),
       script_observers_(script_observers) {
@@ -143,7 +212,6 @@ void ScriptExecutor::ExecuteScript(const HostID& host_id,
   params.host_id = host_id;
   params.is_javascript = (script_type == JAVASCRIPT);
   params.code = code;
-  params.all_frames = (frame_scope == ALL_FRAMES);
   params.match_about_blank = (about_blank == MATCH_ABOUT_BLANK);
   params.run_at = static_cast<int>(run_at);
   params.in_main_world = (world_type == MAIN_WORLD);
@@ -154,7 +222,7 @@ void ScriptExecutor::ExecuteScript(const HostID& host_id,
   params.user_gesture = user_gesture;
 
   // Handler handles IPCs and deletes itself on completion.
-  new Handler(script_observers_, web_contents_, params, callback);
+  new Handler(script_observers_, web_contents_, params, frame_scope, callback);
 }
 
 }  // namespace extensions

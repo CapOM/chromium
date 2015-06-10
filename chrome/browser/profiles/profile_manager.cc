@@ -21,6 +21,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
+#include "chrome/browser/bookmarks/startup_task_runner_service_factory.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/download/download_service.h"
@@ -35,8 +36,6 @@
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_metrics.h"
 #include "chrome/browser/profiles/profiles_state.h"
-#include "chrome/browser/profiles/startup_task_runner_service.h"
-#include "chrome/browser/profiles/startup_task_runner_service_factory.h"
 #include "chrome/browser/signin/account_reconcilor_factory.h"
 #include "chrome/browser/signin/account_tracker_service_factory.h"
 #include "chrome/browser/signin/cross_device_promo.h"
@@ -56,6 +55,7 @@
 #include "chrome/common/url_constants.h"
 #include "chrome/grit/generated_resources.h"
 #include "components/bookmarks/browser/bookmark_model.h"
+#include "components/bookmarks/browser/startup_task_runner_service.h"
 #include "components/content_settings/core/browser/host_content_settings_map.h"
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/signin/core/browser/account_tracker_service.h"
@@ -518,8 +518,13 @@ std::string ProfileManager::GetLastUsedProfileName() {
   DCHECK(local_state);
   const std::string last_used_profile_name =
       local_state->GetString(prefs::kProfileLastUsed);
-  if (!last_used_profile_name.empty())
+  // Make sure the system profile can't be the one marked as the last one used
+  // since it shouldn't get a browser.
+  if (!last_used_profile_name.empty() &&
+      last_used_profile_name !=
+          base::FilePath(chrome::kSystemProfileDir).AsUTF8Unsafe()) {
     return last_used_profile_name;
+  }
 
   return chrome::kInitialProfile;
 }
@@ -538,7 +543,8 @@ std::vector<Profile*> ProfileManager::GetLastOpenedProfiles(
     base::ListValue::const_iterator it;
     std::string profile;
     for (it = profile_list->begin(); it != profile_list->end(); ++it) {
-      if (!(*it)->GetAsString(&profile) || profile.empty()) {
+      if (!(*it)->GetAsString(&profile) || profile.empty() ||
+          profile == base::FilePath(chrome::kSystemProfileDir).AsUTF8Unsafe()) {
         LOG(WARNING) << "Invalid entry in " << prefs::kProfilesLastActive;
         continue;
       }
@@ -775,9 +781,7 @@ void ProfileManager::CleanUpEphemeralProfiles() {
     if (new_profile_path.empty())
       new_profile_path = GenerateNextProfileDirectoryPath();
 
-    PrefService* local_state = g_browser_process->local_state();
-    local_state->SetString(prefs::kProfileLastUsed,
-                           new_profile_path.BaseName().MaybeAsASCII());
+    profiles::SetLastUsedProfile(new_profile_path.BaseName().MaybeAsASCII());
   }
 
   // This uses a separate loop, because deleting the profile from the
@@ -966,8 +970,12 @@ void ProfileManager::Observe(
     for (it = active_profiles_.begin(); it != active_profiles_.end(); ++it) {
       std::string profile_path = (*it)->GetPath().BaseName().MaybeAsASCII();
       // Some profiles might become ephemeral after they are created.
+      // Don't persist the System Profile as one of the last actives, it should
+      // never get a browser.
       if (!(*it)->GetPrefs()->GetBoolean(prefs::kForceEphemeralProfiles) &&
-          profile_paths.find(profile_path) == profile_paths.end()) {
+          profile_paths.find(profile_path) == profile_paths.end() &&
+          profile_path !=
+              base::FilePath(chrome::kSystemProfileDir).AsUTF8Unsafe()) {
         profile_paths.insert(profile_path);
         profile_list->Append(new base::StringValue(profile_path));
       }
@@ -1206,10 +1214,8 @@ void ProfileManager::FinishDeletingProfile(
     const base::FilePath& new_active_profile_dir) {
   // Update the last used profile pref before closing browser windows. This
   // way the correct last used profile is set for any notification observers.
-  PrefService* local_state = g_browser_process->local_state();
-  DCHECK(local_state);
-  local_state->SetString(prefs::kProfileLastUsed,
-                         new_active_profile_dir.BaseName().MaybeAsASCII());
+  profiles::SetLastUsedProfile(
+      new_active_profile_dir.BaseName().MaybeAsASCII());
 
   ProfileInfoCache& cache = GetProfileInfoCache();
   // TODO(sail): Due to bug 88586 we don't delete the profile instance. Once we
@@ -1376,7 +1382,7 @@ void ProfileManager::UpdateLastUser(Profile* last_active) {
     std::string profile_path_base =
         last_active->GetPath().BaseName().MaybeAsASCII();
     if (profile_path_base != GetLastUsedProfileName())
-      local_state->SetString(prefs::kProfileLastUsed, profile_path_base);
+      profiles::SetLastUsedProfile(profile_path_base);
 
     ProfileInfoCache& cache = GetProfileInfoCache();
     size_t profile_index =

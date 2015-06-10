@@ -7,7 +7,6 @@ Vert</translation>
 <translation id="2676780859508944670">Behandler …</translation>
 <translation id="6062854958530969723">Vertsinitialiseringen mislyktes.</translation>
 <translation id="5843054235973879827">Hvorfor er dette trygt?</translation>
-<translation id="5895138241574237353">Start på nytt</translation>
 <translation id="5619148062500147964">Til denne datamaskinen</translation>
 <translation id="4068946408131579958">Alle tilkoblinger</translation>
 <translation id="2208514473086078157">Innstillingene tillater ikke at denne datamaskinen deles som vert for Chrome Eksternt skrivebord. Ta kontakt med systemadministratoren for å få hjelp.</translation>
@@ -50,7 +49,7 @@ Vert</translation>
 <translation id="195619862187186579">Tastaturoppsett</translation>
 <translation id="8355326866731426344">Denne tilgangskoden utløper om <ph name="TIMEOUT"/></translation>
 <translation id="985602178874221306">The Chromium Authors</translation>
-<translation id="2498359688066513246">Hjelp og tilbakemeldinger</translation>
+<translation id="2498359688066513246">Hjelp og tilbakemelding</translation>
 <translation id="3606997049964069799">Du er ikke logget på Chromium. Logg på, og prøv på nytt.</translation>
 <translation id="6198252989419008588">Endre personlig kode</translation>
 <translation id="7970576581263377361">Autentiseringen mislyktes. Logg på Chromium på nytt.</translation>
@@ -255,8 +254,6 @@ skrivebord-vert</translation>
 <translation id="6570205395680337606">Tilbakestill programmet. Du mister alt arbeid som ikke er lagret.</translation>
 <translation id="6284412385303060032">Verten som kjører på skjermen for konsollpålogging, har blitt avsluttet for å støtte gardinmodus ved å bytte til en vert som kjører i en brukerspesifikk økt.</translation>
 <translation id="3596628256176442606">Med denne tjenesten kan du motta innkommende tilkoblinger fra Chromoting-klienter.</translation>
-<translation id="1978866438647250517">• Forbedringer i brukergrensesnittet.
-• Redusert bruk av nettverket ved kjøring i bakgrunnen.</translation>
 <translation id="4741792197137897469">Autentiseringen mislyktes. Logg på Chrome på nytt.</translation>
 <translation id="4277463233460010382">Denne datamaskinen er konfigurer for å la én eller flere klienter koble til uten å skrive inn noen PIN-kode.</translation>
 <translation id="837021510621780684">Fra denne datamaskinen</translation>

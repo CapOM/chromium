@@ -132,6 +132,7 @@
 #include "content/public/test/mock_notification_observer.h"
 #include "content/public/test/test_navigation_observer.h"
 #include "content/public/test/test_utils.h"
+#include "extensions/browser/extension_dialog_auto_confirm.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
@@ -154,6 +155,7 @@
 #include "net/test/url_request/url_request_mock_http_job.h"
 #include "net/url_request/url_request.h"
 #include "net/url_request/url_request_filter.h"
+#include "net/url_request/url_request_interceptor.h"
 #include "policy/policy_constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -264,13 +266,22 @@ void UndoRedirectHostsToTestData(const char* const urls[], size_t size) {
 }
 
 // Fails requests using ERR_CONNECTION_RESET.
-net::URLRequestJob* FailedJobFactory(
-    net::URLRequest* request,
-    net::NetworkDelegate* network_delegate,
-    const std::string& scheme) {
-  return new net::URLRequestFailedJob(
-      request, network_delegate, net::ERR_CONNECTION_RESET);
-}
+class FailedJobInterceptor : public net::URLRequestInterceptor {
+ public:
+  FailedJobInterceptor() {}
+  ~FailedJobInterceptor() override {}
+
+  // URLRequestInterceptor implementation:
+  net::URLRequestJob* MaybeInterceptRequest(
+      net::URLRequest* request,
+      net::NetworkDelegate* network_delegate) const override {
+    return new net::URLRequestFailedJob(request, network_delegate,
+                                        net::ERR_CONNECTION_RESET);
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(FailedJobInterceptor);
+};
 
 // While |MakeRequestFail| is in scope URLRequests to |host| will fail.
 class MakeRequestFail {
@@ -295,8 +306,12 @@ class MakeRequestFail {
   // Filters requests to the |host| such that they fail. Run on IO thread.
   static void MakeRequestFailOnIO(const std::string& host) {
     net::URLRequestFilter* filter = net::URLRequestFilter::GetInstance();
-    filter->AddHostnameHandler("http", host, &FailedJobFactory);
-    filter->AddHostnameHandler("https", host, &FailedJobFactory);
+    filter->AddHostnameInterceptor(
+        "http", host,
+        scoped_ptr<net::URLRequestInterceptor>(new FailedJobInterceptor()));
+    filter->AddHostnameInterceptor(
+        "https", host,
+        scoped_ptr<net::URLRequestInterceptor>(new FailedJobInterceptor()));
   }
 
   // Remove filters for requests to the |host|. Run on IO thread.
@@ -1954,8 +1969,8 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, ExtensionAllowedTypes) {
 #define MAYBE_ExtensionInstallSources ExtensionInstallSources
 #endif
 IN_PROC_BROWSER_TEST_F(PolicyTest, MAYBE_ExtensionInstallSources) {
-  ExtensionInstallPrompt::g_auto_confirm_for_tests =
-      ExtensionInstallPrompt::ACCEPT;
+  extensions::ScopedTestDialogAutoConfirm auto_confirm(
+      extensions::ScopedTestDialogAutoConfirm::ACCEPT);
 
   const GURL install_source_url(URLRequestMockHTTPJob::GetMockUrl(
       base::FilePath(FILE_PATH_LITERAL("extensions/*"))));
@@ -2510,6 +2525,45 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, URLBlacklist) {
   }
 }
 
+IN_PROC_BROWSER_TEST_F(PolicyTest, URLBlacklistSubresources) {
+  // Checks that an image with a blacklisted URL is loaded, but an iframe with a
+  // blacklisted URL is not.
+
+  GURL main_url = URLRequestMockHTTPJob::GetMockUrl(
+      base::FilePath(FILE_PATH_LITERAL("policy/blacklist-subresources.html")));
+  GURL image_url = URLRequestMockHTTPJob::GetMockUrl(
+      base::FilePath(FILE_PATH_LITERAL("policy/pixel.png")));
+  GURL subframe_url = URLRequestMockHTTPJob::GetMockUrl(
+      base::FilePath(FILE_PATH_LITERAL("policy/blank.html")));
+
+  // Set a blacklist containing the image and the iframe which are used by the
+  // main document.
+  base::ListValue blacklist;
+  blacklist.Append(new base::StringValue(image_url.spec().c_str()));
+  blacklist.Append(new base::StringValue(subframe_url.spec().c_str()));
+  PolicyMap policies;
+  policies.Set(key::kURLBlacklist, POLICY_LEVEL_MANDATORY,
+               POLICY_SCOPE_USER, blacklist.DeepCopy(), NULL);
+  UpdateProviderPolicy(policies);
+  FlushBlacklistPolicy();
+
+  std::string blacklisted_image_load_result;
+  ui_test_utils::NavigateToURL(browser(), main_url);
+  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
+      browser()->tab_strip_model()->GetActiveWebContents(),
+      "window.domAutomationController.send(imageLoadResult)",
+      &blacklisted_image_load_result));
+  EXPECT_EQ("success", blacklisted_image_load_result);
+
+  std::string blacklisted_iframe_load_result;
+  ui_test_utils::NavigateToURL(browser(), main_url);
+  ASSERT_TRUE(content::ExecuteScriptAndExtractString(
+      browser()->tab_strip_model()->GetActiveWebContents(),
+      "window.domAutomationController.send(iframeLoadResult)",
+      &blacklisted_iframe_load_result));
+  EXPECT_EQ("error", blacklisted_iframe_load_result);
+}
+
 #if defined(OS_MACOSX)
 // http://crbug.com/339240
 #define MAYBE_FileURLBlacklist DISABLED_FileURLBlacklist
@@ -2580,13 +2634,31 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, MAYBE_FileURLBlacklist) {
   CheckURLIsBlocked(browser(), file_path2.c_str());
 }
 
-static bool IsMinSSLFallbackVersionTLS12(Profile* profile) {
-  scoped_refptr<net::SSLConfigService> config_service(
-      profile->GetSSLConfigService());
+namespace {
+
+void GetSSLVersionFallbackMinOnIOThread(
+    const scoped_refptr<net::SSLConfigService>& config_service,
+    uint16_t* version_fallback_min) {
   net::SSLConfig config;
   config_service->GetSSLConfig(&config);
-  return config.version_fallback_min == net::SSL_PROTOCOL_VERSION_TLS1_2;
+  *version_fallback_min = config.version_fallback_min;
 }
+
+uint16_t GetSSLVersionFallbackMin(Profile* profile) {
+  scoped_refptr<net::SSLConfigService> config_service(
+      profile->GetSSLConfigService());
+  uint16_t version_fallback_min;
+  base::RunLoop loop;
+  BrowserThread::PostTaskAndReply(
+      BrowserThread::IO, FROM_HERE,
+      base::Bind(&GetSSLVersionFallbackMinOnIOThread, config_service,
+                 base::Unretained(&version_fallback_min)),
+      loop.QuitClosure());
+  loop.Run();
+  return version_fallback_min;
+}
+
+}  // namespace
 
 IN_PROC_BROWSER_TEST_F(PolicyTest, SSLVersionFallbackMin) {
   PrefService* prefs = g_browser_process->local_state();
@@ -2596,7 +2668,8 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, SSLVersionFallbackMin) {
       prefs->GetString(prefs::kSSLVersionFallbackMin));
 
   EXPECT_NE(default_value, new_value);
-  EXPECT_FALSE(IsMinSSLFallbackVersionTLS12(browser()->profile()));
+  EXPECT_NE(net::SSL_PROTOCOL_VERSION_TLS1_2,
+            GetSSLVersionFallbackMin(browser()->profile()));
 
   PolicyMap policies;
   policies.Set(key::kSSLVersionFallbackMin,
@@ -2606,7 +2679,8 @@ IN_PROC_BROWSER_TEST_F(PolicyTest, SSLVersionFallbackMin) {
                NULL);
   UpdateProviderPolicy(policies);
 
-  EXPECT_TRUE(IsMinSSLFallbackVersionTLS12(browser()->profile()));
+  EXPECT_EQ(net::SSL_PROTOCOL_VERSION_TLS1_2,
+            GetSSLVersionFallbackMin(browser()->profile()));
 }
 
 #if !defined(OS_MACOSX)

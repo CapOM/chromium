@@ -6,10 +6,12 @@
 
 #include "cc/surfaces/surface.h"
 #include "cc/surfaces/surface_manager.h"
+#include "content/browser/compositor/surface_utils.h"
 #include "content/browser/frame_host/render_frame_proxy_host.h"
 #include "content/browser/frame_host/render_widget_host_view_child_frame.h"
 #include "content/browser/renderer_host/render_view_host_impl.h"
 #include "content/browser/renderer_host/render_widget_host_impl.h"
+#include "content/browser/renderer_host/render_widget_host_view_base.h"
 #include "content/common/frame_messages.h"
 #include "content/common/gpu/gpu_messages.h"
 #include "third_party/WebKit/public/web/WebInputEvent.h"
@@ -94,28 +96,22 @@ void CrossProcessFrameConnector::SetChildFrameSurface(
 
 void CrossProcessFrameConnector::OnSatisfySequence(
     const cc::SurfaceSequence& sequence) {
-#if !defined(OS_ANDROID)
   std::vector<uint32_t> sequences;
   sequences.push_back(sequence.sequence);
-  cc::SurfaceManager* manager =
-      ImageTransportFactory::GetInstance()->GetSurfaceManager();
+  cc::SurfaceManager* manager = GetSurfaceManager();
   manager->DidSatisfySequences(sequence.id_namespace, &sequences);
-#endif
 }
 
 void CrossProcessFrameConnector::OnRequireSequence(
     const cc::SurfaceId& id,
     const cc::SurfaceSequence& sequence) {
-#if !defined(OS_ANDROID)
-  cc::SurfaceManager* manager =
-      ImageTransportFactory::GetInstance()->GetSurfaceManager();
+  cc::SurfaceManager* manager = GetSurfaceManager();
   cc::Surface* surface = manager->GetSurfaceForId(id);
   if (!surface) {
     LOG(ERROR) << "Attempting to require callback on nonexistent surface";
     return;
   }
   surface->AddDestructionDependency(sequence);
-#endif
 }
 
 void CrossProcessFrameConnector::OnCompositorFrameSwappedACK(
@@ -145,6 +141,13 @@ void CrossProcessFrameConnector::OnInitializeChildFrame(gfx::Rect frame_rect,
 
 gfx::Rect CrossProcessFrameConnector::ChildFrameRect() {
   return child_frame_rect_;
+}
+
+void CrossProcessFrameConnector::GetScreenInfo(blink::WebScreenInfo* results) {
+  RenderWidgetHostView* rwhv =
+      frame_proxy_in_parent_renderer_->GetRenderWidgetHostView();
+  if (rwhv)
+    static_cast<RenderWidgetHostViewBase*>(rwhv)->GetScreenInfo(results);
 }
 
 void CrossProcessFrameConnector::OnForwardInputEvent(

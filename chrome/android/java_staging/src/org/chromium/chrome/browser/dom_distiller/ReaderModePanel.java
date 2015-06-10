@@ -11,8 +11,8 @@ import android.os.SystemClock;
 
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
-import org.chromium.chrome.browser.ContentViewUtil;
 import org.chromium.chrome.browser.Tab;
+import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.compositor.layouts.ChromeAnimation;
 import org.chromium.chrome.browser.compositor.layouts.ChromeAnimation.Animatable;
 import org.chromium.chrome.browser.compositor.layouts.eventfilter.EdgeSwipeEventFilter.ScrollDirection;
@@ -20,9 +20,11 @@ import org.chromium.chrome.browser.dom_distiller.ReaderModeButtonView.ReaderMode
 import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.util.MathUtils;
 import org.chromium.content.browser.ContentView;
+import org.chromium.content.browser.ContentViewClient;
 import org.chromium.content.browser.ContentViewCore;
+import org.chromium.content_public.browser.NavigationController;
+import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
-import org.chromium.content_public.common.TopControlsState;
 import org.chromium.ui.base.WindowAndroid;
 
 import java.util.concurrent.TimeUnit;
@@ -143,7 +145,12 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
 
     private boolean mIsReaderModePanelHidden;
     private boolean mIsReaderModePanelDismissed;
+    private boolean mIsFullscreenModeEntered;
+    private boolean mIsInfobarContainerShown;
+
     private ContentViewCore mDistilledContentViewCore;
+    private boolean mDidStartLoad;
+    private boolean mDidFinishLoad;
     private WebContentsObserver mDistilledContentObserver;
     private boolean mDidFirstNonEmptyDistilledPaint;
     private ReaderModePanelLayoutDelegate mLayoutDelegate;
@@ -152,6 +159,13 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
     private float mLayoutHeight;
     private boolean mIsToolbarShowing;
     private float mDpToPx;
+
+    /**
+     * ContentViewClient state to override when the distilled ContentViewCore is set on the Tab.
+     */
+    private float mTopControlsOffsetYPix;
+    private float mContentOffsetYPix;
+    private float mOverdrawBottomHeightPix;
 
     /**
      * The {@link ReaderModePanelHost} used to get reader mode status and the associated tab.
@@ -180,7 +194,6 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
      * Destroys the panel and associated resources.
      */
     public void onDestroy() {
-        mLayoutAnimations = null;
         hideButtonBar();
     }
 
@@ -527,20 +540,25 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
         animateTo(mX, 1.0f, true);
     }
 
+    private boolean isReaderModeCurrentlyAllowed() {
+        return !mIsReaderModePanelHidden && !mIsReaderModePanelDismissed
+                && !mIsFullscreenModeEntered && !mIsInfobarContainerShown;
+    }
+
     private void nonAnimatedUpdateButtomButtonBar() {
         final int status = mReaderModeHost.getReaderModeStatus();
         final Tab tab = mReaderModeHost.getTab();
 
         if (mReaderModeButtonView != null
-                && (status != ReaderModeManager.POSSIBLE || mIsReaderModePanelHidden
-                        || mIsReaderModePanelDismissed)) {
-            mReaderModeButtonView.dismiss(true);
+                && (status != ReaderModeManager.POSSIBLE || !isReaderModeCurrentlyAllowed())) {
+            // Unfortunately, dismiss() couldn't be used because it might attempt to remove a view
+            // while in onLayout, thus causing crash.
+            mReaderModeButtonView.removeFromParentView();
             mReaderModeButtonView = null;
             return;
         }
         if (mReaderModeButtonView == null
-                && (status == ReaderModeManager.POSSIBLE && !mIsReaderModePanelHidden
-                        && !mIsReaderModePanelDismissed)) {
+                && (status == ReaderModeManager.POSSIBLE && isReaderModeCurrentlyAllowed())) {
             mReaderModeButtonView = ReaderModeButtonView.create(tab.getContentViewCore(),
                     new ReaderModeButtonViewDelegate() {
                         @Override
@@ -572,8 +590,7 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
 
         final int status = mReaderModeHost.getReaderModeStatus();
         if (isPanelWithinScreenBounds()
-                && (status != ReaderModeManager.POSSIBLE
-                        || mIsReaderModePanelHidden || mIsReaderModePanelDismissed)) {
+                && (status != ReaderModeManager.POSSIBLE || !isReaderModeCurrentlyAllowed())) {
             animateTo(0.0f, -1.0f, true);
             mReaderModeHost.destroyReaderModeControl();
             destroyDistilledContentViewCore();
@@ -582,8 +599,7 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
         }
 
         if (!isPanelWithinScreenBounds()
-                && (status == ReaderModeManager.POSSIBLE
-                        && !mIsReaderModePanelHidden && !mIsReaderModePanelDismissed)) {
+                && (status == ReaderModeManager.POSSIBLE && isReaderModeCurrentlyAllowed())) {
             animateTo(0.0f, 0.0f, true);
             mReaderModeHost.createReaderModeControl();
             requestUpdate();
@@ -591,11 +607,22 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
         }
     }
 
-    private static ContentViewCore createDistillerContentViewCore(
+    private ContentViewCore createDistillerContentViewCore(
             Context context, WindowAndroid windowAndroid) {
         ContentViewCore cvc = new ContentViewCore(context);
         ContentView cv = new ContentView(context, cvc);
-        cvc.initialize(cv, cv, ContentViewUtil.createWebContents(false, true), windowAndroid);
+        cvc.initialize(cv, cv, WebContentsFactory.createWebContents(false, true), windowAndroid);
+        cvc.setContentViewClient(new ContentViewClient() {
+            @Override
+            public void onOffsetsForFullscreenChanged(float topControlsOffsetYPix,
+                    float contentOffsetYPix, float overdrawBottomHeightPix) {
+                super.onOffsetsForFullscreenChanged(topControlsOffsetYPix, contentOffsetYPix,
+                        overdrawBottomHeightPix);
+                mTopControlsOffsetYPix = topControlsOffsetYPix;
+                mContentOffsetYPix = contentOffsetYPix;
+                mOverdrawBottomHeightPix = overdrawBottomHeightPix;
+            }
+        });
         return cvc;
     }
 
@@ -608,9 +635,15 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
         if (mDistilledContentViewCore != null) return;
 
         mDidFirstNonEmptyDistilledPaint = false;
+        mDidStartLoad = false;
+        mDidFinishLoad = false;
         mDistilledContentViewCore = createDistillerContentViewCore(
                 mReaderModeHost.getTab().getContentViewCore().getContext(),
                 mReaderModeHost.getTab().getWindowAndroid());
+
+        mergeNavigationHistory(mDistilledContentViewCore.getWebContents(),
+                mReaderModeHost.getTab().getWebContents());
+
         mDistilledContentObserver = new WebContentsObserver(
                 mDistilledContentViewCore.getWebContents()) {
             @Override
@@ -621,6 +654,18 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
                 RecordHistogram.recordTimesHistogram("DomDistiller.Time.SwipeToPaint",
                         SystemClock.elapsedRealtime() - start, TimeUnit.MILLISECONDS);
             }
+
+            @Override
+            public void didStartLoading(String url) {
+                super.didStartLoading(url);
+                mDidStartLoad = true;
+            }
+
+            @Override
+            public void didFinishLoad(long frameId, String validatedUrl, boolean isMainFrame) {
+                super.didFinishLoad(frameId, validatedUrl, isMainFrame);
+                if (isMainFrame) mDidFinishLoad = true;
+            }
         };
         mReaderModeHost.getTab().attachOverlayContentViewCore(
                 mDistilledContentViewCore, true, false);
@@ -628,25 +673,47 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
                 mReaderModeHost.getTab().getContentViewCore().getWebContents(),
                 mDistilledContentViewCore.getWebContents());
         mDistilledContentViewCore.onShow();
-
-        mReaderModeHost.getTab().updateTopControlsState(TopControlsState.BOTH, false);
     }
 
     private void nonAnimatedEnterDistilledMode() {
         RecordUserAction.record("DomDistiller_DistilledPageOpened");
         DomDistillerTabUtils.distillCurrentPageAndView(mReaderModeHost.getTab().getWebContents());
-        mReaderModeHost.getTab().updateTopControlsState(TopControlsState.SHOWN, false);
         nonAnimatedUpdateButtomButtonBar();
     }
 
+    private static void mergeNavigationHistory(WebContents target, WebContents source) {
+        target.getNavigationController().clearHistory();
+        NavigationController distilled = target.getNavigationController();
+        NavigationController original = source.getNavigationController();
+        if (distilled.canPruneAllButLastCommitted()) {
+            distilled.copyStateFromAndPrune(original, false);
+        } else if (distilled.canCopyStateOver()) {
+            distilled.copyStateFrom(original);
+        }
+    }
+
     private void enterDistilledMode() {
+        if (!isReaderModeCurrentlyAllowed()) return;
+
         RecordUserAction.record("DomDistiller_DistilledPageOpened");
         mSlidingT = -1.0f;
         requestUpdate();
 
-        mReaderModeHost.getTab().updateTopControlsState(TopControlsState.HIDDEN, false);
-        DomDistillerTabUtils.distillCurrentPageAndView(mReaderModeHost.getTab().getWebContents());
+        mDistilledContentViewCore.getWebContents().updateTopControlsState(true, false, false);
+
+        mReaderModeHost.getTab().detachOverlayContentViewCore(mDistilledContentViewCore);
+        mDistilledContentObserver.destroy();
+        mDistilledContentObserver = null;
+
+        mDistilledContentViewCore.setContentViewClient(new ContentViewClient());
+        mReaderModeHost.getTab().swapContentViewCore(mDistilledContentViewCore, true,
+                mDidStartLoad, mDidFinishLoad);
+        mDistilledContentViewCore.getContentViewClient().onOffsetsForFullscreenChanged(
+                mTopControlsOffsetYPix, mContentOffsetYPix, mOverdrawBottomHeightPix);
+
+        mDistilledContentViewCore = null;
         destroyDistilledContentViewCore();
+
         if (mLayoutDelegate != null) {
             mLayoutDelegate.setLayoutTabBrightness(1.0f);
             mLayoutDelegate.setLayoutTabY(0.0f);
@@ -656,10 +723,13 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
     }
 
     private void destroyDistilledContentViewCore() {
+        if (mDistilledContentObserver != null) {
+            mDistilledContentObserver.destroy();
+            mDistilledContentObserver = null;
+        }
+
         if (mDistilledContentViewCore == null) return;
 
-        mDistilledContentObserver.destroy();
-        mDistilledContentObserver = null;
         mReaderModeHost.getTab().detachOverlayContentViewCore(mDistilledContentViewCore);
 
         mDistilledContentViewCore.getWebContents().destroy();
@@ -671,9 +741,8 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
      * Hides the reader mode button bar if shown.
      */
     public void hideButtonBar() {
-        if (mIsReaderModePanelHidden) return;
-
         mIsReaderModePanelHidden = true;
+        mLayoutAnimations = null;
         updateBottomButtonBar();
     }
 
@@ -681,9 +750,8 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
      * Dismisses the reader mode button bar if shown.
      */
     public void dismissButtonBar() {
-        if (mIsReaderModePanelDismissed) return;
-
         mIsReaderModePanelDismissed = true;
+        mLayoutAnimations = null;
         updateBottomButtonBar();
     }
 
@@ -692,6 +760,40 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
      */
     public void unhideButtonBar() {
         mIsReaderModePanelHidden = false;
+        updateBottomButtonBar();
+    }
+
+    /**
+     * Temporarily hides the reader mode button while the video is shown.
+     */
+    public void onEnterFullscreen() {
+        mIsFullscreenModeEntered = true;
+        mLayoutAnimations = null;
+        updateBottomButtonBar();
+    }
+
+    /**
+     * Re-shows the reader mode button if necessary once the video is exited.
+     */
+    public void onExitFullscreen() {
+        mIsFullscreenModeEntered = false;
+        updateBottomButtonBar();
+    }
+
+    /**
+     * Temporarily hides the reader mode button while the infobars are shown.
+     */
+    public void onShowInfobarContainer() {
+        mIsInfobarContainerShown = true;
+        mLayoutAnimations = null;
+        updateBottomButtonBar();
+    }
+
+    /**
+     * Re-shows the reader mode button if necessary once the infobars are dismissed.
+     */
+    public void onHideInfobarContainer() {
+        mIsInfobarContainerShown = false;
         updateBottomButtonBar();
     }
 

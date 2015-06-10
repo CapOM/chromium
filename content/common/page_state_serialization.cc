@@ -120,7 +120,7 @@ bool AppendReferencedFilesFromDocumentState(
         index + value_size < index)  // Check for overflow.
       return false;
 
-    if (EqualsASCII(type.string(), "file")) {
+    if (base::EqualsASCII(type.string(), "file")) {
       if (value_size != 2)
         return false;
 
@@ -167,15 +167,15 @@ struct SerializeObject {
       : pickle(data, len),
         version(0),
         parse_error(false) {
-    iter = PickleIterator(pickle);
+    iter = base::PickleIterator(pickle);
   }
 
   std::string GetAsString() {
     return std::string(static_cast<const char*>(pickle.data()), pickle.size());
   }
 
-  Pickle pickle;
-  PickleIterator iter;
+  base::Pickle pickle;
+  base::PickleIterator iter;
   int version;
   bool parse_error;
 };

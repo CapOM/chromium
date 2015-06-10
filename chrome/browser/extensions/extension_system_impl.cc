@@ -39,14 +39,12 @@
 #include "content/public/browser/url_data_source.h"
 #include "extensions/browser/content_verifier.h"
 #include "extensions/browser/content_verifier_delegate.h"
-#include "extensions/browser/event_router.h"
 #include "extensions/browser/extension_pref_store.h"
 #include "extensions/browser/extension_pref_value_map.h"
 #include "extensions/browser/extension_pref_value_map_factory.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/info_map.h"
-#include "extensions/browser/lazy_background_task_queue.h"
 #include "extensions/browser/management_policy.h"
 #include "extensions/browser/quota_service.h"
 #include "extensions/browser/runtime_data.h"
@@ -99,7 +97,6 @@ ExtensionSystemImpl::Shared::~Shared() {
 }
 
 void ExtensionSystemImpl::Shared::InitPrefs() {
-  event_router_.reset(new EventRouter(profile_, ExtensionPrefs::Get(profile_)));
   // Two state stores. The latter, which contains declarative rules, must be
   // loaded immediately so that the rules are ready before we issue network
   // requests.
@@ -147,8 +144,8 @@ namespace {
 
 class ContentVerifierDelegateImpl : public ContentVerifierDelegate {
  public:
-  explicit ContentVerifierDelegateImpl(ExtensionService* service)
-      : service_(service->AsWeakPtr()), default_mode_(GetDefaultMode()) {}
+  explicit ContentVerifierDelegateImpl(content::BrowserContext* context)
+      : context_(context), default_mode_(GetDefaultMode()) {}
 
   ~ContentVerifierDelegateImpl() override {}
 
@@ -208,18 +205,22 @@ class ContentVerifierDelegateImpl : public ContentVerifierDelegate {
 
   void VerifyFailed(const std::string& extension_id,
                     ContentVerifyJob::FailureReason reason) override {
-    if (!service_)
-      return;
-    ExtensionRegistry* registry = ExtensionRegistry::Get(service_->profile());
+    ExtensionRegistry* registry = ExtensionRegistry::Get(context_);
     const Extension* extension =
         registry->GetExtensionById(extension_id, ExtensionRegistry::ENABLED);
     if (!extension)
       return;
+    ExtensionSystem* system = ExtensionSystem::Get(context_);
     Mode mode = ShouldBeVerified(*extension);
     if (mode >= ContentVerifierDelegate::ENFORCE) {
-      service_->DisableExtension(extension_id, Extension::DISABLE_CORRUPTED);
-      ExtensionPrefs::Get(service_->profile())
-          ->IncrementCorruptedDisableCount();
+      if (!system->management_policy()->UserMayModifySettings(extension,
+                                                              NULL)) {
+        LogFailureForPolicyForceInstall(extension_id);
+        return;
+      }
+      system->extension_service()->DisableExtension(
+          extension_id, Extension::DISABLE_CORRUPTED);
+      ExtensionPrefs::Get(context_)->IncrementCorruptedDisableCount();
       UMA_HISTOGRAM_BOOLEAN("Extensions.CorruptExtensionBecameDisabled", true);
       UMA_HISTOGRAM_ENUMERATION("Extensions.CorruptExtensionDisabledReason",
           reason, ContentVerifyJob::FAILURE_REASON_MAX);
@@ -279,12 +280,26 @@ class ContentVerifierDelegateImpl : public ContentVerifierDelegate {
   }
 
  private:
-  base::WeakPtr<ExtensionService> service_;
+  void LogFailureForPolicyForceInstall(const std::string& extension_id) {
+    if (!ContainsKey(corrupt_policy_extensions_, extension_id)) {
+      corrupt_policy_extensions_.insert(extension_id);
+      UMA_HISTOGRAM_BOOLEAN("Extensions.CorruptPolicyExtensionWouldBeDisabled",
+                            true);
+    }
+  }
+
+  content::BrowserContext* context_;
   ContentVerifierDelegate::Mode default_mode_;
 
   // For reporting metrics in BOOTSTRAP mode, when an extension would be
   // disabled if content verification was in ENFORCE mode.
   std::set<std::string> would_be_disabled_ids_;
+
+  // Currently enterprise policy extensions that must remain enabled will not
+  // be disabled due to content verification failure, but we are considering
+  // changing this (crbug.com/447040), so for now we are tracking how often
+  // this happens to help inform the decision.
+  std::set<std::string> corrupt_policy_extensions_;
 
   DISALLOW_COPY_AND_ASSIGN(ContentVerifierDelegateImpl);
 };
@@ -323,7 +338,7 @@ void ExtensionSystemImpl::Shared::Init(bool extensions_enabled) {
   {
     InstallVerifier::Get(profile_)->Init();
     content_verifier_ = new ContentVerifier(
-        profile_, new ContentVerifierDelegateImpl(extension_service_.get()));
+        profile_, new ContentVerifierDelegateImpl(profile_));
     ContentVerifierDelegate::Mode mode =
         ContentVerifierDelegateImpl::GetDefaultMode();
 #if defined(OS_CHROMEOS)
@@ -431,10 +446,6 @@ InfoMap* ExtensionSystemImpl::Shared::info_map() {
   return extension_info_map_.get();
 }
 
-EventRouter* ExtensionSystemImpl::Shared::event_router() {
-  return event_router_.get();
-}
-
 QuotaService* ExtensionSystemImpl::Shared::quota_service() {
   return quota_service_.get();
 }
@@ -498,10 +509,6 @@ StateStore* ExtensionSystemImpl::rules_store() {
 }
 
 InfoMap* ExtensionSystemImpl::info_map() { return shared_->info_map(); }
-
-EventRouter* ExtensionSystemImpl::event_router() {
-  return shared_->event_router();
-}
 
 const OneShotEvent& ExtensionSystemImpl::ready() const {
   return shared_->ready();

@@ -1201,7 +1201,7 @@ TEST_F(NavigationControllerTest, LoadURL_WithBindings) {
   // Going back, the first entry should still appear unprivileged.
   controller.GoBack();
   new_rfh->PrepareForCommit();
-  orig_rfh->SendNavigate(0, entry1_id, false, url1);
+  contents()->GetPendingMainFrame()->SendNavigate(0, entry1_id, false, url1);
   EXPECT_EQ(0, controller.GetLastCommittedEntryIndex());
   EXPECT_EQ(0, controller.GetLastCommittedEntry()->bindings());
 }
@@ -2074,6 +2074,11 @@ TEST_F(NavigationControllerTest, NewSubframe) {
   EXPECT_EQ(1U, navigation_entry_committed_counter_);
   navigation_entry_committed_counter_ = 0;
 
+  main_test_rfh()->OnCreateChildFrame(
+      MSG_ROUTING_NONE, blink::WebTreeScopeType::Document, std::string(),
+      blink::WebSandboxFlags::None);
+  RenderFrameHostImpl* subframe =
+      contents()->GetFrameTree()->root()->child_at(0)->current_frame_host();
   const GURL url2("http://foo2");
   FrameHostMsg_DidCommitProvisionalLoad_Params params;
   params.page_id = 1;
@@ -2087,8 +2092,7 @@ TEST_F(NavigationControllerTest, NewSubframe) {
   params.page_state = PageState::CreateFromURL(url2);
 
   LoadCommittedDetails details;
-  EXPECT_TRUE(controller.RendererDidNavigate(main_test_rfh(), params,
-                                             &details));
+  EXPECT_TRUE(controller.RendererDidNavigate(subframe, params, &details));
   EXPECT_EQ(1U, navigation_entry_committed_counter_);
   navigation_entry_committed_counter_ = 0;
   EXPECT_EQ(url1, details.previous_url);
@@ -2853,6 +2857,7 @@ TEST_F(NavigationControllerTest, RestoreNavigateAfterFailure) {
   fail_load_params.error_description = base::string16();
   fail_load_params.url = url;
   fail_load_params.showing_repost_interstitial = false;
+  main_test_rfh()->InitializeRenderFrameIfNeeded();
   main_test_rfh()->OnMessageReceived(
       FrameHostMsg_DidFailProvisionalLoadWithError(0,  // routing_id
                                                   fail_load_params));

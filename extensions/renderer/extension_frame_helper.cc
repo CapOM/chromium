@@ -19,6 +19,7 @@ ExtensionFrameHelper::ExtensionFrameHelper(content::RenderFrame* render_frame,
                                            Dispatcher* extension_dispatcher)
     : content::RenderFrameObserver(render_frame),
       content::RenderFrameObserverTracker<ExtensionFrameHelper>(render_frame),
+      tab_id_(-1),
       extension_dispatcher_(extension_dispatcher) {}
 
 ExtensionFrameHelper::~ExtensionFrameHelper() {
@@ -49,6 +50,9 @@ bool ExtensionFrameHelper::OnMessageReceived(const IPC::Message& message) {
     IPC_MESSAGE_HANDLER(ExtensionMsg_DeliverMessage, OnExtensionDeliverMessage)
     IPC_MESSAGE_HANDLER(ExtensionMsg_DispatchOnDisconnect,
                         OnExtensionDispatchOnDisconnect)
+    IPC_MESSAGE_HANDLER(ExtensionMsg_SetTabId, OnExtensionSetTabId)
+    IPC_MESSAGE_HANDLER(ExtensionMsg_SetTabExtensionOwner,
+                        OnSetTabExtensionOwner)
     IPC_MESSAGE_UNHANDLED(handled = false)
   IPC_END_MESSAGE_MAP()
   return handled;
@@ -89,6 +93,17 @@ void ExtensionFrameHelper::OnExtensionDispatchOnDisconnect(
   MessagingBindings::DispatchOnDisconnect(
       extension_dispatcher_->script_context_set(), port_id, error_message,
       render_frame());
+}
+
+void ExtensionFrameHelper::OnExtensionSetTabId(int tab_id) {
+  CHECK_EQ(tab_id_, -1);
+  CHECK_GE(tab_id, 0);
+  tab_id_ = tab_id;
+}
+
+void ExtensionFrameHelper::OnSetTabExtensionOwner(
+    const std::string& extension_id) {
+  tab_extension_owner_id_ = extension_id;
 }
 
 }  // namespace extensions

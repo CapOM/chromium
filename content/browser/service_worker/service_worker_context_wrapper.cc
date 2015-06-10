@@ -13,8 +13,11 @@
 #include "base/bind.h"
 #include "base/files/file_path.h"
 #include "base/lazy_instance.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "content/browser/service_worker/service_worker_context_core.h"
 #include "content/browser/service_worker/service_worker_context_observer.h"
@@ -41,7 +44,7 @@ base::LazyInstance<HeaderNameSet> g_excluded_header_name_set =
     LAZY_INSTANCE_INITIALIZER;
 
 void RunSoon(const base::Closure& closure) {
-  base::MessageLoop::current()->PostTask(FROM_HERE, closure);
+  base::ThreadTaskRunnerHandle::Get()->PostTask(FROM_HERE, closure);
 }
 
 void WorkerStarted(const ServiceWorkerContextWrapper::StatusCallback& callback,
@@ -101,7 +104,7 @@ ServiceWorkerContext* ServiceWorkerContext::GetServiceWorkerContext(
 ServiceWorkerContextWrapper::ServiceWorkerContextWrapper(
     BrowserContext* browser_context)
     : observer_list_(
-          new ObserverListThreadSafe<ServiceWorkerContextObserver>()),
+          new base::ObserverListThreadSafe<ServiceWorkerContextObserver>()),
       process_manager_(new ServiceWorkerProcessManager(browser_context)),
       is_incognito_(false),
       storage_partition_(nullptr) {

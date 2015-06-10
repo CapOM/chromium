@@ -829,6 +829,8 @@ void RenderWidgetHostViewAura::HandleParentBoundsChanged() {
         window_->GetBoundsInRootWindow());
   }
 #endif
+  if (!in_shutdown_)
+    host_->SendScreenRects();
 }
 
 void RenderWidgetHostViewAura::ParentHierarchyChanged() {
@@ -1788,18 +1790,6 @@ void RenderWidgetHostViewAura::EnsureCaretInRect(const gfx::Rect& rect) {
       ConvertRectFromScreen(intersected_rect));
 }
 
-void RenderWidgetHostViewAura::OnCandidateWindowShown() {
-  host_->CandidateWindowShown();
-}
-
-void RenderWidgetHostViewAura::OnCandidateWindowUpdated() {
-  host_->CandidateWindowUpdated();
-}
-
-void RenderWidgetHostViewAura::OnCandidateWindowHidden() {
-  host_->CandidateWindowHidden();
-}
-
 bool RenderWidgetHostViewAura::IsEditCommandEnabled(int command_id) {
   return false;
 }
@@ -2467,7 +2457,7 @@ ui::InputMethod* RenderWidgetHostViewAura::GetInputMethod() const {
   aura::Window* root_window = window_->GetRootWindow();
   if (!root_window)
     return NULL;
-  return root_window->GetProperty(aura::client::kRootWindowInputMethodKey);
+  return root_window->GetHost()->GetInputMethod();
 }
 
 void RenderWidgetHostViewAura::Shutdown() {
@@ -2478,8 +2468,7 @@ void RenderWidgetHostViewAura::Shutdown() {
 }
 
 bool RenderWidgetHostViewAura::NeedsInputGrab() {
-  return popup_type_ == blink::WebPopupTypeSelect ||
-         popup_type_ == blink::WebPopupTypePage;
+  return popup_type_ == blink::WebPopupTypePage;
 }
 
 bool RenderWidgetHostViewAura::NeedsMouseCapture() {

@@ -330,6 +330,9 @@
     'network_time_unittest_sources': [
       'network_time/network_time_tracker_unittest.cc',
     ],
+    'offline_page_unittest_sources': [
+      'offline_pages/offline_page_model_unittest.cc',
+    ],
     'omnibox_unittest_sources': [
       'omnibox/answers_cache_unittest.cc',
       'omnibox/autocomplete_input_unittest.cc',
@@ -433,7 +436,9 @@
       'precache/core/precache_url_table_unittest.cc',
     ],
     'proximity_auth_unittest_sources': [
+      'proximity_auth/ble/bluetooth_low_energy_characteristics_finder_unittest.cc',
       'proximity_auth/ble/bluetooth_low_energy_connection_finder_unittest.cc',
+      'proximity_auth/ble/bluetooth_low_energy_connection_unittest.cc',
       'proximity_auth/ble/proximity_auth_ble_system_unittest.cc',
       'proximity_auth/bluetooth_connection_finder_unittest.cc',
       'proximity_auth/bluetooth_connection_unittest.cc',
@@ -692,6 +697,7 @@
         '<@(metrics_unittest_sources)',
         '<@(mime_util_unittest_sources)',
         '<@(network_time_unittest_sources)',
+        '<@(offline_page_unittest_sources)',
         '<@(omnibox_unittest_sources)',
         '<@(os_crypt_unittest_sources)',
         '<@(packed_ct_ev_whitelist_unittest_sources)',
@@ -794,6 +800,7 @@
         'components.gyp:metrics_profiler',
         'components.gyp:metrics_test_support',
         'components.gyp:network_time',
+        'components.gyp:offline_pages',
         'components.gyp:omnibox',
         'components.gyp:omnibox_test_support',
         'components.gyp:os_crypt',
@@ -1234,6 +1241,7 @@
           ],
           'variables': {
             'test_suite_name': 'components_browsertests',
+            'isolate_file': 'components_browsertests.isolate',
             'java_in_dir': 'test/android/browsertests_apk',
             'android_manifest_path': '<(SHARED_INTERMEDIATE_DIR)/components_browsertests_manifest/AndroidManifest.xml',
             'resource_dir': 'test/android/browsertests_apk/res',
@@ -1451,6 +1459,7 @@
       'targets': [
         {
           'target_name': 'components_unittests_apk',
+          'isolate_file': 'components_unittests.isolate',
           'type': 'none',
           'dependencies': [
             'components_unittests',

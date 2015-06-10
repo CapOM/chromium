@@ -95,8 +95,8 @@
             }],
             ['target_arch == "arm" or target_arch == "arm64"', {
               'dependencies': [
-                # The relocation packer only works on ARM or ARM64.
-                '../tools/relocation_packer/relocation_packer.gyp:relocation_packer_unittests#host',
+                # The relocation packer is currently used only for ARM or ARM64.
+                '../third_party/android_platform/relocation_packer.gyp:android_relocation_packer_unittests#host',
               ],
             }],
           ],
@@ -490,7 +490,7 @@
         }],
         ['disable_nacl==0 and disable_nacl_untrusted==0 and enable_nacl_nonsfi_test==1', {
           'dependencies': [
-            '../components/nacl_nonsfi.gyp:nacl_helper_nonsfi_unittests',
+            '../components/nacl.gyp:nacl_helper_nonsfi_unittests',
           ],
         }],
         ['disable_nacl==0 and disable_nacl_untrusted==0', {
@@ -533,8 +533,8 @@
             }],
             ['OS=="win"', {
               'dependencies': [
+                '../components/test_runner/test_runner.gyp:layout_test_helper',
                 '../content/content_shell_and_tests.gyp:content_shell_crash_service',
-                '../content/content_shell_and_tests.gyp:layout_test_helper',
               ],
             }],
             ['OS!="win" and OS!="android"', {
@@ -544,8 +544,8 @@
             }],
             ['OS=="mac"', {
               'dependencies': [
+                '../components/test_runner/test_runner.gyp:layout_test_helper',
                 '../breakpad/breakpad.gyp:dump_syms#host',
-                '../content/content_shell_and_tests.gyp:layout_test_helper',
               ],
             }],
             ['OS=="linux"', {
@@ -1144,9 +1144,9 @@
           'target_name': 'chromium_builder_lkgr_drmemory_win',
           'type': 'none',
           'dependencies': [
+            '../components/test_runner/test_runner.gyp:layout_test_helper',
             '../content/content_shell_and_tests.gyp:content_shell',
             '../content/content_shell_and_tests.gyp:content_shell_crash_service',
-            '../content/content_shell_and_tests.gyp:layout_test_helper',
           ],
         },
         {
@@ -1166,10 +1166,10 @@
             '../chrome_elf/chrome_elf.gyp:chrome_elf_unittests',
             '../cloud_print/cloud_print.gyp:cloud_print_unittests',
             '../components/components_tests.gyp:components_unittests',
+            '../components/test_runner/test_runner.gyp:layout_test_helper',
             '../content/content_shell_and_tests.gyp:content_browsertests',
             '../content/content_shell_and_tests.gyp:content_shell',
             '../content/content_shell_and_tests.gyp:content_shell_crash_service',
-            '../content/content_shell_and_tests.gyp:layout_test_helper',
             '../content/content_shell_and_tests.gyp:content_unittests',
             '../courgette/courgette.gyp:courgette_unittests',
             '../crypto/crypto.gyp:crypto_unittests',
@@ -1249,14 +1249,14 @@
               'target_name': 'chrome_official_builder',
               'type': 'none',
               'dependencies': [
-	        'chrome_official_builder_no_unittests',
+                'chrome_official_builder_no_unittests',
                 '../base/base.gyp:base_unittests',
                 '../chrome/chrome.gyp:browser_tests',
                 '../chrome/chrome.gyp:sync_integration_tests',
                 '../ipc/ipc.gyp:ipc_tests',
                 '../media/media.gyp:media_unittests',
                 '../media/midi/midi.gyp:midi_unittests',
-                '../net/net.gyp:net_unittests_run',
+                '../net/net.gyp:net_unittests',
                 '../printing/printing.gyp:printing_unittests',
                 '../sql/sql.gyp:sql_unittests',
                 '../sync/sync.gyp:sync_unit_tests',

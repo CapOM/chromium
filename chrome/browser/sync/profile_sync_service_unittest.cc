@@ -112,8 +112,7 @@ class SyncBackendHostNoReturn : public SyncBackendHostMock {
       bool delete_sync_data_folder,
       scoped_ptr<syncer::SyncManagerFactory> sync_manager_factory,
       scoped_ptr<syncer::UnrecoverableErrorHandler> unrecoverable_error_handler,
-      syncer::ReportUnrecoverableErrorFunction
-          report_unrecoverable_error_function,
+      const base::Closure& report_unrecoverable_error_function,
       syncer::NetworkResources* network_resources) override {}
 };
 
@@ -132,8 +131,7 @@ class SyncBackendHostMockCollectDeleteDirParam : public SyncBackendHostMock {
       bool delete_sync_data_folder,
       scoped_ptr<syncer::SyncManagerFactory> sync_manager_factory,
       scoped_ptr<syncer::UnrecoverableErrorHandler> unrecoverable_error_handler,
-      syncer::ReportUnrecoverableErrorFunction
-          report_unrecoverable_error_function,
+      const base::Closure& report_unrecoverable_error_function,
       syncer::NetworkResources* network_resources) override {
     delete_dir_param_->push_back(delete_sync_data_folder);
     SyncBackendHostMock::Initialize(frontend, sync_thread.Pass(),
@@ -162,11 +160,11 @@ ACTION_P(ReturnNewMockHostCollectDeleteDirParam, delete_dir_param) {
       delete_dir_param);
 }
 
-KeyedService* BuildFakeProfileInvalidationProvider(
+scoped_ptr<KeyedService> BuildFakeProfileInvalidationProvider(
     content::BrowserContext* context) {
-  return new invalidation::ProfileInvalidationProvider(
+  return make_scoped_ptr(new invalidation::ProfileInvalidationProvider(
       scoped_ptr<invalidation::InvalidationService>(
-          new invalidation::FakeInvalidationService));
+          new invalidation::FakeInvalidationService)));
 }
 
 // A test harness that uses a real ProfileSyncService and in most cases a
@@ -347,7 +345,7 @@ TEST_F(ProfileSyncServiceTest, SuccessfulInitialization) {
   ExpectSyncBackendHostCreation(1);
   InitializeForNthSync();
   EXPECT_FALSE(service()->IsManaged());
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_EQ(ProfileSyncService::SYNC, service()->backend_mode());
 }
 
@@ -377,7 +375,7 @@ TEST_F(ProfileSyncServiceTest, DisabledByPolicyBeforeInit) {
   CreateService(browser_sync::AUTO_START);
   InitializeForNthSync();
   EXPECT_TRUE(service()->IsManaged());
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
 }
 
 // Verify that disable by enterprise policy works even after the backend has
@@ -390,13 +388,13 @@ TEST_F(ProfileSyncServiceTest, DisabledByPolicyAfterInit) {
   InitializeForNthSync();
 
   EXPECT_FALSE(service()->IsManaged());
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
 
   profile()->GetTestingPrefService()->SetManagedPref(
       sync_driver::prefs::kSyncManaged, new base::FundamentalValue(true));
 
   EXPECT_TRUE(service()->IsManaged());
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
 }
 
 // Exercies the ProfileSyncService's code paths related to getting shut down
@@ -407,34 +405,34 @@ TEST_F(ProfileSyncServiceTest, AbortedByShutdown) {
 
   IssueTestTokens();
   InitializeForNthSync();
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
 
   ShutdownAndDeleteService();
 }
 
-// Test StopAndSuppress() before we've initialized the backend.
-TEST_F(ProfileSyncServiceTest, EarlyStopAndSuppress) {
+// Test RequestStop() before we've initialized the backend.
+TEST_F(ProfileSyncServiceTest, EarlyRequestStop) {
   CreateService(browser_sync::AUTO_START);
   IssueTestTokens();
 
-  service()->StopAndSuppress();
+  service()->RequestStop();
   EXPECT_TRUE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 
   // Because of supression, this should fail.
   InitializeForNthSync();
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
 
   // Remove suppression.  This should be enough to allow init to happen.
   ExpectDataTypeManagerCreation(1);
   ExpectSyncBackendHostCreation(1);
-  service()->UnsuppressAndStart();
-  EXPECT_TRUE(service()->SyncActive());
+  service()->RequestStart();
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 }
 
-// Test StopAndSuppress() after we've initialized the backend.
+// Test RequestStop() after we've initialized the backend.
 TEST_F(ProfileSyncServiceTest, DisableAndEnableSyncTemporarily) {
   CreateService(browser_sync::AUTO_START);
   IssueTestTokens();
@@ -442,22 +440,22 @@ TEST_F(ProfileSyncServiceTest, DisableAndEnableSyncTemporarily) {
   ExpectSyncBackendHostCreation(1);
   InitializeForNthSync();
 
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 
   testing::Mock::VerifyAndClearExpectations(components_factory());
 
-  service()->StopAndSuppress();
-  EXPECT_FALSE(service()->SyncActive());
+  service()->RequestStop();
+  EXPECT_FALSE(service()->IsSyncActive());
   EXPECT_TRUE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 
   ExpectDataTypeManagerCreation(1);
   ExpectSyncBackendHostCreation(1);
 
-  service()->UnsuppressAndStart();
-  EXPECT_TRUE(service()->SyncActive());
+  service()->RequestStart();
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 }
@@ -472,13 +470,13 @@ TEST_F(ProfileSyncServiceTest, EnableSyncAndSignOut) {
   IssueTestTokens();
   InitializeForNthSync();
 
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 
   SigninManagerFactory::GetForProfile(profile())->SignOut(
       signin_metrics::SIGNOUT_TEST);
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
 }
 #endif  // !defined(OS_CHROMEOS)
 
@@ -541,14 +539,14 @@ TEST_F(ProfileSyncServiceTest, BackupBeforeFirstSync) {
 
   // At this time, backup is finished. Task is posted to start sync again.
   EXPECT_EQ(ProfileSyncService::BACKUP, service()->backend_mode());
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
   EXPECT_EQ(1u, delete_dir_param.size());
   EXPECT_TRUE(delete_dir_param[0]);
 
   // Pump loop to start sync.
   PumpLoop();
   EXPECT_EQ(ProfileSyncService::SYNC, service()->backend_mode());
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_EQ(2u, delete_dir_param.size());
   EXPECT_TRUE(delete_dir_param[0]);
 }
@@ -566,14 +564,14 @@ TEST_F(ProfileSyncServiceTest, ResumeBackupIfAborted) {
 
   // At this time, backup is finished. Task is posted to start sync again.
   EXPECT_EQ(ProfileSyncService::BACKUP, service()->backend_mode());
-  EXPECT_FALSE(service()->SyncActive());
+  EXPECT_FALSE(service()->IsSyncActive());
   EXPECT_EQ(1u, delete_dir_param.size());
   EXPECT_TRUE(delete_dir_param[0]);
 
   // Pump loop to start sync.
   PumpLoop();
   EXPECT_EQ(ProfileSyncService::SYNC, service()->backend_mode());
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_EQ(2u, delete_dir_param.size());
   EXPECT_TRUE(delete_dir_param[0]);
 }
@@ -586,7 +584,7 @@ TEST_F(ProfileSyncServiceTest, Rollback) {
   ExpectSyncBackendHostCreationCollectDeleteDir(2, &delete_dir_param);
   IssueTestTokens();
   InitializeForNthSync();
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_EQ(ProfileSyncService::SYNC, service()->backend_mode());
 
   // First sync time should be recorded.
@@ -636,7 +634,7 @@ TEST_F(ProfileSyncServiceTest, ClearLastSyncedTimeOnSignOut) {
   ExpectDataTypeManagerCreation(1);
   ExpectSyncBackendHostCreation(1);
   InitializeForNthSync();
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_EQ(l10n_util::GetStringUTF16(IDS_SYNC_TIME_JUST_NOW),
             service()->GetLastSyncedTimeString());
 
@@ -651,12 +649,12 @@ TEST_F(ProfileSyncServiceTest, ClearLastSyncedTimeOnSignOut) {
 // Verify that the disable sync flag disables sync.
 TEST_F(ProfileSyncServiceTest, DisableSyncFlag) {
   base::CommandLine::ForCurrentProcess()->AppendSwitch(switches::kDisableSync);
-  EXPECT_FALSE(ProfileSyncService::IsSyncEnabled());
+  EXPECT_FALSE(ProfileSyncService::IsSyncAllowedByFlag());
 }
 
 // Verify that no disable sync flag enables sync.
 TEST_F(ProfileSyncServiceTest, NoDisableSyncFlag) {
-  EXPECT_TRUE(ProfileSyncService::IsSyncEnabled());
+  EXPECT_TRUE(ProfileSyncService::IsSyncAllowedByFlag());
 }
 
 // Test Sync will stop after receive memory pressure
@@ -667,7 +665,7 @@ TEST_F(ProfileSyncServiceTest, MemoryPressureRecording) {
   ExpectSyncBackendHostCreation(1);
   InitializeForNthSync();
 
-  EXPECT_TRUE(service()->SyncActive());
+  EXPECT_TRUE(service()->IsSyncActive());
   EXPECT_FALSE(profile()->GetPrefs()->GetBoolean(
       sync_driver::prefs::kSyncSuppressStart));
 

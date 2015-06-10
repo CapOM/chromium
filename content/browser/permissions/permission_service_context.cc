@@ -46,6 +46,12 @@ void PermissionServiceContext::RenderFrameDeleted(
   CancelPendingOperations(render_frame_host);
 }
 
+void PermissionServiceContext::RenderFrameHostChanged(
+    RenderFrameHost* old_host,
+    RenderFrameHost* new_host) {
+  CancelPendingOperations(old_host);
+}
+
 void PermissionServiceContext::DidNavigateAnyFrame(
     RenderFrameHost* render_frame_host,
     const LoadCommittedDetails& details,
@@ -58,6 +64,7 @@ void PermissionServiceContext::DidNavigateAnyFrame(
 
 void PermissionServiceContext::CancelPendingOperations(
     RenderFrameHost* render_frame_host) const {
+  DCHECK(render_frame_host_);
   if (render_frame_host != render_frame_host_)
     return;
 
@@ -76,6 +83,10 @@ BrowserContext* PermissionServiceContext::GetBrowserContext() const {
 GURL PermissionServiceContext::GetEmbeddingOrigin() const {
   return web_contents() ? web_contents()->GetLastCommittedURL().GetOrigin()
                         : GURL();
+}
+
+RenderFrameHost* PermissionServiceContext::render_frame_host() const {
+  return render_frame_host_;
 }
 
 } // namespace content

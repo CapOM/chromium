@@ -4,7 +4,6 @@
 
 #include "media/base/media_log.h"
 
-
 #include "base/atomic_sequence_num.h"
 #include "base/json/json_writer.h"
 #include "base/values.h"
@@ -47,10 +46,6 @@ std::string MediaLog::EventTypeToString(MediaLogEvent::Type type) {
       return "WEBMEDIAPLAYER_CREATED";
     case MediaLogEvent::WEBMEDIAPLAYER_DESTROYED:
       return "WEBMEDIAPLAYER_DESTROYED";
-    case MediaLogEvent::PIPELINE_CREATED:
-      return "PIPELINE_CREATED";
-    case MediaLogEvent::PIPELINE_DESTROYED:
-      return "PIPELINE_DESTROYED";
     case MediaLogEvent::LOAD:
       return "LOAD";
     case MediaLogEvent::SEEK:
@@ -100,8 +95,6 @@ std::string MediaLog::PipelineStatusToString(PipelineStatus status) {
       return "pipeline: network error";
     case PIPELINE_ERROR_DECODE:
       return "pipeline: decode error";
-    case PIPELINE_ERROR_DECRYPT:
-      return "pipeline: decrypt error";
     case PIPELINE_ERROR_ABORT:
       return "pipeline: abort";
     case PIPELINE_ERROR_INITIALIZATION_FAILED:

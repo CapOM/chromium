@@ -288,7 +288,10 @@ void DecoderStream<StreamType>::Decode(
 
   int buffer_size = buffer->end_of_stream() ? 0 : buffer->data_size();
 
-  TRACE_EVENT_ASYNC_BEGIN0("media", GetTraceString<StreamType>(), this);
+  TRACE_EVENT_ASYNC_BEGIN2(
+      "media", GetTraceString<StreamType>(), this, "key frame",
+      !buffer->end_of_stream() && buffer->is_key_frame(), "timestamp (ms)",
+      buffer->timestamp().InMilliseconds());
 
   if (buffer->end_of_stream())
     decoding_eos_ = true;
@@ -337,7 +340,6 @@ void DecoderStream<StreamType>::OnDecodeDone(int buffer_size,
 
   switch (status) {
     case Decoder::kDecodeError:
-    case Decoder::kDecryptError:
       state_ = STATE_ERROR;
       ready_outputs_.clear();
       if (!read_cb_.is_null())
@@ -377,7 +379,6 @@ void DecoderStream<StreamType>::OnDecodeOutputReady(
     const scoped_refptr<Output>& output) {
   FUNCTION_DVLOG(2) << ": " << output->timestamp().InMilliseconds() << " ms";
   DCHECK(output.get());
-  DCHECK(!output->end_of_stream());
   DCHECK(state_ == STATE_NORMAL || state_ == STATE_FLUSHING_DECODER ||
          state_ == STATE_PENDING_DEMUXER_READ || state_ == STATE_ERROR)
       << state_;
@@ -505,7 +506,7 @@ void DecoderStream<StreamType>::ReinitializeDecoder() {
 }
 
 template <DemuxerStream::Type StreamType>
-void DecoderStream<StreamType>::OnDecoderReinitialized(PipelineStatus status) {
+void DecoderStream<StreamType>::OnDecoderReinitialized(bool success) {
   FUNCTION_DVLOG(2);
   DCHECK(task_runner_->BelongsToCurrentThread());
   DCHECK_EQ(state_, STATE_REINITIALIZING_DECODER);
@@ -516,7 +517,7 @@ void DecoderStream<StreamType>::OnDecoderReinitialized(PipelineStatus status) {
   // Also, Reset() can be called during pending ReinitializeDecoder().
   // This function needs to handle them all!
 
-  if (status != PIPELINE_OK) {
+  if (!success) {
     // Reinitialization failed. Try to fall back to one of the remaining
     // decoders. This will consume at least one decoder so doing it more than
     // once is safe.

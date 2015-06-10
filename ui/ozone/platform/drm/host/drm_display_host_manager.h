@@ -8,7 +8,7 @@
 #include <queue>
 #include <set>
 
-#include "base/files/file_path.h"
+#include "base/files/scoped_file.h"
 #include "base/memory/scoped_vector.h"
 #include "base/memory/weak_ptr.h"
 #include "ui/display/types/native_display_delegate.h"
@@ -38,8 +38,8 @@ class DrmDisplayHostManager : public DeviceEventObserver,
   void AddDelegate(DrmNativeDisplayDelegate* delegate);
   void RemoveDelegate(DrmNativeDisplayDelegate* delegate);
 
-  bool TakeDisplayControl();
-  bool RelinquishDisplayControl();
+  void TakeDisplayControl(const DisplayControlCallback& callback);
+  void RelinquishDisplayControl(const DisplayControlCallback& callback);
   void UpdateDisplays(const GetDisplaysCallback& callback);
 
   // DeviceEventObserver overrides:
@@ -81,6 +81,9 @@ class DrmDisplayHostManager : public DeviceEventObserver,
   void OnHDCPStateReceived(int64_t display_id, bool status, HDCPState state);
   void OnHDCPStateUpdated(int64_t display_id, bool status);
 
+  void OnTakeDisplayControl(bool status);
+  void OnRelinquishDisplayControl(bool status);
+
   void RunUpdateDisplaysCallback(const GetDisplaysCallback& callback) const;
 
   void NotifyDisplayDelegate() const;
@@ -95,6 +98,9 @@ class DrmDisplayHostManager : public DeviceEventObserver,
   // with the GPU process trying to open it and aquire DRM master.
   base::FilePath primary_graphics_card_path_;
 
+  // File path for virtual gem (VGEM) device.
+  base::FilePath vgem_card_path_;
+
   // Keeps track if there is a dummy display. This happens on initialization
   // when there is no connection to the GPU to update the displays.
   bool has_dummy_display_;
@@ -102,6 +108,10 @@ class DrmDisplayHostManager : public DeviceEventObserver,
   ScopedVector<DrmDisplayHost> displays_;
 
   GetDisplaysCallback get_displays_callback_;
+
+  DisplayControlCallback take_display_control_callback_;
+
+  DisplayControlCallback relinquish_display_control_callback_;
 
   // Used to serialize display event processing. This is done since
   // opening/closing DRM devices cannot be done on the UI thread and are handled
@@ -118,6 +128,9 @@ class DrmDisplayHostManager : public DeviceEventObserver,
   // This is used to cache the primary DRM device until the channel is
   // established.
   scoped_ptr<DrmDeviceHandle> primary_drm_device_handle_;
+
+  // Manages the VGEM device by itself and doesn't send it to GPU process.
+  base::ScopedFD vgem_card_device_file_;
 
   base::WeakPtrFactory<DrmDisplayHostManager> weak_ptr_factory_;
 

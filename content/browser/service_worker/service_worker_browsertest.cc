@@ -794,7 +794,14 @@ IN_PROC_BROWSER_TEST_F(EmbeddedWorkerBrowserTest, StartAndStop) {
   ASSERT_EQ(EmbeddedWorkerInstance::STOPPED, last_worker_status_);
 }
 
-IN_PROC_BROWSER_TEST_F(EmbeddedWorkerBrowserTest, StartPaused_ThenResume) {
+#if defined(OS_LINUX)
+// Flaky on Linux 32-bit: http://crbug.com/498688.
+#define MAYBE_StartPaused_ThenResume DISABLED_StartPaused_ThenResume
+#else
+#define MAYBE_StartPaused_ThenResume StartPaused_ThenResume
+#endif
+IN_PROC_BROWSER_TEST_F(EmbeddedWorkerBrowserTest,
+                       MAYBE_StartPaused_ThenResume) {
   pause_mode_ = PAUSE_THEN_RESUME;
   base::RunLoop start_run_loop;
   done_closure_ = start_run_loop.QuitClosure();
@@ -995,7 +1002,10 @@ class WaitForLoaded : public EmbeddedWorkerInstance::Listener {
   base::Closure quit_;
 };
 
-IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest, TimeoutStartingWorker) {
+// This test has started flaking somewhat consistently on Win, Mac and Linux.
+// Disabling for now, see http://crbug.com/496065.
+IN_PROC_BROWSER_TEST_F(ServiceWorkerVersionBrowserTest,
+                       DISABLED_TimeoutStartingWorker) {
   RunOnIOThread(base::Bind(&self::SetUpRegistrationOnIOThread, this,
                            "/service_worker/while_true_worker.js"));
 

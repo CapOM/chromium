@@ -10,7 +10,7 @@
 
 #include "base/callback_forward.h"
 #include "cc/layers/texture_layer.h"
-#include "third_party/WebKit/public/platform/WebScreenOrientationType.h"
+#include "third_party/WebKit/public/platform/modules/screen_orientation/WebScreenOrientationType.h"
 
 class GURL;
 
@@ -30,13 +30,16 @@ namespace device {
 class BluetoothAdapter;
 }
 
+namespace test_runner {
+class WebTestProxyBase;
+}
+
 namespace content {
 
 class PageState;
 class RenderFrame;
 class RendererGamepadProvider;
 class RenderView;
-class WebTestProxyBase;
 
 // Turn the browser process into layout test mode.
 void EnableBrowserLayoutTestMode();
@@ -51,7 +54,8 @@ void EnableRendererLayoutTestMode();
 // |callback| is invoked with a pointer to WebTestProxyBase for each created
 // WebTestProxy.
 void EnableWebTestProxyCreation(
-    const base::Callback<void(RenderView*, WebTestProxyBase*)>& callback);
+    const base::Callback<void(RenderView*, test_runner::WebTestProxyBase*)>&
+        callback);
 
 typedef base::Callback<void(const blink::WebURLResponse& response,
                             const std::string& data)> FetchManifestCallback;

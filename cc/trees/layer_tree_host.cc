@@ -933,9 +933,10 @@ size_t LayerTreeHost::CalculateMemoryForRenderSurfaces(
     Layer* render_surface_layer = update_list.at(i);
     RenderSurface* render_surface = render_surface_layer->render_surface();
 
-    size_t bytes =
-        Resource::MemorySizeBytes(render_surface->content_rect().size(),
-                                  RGBA_8888);
+    // We can use UncheckedMemorySizeBytes, since render surface content rect is
+    // limited by max texture size.
+    size_t bytes = Resource::UncheckedMemorySizeBytes(
+        render_surface->content_rect().size(), RGBA_8888);
     contents_texture_bytes += bytes;
 
     if (render_surface_layer->background_filters().IsEmpty() &&
@@ -943,8 +944,10 @@ size_t LayerTreeHost::CalculateMemoryForRenderSurfaces(
       continue;
 
     if (!readback_bytes) {
-      readback_bytes = Resource::MemorySizeBytes(device_viewport_size_,
-                                                 RGBA_8888);
+      // We need to use a checked size calucation here, since we don't control
+      // the size of the device viewport.
+      readback_bytes =
+          Resource::CheckedMemorySizeBytes(device_viewport_size_, RGBA_8888);
     }
   }
   return readback_bytes + contents_texture_bytes;
@@ -1300,6 +1303,13 @@ void LayerTreeHost::SendBeginFramesToChildren(
 void LayerTreeHost::SetAuthoritativeVSyncInterval(
     const base::TimeDelta& interval) {
   proxy_->SetAuthoritativeVSyncInterval(interval);
+}
+
+void LayerTreeHost::RecordFrameTimingEvents(
+    scoped_ptr<FrameTimingTracker::CompositeTimingSet> composite_events,
+    scoped_ptr<FrameTimingTracker::MainFrameTimingSet> main_frame_events) {
+  client_->RecordFrameTimingEvents(composite_events.Pass(),
+                                   main_frame_events.Pass());
 }
 
 }  // namespace cc

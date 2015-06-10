@@ -47,8 +47,8 @@ import org.chromium.chrome.browser.share.ShareHelper;
 import org.chromium.chrome.browser.sync.SyncController;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
-import org.chromium.chrome.shell.sync.AccountChooserFragment;
-import org.chromium.chrome.shell.sync.SignoutFragment;
+import org.chromium.chrome.shell.signin.AccountChooserFragment;
+import org.chromium.chrome.shell.signin.SignoutFragment;
 import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
 import org.chromium.components.service_tab_launcher.ServiceTabLauncher;
 import org.chromium.content.app.ContentApplication;
@@ -88,7 +88,7 @@ public class ChromeShellActivity extends AppCompatActivity implements AppMenuPro
                 }
             };
 
-    private WindowAndroid mWindow;
+    private ActivityWindowAndroid mWindow;
     private TabManager mTabManager;
     private ChromeShellToolbar mToolbar;
     private DevToolsServer mDevToolsServer;

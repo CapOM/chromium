@@ -152,8 +152,8 @@ scoped_ptr<SystemInputInjector> EventFactoryEvdev::CreateSystemInputInjector() {
 void EventFactoryEvdev::DispatchKeyEvent(const KeyEventParams& params) {
   TRACE_EVENT1("evdev", "EventFactoryEvdev::DispatchKeyEvent", "device",
                params.device_id);
-  keyboard_.OnKeyChange(params.code, params.down, params.timestamp,
-                        params.device_id);
+  keyboard_.OnKeyChange(params.code, params.down, params.suppress_auto_repeat,
+                        params.timestamp, params.device_id);
 }
 
 void EventFactoryEvdev::DispatchMouseMoveEvent(
@@ -199,7 +199,14 @@ void EventFactoryEvdev::DispatchMouseButtonEvent(
   }
 
   int flag = modifiers_.GetEventFlagFromModifier(modifier);
+  bool was_down = modifiers_.GetModifierFlags() & flag;
   modifiers_.UpdateModifier(modifier, params.down);
+  bool down = modifiers_.GetModifierFlags() & flag;
+
+  // Suppress nested clicks. EventModifiersEvdev counts presses, we only
+  // dispatch an event on 0-1 (first press) and 1-0 (last release) transitions.
+  if (down == was_down)
+    return;
 
   MouseEvent event(params.down ? ui::ET_MOUSE_PRESSED : ui::ET_MOUSE_RELEASED,
                    params.location, params.location, params.timestamp,

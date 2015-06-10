@@ -21,9 +21,7 @@
 #include "cc/output/copy_output_request.h"
 #include "cc/output/copy_output_result.h"
 #include "cc/test/animation_test_common.h"
-#include "cc/test/fake_content_layer.h"
 #include "cc/test/fake_content_layer_client.h"
-#include "cc/test/fake_content_layer_impl.h"
 #include "cc/test/fake_impl_proxy.h"
 #include "cc/test/fake_layer_tree_host.h"
 #include "cc/test/fake_layer_tree_host_impl.h"
@@ -2674,6 +2672,30 @@ TEST_F(LayerTreeHostCommonTest, VisibleRectForPerspectiveUnprojection) {
   gfx::Rect actual = LayerTreeHostCommon::CalculateVisibleRect(
       target_surface_rect, layer_content_rect, layer_to_surface_transform);
   EXPECT_EQ(expected, actual);
+}
+
+TEST_F(LayerTreeHostCommonTest,
+       VisibleRectsForPositionedRootLayerClippedByViewport) {
+  scoped_refptr<Layer> root =
+      make_scoped_refptr(new LayerWithForcedDrawsContent(layer_settings()));
+  scoped_ptr<FakeLayerTreeHost> host(CreateFakeLayerTreeHost());
+  host->SetRootLayer(root);
+
+  gfx::Transform identity_matrix;
+  // Root layer is positioned at (60, 70). The default device viewport size
+  // is (0, 0, 100x100) in target space. So the root layer's visible rect
+  // will be clipped by the viewport to be (0, 0, 40x30) in layer's space.
+  SetLayerPropertiesForTesting(root.get(), identity_matrix, gfx::Point3F(),
+                               gfx::PointF(60, 70), gfx::Size(100, 100), true,
+                               false);
+  ExecuteCalculateDrawProperties(root.get());
+
+  EXPECT_EQ(gfx::Rect(0, 0, 100, 100),
+            root->render_surface()->DrawableContentRect());
+  // In target space, not clipped.
+  EXPECT_EQ(gfx::Rect(60, 70, 100, 100), root->drawable_content_rect());
+  // In layer space, clipped.
+  EXPECT_EQ(gfx::Rect(0, 0, 40, 30), root->visible_content_rect());
 }
 
 TEST_F(LayerTreeHostCommonTest, DrawableAndVisibleContentRectsForSimpleLayers) {
@@ -7086,8 +7108,8 @@ TEST_F(LayerTreeHostCommonTest,
             render_surface2->render_surface()->content_rect().ToString());
 
   // Sanity check our num_unclipped_descendants values.
-  EXPECT_EQ(1, render_surface1->num_unclipped_descendants());
-  EXPECT_EQ(0, render_surface2->num_unclipped_descendants());
+  EXPECT_EQ(1u, render_surface1->num_unclipped_descendants());
+  EXPECT_EQ(0u, render_surface2->num_unclipped_descendants());
 }
 
 TEST_F(LayerTreeHostCommonTest, CanRenderToSeparateSurface) {
@@ -9355,8 +9377,8 @@ TEST_F(LayerTreeHostCommonTest, SkippingSubtreeMain) {
       make_scoped_refptr(new LayerWithForcedDrawsContent(layer_settings()));
   scoped_refptr<LayerWithForcedDrawsContent> grandchild =
       make_scoped_refptr(new LayerWithForcedDrawsContent(layer_settings()));
-  scoped_refptr<FakeContentLayer> greatgrandchild(
-      FakeContentLayer::Create(layer_settings(), &client));
+  scoped_refptr<FakePictureLayer> greatgrandchild(
+      FakePictureLayer::Create(layer_settings(), &client));
   SetLayerPropertiesForTesting(root.get(), identity, gfx::Point3F(),
                                gfx::PointF(), gfx::Size(100, 100), true, false);
   SetLayerPropertiesForTesting(child.get(), identity, gfx::Point3F(),
@@ -9428,8 +9450,8 @@ TEST_F(LayerTreeHostCommonTest, SkippingSubtreeImpl) {
   scoped_ptr<LayerImpl> grandchild =
       LayerImpl::Create(host_impl.active_tree(), 3);
 
-  scoped_ptr<FakeContentLayerImpl> greatgrandchild(
-      FakeContentLayerImpl::Create(host_impl.active_tree(), 4));
+  scoped_ptr<FakePictureLayerImpl> greatgrandchild(
+      FakePictureLayerImpl::Create(host_impl.active_tree(), 4));
 
   child->SetDrawsContent(true);
   grandchild->SetDrawsContent(true);
@@ -9577,7 +9599,7 @@ TEST_F(LayerTreeHostCommonTest, LayerTreeRebuildTest) {
   host->SetRootLayer(root);
 
   ExecuteCalculateDrawProperties(root.get());
-  EXPECT_EQ(parent->draw_properties().num_unclipped_descendants, 1);
+  EXPECT_EQ(parent->draw_properties().num_unclipped_descendants, 1u);
 
   // Ensure the dynamic update to input handlers happens.
   child->SetHaveWheelEventHandlers(true);

@@ -8,7 +8,7 @@
 
 #include "base/values.h"
 #include "content/public/common/url_constants.h"
-#include "content/public/renderer/render_view.h"
+#include "content/public/renderer/render_frame.h"
 #include "extensions/common/error_utils.h"
 #include "extensions/common/extension_messages.h"
 #include "extensions/common/manifest_constants.h"
@@ -17,21 +17,21 @@
 #include "extensions/renderer/script_context.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
-#include "third_party/WebKit/public/web/WebFrame.h"
+#include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebScriptSource.h"
 
 namespace extensions {
 
 ProgrammaticScriptInjector::ProgrammaticScriptInjector(
     const ExtensionMsg_ExecuteCode_Params& params,
-    blink::WebFrame* web_frame)
+    content::RenderFrame* render_frame)
     : params_(new ExtensionMsg_ExecuteCode_Params(params)),
-      url_(ScriptContext::GetDataSourceURLForFrame(web_frame)),
-      render_view_(content::RenderView::FromWebView(web_frame->view())),
-      results_(new base::ListValue()),
+      url_(ScriptContext::GetDataSourceURLForFrame(
+          render_frame->GetWebFrame())),
+      render_frame_(render_frame),
       finished_(false) {
   effective_url_ = ScriptContext::GetEffectiveDocumentURL(
-      web_frame, url_, params.match_about_blank);
+      render_frame->GetWebFrame(), url_, params.match_about_blank);
 }
 
 ProgrammaticScriptInjector::~ProgrammaticScriptInjector() {
@@ -40,10 +40,6 @@ ProgrammaticScriptInjector::~ProgrammaticScriptInjector() {
 UserScript::InjectionType ProgrammaticScriptInjector::script_type()
     const {
   return UserScript::PROGRAMMATIC_SCRIPT;
-}
-
-bool ProgrammaticScriptInjector::ShouldExecuteInChildFrames() const {
-  return params_->all_frames;
 }
 
 bool ProgrammaticScriptInjector::ShouldExecuteInMainWorld() const {
@@ -70,13 +66,8 @@ bool ProgrammaticScriptInjector::ShouldInjectCss(
 
 PermissionsData::AccessType ProgrammaticScriptInjector::CanExecuteOnFrame(
     const InjectionHost* injection_host,
-    blink::WebFrame* frame,
-    int tab_id,
-    const GURL& top_url) const {
-  // It doesn't make sense to inject a script into a remote frame or a frame
-  // with a null document.
-  if (frame->isWebRemoteFrame() || frame->document().isNull())
-    return PermissionsData::ACCESS_DENIED;
+    blink::WebLocalFrame* frame,
+    int tab_id) const {
   GURL effective_document_url = ScriptContext::GetEffectiveDocumentURL(
       frame, frame->document().url(), params_->match_about_blank);
   if (params_->is_web_view) {
@@ -92,7 +83,10 @@ PermissionsData::AccessType ProgrammaticScriptInjector::CanExecuteOnFrame(
   DCHECK_EQ(injection_host->id().type(), HostID::EXTENSIONS);
 
   return injection_host->CanExecuteOnFrame(
-      effective_document_url, top_url, tab_id, true /* is_declarative */);
+      effective_document_url,
+      content::RenderFrame::FromWebFrame(frame),
+      tab_id,
+      true /* is_declarative */);
 }
 
 std::vector<blink::WebScriptSource> ProgrammaticScriptInjector::GetJsSources(
@@ -120,9 +114,11 @@ void ProgrammaticScriptInjector::GetRunInfo(
 }
 
 void ProgrammaticScriptInjector::OnInjectionComplete(
-    scoped_ptr<base::ListValue> execution_results,
+    scoped_ptr<base::Value> execution_result,
     UserScript::RunLocation run_location) {
-  results_ = execution_results.Pass();
+  DCHECK(results_.empty());
+  if (execution_result)
+    results_.Append(execution_result.Pass());
   Finish(std::string());
 }
 
@@ -154,12 +150,12 @@ void ProgrammaticScriptInjector::Finish(const std::string& error) {
   DCHECK(!finished_);
   finished_ = true;
 
-  render_view_->Send(new ExtensionHostMsg_ExecuteCodeFinished(
-      render_view_->GetRoutingID(),
+  render_frame_->Send(new ExtensionHostMsg_ExecuteCodeFinished(
+      render_frame_->GetRoutingID(),
       params_->request_id,
       error,
       url_,
-      *results_));
+      results_));
 }
 
 }  // namespace extensions

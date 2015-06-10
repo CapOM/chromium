@@ -6,6 +6,7 @@
 
 #include <string>
 
+#include "base/numerics/safe_conversions.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/trace_event_argument.h"
 #include "cc/base/math_util.h"
@@ -94,13 +95,14 @@ DisplayItemList::~DisplayItemList() {
 
 void DisplayItemList::Raster(SkCanvas* canvas,
                              SkPicture::AbortCallback* callback,
+                             const gfx::Rect& canvas_target_playback_rect,
                              float contents_scale) const {
   DCHECK(ProcessAppendedItemsCalled());
   if (!use_cached_picture_) {
     canvas->save();
     canvas->scale(contents_scale, contents_scale);
     for (auto* item : items_)
-      item->Raster(canvas, callback);
+      item->Raster(canvas, canvas_target_playback_rect, callback);
     canvas->restore();
   } else {
     DCHECK(picture_);
@@ -145,7 +147,7 @@ void DisplayItemList::ProcessAppendedItems() {
 
     if (use_cached_picture_) {
       DCHECK(canvas_);
-      item->Raster(canvas_.get(), NULL);
+      item->Raster(canvas_.get(), gfx::Rect(), NULL);
     }
 
     if (retain_individual_display_items_) {
@@ -157,6 +159,15 @@ void DisplayItemList::ProcessAppendedItems() {
 
   if (!retain_individual_display_items_)
     items_.clear();
+}
+
+void DisplayItemList::RemoveLast() {
+  // We cannot remove the last item if it has been squashed into a picture.
+  // The last item should not have been handled by ProcessAppendedItems, so we
+  // don't need to remove it from approximate_op_count_, etc.
+  DCHECK(retain_individual_display_items_);
+  DCHECK(!use_cached_picture_);
+  items_.RemoveLast();
 }
 
 void DisplayItemList::Finalize() {
@@ -204,7 +215,7 @@ DisplayItemList::AsValue() const {
   scoped_refptr<base::trace_event::TracedValue> state =
       new base::trace_event::TracedValue();
 
-  state->SetInteger("length", items_.size());
+  state->SetInteger("length", base::saturated_cast<int>(items_.size()));
   state->BeginArray("params.items");
   for (const DisplayItem* item : items_) {
     item->AsValueInto(state.get());
@@ -218,7 +229,7 @@ DisplayItemList::AsValue() const {
         recorder.beginRecording(layer_rect_.width(), layer_rect_.height());
     canvas->translate(-layer_rect_.x(), -layer_rect_.y());
     canvas->clipRect(gfx::RectToSkRect(layer_rect_));
-    Raster(canvas, NULL, 1.f);
+    Raster(canvas, NULL, gfx::Rect(), 1.f);
     skia::RefPtr<SkPicture> picture =
         skia::AdoptRef(recorder.endRecordingAsPicture());
 

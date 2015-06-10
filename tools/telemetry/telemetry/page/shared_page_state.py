@@ -37,15 +37,15 @@ class SharedPageState(shared_state.SharedState):
 
   _device_type = None
 
-  def __init__(self, test, finder_options, user_story_set):
-    super(SharedPageState, self).__init__(test, finder_options, user_story_set)
+  def __init__(self, test, finder_options, story_set):
+    super(SharedPageState, self).__init__(test, finder_options, story_set)
     if isinstance(test, timeline_based_measurement.TimelineBasedMeasurement):
       # This is to avoid the cyclic-import caused by timeline_based_page_test.
       from telemetry.web_perf import timeline_based_page_test
       self._test = timeline_based_page_test.TimelineBasedPageTest(test)
     else:
       self._test = test
-    device_type = self._device_type or user_story_set.user_agent_type
+    device_type = self._device_type or story_set.user_agent_type
     _PrepareFinderOptions(finder_options, self._test, device_type)
     self.browser = None
     self._finder_options = finder_options
@@ -214,7 +214,7 @@ class SharedPageState(shared_state.SharedState):
           '(page.CanRunOnBrowser() returns False).')
       return 'skip', skip_value
     expectation = expectations.GetExpectationForPage(
-        self.browser, self._current_page)
+        self, self._current_page)
     if expectation == 'skip':
       skip_value = skip.SkipValue(
           self._current_page, 'Skipped by test expectations')

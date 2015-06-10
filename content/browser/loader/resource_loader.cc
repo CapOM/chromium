@@ -5,9 +5,11 @@
 #include "content/browser/loader/resource_loader.h"
 
 #include "base/command_line.h"
-#include "base/message_loop/message_loop.h"
+#include "base/location.h"
 #include "base/metrics/histogram.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
 #include "content/browser/appcache/appcache_interceptor.h"
 #include "content/browser/child_process_security_policy_impl.h"
@@ -63,12 +65,7 @@ void PopulateResourceResponse(ResourceRequestInfoImpl* info,
   response->head.socket_address = request->GetSocketAddress();
   if (ServiceWorkerRequestHandler* handler =
           ServiceWorkerRequestHandler::GetHandler(request)) {
-    handler->GetExtraResponseInfo(
-        &response->head.was_fetched_via_service_worker,
-        &response->head.was_fallback_required_by_service_worker,
-        &response->head.original_url_via_service_worker,
-        &response->head.response_type_via_service_worker,
-        &response->head.service_worker_start_time);
+    handler->GetExtraResponseInfo(&response->head);
   }
   AppCacheInterceptor::GetExtraResponseInfo(
       request,
@@ -465,23 +462,20 @@ void ResourceLoader::Resume() {
       request_->FollowDeferredRedirect();
       break;
     case DEFERRED_READ:
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&ResourceLoader::ResumeReading,
-                     weak_ptr_factory_.GetWeakPtr()));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&ResourceLoader::ResumeReading,
+                                weak_ptr_factory_.GetWeakPtr()));
       break;
     case DEFERRED_RESPONSE_COMPLETE:
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&ResourceLoader::ResponseCompleted,
-                     weak_ptr_factory_.GetWeakPtr()));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&ResourceLoader::ResponseCompleted,
+                                weak_ptr_factory_.GetWeakPtr()));
       break;
     case DEFERRED_FINISH:
       // Delay self-destruction since we don't know how we were reached.
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&ResourceLoader::CallDidFinishLoading,
-                     weak_ptr_factory_.GetWeakPtr()));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&ResourceLoader::CallDidFinishLoading,
+                                weak_ptr_factory_.GetWeakPtr()));
       break;
   }
 }
@@ -545,10 +539,9 @@ void ResourceLoader::CancelRequestInternal(int error, bool from_renderer) {
     // If the request isn't in flight, then we won't get an asynchronous
     // notification from the request, so we have to signal ourselves to finish
     // this request.
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(&ResourceLoader::ResponseCompleted,
-                   weak_ptr_factory_.GetWeakPtr()));
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(&ResourceLoader::ResponseCompleted,
+                              weak_ptr_factory_.GetWeakPtr()));
   }
 }
 
@@ -623,12 +616,10 @@ void ResourceLoader::StartReading(bool is_continuation) {
   } else {
     // Else, trigger OnReadCompleted asynchronously to avoid starving the IO
     // thread in case the URLRequest can provide data synchronously.
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&ResourceLoader::OnReadCompleted,
-                   weak_ptr_factory_.GetWeakPtr(),
-                   request_.get(),
-                   bytes_read));
+                   weak_ptr_factory_.GetWeakPtr(), request_.get(), bytes_read));
   }
 }
 

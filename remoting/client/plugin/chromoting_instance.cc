@@ -90,11 +90,7 @@ std::string ConnectionStateToString(protocol::ConnectionToHost::State state) {
     case protocol::ConnectionToHost::CONNECTING:
       return "CONNECTING";
     case protocol::ConnectionToHost::AUTHENTICATED:
-      // Report the authenticated state as 'CONNECTING' to avoid changing
-      // the interface between the plugin and webapp.
-      // TODO(garykac) Change to 'AUTHENTICATED' in M44 or once we've switched
-      // the client to NaCl.
-      return "CONNECTING";
+      return "AUTHENTICATED";
     case protocol::ConnectionToHost::CONNECTED:
       return "CONNECTED";
     case protocol::ConnectionToHost::CLOSED:
@@ -357,7 +353,7 @@ void ChromotingInstance::HandleMessage(const pp::Var& message) {
   } else if (method == "enableDebugRegion") {
     HandleEnableDebugRegion(*data);
   } else if (method == "enableTouchEvents") {
-    HandleEnableTouchEvents();
+    HandleEnableTouchEvents(*data);
   }
 }
 
@@ -989,8 +985,19 @@ void ChromotingInstance::HandleEnableDebugRegion(
   video_renderer_->EnableDebugDirtyRegion(enable);
 }
 
-void ChromotingInstance::HandleEnableTouchEvents() {
-  RequestInputEvents(PP_INPUTEVENT_CLASS_TOUCH);
+void ChromotingInstance::HandleEnableTouchEvents(
+    const base::DictionaryValue& data) {
+  bool enable = false;
+  if (!data.GetBoolean("enable", &enable)) {
+    LOG(ERROR) << "Invalid handleTouchEvents.";
+    return;
+  }
+
+  if (enable) {
+    RequestInputEvents(PP_INPUTEVENT_CLASS_TOUCH);
+  } else {
+    ClearInputEventRequest(PP_INPUTEVENT_CLASS_TOUCH);
+  }
 }
 
 void ChromotingInstance::Disconnect() {

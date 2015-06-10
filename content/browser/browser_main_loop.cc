@@ -6,9 +6,9 @@
 
 #include "base/bind.h"
 #include "base/command_line.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/memory_pressure_monitor.h"
-#include "base/message_loop/message_loop.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/pending_task.h"
@@ -17,6 +17,7 @@
 #include "base/process/process_metrics.h"
 #include "base/profiler/scoped_profile.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/system_monitor/system_monitor.h"
@@ -39,6 +40,7 @@
 #include "content/browser/histogram_synchronizer.h"
 #include "content/browser/loader/resource_dispatcher_host_impl.h"
 #include "content/browser/media/media_internals.h"
+#include "content/browser/mojo/mojo_shell_context.h"
 #include "content/browser/net/browser_online_state_observer.h"
 #include "content/browser/renderer_host/media/media_stream_manager.h"
 #include "content/browser/speech/speech_recognition_manager_impl.h"
@@ -84,6 +86,7 @@
 #include "base/android/jni_android.h"
 #include "content/browser/android/browser_startup_controller.h"
 #include "content/browser/android/browser_surface_texture_manager.h"
+#include "content/browser/android/in_process_surface_texture_manager.h"
 #include "content/browser/android/tracing_controller_android.h"
 #include "content/browser/screen_orientation/screen_orientation_delegate_android.h"
 #include "content/public/browser/screen_orientation_provider.h"
@@ -97,8 +100,10 @@
 #if defined(OS_MACOSX) && !defined(OS_IOS)
 #include "base/memory/memory_pressure_monitor_mac.h"
 #include "content/browser/bootstrap_sandbox_mac.h"
+#include "content/browser/browser_io_surface_manager_mac.h"
 #include "content/browser/cocoa/system_hotkey_helper_mac.h"
 #include "content/browser/compositor/browser_compositor_view_mac.h"
+#include "content/browser/in_process_io_surface_manager_mac.h"
 #include "content/browser/theme_helper_mac.h"
 #endif
 
@@ -545,7 +550,7 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
 #if !defined(OS_IOS)
   {
     TRACE_EVENT0("startup", "BrowserMainLoop::Subsystem:MediaFeatures");
-    media::InitializeCPUSpecificMediaFeatures();
+    media::InitializeMediaLibrary();
   }
   {
     TRACE_EVENT0("startup",
@@ -586,7 +591,13 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
 #if defined(OS_ANDROID)
   {
     TRACE_EVENT0("startup", "BrowserMainLoop::Subsystem:SurfaceTextureManager");
-    SurfaceTextureManager::SetInstance(new BrowserSurfaceTextureManager);
+    if (parsed_command_line_.HasSwitch(switches::kSingleProcess)) {
+      SurfaceTextureManager::SetInstance(
+          InProcessSurfaceTextureManager::GetInstance());
+    } else {
+      SurfaceTextureManager::SetInstance(
+          BrowserSurfaceTextureManager::GetInstance());
+    }
   }
 
   if (!parsed_command_line_.HasSwitch(
@@ -596,6 +607,17 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
     screen_orientation_delegate_.reset(
         new ScreenOrientationDelegateAndroid());
     ScreenOrientationProvider::SetDelegate(screen_orientation_delegate_.get());
+  }
+#endif
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  {
+    TRACE_EVENT0("startup", "BrowserMainLoop::Subsystem:IOSurfaceManager");
+    if (parsed_command_line_.HasSwitch(switches::kSingleProcess)) {
+      IOSurfaceManager::SetInstance(InProcessIOSurfaceManager::GetInstance());
+    } else {
+      IOSurfaceManager::SetInstance(BrowserIOSurfaceManager::GetInstance());
+    }
   }
 #endif
 
@@ -620,7 +642,7 @@ void BrowserMainLoop::PostMainMessageLoopStart() {
 
 #if defined(TCMALLOC_TRACE_MEMORY_SUPPORTED)
   trace_memory_controller_.reset(new base::trace_event::TraceMemoryController(
-      base::MessageLoop::current()->message_loop_proxy(),
+      base::MessageLoop::current()->task_runner(),
       ::HeapProfilerWithPseudoStackStart, ::HeapProfilerStop,
       ::GetHeapProfile));
 #endif
@@ -705,13 +727,13 @@ void BrowserMainLoop::CreateStartupTasks() {
   // First time through, we really want to create all the tasks
   if (!startup_task_runner_.get()) {
 #if defined(OS_ANDROID)
-    startup_task_runner_ = make_scoped_ptr(new StartupTaskRunner(
-        base::Bind(&BrowserStartupComplete),
-        base::MessageLoop::current()->message_loop_proxy()));
+    startup_task_runner_ = make_scoped_ptr(
+        new StartupTaskRunner(base::Bind(&BrowserStartupComplete),
+                              base::ThreadTaskRunnerHandle::Get()));
 #else
-    startup_task_runner_ = make_scoped_ptr(new StartupTaskRunner(
-        base::Callback<void(int)>(),
-        base::MessageLoop::current()->message_loop_proxy()));
+    startup_task_runner_ = make_scoped_ptr(
+        new StartupTaskRunner(base::Callback<void(int)>(),
+                              base::ThreadTaskRunnerHandle::Get()));
 #endif
     StartupTask pre_create_threads =
         base::Bind(&BrowserMainLoop::PreCreateThreads, base::Unretained(this));
@@ -888,6 +910,8 @@ void BrowserMainLoop::ShutdownThreadsAndCleanUp() {
       BrowserThread::IO, FROM_HERE,
       base::Bind(base::IgnoreResult(&base::ThreadRestrictions::SetIOAllowed),
                  true));
+
+  mojo_shell_context_.reset();
 
 #if !defined(OS_IOS)
   if (RenderProcessHost::run_renderer_in_process())
@@ -1196,7 +1220,7 @@ int BrowserMainLoop::BrowserThreadsStarted() {
         "startup",
         "BrowserMainLoop::BrowserThreadsStarted::InitUserInputMonitor");
     user_input_monitor_ = media::UserInputMonitor::Create(
-        io_thread_->message_loop_proxy(), main_thread_->message_loop_proxy());
+        io_thread_->task_runner(), main_thread_->task_runner());
   }
 
   {
@@ -1244,6 +1268,8 @@ int BrowserMainLoop::BrowserThreadsStarted() {
 #endif  // defined(OS_MACOSX)
 
 #endif  // !defined(OS_IOS)
+
+  mojo_shell_context_.reset(new MojoShellContext);
 
   return result_code_;
 }
@@ -1298,8 +1324,8 @@ void BrowserMainLoop::MainMessageLoopRun() {
 #else
   DCHECK(base::MessageLoopForUI::IsCurrent());
   if (parameters_.ui_task) {
-    base::MessageLoopForUI::current()->PostTask(FROM_HERE,
-                                                *parameters_.ui_task);
+    base::ThreadTaskRunnerHandle::Get()->PostTask(FROM_HERE,
+                                                  *parameters_.ui_task);
   }
 
   base::RunLoop run_loop;

@@ -1883,6 +1883,14 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
                desc="Download page message: Server certificate problem.">
         There was a problem with server's certificate.
       </message>
+      <message name="IDS_DOWNLOAD_INTERRUPTED_STATUS_FORBIDDEN"
+               desc="Forbidden.">
+        Forbidden
+      </message>
+      <message name="IDS_DOWNLOAD_INTERRUPTED_DESCRIPTION_FORBIDDEN"
+               desc="Download page message: Forbidden.">
+        Access to this resource was forbidden by the server.
+      </message>
 
       <!-- Download Shelf Items -->
       <message name="IDS_DOWNLOAD_STATUS_STARTING"
@@ -2547,6 +2555,12 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
       <message name="IDS_BLOCKED_COOKIES_NO_ACTION" desc="Radio button choice to continue blocking a site from setting cookies, displayed in bubble when a page tries to set cookies.">
         Continue blocking cookies
+      </message>
+      <message name="IDS_ALLOWED_COOKIES_NO_ACTION" desc="Radio button choice to keep allowing a site to set the cookies, displayed in bubble when a page tries to set cookies.">
+        Continue allowing cookies
+      </message>
+      <message name="IDS_ALLOWED_COOKIES_BLOCK" desc="Radio button choice to block a site to set the cookies, displayed in bubble when a page tries to set cookies.">
+        Always block cookies on <ph name="HOST">$1<ex>mail.google.com</ex></ph>
       </message>
       <message name="IDS_BLOCKED_IMAGES_NO_ACTION" desc="Radio button choice to continue blocking a site from showing images, displayed in bubble when a page tries to display images.">
         Continue blocking images
@@ -3789,9 +3803,6 @@ Even if you have downloaded files from this website before, the website might ha
       </message>
       <message name="IDS_UTILITY_PROCESS_IMAGE_DECODER_NAME" desc="The name of the utility process used for decoding images.">
         Image Decoder
-      </message>
-      <message name="IDS_UTILITY_PROCESS_JSON_PARSER_NAME" desc="The name of the utility process used for parsing JSON files.">
-        JSON Parser
       </message>
       <message name="IDS_UTILITY_PROCESS_PROXY_RESOLVER_NAME" desc="The name of the utility process used for out-of-process V8 proxy resolution.">
         V8 Proxy Resolver
@@ -5119,6 +5130,11 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Hide Details
       </message>
 
+      <!-- Error messages for Chrome Web Store UI -->
+      <message name="IDS_WEBSTORE_DOWNLOAD_ACCESS_DENIED" desc="Text displayed in the error prompt when a CRX cannot be downloaded due to an authentication error.">
+        Access denied.
+      </message>
+
       <!-- Global error messages for extensions -->
       <message name="IDS_EXTENSION_WARNINGS_WRENCH_MENU_ITEM" desc="The wrench menu item indicating that extensions caused problems.">
         Extension error
@@ -6355,12 +6371,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_PASSWORD_MANAGER_SAVE_PASSWORD_SMART_LOCK_NO_THANKS_BUTTON" desc="Text for the button the user clicks to dismiss save password bubble.">
         No thanks
       </message>
-      <message name="IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_NAME" desc="Name of the flag to enable showing of the password save prompt on in-page navigations">
-        Enable showing of password prompt on in-page navigations.
-      </message>
-      <message name="IDS_FLAGS_ENABLE_SAVE_PASSOWRD_ON_IN_PAGE_NAVIGATION_DESCRIPTION" desc="Description of the flag to enable showing of password save prompt on in-page navigations">
-        Enable showing of the password prompt on in-page navigations. This allows for saving passwords on more pages but might sometimes trigger the prompt on unsuccessful login attempts.
-      </message>
       <message name="IDS_FLAGS_ENABLE_AFFILIATION_BASED_MATCHING_NAME" desc="Name of the flag to enable affiliation based matching, so that credentials stored for an Android application will also be considered matches for, and be filled into corresponding websites (so-called 'affiliated' websites).">
         Enable affiliation based matching in password manager.
       </message>
@@ -6474,6 +6484,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_DATA_REDUCTION_PROXY_RESET_SAVINGS_DESCRIPTION" desc="Description in about::flags to clear data savings obtained with data reduction proxy when Chrome restarts">
          Clears data savings obtained by using data reduction proxy when chrome starts.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_DATA_REDUCTION_PROXY_CARRIER_TEST_NAME" desc="An about::flags experiment title to enable using the carrier test data reduction proxy">
+        Enable a carrier-specific Data Reduction Proxy for testing.
+      </message>
+      <message name="IDS_FLAGS_ENABLE_DATA_REDUCTION_PROXY_CARRIER_TEST_DESCRIPTION" desc="Describes an about:flags experiment to enable using the carrier test data reduction proxy">
+        Use a carrier-specific Data Reduction Proxy for testing.
       </message>
       <message name="IDS_FLAGS_LCD_TEXT_NAME" desc="Name of about:flags option for LCD text.">
         LCD text antialiasing
@@ -6752,6 +6768,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_DISABLE_THREADED_SCROLLING_DESCRIPTION" desc="Description for the flag to disable threaded scrolling.">
         Disabled threaded handling of scroll-related input events, forcing all such scroll events to be handled on the main thread. Note that this can dramatically hurt scrolling performance of most websites and is intended for testing purposes only.
       </message>
+      <message name="IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_NAME" desc="Title for the flag to enable the viewport scroll order experiment.">
+        Invert Viewport Scroll Order.
+      </message>
+      <message name="IDS_FLAGS_INVERT_VIEWPORT_SCROLL_ORDER_DESCRIPTION" desc="Description for the flag to enable the viewport scroll order experiment.">
+        Enables flipped viewport scroll order in some situations. Namely, during a pinch-zoom, the visual viewport should be scrolled first, then the layout viewport.
+      </message>
       <message name="IDS_FLAGS_BLEEDING_RENDERER_NAME" desc="Name of the 'Stacked Tabs' lab.">
         Bleeding Edge Renderer Paths - LIKELY TO CRASH YOUR BROWSER
       </message>
@@ -6889,6 +6911,20 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_TRY_SUPPORTED_CHANNEL_LAYOUTS_DESCRIPTION" desc="Description for the flag to enable support for trying supported channel layouts.">
         Causes audio output streams to check if channel layouts other than the default hardware layout are available. Turning this on will allow the OS to do stereo to surround expansion if supported. May expose third party driver bugs, use with caution.
       </message>
+      <if expr="is_macosx">
+        <message name="IDS_FLAGS_APP_INFO_DIALOG_NAME" desc="Name of the flag to enable or disable the toolkit-views App Info dialog on Mac.">
+          Toolkit-Views App Info Dialog.
+        </message>
+        <message name="IDS_FLAGS_APP_INFO_DIALOG_DESCRIPTION" desc="Description of flag to enable or disable the toolkit-views App Info dialog on Mac.">
+          Makes the Toolkit-Views based App Info dialog accessible from chrome://apps or chrome://extensions in place of the native extension permissions dialog, or the details link (which is a link to the Web Store).
+        </message>
+        <message name="IDS_FLAGS_MAC_VIEWS_NATIVE_APP_WINDOWS_NAME" desc="Name of the flag to enable or disable toolkit-views Chrome App windows on Mac.">
+          Toolkit-Views App Windows.
+        </message>
+        <message name="IDS_FLAGS_MAC_VIEWS_NATIVE_APP_WINDOWS_DESCRIPTION" desc="Description of flag to enable or disable toolkit-views Chrome App windows on Mac.">
+          Controls whether to use Toolkit-Views based Chrome App windows.
+        </message>
+      </if>
 
       <!-- Crashes -->
       <message name="IDS_CRASHES_TITLE" desc="Title for the chrome://crashes page.">
@@ -7230,7 +7266,7 @@ Keep your key file in a safe place. You will need it to create new versions of y
         Continue allowing unsandboxed plugins
       </message>
       <message name="IDS_ALLOWED_PPAPI_BROKER_BLOCK" desc="Radio button to block the Pepper broker">
-        Never allow unsandboxed plugins on <ph name="HOST">$1<ex>example.com</ex></ph>
+        Always block unsandboxed plugins on <ph name="HOST">$1<ex>example.com</ex></ph>
       </message>
       <message name="IDS_PPAPI_BROKER_BUBBLE_MANAGE_LINK" desc="Link title to manage Pepper broker settings">
         Manage unsandboxed plugin blocking...
@@ -7265,6 +7301,14 @@ Keep your key file in a safe place. You will need it to create new versions of y
           Don't load
         </message>
       </if>
+
+      <!-- chromeos bookmark app add to shelf strings -->
+      <message name="IDS_ADD_TO_SHELF_INFOBAR_TITLE" desc="Label displayed in an infobar asking users to add to the site to their shelf">
+        Add this site to your shelf to use it any time.
+      </message>
+      <message name="IDS_ADD_TO_SHELF_INFOBAR_ADD_BUTTON" desc="Text displayed on the button to allow users to add to the site to their shelf">
+        Add
+      </message>
 
       <!-- about:system strings -->
       <if expr="not is_android">
@@ -8991,6 +9035,12 @@ I don't think this site should be blocked!
       </message>
       <message name="IDS_ERRORPAGES_BUTTON_RELOAD" desc="Label for the button on an error page to reload the page">
         Reload
+      </message>
+      <message name="IDS_ERRORPAGES_BUTTON_SHOW_CACHED_COPY" desc="Label for the button on an error page to show Google cached copy">
+        Show cached copy
+      </message>
+      <message name="IDS_ERRORPAGES_BUTTON_SHOW_CACHED_PAGE" desc="Label for the button on an error page to show Google cached page for ">
+        Show cached page
       </message>
       <message name="IDS_ERRORPAGES_BUTTON_SHOW_SAVED_COPY" desc="Label for the button on an error page to show a saved entry from the cache">
         Show saved copy
@@ -10873,7 +10923,7 @@ Dead Jim feedback.
       <message name="IDS_OPTIONS_HOMEPAGE_TITLE" desc="The title of the home page overlay" formatter_data="android_java">
         Home page
       </message>
-      <message name="IDS_OPTIONS_STARTUP_PAGES_PLACEHOLDER" desc="The placeholder text in the custom startup urls dialog" formatter_data="android_java">
+      <message name="IDS_OPTIONS_STARTUP_PAGES_PLACEHOLDER" desc="The placeholder text in the custom startup urls dialog">
         Enter URL...
       </message>
 
@@ -14260,11 +14310,11 @@ After you create a new supervised user, you can manage their settings at any tim
       </message>
 
       <if expr="chromeos">
-        <message name="IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to turn off smart deployment of the virtual keyboard.">
-          Disable Smart Virtual Keyboard
+        <message name="IDS_FLAGS_SMART_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to toggle smart deployment of the virtual keyboard.">
+          Smart Deployment of the Virtual Keyboard
         </message>
-        <message name="IDS_FLAGS_DISABLE_SMART_VIRTUAL_KEYBOARD_DESCRIPTION" desc="Description of about:flags option to turn off smart deployment of the virtual keyboard">
-          Disable smart deployment of the virtual keyboard.
+        <message name="IDS_FLAGS_SMART_VIRTUAL_KEYBOARD_DESCRIPTION" desc="Description of about:flags option to turn off smart deployment of the virtual keyboard">
+          Enable/Disable smart deployment of the virtual keyboard.
         </message>
 
         <message name="IDS_FLAGS_ENABLE_VIRTUAL_KEYBOARD_NAME" desc="Name of about:flags option to turn on the virtual keyboard">
@@ -15581,7 +15631,6 @@ After you create a new supervised user, you can manage their settings at any tim
           Your printer is ready.
         </message>
       </if>
-
     </messages>
   </release>
 </grit>

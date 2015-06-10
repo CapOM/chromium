@@ -121,9 +121,6 @@ IPC_STRUCT_BEGIN(ExtensionMsg_ExecuteCode_Params)
   // The webview guest source who calls to execute code.
   IPC_STRUCT_MEMBER(GURL, webview_src)
 
-  // Whether to inject into all frames, or only the root frame.
-  IPC_STRUCT_MEMBER(bool, all_frames)
-
   // Whether to inject into about:blank (sub)frames.
   IPC_STRUCT_MEMBER(bool, match_about_blank)
 
@@ -426,6 +423,11 @@ IPC_MESSAGE_CONTROL2(ExtensionMsg_SetSystemFont,
 // in the process (e.g. because of iframes or content scripts).
 IPC_MESSAGE_CONTROL1(ExtensionMsg_ActivateExtension,
                      std::string /* extension_id */)
+
+// Notifies the renderer that the current tab is an extension page (we limit
+// what other extensions can do on these pages).
+IPC_MESSAGE_ROUTED1(ExtensionMsg_SetTabExtensionOwner,
+                    std::string /* extension_id */)
 
 // Notifies the renderer that extensions were loaded in the browser.
 IPC_MESSAGE_CONTROL1(ExtensionMsg_Loaded,

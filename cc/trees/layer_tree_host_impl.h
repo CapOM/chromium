@@ -127,6 +127,10 @@ class LayerTreeHostImplClient {
   // Called when output surface asks for a draw.
   virtual void OnDrawForOutputSurface() = 0;
 
+  virtual void PostFrameTimingEventsOnImplThread(
+      scoped_ptr<FrameTimingTracker::CompositeTimingSet> composite_events,
+      scoped_ptr<FrameTimingTracker::MainFrameTimingSet> main_frame_events) = 0;
+
  protected:
   virtual ~LayerTreeHostImplClient() {}
 };
@@ -181,7 +185,7 @@ class CC_EXPORT LayerTreeHostImpl
                                bool anchor_point,
                                float page_scale,
                                base::TimeDelta duration);
-  void SetNeedsAnimate() override;
+  void SetNeedsAnimateInput() override;
   bool IsCurrentlyScrollingLayerAt(const gfx::Point& viewport_point,
                                    InputHandler::ScrollInputType type) override;
   bool HaveWheelEventHandlersAt(const gfx::Point& viewport_point) override;
@@ -390,6 +394,7 @@ class CC_EXPORT LayerTreeHostImpl
   bool AnimationsAreVisible() { return visible() && CanDraw(); }
 
   void SetNeedsCommit() { client_->SetNeedsCommitOnImplThread(); }
+  void SetNeedsAnimate();
   void SetNeedsRedraw();
 
   ManagedMemoryPolicy ActualManagedMemoryPolicy() const;
@@ -539,6 +544,11 @@ class CC_EXPORT LayerTreeHostImpl
       const BeginFrameArgs& start_of_main_frame_args,
       const BeginFrameArgs& expected_next_main_frame_args);
 
+  // Post the given frame timing events to the requester.
+  void PostFrameTimingEvents(
+      scoped_ptr<FrameTimingTracker::CompositeTimingSet> composite_events,
+      scoped_ptr<FrameTimingTracker::MainFrameTimingSet> main_frame_events);
+
  protected:
   LayerTreeHostImpl(
       const LayerTreeSettings& settings,
@@ -590,6 +600,7 @@ class CC_EXPORT LayerTreeHostImpl
   // outer if the inner is at its scroll extents.
   void ScrollViewportInnerFirst(gfx::Vector2dF scroll_delta);
 
+  void AnimateInput(base::TimeTicks monotonic_time);
   void AnimatePageScale(base::TimeTicks monotonic_time);
   void AnimateScrollbars(base::TimeTicks monotonic_time);
   void AnimateTopControls(base::TimeTicks monotonic_time);
@@ -689,6 +700,8 @@ class CC_EXPORT LayerTreeHostImpl
 
   // The optional delegate for the root layer scroll offset.
   LayerScrollOffsetDelegate* root_layer_scroll_offset_delegate_;
+  LayerScrollOffsetDelegate::AnimationCallback root_layer_animation_callback_;
+
   const LayerTreeSettings settings_;
   LayerTreeDebugState debug_state_;
   bool visible_;

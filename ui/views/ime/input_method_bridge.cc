@@ -81,7 +81,8 @@ InputMethodBridge::~InputMethodBridge() {
 }
 
 void InputMethodBridge::OnFocus() {
-  DCHECK(host_);
+  if (!host_)  // |host_| could be NULL after OnInputMethodDestroyed.
+    return;
 
   // Direct the shared IME to send TextInputClient messages to |this| object.
   if (shared_input_method_ || !host_->GetTextInputClient())
@@ -96,7 +97,8 @@ void InputMethodBridge::OnFocus() {
 }
 
 void InputMethodBridge::OnBlur() {
-  DCHECK(host_);
+  if (!host_)  // |host_| could be NULL after OnInputMethodDestroyed.
+    return;
 
   if (HasCompositionText()) {
     ConfirmCompositionText();
@@ -309,15 +311,6 @@ void InputMethodBridge::EnsureCaretInRect(const gfx::Rect& rect) {
   TextInputClient* client = GetTextInputClient();
   if (client)
     client->EnsureCaretInRect(rect);
-}
-
-void InputMethodBridge::OnCandidateWindowShown() {
-}
-
-void InputMethodBridge::OnCandidateWindowUpdated() {
-}
-
-void InputMethodBridge::OnCandidateWindowHidden() {
 }
 
 bool InputMethodBridge::IsEditCommandEnabled(int command_id) {

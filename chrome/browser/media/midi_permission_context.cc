@@ -5,7 +5,7 @@
 #include "chrome/browser/media/midi_permission_context.h"
 
 #include "chrome/browser/content_settings/tab_specific_content_settings.h"
-#include "components/content_settings/core/common/permission_request_id.h"
+#include "chrome/browser/permissions/permission_request_id.h"
 #include "content/public/browser/child_process_security_policy.h"
 #include "url/gurl.h"
 
@@ -20,8 +20,8 @@ void MidiPermissionContext::UpdateTabContext(const PermissionRequestID& id,
                                              const GURL& requesting_frame,
                                              bool allowed) {
   TabSpecificContentSettings* content_settings =
-      TabSpecificContentSettings::Get(id.render_process_id(),
-                                      id.render_view_id());
+      TabSpecificContentSettings::GetForFrame(id.render_process_id(),
+                                              id.render_frame_id());
   if (!content_settings)
     return;
 

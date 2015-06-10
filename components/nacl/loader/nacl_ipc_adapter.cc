@@ -19,12 +19,8 @@
 #include "ipc/ipc_platform_file.h"
 #include "native_client/src/public/nacl_desc.h"
 #include "native_client/src/public/nacl_desc_custom.h"
-#include "native_client/src/trusted/desc/nacl_desc_base.h"
-#include "native_client/src/trusted/desc/nacl_desc_imc_shm.h"
-#include "native_client/src/trusted/desc/nacl_desc_io.h"
 #include "native_client/src/trusted/desc/nacl_desc_quota.h"
 #include "native_client/src/trusted/desc/nacl_desc_quota_interface.h"
-#include "native_client/src/trusted/desc/nacl_desc_sync_socket.h"
 #include "native_client/src/trusted/service_runtime/include/sys/fcntl.h"
 #include "ppapi/c/ppb_file_io.h"
 #include "ppapi/proxy/ppapi_messages.h"
@@ -485,7 +481,7 @@ bool NaClIPCAdapter::OnMessageReceived(const IPC::Message& msg) {
   // Handle PpapiHostMsg_OpenResource outside the lock as it requires sending
   // IPC to handle properly.
   if (type == PpapiHostMsg_OpenResource::ID) {
-    PickleIterator iter = IPC::SyncMessage::GetDataIterator(&msg);
+    base::PickleIterator iter = IPC::SyncMessage::GetDataIterator(&msg);
     ppapi::proxy::SerializedHandle sh;
     uint64_t token_lo;
     uint64_t token_hi;
@@ -551,7 +547,7 @@ bool NaClIPCAdapter::RewriteMessage(const IPC::Message& msg, uint32_t type) {
 #if defined(OS_WIN)
               shm_handle,
 #else
-              shm_handle.fd,
+              base::SharedMemory::GetFdFromSharedMemoryHandle(shm_handle),
 #endif
               static_cast<size_t>(size))));
           break;
@@ -569,7 +565,7 @@ bool NaClIPCAdapter::RewriteMessage(const IPC::Message& msg, uint32_t type) {
         case ppapi::proxy::SerializedHandle::FILE: {
           // Create the NaClDesc for the file descriptor. If quota checking is
           // required, wrap it in a NaClDescQuota.
-          NaClDesc* desc = NaClDescIoDescFromHandleAllocCtor(
+          NaClDesc* desc = NaClDescIoMakeFromHandle(
 #if defined(OS_WIN)
               iter->descriptor(),
 #else
@@ -639,7 +635,7 @@ void NaClIPCAdapter::SaveOpenResourceMessage(
     // The file token didn't resolve successfully, so we give the
     // original FD to the client without making a validated NaClDesc.
     // However, we must rewrite the message to clear the file tokens.
-    PickleIterator iter = IPC::SyncMessage::GetDataIterator(&orig_msg);
+    base::PickleIterator iter = IPC::SyncMessage::GetDataIterator(&orig_msg);
     ppapi::proxy::SerializedHandle sh;
 
     // We know that this can be read safely; see the original read in
@@ -648,7 +644,7 @@ void NaClIPCAdapter::SaveOpenResourceMessage(
     scoped_ptr<IPC::Message> new_msg = CreateOpenResourceReply(orig_msg, sh);
 
     scoped_ptr<NaClDescWrapper> desc_wrapper(new NaClDescWrapper(
-        NaClDescIoDescFromHandleAllocCtor(
+        NaClDescIoMakeFromHandle(
 #if defined(OS_WIN)
             sh.descriptor(),
 #else

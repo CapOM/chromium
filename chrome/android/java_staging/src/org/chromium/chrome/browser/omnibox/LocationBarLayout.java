@@ -790,10 +790,10 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         mContextualMenuBar.setCustomSelectionActionModeCallback(
                 new CustomSelectionActionModeCallback() {
                     @Override
-                    public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
-                        super.onPrepareActionMode(mode, menu);
+                    public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                        boolean retVal = super.onCreateActionMode(mode, menu);
                         mode.getMenuInflater().inflate(R.menu.textselectionmenu, menu);
-                        return true;
+                        return retVal;
                     }
 
                     @Override
@@ -1751,6 +1751,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         Editable text = mUrlBar.getText();
 
         return mUrlBar.isCursorAtEndOfTypedText()
+                && !mUrlBar.isInBatchEditMode()
                 && BaseInputConnection.getComposingSpanEnd(text)
                         == BaseInputConnection.getComposingSpanStart(text);
     }
@@ -2391,4 +2392,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     public View getContainerView() {
         return this;
     }
+
+    @Override
+    public void setTitleToPageTitle() { }
 }

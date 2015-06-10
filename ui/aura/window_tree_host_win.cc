@@ -62,11 +62,11 @@ gfx::AcceleratedWidget WindowTreeHostWin::GetAcceleratedWidget() {
   return widget_;
 }
 
-void WindowTreeHostWin::Show() {
+void WindowTreeHostWin::ShowImpl() {
   window_->Show();
 }
 
-void WindowTreeHostWin::Hide() {
+void WindowTreeHostWin::HideImpl() {
   window_->Hide();
 }
 
@@ -110,10 +110,6 @@ void WindowTreeHostWin::MoveCursorToNative(const gfx::Point& location) {
 
 void WindowTreeHostWin::OnCursorVisibilityChangedNative(bool show) {
   NOTIMPLEMENTED();
-}
-
-ui::EventProcessor* WindowTreeHostWin::GetEventProcessor() {
-  return dispatcher();
 }
 
 void WindowTreeHostWin::OnBoundsChanged(const gfx::Rect& new_bounds) {

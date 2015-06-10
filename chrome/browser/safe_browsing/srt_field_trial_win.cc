@@ -5,6 +5,7 @@
 #include "chrome/browser/safe_browsing/srt_field_trial_win.h"
 
 #include "base/metrics/field_trial.h"
+#include "base/metrics/histogram.h"
 #include "components/variations/variations_associated_data.h"
 
 namespace {
@@ -12,8 +13,7 @@ namespace {
 // Field trial strings.
 const char kSRTCanaryGroupName[] = "SRTCanary";
 const char kSRTPromptTrialName[] = "SRTPromptFieldTrial";
-const char kSRTPromptOnGroup[] = "On";
-const char kSRTPromptDefaultGroup[] = "Default";
+const char kSRTPromptOffGroup[] = "Off";
 const char kSRTPromptSeedParamName[] = "Seed";
 
 // The download links of the Software Removal Tool.
@@ -30,7 +30,7 @@ namespace safe_browsing {
 
 bool IsInSRTPromptFieldTrialGroups() {
   return base::FieldTrialList::FindFullName(kSRTPromptTrialName) !=
-         kSRTPromptDefaultGroup;
+         kSRTPromptOffGroup;
 }
 
 const char* GetSRTDownloadURL() {
@@ -43,6 +43,11 @@ const char* GetSRTDownloadURL() {
 std::string GetIncomingSRTSeed() {
   return variations::GetVariationParamValue(kSRTPromptTrialName,
                                             kSRTPromptSeedParamName);
+}
+
+void RecordSRTPromptHistogram(SRTPromptHistogramValue value) {
+  UMA_HISTOGRAM_ENUMERATION("SoftwareReporter.PromptUsage", value,
+                            SRT_PROMPT_MAX);
 }
 
 }  // namespace safe_browsing

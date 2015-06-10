@@ -316,6 +316,51 @@ class RenderViewSizeObserver : public content::WebContentsObserver {
   DISALLOW_COPY_AND_ASSIGN(RenderViewSizeObserver);
 };
 
+void ProceedThroughInterstitial(content::WebContents* web_contents) {
+  InterstitialPage* interstitial_page = web_contents->GetInterstitialPage();
+  ASSERT_TRUE(interstitial_page);
+
+  content::WindowedNotificationObserver observer(
+      content::NOTIFICATION_LOAD_STOP,
+      content::Source<NavigationController>(&web_contents->GetController()));
+  interstitial_page->Proceed();
+  observer.Wait();
+}
+
+bool GetFilePathWithHostAndPortReplacement(
+    const std::string& original_file_path,
+    const net::HostPortPair& host_port_pair,
+    std::string* replacement_path) {
+  std::vector<net::SpawnedTestServer::StringPair> replacement_text;
+  replacement_text.push_back(
+      make_pair("REPLACE_WITH_HOST_AND_PORT", host_port_pair.ToString()));
+  return net::SpawnedTestServer::GetFilePathWithReplacements(
+      original_file_path, replacement_text, replacement_path);
+}
+
+// A WebContentsObserver useful for testing the SecurityStyleChanged()
+// method: it keeps track of the latest security style that was fired.
+class SecurityStyleTestObserver : public WebContentsObserver {
+ public:
+  explicit SecurityStyleTestObserver(content::WebContents* web_contents)
+      : content::WebContentsObserver(web_contents),
+        latest_security_style_(content::SECURITY_STYLE_UNKNOWN) {}
+  ~SecurityStyleTestObserver() override {}
+
+  void SecurityStyleChanged(content::SecurityStyle security_style) override {
+    latest_security_style_ = security_style;
+  }
+
+  content::SecurityStyle latest_security_style() const {
+    return latest_security_style_;
+  }
+
+ private:
+  content::SecurityStyle latest_security_style_;
+
+  DISALLOW_COPY_AND_ASSIGN(SecurityStyleTestObserver);
+};
+
 }  // namespace
 
 class BrowserTest : public ExtensionBrowserTest {
@@ -1415,7 +1460,10 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, ShouldShowLocationBar) {
 
   EXPECT_FALSE(
       dev_tools_browser->SupportsWindowFeature(Browser::FEATURE_LOCATIONBAR));
-  EXPECT_FALSE(
+
+  // App windows can show location bars, for example when they navigate away
+  // from their starting origin.
+  EXPECT_TRUE(
       app_browser->SupportsWindowFeature(Browser::FEATURE_LOCATIONBAR));
 
   DevToolsWindowTesting::CloseDevToolsWindowSync(devtools_window);
@@ -1480,28 +1528,18 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, PageLanguageDetection) {
 IN_PROC_BROWSER_TEST_F(BrowserTest, RestorePinnedTabs) {
   ASSERT_TRUE(test_server()->Start());
 
-  // Add an pinned app tab.
+  // Add a pinned tab.
   host_resolver()->AddRule("www.example.com", "127.0.0.1");
   GURL url(test_server()->GetURL("empty.html"));
   TabStripModel* model = browser()->tab_strip_model();
-  ASSERT_TRUE(LoadExtension(test_data_dir_.AppendASCII("app/")));
-  const Extension* extension_app = GetExtension();
   ui_test_utils::NavigateToURL(browser(), url);
-  WebContents* app_contents = WebContents::Create(
-      WebContents::CreateParams(browser()->profile()));
-  extensions::TabHelper::CreateForWebContents(app_contents);
-  extensions::TabHelper* extensions_tab_helper =
-      extensions::TabHelper::FromWebContents(app_contents);
-  extensions_tab_helper->SetExtensionApp(extension_app);
-  model->AddWebContents(app_contents, 0, ui::PageTransitionFromInt(0),
-                        TabStripModel::ADD_NONE);
   model->SetTabPinned(0, true);
-  ui_test_utils::NavigateToURL(browser(), url);
 
   // Add a non pinned tab.
   chrome::NewTab(browser());
+  ui_test_utils::NavigateToURL(browser(), url);
 
-  // Add a pinned non-app tab.
+  // Add another pinned tab.
   chrome::NewTab(browser());
   ui_test_utils::NavigateToURL(browser(), GURL(url::kAboutBlankURL));
   model->SetTabPinned(2, true);
@@ -1537,20 +1575,12 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, RestorePinnedTabs) {
 
   // Make sure the state matches.
   TabStripModel* new_model = new_browser->tab_strip_model();
-  EXPECT_TRUE(new_model->IsAppTab(0));
-  EXPECT_FALSE(new_model->IsAppTab(1));
-  EXPECT_FALSE(new_model->IsAppTab(2));
-
   EXPECT_TRUE(new_model->IsTabPinned(0));
   EXPECT_TRUE(new_model->IsTabPinned(1));
   EXPECT_FALSE(new_model->IsTabPinned(2));
 
   EXPECT_EQ(GURL(chrome::kChromeUINewTabURL),
             new_model->GetWebContentsAt(2)->GetURL());
-
-  EXPECT_TRUE(
-      extensions::TabHelper::FromWebContents(
-          new_model->GetWebContentsAt(0))->extension_app() == extension_app);
 }
 #endif  // !defined(OS_CHROMEOS)
 
@@ -1906,6 +1936,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, InterstitialCommandDisable) {
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_PRINT));
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_SAVE_PAGE));
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_ENCODING_MENU));
+  EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_DUPLICATE_TAB));
 
   WebContents* contents = browser()->tab_strip_model()->GetActiveWebContents();
 
@@ -1919,6 +1950,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, InterstitialCommandDisable) {
   EXPECT_FALSE(command_updater->IsCommandEnabled(IDC_PRINT));
   EXPECT_FALSE(command_updater->IsCommandEnabled(IDC_SAVE_PAGE));
   EXPECT_FALSE(command_updater->IsCommandEnabled(IDC_ENCODING_MENU));
+  EXPECT_FALSE(command_updater->IsCommandEnabled(IDC_DUPLICATE_TAB));
 
   // Proceed and wait for interstitial to detach. This doesn't destroy
   // |contents|.
@@ -1930,6 +1962,7 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, InterstitialCommandDisable) {
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_PRINT));
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_SAVE_PAGE));
   EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_ENCODING_MENU));
+  EXPECT_TRUE(command_updater->IsCommandEnabled(IDC_DUPLICATE_TAB));
 }
 
 // Ensure that creating an interstitial page closes any JavaScript dialogs
@@ -2738,4 +2771,98 @@ IN_PROC_BROWSER_TEST_F(BrowserTest, GetSizeForNewRenderView) {
   EXPECT_EQ(exp_final_size,
             web_contents->GetRenderWidgetHostView()->GetViewBounds().size());
   EXPECT_EQ(exp_final_size, web_contents->GetContainerBounds().size());
+}
+
+IN_PROC_BROWSER_TEST_F(BrowserTest, CanDuplicateTab) {
+  GURL url(ui_test_utils::GetTestUrl(
+      base::FilePath(base::FilePath::kCurrentDirectory),
+      base::FilePath(kTitle1File)));
+  ui_test_utils::NavigateToURL(browser(), url);
+
+  AddTabAtIndex(0, url, ui::PAGE_TRANSITION_TYPED);
+
+  int active_index = browser()->tab_strip_model()->active_index();
+  EXPECT_EQ(0, active_index);
+
+  EXPECT_TRUE(chrome::CanDuplicateTab(browser()));
+  EXPECT_TRUE(chrome::CanDuplicateTabAt(browser(), 0));
+  EXPECT_TRUE(chrome::CanDuplicateTabAt(browser(), 1));
+
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+
+  TestInterstitialPage* interstitial =
+      new TestInterstitialPage(web_contents, false, GURL());
+  content::WaitForInterstitialAttach(web_contents);
+
+  EXPECT_TRUE(web_contents->ShowingInterstitialPage());
+
+  // Verify that the "Duplicate tab" command is disabled on interstitial
+  // pages. Regression test for crbug.com/310812
+  EXPECT_FALSE(chrome::CanDuplicateTab(browser()));
+  EXPECT_FALSE(chrome::CanDuplicateTabAt(browser(), 0));
+  EXPECT_TRUE(chrome::CanDuplicateTabAt(browser(), 1));
+
+  // Don't proceed and wait for interstitial to detach. This doesn't
+  // destroy |contents|.
+  interstitial->DontProceed();
+  content::WaitForInterstitialDetach(web_contents);
+  // interstitial is deleted now.
+
+  EXPECT_TRUE(chrome::CanDuplicateTab(browser()));
+  EXPECT_TRUE(chrome::CanDuplicateTabAt(browser(), 0));
+  EXPECT_TRUE(chrome::CanDuplicateTabAt(browser(), 1));
+}
+
+// Tests that the WebContentsObserver::SecurityStyleChanged event fires
+// with the current style on HTTP, broken HTTPS, and valid HTTPS pages.
+IN_PROC_BROWSER_TEST_F(BrowserTest, SecurityStyleChangedObserver) {
+  net::SpawnedTestServer https_test_server(net::SpawnedTestServer::TYPE_HTTPS,
+                                           net::SpawnedTestServer::kLocalhost,
+                                           base::FilePath(kDocRoot));
+  net::SpawnedTestServer https_test_server_expired(
+      net::SpawnedTestServer::TYPE_HTTPS,
+      net::SpawnedTestServer::SSLOptions(
+          net::SpawnedTestServer::SSLOptions::CERT_EXPIRED),
+      base::FilePath(kDocRoot));
+
+  ASSERT_TRUE(https_test_server.Start());
+  ASSERT_TRUE(https_test_server_expired.Start());
+  ASSERT_TRUE(test_server()->Start());
+
+  content::WebContents* web_contents =
+      browser()->tab_strip_model()->GetActiveWebContents();
+  SecurityStyleTestObserver observer(web_contents);
+
+  // Visit an HTTP url.
+  GURL http_url(test_server()->GetURL(std::string()));
+  ui_test_utils::NavigateToURL(browser(), http_url);
+  EXPECT_EQ(content::SECURITY_STYLE_UNAUTHENTICATED,
+            observer.latest_security_style());
+
+  // Visit a valid HTTPS url.
+  GURL valid_https_url(https_test_server.GetURL(std::string()));
+  ui_test_utils::NavigateToURL(browser(), valid_https_url);
+  EXPECT_EQ(content::SECURITY_STYLE_AUTHENTICATED,
+            observer.latest_security_style());
+
+  // Visit an (otherwise valid) HTTPS page that displays mixed content.
+  std::string replacement_path;
+  ASSERT_TRUE(GetFilePathWithHostAndPortReplacement(
+      "files/ssl/page_displays_insecure_content.html",
+      test_server()->host_port_pair(), &replacement_path));
+
+  GURL mixed_content_url(https_test_server.GetURL(replacement_path));
+  ui_test_utils::NavigateToURL(browser(), mixed_content_url);
+  EXPECT_EQ(content::SECURITY_STYLE_WARNING, observer.latest_security_style());
+
+  // Visit a broken HTTPS url. Other conditions cannot be tested after
+  // this one because once the interstitial is clicked through, all URLs
+  // for this host will remain in a broken state.
+  GURL expired_url(https_test_server_expired.GetURL(std::string()));
+  ui_test_utils::NavigateToURL(browser(), expired_url);
+
+  ProceedThroughInterstitial(web_contents);
+  EXPECT_EQ(content::SECURITY_STYLE_AUTHENTICATION_BROKEN,
+            observer.latest_security_style());
 }

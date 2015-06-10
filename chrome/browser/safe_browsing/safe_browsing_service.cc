@@ -37,7 +37,6 @@
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
-#include "components/startup_metric_utils/startup_metric_utils.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cookie_store_factory.h"
 #include "content/public/browser/notification_service.h"
@@ -218,9 +217,6 @@ SafeBrowsingService::~SafeBrowsingService() {
 }
 
 void SafeBrowsingService::Initialize() {
-  startup_metric_utils::ScopedSlowStartupUMA
-      scoped_timer("Startup.SlowStartupSafeBrowsingServiceInitialize");
-
   url_request_context_getter_ =
       new SafeBrowsingURLRequestContextGetter(this);
 
@@ -235,13 +231,13 @@ void SafeBrowsingService::Initialize() {
           make_scoped_refptr(g_browser_process->system_request_context())));
 
 #if defined(FULL_SAFE_BROWSING)
-#if !defined(SAFE_BROWSING_CSD)
+#if defined(SAFE_BROWSING_CSD)
   if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableClientSidePhishingDetection)) {
     csd_service_.reset(safe_browsing::ClientSideDetectionService::Create(
         url_request_context_getter_.get()));
   }
-#endif  // !defined(SAFE_BROWSING_CSD)
+#endif  // defined(SAFE_BROWSING_CSD)
 
 // TODO(nparker): Adding SAFE_BROWSING_SERVICE_DOWNLOAD to control this might
 // allow removing FULL_SAFE_BROWSING above.

@@ -8,10 +8,11 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
+#include "base/location.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/message_loop/message_loop.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
 #include "content/browser/renderer_host/media/media_stream_provider.h"
 #include "content/browser/renderer_host/media/video_capture_controller.h"
@@ -22,6 +23,7 @@
 #include "content/public/test/test_browser_thread_bundle.h"
 #include "gpu/command_buffer/common/mailbox_holder.h"
 #include "media/base/video_capture_types.h"
+#include "media/base/video_frame_metadata.h"
 #include "media/base/video_util.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -42,7 +44,8 @@ class MockVideoCaptureControllerEventHandler
  public:
   explicit MockVideoCaptureControllerEventHandler(
       VideoCaptureController* controller)
-      : controller_(controller) {}
+      : controller_(controller),
+        resource_utilization_(-1.0) {}
   ~MockVideoCaptureControllerEventHandler() override {}
 
   // These mock methods are delegated to by our fake implementation of
@@ -73,14 +76,15 @@ class MockVideoCaptureControllerEventHandler
       const base::TimeTicks& timestamp,
       scoped_ptr<base::DictionaryValue> metadata) override {
     DoBufferReady(id, coded_size);
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&VideoCaptureController::ReturnBuffer,
                    base::Unretained(controller_),
                    id,
                    this,
                    buffer_id,
-                   0));
+                   0,
+                   resource_utilization_));
   }
   void OnMailboxBufferReady(
       VideoCaptureControllerID id,
@@ -90,24 +94,27 @@ class MockVideoCaptureControllerEventHandler
       const base::TimeTicks& timestamp,
       scoped_ptr<base::DictionaryValue> metadata) override {
     DoMailboxBufferReady(id);
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&VideoCaptureController::ReturnBuffer,
                    base::Unretained(controller_),
                    id,
                    this,
                    buffer_id,
-                   mailbox_holder.sync_point));
+                   mailbox_holder.sync_point,
+                   resource_utilization_));
   }
   void OnEnded(VideoCaptureControllerID id) override {
     DoEnded(id);
     // OnEnded() must respond by (eventually) unregistering the client.
-    base::MessageLoop::current()->PostTask(FROM_HERE,
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE,
         base::Bind(base::IgnoreResult(&VideoCaptureController::RemoveClient),
                    base::Unretained(controller_), id, this));
   }
 
   VideoCaptureController* controller_;
+  double resource_utilization_;
 };
 
 // Test class.
@@ -342,12 +349,23 @@ TEST_F(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
   }
   scoped_refptr<media::VideoFrame> video_frame =
       WrapI420Buffer(capture_resolution, static_cast<uint8*>(buffer->data()));
+  ASSERT_FALSE(video_frame->metadata()->HasKey(
+      media::VideoFrameMetadata::RESOURCE_UTILIZATION));
+  client_a_->resource_utilization_ = 0.5;
+  client_b_->resource_utilization_ = -1.0;
   device_->OnIncomingCapturedVideoFrame(buffer.Pass(), video_frame,
                                         base::TimeTicks());
 
   base::RunLoop().RunUntilIdle();
   Mock::VerifyAndClearExpectations(client_a_.get());
   Mock::VerifyAndClearExpectations(client_b_.get());
+  // Expect VideoCaptureController set the metadata in |video_frame| to hold a
+  // resource utilization of 0.5 (the largest of all reported values).
+  double resource_utilization_in_metadata = -1.0;
+  ASSERT_TRUE(video_frame->metadata()->GetDouble(
+      media::VideoFrameMetadata::RESOURCE_UTILIZATION,
+      &resource_utilization_in_metadata));
+  ASSERT_EQ(0.5, resource_utilization_in_metadata);
 
   // Second buffer which ought to use the same shared memory buffer. In this
   // case pretend that the Buffer pointer is held by the device for a long
@@ -359,6 +377,10 @@ TEST_F(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
   memset(buffer2->data(), buffer_no++, buffer2->size());
   video_frame =
       WrapI420Buffer(capture_resolution, static_cast<uint8*>(buffer2->data()));
+  ASSERT_FALSE(video_frame->metadata()->HasKey(
+      media::VideoFrameMetadata::RESOURCE_UTILIZATION));
+  client_a_->resource_utilization_ = 0.5;
+  client_b_->resource_utilization_ = 3.14;
   device_->OnIncomingCapturedVideoFrame(buffer2.Pass(), video_frame,
                                         base::TimeTicks());
 
@@ -369,6 +391,13 @@ TEST_F(VideoCaptureControllerTest, NormalCaptureMultipleClients) {
   base::RunLoop().RunUntilIdle();
   Mock::VerifyAndClearExpectations(client_a_.get());
   Mock::VerifyAndClearExpectations(client_b_.get());
+  // Expect VideoCaptureController set the metadata in |video_frame| to hold a
+  // resource utilization of 3.14 (the largest of all reported values).
+  resource_utilization_in_metadata = -1.0;
+  ASSERT_TRUE(video_frame->metadata()->GetDouble(
+      media::VideoFrameMetadata::RESOURCE_UTILIZATION,
+      &resource_utilization_in_metadata));
+  ASSERT_EQ(3.14, resource_utilization_in_metadata);
 
   // Add a fourth client now that some buffers have come through.
   controller_->AddClient(client_b_route_2,

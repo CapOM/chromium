@@ -291,11 +291,10 @@ ProfileSyncService::~ProfileSyncService() {
 
 bool ProfileSyncService::IsSyncEnabledAndLoggedIn() {
   // Exit if sync is disabled.
-  if (IsManaged() || sync_prefs_.IsStartSuppressed())
+  if (IsManaged() || !IsSyncRequested())
     return false;
 
-  // Sync is logged in if there is a non-empty effective account id.
-  return !signin_->GetAccountIdToUse().empty();
+  return IsSignedIn();
 }
 
 bool ProfileSyncService::IsOAuthRefreshTokenAvailable() {
@@ -322,7 +321,7 @@ void ProfileSyncService::Initialize() {
 
   RegisterAuthNotifications();
 
-  if (!HasSyncSetupCompleted() || signin_->GetAccountIdToUse().empty()) {
+  if (!HasSyncSetupCompleted() || !IsSignedIn()) {
     // Clean up in case of previous crash / setup abort / signout.
     DisableForUser();
   }
@@ -348,8 +347,7 @@ void ProfileSyncService::Initialize() {
   if (browser_sync::BackupRollbackController::IsBackupEnabled()) {
     // Backup is needed if user's not signed in or signed in but previous
     // backup didn't finish, i.e. backend didn't switch from backup to sync.
-    need_backup_ = signin_->GetAccountIdToUse().empty() ||
-        sync_prefs_.GetFirstSyncTime().is_null();
+    need_backup_ = !IsSignedIn() || sync_prefs_.GetFirstSyncTime().is_null();
 
     // Try to resume rollback if it didn't finish in last session.
     running_rollback = backup_rollback_controller_->StartRollback();
@@ -358,7 +356,7 @@ void ProfileSyncService::Initialize() {
   }
 
 #if defined(ENABLE_PRE_SYNC_BACKUP)
-  if (!running_rollback && signin_->GetAccountIdToUse().empty()) {
+  if (!running_rollback && !IsSignedIn()) {
     CleanUpBackup();
   }
 #else
@@ -543,16 +541,12 @@ void ProfileSyncService::InitializeBackend(bool delete_stale_data) {
               MakeWeakHandle(weak_factory_.GetWeakPtr())));
 
   backend_->Initialize(
-      this,
-      sync_thread_.Pass(),
-      GetJsEventHandler(),
-      sync_service_url_,
-      credentials,
-      delete_stale_data,
+      this, sync_thread_.Pass(), GetJsEventHandler(), sync_service_url_,
+      credentials, delete_stale_data,
       scoped_ptr<syncer::SyncManagerFactory>(
           new syncer::SyncManagerFactory(GetManagerType())).Pass(),
       backend_unrecoverable_error_handler.Pass(),
-      &browser_sync::ChromeReportUnrecoverableError,
+      base::Bind(browser_sync::ChromeReportUnrecoverableError),
       network_resources_.get());
 }
 
@@ -1258,7 +1252,7 @@ void ProfileSyncService::OnConnectionStatusChange(
 }
 
 void ProfileSyncService::StopSyncingPermanently() {
-  sync_prefs_.SetStartSuppressed(true);
+  sync_prefs_.SetSyncRequested(false);
   DisableForUser();
 }
 
@@ -1549,7 +1543,7 @@ ProfileSyncService::SyncStatusSummary
       directory_data_type_manager_.get() &&
       directory_data_type_manager_->state() == DataTypeManager::STOPPED) {
     return DATATYPES_NOT_INITIALIZED;
-  } else if (SyncActive()) {
+  } else if (IsSyncActive()) {
     return INITIALIZED;
   }
   return UNKNOWN_ERROR;
@@ -1626,10 +1620,15 @@ void ProfileSyncService::SetSetupInProgress(bool setup_in_progress) {
   NotifyObservers();
 }
 
-bool ProfileSyncService::SyncActive() const {
+bool ProfileSyncService::IsSyncActive() const {
   return backend_initialized_ && backend_mode_ == SYNC &&
          directory_data_type_manager_ &&
          directory_data_type_manager_->state() != DataTypeManager::STOPPED;
+}
+
+bool ProfileSyncService::IsSignedIn() const {
+  // Sync is logged in if there is a non-empty effective account id.
+  return !signin_->GetAccountIdToUse().empty();
 }
 
 bool ProfileSyncService::backend_initialized() const {
@@ -1786,7 +1785,7 @@ void ProfileSyncService::ChangePreferredDataTypes(
 }
 
 syncer::ModelTypeSet ProfileSyncService::GetActiveDataTypes() const {
-  if (!SyncActive() || !ConfigurationDone())
+  if (!IsSyncActive() || !ConfigurationDone())
     return syncer::ModelTypeSet();
   const syncer::ModelTypeSet preferred_types = GetPreferredDataTypes();
   const syncer::ModelTypeSet failed_types =
@@ -2217,7 +2216,7 @@ void ProfileSyncService::OnSyncManagedPrefChange(bool is_sync_managed) {
 void ProfileSyncService::GoogleSigninSucceeded(const std::string& account_id,
                                                const std::string& username,
                                                const std::string& password) {
-  if (!sync_prefs_.IsStartSuppressed() && !password.empty()) {
+  if (IsSyncRequested() && !password.empty()) {
     cached_passphrase_ = password;
     // Try to consume the passphrase we just cached. If the sync backend
     // is not running yet, the passphrase will remain cached until the
@@ -2420,9 +2419,7 @@ void ProfileSyncService::SyncEvent(SyncEventCodes code) {
 }
 
 // static
-bool ProfileSyncService::IsSyncEnabled() {
-  // We have switches::kEnableSync just in case we need to change back to
-  // sync-disabled-by-default on a platform.
+bool ProfileSyncService::IsSyncAllowedByFlag() {
   return !base::CommandLine::ForCurrentProcess()->HasSwitch(
       switches::kDisableSync);
 }
@@ -2431,16 +2428,16 @@ bool ProfileSyncService::IsManaged() const {
   return sync_prefs_.IsManaged() || sync_disabled_by_admin_;
 }
 
-void ProfileSyncService::StopAndSuppress() {
-  sync_prefs_.SetStartSuppressed(true);
+void ProfileSyncService::RequestStop() {
+  sync_prefs_.SetSyncRequested(false);
   if (HasSyncingBackend()) {
     backend_->UnregisterInvalidationIds();
   }
   ShutdownImpl(syncer::STOP_SYNC);
 }
 
-bool ProfileSyncService::IsStartSuppressed() const {
-  return sync_prefs_.IsStartSuppressed();
+bool ProfileSyncService::IsSyncRequested() const {
+  return sync_prefs_.IsSyncRequested();
 }
 
 SigninManagerBase* ProfileSyncService::signin() const {
@@ -2449,9 +2446,9 @@ SigninManagerBase* ProfileSyncService::signin() const {
   return signin_->GetOriginal();
 }
 
-void ProfileSyncService::UnsuppressAndStart() {
+void ProfileSyncService::RequestStart() {
   DCHECK(profile_);
-  sync_prefs_.SetStartSuppressed(false);
+  sync_prefs_.SetSyncRequested(true);
   DCHECK(!signin_.get() || signin_->GetOriginal()->IsAuthenticated());
   startup_controller_->TryStart();
 }
@@ -2564,7 +2561,7 @@ bool ProfileSyncService::HasSyncingBackend() const {
 }
 
 void ProfileSyncService::UpdateFirstSyncTimePref() {
-  if (signin_->GetAccountIdToUse().empty()) {
+  if (!IsSignedIn()) {
     // Clear if user's not signed in and rollback is done.
     if (backend_mode_ != ROLLBACK)
       sync_prefs_.ClearFirstSyncTime();

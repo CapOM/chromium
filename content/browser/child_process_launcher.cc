@@ -26,6 +26,7 @@
 #include "content/public/common/sandbox_init.h"
 #elif defined(OS_MACOSX)
 #include "content/browser/bootstrap_sandbox_mac.h"
+#include "content/browser/browser_io_surface_manager_mac.h"
 #include "content/browser/mach_broker_mac.h"
 #include "sandbox/mac/bootstrap_sandbox.h"
 #elif defined(OS_ANDROID)
@@ -144,12 +145,14 @@ void LaunchOnLauncherThread(const NotifyCallback& callback,
   // Android WebView runs in single process, ensure that we never get here
   // when running in single process mode.
   CHECK(!cmd_line->HasSwitch(switches::kSingleProcess));
-
+  std::map<int, base::MemoryMappedFile::Region> regions;
   GetContentClient()->browser()->GetAdditionalMappedFilesForChildProcess(
       *cmd_line, child_process_id, files_to_register.get());
 
+  GetContentClient()->browser()->AppendMappedFileCommandLineSwitches(cmd_line);
+
   StartChildProcess(
-      cmd_line->argv(), child_process_id, files_to_register.Pass(),
+      cmd_line->argv(), child_process_id, files_to_register.Pass(), regions,
       base::Bind(&OnChildProcessStartedAndroid, callback, client_thread_id,
                  begin_launch_time, base::Passed(&ipcfd)));
 
@@ -160,6 +163,9 @@ void LaunchOnLauncherThread(const NotifyCallback& callback,
 #if !defined(OS_MACOSX)
   GetContentClient()->browser()->GetAdditionalMappedFilesForChildProcess(
       *cmd_line, child_process_id, files_to_register.get());
+
+  GetContentClient()->browser()->AppendMappedFileCommandLineSwitches(cmd_line);
+
   if (use_zygote) {
     base::ProcessHandle handle = ZygoteHostImpl::GetInstance()->ForkRequest(
         cmd_line->argv(), files_to_register.Pass(), process_type);
@@ -202,6 +208,9 @@ void LaunchOnLauncherThread(const NotifyCallback& callback,
     // Make sure the MachBroker is running, and inform it to expect a
     // check-in from the new process.
     broker->EnsureRunning();
+
+    // Make sure the IOSurfaceManager service is running.
+    BrowserIOSurfaceManager::GetInstance()->EnsureRunning();
 
     const int bootstrap_sandbox_policy = delegate->GetSandboxType();
     if (ShouldEnableBootstrapSandbox() &&

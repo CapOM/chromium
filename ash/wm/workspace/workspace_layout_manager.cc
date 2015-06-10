@@ -134,8 +134,7 @@ void WorkspaceLayoutManager::SetChildBounds(
 
 void WorkspaceLayoutManager::OnKeyboardBoundsChanging(
     const gfx::Rect& new_bounds) {
-  ui::InputMethod* input_method =
-      root_window_->GetProperty(aura::client::kRootWindowInputMethodKey);
+  ui::InputMethod* input_method = root_window_->GetHost()->GetInputMethod();
   ui::TextInputClient* text_input_client = input_method->GetTextInputClient();
   if (!text_input_client)
     return;
@@ -245,8 +244,10 @@ void WorkspaceLayoutManager::OnWindowBoundsChanged(aura::Window* window,
 // WorkspaceLayoutManager,
 // aura::client::ActivationChangeObserver implementation:
 
-void WorkspaceLayoutManager::OnWindowActivated(aura::Window* gained_active,
-                                               aura::Window* lost_active) {
+void WorkspaceLayoutManager::OnWindowActivated(
+    aura::client::ActivationChangeObserver::ActivationReason reason,
+    aura::Window* gained_active,
+    aura::Window* lost_active) {
   wm::WindowState* window_state = wm::GetWindowState(gained_active);
   if (window_state && window_state->IsMinimized() &&
       !gained_active->IsVisible()) {

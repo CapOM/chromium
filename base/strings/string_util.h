@@ -272,6 +272,49 @@ template <class str> inline str StringToLowerASCII(const str& s) {
   return output;
 }
 
+// Converts the elements of the given string.  This version uses a pointer to
+// clearly differentiate it from the non-pointer variant.
+template <class str> inline void StringToUpperASCII(str* s) {
+  for (typename str::iterator i = s->begin(); i != s->end(); ++i)
+    *i = ToUpperASCII(*i);
+}
+
+template <class str> inline str StringToUpperASCII(const str& s) {
+  // for std::string and std::wstring
+  str output(s);
+  StringToUpperASCII(&output);
+  return output;
+}
+//
+// Compare the lower-case form of the given string against the given ASCII
+// string.  This is useful for doing checking if an input string matches some
+// token, and it is optimized to avoid intermediate string copies.  This API is
+// borrowed from the equivalent APIs in Mozilla.
+BASE_EXPORT bool LowerCaseEqualsASCII(const std::string& a, const char* b);
+BASE_EXPORT bool LowerCaseEqualsASCII(const string16& a, const char* b);
+
+// Same thing, but with string iterators instead.
+BASE_EXPORT bool LowerCaseEqualsASCII(std::string::const_iterator a_begin,
+                                      std::string::const_iterator a_end,
+                                      const char* b);
+BASE_EXPORT bool LowerCaseEqualsASCII(string16::const_iterator a_begin,
+                                      string16::const_iterator a_end,
+                                      const char* b);
+BASE_EXPORT bool LowerCaseEqualsASCII(const char* a_begin,
+                                      const char* a_end,
+                                      const char* b);
+BASE_EXPORT bool LowerCaseEqualsASCII(const char* a_begin,
+                                      const char* a_end,
+                                      const char* b_begin,
+                                      const char* b_end);
+BASE_EXPORT bool LowerCaseEqualsASCII(const char16* a_begin,
+                                      const char16* a_end,
+                                      const char* b);
+
+// Performs a case-sensitive string compare. The behavior is undefined if both
+// strings are not ASCII.
+BASE_EXPORT bool EqualsASCII(const string16& a, const StringPiece& b);
+
 }  // namespace base
 
 #if defined(OS_WIN)
@@ -281,45 +324,6 @@ template <class str> inline str StringToLowerASCII(const str& s) {
 #else
 #error Define string operations appropriately for your platform
 #endif
-
-// Converts the elements of the given string.  This version uses a pointer to
-// clearly differentiate it from the non-pointer variant.
-template <class str> inline void StringToUpperASCII(str* s) {
-  for (typename str::iterator i = s->begin(); i != s->end(); ++i)
-    *i = base::ToUpperASCII(*i);
-}
-
-template <class str> inline str StringToUpperASCII(const str& s) {
-  // for std::string and std::wstring
-  str output(s);
-  StringToUpperASCII(&output);
-  return output;
-}
-
-// Compare the lower-case form of the given string against the given ASCII
-// string.  This is useful for doing checking if an input string matches some
-// token, and it is optimized to avoid intermediate string copies.  This API is
-// borrowed from the equivalent APIs in Mozilla.
-BASE_EXPORT bool LowerCaseEqualsASCII(const std::string& a, const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(const base::string16& a, const char* b);
-
-// Same thing, but with string iterators instead.
-BASE_EXPORT bool LowerCaseEqualsASCII(std::string::const_iterator a_begin,
-                                      std::string::const_iterator a_end,
-                                      const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(base::string16::const_iterator a_begin,
-                                      base::string16::const_iterator a_end,
-                                      const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(const char* a_begin,
-                                      const char* a_end,
-                                      const char* b);
-BASE_EXPORT bool LowerCaseEqualsASCII(const base::char16* a_begin,
-                                      const base::char16* a_end,
-                                      const char* b);
-
-// Performs a case-sensitive string compare. The behavior is undefined if both
-// strings are not ASCII.
-BASE_EXPORT bool EqualsASCII(const base::string16& a, const base::StringPiece& b);
 
 // Returns true if str starts with search, or false otherwise.
 BASE_EXPORT bool StartsWithASCII(const std::string& str,
@@ -499,34 +503,5 @@ BASE_EXPORT bool MatchPattern(const base::StringPiece& string,
                               const base::StringPiece& pattern);
 BASE_EXPORT bool MatchPattern(const base::string16& string,
                               const base::string16& pattern);
-
-// Hack to convert any char-like type to its unsigned counterpart.
-// For example, it will convert char, signed char and unsigned char to unsigned
-// char.
-template<typename T>
-struct ToUnsigned {
-  typedef T Unsigned;
-};
-
-template<>
-struct ToUnsigned<char> {
-  typedef unsigned char Unsigned;
-};
-template<>
-struct ToUnsigned<signed char> {
-  typedef unsigned char Unsigned;
-};
-template<>
-struct ToUnsigned<wchar_t> {
-#if defined(WCHAR_T_IS_UTF16)
-  typedef unsigned short Unsigned;
-#elif defined(WCHAR_T_IS_UTF32)
-  typedef uint32 Unsigned;
-#endif
-};
-template<>
-struct ToUnsigned<short> {
-  typedef unsigned short Unsigned;
-};
 
 #endif  // BASE_STRINGS_STRING_UTIL_H_

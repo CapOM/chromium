@@ -61,7 +61,7 @@ def CreatePageSetFromPath(path, skipped_file,
     _AddDir(path, tuple(skipped))
   else:
     _AddPage(path)
-  ps = page_set.PageSet(file_path=os.getcwd()+os.sep,
+  ps = page_set.PageSet(base_dir=os.getcwd()+os.sep,
                         serving_dirs=serving_dirs)
   for url in page_urls:
     ps.AddUserStory(page_module.Page(
@@ -176,7 +176,8 @@ class BlinkPerfCSS(perf_benchmark.PerfBenchmark):
     return CreatePageSetFromPath(path, SKIPPED_FILE)
 
 
-@benchmark.Disabled('xp')  # http://crbug.com/488059
+@benchmark.Disabled('xp',  # http://crbug.com/488059
+                    'android')  # http://crbug.com/496707
 class BlinkPerfCanvas(perf_benchmark.PerfBenchmark):
   tag = 'canvas'
   test = _BlinkPerfMeasurement

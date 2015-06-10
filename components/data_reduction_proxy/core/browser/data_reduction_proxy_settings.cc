@@ -18,16 +18,10 @@
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
 
 namespace {
+
 // Key of the UMA DataReductionProxy.StartupState histogram.
 const char kUMAProxyStartupStateHistogram[] =
     "DataReductionProxy.StartupState";
-
-bool IsLoFiEnabledOnCommandLine() {
-  const base::CommandLine& command_line =
-      *base::CommandLine::ForCurrentProcess();
-  return command_line.HasSwitch(
-      data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
-}
 
 }  // namespace
 
@@ -42,6 +36,8 @@ DataReductionProxySettings::DataReductionProxySettings()
       allowed_(false),
       alternative_allowed_(false),
       promo_allowed_(false),
+      lo_fi_mode_active_(false),
+      lo_fi_show_image_requested_(false),
       prefs_(NULL),
       config_(nullptr) {
 }
@@ -174,8 +170,25 @@ PrefService* DataReductionProxySettings::GetOriginalProfilePrefs() {
   return prefs_;
 }
 
-bool DataReductionProxySettings::IsLoFiEnabled() const {
-  return IsDataReductionProxyEnabled() && IsLoFiEnabledOnCommandLine();
+void DataReductionProxySettings::SetLoFiModeActiveOnMainFrame(
+    bool lo_fi_mode_active) {
+  lo_fi_show_image_requested_ = false;
+  lo_fi_mode_active_ = lo_fi_mode_active;
+  if (!register_synthetic_field_trial_.is_null()) {
+    RegisterLoFiFieldTrial();
+  }
+}
+
+bool DataReductionProxySettings::WasLoFiModeActiveOnMainFrame() const {
+  return lo_fi_mode_active_;
+}
+
+bool DataReductionProxySettings::WasLoFiShowImageRequestedBefore() {
+  return lo_fi_show_image_requested_;
+}
+
+void DataReductionProxySettings::SetLoFiShowImageRequested() {
+  lo_fi_show_image_requested_ = true;
 }
 
 void DataReductionProxySettings::RegisterDataReductionProxyFieldTrial() {
@@ -187,7 +200,9 @@ void DataReductionProxySettings::RegisterDataReductionProxyFieldTrial() {
 void DataReductionProxySettings::RegisterLoFiFieldTrial() {
   register_synthetic_field_trial_.Run(
       "SyntheticDataReductionProxyLoFiSetting",
-      IsLoFiEnabled() ? "Enabled" : "Disabled");
+      IsDataReductionProxyEnabled() && WasLoFiModeActiveOnMainFrame()
+          ? "Enabled"
+          : "Disabled");
 }
 
 void DataReductionProxySettings::OnProxyEnabledPrefChange() {
@@ -218,7 +233,8 @@ void DataReductionProxySettings::UpdateIOData(bool at_startup) {
   data_reduction_proxy_service_->SetProxyPrefs(
       IsDataReductionProxyEnabled(), IsDataReductionProxyAlternativeEnabled(),
       at_startup);
-  data_reduction_proxy_service_->RetrieveConfig();
+  if (IsDataReductionProxyEnabled())
+    data_reduction_proxy_service_->RetrieveConfig();
 }
 
 void DataReductionProxySettings::MaybeActivateDataReductionProxy(

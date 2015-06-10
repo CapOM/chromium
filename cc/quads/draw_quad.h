@@ -51,17 +51,6 @@ class CC_EXPORT DrawQuad {
 
   virtual ~DrawQuad();
 
-  // TODO(danakj): Chromify or remove these SharedQuadState helpers.
-  const gfx::Transform& quadTransform() const {
-    return shared_quad_state->content_to_target_transform;
-  }
-  gfx::Rect visibleContentRect() const {
-    return shared_quad_state->visible_content_rect;
-  }
-  gfx::Rect clipRect() const { return shared_quad_state->clip_rect; }
-  bool isClipped() const { return shared_quad_state->is_clipped; }
-  float opacity() const { return shared_quad_state->opacity; }
-
   Material material;
 
   // This rect, after applying the quad_transform(), gives the geometry that
@@ -96,9 +85,6 @@ class CC_EXPORT DrawQuad {
     return !opaque_rect.Contains(visible_rect);
   }
 
-  typedef base::Callback<ResourceId(ResourceId)> ResourceIteratorCallback;
-  virtual void IterateResources(const ResourceIteratorCallback& callback) = 0;
-
   // Is the left edge of this tile aligned with the originating layer's
   // left edge?
   bool IsLeftEdge() const { return !rect.x(); }
@@ -126,6 +112,22 @@ class CC_EXPORT DrawQuad {
   }
 
   void AsValueInto(base::trace_event::TracedValue* value) const;
+
+  struct CC_EXPORT Resources {
+    enum : size_t { kMaxResourceIdCount = 4 };
+    Resources();
+
+    ResourceId* begin() { return ids; }
+    ResourceId* end() {
+      DCHECK_LE(count, kMaxResourceIdCount);
+      return ids + count;
+    }
+
+    size_t count;
+    ResourceId ids[kMaxResourceIdCount];
+  };
+
+  Resources resources;
 
  protected:
   DrawQuad();

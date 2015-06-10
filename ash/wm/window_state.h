@@ -108,6 +108,9 @@ class ASH_EXPORT WindowState : public aura::WindowObserver {
   bool IsActive() const;
   bool IsDocked() const;
 
+  // Returns true if the window's location can be controlled by the user.
+  bool IsUserPositionable() const;
+
   // Checks if the window can change its state accordingly.
   bool CanMaximize() const;
   bool CanMinimize() const;
@@ -370,7 +373,7 @@ class ASH_EXPORT WindowState : public aura::WindowObserver {
   // restored when only this one window gets shown.
   scoped_ptr<gfx::Rect> pre_auto_manage_window_bounds_;
 
-  ObserverList<WindowStateObserver> observer_list_;
+  base::ObserverList<WindowStateObserver> observer_list_;
 
   // True to ignore a property change event to avoid reentrance in
   // UpdateWindowStateType()

@@ -23,7 +23,6 @@ class VideoFrame;
 namespace cast {
 
 class CastTransportSender;
-struct SenderEncodedFrame;
 class VideoEncoder;
 class VideoFrameFactory;
 
@@ -67,7 +66,8 @@ class VideoSender : public FrameSender,
 
  private:
   // Called by the |video_encoder_| with the next EncodedFrame to send.
-  void OnEncodedVideoFrame(int encoder_bitrate,
+  void OnEncodedVideoFrame(const scoped_refptr<media::VideoFrame>& video_frame,
+                           int encoder_bitrate,
                            scoped_ptr<SenderEncodedFrame> encoded_frame);
 
   // Encodes media::VideoFrame images into EncodedFrames.  Per configuration,

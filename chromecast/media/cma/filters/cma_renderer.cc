@@ -233,12 +233,12 @@ void CmaRenderer::InitializeAudioPipeline() {
   DCHECK_EQ(state_, kUninitialized) << state_;
   DCHECK(!init_cb_.is_null());
 
-  ::media::PipelineStatusCB audio_initialization_done_cb =
-      ::media::BindToCurrentLoop(
-          base::Bind(&CmaRenderer::OnAudioPipelineInitializeDone, weak_this_));
-
   ::media::DemuxerStream* stream =
       demuxer_stream_provider_->GetStream(::media::DemuxerStream::AUDIO);
+  ::media::PipelineStatusCB audio_initialization_done_cb =
+      ::media::BindToCurrentLoop(
+          base::Bind(&CmaRenderer::OnAudioPipelineInitializeDone, weak_this_,
+                     stream != nullptr));
   if (!stream) {
     audio_initialization_done_cb.Run(::media::PIPELINE_OK);
     return;
@@ -266,6 +266,7 @@ void CmaRenderer::InitializeAudioPipeline() {
 }
 
 void CmaRenderer::OnAudioPipelineInitializeDone(
+    bool audio_stream_present,
     ::media::PipelineStatus status) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -279,8 +280,8 @@ void CmaRenderer::OnAudioPipelineInitializeDone(
     base::ResetAndReturn(&init_cb_).Run(status);
     return;
   }
-  has_audio_ = true;
 
+  has_audio_ = audio_stream_present;
   InitializeVideoPipeline();
 }
 
@@ -289,12 +290,12 @@ void CmaRenderer::InitializeVideoPipeline() {
   DCHECK_EQ(state_, kUninitialized) << state_;
   DCHECK(!init_cb_.is_null());
 
-  ::media::PipelineStatusCB video_initialization_done_cb =
-      ::media::BindToCurrentLoop(
-          base::Bind(&CmaRenderer::OnVideoPipelineInitializeDone, weak_this_));
-
   ::media::DemuxerStream* stream =
       demuxer_stream_provider_->GetStream(::media::DemuxerStream::VIDEO);
+  ::media::PipelineStatusCB video_initialization_done_cb =
+      ::media::BindToCurrentLoop(
+          base::Bind(&CmaRenderer::OnVideoPipelineInitializeDone, weak_this_,
+                     stream != nullptr));
   if (!stream) {
     video_initialization_done_cb.Run(::media::PIPELINE_OK);
     return;
@@ -321,13 +322,16 @@ void CmaRenderer::InitializeVideoPipeline() {
 
   initial_natural_size_ = config.natural_size();
 
+  std::vector<::media::VideoDecoderConfig> configs;
+  configs.push_back(config);
   media_pipeline_->InitializeVideo(
-      config,
+      configs,
       frame_provider.Pass(),
       video_initialization_done_cb);
 }
 
 void CmaRenderer::OnVideoPipelineInitializeDone(
+    bool video_stream_present,
     ::media::PipelineStatus status) {
   DCHECK(thread_checker_.CalledOnValidThread());
 
@@ -341,17 +345,16 @@ void CmaRenderer::OnVideoPipelineInitializeDone(
     base::ResetAndReturn(&init_cb_).Run(status);
     return;
   }
-  has_video_ = true;
 
+  has_video_ = video_stream_present;
   CompleteStateTransition(kFlushed);
   base::ResetAndReturn(&init_cb_).Run(::media::PIPELINE_OK);
 }
 
 void CmaRenderer::OnEosReached(bool is_audio) {
   DCHECK(thread_checker_.CalledOnValidThread());
-  CMALOG(kLogControl) << __FUNCTION__;
   if (state_ != kPlaying) {
-    LOG(WARNING) << "Ignoring a late EOS event";
+    LOG(WARNING) << __FUNCTION__ << " Ignoring a late EOS event";
     return;
   }
 
@@ -365,6 +368,9 @@ void CmaRenderer::OnEosReached(bool is_audio) {
 
   bool audio_finished = !has_audio_ || received_audio_eos_;
   bool video_finished = !has_video_ || received_video_eos_;
+  CMALOG(kLogControl) << __FUNCTION__
+                      << " audio_finished=" << audio_finished
+                      << " video_finished=" << video_finished;
   if (audio_finished && video_finished)
     ended_cb_.Run();
 }

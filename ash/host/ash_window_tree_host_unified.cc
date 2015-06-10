@@ -110,10 +110,10 @@ gfx::AcceleratedWidget AshWindowTreeHostUnified::GetAcceleratedWidget() {
   return gfx::kNullAcceleratedWidget;
 }
 
-void AshWindowTreeHostUnified::Show() {
+void AshWindowTreeHostUnified::ShowImpl() {
 }
 
-void AshWindowTreeHostUnified::Hide() {
+void AshWindowTreeHostUnified::HideImpl() {
 }
 
 gfx::Rect AshWindowTreeHostUnified::GetBounds() const {
@@ -179,10 +179,6 @@ void AshWindowTreeHostUnified::OnWindowDestroying(aura::Window* window) {
   DCHECK(iter != mirroring_hosts_.end());
   window->RemoveObserver(this);
   mirroring_hosts_.erase(iter);
-}
-
-ui::EventProcessor* AshWindowTreeHostUnified::GetEventProcessor() {
-  return dispatcher();
 }
 
 }  // namespace ash

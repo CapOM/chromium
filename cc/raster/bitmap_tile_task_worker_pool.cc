@@ -42,9 +42,10 @@ class RasterBufferImpl : public RasterBuffer {
     DCHECK(!playback_rect.IsEmpty())
         << "Why are we rastering a tile that's not dirty?";
 
+    size_t stride = 0u;
     TileTaskWorkerPool::PlaybackToMemory(
         lock_.sk_bitmap().getPixels(), resource_->format(), resource_->size(),
-        0, raster_source, raster_full_rect, playback_rect, scale);
+        stride, raster_source, raster_full_rect, playback_rect, scale);
   }
 
  private:
@@ -105,7 +106,7 @@ void BitmapTileTaskWorkerPool::ScheduleTasks(TileTaskQueue* queue) {
   // Mark all task sets as pending.
   tasks_pending_.set();
 
-  unsigned priority = kTileTaskPriorityBase;
+  size_t priority = kTileTaskPriorityBase;
 
   graph_.Reset();
 

@@ -1304,6 +1304,77 @@ def _CheckJavaStyle(input_api, output_api):
       black_list=_EXCLUDED_PATHS + input_api.DEFAULT_BLACK_LIST)
 
 
+def _CheckAndroidCrLogUsage(input_api, output_api):
+  """Checks that new logs using org.chromium.base.Log:
+    - Are using 'TAG' as variable name for the tags (warn)
+    - Are using the suggested name format for the tags: "cr.<PackageTag>" (warn)
+    - Are using a tag that is shorter than 23 characters (error)
+  """
+  cr_log_import_pattern = input_api.re.compile(
+      r'^import org\.chromium\.base\.Log;$', input_api.re.MULTILINE);
+  # Extract the tag from lines like `Log.d(TAG, "*");` or `Log.d("TAG", "*");`
+  cr_log_pattern = input_api.re.compile(r'^\s*Log\.\w\((?P<tag>\"?\w+\"?)\,')
+  log_decl_pattern = input_api.re.compile(
+      r'^\s*private static final String TAG = "(?P<name>(.*)")',
+      input_api.re.MULTILINE)
+  log_name_pattern = input_api.re.compile(r'^cr[.\w]*')
+
+  REF_MSG = ('See base/android/java/src/org/chromium/base/README_logging.md '
+            'or contact dgn@chromium.org for more info.')
+  sources = lambda x: input_api.FilterSourceFile(x, white_list=(r'.*\.java$',))
+  tag_errors = []
+  tag_decl_errors = []
+  tag_length_errors = []
+
+  for f in input_api.AffectedSourceFiles(sources):
+    file_content = input_api.ReadFile(f)
+    has_modified_logs = False
+
+    # Per line checks
+    if cr_log_import_pattern.search(file_content):
+      for line_num, line in f.ChangedContents():
+
+        # Check if the new line is doing some logging
+        match = cr_log_pattern.search(line)
+        if match:
+          has_modified_logs = True
+
+          # Make sure it uses "TAG"
+          if not match.group('tag') == 'TAG':
+            tag_errors.append("%s:%d" % (f.LocalPath(), line_num))
+
+    # Per file checks
+    if has_modified_logs:
+      # Make sure the tag is using the "cr" prefix and is not too long
+      match = log_decl_pattern.search(file_content)
+      tag_name = match.group('name') if match else ''
+      if not log_name_pattern.search(tag_name ):
+        tag_decl_errors.append(f.LocalPath())
+      if len(tag_name) > 23:
+        tag_length_errors.append(f.LocalPath())
+
+  results = []
+  if tag_decl_errors:
+    results.append(output_api.PresubmitPromptWarning(
+        'Please define your tags using the suggested format: .\n'
+        '"private static final String TAG = "cr.<package tag>".\n' + REF_MSG,
+        tag_decl_errors))
+
+  if tag_length_errors:
+    results.append(output_api.PresubmitError(
+        'The tag length is restricted by the system to be at most '
+        '23 characters.\n' + REF_MSG,
+        tag_length_errors))
+
+  if tag_errors:
+    results.append(output_api.PresubmitPromptWarning(
+        'Please use a variable named "TAG" for your log tags.\n' + REF_MSG,
+        tag_errors))
+
+  return results
+
+
+# TODO(dgn): refactor with _CheckAndroidCrLogUsage
 def _CheckNoNewUtilLogUsage(input_api, output_api):
   """Checks that new logs are using org.chromium.base.Log."""
 
@@ -1410,7 +1481,8 @@ _DEPRECATED_CSS = [
 def _CheckNoDeprecatedCSS(input_api, output_api):
   """ Make sure that we don't use deprecated CSS
       properties, functions or values. Our external
-      documentation is ignored by the hooks as it
+      documentation and iOS CSS for dom distiller
+      (reader mode) are ignored by the hooks as it
       needs to be consumed by WebKit. """
   results = []
   file_inclusion_pattern = (r".+\.css$",)
@@ -1419,6 +1491,7 @@ def _CheckNoDeprecatedCSS(input_api, output_api):
                 input_api.DEFAULT_BLACK_LIST +
                 (r"^chrome/common/extensions/docs",
                  r"^chrome/docs",
+                 r"^components/dom_distiller/core/css/distilledpage_ios.css",
                  r"^native_client_sdk"))
   file_filter = lambda f: input_api.FilterSourceFile(
       f, white_list=file_inclusion_pattern, black_list=black_list)
@@ -1453,6 +1526,14 @@ def _CheckNoDeprecatedJS(input_api, output_api):
           results.append(output_api.PresubmitError(
               "%s:%d: Use of deprecated JS %s, use %s instead" %
               (fpath.LocalPath(), lnum, deprecated, replacement)))
+  return results
+
+
+def _AndroidSpecificOnUploadChecks(input_api, output_api):
+  """Groups checks that target android code."""
+  results = []
+  results.extend(_CheckNoNewUtilLogUsage(input_api, output_api))
+  results.extend(_CheckAndroidCrLogUsage(input_api, output_api))
   return results
 
 
@@ -1728,7 +1809,7 @@ def CheckChangeOnUpload(input_api, output_api):
   results.extend(
       input_api.canned_checks.CheckGNFormatted(input_api, output_api))
   results.extend(_CheckUmaHistogramChanges(input_api, output_api))
-  results.extend(_CheckNoNewUtilLogUsage(input_api, output_api))
+  results.extend(_AndroidSpecificOnUploadChecks(input_api, output_api))
   return results
 
 
@@ -1788,29 +1869,30 @@ def CheckChangeOnCommit(input_api, output_api):
 
 
 def GetPreferredTryMasters(project, change):
-  import re
-  files = change.LocalPaths()
-
-  import os
   import json
-  with open(os.path.join(
-      change.RepositoryRoot(), 'testing', 'commit_queue', 'config.json')) as f:
-    cq_config = json.load(f)
-    cq_verifiers = cq_config.get('verifiers_no_patch', {})
-    cq_try_jobs = cq_verifiers.get('try_job_verifier', {})
-    builders = cq_try_jobs.get('launched', {})
+  import os.path
+  import platform
+  import subprocess
 
-    for master, master_config in cq_try_jobs.get('triggered', {}).iteritems():
-      for triggered_bot in master_config:
-        builders.get(master, {}).pop(triggered_bot, None)
+  cq_config_path = os.path.join(
+      change.RepositoryRoot(), 'infra', 'config', 'cq.cfg')
+  # commit_queue.py below is a script in depot_tools directory, which has a
+  # 'builders' command to retrieve a list of CQ builders from the CQ config.
+  is_win = platform.system() == 'Windows'
+  masters = json.loads(subprocess.check_output(
+      ['commit_queue', 'builders', cq_config_path], shell=is_win))
 
-    # Explicitly iterate over copies of dicts since we mutate them.
-    for master in builders.keys():
-      for builder in builders[master].keys():
-        # Do not trigger presubmit builders, since they're likely to fail
-        # (e.g. OWNERS checks before finished code review), and we're
-        # running local presubmit anyway.
-        if 'presubmit' in builder:
-          builders[master].pop(builder)
+  # Explicitly iterate over copies of keys since we mutate them.
+  for master in masters.keys():
+    for builder in masters[master].keys():
+      # Do not trigger presubmit builders, since they're likely to fail
+      # (e.g. OWNERS checks before finished code review), and we're
+      # running local presubmit anyway.
+      if 'presubmit' in builder:
+        masters[master].pop(builder)
+      else:
+        # Convert testfilter format to the one expected by git-cl-try.
+        testfilter = masters[master][builder].get('testfilter', 'defaulttests')
+        masters[master][builder] = [testfilter]
 
-  return builders
+  return masters
