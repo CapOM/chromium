@@ -9,8 +9,8 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.pm.PackageManager;
 
-import org.chromium.base.JNINamespace;
 import org.chromium.base.CalledByNative;
+import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
 
 /**
