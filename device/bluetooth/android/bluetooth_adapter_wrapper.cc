@@ -20,7 +20,7 @@ BluetoothAdapterWrapper::CreateWithDefaultAdapter() {
 
 // static
 bool BluetoothAdapterWrapper::RegisterJNI(JNIEnv* env) {
-  return RegisterNativesImpl(env);  // Generated in BluetoothAdapter_jni.h
+  return RegisterNativesImpl(env);  // From BluetoothAdapterWrapper_jni.h
 }
 
 }  // namespace device
