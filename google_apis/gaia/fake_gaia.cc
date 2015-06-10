@@ -51,7 +51,7 @@ const char kTestOAuthLoginSID[] = "fake-oauth-SID-cookie";
 const char kTestOAuthLoginLSID[] = "fake-oauth-LSID-cookie";
 const char kTestOAuthLoginAuthCode[] = "fake-oauth-auth-code";
 
-const char kDefaultGaiaId[]  ="12345";
+const char kDefaultGaiaId[] = "12345";
 
 const base::FilePath::CharType kServiceLogin[] =
     FILE_PATH_LITERAL("google_apis/test/service_login.html");
@@ -64,7 +64,7 @@ const char kAuthHeaderBearer[] = "Bearer ";
 const char kAuthHeaderOAuth[] = "OAuth ";
 
 const char kListAccountsResponseFormat[] =
-    "[\"gaia.l.a.r\",[[\"gaia.l.a\",1,\"\",\"%s\",\"\",1,1,0]]]";
+    "[\"gaia.l.a.r\",[[\"gaia.l.a\",1,\"\",\"%s\",\"\",1,1,0,0,1,\"12345\"]]]";
 
 typedef std::map<std::string, std::string> CookieMap;
 
@@ -266,7 +266,7 @@ void FakeGaia::Initialize() {
   // Handles /SSO GAIA call (not GAIA, made up for SAML tests).
   REGISTER_PATH_RESPONSE_HANDLER("/SSO", HandleSSO);
 
-  // Handles /o/oauth2/token GAIA call.
+  // Handles /oauth2/v4/token GAIA call.
   REGISTER_RESPONSE_HANDLER(
       gaia_urls->oauth2_token_url(), HandleAuthToken);
 
@@ -624,7 +624,7 @@ void FakeGaia::HandleAuthToken(const HttpRequest& request,
   std::string grant_type;
   if (!GetQueryParameter(request.content, "grant_type", &grant_type)) {
     http_response->set_code(net::HTTP_BAD_REQUEST);
-    LOG(ERROR) << "No 'grant_type' param in /o/oauth2/token";
+    LOG(ERROR) << "No 'grant_type' param in /oauth2/v4/token";
     return;
   }
 
@@ -633,7 +633,7 @@ void FakeGaia::HandleAuthToken(const HttpRequest& request,
     if (!GetQueryParameter(request.content, "code", &auth_code) ||
         auth_code != merge_session_params_.auth_code) {
       http_response->set_code(net::HTTP_BAD_REQUEST);
-      LOG(ERROR) << "No 'code' param in /o/oauth2/token";
+      LOG(ERROR) << "No 'code' param in /oauth2/v4/token";
       return;
     }
 
@@ -683,7 +683,7 @@ void FakeGaia::HandleAuthToken(const HttpRequest& request,
     }
   }
 
-  LOG(ERROR) << "Bad request for /o/oauth2/token - "
+  LOG(ERROR) << "Bad request for /oauth2/v4/token - "
               << "refresh_token = " << refresh_token
               << ", scope = " << scope
               << ", client_id = " << client_id;

@@ -51,10 +51,6 @@
         'public/video_plane.h',
       ],
     },
-    # TODO(gunsch): Remove this fake target once it's either added or no
-    # longer referenced from internal code.
-    {'target_name': 'cast_media_audio', 'type': 'none'},
-
     {
       'target_name': 'cast_base',
       'type': '<(component)',
@@ -110,6 +106,10 @@
       'sources': [
         'net/connectivity_checker.cc',
         'net/connectivity_checker.h',
+        'net/connectivity_checker_impl.cc',
+        'net/connectivity_checker_impl.h',
+        'net/fake_connectivity_checker.cc',
+        'net/fake_connectivity_checker.h',
         'net/net_switches.cc',
         'net/net_switches.h',
         'net/net_util_cast.cc',
@@ -490,6 +490,7 @@
           'dependencies': [
             '<(android_support_v13_target)',
             '../base/base.gyp:base_java',
+            '../components/components.gyp:external_video_surface_java',
             '../content/content.gyp:content_java',
             '../media/media.gyp:media_java',
             '../net/net.gyp:net_java',

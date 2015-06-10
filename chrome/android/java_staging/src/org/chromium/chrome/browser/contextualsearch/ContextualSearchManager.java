@@ -21,8 +21,8 @@ import org.chromium.base.CalledByNative;
 import org.chromium.base.SysUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.browser.ChromeActivity;
-import org.chromium.chrome.browser.ContentViewUtil;
 import org.chromium.chrome.browser.Tab;
+import org.chromium.chrome.browser.WebContentsFactory;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchControl;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.PanelState;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
@@ -497,7 +497,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
             // the user activates a Voice Search.
             nativeGatherSurroundingText(mNativeContextualSearchManagerPtr,
                     mSelectionController.getSelectedText(), NEVER_USE_RESOLVED_SEARCH_TERM,
-                    getBaseContentView());
+                    getBaseContentView(), mPolicy.maySendBasePageUrl());
         }
 
         mWereSearchResultsSeen = false;
@@ -524,7 +524,8 @@ public class ContextualSearchManager extends ContextualSearchObservable
         ContentViewCore baseContentView = getBaseContentView();
         if (baseContentView != null) {
             nativeStartSearchTermResolutionRequest(mNativeContextualSearchManagerPtr, selection,
-                    true, getBaseContentView());
+                    ALWAYS_USE_RESOLVED_SEARCH_TERM, getBaseContentView(),
+                    mPolicy.maySendBasePageUrl());
         }
     }
 
@@ -558,8 +559,8 @@ public class ContextualSearchManager extends ContextualSearchObservable
         // Saved in the case a search needs to be made after first run.
         if (mSelectionController.getSelectionType() == SelectionType.TAP) {
             nativeGatherSurroundingText(mNativeContextualSearchManagerPtr,
-                    mSelectionController.getSelectedText(),
-                    ALWAYS_USE_RESOLVED_SEARCH_TERM, getBaseContentView());
+                    mSelectionController.getSelectedText(), ALWAYS_USE_RESOLVED_SEARCH_TERM,
+                    getBaseContentView(), mPolicy.maySendBasePageUrl());
         }
     }
 
@@ -604,7 +605,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
         mTabModelSelectorTabObserver = new TabModelSelectorTabObserver(selector) {
             @Override
-            public void onPageLoadStarted(Tab tab) {
+            public void onPageLoadStarted(Tab tab, String url) {
                 hideContextualSearch(StateChangeReason.UNKNOWN);
                 mDidBasePageLoadJustStart = true;
             }
@@ -648,6 +649,8 @@ public class ContextualSearchManager extends ContextualSearchObservable
         if (newState == ActivityState.RESUMED || newState == ActivityState.STOPPED
                 || newState == ActivityState.DESTROYED) {
             hideContextualSearch(StateChangeReason.UNKNOWN);
+        } else if (newState == ActivityState.PAUSED) {
+            mPolicy.logCurrentState(getBaseContentView());
         }
     }
 
@@ -756,6 +759,8 @@ public class ContextualSearchManager extends ContextualSearchObservable
             if (mIsSearchContentViewShowing || shouldPreload) {
                 loadSearchUrl();
             }
+            mPolicy.logSearchTermResolutionDetails(searchTerm,
+                    mNetworkCommunicator.getBasePageUrl());
         }
     }
 
@@ -938,7 +943,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
         ContentView cv = new ContentView(mActivity, mSearchContentViewCore);
         // Creates an initially hidden WebContents which gets shown when the panel is opened.
         mSearchContentViewCore.initialize(cv, cv,
-                ContentViewUtil.createWebContents(false, true), mWindowAndroid);
+                WebContentsFactory.createWebContents(false, true), mWindowAndroid);
 
         // Transfers the ownership of the WebContents to the native ContextualSearchManager.
         nativeSetWebContents(mNativeContextualSearchManagerPtr, mSearchContentViewCore,
@@ -1204,7 +1209,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
             createNewSearchContentViewCoreIfNeeded();
             if (mSearchContentViewCore != null) mSearchContentViewCore.onShow();
             mSearchPanelDelegate.setWasSearchContentViewSeen();
-            mPolicy.resetTapCounters();
+            mPolicy.updateCountersForOpen();
         } else {
             if (mSearchContentViewCore != null) mSearchContentViewCore.onHide();
         }
@@ -1350,12 +1355,12 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
     private native long nativeInit();
     private native void nativeDestroy(long nativeContextualSearchManager);
-    private native void nativeStartSearchTermResolutionRequest(
-            long nativeContextualSearchManager, String selection, boolean useResolvedSearchTerm,
-            ContentViewCore baseContentViewCore);
-    private native void nativeGatherSurroundingText(
-            long nativeContextualSearchManager, String selection, boolean useResolvedSearchTerm,
-            ContentViewCore baseContentViewCore);
+    private native void nativeStartSearchTermResolutionRequest(long nativeContextualSearchManager,
+            String selection, boolean useResolvedSearchTerm, ContentViewCore baseContentViewCore,
+            boolean maySendBasePageUrl);
+    private native void nativeGatherSurroundingText(long nativeContextualSearchManager,
+            String selection, boolean useResolvedSearchTerm, ContentViewCore baseContentViewCore,
+            boolean maySendBasePageUrl);
     private native void nativeContinueSearchTermResolutionRequest(
             long nativeContextualSearchManager);
     private native void nativeRemoveLastSearchVisit(

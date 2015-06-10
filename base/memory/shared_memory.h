@@ -34,10 +34,7 @@ class FilePath;
 #if defined(OS_WIN)
 typedef HANDLE SharedMemoryHandle;
 #elif defined(OS_POSIX)
-// A SharedMemoryId is sufficient to identify a given shared memory segment on a
-// system, but insufficient to map it.
 typedef FileDescriptor SharedMemoryHandle;
-typedef ino_t SharedMemoryId;
 #endif
 
 // Options for creating a shared memory object.
@@ -116,19 +113,11 @@ class BASE_EXPORT SharedMemory {
   // Returns the maximum number of handles that can be open at once per process.
   static size_t GetHandleLimit();
 
-  // The copy shares the same underlying OS primitives. The new
-  // SharedMemoryHandle will not clean up the OS primitives when destroyed. The
-  // original must outlive the copy.
-  static SharedMemoryHandle ShallowCopyHandle(const SharedMemoryHandle& handle);
+  // Duplicates The underlying OS primitive. Returns NULLHandle() on failure.
+  // The caller is responsible for destroying the duplicated OS primitive.
+  static SharedMemoryHandle DuplicateHandle(const SharedMemoryHandle& handle);
 
 #if defined(OS_POSIX)
-  // The underlying OS primitives are duplicated.
-  // |clean_up_resources_on_destruction| indicates whether the underlying OS
-  // primitives are cleaned up on destruction.
-  static SharedMemoryHandle DeepCopyHandle(
-      const SharedMemoryHandle& handle,
-      bool clean_up_resources_on_destruction);
-
   // This method requires that the SharedMemoryHandle is backed by a POSIX fd.
   static int GetFdFromSharedMemoryHandle(const SharedMemoryHandle& handle);
 #endif
@@ -214,14 +203,6 @@ class BASE_EXPORT SharedMemory {
   // Use of this handle for anything other than an opaque
   // identifier is not portable.
   SharedMemoryHandle handle() const;
-
-#if defined(OS_POSIX) && !defined(OS_NACL)
-  // Returns a unique identifier for this shared memory segment. Inode numbers
-  // are technically only unique to a single filesystem. However, we always
-  // allocate shared memory backing files from the same directory, so will end
-  // up on the same filesystem.
-  SharedMemoryId id() const { return inode_; }
-#endif
 
   // Closes the open shared memory segment. The memory will remain mapped if
   // it was previously mapped.
@@ -312,7 +293,6 @@ class BASE_EXPORT SharedMemory {
 #elif defined(OS_POSIX)
   int                mapped_file_;
   int                readonly_mapped_file_;
-  ino_t              inode_;
 #endif
   size_t             mapped_size_;
   void*              memory_;

@@ -79,9 +79,6 @@ class VIEWS_EXPORT DesktopNativeWidgetAura
   // as by the time we get here |dispatcher_| is NULL.
   virtual void OnDesktopWindowTreeHostDestroyed(aura::WindowTreeHost* host);
 
-  wm::InputMethodEventFilter* input_method_event_filter() {
-    return input_method_event_filter_.get();
-  }
   wm::CompoundEventFilter* root_window_event_filter() {
     return root_window_event_filter_.get();
   }
@@ -213,8 +210,10 @@ class VIEWS_EXPORT DesktopNativeWidgetAura
   bool ShouldActivate() const override;
 
   // Overridden from aura::client::ActivationChangeObserver:
-  void OnWindowActivated(aura::Window* gained_active,
-                         aura::Window* lost_active) override;
+  void OnWindowActivated(
+      aura::client::ActivationChangeObserver::ActivationReason reason,
+      aura::Window* gained_active,
+      aura::Window* lost_active) override;
 
   // Overridden from aura::client::FocusChangeObserver:
   void OnWindowFocused(aura::Window* gained_focus,
@@ -238,9 +237,6 @@ class VIEWS_EXPORT DesktopNativeWidgetAura
  private:
   friend class FocusManagerEventHandler;
   friend class RootWindowDestructionObserver;
-
-  // Installs the input method filter.
-  void InstallInputMethodEventFilter();
 
   // To save a clear on platforms where the window is never transparent, the
   // window is only set as transparent when the glass frame is in use.
@@ -276,8 +272,6 @@ class VIEWS_EXPORT DesktopNativeWidgetAura
 
   // Toplevel event filter which dispatches to other event filters.
   scoped_ptr<wm::CompoundEventFilter> root_window_event_filter_;
-
-  scoped_ptr<wm::InputMethodEventFilter> input_method_event_filter_;
 
   scoped_ptr<DropHelper> drop_helper_;
   int last_drop_operation_;

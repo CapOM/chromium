@@ -24,14 +24,22 @@
 tests = [
   {
     "test": "mojo:clipboard_apptests",
+    "type": "gtest_isolated",
   },
   {
     "test": "mojo:network_service_apptests",
+    "type": "gtest_isolated",
   },
-  # TODO(msw|jam): Fix and enable the shell_apptests: http://crbug.com/479316
+  # TODO(msw|jam): Fix and enable the runner_apptests: http://crbug.com/479316
   #{
-  #  "test": "mojo:shell_apptests",
+  #  "test": "mojo:runner_apptests",
+  #  "type": "gtest_isolated",
   #},
+  {
+    "test": "mojo:view_manager_apptests",
+    "type": "gtest_isolated",
+    "args": ["--use-headless-config"]
+  },
 ]
 
 # TODO(msw): Get these tests passing on Android too. http://crbug.com/486220
@@ -39,13 +47,16 @@ if config.target_os != config.OS_ANDROID:
   tests += [
     {
       "test": "mojo:html_viewer_apptests",
-    },
-    {
-      "test": "mojo:view_manager_apptests",
       "type": "gtest_isolated",
-      "args": ["--use-headless-config"]
+      "args": ["--is-headless"]
     },
     {
       "test": "mojo:resource_provider_apptests",
+      "type": "gtest_isolated",
+    },
+    {
+      "test": "mojo:mandoline_frame_apptests",
+      "type": "gtest_isolated",
+      "args": ["--use-headless-config"]
     },
   ]

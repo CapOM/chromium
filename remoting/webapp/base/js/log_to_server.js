@@ -14,9 +14,11 @@ var remoting = remoting || {};
 
 /**
  * @param {remoting.SignalStrategy} signalStrategy Signal strategy.
+ * @param {boolean=} opt_isHost True if this instance should log role=host
+ *     events rather than role=client.
  * @constructor
  */
-remoting.LogToServer = function(signalStrategy) {
+remoting.LogToServer = function(signalStrategy, opt_isHost) {
   /** @private */
   this.statsAccumulator_ = new remoting.StatsAccumulator();
   /** @private */
@@ -35,8 +37,10 @@ remoting.LogToServer = function(signalStrategy) {
   this.hostVersion_ = '';
   /** @private */
   this.logEntryMode_ = remoting.ServerLogEntry.VALUE_MODE_UNKNOWN;
+  /** @private */
+  this.role_ = opt_isHost ? 'host' : 'client';
 
-  this.setSessionId_();
+  this.setSessionId();
   signalStrategy.sendConnectionSetupResults(this);
 };
 
@@ -65,7 +69,7 @@ remoting.LogToServer.prototype.logClientSessionStateChange =
   this.maybeExpireSessionId_();
   // Log the session state change.
   var entry = remoting.ServerLogEntry.makeClientSessionStateChange(
-      state, connectionError, this.logEntryMode_);
+      state, connectionError, this.logEntryMode_, this.role_);
   entry.addClientOSFields();
   entry.addChromeVersionField();
   entry.addWebappVersionField();
@@ -115,21 +119,6 @@ remoting.LogToServer.prototype.logSignalStrategyProgress =
  */
 remoting.LogToServer.prototype.getSessionId = function() {
   return this.sessionId_;
-};
-
-/**
- * Whether a session state is one of the states that occurs at the start of
- * a session.
- *
- * @private
- * @param {remoting.ClientSession.State} state
- * @return {boolean}
- */
-remoting.LogToServer.isStartOfSession_ = function(state) {
-  return ((state == remoting.ClientSession.State.CONNECTING) ||
-      (state == remoting.ClientSession.State.INITIALIZING) ||
-      (state == remoting.ClientSession.State.AUTHENTICATED) ||
-      (state == remoting.ClientSession.State.CONNECTED));
 };
 
 /**
@@ -219,10 +208,8 @@ remoting.LogToServer.prototype.log_ = function(entry) {
 
 /**
  * Sets the session ID to a random string.
- *
- * @private
  */
-remoting.LogToServer.prototype.setSessionId_ = function() {
+remoting.LogToServer.prototype.setSessionId = function() {
   this.sessionId_ = remoting.LogToServer.generateSessionId_();
   this.sessionIdGenerationTime_ = new Date().getTime();
 };
@@ -254,7 +241,7 @@ remoting.LogToServer.prototype.maybeExpireSessionId_ = function() {
                                                          this.logEntryMode_);
     this.log_(entry);
     // Generate a new session ID.
-    this.setSessionId_();
+    this.setSessionId();
     // Log the new session ID.
     entry = remoting.ServerLogEntry.makeSessionIdNew(this.sessionId_,
                                                      this.logEntryMode_);

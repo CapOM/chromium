@@ -98,7 +98,7 @@ class DataReductionProxyParams : public DataReductionProxyConfigValues {
 
   // Returns true if this client has the command line switch to enable Lo-Fi
   // mode.
-  static bool IsLoFiEnabled();
+  static bool IsLoFiEnabledThroughSwitch();
 
   // Returns true if this client has the command line switch to show
   // interstitials for data reduction proxy bypasses.
@@ -112,6 +112,9 @@ class DataReductionProxyParams : public DataReductionProxyConfigValues {
   // proxy server as quic://proxy.googlezip.net.
   static bool IsIncludedInQuicFieldTrial();
 
+  // Returns the name of the Lo-Fi field trial.
+  static std::string GetLoFiFieldTrialName();
+
   static std::string GetQuicFieldTrialName();
 
   // Returns true if this client is part of a field trial that allows Data Saver
@@ -120,6 +123,10 @@ class DataReductionProxyParams : public DataReductionProxyConfigValues {
 
   // Returns true if the Data Reduction Proxy config client should be used.
   static bool IsConfigClientEnabled();
+
+  // If the Data Reduction Proxy config client is being used, the URL for the
+  // Data Reduction Proxy config service.
+  static GURL GetConfigServiceURL();
 
   // Returns true if the Data Reduction Proxy is forced to be enabled from the
   // command line.

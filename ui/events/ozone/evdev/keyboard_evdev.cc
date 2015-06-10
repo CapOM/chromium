@@ -60,7 +60,7 @@ KeyboardEvdev::KeyboardEvdev(EventModifiersEvdev* modifiers,
     : callback_(callback),
       modifiers_(modifiers),
       keyboard_layout_engine_(keyboard_layout_engine),
-      repeat_enabled_(true),
+      auto_repeat_enabled_(true),
       repeat_key_(KEY_RESERVED),
       repeat_sequence_(0),
       repeat_device_id_(0),
@@ -74,22 +74,20 @@ KeyboardEvdev::~KeyboardEvdev() {
 
 void KeyboardEvdev::OnKeyChange(unsigned int key,
                                 bool down,
+                                bool suppress_auto_repeat,
                                 base::TimeDelta timestamp,
                                 int device_id) {
   if (key > KEY_MAX)
     return;
 
-  if (down == key_state_.test(key))
-    return;
+  bool was_down = key_state_.test(key);
+  bool is_repeat = down && was_down;
+  if (!down && !was_down)
+    return;  // Key already released.
 
-  // State transition: !(down) -> (down)
-  if (down)
-    key_state_.set(key);
-  else
-    key_state_.reset(key);
-
-  UpdateKeyRepeat(key, down, device_id);
-  DispatchKey(key, down, false /* repeat */, timestamp, device_id);
+  key_state_.set(key, down);
+  UpdateKeyRepeat(key, down, suppress_auto_repeat, device_id);
+  DispatchKey(key, down, is_repeat, timestamp, device_id);
 }
 
 void KeyboardEvdev::SetCapsLockEnabled(bool enabled) {
@@ -101,11 +99,11 @@ bool KeyboardEvdev::IsCapsLockEnabled() {
 }
 
 bool KeyboardEvdev::IsAutoRepeatEnabled() {
-  return repeat_enabled_;
+  return auto_repeat_enabled_;
 }
 
 void KeyboardEvdev::SetAutoRepeatEnabled(bool enabled) {
-  repeat_enabled_ = enabled;
+  auto_repeat_enabled_ = enabled;
 }
 
 void KeyboardEvdev::SetAutoRepeatRate(const base::TimeDelta& delay,
@@ -143,8 +141,9 @@ void KeyboardEvdev::UpdateModifier(int modifier_flag, bool down) {
 
 void KeyboardEvdev::UpdateKeyRepeat(unsigned int key,
                                     bool down,
+                                    bool suppress_auto_repeat,
                                     int device_id) {
-  if (!repeat_enabled_)
+  if (!auto_repeat_enabled_ || suppress_auto_repeat)
     StopKeyRepeat();
   else if (key != repeat_key_ && down)
     StartKeyRepeat(key, device_id);

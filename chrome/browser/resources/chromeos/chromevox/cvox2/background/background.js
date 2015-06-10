@@ -302,6 +302,15 @@ Background.prototype = {
 
         continueReading(null);
         return;
+      case 'showContextMenu':
+        if (this.currentRange_) {
+          var actionNode = this.currentRange_.getStart().getNode();
+          if (actionNode.role == chrome.automation.RoleType.inlineTextBox)
+            actionNode = actionNode.parent;
+          actionNode.showContextMenu();
+          return;
+        }
+        break;
     }
 
     if (pred) {
@@ -347,7 +356,7 @@ Background.prototype = {
     if (!prevRange ||
         (prevRange.getStart().getNode().root != node.root &&
          node.root.focused))
-      this.setupChromeVoxVariants_(node.root.attributes.url || '');
+      this.setupChromeVoxVariants_(node.root.docUrl || '');
 
     // Don't process nodes inside of web content if ChromeVox Next is inactive.
     if (node.root.role != chrome.automation.RoleType.desktop &&
@@ -366,7 +375,7 @@ Background.prototype = {
    * @param {Object} evt
    */
   onLoadComplete: function(evt) {
-    this.setupChromeVoxVariants_(evt.target.attributes.url);
+    this.setupChromeVoxVariants_(evt.target.docUrl);
 
     // Don't process nodes inside of web content if ChromeVox Next is inactive.
     if (evt.target.root.role != chrome.automation.RoleType.desktop &&
@@ -416,9 +425,9 @@ Background.prototype = {
     }
 
     var textChangeEvent = new cvox.TextChangeEvent(
-        evt.target.attributes.value,
-        evt.target.attributes.textSelStart,
-        evt.target.attributes.textSelEnd,
+        evt.target.value,
+        evt.target.textSelStart,
+        evt.target.textSelEnd,
         true);  // triggered by user
     if (!this.editableTextHandler ||
         evt.target != this.currentRange_.getStart().getNode()) {
@@ -487,7 +496,7 @@ Background.prototype = {
    * @param {?string} opt_prependFormatStr If set, a format string for
    *     cvox2.Output to prepend to the output.
    * @private
-   **/
+   */
   outputLiveRegionChange_: function(node, opt_prependFormatStr) {
     var range = cursors.Range.fromNode(node);
     var output = new Output();
@@ -523,16 +532,13 @@ Background.prototype = {
    * @private
    */
   setupChromeVoxVariants_: function(url) {
-    if (this.mode_ === ChromeVoxMode.FORCE_NEXT)
-      return;
-
     this.compat_.active = this.isWhitelistedForCompat_(url);
     var mode = this.mode_;
     if (this.compat_.active)
       mode = ChromeVoxMode.COMPAT;
     else if (this.isWhitelistedForNext_(url))
       mode = ChromeVoxMode.NEXT;
-    else
+    else if (mode != ChromeVoxMode.FORCE_NEXT)
       mode = ChromeVoxMode.CLASSIC;
 
     this.setChromeVoxMode(mode);
@@ -554,9 +560,6 @@ Background.prototype = {
    * @param {ChromeVoxMode} mode
    */
   setChromeVoxMode: function(mode) {
-    if (mode === this.mode_)
-      return;
-
     if (mode === ChromeVoxMode.NEXT ||
         mode === ChromeVoxMode.COMPAT ||
         mode === ChromeVoxMode.FORCE_NEXT) {

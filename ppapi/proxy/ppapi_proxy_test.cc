@@ -62,10 +62,11 @@ PPB_Proxy_Private ppb_proxy_private = {
 // for the PluginProxyTestHarness and should only respond for PPP interfaces,
 // and the other handler is for the HostProxyTestHarness which should only
 // ever respond for PPB interfaces.
-ObserverList<ProxyTestHarnessBase> get_interface_handlers_;
+base::ObserverList<ProxyTestHarnessBase> get_interface_handlers_;
 
 const void* MockGetInterface(const char* name) {
-  ObserverList<ProxyTestHarnessBase>::Iterator it(&get_interface_handlers_);
+  base::ObserverList<ProxyTestHarnessBase>::Iterator it(
+      &get_interface_handlers_);
   while (ProxyTestHarnessBase* observer = it.GetNext()) {
     const void* interface = observer->GetInterface(name);
     if (interface)
@@ -259,14 +260,8 @@ PluginProxyTestHarness::PluginDelegateMock::ShareHandleWithRemote(
 base::SharedMemoryHandle
 PluginProxyTestHarness::PluginDelegateMock::ShareSharedMemoryHandleWithRemote(
     const base::SharedMemoryHandle& handle,
-    base::ProcessId remote_pid) {
-#if defined(OS_POSIX)
-  return ShareHandleWithRemote(handle.fd, remote_pid, false);
-#elif defined(OS_WIN)
-  return ShareHandleWithRemote(handle, remote_pid, false);
-#else
-#error Not implemented.
-#endif
+    base::ProcessId /* remote_pid */) {
+  return base::SharedMemory::DuplicateHandle(handle);
 }
 
 std::set<PP_Instance>*
@@ -505,14 +500,8 @@ HostProxyTestHarness::DelegateMock::ShareHandleWithRemote(
 base::SharedMemoryHandle
 HostProxyTestHarness::DelegateMock::ShareSharedMemoryHandleWithRemote(
     const base::SharedMemoryHandle& handle,
-    base::ProcessId remote_pid) {
-#if defined(OS_POSIX)
-  return ShareHandleWithRemote(handle.fd, remote_pid, false);
-#elif defined(OS_WIN)
-  return ShareHandleWithRemote(handle, remote_pid, false);
-#else
-#error Not implemented.
-#endif
+    base::ProcessId /*remote_pid*/) {
+  return base::SharedMemory::DuplicateHandle(handle);
 }
 
 // HostProxyTest ---------------------------------------------------------------

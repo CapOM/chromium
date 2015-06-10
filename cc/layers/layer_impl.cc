@@ -5,6 +5,7 @@
 #include "cc/layers/layer_impl.h"
 
 #include "base/json/json_reader.h"
+#include "base/numerics/safe_conversions.h"
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/trace_event.h"
 #include "base/trace_event/trace_event_argument.h"
@@ -743,19 +744,12 @@ void LayerImpl::NoteLayerPropertyChangedForDescendants() {
   SetNeedsPushProperties();
 }
 
-#if DCHECK_IS_ON()
-// Verify that the resource id is valid.
-static ResourceId ValidateResource(const ResourceProvider* provider,
-                                   ResourceId id) {
-  provider->ValidateResource(id);
-  return id;
-}
-#endif
-
 void LayerImpl::ValidateQuadResourcesInternal(DrawQuad* quad) const {
 #if DCHECK_IS_ON()
-  quad->IterateResources(
-      base::Bind(&ValidateResource, layer_tree_impl_->resource_provider()));
+  const ResourceProvider* resource_provider =
+      layer_tree_impl_->resource_provider();
+  for (ResourceId resource_id : quad->resources)
+    resource_provider->ValidateResource(resource_id);
 #endif
 }
 
@@ -1157,8 +1151,8 @@ void LayerImpl::SetContentsScale(float contents_scale_x,
   NoteLayerPropertyChanged();
 }
 
-bool LayerImpl::IsExternalFlingActive() const {
-  return layer_tree_impl_->IsExternalFlingActive();
+bool LayerImpl::IsExternalScrollActive() const {
+  return layer_tree_impl_->IsExternalScrollActive();
 }
 
 void LayerImpl::SetCurrentScrollOffset(const gfx::ScrollOffset& scroll_offset) {
@@ -1522,7 +1516,8 @@ void LayerImpl::AsValueInto(base::trace_event::TracedValue* state) const {
   MathUtil::AddToTracedValue("position", position_, state);
 
   state->SetInteger("draws_content", DrawsContent());
-  state->SetInteger("gpu_memory_usage", GPUMemoryUsageInBytes());
+  state->SetInteger("gpu_memory_usage",
+                    base::saturated_cast<int>(GPUMemoryUsageInBytes()));
 
   MathUtil::AddToTracedValue(
       "scroll_offset", scroll_offset_ ? scroll_offset_->Current(IsActive())

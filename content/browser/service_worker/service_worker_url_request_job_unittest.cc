@@ -101,8 +101,8 @@ class MockHttpProtocolHandler
 // the memory.
 storage::BlobProtocolHandler* CreateMockBlobProtocolHandler(
     storage::BlobStorageContext* blob_storage_context) {
-  // The FileSystemContext and MessageLoopProxy are not actually used but a
-  // MessageLoopProxy is needed to avoid a DCHECK in BlobURLRequestJob ctor.
+  // The FileSystemContext and task runner are not actually used but a
+  // task runner is needed to avoid a DCHECK in BlobURLRequestJob ctor.
   return new storage::BlobProtocolHandler(
       blob_storage_context, nullptr, base::ThreadTaskRunnerHandle::Get().get());
 }
@@ -168,9 +168,9 @@ class ServiceWorkerURLRequestJobTest : public testing::Test {
                                       helper_->context()->AsWeakPtr(),
                                       nullptr));
     provider_host->SetDocumentUrl(GURL("http://example.com/"));
+    registration_->SetActiveVersion(version_);
     provider_host->AssociateRegistration(registration_.get(),
                                          false /* notify_controllerchange */);
-    registration_->SetActiveVersion(version_);
 
     ChromeBlobStorageContext* chrome_blob_storage_context =
         ChromeBlobStorageContext::GetFor(browser_context_.get());
@@ -640,6 +640,10 @@ TEST_F(ServiceWorkerURLRequestJobTest, FailFetchDispatch) {
   EXPECT_EQ(200, request_->GetResponseCode());
   EXPECT_EQ("PASS", url_request_delegate_.response_data());
   EXPECT_FALSE(HasInflightRequests());
+  ServiceWorkerProviderHost* host =
+      helper_->context()->GetProviderHost(kProcessID, kProviderID);
+  ASSERT_TRUE(host);
+  EXPECT_EQ(host->controlling_version(), nullptr);
 }
 
 // TODO(horo): Remove this test when crbug.com/485900 is fixed.

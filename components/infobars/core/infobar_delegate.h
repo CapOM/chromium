@@ -14,6 +14,7 @@ class ConfirmInfoBarDelegate;
 class InsecureContentInfoBarDelegate;
 class MediaStreamInfoBarDelegate;
 class NativeAppInfoBarDelegate;
+class PermissionInfobarDelegate;
 class PopupBlockedInfoBarDelegate;
 class RegisterProtocolHandlerInfoBarDelegate;
 class ScreenCaptureInfoBarDelegate;
@@ -62,9 +63,6 @@ class InfoBarDelegate {
     bool is_navigation_to_different_page;
     // True if the entry replaced the existing one.
     bool did_replace_entry;
-    // True for the main frame, false for a sub-frame.
-    bool is_main_frame;
-    bool is_reload;
     bool is_redirect;
   };
 
@@ -117,6 +115,7 @@ class InfoBarDelegate {
   virtual InsecureContentInfoBarDelegate* AsInsecureContentInfoBarDelegate();
   virtual MediaStreamInfoBarDelegate* AsMediaStreamInfoBarDelegate();
   virtual NativeAppInfoBarDelegate* AsNativeAppInfoBarDelegate();
+  virtual PermissionInfobarDelegate* AsPermissionInfobarDelegate();
   virtual PopupBlockedInfoBarDelegate* AsPopupBlockedInfoBarDelegate();
   virtual RegisterProtocolHandlerInfoBarDelegate*
       AsRegisterProtocolHandlerInfoBarDelegate();

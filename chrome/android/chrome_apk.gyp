@@ -9,7 +9,7 @@
   'variables': {
     'chromium_code': 1,
     'package_name': 'chrome_public_apk',
-    'manifest_package%': 'org.chromium.chrome',
+    'manifest_package': 'org.chromium.chrome',
     'chrome_public_apk_manifest': '<(SHARED_INTERMEDIATE_DIR)/chrome_public_apk_manifest/AndroidManifest.xml',
     'chrome_public_test_apk_manifest': '<(SHARED_INTERMEDIATE_DIR)/chrome_public_test_apk_manifest/AndroidManifest.xml',
     'never_lint': 1,
@@ -140,8 +140,7 @@
         'res_extra_files': ['<!@(find <(res_channel_dir) -type f)'],
       },
       'dependencies': [
-        'chrome_template_resources',
-        'hosted_service_aidl',
+        'custom_tabs_service_aidl',
         '<(DEPTH)/base/base.gyp:base_java',
         '<(DEPTH)/chrome/chrome.gyp:chrome_java',
         '<(DEPTH)/chrome/chrome.gyp:document_tab_model_info_proto_java',
@@ -191,8 +190,22 @@
       'includes': [ '../../build/java.gypi' ],
     },
     {
-      # GN: //chrome/android:chrome_template_resources
-      'target_name': 'chrome_template_resources',
+      # GN: //chrome/android:custom_tabs_service_aidl
+      'target_name': 'custom_tabs_service_aidl',
+      'type': 'none',
+      'variables': {
+        'aidl_interface_file': '<(chrome_java_dir)/src/org/chromium/chrome/browser/customtabs/common.aidl',
+        'aidl_import_include': '<(chrome_java_dir)/src/org/chromium/chrome/browser/customtabs',
+      },
+      'sources': [
+        '<(chrome_java_dir)/src/org/chromium/chrome/browser/customtabs/ICustomTabsConnectionCallback.aidl',
+        '<(chrome_java_dir)/src/org/chromium/chrome/browser/customtabs/ICustomTabsConnectionService.aidl',
+      ],
+      'includes': [ '../../build/java_aidl.gypi' ],
+    },
+    {
+      # GN: //chrome/android:chrome_public_template_resources
+      'target_name': 'chrome_public_template_resources',
       'type': 'none',
       'variables': {
         'jinja_inputs_base_dir': '<(chrome_java_dir)/res_template',
@@ -212,20 +225,6 @@
         },
       },
       'includes': [ '../../build/android/jinja_template.gypi' ],
-    },
-    {
-      # GN: //chrome/android:hosted_service_aidl
-      'target_name': 'hosted_service_aidl',
-      'type': 'none',
-      'variables': {
-        'aidl_interface_file': '<(chrome_java_dir)/src/org/chromium/chrome/browser/hosted/common.aidl',
-        'aidl_import_include': '<(chrome_java_dir)/src/org/chromium/chrome/browser/hosted',
-      },
-      'sources': [
-        '<(chrome_java_dir)/src/org/chromium/chrome/browser/hosted/IBrowserConnectionCallback.aidl',
-        '<(chrome_java_dir)/src/org/chromium/chrome/browser/hosted/IBrowserConnectionService.aidl',
-      ],
-      'includes': [ '../../build/java_aidl.gypi' ],
     },
     {
       # GN: //chrome/android:chrome_public
@@ -282,6 +281,7 @@
           'configuration_policy=<(configuration_policy)',
           'manifest_package=<(manifest_package)',
           'min_sdk_version=16',
+          'target_sdk_version=22',
         ],
       },
       'includes': [ '../../build/android/jinja_template.gypi' ],
@@ -307,6 +307,7 @@
       },
       'dependencies': [
         'chrome_android_paks_copy',
+        'chrome_public_template_resources',
         'chrome_staging_java',
       ],
       'includes': [ 'chrome_apk.gypi' ],
@@ -392,6 +393,8 @@
       'dependencies': [
         'chrome_shared_test_java',
         'chrome_public_apk_java',
+        '<(DEPTH)/testing/android/on_device_instrumentation.gyp:broker_java',
+        '<(DEPTH)/testing/android/on_device_instrumentation.gyp:require_driver_apk',
       ],
       'variables': {
         'android_manifest_path': '<(chrome_public_test_apk_manifest)',
@@ -400,8 +403,13 @@
         'java_in_dir_suffix': '/src_dummy',
         'apk_name': 'ChromePublicTest',
         'is_test_apk': 1,
+        'test_type': 'instrumentation',
+        'isolate_file': '../chrome_public_test_apk.isolate',
       },
-      'includes': [ '../../build/java_apk.gypi' ],
+      'includes': [
+        '../../build/java_apk.gypi',
+        '../../build/android/test_runner.gypi',
+      ],
     },
   ],
 }

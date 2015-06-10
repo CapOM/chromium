@@ -111,11 +111,15 @@ struct NET_EXPORT AlternativeService {
   AlternativeService& operator=(const AlternativeService& alternative_service) =
       default;
 
-  HostPortPair host_port_pair() { return HostPortPair(host, port); }
+  HostPortPair host_port_pair() const { return HostPortPair(host, port); }
 
   bool operator==(const AlternativeService& other) const {
     return protocol == other.protocol && host == other.host &&
            port == other.port;
+  }
+
+  bool operator!=(const AlternativeService& other) const {
+    return !this->operator==(other);
   }
 
   bool operator<(const AlternativeService& other) const {
@@ -183,6 +187,14 @@ struct NET_EXPORT SupportsQuic {
 struct NET_EXPORT ServerNetworkStats {
   ServerNetworkStats() : bandwidth_estimate(QuicBandwidth::Zero()) {}
 
+  bool operator==(const ServerNetworkStats& other) const {
+    return srtt == other.srtt && bandwidth_estimate == other.bandwidth_estimate;
+  }
+
+  bool operator!=(const ServerNetworkStats& other) const {
+    return !this->operator==(other);
+  }
+
   base::TimeDelta srtt;
   QuicBandwidth bandwidth_estimate;
 };
@@ -213,6 +225,9 @@ class NET_EXPORT HttpServerProperties {
   // Returns true if |server| supports a network protocol which honors
   // request prioritization.
   virtual bool SupportsRequestPriority(const HostPortPair& server) = 0;
+
+  // Returns the value set by SetSupportsSpdy(). If not set, returns false.
+  virtual bool GetSupportsSpdy(const HostPortPair& server) = 0;
 
   // Add |server| into the persistent store. Should only be called from IO
   // thread.
@@ -271,7 +286,7 @@ class NET_EXPORT HttpServerProperties {
   virtual const AlternativeServiceMap& alternative_service_map() const = 0;
 
   // Returns all alternative service mappings as human readable strings.
-  virtual base::Value* GetAlternativeServiceInfoAsValue() const = 0;
+  virtual scoped_ptr<base::Value> GetAlternativeServiceInfoAsValue() const = 0;
 
   // Sets the threshold to be used when evaluating alternative service
   // advertisments. Only advertisements with a probability greater than or equal
@@ -306,6 +321,7 @@ class NET_EXPORT HttpServerProperties {
   virtual void SetSupportsQuic(bool used_quic,
                                const IPAddressNumber& last_address) = 0;
 
+  // Sets |stats| for |host_port_pair|.
   virtual void SetServerNetworkStats(const HostPortPair& host_port_pair,
                                      ServerNetworkStats stats) = 0;
 

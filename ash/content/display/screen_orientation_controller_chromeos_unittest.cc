@@ -22,7 +22,7 @@
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/test/test_browser_context.h"
-#include "third_party/WebKit/public/platform/WebScreenOrientationLockType.h"
+#include "third_party/WebKit/public/platform/modules/screen_orientation/WebScreenOrientationLockType.h"
 #include "ui/aura/window.h"
 #include "ui/gfx/display.h"
 #include "ui/message_center/message_center.h"
@@ -135,7 +135,7 @@ ScreenOrientationControllerTest::~ScreenOrientationControllerTest() {
 }
 
 content::WebContents* ScreenOrientationControllerTest::CreateWebContents() {
-  return views::ViewsDelegate::views_delegate->CreateWebContents(
+  return views::ViewsDelegate::GetInstance()->CreateWebContents(
       ash_test_helper()->test_shell_delegate()->GetActiveBrowserContext(),
       nullptr);
 }
@@ -143,7 +143,7 @@ content::WebContents* ScreenOrientationControllerTest::CreateWebContents() {
 content::WebContents*
 ScreenOrientationControllerTest::CreateSecondaryWebContents() {
   secondary_browser_context_.reset(new content::TestBrowserContext());
-  return views::ViewsDelegate::views_delegate->CreateWebContents(
+  return views::ViewsDelegate::GetInstance()->CreateWebContents(
       secondary_browser_context_.get(), nullptr);
 }
 

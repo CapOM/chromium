@@ -40,7 +40,7 @@ scoped_refptr<Layer> Layer::Create(const LayerSettings& settings) {
 
 Layer::Layer(const LayerSettings& settings)
     : needs_push_properties_(false),
-      num_dependents_need_push_properties_(false),
+      num_dependents_need_push_properties_(0),
       stacking_order_changed_(false),
       // Layer IDs start from 1.
       layer_id_(g_next_layer_id.GetNext() + 1),
@@ -131,6 +131,11 @@ void Layer::SetLayerTreeHost(LayerTreeHost* host) {
 
   if (layer_tree_host_)
     layer_tree_host_->property_trees()->needs_rebuild = true;
+
+  if (host)
+    host->property_trees()->needs_rebuild = true;
+
+  InvalidatePropertyTreesIndices();
 
   layer_tree_host_ = host;
 
@@ -337,26 +342,20 @@ void Layer::ReplaceChild(Layer* reference, scoped_refptr<Layer> new_layer) {
   if (reference == new_layer.get())
     return;
 
-  int reference_index = IndexOfChild(reference);
-  if (reference_index == -1) {
-    NOTREACHED();
-    return;
-  }
-
+  // Find the index of |reference| in |children_|.
+  auto reference_it =
+      std::find_if(children_.begin(), children_.end(),
+                   [reference](const scoped_refptr<Layer>& layer) {
+                     return layer.get() == reference;
+                   });
+  DCHECK(reference_it != children_.end());
+  size_t reference_index = reference_it - children_.begin();
   reference->RemoveFromParent();
 
   if (new_layer.get()) {
     new_layer->RemoveFromParent();
     InsertChild(new_layer, reference_index);
   }
-}
-
-int Layer::IndexOfChild(const Layer* reference) {
-  for (size_t i = 0; i < children_.size(); ++i) {
-    if (children_[i].get() == reference)
-      return i;
-  }
-  return -1;
 }
 
 void Layer::SetBounds(const gfx::Size& size) {
@@ -416,7 +415,7 @@ bool Layer::HasAncestor(const Layer* ancestor) const {
 void Layer::RequestCopyOfOutput(
     scoped_ptr<CopyOutputRequest> request) {
   DCHECK(IsPropertyChangeAllowed());
-  int size = copy_requests_.size();
+  bool had_no_copy_requests = copy_requests_.empty();
   if (void* source = request->source()) {
     auto it = std::find_if(
         copy_requests_.begin(), copy_requests_.end(),
@@ -427,7 +426,7 @@ void Layer::RequestCopyOfOutput(
   if (request->IsEmpty())
     return;
   copy_requests_.push_back(request.Pass());
-  if (size == 0) {
+  if (had_no_copy_requests) {
     bool copy_request_added = true;
     UpdateNumCopyRequestsForSubtree(copy_request_added);
   }
@@ -1053,6 +1052,13 @@ int Layer::opacity_tree_index() const {
   return opacity_tree_index_;
 }
 
+void Layer::InvalidatePropertyTreesIndices() {
+  int invalid_property_tree_index = -1;
+  SetTransformTreeIndex(invalid_property_tree_index);
+  SetClipTreeIndex(invalid_property_tree_index);
+  SetOpacityTreeIndex(invalid_property_tree_index);
+}
+
 void Layer::SetShouldFlattenTransform(bool should_flatten) {
   DCHECK(IsPropertyChangeAllowed());
   if (should_flatten_transform_ == should_flatten)
@@ -1150,7 +1156,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
 
   // TODO(enne): This is needed because CDP does this.  Once main thread CDP
   // goes away, content scale / bounds can be removed.
-  if (layer_tree_host()->settings().impl_side_painting) {
+  if (layer_tree_host()->using_only_property_trees()) {
     layer->SetContentsScale(1.f, 1.f);
     layer->SetContentBounds(bounds());
   } else {
@@ -1274,7 +1280,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->SetScrollCompensationAdjustment(ScrollCompensationAdjustment());
 
   // Wrap the copy_requests_ in a PostTask to the main thread.
-  int size = copy_requests_.size();
+  bool had_copy_requests = !copy_requests_.empty();
   ScopedPtrVector<CopyOutputRequest> main_thread_copy_requests;
   for (ScopedPtrVector<CopyOutputRequest>::iterator it = copy_requests_.begin();
        it != copy_requests_.end();
@@ -1293,7 +1299,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   }
   if (!copy_requests_.empty() && layer_tree_host_)
     layer_tree_host_->property_trees()->needs_rebuild = true;
-  if (size != 0)
+  if (had_copy_requests)
     UpdateNumCopyRequestsForSubtree(false);
   copy_requests_.clear();
   layer->PassCopyRequests(&main_thread_copy_requests);

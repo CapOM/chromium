@@ -112,9 +112,9 @@ void LayerTreeImpl::GatherFrameTimingRequestIds(
       });
 }
 
-bool LayerTreeImpl::IsExternalFlingActive() const {
+bool LayerTreeImpl::IsExternalScrollActive() const {
   return root_layer_scroll_offset_delegate_ &&
-         root_layer_scroll_offset_delegate_->IsExternalFlingActive();
+         root_layer_scroll_offset_delegate_->IsExternalScrollActive();
 }
 
 void LayerTreeImpl::DidUpdateScrollOffset(int layer_id) {
@@ -1361,9 +1361,11 @@ static void FindClosestMatchingLayer(
     LayerImpl* layer,
     const Functor& func,
     FindClosestMatchingLayerDataForRecursion* data_for_recursion) {
-  for (int i = layer->children().size() - 1; i >= 0; --i) {
-    FindClosestMatchingLayer(
-        screen_space_point, layer->children()[i], func, data_for_recursion);
+  size_t children_size = layer->children().size();
+  for (size_t i = 0; i < children_size; ++i) {
+    size_t index = children_size - 1 - i;
+    FindClosestMatchingLayer(screen_space_point, layer->children()[index], func,
+                             data_for_recursion);
   }
 
   float distance_to_intersection = 0.f;

@@ -115,20 +115,17 @@ ConnectionManager::ConnectionManager(ConnectionManagerDelegate* delegate,
     : delegate_(delegate),
       window_manager_client_connection_(nullptr),
       next_connection_id_(1),
+      event_dispatcher_(this),
       display_manager_(display_manager.Pass()),
       root_(CreateServerView(RootViewId())),
       current_change_(nullptr),
       in_destructor_(false),
       animation_runner_(base::TimeTicks::Now()),
-      event_dispatcher_(this),
-      event_dispatcher_binding_(&event_dispatcher_),
       focus_controller_(new FocusController(this, root_.get())) {
   root_->SetBounds(gfx::Rect(800, 600));
   root_->SetVisible(true);
 
-  mojo::NativeViewportEventDispatcherPtr event_dispatcher_ptr;
-  event_dispatcher_binding_.Bind(GetProxy(&event_dispatcher_ptr));
-  display_manager_->Init(this, event_dispatcher_ptr.Pass());
+  display_manager_->Init(this, &event_dispatcher_);
 }
 
 ConnectionManager::~ConnectionManager() {
@@ -179,45 +176,29 @@ void ConnectionManager::OnConnectionError(ClientConnection* connection) {
   }
 }
 
-void ConnectionManager::EmbedAtView(
-    ConnectionSpecificId creator_id,
-    mojo::URLRequestPtr request,
-    const ViewId& view_id,
-    mojo::InterfaceRequest<mojo::ServiceProvider> services,
-    mojo::ServiceProviderPtr exposed_services) {
-  std::string creator_url;
-  ConnectionMap::const_iterator it = connection_map_.find(creator_id);
-  if (it != connection_map_.end())
-    creator_url = it->second->service()->url();
-
+void ConnectionManager::EmbedAtView(mojo::ConnectionSpecificId creator_id,
+                                    const ViewId& view_id,
+                                    mojo::URLRequestPtr request) {
   mojo::ViewManagerServicePtr service_ptr;
   ClientConnection* client_connection =
       delegate_->CreateClientConnectionForEmbedAtView(
-          this, GetProxy(&service_ptr), creator_id, creator_url, request.Pass(),
-          view_id);
+          this, GetProxy(&service_ptr), creator_id, request.Pass(), view_id);
   AddConnection(client_connection);
   client_connection->service()->Init(client_connection->client(),
-                                     service_ptr.Pass(), services.Pass(),
-                                     exposed_services.Pass());
+                                     service_ptr.Pass());
   OnConnectionMessagedClient(client_connection->service()->id());
 }
 
 void ConnectionManager::EmbedAtView(mojo::ConnectionSpecificId creator_id,
                                     const ViewId& view_id,
                                     mojo::ViewManagerClientPtr client) {
-  std::string creator_url;
-  ConnectionMap::const_iterator it = connection_map_.find(creator_id);
-  if (it != connection_map_.end())
-    creator_url = it->second->service()->url();
-
   mojo::ViewManagerServicePtr service_ptr;
   ClientConnection* client_connection =
       delegate_->CreateClientConnectionForEmbedAtView(
-          this, GetProxy(&service_ptr), creator_id, creator_url, view_id,
-          client.Pass());
+          this, GetProxy(&service_ptr), creator_id, view_id, client.Pass());
   AddConnection(client_connection);
   client_connection->service()->Init(client_connection->client(),
-                                     service_ptr.Pass(), nullptr, nullptr);
+                                     service_ptr.Pass());
   OnConnectionMessagedClient(client_connection->service()->id());
 }
 
@@ -265,13 +246,29 @@ const ViewManagerServiceImpl* ConnectionManager::GetConnectionWithRoot(
   return nullptr;
 }
 
+ViewManagerServiceImpl* ConnectionManager::GetEmbedRoot(
+    ViewManagerServiceImpl* service) {
+  while (service) {
+    const ViewId* root_id = service->root();
+    if (!root_id || root_id->connection_id == service->id())
+      return nullptr;
+
+    ViewManagerServiceImpl* parent_service =
+        GetConnection(root_id->connection_id);
+    service = parent_service;
+    if (service && service->is_embed_root())
+      return service;
+  }
+  return nullptr;
+}
+
 void ConnectionManager::SetWindowManagerClientConnection(
     scoped_ptr<ClientConnection> connection) {
   CHECK(!window_manager_client_connection_);
   window_manager_client_connection_ = connection.release();
   AddConnection(window_manager_client_connection_);
   window_manager_client_connection_->service()->Init(
-      window_manager_client_connection_->client(), nullptr, nullptr, nullptr);
+      window_manager_client_connection_->client(), nullptr);
 }
 
 mojo::ViewManagerClient*
@@ -296,11 +293,16 @@ bool ConnectionManager::CloneAndAnimate(const ViewId& view_id) {
 }
 
 void ConnectionManager::ProcessEvent(mojo::EventPtr event) {
-  event_dispatcher_.OnEvent(event.Pass(), EventDispatcher::OnEventCallback());
+  event_dispatcher_.OnEvent(event.Pass());
 }
 
 void ConnectionManager::DispatchInputEventToView(const ServerView* view,
                                                  mojo::EventPtr event) {
+  // It's possible for events to flow through here from the platform_window
+  // before any connections are established with the view_manager.
+  if (!has_window_manager_client_connection())
+    return;
+
   // If the view is an embed root, forward to the embedded view, not the owner.
   ViewManagerServiceImpl* connection = GetConnectionWithRoot(view->id());
   if (!connection)

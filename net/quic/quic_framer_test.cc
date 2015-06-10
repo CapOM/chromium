@@ -4,6 +4,7 @@
 
 #include "net/quic/quic_framer.h"
 
+#include <stdint.h>
 #include <algorithm>
 #include <map>
 #include <string>
@@ -12,7 +13,6 @@
 #include "base/containers/hash_tables.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/port.h"
 #include "base/stl_util.h"
 #include "net/quic/crypto/quic_decrypter.h"
 #include "net/quic/crypto/quic_encrypter.h"
@@ -37,7 +37,7 @@ using testing::_;
 namespace net {
 namespace test {
 
-const QuicPacketSequenceNumber kEpoch = GG_UINT64_C(1) << 48;
+const QuicPacketSequenceNumber kEpoch = UINT64_C(1) << 48;
 const QuicPacketSequenceNumber kMask = kEpoch - 1;
 
 // Index into the connection_id offset in the header.
@@ -107,13 +107,6 @@ class TestEncrypter : public QuicEncrypter {
   ~TestEncrypter() override {}
   bool SetKey(StringPiece key) override { return true; }
   bool SetNoncePrefix(StringPiece nonce_prefix) override { return true; }
-  bool Encrypt(StringPiece nonce,
-               StringPiece associated_data,
-               StringPiece plaintext,
-               unsigned char* output) override {
-    CHECK(false) << "Not implemented";
-    return false;
-  }
   bool EncryptPacket(QuicPacketSequenceNumber sequence_number,
                      StringPiece associated_data,
                      StringPiece plaintext,
@@ -237,12 +230,12 @@ class TestQuicVisitor : public QuicFramerVisitorInterface {
   bool OnStreamFrame(const QuicStreamFrame& frame) override {
     ++frame_count_;
     // Save a copy of the data so it is valid after the packet is processed.
-    stream_data_.push_back(frame.GetDataAsString());
+    string* string_data = new string();
+    frame.data.AppendToString(string_data);
+    stream_data_.push_back(string_data);
     QuicStreamFrame* stream_frame = new QuicStreamFrame(frame);
     // Make sure that the stream frame points to this data.
-    stream_frame->data.Clear();
-    stream_frame->data.Append(const_cast<char*>(stream_data_.back()->data()),
-                              stream_data_.back()->size());
+    stream_frame->data = StringPiece(*string_data);
     stream_frames_.push_back(stream_frame);
     return true;
   }
@@ -435,8 +428,7 @@ class QuicFramerTest : public ::testing::TestWithParam<QuicVersion> {
 
   // Checks if the supplied string matches data in the supplied StreamFrame.
   void CheckStreamFrameData(string str, QuicStreamFrame* frame) {
-    scoped_ptr<string> frame_data(frame->GetDataAsString());
-    EXPECT_EQ(str, *frame_data);
+    EXPECT_EQ(str, frame->data);
   }
 
   void CheckStreamFrameBoundaries(unsigned char* packet,
@@ -502,7 +494,7 @@ INSTANTIATE_TEST_CASE_P(QuicFramerTests,
 
 TEST_P(QuicFramerTest, CalculatePacketSequenceNumberFromWireNearEpochStart) {
   // A few quick manual sanity checks
-  CheckCalculatePacketSequenceNumber(GG_UINT64_C(1), GG_UINT64_C(0));
+  CheckCalculatePacketSequenceNumber(UINT64_C(1), UINT64_C(0));
   CheckCalculatePacketSequenceNumber(kEpoch + 1, kMask);
   CheckCalculatePacketSequenceNumber(kEpoch, kMask);
 
@@ -644,7 +636,7 @@ TEST_P(QuicFramerTest, LargePacket) {
 
   ASSERT_TRUE(visitor_.header_.get());
   // Make sure we've parsed the packet header, so we can send an error.
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   // Make sure the correct error is propagated.
   EXPECT_EQ(QUIC_PACKET_TOO_LARGE, framer_.error());
@@ -668,14 +660,14 @@ TEST_P(QuicFramerTest, PacketHeader) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
@@ -703,7 +695,7 @@ TEST_P(QuicFramerTest, PacketHeader) {
 
 TEST_P(QuicFramerTest, PacketHeaderWith4ByteConnectionId) {
   QuicFramerPeer::SetLastSerializedConnectionId(
-      &framer_, GG_UINT64_C(0xFEDCBA9876543210));
+      &framer_, UINT64_C(0xFEDCBA9876543210));
 
   unsigned char packet[] = {
     // public flags (4 byte connection_id)
@@ -721,14 +713,14 @@ TEST_P(QuicFramerTest, PacketHeaderWith4ByteConnectionId) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
@@ -759,7 +751,7 @@ TEST_P(QuicFramerTest, PacketHeaderWith4ByteConnectionId) {
 
 TEST_P(QuicFramerTest, PacketHeader1ByteConnectionId) {
   QuicFramerPeer::SetLastSerializedConnectionId(
-      &framer_, GG_UINT64_C(0xFEDCBA9876543210));
+      &framer_, UINT64_C(0xFEDCBA9876543210));
 
   unsigned char packet[] = {
     // public flags (1 byte connection_id)
@@ -777,14 +769,14 @@ TEST_P(QuicFramerTest, PacketHeader1ByteConnectionId) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
@@ -815,7 +807,7 @@ TEST_P(QuicFramerTest, PacketHeader1ByteConnectionId) {
 
 TEST_P(QuicFramerTest, PacketHeaderWith0ByteConnectionId) {
   QuicFramerPeer::SetLastSerializedConnectionId(
-      &framer_, GG_UINT64_C(0xFEDCBA9876543210));
+      &framer_, UINT64_C(0xFEDCBA9876543210));
 
   unsigned char packet[] = {
     // public flags (0 byte connection_id)
@@ -832,14 +824,14 @@ TEST_P(QuicFramerTest, PacketHeaderWith0ByteConnectionId) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
@@ -888,7 +880,7 @@ TEST_P(QuicFramerTest, PacketHeaderWithVersionFlag) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_TRUE(visitor_.header_->public_header.version_flag);
@@ -896,7 +888,7 @@ TEST_P(QuicFramerTest, PacketHeaderWithVersionFlag) {
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
@@ -925,8 +917,7 @@ TEST_P(QuicFramerTest, PacketHeaderWithVersionFlag) {
 }
 
 TEST_P(QuicFramerTest, PacketHeaderWith4ByteSequenceNumber) {
-  QuicFramerPeer::SetLastSequenceNumber(&framer_,
-                                        GG_UINT64_C(0x123456789ABA));
+  QuicFramerPeer::SetLastSequenceNumber(&framer_, UINT64_C(0x123456789ABA));
 
   unsigned char packet[] = {
     // public flags (8 byte connection_id and 4 byte sequence number)
@@ -944,15 +935,14 @@ TEST_P(QuicFramerTest, PacketHeaderWith4ByteSequenceNumber) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
-            visitor_.header_->packet_sequence_number);
+  EXPECT_EQ(UINT64_C(0x123456789ABC), visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
 
@@ -980,8 +970,7 @@ TEST_P(QuicFramerTest, PacketHeaderWith4ByteSequenceNumber) {
 }
 
 TEST_P(QuicFramerTest, PacketHeaderWith2ByteSequenceNumber) {
-  QuicFramerPeer::SetLastSequenceNumber(&framer_,
-                                        GG_UINT64_C(0x123456789ABA));
+  QuicFramerPeer::SetLastSequenceNumber(&framer_, UINT64_C(0x123456789ABA));
 
   unsigned char packet[] = {
     // public flags (8 byte connection_id and 2 byte sequence number)
@@ -999,15 +988,14 @@ TEST_P(QuicFramerTest, PacketHeaderWith2ByteSequenceNumber) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
-            visitor_.header_->packet_sequence_number);
+  EXPECT_EQ(UINT64_C(0x123456789ABC), visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
 
@@ -1035,8 +1023,7 @@ TEST_P(QuicFramerTest, PacketHeaderWith2ByteSequenceNumber) {
 }
 
 TEST_P(QuicFramerTest, PacketHeaderWith1ByteSequenceNumber) {
-  QuicFramerPeer::SetLastSequenceNumber(&framer_,
-                                        GG_UINT64_C(0x123456789ABA));
+  QuicFramerPeer::SetLastSequenceNumber(&framer_, UINT64_C(0x123456789ABA));
 
   unsigned char packet[] = {
     // public flags (8 byte connection_id and 1 byte sequence number)
@@ -1054,15 +1041,14 @@ TEST_P(QuicFramerTest, PacketHeaderWith1ByteSequenceNumber) {
   EXPECT_FALSE(framer_.ProcessPacket(encrypted));
   EXPECT_EQ(QUIC_MISSING_PAYLOAD, framer_.error());
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
   EXPECT_FALSE(visitor_.header_->fec_flag);
   EXPECT_FALSE(visitor_.header_->entropy_flag);
   EXPECT_EQ(0, visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
-            visitor_.header_->packet_sequence_number);
+  EXPECT_EQ(UINT64_C(0x123456789ABC), visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
 
@@ -1301,8 +1287,7 @@ TEST_P(QuicFramerTest, StreamFrame) {
   EXPECT_EQ(static_cast<uint64>(0x01020304),
             visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 
   // Now test framing boundaries.
@@ -1346,10 +1331,9 @@ TEST_P(QuicFramerTest, StreamFrame3ByteStreamId) {
 
   ASSERT_EQ(1u, visitor_.stream_frames_.size());
   EXPECT_EQ(0u, visitor_.ack_frames_.size());
-  EXPECT_EQ(GG_UINT64_C(0x00020304), visitor_.stream_frames_[0]->stream_id);
+  EXPECT_EQ(UINT64_C(0x00020304), visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 
   // Now test framing boundaries.
@@ -1397,8 +1381,7 @@ TEST_P(QuicFramerTest, StreamFrame2ByteStreamId) {
   EXPECT_EQ(static_cast<uint64>(0x00000304),
             visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 
   // Now test framing boundaries.
@@ -1446,8 +1429,7 @@ TEST_P(QuicFramerTest, StreamFrame1ByteStreamId) {
   EXPECT_EQ(static_cast<uint64>(0x00000004),
             visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 
   // Now test framing boundaries.
@@ -1499,8 +1481,7 @@ TEST_P(QuicFramerTest, StreamFrameWithVersion) {
   EXPECT_EQ(static_cast<uint64>(0x01020304),
             visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 
   // Now test framing boundaries.
@@ -1585,12 +1566,12 @@ TEST_P(QuicFramerTest, RevivedStreamFrame) {
   };
 
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = true;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   // Do not encrypt the payload because the revived payload is post-encryption.
@@ -1601,7 +1582,7 @@ TEST_P(QuicFramerTest, RevivedStreamFrame) {
   EXPECT_EQ(QUIC_NO_ERROR, framer_.error());
   ASSERT_EQ(1, visitor_.revived_packets_);
   ASSERT_TRUE(visitor_.header_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.header_->public_header.connection_id);
   EXPECT_FALSE(visitor_.header_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.header_->public_header.version_flag);
@@ -1609,17 +1590,15 @@ TEST_P(QuicFramerTest, RevivedStreamFrame) {
   EXPECT_TRUE(visitor_.header_->entropy_flag);
   EXPECT_EQ(1 << (header.packet_sequence_number % 8),
             visitor_.header_->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
-            visitor_.header_->packet_sequence_number);
+  EXPECT_EQ(UINT64_C(0x123456789ABC), visitor_.header_->packet_sequence_number);
   EXPECT_EQ(NOT_IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
   EXPECT_EQ(0x00u, visitor_.header_->fec_group);
 
   ASSERT_EQ(1u, visitor_.stream_frames_.size());
   EXPECT_EQ(0u, visitor_.ack_frames_.size());
-  EXPECT_EQ(GG_UINT64_C(0x01020304), visitor_.stream_frames_[0]->stream_id);
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 }
 
@@ -1660,8 +1639,7 @@ TEST_P(QuicFramerTest, StreamFrameInFecGroup) {
   ASSERT_TRUE(visitor_.header_.get());
   EXPECT_TRUE(CheckDecryption(encrypted, !kIncludeVersion));
   EXPECT_EQ(IN_FEC_GROUP, visitor_.header_->is_in_fec_group);
-  EXPECT_EQ(GG_UINT64_C(0x341256789ABA),
-            visitor_.header_->fec_group);
+  EXPECT_EQ(UINT64_C(0x341256789ABA), visitor_.header_->fec_group);
   const size_t fec_offset =
       GetStartOfFecProtectedData(PACKET_8BYTE_CONNECTION_ID,
                                  !kIncludeVersion,
@@ -1672,10 +1650,9 @@ TEST_P(QuicFramerTest, StreamFrameInFecGroup) {
 
   ASSERT_EQ(1u, visitor_.stream_frames_.size());
   EXPECT_EQ(0u, visitor_.ack_frames_.size());
-  EXPECT_EQ(GG_UINT64_C(0x01020304), visitor_.stream_frames_[0]->stream_id);
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.stream_frames_[0]->stream_id);
   EXPECT_TRUE(visitor_.stream_frames_[0]->fin);
-  EXPECT_EQ(GG_UINT64_C(0xBA98FEDC32107654),
-            visitor_.stream_frames_[0]->offset);
+  EXPECT_EQ(UINT64_C(0xBA98FEDC32107654), visitor_.stream_frames_[0]->offset);
   CheckStreamFrameData("hello world!", visitor_.stream_frames_[0]);
 }
 
@@ -1730,12 +1707,12 @@ TEST_P(QuicFramerTest, AckFrameTwoTimestamp) {
   ASSERT_EQ(1u, visitor_.ack_frames_.size());
   const QuicAckFrame& frame = *visitor_.ack_frames_[0];
   EXPECT_EQ(0xBA, frame.entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABF), frame.largest_observed);
+  EXPECT_EQ(UINT64_C(0x0123456789ABF), frame.largest_observed);
   ASSERT_EQ(1u, frame.missing_packets.size());
   ASSERT_EQ(2u, frame.received_packet_times.size());
   SequenceNumberSet::const_iterator missing_iter =
       frame.missing_packets.begin();
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABE), *missing_iter);
+  EXPECT_EQ(UINT64_C(0x0123456789ABE), *missing_iter);
 
   const size_t kReceivedEntropyOffset = kQuicFrameTypeSize;
   const size_t kLargestObservedOffset = kReceivedEntropyOffset +
@@ -1847,12 +1824,12 @@ TEST_P(QuicFramerTest, AckFrameOneTimestamp) {
   ASSERT_EQ(1u, visitor_.ack_frames_.size());
   const QuicAckFrame& frame = *visitor_.ack_frames_[0];
   EXPECT_EQ(0xBA, frame.entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABF), frame.largest_observed);
+  EXPECT_EQ(UINT64_C(0x0123456789ABF), frame.largest_observed);
   ASSERT_EQ(1u, frame.missing_packets.size());
   ASSERT_EQ(1u, frame.received_packet_times.size());
   SequenceNumberSet::const_iterator missing_iter =
       frame.missing_packets.begin();
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABE), *missing_iter);
+  EXPECT_EQ(UINT64_C(0x0123456789ABE), *missing_iter);
 
   const size_t kReceivedEntropyOffset = kQuicFrameTypeSize;
   const size_t kLargestObservedOffset = kReceivedEntropyOffset +
@@ -1950,11 +1927,11 @@ TEST_P(QuicFramerTest, AckFrame) {
   ASSERT_EQ(1u, visitor_.ack_frames_.size());
   const QuicAckFrame& frame = *visitor_.ack_frames_[0];
   EXPECT_EQ(0xBA, frame.entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABF), frame.largest_observed);
+  EXPECT_EQ(UINT64_C(0x0123456789ABF), frame.largest_observed);
   ASSERT_EQ(1u, frame.missing_packets.size());
   SequenceNumberSet::const_iterator missing_iter =
       frame.missing_packets.begin();
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABE), *missing_iter);
+  EXPECT_EQ(UINT64_C(0x0123456789ABE), *missing_iter);
 
   const size_t kReceivedEntropyOffset = kQuicFrameTypeSize;
   const size_t kLargestObservedOffset = kReceivedEntropyOffset +
@@ -2048,11 +2025,11 @@ TEST_P(QuicFramerTest, AckFrameRevivedPackets) {
   ASSERT_EQ(1u, visitor_.ack_frames_.size());
   const QuicAckFrame& frame = *visitor_.ack_frames_[0];
   EXPECT_EQ(0xBA, frame.entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABF), frame.largest_observed);
+  EXPECT_EQ(UINT64_C(0x0123456789ABF), frame.largest_observed);
   ASSERT_EQ(1u, frame.missing_packets.size());
   SequenceNumberSet::const_iterator missing_iter =
       frame.missing_packets.begin();
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABE), *missing_iter);
+  EXPECT_EQ(UINT64_C(0x0123456789ABE), *missing_iter);
 
   const size_t kReceivedEntropyOffset = kQuicFrameTypeSize;
   const size_t kLargestObservedOffset = kReceivedEntropyOffset +
@@ -2140,7 +2117,7 @@ TEST_P(QuicFramerTest, AckFrameNoNacks) {
   ASSERT_EQ(1u, visitor_.ack_frames_.size());
   QuicAckFrame* frame = visitor_.ack_frames_[0];
   EXPECT_EQ(0xBA, frame->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABF), frame->largest_observed);
+  EXPECT_EQ(UINT64_C(0x0123456789ABF), frame->largest_observed);
   ASSERT_EQ(0u, frame->missing_packets.size());
 
   // Verify that the packet re-serializes identically.
@@ -2203,15 +2180,15 @@ TEST_P(QuicFramerTest, AckFrame500Nacks) {
   ASSERT_EQ(1u, visitor_.ack_frames_.size());
   QuicAckFrame* frame = visitor_.ack_frames_[0];
   EXPECT_EQ(0xBA, frame->entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABF), frame->largest_observed);
+  EXPECT_EQ(UINT64_C(0x0123456789ABF), frame->largest_observed);
   EXPECT_EQ(0u, frame->revived_packets.size());
   ASSERT_EQ(500u, frame->missing_packets.size());
   SequenceNumberSet::const_iterator first_missing_iter =
       frame->missing_packets.begin();
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABE) - 499, *first_missing_iter);
+  EXPECT_EQ(UINT64_C(0x0123456789ABE) - 499, *first_missing_iter);
   SequenceNumberSet::const_reverse_iterator last_missing_iter =
       frame->missing_packets.rbegin();
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABE), *last_missing_iter);
+  EXPECT_EQ(UINT64_C(0x0123456789ABE), *last_missing_iter);
 
   // Verify that the packet re-serializes identically.
   QuicFrames frames;
@@ -2258,7 +2235,7 @@ TEST_P(QuicFramerTest, StopWaitingFrame) {
   ASSERT_EQ(1u, visitor_.stop_waiting_frames_.size());
   const QuicStopWaitingFrame& frame = *visitor_.stop_waiting_frames_[0];
   EXPECT_EQ(0xAB, frame.entropy_hash);
-  EXPECT_EQ(GG_UINT64_C(0x0123456789AA0), frame.least_unacked);
+  EXPECT_EQ(UINT64_C(0x0123456789AA0), frame.least_unacked);
 
   const size_t kSentEntropyOffset = kQuicFrameTypeSize;
   const size_t kLeastUnackedOffset = kSentEntropyOffset + kQuicEntropyHashSize;
@@ -2324,10 +2301,10 @@ TEST_P(QuicFramerTest, RstStreamFrameQuicVersion24) {
   ASSERT_TRUE(visitor_.header_.get());
   EXPECT_TRUE(CheckDecryption(encrypted, !kIncludeVersion));
 
-  EXPECT_EQ(GG_UINT64_C(0x01020304), visitor_.rst_stream_frame_.stream_id);
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.rst_stream_frame_.stream_id);
   EXPECT_EQ(0x01, visitor_.rst_stream_frame_.error_code);
   EXPECT_EQ("because I can", visitor_.rst_stream_frame_.error_details);
-  EXPECT_EQ(GG_UINT64_C(0x0807060504030201),
+  EXPECT_EQ(UINT64_C(0x0807060504030201),
             visitor_.rst_stream_frame_.byte_offset);
 
   // Now test framing boundaries.
@@ -2393,9 +2370,9 @@ TEST_P(QuicFramerTest, RstStreamFrameQuic) {
   ASSERT_TRUE(visitor_.header_.get());
   EXPECT_TRUE(CheckDecryption(encrypted, !kIncludeVersion));
 
-  EXPECT_EQ(GG_UINT64_C(0x01020304), visitor_.rst_stream_frame_.stream_id);
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.rst_stream_frame_.stream_id);
   EXPECT_EQ(0x01, visitor_.rst_stream_frame_.error_code);
-  EXPECT_EQ(GG_UINT64_C(0x0807060504030201),
+  EXPECT_EQ(UINT64_C(0x0807060504030201),
             visitor_.rst_stream_frame_.byte_offset);
 
   // Now test framing boundaries.
@@ -2512,8 +2489,7 @@ TEST_P(QuicFramerTest, GoAwayFrame) {
   ASSERT_TRUE(visitor_.header_.get());
   EXPECT_TRUE(CheckDecryption(encrypted, !kIncludeVersion));
 
-  EXPECT_EQ(GG_UINT64_C(0x01020304),
-            visitor_.goaway_frame_.last_good_stream_id);
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.goaway_frame_.last_good_stream_id);
   EXPECT_EQ(0x9, visitor_.goaway_frame_.error_code);
   EXPECT_EQ("because I can", visitor_.goaway_frame_.reason_phrase);
 
@@ -2568,9 +2544,8 @@ TEST_P(QuicFramerTest, WindowUpdateFrame) {
   ASSERT_TRUE(visitor_.header_.get());
   EXPECT_TRUE(CheckDecryption(encrypted, !kIncludeVersion));
 
-  EXPECT_EQ(GG_UINT64_C(0x01020304),
-            visitor_.window_update_frame_.stream_id);
-  EXPECT_EQ(GG_UINT64_C(0x0c0b0a0908070605),
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.window_update_frame_.stream_id);
+  EXPECT_EQ(UINT64_C(0x0c0b0a0908070605),
             visitor_.window_update_frame_.byte_offset);
 
   // Now test framing boundaries.
@@ -2617,8 +2592,7 @@ TEST_P(QuicFramerTest, BlockedFrame) {
   ASSERT_TRUE(visitor_.header_.get());
   EXPECT_TRUE(CheckDecryption(encrypted, !kIncludeVersion));
 
-  EXPECT_EQ(GG_UINT64_C(0x01020304),
-            visitor_.blocked_frame_.stream_id);
+  EXPECT_EQ(UINT64_C(0x01020304), visitor_.blocked_frame_.stream_id);
 
   // Now test framing boundaries.
   for (size_t i = kQuicFrameTypeSize; i < QuicFramer::GetBlockedFrameSize();
@@ -2692,13 +2666,13 @@ TEST_P(QuicFramerTest, PublicResetPacket) {
   EXPECT_TRUE(framer_.ProcessPacket(encrypted));
   ASSERT_EQ(QUIC_NO_ERROR, framer_.error());
   ASSERT_TRUE(visitor_.public_reset_packet_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.public_reset_packet_->public_header.connection_id);
   EXPECT_TRUE(visitor_.public_reset_packet_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.public_reset_packet_->public_header.version_flag);
-  EXPECT_EQ(GG_UINT64_C(0xABCDEF0123456789),
+  EXPECT_EQ(UINT64_C(0xABCDEF0123456789),
             visitor_.public_reset_packet_->nonce_proof);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.public_reset_packet_->rejected_sequence_number);
   EXPECT_TRUE(
       visitor_.public_reset_packet_->client_address.address().empty());
@@ -2796,13 +2770,13 @@ TEST_P(QuicFramerTest, PublicResetPacketWithClientAddress) {
   EXPECT_TRUE(framer_.ProcessPacket(encrypted));
   ASSERT_EQ(QUIC_NO_ERROR, framer_.error());
   ASSERT_TRUE(visitor_.public_reset_packet_.get());
-  EXPECT_EQ(GG_UINT64_C(0xFEDCBA9876543210),
+  EXPECT_EQ(UINT64_C(0xFEDCBA9876543210),
             visitor_.public_reset_packet_->public_header.connection_id);
   EXPECT_TRUE(visitor_.public_reset_packet_->public_header.reset_flag);
   EXPECT_FALSE(visitor_.public_reset_packet_->public_header.version_flag);
-  EXPECT_EQ(GG_UINT64_C(0xABCDEF0123456789),
+  EXPECT_EQ(UINT64_C(0xABCDEF0123456789),
             visitor_.public_reset_packet_->nonce_proof);
-  EXPECT_EQ(GG_UINT64_C(0x123456789ABC),
+  EXPECT_EQ(UINT64_C(0x123456789ABC),
             visitor_.public_reset_packet_->rejected_sequence_number);
   EXPECT_EQ("4.31.198.44",
             IPAddressToString(visitor_.public_reset_packet_->
@@ -2898,18 +2872,18 @@ TEST_P(QuicFramerTest, FecPacket) {
   EXPECT_EQ(0u, visitor_.ack_frames_.size());
   ASSERT_EQ(1, visitor_.fec_count_);
   const QuicFecData& fec_data = *visitor_.fec_data_[0];
-  EXPECT_EQ(GG_UINT64_C(0x0123456789ABB), fec_data.fec_group);
+  EXPECT_EQ(UINT64_C(0x0123456789ABB), fec_data.fec_group);
   EXPECT_EQ("abcdefghijklmnop", fec_data.redundancy);
 }
 
 TEST_P(QuicFramerTest, BuildPaddingFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicPaddingFrame padding_frame;
@@ -2950,13 +2924,13 @@ TEST_P(QuicFramerTest, BuildPaddingFramePacket) {
 
 TEST_P(QuicFramerTest, Build4ByteSequenceNumberPaddingFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
   header.public_header.sequence_number_length = PACKET_4BYTE_SEQUENCE_NUMBER;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicPaddingFrame padding_frame;
@@ -2996,13 +2970,13 @@ TEST_P(QuicFramerTest, Build4ByteSequenceNumberPaddingFramePacket) {
 
 TEST_P(QuicFramerTest, Build2ByteSequenceNumberPaddingFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
   header.public_header.sequence_number_length = PACKET_2BYTE_SEQUENCE_NUMBER;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicPaddingFrame padding_frame;
@@ -3042,13 +3016,13 @@ TEST_P(QuicFramerTest, Build2ByteSequenceNumberPaddingFramePacket) {
 
 TEST_P(QuicFramerTest, Build1ByteSequenceNumberPaddingFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
   header.public_header.sequence_number_length = PACKET_1BYTE_SEQUENCE_NUMBER;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicPaddingFrame padding_frame;
@@ -3088,19 +3062,16 @@ TEST_P(QuicFramerTest, Build1ByteSequenceNumberPaddingFramePacket) {
 
 TEST_P(QuicFramerTest, BuildStreamFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x77123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x77123456789ABC);
   header.fec_group = 0;
 
-  QuicStreamFrame stream_frame;
-  stream_frame.stream_id = 0x01020304;
-  stream_frame.fin = true;
-  stream_frame.offset = GG_UINT64_C(0xBA98FEDC32107654);
-  stream_frame.data = MakeIOVector("hello world!");
+  QuicStreamFrame stream_frame(0x01020304, true, UINT64_C(0xBA98FEDC32107654),
+                               StringPiece("hello world!"));
 
   QuicFrames frames;
   frames.push_back(QuicFrame(&stream_frame));
@@ -3140,20 +3111,17 @@ TEST_P(QuicFramerTest, BuildStreamFramePacket) {
 
 TEST_P(QuicFramerTest, BuildStreamFramePacketInFecGroup) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x77123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x77123456789ABC);
   header.is_in_fec_group = IN_FEC_GROUP;
-  header.fec_group = GG_UINT64_C(0x77123456789ABC);
+  header.fec_group = UINT64_C(0x77123456789ABC);
 
-  QuicStreamFrame stream_frame;
-  stream_frame.stream_id = 0x01020304;
-  stream_frame.fin = true;
-  stream_frame.offset = GG_UINT64_C(0xBA98FEDC32107654);
-  stream_frame.data = MakeIOVector("hello world!");
+  QuicStreamFrame stream_frame(0x01020304, true, UINT64_C(0xBA98FEDC32107654),
+                               StringPiece("hello world!"));
 
   QuicFrames frames;
   frames.push_back(QuicFrame(&stream_frame));
@@ -3190,19 +3158,16 @@ TEST_P(QuicFramerTest, BuildStreamFramePacketInFecGroup) {
 
 TEST_P(QuicFramerTest, BuildStreamFramePacketWithVersionFlag) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = true;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x77123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x77123456789ABC);
   header.fec_group = 0;
 
-  QuicStreamFrame stream_frame;
-  stream_frame.stream_id = 0x01020304;
-  stream_frame.fin = true;
-  stream_frame.offset = GG_UINT64_C(0xBA98FEDC32107654);
-  stream_frame.data = MakeIOVector("hello world!");
+  QuicStreamFrame stream_frame(0x01020304, true, UINT64_C(0xBA98FEDC32107654),
+                               StringPiece("hello world!"));
 
   QuicFrames frames;
   frames.push_back(QuicFrame(&stream_frame));
@@ -3276,7 +3241,7 @@ TEST_P(QuicFramerTest, BuildStreamFramePacketWithVersionFlag) {
 
 TEST_P(QuicFramerTest, BuildVersionNegotiationPacket) {
   QuicPacketPublicHeader header;
-  header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.reset_flag = false;
   header.version_flag = true;
 
@@ -3311,19 +3276,19 @@ TEST_P(QuicFramerTest, BuildVersionNegotiationPacket) {
 
 TEST_P(QuicFramerTest, BuildAckFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x770123456789AA8);
+  header.packet_sequence_number = UINT64_C(0x770123456789AA8);
   header.fec_group = 0;
 
   QuicAckFrame ack_frame;
   ack_frame.entropy_hash = 0x43;
-  ack_frame.largest_observed = GG_UINT64_C(0x770123456789ABF);
+  ack_frame.largest_observed = UINT64_C(0x770123456789ABF);
   ack_frame.delta_time_largest_observed = QuicTime::Delta::Zero();
-  ack_frame.missing_packets.insert(GG_UINT64_C(0x770123456789ABE));
+  ack_frame.missing_packets.insert(UINT64_C(0x770123456789ABE));
 
   QuicFrames frames;
   frames.push_back(QuicFrame(&ack_frame));
@@ -3372,12 +3337,12 @@ TEST_P(QuicFramerTest, BuildAckFramePacket) {
 
 TEST_P(QuicFramerTest, BuildTruncatedAckFrameLargePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x770123456789AA8);
+  header.packet_sequence_number = UINT64_C(0x770123456789AA8);
   header.fec_group = 0;
 
   QuicAckFrame ack_frame;
@@ -3481,12 +3446,12 @@ TEST_P(QuicFramerTest, BuildTruncatedAckFrameLargePacket) {
 
 TEST_P(QuicFramerTest, BuildTruncatedAckFrameSmallPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x770123456789AA8);
+  header.packet_sequence_number = UINT64_C(0x770123456789AA8);
   header.fec_group = 0;
 
   QuicAckFrame ack_frame;
@@ -3544,17 +3509,17 @@ TEST_P(QuicFramerTest, BuildTruncatedAckFrameSmallPacket) {
 
 TEST_P(QuicFramerTest, BuildStopWaitingPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x770123456789AA8);
+  header.packet_sequence_number = UINT64_C(0x770123456789AA8);
   header.fec_group = 0;
 
   QuicStopWaitingFrame stop_waiting_frame;
   stop_waiting_frame.entropy_hash = 0x14;
-  stop_waiting_frame.least_unacked = GG_UINT64_C(0x770123456789AA0);
+  stop_waiting_frame.least_unacked = UINT64_C(0x770123456789AA0);
 
   QuicFrames frames;
   frames.push_back(QuicFrame(&stop_waiting_frame));
@@ -3595,12 +3560,12 @@ TEST_P(QuicFramerTest, BuildRstFramePacketQuicVersion24) {
   }
 
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicRstStreamFrame rst_frame;
@@ -3657,12 +3622,12 @@ TEST_P(QuicFramerTest, BuildRstFramePacketQuic) {
   }
 
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicRstStreamFrame rst_frame;
@@ -3708,12 +3673,12 @@ TEST_P(QuicFramerTest, BuildRstFramePacketQuic) {
 
 TEST_P(QuicFramerTest, BuildCloseFramePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicConnectionCloseFrame close_frame;
@@ -3758,12 +3723,12 @@ TEST_P(QuicFramerTest, BuildCloseFramePacket) {
 
 TEST_P(QuicFramerTest, BuildGoAwayPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicGoAwayFrame goaway_frame;
@@ -3811,12 +3776,12 @@ TEST_P(QuicFramerTest, BuildGoAwayPacket) {
 
 TEST_P(QuicFramerTest, BuildWindowUpdatePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicWindowUpdateFrame window_update_frame;
@@ -3857,12 +3822,12 @@ TEST_P(QuicFramerTest, BuildWindowUpdatePacket) {
 
 TEST_P(QuicFramerTest, BuildBlockedPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicBlockedFrame blocked_frame;
@@ -3899,12 +3864,12 @@ TEST_P(QuicFramerTest, BuildBlockedPacket) {
 
 TEST_P(QuicFramerTest, BuildPingPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicPingFrame ping_frame;
@@ -3938,11 +3903,11 @@ TEST_P(QuicFramerTest, BuildPingPacket) {
 
 TEST_P(QuicFramerTest, BuildPublicResetPacket) {
   QuicPublicResetPacket reset_packet;
-  reset_packet.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  reset_packet.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   reset_packet.public_header.reset_flag = true;
   reset_packet.public_header.version_flag = false;
-  reset_packet.rejected_sequence_number = GG_UINT64_C(0x123456789ABC);
-  reset_packet.nonce_proof = GG_UINT64_C(0xABCDEF0123456789);
+  reset_packet.rejected_sequence_number = UINT64_C(0x123456789ABC);
+  reset_packet.nonce_proof = UINT64_C(0xABCDEF0123456789);
 
   unsigned char packet[] = {
     // public flags (public reset, 8 byte ConnectionId)
@@ -3981,11 +3946,11 @@ TEST_P(QuicFramerTest, BuildPublicResetPacket) {
 
 TEST_P(QuicFramerTest, BuildPublicResetPacketWithClientAddress) {
   QuicPublicResetPacket reset_packet;
-  reset_packet.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  reset_packet.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   reset_packet.public_header.reset_flag = true;
   reset_packet.public_header.version_flag = false;
-  reset_packet.rejected_sequence_number = GG_UINT64_C(0x123456789ABC);
-  reset_packet.nonce_proof = GG_UINT64_C(0xABCDEF0123456789);
+  reset_packet.rejected_sequence_number = UINT64_C(0x123456789ABC);
+  reset_packet.nonce_proof = UINT64_C(0xABCDEF0123456789);
   reset_packet.client_address = IPEndPoint(Loopback4(), 0x1234);
 
   unsigned char packet[] = {
@@ -4033,14 +3998,14 @@ TEST_P(QuicFramerTest, BuildPublicResetPacketWithClientAddress) {
 
 TEST_P(QuicFramerTest, BuildFecPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = true;
   header.entropy_flag = true;
-  header.packet_sequence_number = (GG_UINT64_C(0x123456789ABC));
+  header.packet_sequence_number = (UINT64_C(0x123456789ABC));
   header.is_in_fec_group = IN_FEC_GROUP;
-  header.fec_group = GG_UINT64_C(0x123456789ABB);;
+  header.fec_group = UINT64_C(0x123456789ABB);
 
   QuicFecData fec_data;
   fec_data.fec_group = 1;
@@ -4076,7 +4041,7 @@ TEST_P(QuicFramerTest, BuildFecPacket) {
 }
 
 TEST_P(QuicFramerTest, EncryptPacket) {
-  QuicPacketSequenceNumber sequence_number = GG_UINT64_C(0x123456789ABC);
+  QuicPacketSequenceNumber sequence_number = UINT64_C(0x123456789ABC);
   unsigned char packet[] = {
     // public flags (8 byte connection_id)
     0x3C,
@@ -4110,7 +4075,7 @@ TEST_P(QuicFramerTest, EncryptPacket) {
 }
 
 TEST_P(QuicFramerTest, EncryptPacketWithVersionFlag) {
-  QuicPacketSequenceNumber sequence_number = GG_UINT64_C(0x123456789ABC);
+  QuicPacketSequenceNumber sequence_number = UINT64_C(0x123456789ABC);
   unsigned char packet[] = {
     // public flags (version, 8 byte connection_id)
     0x3D,
@@ -4147,12 +4112,12 @@ TEST_P(QuicFramerTest, EncryptPacketWithVersionFlag) {
 
 TEST_P(QuicFramerTest, AckTruncationLargePacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   // Create a packet with just the ack.
@@ -4187,12 +4152,12 @@ TEST_P(QuicFramerTest, AckTruncationLargePacket) {
 
 TEST_P(QuicFramerTest, AckTruncationSmallPacket) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = false;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   // Create a packet with just the ack.
@@ -4227,12 +4192,12 @@ TEST_P(QuicFramerTest, AckTruncationSmallPacket) {
 
 TEST_P(QuicFramerTest, CleanTruncation) {
   QuicPacketHeader header;
-  header.public_header.connection_id = GG_UINT64_C(0xFEDCBA9876543210);
+  header.public_header.connection_id = UINT64_C(0xFEDCBA9876543210);
   header.public_header.reset_flag = false;
   header.public_header.version_flag = false;
   header.fec_flag = false;
   header.entropy_flag = true;
-  header.packet_sequence_number = GG_UINT64_C(0x123456789ABC);
+  header.packet_sequence_number = UINT64_C(0x123456789ABC);
   header.fec_group = 0;
 
   QuicAckFrame ack_frame;
@@ -4410,9 +4375,8 @@ TEST_P(QuicFramerTest, StopPacketProcessing) {
 static char kTestString[] = "At least 20 characters.";
 static QuicStreamId kTestQuicStreamId = 1;
 static bool ExpectedStreamFrame(const QuicStreamFrame& frame) {
-  scoped_ptr<string> data(frame.GetDataAsString());
   return frame.stream_id == kTestQuicStreamId && !frame.fin &&
-         frame.offset == 0 && *data == kTestString;
+         frame.offset == 0 && frame.data == kTestString;
   // FIN is hard-coded false in ConstructEncryptedPacket.
   // Offset 0 is hard-coded in ConstructEncryptedPacket.
 }

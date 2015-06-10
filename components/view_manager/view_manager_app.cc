@@ -8,7 +8,6 @@
 #include "components/view_manager/client_connection.h"
 #include "components/view_manager/connection_manager.h"
 #include "components/view_manager/display_manager.h"
-#include "components/view_manager/native_viewport/native_viewport_impl.h"
 #include "components/view_manager/public/cpp/args.h"
 #include "components/view_manager/view_manager_service_impl.h"
 #include "mojo/application/public/cpp/application_connection.h"
@@ -24,13 +23,12 @@ using mojo::ApplicationConnection;
 using mojo::ApplicationImpl;
 using mojo::Gpu;
 using mojo::InterfaceRequest;
-using mojo::NativeViewport;
 using mojo::ViewManagerRoot;
 using mojo::ViewManagerService;
 
 namespace view_manager {
 
-ViewManagerApp::ViewManagerApp() : app_impl_(nullptr) {
+ViewManagerApp::ViewManagerApp() : app_impl_(nullptr), is_headless_(false) {
 }
 
 ViewManagerApp::~ViewManagerApp() {}
@@ -38,12 +36,6 @@ ViewManagerApp::~ViewManagerApp() {}
 void ViewManagerApp::Initialize(ApplicationImpl* app) {
   app_impl_ = app;
   tracing_.Initialize(app);
-
-  scoped_ptr<DefaultDisplayManager> display_manager(new DefaultDisplayManager(
-      app_impl_, base::Bind(&ViewManagerApp::OnLostConnectionToWindowManager,
-                            base::Unretained(this))));
-  connection_manager_.reset(
-      new ConnectionManager(this, display_manager.Pass()));
 
 #if !defined(OS_ANDROID)
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
@@ -56,6 +48,17 @@ void ViewManagerApp::Initialize(ApplicationImpl* app) {
       gfx::GLSurface::InitializeOneOff();
   }
 #endif
+
+  if (!gpu_state_.get())
+    gpu_state_ = new gles2::GpuState;
+  scoped_ptr<DefaultDisplayManager> display_manager(new DefaultDisplayManager(
+      is_headless_,
+      app_impl_,
+      gpu_state_,
+      base::Bind(&ViewManagerApp::OnLostConnectionToWindowManager,
+                 base::Unretained(this))));
+  connection_manager_.reset(
+      new ConnectionManager(this, display_manager.Pass()));
 }
 
 bool ViewManagerApp::ConfigureIncomingConnection(
@@ -65,7 +68,6 @@ bool ViewManagerApp::ConfigureIncomingConnection(
   // to the ViewManager.
   connection->AddService<ViewManagerService>(this);
   connection->AddService<ViewManagerRoot>(this);
-  connection->AddService<NativeViewport>(this);
   connection->AddService<Gpu>(this);
 
   return true;
@@ -79,15 +81,13 @@ ClientConnection* ViewManagerApp::CreateClientConnectionForEmbedAtView(
     ConnectionManager* connection_manager,
     mojo::InterfaceRequest<mojo::ViewManagerService> service_request,
     mojo::ConnectionSpecificId creator_id,
-    const std::string& creator_url,
     mojo::URLRequestPtr request,
     const ViewId& root_id) {
   mojo::ViewManagerClientPtr client;
-  std::string url = request->url.To<std::string>();
   app_impl_->ConnectToService(request.Pass(), &client);
 
-  scoped_ptr<ViewManagerServiceImpl> service(new ViewManagerServiceImpl(
-      connection_manager, creator_id, creator_url, url, root_id));
+  scoped_ptr<ViewManagerServiceImpl> service(
+      new ViewManagerServiceImpl(connection_manager, creator_id, root_id));
   return new DefaultClientConnection(service.Pass(), connection_manager,
                                      service_request.Pass(), client.Pass());
 }
@@ -96,11 +96,10 @@ ClientConnection* ViewManagerApp::CreateClientConnectionForEmbedAtView(
     ConnectionManager* connection_manager,
     mojo::InterfaceRequest<mojo::ViewManagerService> service_request,
     mojo::ConnectionSpecificId creator_id,
-    const std::string& creator_url,
     const ViewId& root_id,
     mojo::ViewManagerClientPtr view_manager_client) {
-  scoped_ptr<ViewManagerServiceImpl> service(new ViewManagerServiceImpl(
-      connection_manager, creator_id, creator_url, std::string(), root_id));
+  scoped_ptr<ViewManagerServiceImpl> service(
+      new ViewManagerServiceImpl(connection_manager, creator_id, root_id));
   return new DefaultClientConnection(service.Pass(), connection_manager,
                                      service_request.Pass(),
                                      view_manager_client.Pass());
@@ -114,8 +113,7 @@ void ViewManagerApp::Create(ApplicationConnection* connection,
   }
 
   scoped_ptr<ViewManagerServiceImpl> service(new ViewManagerServiceImpl(
-      connection_manager_.get(), kInvalidConnectionId, std::string(),
-      connection->GetRemoteApplicationURL(), RootViewId()));
+      connection_manager_.get(), kInvalidConnectionId, RootViewId()));
   mojo::ViewManagerClientPtr client;
   connection->ConnectToService(&client);
   scoped_ptr<ClientConnection> client_connection(
@@ -137,18 +135,6 @@ void ViewManagerApp::Create(ApplicationConnection* connection,
   view_manager_root_binding_.reset(new mojo::Binding<ViewManagerRoot>(
       connection_manager_.get(), request.Pass()));
   view_manager_root_binding_->set_error_handler(this);
-}
-
-void ViewManagerApp::Create(
-    mojo::ApplicationConnection* connection,
-    mojo::InterfaceRequest<NativeViewport> request) {
-  if (!gpu_state_.get())
-    gpu_state_ = new gles2::GpuState;
-  new native_viewport::NativeViewportImpl(
-      is_headless_,
-      gpu_state_,
-      request.Pass(),
-      app_impl_->app_lifetime_helper()->CreateAppRefCount());
 }
 
 void ViewManagerApp::Create(

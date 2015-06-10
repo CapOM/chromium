@@ -16,6 +16,7 @@
 #include "ui/aura/window.h"
 #include "ui/aura/window_event_dispatcher.h"
 #include "ui/aura/window_observer.h"
+#include "ui/aura/window_tree_host.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
 #include "ui/base/ui_base_switches_util.h"
 #include "ui/base/ui_base_types.h"
@@ -28,7 +29,6 @@
 #include "ui/views/drag_utils.h"
 #include "ui/views/ime/input_method_bridge.h"
 #include "ui/views/ime/null_input_method.h"
-#include "ui/views/views_delegate.h"
 #include "ui/views/widget/drop_helper.h"
 #include "ui/views/widget/native_widget_delegate.h"
 #include "ui/views/widget/root_view.h"
@@ -274,10 +274,7 @@ InputMethod* NativeWidgetAura::CreateInputMethod() {
   if (switches::IsTextInputFocusManagerEnabled())
     return new NullInputMethod();
 
-  aura::Window* root_window = window_->GetRootWindow();
-  ui::InputMethod* host =
-      root_window->GetProperty(aura::client::kRootWindowInputMethodKey);
-  return new InputMethodBridge(this, host, true);
+  return new InputMethodBridge(this, GetHostInputMethod(), true);
 }
 
 internal::InputMethodDelegate* NativeWidgetAura::GetInputMethodDelegate() {
@@ -286,7 +283,7 @@ internal::InputMethodDelegate* NativeWidgetAura::GetInputMethodDelegate() {
 
 ui::InputMethod* NativeWidgetAura::GetHostInputMethod() {
   aura::Window* root_window = window_->GetRootWindow();
-  return root_window->GetProperty(aura::client::kRootWindowInputMethodKey);
+  return root_window->GetHost()->GetInputMethod();
 }
 
 void NativeWidgetAura::CenterWindow(const gfx::Size& size) {
@@ -705,7 +702,7 @@ void NativeWidgetAura::SetVisibilityAnimationTransition(
 }
 
 ui::NativeTheme* NativeWidgetAura::GetNativeTheme() const {
-#if !defined(OS_CHROMEOS)
+#if !defined(OS_CHROMEOS) && !defined(OS_ANDROID)
   return DesktopWindowTreeHost::GetNativeTheme(window_);
 #else
   return ui::NativeThemeAura::instance();
@@ -936,8 +933,10 @@ bool NativeWidgetAura::ShouldActivate() const {
 ////////////////////////////////////////////////////////////////////////////////
 // NativeWidgetAura, aura::client::ActivationChangeObserver implementation:
 
-void NativeWidgetAura::OnWindowActivated(aura::Window* gained_active,
-                                         aura::Window* lost_active) {
+void NativeWidgetAura::OnWindowActivated(
+    aura::client::ActivationChangeObserver::ActivationReason,
+    aura::Window* gained_active,
+    aura::Window* lost_active) {
   DCHECK(window_ == gained_active || window_ == lost_active);
   if (GetWidget()->GetFocusManager()) {
     if (window_ == gained_active)

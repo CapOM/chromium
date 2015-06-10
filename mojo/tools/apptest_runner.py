@@ -8,11 +8,11 @@
 import argparse
 import json
 import logging
+import os
 import sys
 import time
 
 from mopy import gtest
-from mopy.android import AndroidShell
 from mopy.config import Config
 
 
@@ -22,6 +22,8 @@ def main():
                       help="a file listing apptests to run")
   parser.add_argument("build_dir", type=str, help="the build output directory")
   parser.add_argument("--verbose", default=False, action='store_true')
+  parser.add_argument('--repeat_count', default=1, metavar='INT',
+                      action='store', type=int)
   parser.add_argument('--write-full-results-to', metavar='FILENAME',
                       help='Path to write the JSON list of full results.')
   args = parser.parse_args()
@@ -40,31 +42,37 @@ def main():
   logger.debug("Test list: %s" % test_list)
 
   shell = None
-  extra_args = []
   if config.target_os == Config.OS_ANDROID:
+    from mopy.android import AndroidShell
     shell = AndroidShell(config)
-    extra_args.extend(shell.PrepareShellRun('localhost'))
+    result = shell.InitShell()
+    if result != 0:
+      return result
 
   tests = []
   passed = []
   failed = []
-  for test_dict in test_list:
-    test = test_dict["test"]
-    test_name = test_dict.get("name", test)
-    test_type = test_dict.get("type", "gtest")
-    test_args = test_dict.get("args", []) + extra_args
+  for _ in range(args.repeat_count):
+    for test_dict in test_list:
+      test = test_dict["test"]
+      test_name = test_dict.get("name", test)
+      test_type = test_dict.get("type", "gtest")
+      test_args = test_dict.get("args", [])
 
-    print "Running %s...%s" % (test_name, ("\n" if args.verbose else "")),
-    sys.stdout.flush()
+      print "Running %s...%s" % (test_name, ("\n" if args.verbose else "")),
+      sys.stdout.flush()
 
-    tests.append(test_name)
-    assert test_type in ("gtest", "gtest_isolated")
-    isolate = test_type == "gtest_isolated"
-    result = gtest.run_apptest(config, shell, test_args, test, isolate)
-    passed.extend([test_name] if result else [])
-    failed.extend([] if result else [test_name])
-    print "[  PASSED  ]" if result else "[  FAILED  ]",
-    print test_name if args.verbose or not result else ""
+      tests.append(test_name)
+      assert test_type in ("gtest", "gtest_isolated")
+      isolate = test_type == "gtest_isolated"
+      result = gtest.run_apptest(config, shell, test_args, test, isolate)
+      passed.extend([test_name] if result else [])
+      failed.extend([] if result else [test_name])
+      print "[  PASSED  ]" if result else "[  FAILED  ]",
+      print test_name if args.verbose or not result else ""
+
+    if failed:
+      break;
 
   print "[  PASSED  ] %d apptests" % len(passed),
   print ": %s" % ", ".join(passed) if passed else ""

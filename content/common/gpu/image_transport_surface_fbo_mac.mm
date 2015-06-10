@@ -171,6 +171,7 @@ void ImageTransportSurfaceFBO::AdjustBufferAllocation() {
 
 gfx::SwapResult ImageTransportSurfaceFBO::SwapBuffers() {
   TRACE_EVENT0("gpu", "ImageTransportSurfaceFBO::SwapBuffers");
+  pending_swap_pixel_damage_rect_ = gfx::Rect(pixel_size_);
   return SwapBuffersInternal() ? gfx::SwapResult::SWAP_ACK
                                : gfx::SwapResult::SWAP_FAILED;
 }
@@ -179,7 +180,11 @@ bool ImageTransportSurfaceFBO::SwapBuffersInternal() {
   DCHECK(backbuffer_suggested_allocation_);
   if (!frontbuffer_suggested_allocation_)
     return true;
-  glFlush();
+
+  {
+    TRACE_EVENT0("gpu", "ImageTransportSurfaceFBO::glFlush");
+    glFlush();
+  }
 
   // It is the responsibility of the storage provider to send the swap IPC.
   is_swap_buffers_send_pending_ = true;
@@ -198,10 +203,12 @@ void ImageTransportSurfaceFBO::SendSwapBuffers(uint64 surface_handle,
   GpuHostMsg_AcceleratedSurfaceBuffersSwapped_Params params;
   params.surface_handle = surface_handle;
   params.size = pixel_size;
+  params.damage_rect = pending_swap_pixel_damage_rect_;
   params.scale_factor = scale_factor;
   params.latency_info.swap(latency_info_);
   helper_->SendAcceleratedSurfaceBuffersSwapped(params);
   is_swap_buffers_send_pending_ = false;
+  pending_swap_pixel_damage_rect_ = gfx::Rect();
 }
 
 void ImageTransportSurfaceFBO::SetRendererID(int renderer_id) {
@@ -214,6 +221,7 @@ gfx::SwapResult ImageTransportSurfaceFBO::PostSubBuffer(int x,
                                                         int width,
                                                         int height) {
   TRACE_EVENT0("gpu", "ImageTransportSurfaceFBO::PostSubBuffer");
+  pending_swap_pixel_damage_rect_.Union(gfx::Rect(x, y, width, height));
   return SwapBuffersInternal() ? gfx::SwapResult::SWAP_ACK
                                : gfx::SwapResult::SWAP_FAILED;
 }

@@ -45,6 +45,10 @@
 #include "ui/events/latency_info.h"
 #include "ui/gl/gl_switches.h"
 
+#if defined(OS_ANDROID)
+#include "base/android/build_info.h"
+#endif
+
 #if defined(OS_WIN)
 #include "base/win/windows_version.h"
 #include "content/common/sandbox_win.h"
@@ -58,6 +62,11 @@
 
 #if defined(USE_X11) && !defined(OS_CHROMEOS)
 #include "ui/gfx/x/x11_switches.h"
+#endif
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+#include "content/browser/browser_io_surface_manager_mac.h"
+#include "content/common/child_process_messages.h"
 #endif
 
 namespace content {
@@ -104,6 +113,7 @@ static const char* const kSwitchNames[] = {
   switches::kVModule,
 #if defined(OS_MACOSX)
   switches::kDisableRemoteCoreAnimation,
+  switches::kEnableNSGLSurfaces,
   switches::kEnableSandboxLogging,
 #endif
 #if defined(USE_AURA)
@@ -478,6 +488,11 @@ GpuProcessHost::~GpuProcessHost() {
       case base::TERMINATION_STATUS_PROCESS_WAS_KILLED:
         message = "You killed the GPU process! Why?";
         break;
+#if defined(OS_CHROMEOS)
+      case base::TERMINATION_STATUS_PROCESS_WAS_KILLED_BY_OOM:
+        message = "The GUP process was killed due to out of memory.";
+        break;
+#endif
       case base::TERMINATION_STATUS_PROCESS_CRASHED:
         message = "The GPU process crashed!";
         break;
@@ -588,6 +603,11 @@ bool GpuProcessHost::OnMessageReceived(const IPC::Message& message) {
 
 void GpuProcessHost::OnChannelConnected(int32 peer_pid) {
   TRACE_EVENT0("gpu", "GpuProcessHost::OnChannelConnected");
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  Send(new ChildProcessMsg_SetIOSurfaceManagerToken(
+      BrowserIOSurfaceManager::GetInstance()->GetGpuProcessToken()));
+#endif
 
   while (!queued_messages_.empty()) {
     Send(queued_messages_.front());
@@ -1050,6 +1070,9 @@ std::string GpuProcessHost::GetShaderPrefixKey() {
     gpu::GPUInfo info = GpuDataManagerImpl::GetInstance()->GetGPUInfo();
 
     std::string in_str = GetContentClient()->GetProduct() + "-" +
+#if defined(OS_ANDROID)
+        base::android::BuildInfo::GetInstance()->android_build_fp() + "-" +
+#endif
         info.gl_vendor + "-" + info.gl_renderer + "-" +
         info.driver_version + "-" + info.driver_vendor;
 

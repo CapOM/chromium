@@ -114,6 +114,9 @@ void StringToWorkarounds(
     workarounds->max_varying_vectors = 16;
   if (workarounds->max_vertex_uniform_vectors_256)
     workarounds->max_vertex_uniform_vectors = 256;
+
+  if (workarounds->max_copy_texture_chromium_size_262144)
+    workarounds->max_copy_texture_chromium_size = 262144;
 }
 
 }  // anonymous namespace.
@@ -175,7 +178,8 @@ FeatureInfo::Workarounds::Workarounds() :
     max_cube_map_texture_size(0),
     max_fragment_uniform_vectors(0),
     max_varying_vectors(0),
-    max_vertex_uniform_vectors(0) {
+    max_vertex_uniform_vectors(0),
+    max_copy_texture_chromium_size(0) {
 }
 
 FeatureInfo::FeatureInfo() {
@@ -523,10 +527,11 @@ void FeatureInfo::InitializeFeatures() {
   }
 
   // Check if we should allow GL_OES_texture_npot
-  if (gl_version_info_->is_es3 ||
-      gl_version_info_->is_desktop_core_profile ||
-      extensions.Contains("GL_ARB_texture_non_power_of_two") ||
-      extensions.Contains("GL_OES_texture_npot")) {
+  if (!disallowed_features_.npot_support &&
+      (gl_version_info_->is_es3 ||
+       gl_version_info_->is_desktop_core_profile ||
+       extensions.Contains("GL_ARB_texture_non_power_of_two") ||
+       extensions.Contains("GL_OES_texture_npot"))) {
     AddExtensionString("GL_OES_texture_npot");
     feature_flags_.npot_ok = true;
   }

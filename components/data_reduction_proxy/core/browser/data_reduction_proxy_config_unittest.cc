@@ -7,7 +7,10 @@
 #include <vector>
 
 #include "base/command_line.h"
+#include "base/metrics/field_trial.h"
+#include "base/strings/safe_sprintf.h"
 #include "base/strings/string_util.h"
+#include "base/time/time.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_config_test_utils.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_configurator_test_utils.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_mutable_config_values.h"
@@ -16,6 +19,9 @@
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_event_creator.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params_test_utils.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
+#include "components/variations/variations_associated_data.h"
+#include "net/base/network_quality.h"
+#include "net/base/network_quality_estimator.h"
 #include "net/http/http_status_code.h"
 #include "net/log/test_net_log.h"
 #include "net/proxy/proxy_server.h"
@@ -1103,6 +1109,202 @@ TEST_F(DataReductionProxyConfigTest, IsDataReductionProxyWithMutableConfig) {
     EXPECT_FALSE(proxy_type_info.is_alternative) << i;
     EXPECT_FALSE(proxy_type_info.is_ssl) << i;
   }
+}
+
+TEST_F(DataReductionProxyConfigTest, LoFiOn) {
+  const struct {
+    bool lofi_switch_enabled;
+    bool lofi_enabled_field_trial_group;
+    bool network_prohibitively_slow;
+    bool expect_lofi_header;
+
+  } tests[] = {
+      {
+       // Lo-Fi off.
+       false,
+       false,
+       false,
+       false,
+      },
+      {
+       // In enabled field trial group but network quality is not bad.
+       false,
+       true,
+       false,
+       false,
+      },
+      {
+       // Not in enabled field trial group and network quality is bad.
+       false,
+       false,
+       true,
+       false,
+      },
+      {
+       // In enabled field trial group and network quality is bad.
+       false,
+       true,
+       true,
+       true,
+      },
+      {
+       // Lo-Fi enabled through command line switch.
+       true,
+       false,
+       false,
+       true,
+      },
+  };
+  for (size_t i = 0; i < arraysize(tests); ++i) {
+    config()->ResetLoFiStatusForTest();
+    if (tests[i].lofi_switch_enabled) {
+      base::CommandLine::ForCurrentProcess()->AppendSwitch(
+          data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
+    }
+
+    EXPECT_CALL(*config(), IsIncludedInLoFiEnabledFieldTrial())
+        .WillRepeatedly(
+            testing::Return(tests[i].lofi_enabled_field_trial_group));
+
+    EXPECT_CALL(*config(), IsNetworkQualityProhibitivelySlow(_))
+        .WillRepeatedly(testing::Return(tests[i].network_prohibitively_slow));
+
+    config()->UpdateLoFiStatusOnMainFrameRequest(false, nullptr);
+
+    EXPECT_EQ(tests[i].expect_lofi_header,
+              config()->ShouldUseLoFiHeaderForRequests())
+        << i;
+  }
+}
+
+TEST_F(DataReductionProxyConfigTest, LoFiStatusTransition) {
+  const struct {
+    bool lofi_switch_enabled;
+  } tests[] = {
+      {
+       false,
+      },
+      {
+       true,
+      },
+  };
+
+  for (size_t i = 0; i < arraysize(tests); ++i) {
+    config()->ResetLoFiStatusForTest();
+    if (tests[i].lofi_switch_enabled) {
+      base::CommandLine::ForCurrentProcess()->AppendSwitch(
+          data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
+    } else {
+      EXPECT_CALL(*config(), IsIncludedInLoFiEnabledFieldTrial())
+          .WillRepeatedly(testing::Return(true));
+
+      EXPECT_CALL(*config(), IsNetworkQualityProhibitivelySlow(_))
+          .WillRepeatedly(testing::Return(true));
+    }
+
+    // First, set the status to enabled.
+    config()->UpdateLoFiStatusOnMainFrameRequest(false, nullptr);
+    EXPECT_EQ(true, config()->ShouldUseLoFiHeaderForRequests()) << i;
+
+    // Full page reload with Lo-Fi disabled (main frame request).
+    config()->UpdateLoFiStatusOnMainFrameRequest(true, nullptr);
+    EXPECT_FALSE(config()->ShouldUseLoFiHeaderForRequests()) << i;
+
+    // New page load (main frame request).
+    config()->UpdateLoFiStatusOnMainFrameRequest(false, nullptr);
+    EXPECT_EQ(true, config()->ShouldUseLoFiHeaderForRequests()) << i;
+  }
+}
+
+// Overrides net::NetworkQualityEstimator::GetEstimate() for testing purposes.
+class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
+ public:
+  TestNetworkQualityEstimator() : rtt_(base::TimeDelta()), kbps_(0) {}
+
+  ~TestNetworkQualityEstimator() override {}
+
+  net::NetworkQuality GetEstimate() const override {
+    return net::NetworkQuality(rtt_, 0.0, kbps_, 0.0);
+  }
+
+  void SetRtt(base::TimeDelta rtt) { rtt_ = rtt; }
+
+  void SetKbps(uint64_t kbps) { kbps_ = kbps; }
+
+ private:
+  base::TimeDelta rtt_;
+  uint64_t kbps_;
+};
+
+TEST_F(DataReductionProxyConfigTest, AutoLoFiParams) {
+  DataReductionProxyConfig config(nullptr, nullptr, configurator(),
+                                  event_creator());
+  variations::testing::ClearAllVariationParams();
+  std::map<std::string, std::string> variation_params;
+
+  int rtt_msec = 120;
+  char rtt[20];
+  base::strings::SafeSPrintf(rtt, "%d", rtt_msec);
+  variation_params["rtt_msec"] = rtt;
+
+  variation_params["kbps"] = "240";
+
+  int hysteresis_sec = 360;
+  char hysteresis[20];
+  base::strings::SafeSPrintf(hysteresis, "%d", hysteresis_sec);
+  variation_params["hysteresis_period_seconds"] = hysteresis;
+
+  variation_params["spurious_field"] = "480";
+
+  ASSERT_TRUE(variations::AssociateVariationParams(
+      DataReductionProxyParams::GetLoFiFieldTrialName(), "Enabled",
+      variation_params));
+
+  base::FieldTrialList field_trial_list(nullptr);
+  base::FieldTrialList::CreateFieldTrial(
+      DataReductionProxyParams::GetLoFiFieldTrialName(), "Enabled");
+
+  config.PopulateAutoLoFiParams();
+
+  EXPECT_EQ(base::TimeDelta::FromMilliseconds(rtt_msec),
+            config.auto_lofi_minimum_rtt_);
+  EXPECT_EQ(240U, config.auto_lofi_maximum_kbps_);
+  EXPECT_EQ(base::TimeDelta::FromSeconds(hysteresis_sec),
+            config.auto_lofi_hysteresis_);
+
+  TestNetworkQualityEstimator test_network_quality_estimator;
+
+  // RTT is higher than threshold. Network is slow.
+  test_network_quality_estimator.SetRtt(
+      base::TimeDelta::FromMilliseconds(rtt_msec + 1));
+  EXPECT_TRUE(config.IsNetworkQualityProhibitivelySlow(
+      &test_network_quality_estimator));
+
+  // Network quality improved. RTT is lower than the threshold. However,
+  // network should still be marked as slow because of hysteresis.
+  test_network_quality_estimator.SetRtt(
+      base::TimeDelta::FromMilliseconds(rtt_msec - 1));
+  EXPECT_TRUE(config.IsNetworkQualityProhibitivelySlow(
+      &test_network_quality_estimator));
+
+  // Change the last update time to be older than the hysteresis duration.
+  // Checking network quality afterwards should show that network is no longer
+  // slow.
+  config.network_quality_last_updated_ =
+      base::TimeTicks::Now() - base::TimeDelta::FromSeconds(hysteresis_sec + 1);
+  EXPECT_FALSE(config.IsNetworkQualityProhibitivelySlow(
+      &test_network_quality_estimator));
+
+  // Changing the RTT has no effect because of hysteresis.
+  test_network_quality_estimator.SetRtt(
+      base::TimeDelta::FromMilliseconds(rtt_msec + 1));
+  EXPECT_FALSE(config.IsNetworkQualityProhibitivelySlow(
+      &test_network_quality_estimator));
+
+  // Change in connection type changes the network quality despite hysteresis.
+  config.connection_type_ = net::NetworkChangeNotifier::CONNECTION_WIFI;
+  EXPECT_TRUE(config.IsNetworkQualityProhibitivelySlow(
+      &test_network_quality_estimator));
 }
 
 }  // namespace data_reduction_proxy

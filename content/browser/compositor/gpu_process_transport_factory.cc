@@ -9,9 +9,10 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/location.h"
-#include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/simple_thread.h"
 #include "base/threading/thread.h"
 #include "cc/output/compositor_frame.h"
@@ -56,6 +57,7 @@
 #elif defined(USE_OZONE)
 #include "content/browser/compositor/browser_compositor_overlay_candidate_validator_ozone.h"
 #include "content/browser/compositor/software_output_device_ozone.h"
+#include "ui/ozone/public/overlay_candidates_ozone.h"
 #include "ui/ozone/public/overlay_manager_ozone.h"
 #include "ui/ozone/public/ozone_platform.h"
 #include "ui/ozone/public/ozone_switches.h"
@@ -161,17 +163,17 @@ GpuProcessTransportFactory::CreateSoftwareOutputDevice(
 scoped_ptr<BrowserCompositorOverlayCandidateValidator>
 CreateOverlayCandidateValidator(gfx::AcceleratedWidget widget) {
 #if defined(USE_OZONE)
-  ui::OverlayCandidatesOzone* overlay_candidates =
+  scoped_ptr<ui::OverlayCandidatesOzone> overlay_candidates =
       ui::OzonePlatform::GetInstance()
           ->GetOverlayManager()
-          ->GetOverlayCandidates(widget);
+          ->CreateOverlayCandidates(widget);
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   if (overlay_candidates &&
       (command_line->HasSwitch(switches::kEnableHardwareOverlays) ||
        command_line->HasSwitch(switches::kOzoneTestSingleOverlaySupport))) {
     return scoped_ptr<BrowserCompositorOverlayCandidateValidator>(
         new BrowserCompositorOverlayCandidateValidatorOzone(
-            widget, overlay_candidates));
+            widget, overlay_candidates.Pass()));
   }
 #endif
   return scoped_ptr<BrowserCompositorOverlayCandidateValidator>();
@@ -593,7 +595,7 @@ GpuProcessTransportFactory::CreateContextCommon(
 }
 
 void GpuProcessTransportFactory::OnLostMainThreadSharedContextInsideCallback() {
-  base::MessageLoop::current()->PostTask(
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
       FROM_HERE,
       base::Bind(&GpuProcessTransportFactory::OnLostMainThreadSharedContext,
                  callback_factory_.GetWeakPtr()));

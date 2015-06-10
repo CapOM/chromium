@@ -30,7 +30,7 @@ using ::testing::Pointee;
 
 namespace {
 
-const int64 kSlowNavigationDelayInMS = 2000;
+const int64 kSlowNavigationDelayInMS = 6000;
 const int64 kQuickNavigationDelayInMS = 500;
 
 // This sublass is used to disable some code paths which are not essential for
@@ -402,14 +402,14 @@ TEST_F(ManagePasswordsUIControllerTest, ChooseCredentialLocal) {
 
   controller()->ManagePasswordsUIController::ChooseCredential(
       test_local_form(),
-      password_manager::CredentialType::CREDENTIAL_TYPE_LOCAL);
+      password_manager::CredentialType::CREDENTIAL_TYPE_PASSWORD);
   controller()->OnBubbleHidden();
   EXPECT_EQ(password_manager::ui::MANAGE_STATE, controller()->state());
   ASSERT_TRUE(credential_info());
   EXPECT_EQ(test_local_form().username_value, credential_info()->id);
   EXPECT_EQ(test_local_form().password_value, credential_info()->password);
   EXPECT_TRUE(credential_info()->federation.is_empty());
-  EXPECT_EQ(password_manager::CredentialType::CREDENTIAL_TYPE_LOCAL,
+  EXPECT_EQ(password_manager::CredentialType::CREDENTIAL_TYPE_PASSWORD,
             credential_info()->type);
 }
 
@@ -436,7 +436,7 @@ TEST_F(ManagePasswordsUIControllerTest, ChooseCredentialLocalButFederated) {
 
   controller()->ManagePasswordsUIController::ChooseCredential(
       test_federated_form(),
-      password_manager::CredentialType::CREDENTIAL_TYPE_LOCAL);
+      password_manager::CredentialType::CREDENTIAL_TYPE_PASSWORD);
   controller()->OnBubbleHidden();
   EXPECT_EQ(password_manager::ui::MANAGE_STATE, controller()->state());
   ASSERT_TRUE(credential_info());

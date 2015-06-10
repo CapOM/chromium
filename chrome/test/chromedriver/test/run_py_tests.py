@@ -142,6 +142,8 @@ _ANDROID_NEGATIVE_FILTER['chrome'] = (
         'ChromeDriverTest.testShouldHandleNewWindowLoadingProperly',
         # Android doesn't support multiple sessions on one device.
         'SessionHandlingTest.testGetSessions',
+        # Android doesn't use the chrome://print dialog.
+        'ChromeDriverTest.testCanSwitchToPrintPreviewDialog',
     ]
 )
 _ANDROID_NEGATIVE_FILTER['chrome_stable'] = (
@@ -1045,9 +1047,7 @@ class ChromeDriverTest(ChromeDriverBaseTest):
     if _ANDROID_PACKAGE_KEY:
       packages = ['chrome_stable', 'chrome_beta', 'chromedriver_webview_shell']
       if _ANDROID_PACKAGE_KEY in packages:
-        self.assertRaisesRegexp(RuntimeError,
-                                'Server returned error: Not Implemented',
-                                self._driver.TouchPinch, 1, 2, 3.0)
+        self.assertFalse(self._driver.capabilities['hasTouchScreen'])
 
   def testHasTouchScreen(self):
     self.assertIn('hasTouchScreen', self._driver.capabilities)
@@ -1080,6 +1080,15 @@ class ChromeDriverTest(ChromeDriverBaseTest):
     self._driver.GoBack()
     p = self._driver.FindElement('tag name', 'p')
     self.assertEquals('Two', p.GetText())
+
+  def testCanSwitchToPrintPreviewDialog(self):
+    old_handles = self._driver.GetWindowHandles()
+    self.assertEquals(1, len(old_handles))
+    self._driver.ExecuteScript('setTimeout(function(){window.print();}, 0);')
+    new_window_handle = self._WaitForNewWindow(old_handles)
+    self.assertNotEqual(None, new_window_handle)
+    self._driver.SwitchToWindow(new_window_handle)
+    self.assertEquals('chrome://print/', self._driver.GetCurrentUrl())
 
 
 class ChromeDriverAndroidTest(ChromeDriverBaseTest):

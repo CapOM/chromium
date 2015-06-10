@@ -60,6 +60,7 @@ class CastSelectDefaultView : public TrayItemMore {
       const CastConfigDelegate::ReceiversAndActivites& receivers_activities);
 
   CastConfigDelegate* cast_config_delegate_;
+  base::WeakPtrFactory<CastSelectDefaultView> weak_ptr_factory_;
   DISALLOW_COPY_AND_ASSIGN(CastSelectDefaultView);
 };
 
@@ -68,7 +69,8 @@ CastSelectDefaultView::CastSelectDefaultView(
     CastConfigDelegate* cast_config_delegate,
     bool show_more)
     : TrayItemMore(owner, show_more),
-      cast_config_delegate_(cast_config_delegate) {
+      cast_config_delegate_(cast_config_delegate),
+      weak_ptr_factory_(this) {
   ui::ResourceBundle& rb = ui::ResourceBundle::GetSharedInstance();
   SetImage(rb.GetImageNamed(IDR_AURA_UBER_TRAY_CAST).ToImageSkia());
 
@@ -99,8 +101,9 @@ void CastSelectDefaultView::UpdateLabel() {
       cast_config_delegate_->HasCastExtension() == false)
     return;
 
-  cast_config_delegate_->GetReceiversAndActivities(base::Bind(
-      &CastSelectDefaultView::UpdateLabelCallback, base::Unretained(this)));
+  cast_config_delegate_->GetReceiversAndActivities(
+      base::Bind(&CastSelectDefaultView::UpdateLabelCallback,
+                 weak_ptr_factory_.GetWeakPtr()));
 }
 
 // This view is displayed when the screen is actively being casted; it allows
@@ -126,16 +129,15 @@ class CastCastView : public views::View, public views::ButtonListener {
 
   CastConfigDelegate* cast_config_delegate_;
   views::ImageView* icon_;
-  views::View* label_container_;
-  views::Label* title_;
-  views::Label* details_;
+  views::Label* label_;
   TrayPopupLabelButton* stop_button_;
+  base::WeakPtrFactory<CastCastView> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(CastCastView);
 };
 
 CastCastView::CastCastView(CastConfigDelegate* cast_config_delegate)
-    : cast_config_delegate_(cast_config_delegate) {
+    : cast_config_delegate_(cast_config_delegate), weak_ptr_factory_(this) {
   // We will initialize the primary tray view which shows a stop button here.
 
   set_background(views::Background::CreateSolidBackground(kBackgroundColor));
@@ -148,29 +150,14 @@ CastCastView::CastCastView(CastConfigDelegate* cast_config_delegate)
       bundle.GetImageNamed(IDR_AURA_UBER_TRAY_CAST_ENABLED).ToImageSkia());
   AddChildView(icon_);
 
-  // The view has two labels, one above the other. The top label (|title_|)
-  // specifies that we are, say, "Casting desktop". The bottom label
-  // (|details_|) specifies where we are casting to, ie, "SomeRandom cast"
-  label_container_ = new views::View;
-  label_container_->SetLayoutManager(
-      new views::BoxLayout(views::BoxLayout::kVertical, 0, 0, 0));
-
-  title_ = new views::Label;
-  title_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  title_->SetFontList(bundle.GetFontList(ui::ResourceBundle::BoldFont));
-  title_->SetText(
-      bundle.GetLocalizedString(IDS_ASH_STATUS_TRAY_CAST_UNKNOWN_CAST_TYPE));
-  label_container_->AddChildView(title_);
-
-  details_ = new views::Label;
-  details_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
-  details_->SetMultiLine(false);
-  details_->SetEnabledColor(kHeaderTextColorNormal);
-  details_->SetText(
-      bundle.GetLocalizedString(IDS_ASH_STATUS_TRAY_CAST_UNKNOWN_RECEIVER));
-  label_container_->AddChildView(details_);
-
-  AddChildView(label_container_);
+  // The label which describes both what we are casting (ie, the desktop) and
+  // where we are casting it to.
+  label_ = new views::Label;
+  label_->SetHorizontalAlignment(gfx::ALIGN_LEFT);
+  label_->SetMultiLine(true);
+  label_->SetText(
+      bundle.GetLocalizedString(IDS_ASH_STATUS_TRAY_CAST_CAST_UNKNOWN));
+  AddChildView(label_);
 
   // Add the stop bottom on the far-right. We customize how this stop button is
   // displayed inside of |Layout()|.
@@ -197,18 +184,12 @@ void CastCastView::Layout() {
   stop_button_->SetBoundsRect(stop_bounds);
 
   // Adjust the label's bounds in case it got cut off by |stop_button_|.
-  if (label_container_->bounds().Intersects(stop_button_->bounds())) {
-    gfx::Rect label_bounds = label_container_->bounds();
+  if (label_->bounds().Intersects(stop_button_->bounds())) {
+    gfx::Rect label_bounds = label_->bounds();
     label_bounds.set_width(stop_button_->x() - kTrayPopupPaddingBetweenItems -
-                           label_container_->x());
-    label_container_->SetBoundsRect(label_bounds);
+                           label_->x());
+    label_->SetBoundsRect(label_bounds);
   }
-
-  // Center the label.
-  // TODO(jdufault): Why doesn't this happen automatically?
-  const int extra_height =
-      height() - label_container_->GetPreferredSize().height();
-  label_container_->SetY(extra_height / 2);
 }
 
 void CastCastView::UpdateLabel() {
@@ -216,8 +197,8 @@ void CastCastView::UpdateLabel() {
       cast_config_delegate_->HasCastExtension() == false)
     return;
 
-  cast_config_delegate_->GetReceiversAndActivities(
-      base::Bind(&CastCastView::UpdateLabelCallback, base::Unretained(this)));
+  cast_config_delegate_->GetReceiversAndActivities(base::Bind(
+      &CastCastView::UpdateLabelCallback, weak_ptr_factory_.GetWeakPtr()));
 }
 
 void CastCastView::UpdateLabelCallback(
@@ -230,17 +211,15 @@ void CastCastView::UpdateLabelCallback(
       // what we are actually casting - either the desktop, a tab, or a fallback
       // that catches everything else (ie, an extension tab).
       if (activity.tab_id == CastConfigDelegate::Activity::TabId::DESKTOP) {
-        title_->SetText(
-            l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_CAST_CAST_DESKTOP));
+        label_->SetText(l10n_util::GetStringFUTF16(
+            IDS_ASH_STATUS_TRAY_CAST_CAST_DESKTOP, receiver.name));
       } else if (activity.tab_id >= 0) {
-        title_->SetText(l10n_util::GetStringFUTF16(
-            IDS_ASH_STATUS_TRAY_CAST_CAST_TAB, activity.title));
+        label_->SetText(l10n_util::GetStringFUTF16(
+            IDS_ASH_STATUS_TRAY_CAST_CAST_TAB, activity.title, receiver.name));
       } else {
-        // We will fallback to whatever the extension provides us
-        title_->SetText(activity.title);
+        label_->SetText(
+            l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_CAST_CAST_UNKNOWN));
       }
-
-      details_->SetText(receiver.name);
       Layout();
       break;
     }
@@ -405,10 +384,11 @@ class CastDetailedView : public TrayDetailsView, public ViewClickListener {
 
   CastConfigDelegate* cast_config_delegate_;
   user::LoginStatus login_;
-  views::View* options_;
+  views::View* options_ = nullptr;
   CastConfigDelegate::ReceiversAndActivites receivers_and_activities_;
   // A mapping from the view pointer to the associated activity id
   std::map<views::View*, std::string> receiver_activity_map_;
+  base::WeakPtrFactory<CastDetailedView> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(CastDetailedView);
 };
@@ -419,7 +399,7 @@ CastDetailedView::CastDetailedView(SystemTrayItem* owner,
     : TrayDetailsView(owner),
       cast_config_delegate_(cast_config_delegate),
       login_(login),
-      options_(nullptr) {
+      weak_ptr_factory_(this) {
   CreateItems();
   UpdateReceiverList();
 }
@@ -434,8 +414,9 @@ void CastDetailedView::CreateItems() {
 }
 
 void CastDetailedView::UpdateReceiverList() {
-  cast_config_delegate_->GetReceiversAndActivities(base::Bind(
-      &CastDetailedView::UpdateReceiverListCallback, base::Unretained(this)));
+  cast_config_delegate_->GetReceiversAndActivities(
+      base::Bind(&CastDetailedView::UpdateReceiverListCallback,
+                 weak_ptr_factory_.GetWeakPtr()));
 }
 
 void CastDetailedView::UpdateReceiverListCallback(

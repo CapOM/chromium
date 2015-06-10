@@ -322,10 +322,8 @@
         'base/media_log_event.h',
         'base/media_permission.cc',
         'base/media_permission.h',
-        'base/media_posix.cc',
         'base/media_switches.cc',
         'base/media_switches.h',
-        'base/media_win.cc',
         'base/mime_util.cc',
         'base/mime_util.h',
         'base/moving_average.cc',
@@ -621,7 +619,6 @@
             'base/container_names.h',
             'base/media_file_checker.cc',
             'base/media_file_checker.h',
-            'base/media_posix.cc',
             'ffmpeg/ffmpeg_common.cc',
             'ffmpeg/ffmpeg_common.h',
             'filters/audio_file_reader.cc',
@@ -690,7 +687,6 @@
           'sources': [
             'base/media.cc',
             'base/media.h',
-            'base/media_stub.cc',
           ],
           'sources!': [
             'filters/opus_audio_decoder.cc',
@@ -1041,10 +1037,12 @@
         ['target_arch=="ia32" or target_arch=="x64"', {
           'dependencies': [
             'media_asm',
-            'media_sse2',
           ],
           'sources': [
+            'base/simd/convert_rgb_to_yuv_sse2.cc',
+            'base/simd/convert_rgb_to_yuv_ssse3.cc',
             'base/simd/convert_yuv_to_rgb_x86.cc',
+            'base/simd/filter_yuv_sse2.cc',
           ],
         }],
         ['OS!="linux" and OS!="win"', {
@@ -1251,7 +1249,7 @@
             'test/pipeline_integration_test_base.cc',
           ],
         }],
-        ['os_posix==1 and OS!="mac"', {
+        ['(os_posix==1 and OS!="mac") or (OS=="win" and component!="shared_library" and win_use_allocator_shim==1)', {
           'conditions': [
             ['use_allocator!="none"', {
               'dependencies': [
@@ -1640,25 +1638,6 @@
             '../third_party/yasm/yasm_compile.gypi',
           ],
         },
-        {
-          # GN version: //media/base:media_sse2
-          'target_name': 'media_sse2',
-          'type': 'static_library',
-          'cflags': [
-            '-msse2',
-          ],
-          'defines': [
-            'MEDIA_IMPLEMENTATION',
-          ],
-          'include_dirs': [
-            '..',
-          ],
-          'sources': [
-            'base/simd/convert_rgb_to_yuv_sse2.cc',
-            'base/simd/convert_rgb_to_yuv_ssse3.cc',
-            'base/simd/filter_yuv_sse2.cc',
-          ],
-        },
       ], # targets
     }],
     ['OS=="android"', {
@@ -1673,6 +1652,7 @@
           ],
           'variables': {
             'test_suite_name': 'media_unittests',
+            'isolate_file': 'media_unittests.isolate',
           },
           'includes': ['../build/apk_test.gypi'],
         },
@@ -1686,6 +1666,7 @@
           ],
           'variables': {
             'test_suite_name': 'media_perftests',
+            'isolate_file': 'media_perftests.isolate',
           },
           'includes': ['../build/apk_test.gypi'],
         },
@@ -1860,6 +1841,7 @@
           'type': '<(component)',
           'dependencies': [
             '../base/base.gyp:base',
+            '../gpu/gpu.gyp:command_buffer_common',
             '../ui/gfx/gfx.gyp:gfx_geometry',
             'shared_memory_support',
           ],

@@ -90,34 +90,15 @@ void ExtensionWebContentsObserver::RenderViewCreated(
     }
   }
 
-  switch (type) {
-    case Manifest::TYPE_EXTENSION:
-    case Manifest::TYPE_USER_SCRIPT:
-    case Manifest::TYPE_HOSTED_APP:
-    case Manifest::TYPE_LEGACY_PACKAGED_APP:
-    case Manifest::TYPE_PLATFORM_APP:
-      // Always send a Loaded message before ActivateExtension so that
-      // ExtensionDispatcher knows what Extension is active, not just its ID.
-      // This is important for classifying the Extension's JavaScript context
-      // correctly (see ExtensionDispatcher::ClassifyJavaScriptContext).
-      // We also have to include the tab-specific permissions here, since it's
-      // an extension process.
-      render_view_host->Send(
-          new ExtensionMsg_Loaded(std::vector<ExtensionMsg_Loaded_Params>(
-              1, ExtensionMsg_Loaded_Params(
-                     extension, true /* include tab permissions */))));
-      render_view_host->Send(
-          new ExtensionMsg_ActivateExtension(extension->id()));
-      break;
-
-    case Manifest::TYPE_UNKNOWN:
-    case Manifest::TYPE_THEME:
-    case Manifest::TYPE_SHARED_MODULE:
-      break;
-
-    case Manifest::NUM_LOAD_TYPES:
-      NOTREACHED();
-  }
+  // Tells the new view that it's hosted in an extension process.
+  //
+  // This will often be a rendant IPC, because activating extensions happens at
+  // the process level, not at the view level. However, without some mild
+  // refactoring this isn't trivial to do, and this way is simpler.
+  //
+  // Plus, we can delete the concept of activating an extension once site
+  // isolation is turned on.
+  render_view_host->Send(new ExtensionMsg_ActivateExtension(extension->id()));
 }
 
 void ExtensionWebContentsObserver::RenderFrameCreated(
@@ -142,10 +123,19 @@ void ExtensionWebContentsObserver::RenderFrameHostChanged(
   if (old_host)
     process_manager->UnregisterRenderFrameHost(old_host);
 
-  const Extension* extension = GetExtension(new_host->GetRenderViewHost());
-  if (extension) {
+  const Extension* frame_extension = GetExtensionForRenderFrame(new_host);
+  if (frame_extension) {
     process_manager->RegisterRenderFrameHost(
-        web_contents(), new_host, extension);
+        web_contents(), new_host, frame_extension);
+  }
+
+  // This can be different from |frame_extension| above in the case of, e.g.,
+  // a non-extension iframe hosted in a chrome-extension:// page.
+  const Extension* tab_extension =
+      GetExtensionForRenderFrame(web_contents()->GetMainFrame());
+  if (tab_extension) {
+    new_host->Send(new ExtensionMsg_SetTabExtensionOwner(
+        new_host->GetRoutingID(), tab_extension->id()));
   }
 }
 

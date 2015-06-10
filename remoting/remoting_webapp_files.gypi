@@ -89,6 +89,7 @@
       'webapp/base/js/identity_unittest.js',
       'webapp/base/js/ipc_unittest.js',
       'webapp/base/js/l10n_unittest.js',
+      'webapp/base/js/platform_unittest.js',
       'webapp/base/js/protocol_extension_manager_unittest.js',
       'webapp/base/js/typecheck_unittest.js',
       'webapp/base/js/viewport_unittest.js',
@@ -102,8 +103,8 @@
       'webapp/crd/js/gcd_client_with_mock_xhr_unittest.js',
       'webapp/crd/js/host_controller_unittest.js',
       'webapp/crd/js/host_daemon_facade_unittest.js',
-      'webapp/crd/js/host_list_api_impl_unittest.js',
       'webapp/crd/js/host_table_entry_unittest.js',
+      'webapp/crd/js/legacy_host_list_api_unittest.js',
       'webapp/crd/js/menu_button_unittest.js',
       'webapp/crd/js/mock_xhr_unittest.js',
     ],
@@ -250,6 +251,7 @@
     # Files for controlling the local machine as a host.
     # Includes both it2me and me2me files.
     'remoting_webapp_js_host_control_files': [
+      'webapp/crd/js/buffered_signal_strategy.js',
       'webapp/crd/js/host_controller.js',
       'webapp/crd/js/host_daemon_facade.js',
       'webapp/crd/js/host_screen.js',
@@ -264,10 +266,15 @@
     'remoting_webapp_js_host_display_files': [
       'webapp/crd/js/host_list.js',
       'webapp/crd/js/host_list_api.js',
-      'webapp/crd/js/host_list_api_gcd_impl.js',
-      'webapp/crd/js/host_list_api_impl.js',
       'webapp/crd/js/host_table_entry.js',
       'webapp/crd/js/local_host_section.js',
+
+      # Must come after host_list_api.js because of an issue with
+      # JSCompiler.  If an implementation of an interface occurs in a
+      # file processed before the interface itself, the @override tag
+      # doesn't always work correctly.
+      'webapp/crd/js/gcd_host_list_api.js',
+      'webapp/crd/js/legacy_host_list_api.js',
     ],
     # The CRD-specific JavaScript files required by main.html.
     'remoting_webapp_crd_js_ui_files': [
@@ -379,7 +386,6 @@
     'remoting_webapp_background_html_all_js_files': [
       '<@(remoting_webapp_background_html_js_files)',
       'webapp/base/js/base.js',
-      'webapp/base/js/client_session.js',
       'webapp/base/js/error.js',
       'webapp/base/js/identity.js',
       'webapp/base/js/ipc.js',

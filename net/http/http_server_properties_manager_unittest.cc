@@ -14,6 +14,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/test/test_simple_task_runner.h"
 #include "base/values.h"
+#include "net/base/ip_address_number.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
@@ -44,7 +45,6 @@ class TestingHttpServerPropertiesManager : public HttpServerPropertiesManager {
 
   // Make these methods public for testing.
   using HttpServerPropertiesManager::ScheduleUpdateCacheOnPrefThread;
-  using HttpServerPropertiesManager::ScheduleUpdatePrefsOnNetworkThread;
 
   // Post tasks without a delay during tests.
   void StartPrefsUpdateTimerOnNetworkThread(base::TimeDelta delay) override {
@@ -67,6 +67,10 @@ class TestingHttpServerPropertiesManager : public HttpServerPropertiesManager {
     HttpServerPropertiesManager::UpdatePrefsFromCacheOnNetworkThread(callback);
   }
 
+  void ScheduleUpdatePrefsOnNetworkThreadConcrete(Location location) {
+    HttpServerPropertiesManager::ScheduleUpdatePrefsOnNetworkThread(location);
+  }
+
   void ScheduleUpdatePrefsOnNetworkThread() {
     // Picked a random Location as caller.
     HttpServerPropertiesManager::ScheduleUpdatePrefsOnNetworkThread(
@@ -75,6 +79,7 @@ class TestingHttpServerPropertiesManager : public HttpServerPropertiesManager {
 
   MOCK_METHOD0(UpdateCacheFromPrefsOnPrefThread, void());
   MOCK_METHOD1(UpdatePrefsFromCacheOnNetworkThread, void(const base::Closure&));
+  MOCK_METHOD1(ScheduleUpdatePrefsOnNetworkThread, void(Location location));
   MOCK_METHOD6(UpdateCacheFromPrefsOnNetworkThread,
                void(std::vector<std::string>* spdy_servers,
                     SpdySettingsMap* spdy_settings_map,
@@ -120,6 +125,22 @@ class HttpServerPropertiesManagerTest : public testing::Test {
         .WillOnce(Invoke(http_server_props_manager_.get(),
                          &TestingHttpServerPropertiesManager::
                              UpdateCacheFromPrefsOnUIConcrete));
+  }
+
+  void ExpectScheduleUpdatePrefsOnNetworkThread() {
+    EXPECT_CALL(*http_server_props_manager_,
+                ScheduleUpdatePrefsOnNetworkThread(_))
+        .WillOnce(Invoke(http_server_props_manager_.get(),
+                         &TestingHttpServerPropertiesManager::
+                             ScheduleUpdatePrefsOnNetworkThreadConcrete));
+  }
+
+  void ExpectScheduleUpdatePrefsOnNetworkThreadRepeatedly() {
+    EXPECT_CALL(*http_server_props_manager_,
+                ScheduleUpdatePrefsOnNetworkThread(_))
+        .WillRepeatedly(Invoke(http_server_props_manager_.get(),
+                               &TestingHttpServerPropertiesManager::
+                                   ScheduleUpdatePrefsOnNetworkThreadConcrete));
   }
 
   void ExpectPrefsUpdate() {
@@ -266,6 +287,7 @@ TEST_F(HttpServerPropertiesManagerTest, BadCachedHostPortPair) {
   ExpectCacheUpdate();
   // The prefs are automaticalls updated in the case corruption is detected.
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   base::DictionaryValue* server_pref_dict = new base::DictionaryValue;
 
@@ -319,6 +341,7 @@ TEST_F(HttpServerPropertiesManagerTest, BadCachedAltProtocolPort) {
   ExpectCacheUpdate();
   // The prefs are automaticalls updated in the case corruption is detected.
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   base::DictionaryValue* server_pref_dict = new base::DictionaryValue;
 
@@ -357,6 +380,7 @@ TEST_F(HttpServerPropertiesManagerTest, BadCachedAltProtocolPort) {
 
 TEST_F(HttpServerPropertiesManagerTest, SupportsSpdy) {
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   // Post an update task to the network thread. SetSupportsSpdy calls
   // ScheduleUpdatePrefsOnNetworkThread.
@@ -365,6 +389,8 @@ TEST_F(HttpServerPropertiesManagerTest, SupportsSpdy) {
   HostPortPair spdy_server_mail("mail.google.com", 443);
   EXPECT_FALSE(
       http_server_props_manager_->SupportsRequestPriority(spdy_server_mail));
+  http_server_props_manager_->SetSupportsSpdy(spdy_server_mail, true);
+  // ExpectScheduleUpdatePrefsOnNetworkThread() should be called only once.
   http_server_props_manager_->SetSupportsSpdy(spdy_server_mail, true);
 
   // Run the task.
@@ -377,6 +403,7 @@ TEST_F(HttpServerPropertiesManagerTest, SupportsSpdy) {
 
 TEST_F(HttpServerPropertiesManagerTest, SetSpdySetting) {
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   // Add SpdySetting for mail.google.com:443.
   HostPortPair spdy_server_mail("mail.google.com", 443);
@@ -403,6 +430,7 @@ TEST_F(HttpServerPropertiesManagerTest, SetSpdySetting) {
 
 TEST_F(HttpServerPropertiesManagerTest, ClearSpdySetting) {
   ExpectPrefsUpdateRepeatedly();
+  ExpectScheduleUpdatePrefsOnNetworkThreadRepeatedly();
 
   // Add SpdySetting for mail.google.com:443.
   HostPortPair spdy_server_mail("mail.google.com", 443);
@@ -441,6 +469,7 @@ TEST_F(HttpServerPropertiesManagerTest, ClearSpdySetting) {
 
 TEST_F(HttpServerPropertiesManagerTest, ClearAllSpdySetting) {
   ExpectPrefsUpdateRepeatedly();
+  ExpectScheduleUpdatePrefsOnNetworkThreadRepeatedly();
 
   // Add SpdySetting for mail.google.com:443.
   HostPortPair spdy_server_mail("mail.google.com", 443);
@@ -478,10 +507,14 @@ TEST_F(HttpServerPropertiesManagerTest, ClearAllSpdySetting) {
 
 TEST_F(HttpServerPropertiesManagerTest, GetAlternativeService) {
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   HostPortPair spdy_server_mail("mail.google.com", 80);
   EXPECT_FALSE(HasAlternativeService(spdy_server_mail));
   AlternativeService alternative_service(NPN_SPDY_4, "mail.google.com", 443);
+  http_server_props_manager_->SetAlternativeService(spdy_server_mail,
+                                                    alternative_service, 1.0);
+  // ExpectScheduleUpdatePrefsOnNetworkThread() should be called only once.
   http_server_props_manager_->SetAlternativeService(spdy_server_mail,
                                                     alternative_service, 1.0);
 
@@ -495,14 +528,84 @@ TEST_F(HttpServerPropertiesManagerTest, GetAlternativeService) {
   EXPECT_EQ(NPN_SPDY_4, alternative_service.protocol);
 }
 
+TEST_F(HttpServerPropertiesManagerTest, ClearAlternativeService) {
+  ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
+
+  HostPortPair spdy_server_mail("mail.google.com", 80);
+  EXPECT_FALSE(HasAlternativeService(spdy_server_mail));
+  AlternativeService alternative_service(NPN_SPDY_4, "mail.google.com", 443);
+  http_server_props_manager_->SetAlternativeService(spdy_server_mail,
+                                                    alternative_service, 1.0);
+  ExpectScheduleUpdatePrefsOnNetworkThread();
+  http_server_props_manager_->ClearAlternativeService(spdy_server_mail);
+  // ExpectScheduleUpdatePrefsOnNetworkThread() should be called only once.
+  http_server_props_manager_->ClearAlternativeService(spdy_server_mail);
+
+  // Run the task.
+  base::RunLoop().RunUntilIdle();
+  Mock::VerifyAndClearExpectations(http_server_props_manager_.get());
+
+  EXPECT_FALSE(HasAlternativeService(spdy_server_mail));
+}
+
+TEST_F(HttpServerPropertiesManagerTest, ConfirmAlternativeService) {
+  ExpectPrefsUpdate();
+
+  HostPortPair spdy_server_mail("mail.google.com", 80);
+  EXPECT_FALSE(HasAlternativeService(spdy_server_mail));
+  AlternativeService alternative_service(NPN_SPDY_4, "mail.google.com", 443);
+
+  ExpectScheduleUpdatePrefsOnNetworkThread();
+  http_server_props_manager_->SetAlternativeService(spdy_server_mail,
+                                                    alternative_service, 1.0);
+
+  EXPECT_FALSE(http_server_props_manager_->IsAlternativeServiceBroken(
+      alternative_service));
+  EXPECT_FALSE(http_server_props_manager_->WasAlternativeServiceRecentlyBroken(
+      alternative_service));
+
+  ExpectScheduleUpdatePrefsOnNetworkThread();
+  http_server_props_manager_->MarkAlternativeServiceBroken(alternative_service);
+  EXPECT_TRUE(http_server_props_manager_->IsAlternativeServiceBroken(
+      alternative_service));
+  EXPECT_TRUE(http_server_props_manager_->WasAlternativeServiceRecentlyBroken(
+      alternative_service));
+
+  ExpectScheduleUpdatePrefsOnNetworkThread();
+  http_server_props_manager_->ConfirmAlternativeService(alternative_service);
+  EXPECT_FALSE(http_server_props_manager_->IsAlternativeServiceBroken(
+      alternative_service));
+  EXPECT_FALSE(http_server_props_manager_->WasAlternativeServiceRecentlyBroken(
+      alternative_service));
+  // ExpectScheduleUpdatePrefsOnNetworkThread() should be called only once.
+  http_server_props_manager_->ConfirmAlternativeService(alternative_service);
+  EXPECT_FALSE(http_server_props_manager_->IsAlternativeServiceBroken(
+      alternative_service));
+  EXPECT_FALSE(http_server_props_manager_->WasAlternativeServiceRecentlyBroken(
+      alternative_service));
+
+  // Run the task.
+  base::RunLoop().RunUntilIdle();
+  Mock::VerifyAndClearExpectations(http_server_props_manager_.get());
+
+  EXPECT_FALSE(http_server_props_manager_->IsAlternativeServiceBroken(
+      alternative_service));
+  EXPECT_FALSE(http_server_props_manager_->WasAlternativeServiceRecentlyBroken(
+      alternative_service));
+}
+
 TEST_F(HttpServerPropertiesManagerTest, SupportsQuic) {
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   IPAddressNumber address;
   EXPECT_FALSE(http_server_props_manager_->GetSupportsQuic(&address));
 
   IPAddressNumber actual_address;
   CHECK(ParseIPLiteralToNumber("127.0.0.1", &actual_address));
+  http_server_props_manager_->SetSupportsQuic(true, actual_address);
+  // ExpectScheduleUpdatePrefsOnNetworkThread() should be called only once.
   http_server_props_manager_->SetSupportsQuic(true, actual_address);
 
   // Run the task.
@@ -515,6 +618,7 @@ TEST_F(HttpServerPropertiesManagerTest, SupportsQuic) {
 
 TEST_F(HttpServerPropertiesManagerTest, ServerNetworkStats) {
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThread();
 
   HostPortPair mail_server("mail.google.com", 80);
   const ServerNetworkStats* stats =
@@ -522,6 +626,8 @@ TEST_F(HttpServerPropertiesManagerTest, ServerNetworkStats) {
   EXPECT_EQ(NULL, stats);
   ServerNetworkStats stats1;
   stats1.srtt = base::TimeDelta::FromMicroseconds(10);
+  http_server_props_manager_->SetServerNetworkStats(mail_server, stats1);
+  // ExpectScheduleUpdatePrefsOnNetworkThread() should be called only once.
   http_server_props_manager_->SetServerNetworkStats(mail_server, stats1);
 
   // Run the task.
@@ -535,6 +641,7 @@ TEST_F(HttpServerPropertiesManagerTest, ServerNetworkStats) {
 
 TEST_F(HttpServerPropertiesManagerTest, Clear) {
   ExpectPrefsUpdate();
+  ExpectScheduleUpdatePrefsOnNetworkThreadRepeatedly();
 
   HostPortPair spdy_server_mail("mail.google.com", 443);
   http_server_props_manager_->SetSupportsSpdy(spdy_server_mail, true);
@@ -665,6 +772,8 @@ TEST_F(HttpServerPropertiesManagerTest, BadSupportsQuic) {
 }
 
 TEST_F(HttpServerPropertiesManagerTest, UpdateCacheWithPrefs) {
+  ExpectScheduleUpdatePrefsOnNetworkThreadRepeatedly();
+
   const HostPortPair server_www("www.google.com", 80);
   const HostPortPair server_mail("mail.google.com", 80);
 

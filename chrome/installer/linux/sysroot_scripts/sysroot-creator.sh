@@ -63,13 +63,16 @@ readonly RELEASE_LIST_GPG="${REPO_BASEDIR}/${RELEASE_FILE_GPG}"
 readonly PACKAGE_FILE_AMD64="main/binary-amd64/Packages.bz2"
 readonly PACKAGE_FILE_I386="main/binary-i386/Packages.bz2"
 readonly PACKAGE_FILE_ARM="main/binary-armhf/Packages.bz2"
+readonly PACKAGE_FILE_MIPS="main/binary-mipsel/Packages.bz2"
 readonly PACKAGE_LIST_AMD64="${REPO_BASEDIR}/${PACKAGE_FILE_AMD64}"
 readonly PACKAGE_LIST_I386="${REPO_BASEDIR}/${PACKAGE_FILE_I386}"
 readonly PACKAGE_LIST_ARM="${REPO_BASEDIR}/${PACKAGE_FILE_ARM}"
+readonly PACKAGE_LIST_MIPS="${REPO_BASEDIR}/${PACKAGE_FILE_MIPS}"
 
 readonly DEBIAN_DEP_LIST_AMD64="packagelist.${DIST}.amd64"
 readonly DEBIAN_DEP_LIST_I386="packagelist.${DIST}.i386"
 readonly DEBIAN_DEP_LIST_ARM="packagelist.${DIST}.arm"
+readonly DEBIAN_DEP_LIST_MIPS="packagelist.${DIST}.mipsel"
 
 ######################################################################
 # Helper
@@ -118,6 +121,9 @@ SetEnvironmentVariables() {
   echo $1 | grep -qs Amd64$ && ARCH=AMD64
   if [ -z "$ARCH" ]; then
     echo $1 | grep -qs I386$ && ARCH=I386
+  fi
+  if [ -z "$ARCH" ]; then
+    echo $1 | grep -qs Mips$ && ARCH=MIPS
   fi
   if [ -z "$ARCH" ]; then
     echo $1 | grep -qs ARM$ && ARCH=ARM
@@ -212,6 +218,16 @@ GeneratePackageListARM() {
   GeneratePackageList "$tmp_package_list" "$output_file" "${DEBIAN_PACKAGES}"
 }
 
+GeneratePackageListMips() {
+  local output_file="$1"
+  local package_list="${BUILD_DIR}/Packages.${DIST}_mips.bz2"
+  local tmp_package_list="${BUILD_DIR}/Packages.${DIST}_mips"
+  DownloadOrCopy "${PACKAGE_LIST_MIPS}" "${package_list}"
+  VerifyPackageListing "${PACKAGE_FILE_MIPS}" "${package_list}"
+  ExtractPackageBz2 "$package_list" "$tmp_package_list"
+  GeneratePackageList "$tmp_package_list" "$output_file" "${DEBIAN_PACKAGES}"
+}
+
 StripChecksumsFromPackageList() {
   local package_file="$1"
   sed -i 's/ [a-f0-9]\{64\}$//' "$package_file"
@@ -239,7 +255,7 @@ HacksAndPatchesAmd64() {
   lscripts="${INSTALL_ROOT}/usr/lib/x86_64-linux-gnu/libpthread.so \
             ${INSTALL_ROOT}/usr/lib/x86_64-linux-gnu/libc.so"
 
-  #SubBanner "Rewriting Linker Scripts"
+  # Rewrite linker scripts
   sed -i -e 's|/usr/lib/x86_64-linux-gnu/||g'  ${lscripts}
   sed -i -e 's|/lib/x86_64-linux-gnu/||g' ${lscripts}
 
@@ -263,7 +279,7 @@ HacksAndPatchesI386() {
   lscripts="${INSTALL_ROOT}/usr/lib/i386-linux-gnu/libpthread.so \
             ${INSTALL_ROOT}/usr/lib/i386-linux-gnu/libc.so"
 
-  #SubBanner "Rewriting Linker Scripts"
+  # Rewrite linker scripts
   sed -i -e 's|/usr/lib/i386-linux-gnu/||g'  ${lscripts}
   sed -i -e 's|/lib/i386-linux-gnu/||g' ${lscripts}
 
@@ -287,7 +303,7 @@ HacksAndPatchesARM() {
   lscripts="${INSTALL_ROOT}/usr/lib/arm-linux-gnueabihf/libpthread.so \
             ${INSTALL_ROOT}/usr/lib/arm-linux-gnueabihf/libc.so"
 
-  #SubBanner "Rewriting Linker Scripts"
+  # Rewrite linker scripts
   sed -i -e 's|/usr/lib/arm-linux-gnueabihf/||g' ${lscripts}
   sed -i -e 's|/lib/arm-linux-gnueabihf/||g' ${lscripts}
 
@@ -296,6 +312,25 @@ HacksAndPatchesARM() {
   SubBanner "Package Configs Symlink"
   mkdir -p ${INSTALL_ROOT}/usr/share
   ln -s ../lib/arm-linux-gnueabihf/pkgconfig ${INSTALL_ROOT}/usr/share/pkgconfig
+}
+
+
+HacksAndPatchesMips() {
+  Banner "Misc Hacks & Patches"
+  # these are linker scripts with absolute pathnames in them
+  # which we rewrite here
+  lscripts="${INSTALL_ROOT}/usr/lib/mipsel-linux-gnu/libpthread.so \
+            ${INSTALL_ROOT}/usr/lib/mipsel-linux-gnu/libc.so"
+
+  # Rewrite linker scripts
+  sed -i -e 's|/usr/lib/mipsel-linux-gnu/||g' ${lscripts}
+  sed -i -e 's|/lib/mipsel-linux-gnu/||g' ${lscripts}
+
+  # This is for chrome's ./build/linux/pkg-config-wrapper
+  # which overwrites PKG_CONFIG_PATH internally
+  SubBanner "Package Configs Symlink"
+  mkdir -p ${INSTALL_ROOT}/usr/share
+  ln -s ../lib/mipsel-linux-gnu/pkgconfig ${INSTALL_ROOT}/usr/share/pkgconfig
 }
 
 
@@ -336,18 +371,23 @@ CleanupJailSymlinks() {
 
   SAVEDPWD=$(pwd)
   cd ${INSTALL_ROOT}
-  find lib lib64 usr/lib -type l -printf '%p %l\n' | while read link target; do
+  local libdirs="lib usr/lib"
+  if [ "${ARCH}" != "MIPS" ]; then
+    libdirs+=" lib64"
+  fi
+  find $libdirs -type l -printf '%p %l\n' | while read link target; do
     # skip links with non-absolute paths
     echo "${target}" | grep -qs ^/ || continue
     echo "${link}: ${target}"
     case "${link}" in
       usr/lib/gcc/x86_64-linux-gnu/4.*/* | usr/lib/gcc/i486-linux-gnu/4.*/* | \
-      usr/lib/gcc/arm-linux-gnueabihf/4.*/*)
+      usr/lib/gcc/arm-linux-gnueabihf/4.*/* | \
+      usr/lib/gcc/mipsel-linux-gnu/4.*/*)
         # Relativize the symlink.
         ln -snfv "../../../../..${target}" "${link}"
         ;;
       usr/lib/x86_64-linux-gnu/* | usr/lib/i386-linux-gnu/* | \
-      usr/lib/arm-linux-gnueabihf/*)
+      usr/lib/arm-linux-gnueabihf/* | usr/lib/mipsel-linux-gnu/* )
         # Relativize the symlink.
         ln -snfv "../../..${target}" "${link}"
         ;;
@@ -362,7 +402,7 @@ CleanupJailSymlinks() {
     esac
   done
 
-  find lib lib64 usr/lib -type l -printf '%p %l\n' | while read link target; do
+  find $libdirs -type l -printf '%p %l\n' | while read link target; do
     # Make sure we catch new bad links.
     if [ ! -r "${link}" ]; then
       echo "ERROR: FOUND BAD LINK ${link}"
@@ -426,6 +466,24 @@ BuildSysrootARM() {
 }
 
 #@
+#@ BuildSysrootMips
+#@
+#@    Build everything and package it
+BuildSysrootMips() {
+  ClearInstallDir
+  local package_file="$BUILD_DIR/package_with_sha256sum_arm"
+  GeneratePackageListMips "$package_file"
+  local files_and_sha256sums="$(cat ${package_file})"
+  StripChecksumsFromPackageList "$package_file"
+  VerifyPackageFilesMatch "$package_file" "$DEBIAN_DEP_LIST_MIPS"
+  APT_REPO=${APR_REPO_MIPS:=$APT_REPO}
+  InstallIntoSysroot ${files_and_sha256sums}
+  CleanupJailSymlinks
+  HacksAndPatchesMips
+  CreateTarBall
+}
+
+#@
 #@ BuildSysrootAll
 #@
 #@    Build sysroot images for all architectures
@@ -433,6 +491,7 @@ BuildSysrootAll() {
   RunCommand BuildSysrootAmd64
   RunCommand BuildSysrootI386
   RunCommand BuildSysrootARM
+  RunCommand BuildSysrootMips
 }
 
 UploadSysroot() {
@@ -469,6 +528,13 @@ UploadSysrootARM() {
 }
 
 #@
+#@ UploadSysrootMips <revision>
+#@
+UploadSysrootMips() {
+  UploadSysroot "$@"
+}
+
+#@
 #@ UploadSysrootAll <revision>
 #@
 #@    Upload sysroot image for all architectures
@@ -476,6 +542,7 @@ UploadSysrootAll() {
   RunCommand UploadSysrootAmd64 "$@"
   RunCommand UploadSysrootI386 "$@"
   RunCommand UploadSysrootARM "$@"
+  RunCommand UploadSysrootMips "$@"
 }
 
 #
@@ -587,6 +654,16 @@ UpdatePackageListsARM() {
 }
 
 #@
+#@ UpdatePackageListsMips
+#@
+#@     Regenerate the package lists such that they contain an up-to-date
+#@     list of URLs within the Debian archive. (For arm)
+UpdatePackageListsMips() {
+  GeneratePackageListMips "$DEBIAN_DEP_LIST_MIPS"
+  StripChecksumsFromPackageList "$DEBIAN_DEP_LIST_MIPS"
+}
+
+#@
 #@ UpdatePackageListsAll
 #@
 #@    Regenerate the package lists for all architectures.
@@ -594,6 +671,7 @@ UpdatePackageListsAll() {
   RunCommand UpdatePackageListsAmd64
   RunCommand UpdatePackageListsI386
   RunCommand UpdatePackageListsARM
+  RunCommand UpdatePackageListsMips
 }
 
 RunCommand() {

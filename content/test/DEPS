@@ -2,6 +2,7 @@ include_rules = [
   # Allow inclusion of specific components that we depend on. We may only
   # depend on components which we share with the mojo html_viewer.
   "+components/scheduler/renderer",
+  "+components/scheduler/test",
 
   "+cc/blink",
   "+chromeos/audio", # For WebRTC tests.
@@ -16,3 +17,9 @@ include_rules = [
   "+ui/base/resource/resource_bundle.h",
   "!v8/include/v8.h",
 ]
+
+specific_include_rules = {
+  "layouttest_support.cc": [
+    "+components/test_runner",
+  ],
+}

@@ -29,6 +29,18 @@ class PowerTypical10Mobile(perf_benchmark.PerfBenchmark):
   def Name(cls):
     return 'power.typical_10_mobile'
 
+
+@benchmark.Enabled('android')
+@benchmark.Disabled
+class PowerTypical10MobileReload(perf_benchmark.PerfBenchmark):
+  """Android typical 10 mobile power reload test."""
+  test = power.LoadPower
+  page_set = page_sets.Typical10MobileReloadPageSet
+  @classmethod
+  def Name(cls):
+    return 'power.typical_10_mobile_reload'
+
+
 @benchmark.Enabled('android')
 class PowerGpuRasterizationTypical10Mobile(perf_benchmark.PerfBenchmark):
   """Measures power on key mobile sites with GPU rasterization."""
@@ -62,7 +74,7 @@ class PowerTop25(perf_benchmark.PerfBenchmark):
   def Name(cls):
     return 'power.top_25'
 
-  def CreateUserStorySet(self, _):
+  def CreateStorySet(self, _):
     # Exclude techcrunch.com. It is not suitable for this benchmark because it
     # does not consistently become quiescent within 60 seconds.
     user_stories = self.page_set()
@@ -79,6 +91,7 @@ class PowerPPSControlDisabled(perf_benchmark.PerfBenchmark):
   taking power."""
   test = power.QuiescentPower
   page_set = page_sets.PluginPowerSaverPageSet
+  options = {'pageset_repeat': 5}
 
   def SetExtraBrowserOptions(self, options):
     options.AppendExtraBrowserArgs(['--disable-plugin-power-saver'])
@@ -95,6 +108,7 @@ class PowerPPSControlEnabled(perf_benchmark.PerfBenchmark):
   "Click to play" button)."""
   test = power.QuiescentPower
   page_set = page_sets.PluginPowerSaverPageSet
+  options = {'pageset_repeat': 5}
 
   def SetExtraBrowserOptions(self, options):
     options.AppendExtraBrowserArgs(['--enable-plugin-power-saver'])
@@ -110,6 +124,7 @@ class PowerThrottledPlugins(perf_benchmark.PerfBenchmark):
   (PPS) throttling them."""
   test = power.QuiescentPower
   page_set = page_sets.ThrottledPluginsPageSet
+  options = {'pageset_repeat': 5}
 
   def SetExtraBrowserOptions(self, options):
     options.AppendExtraBrowserArgs(['--disable-plugin-power-saver'])
@@ -125,6 +140,7 @@ class PowerThrottledPluginsPPS(perf_benchmark.PerfBenchmark):
   (PPS) enabled to throttle them."""
   test = power.QuiescentPower
   page_set = page_sets.ThrottledPluginsPageSet
+  options = {'pageset_repeat': 5}
 
   def SetExtraBrowserOptions(self, options):
     options.AppendExtraBrowserArgs(['--enable-plugin-power-saver'])

@@ -11,11 +11,11 @@ import re
 import shutil
 import subprocess
 
+from catapult_base import support_binaries
 from telemetry.core import platform as telemetry_platform
 from telemetry.core.platform.profiler import android_prebuilt_profiler_helper
 from telemetry.core import util
 from telemetry import decorators
-from telemetry.util import support_binaries
 
 util.AddDirToPythonPath(util.GetChromiumSrcDir(), 'build', 'android')
 from pylib.utils import md5sum  # pylint: disable=F0401
@@ -208,7 +208,11 @@ def CreateSymFs(device, symfs_dir, libraries, use_symlinks=True):
         pull = True
       else:
         host_md5sums = md5sum.CalculateHostMd5Sums([output_lib])
-        device_md5sums = md5sum.CalculateDeviceMd5Sums([lib], device)
+        try:
+          device_md5sums = md5sum.CalculateDeviceMd5Sums([lib], device)
+        except:
+          logging.exception('New exception caused by DeviceUtils conversion')
+          raise
         pull = (not host_md5sums or not device_md5sums
                 or host_md5sums[0] != device_md5sums[0])
 

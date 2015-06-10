@@ -10,6 +10,13 @@
     'use_default_libcast_media%': 1,
   },
   'targets': [
+    # TODO(gunsch): delete this target once Chromecast M44/earlier is obsolete.
+    # See: b/21639416
+    {
+      'target_name': 'libffmpegsumo',
+      'type': 'loadable_module',
+      'sources': ['empty.cc'],
+    },
     {
       'target_name': 'media_base',
       'type': '<(component)',
@@ -101,6 +108,8 @@
         'cma/base/decoder_config_adapter.h',
         'cma/base/media_task_runner.cc',
         'cma/base/media_task_runner.h',
+        'cma/base/simple_media_task_runner.cc',
+        'cma/base/simple_media_task_runner.h',         
       ],
     },
     {

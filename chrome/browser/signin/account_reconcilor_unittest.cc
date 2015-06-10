@@ -43,7 +43,7 @@ namespace {
 
 class MockAccountReconcilor : public testing::StrictMock<AccountReconcilor> {
  public:
-  static KeyedService* Build(content::BrowserContext* context);
+  static scoped_ptr<KeyedService> Build(content::BrowserContext* context);
 
   MockAccountReconcilor(ProfileOAuth2TokenService* token_service,
                         SigninManagerBase* signin_manager,
@@ -56,15 +56,16 @@ class MockAccountReconcilor : public testing::StrictMock<AccountReconcilor> {
 };
 
 // static
-KeyedService* MockAccountReconcilor::Build(content::BrowserContext* context) {
+scoped_ptr<KeyedService> MockAccountReconcilor::Build(
+    content::BrowserContext* context) {
   Profile* profile = Profile::FromBrowserContext(context);
-  AccountReconcilor* reconcilor = new MockAccountReconcilor(
+  scoped_ptr<AccountReconcilor> reconcilor(new MockAccountReconcilor(
       ProfileOAuth2TokenServiceFactory::GetForProfile(profile),
       SigninManagerFactory::GetForProfile(profile),
       ChromeSigninClientFactory::GetForProfile(profile),
-      GaiaCookieManagerServiceFactory::GetForProfile(profile));
+      GaiaCookieManagerServiceFactory::GetForProfile(profile)));
   reconcilor->Initialize(false /* start_reconcile_if_tokens_available */);
-  return reconcilor;
+  return reconcilor.Pass();
 }
 
 MockAccountReconcilor::MockAccountReconcilor(
@@ -316,24 +317,24 @@ TEST_F(AccountReconcilorTest, GetAccountsFromCookieSuccess) {
   const std::string account_id =
       ConnectProfileToAccount("12345", "user@gmail.com");
   cookie_manager_service()->SetListAccountsResponseOneAccountWithExpiry(
-      "user@gmail.com", true);
+      "user@gmail.com", "12345", true);
   EXPECT_CALL(*GetMockReconcilor(), PerformMergeAction(account_id));
 
   AccountReconcilor* reconcilor =
       AccountReconcilorFactory::GetForProfile(profile());
   ASSERT_TRUE(reconcilor);
 
-  ASSERT_EQ(AccountReconcilor::State::NOT_RECONCILING, reconcilor->GetState());
+  ASSERT_EQ(signin_metrics::ACCOUNT_RECONCILOR_OK, reconcilor->GetState());
   reconcilor->StartReconcile();
-  ASSERT_EQ(AccountReconcilor::State::GATHERING_INFORMATION,
+  ASSERT_EQ(signin_metrics::ACCOUNT_RECONCILOR_RUNNING,
             reconcilor->GetState());
   base::RunLoop().RunUntilIdle();
-  ASSERT_EQ(AccountReconcilor::State::APPLYING_CHANGES, reconcilor->GetState());
+  ASSERT_EQ(signin_metrics::ACCOUNT_RECONCILOR_RUNNING, reconcilor->GetState());
 
-  std::vector<std::pair<std::string, bool> > accounts;
+  std::vector<gaia::ListedAccount> accounts;
   ASSERT_TRUE(cookie_manager_service()->ListAccounts(&accounts));
   ASSERT_EQ(1u, accounts.size());
-  ASSERT_EQ(account_id, accounts[0].first);
+  ASSERT_EQ(account_id, accounts[0].id);
 }
 
 TEST_F(AccountReconcilorTest, GetAccountsFromCookieFailure) {
@@ -344,18 +345,18 @@ TEST_F(AccountReconcilorTest, GetAccountsFromCookieFailure) {
       AccountReconcilorFactory::GetForProfile(profile());
   ASSERT_TRUE(reconcilor);
 
-  ASSERT_EQ(AccountReconcilor::State::NOT_RECONCILING, reconcilor->GetState());
+  ASSERT_EQ(signin_metrics::ACCOUNT_RECONCILOR_OK, reconcilor->GetState());
   reconcilor->StartReconcile();
-  ASSERT_EQ(AccountReconcilor::State::GATHERING_INFORMATION,
+  ASSERT_EQ(signin_metrics::ACCOUNT_RECONCILOR_RUNNING,
             reconcilor->GetState());
   base::RunLoop().RunUntilIdle();
 
-  std::vector<std::pair<std::string, bool> > accounts;
+  std::vector<gaia::ListedAccount> accounts;
   ASSERT_FALSE(cookie_manager_service()->ListAccounts(&accounts));
   ASSERT_EQ(0u, accounts.size());
 
   base::RunLoop().RunUntilIdle();
-  ASSERT_EQ(AccountReconcilor::State::NOT_RECONCILING_ERROR_OCCURED,
+  ASSERT_EQ(signin_metrics::ACCOUNT_RECONCILOR_ERROR,
             reconcilor->GetState());
 }
 
@@ -367,7 +368,8 @@ TEST_P(AccountReconcilorTest, StartReconcileNoop) {
       AccountReconcilorFactory::GetForProfile(profile());
   ASSERT_TRUE(reconcilor);
 
-  cookie_manager_service()->SetListAccountsResponseOneAccount("user@gmail.com");
+  cookie_manager_service()->SetListAccountsResponseOneAccount(
+      "user@gmail.com", "12345");
 
   reconcilor->StartReconcile();
   ASSERT_TRUE(reconcilor->is_reconcile_started_);
@@ -397,7 +399,7 @@ TEST_P(AccountReconcilorTest, StartReconcileCookiesDisabled) {
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
 
   base::RunLoop().RunUntilIdle();
-  std::vector<std::pair<std::string, bool> > accounts;
+  std::vector<gaia::ListedAccount> accounts;
   // This will be the first call to ListAccounts.
   ASSERT_FALSE(cookie_manager_service()->ListAccounts(&accounts));
   ASSERT_FALSE(reconcilor->is_reconcile_started_);
@@ -487,7 +489,7 @@ TEST_P(AccountReconcilorTest, StartReconcileNoopWithDots) {
   const std::string account_id =
       ConnectProfileToAccount("12345", "Dot.S@gmail.com");
   cookie_manager_service()->SetListAccountsResponseOneAccount(
-      "dot.s@gmail.com");
+      "dot.s@gmail.com", "12345");
   AccountReconcilor* reconcilor =
       AccountReconcilorFactory::GetForProfile(profile());
   ASSERT_TRUE(reconcilor);
@@ -508,7 +510,7 @@ TEST_P(AccountReconcilorTest, StartReconcileNoopMultiple) {
   const std::string account_id2 =
       PickAccountIdForAccount("67890", "other@gmail.com");
   cookie_manager_service()->SetListAccountsResponseTwoAccounts(
-      "user@gmail.com", "other@gmail.com");
+      "user@gmail.com", "12345", "other@gmail.com", "67890");
   token_service()->UpdateCredentials(account_id2, "refresh_token");
 
   AccountReconcilor* reconcilor =
@@ -532,7 +534,7 @@ TEST_P(AccountReconcilorTest, StartReconcileAddToCookie) {
       ConnectProfileToAccount("12345", "user@gmail.com");
   token_service()->UpdateCredentials(account_id, "refresh_token");
   cookie_manager_service()->SetListAccountsResponseOneAccount(
-      "user@gmail.com");
+      "user@gmail.com", "12345");
 
   const std::string account_id2 =
       PickAccountIdForAccount("67890", "other@gmail.com");
@@ -564,7 +566,7 @@ TEST_P(AccountReconcilorTest, StartReconcileRemoveFromCookie) {
       ConnectProfileToAccount("12345", "user@gmail.com");
   token_service()->UpdateCredentials(account_id, "refresh_token");
   cookie_manager_service()->SetListAccountsResponseTwoAccounts(
-      "user@gmail.com", "other@gmail.com");
+      "user@gmail.com", "12345", "other@gmail.com", "67890");
 
   EXPECT_CALL(*GetMockReconcilor(), PerformLogoutAllAccountsAction());
   EXPECT_CALL(*GetMockReconcilor(), PerformMergeAction(account_id));
@@ -597,7 +599,7 @@ TEST_P(AccountReconcilorTest, StartReconcileAddToCookieTwice) {
       PickAccountIdForAccount("34567", "third@gmail.com");
 
   cookie_manager_service()->SetListAccountsResponseOneAccount(
-      "user@gmail.com");
+      "user@gmail.com", "12345");
   token_service()->UpdateCredentials(account_id2, "refresh_token");
 
   EXPECT_CALL(*GetMockReconcilor(), PerformMergeAction(account_id2));
@@ -623,7 +625,7 @@ TEST_P(AccountReconcilorTest, StartReconcileAddToCookieTwice) {
 
   // Do another pass after I've added a third account to the token service
   cookie_manager_service()->SetListAccountsResponseTwoAccounts(
-      "user@gmail.com", "other@gmail.com");
+      "user@gmail.com", "12345", "other@gmail.com", "67890");
   cookie_manager_service()->set_list_accounts_fetched_once_for_testing(false);
 
   // This will cause the reconcilor to fire.
@@ -661,7 +663,7 @@ TEST_P(AccountReconcilorTest, StartReconcileBadPrimary) {
 
   token_service()->UpdateCredentials(account_id2, "refresh_token");
   cookie_manager_service()->SetListAccountsResponseTwoAccounts(
-      "other@gmail.com", "user@gmail.com");
+      "other@gmail.com", "12345", "user@gmail.com", "67890");
 
   EXPECT_CALL(*GetMockReconcilor(), PerformLogoutAllAccountsAction());
   EXPECT_CALL(*GetMockReconcilor(), PerformMergeAction(account_id));
@@ -693,7 +695,7 @@ TEST_P(AccountReconcilorTest, StartReconcileOnlyOnce) {
   const std::string account_id =
       ConnectProfileToAccount("12345", "user@gmail.com");
   cookie_manager_service()->SetListAccountsResponseOneAccount(
-      "user@gmail.com");
+      "user@gmail.com", "12345");
 
   AccountReconcilor* reconcilor =
       AccountReconcilorFactory::GetForProfile(profile());
@@ -736,7 +738,7 @@ TEST_F(AccountReconcilorTest, AddAccountToCookieCompletedWithBogusAccount) {
   const std::string account_id =
       ConnectProfileToAccount("12345", "user@gmail.com");
   cookie_manager_service()->SetListAccountsResponseOneAccountWithExpiry(
-      "user@gmail.com", true);
+      "user@gmail.com", "12345", true);
 
   EXPECT_CALL(*GetMockReconcilor(), PerformMergeAction(account_id));
 

@@ -231,8 +231,8 @@ DataReductionProxyIOData::CreateNetworkDelegate(
   scoped_ptr<DataReductionProxyNetworkDelegate> network_delegate(
       new DataReductionProxyNetworkDelegate(
           wrapped_network_delegate.Pass(), config_.get(),
-          request_options_.get(), configurator_.get(),
-          experiments_stats_.get()));
+          request_options_.get(), configurator_.get(), experiments_stats_.get(),
+          net_log_, event_creator_.get()));
   if (track_proxy_bypass_statistics)
     network_delegate->InitIODataAndUMA(this, bypass_stats_.get());
   return network_delegate.Pass();
@@ -276,6 +276,15 @@ void DataReductionProxyIOData::UpdateContentLengths(
       base::Bind(&DataReductionProxyService::UpdateContentLengths,
                  service_, received_content_length, original_content_length,
                  data_reduction_proxy_enabled, request_type));
+}
+
+void DataReductionProxyIOData::SetLoFiModeActiveOnMainFrame(
+    bool lo_fi_mode_active) {
+  DCHECK(io_task_runner_->BelongsToCurrentThread());
+  ui_task_runner_->PostTask(
+      FROM_HERE,
+      base::Bind(&DataReductionProxyService::SetLoFiModeActiveOnMainFrame,
+                 service_, lo_fi_mode_active));
 }
 
 void DataReductionProxyIOData::AddEvent(scoped_ptr<base::Value> event) {

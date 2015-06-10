@@ -50,6 +50,7 @@
 #include "ui/native_theme/native_theme_switches.h"
 
 #if defined(OS_ANDROID)
+#include "base/android/build_info.h"
 #include "content/renderer/android/synchronous_compositor_factory.h"
 #include "ui/gfx/android/device_display_info.h"
 #endif
@@ -353,6 +354,9 @@ void RenderWidgetCompositor::Initialize() {
         kMaxSlowDownScaleFactor,
         &settings.initial_debug_state.slow_down_raster_scale_factor);
   }
+
+  settings.invert_viewport_scroll_order =
+      cmd->HasSwitch(switches::kInvertViewportScrollOrder);
 
   if (cmd->HasSwitch(cc::switches::kMaxUnusedResourceMemoryUsagePercentage)) {
     int max_unused_resource_memory_percentage;
@@ -894,6 +898,8 @@ void RenderWidgetCompositor::RequestNewOutputSurface() {
     return;
   }
 
+  DCHECK_EQ(surface->capabilities().max_frames_pending, 1);
+
   layer_tree_host_->SetOutputSurface(surface.Pass());
 }
 
@@ -952,6 +958,38 @@ void RenderWidgetCompositor::DidPostSwapBuffers() {
 
 void RenderWidgetCompositor::DidAbortSwapBuffers() {
   widget_->OnSwapBuffersAborted();
+}
+
+void RenderWidgetCompositor::RecordFrameTimingEvents(
+    scoped_ptr<cc::FrameTimingTracker::CompositeTimingSet> composite_events,
+    scoped_ptr<cc::FrameTimingTracker::MainFrameTimingSet> main_frame_events) {
+  for (const auto& composite_event : *composite_events ) {
+    int64_t frameId = composite_event.first;
+    const std::vector<cc::FrameTimingTracker::CompositeTimingEvent>& events =
+        composite_event.second;
+    std::vector<blink::WebFrameTimingEvent> webEvents;
+    for (size_t i = 0; i < events.size(); ++i) {
+      webEvents.push_back(blink::WebFrameTimingEvent(
+          events[i].frame_id,
+          (events[i].timestamp - base::TimeTicks()).InSecondsF()));
+    }
+    widget_->webwidget()->recordFrameTimingEvent(
+        blink::WebWidget::CompositeEvent, frameId, webEvents);
+  }
+  for (const auto& main_frame_event : *main_frame_events ) {
+    int64_t frameId = main_frame_event.first;
+    const std::vector<cc::FrameTimingTracker::MainFrameTimingEvent>& events =
+        main_frame_event.second;
+    std::vector<blink::WebFrameTimingEvent> webEvents;
+    for (size_t i = 0; i < events.size(); ++i) {
+      webEvents.push_back(blink::WebFrameTimingEvent(
+          events[i].frame_id,
+          (events[i].timestamp - base::TimeTicks()).InSecondsF(),
+          (events[i].end_time - base::TimeTicks()).InSecondsF()));
+    }
+    widget_->webwidget()->recordFrameTimingEvent(
+        blink::WebWidget::RenderEvent, frameId, webEvents);
+  }
 }
 
 void RenderWidgetCompositor::RateLimitSharedMainThreadContext() {

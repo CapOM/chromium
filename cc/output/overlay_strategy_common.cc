@@ -16,29 +16,21 @@
 
 namespace cc {
 
-OverlayStrategyCommon::OverlayStrategyCommon(
-    OverlayCandidateValidator* capability_checker,
-    ResourceProvider* resource_provider)
-    : capability_checker_(capability_checker),
-      resource_provider_(resource_provider) {
+OverlayStrategyCommon::OverlayStrategyCommon() {
 }
 
 OverlayStrategyCommon::~OverlayStrategyCommon() {
 }
 
 bool OverlayStrategyCommon::IsOverlayQuad(const DrawQuad* draw_quad) {
-  unsigned int resource_id;
   switch (draw_quad->material) {
     case DrawQuad::TEXTURE_CONTENT:
-      resource_id = TextureDrawQuad::MaterialCast(draw_quad)->resource_id;
-      break;
+      return TextureDrawQuad::MaterialCast(draw_quad)->allow_overlay();
     case DrawQuad::STREAM_VIDEO_CONTENT:
-      resource_id = StreamVideoDrawQuad::MaterialCast(draw_quad)->resource_id;
-      break;
+      return StreamVideoDrawQuad::MaterialCast(draw_quad)->allow_overlay();
     default:
       return false;
   }
-  return resource_provider_->AllowOverlay(resource_id);
 }
 
 bool OverlayStrategyCommon::IsInvisibleQuad(const DrawQuad* draw_quad) {
@@ -46,7 +38,7 @@ bool OverlayStrategyCommon::IsInvisibleQuad(const DrawQuad* draw_quad) {
     const SolidColorDrawQuad* solid_quad =
         SolidColorDrawQuad::MaterialCast(draw_quad);
     SkColor color = solid_quad->color;
-    float opacity = solid_quad->opacity();
+    float opacity = solid_quad->shared_quad_state->opacity;
     float alpha = (SkColorGetA(color) * (1.0f / 255.0f)) * opacity;
     return solid_quad->ShouldDrawWithBlending() &&
            alpha < std::numeric_limits<float>::epsilon();
@@ -57,13 +49,14 @@ bool OverlayStrategyCommon::IsInvisibleQuad(const DrawQuad* draw_quad) {
 bool OverlayStrategyCommon::GetTextureQuadInfo(const TextureDrawQuad& quad,
                                                OverlayCandidate* quad_info) {
   gfx::OverlayTransform overlay_transform =
-      OverlayCandidate::GetOverlayTransform(quad.quadTransform(),
-                                            quad.y_flipped);
+      OverlayCandidate::GetOverlayTransform(
+          quad.shared_quad_state->content_to_target_transform, quad.y_flipped);
   if (quad.background_color != SK_ColorTRANSPARENT ||
       quad.premultiplied_alpha ||
       overlay_transform == gfx::OVERLAY_TRANSFORM_INVALID)
     return false;
-  quad_info->resource_id = quad.resource_id;
+  quad_info->resource_id = quad.resource_id();
+  quad_info->resource_size_in_pixels = quad.resource_size_in_pixels();
   quad_info->transform = overlay_transform;
   quad_info->uv_rect = BoundingRect(quad.uv_top_left, quad.uv_bottom_right);
   return true;
@@ -72,7 +65,8 @@ bool OverlayStrategyCommon::GetTextureQuadInfo(const TextureDrawQuad& quad,
 bool OverlayStrategyCommon::GetVideoQuadInfo(const StreamVideoDrawQuad& quad,
                                              OverlayCandidate* quad_info) {
   gfx::OverlayTransform overlay_transform =
-      OverlayCandidate::GetOverlayTransform(quad.quadTransform(), false);
+      OverlayCandidate::GetOverlayTransform(
+          quad.shared_quad_state->content_to_target_transform, false);
   if (overlay_transform == gfx::OVERLAY_TRANSFORM_INVALID)
     return false;
   if (!quad.matrix.IsScaleOrTranslation()) {
@@ -80,7 +74,8 @@ bool OverlayStrategyCommon::GetVideoQuadInfo(const StreamVideoDrawQuad& quad,
     // coordinates yet.
     return false;
   }
-  quad_info->resource_id = quad.resource_id;
+  quad_info->resource_id = quad.resource_id();
+  quad_info->resource_size_in_pixels = quad.resource_size_in_pixels();
   quad_info->transform = overlay_transform;
 
   gfx::Point3F uv0 = gfx::Point3F(0, 0, 0);
@@ -130,7 +125,7 @@ bool OverlayStrategyCommon::GetCandidateQuadInfo(const DrawQuad& draw_quad,
 
   quad_info->format = RGBA_8888;
   quad_info->display_rect = OverlayCandidate::GetOverlayRect(
-      draw_quad.quadTransform(), draw_quad.rect);
+      draw_quad.shared_quad_state->content_to_target_transform, draw_quad.rect);
   return true;
 }
 

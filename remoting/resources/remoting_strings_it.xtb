@@ -7,7 +7,6 @@ Chromoting</translation>
 <translation id="2676780859508944670">Operazione in corso...</translation>
 <translation id="6062854958530969723">Inizializzazione host non riuscita.</translation>
 <translation id="5843054235973879827">Perché questa operazione è sicura?</translation>
-<translation id="5895138241574237353">Riavvia</translation>
 <translation id="5619148062500147964">A questo computer</translation>
 <translation id="4068946408131579958">Tutte le connessioni</translation>
 <translation id="2208514473086078157">Le impostazioni criterio non consentono la condivisione di questo computer come host Chrome Remote Desktop. Contatta l'amministratore di sistema per ricevere assistenza.</translation>
@@ -255,8 +254,6 @@ Remote Desktop</translation>
 <translation id="6570205395680337606">Ripristina l'applicazione. Perderai gli eventuali lavori non salvati.</translation>
 <translation id="6284412385303060032">L'esecuzione dell'host nella schermata di accesso alla console si è interrotta per supportare la modalità Curtain, pertanto l'host viene ora eseguito in una sessione specifica dell'utente.</translation>
 <translation id="3596628256176442606">Questo servizio consente connessioni in entrata da client Chromoting.</translation>
-<translation id="1978866438647250517">• Miglioramenti all'interfaccia utente.
-• Utilizzo ridotto della rete se in esecuzione in background.</translation>
 <translation id="4741792197137897469">Autenticazione non riuscita. Accedi di nuovo a Chrome.</translation>
 <translation id="4277463233460010382">Questo computer è configurato per consentire la connessione di uno o più client senza l'inserimento di un codice PIN.</translation>
 <translation id="837021510621780684">Da questo computer</translation>

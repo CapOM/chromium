@@ -15,7 +15,6 @@
 #include "components/view_manager/event_dispatcher.h"
 #include "components/view_manager/focus_controller_delegate.h"
 #include "components/view_manager/ids.h"
-#include "components/view_manager/public/interfaces/native_viewport.mojom.h"
 #include "components/view_manager/public/interfaces/view_manager.mojom.h"
 #include "components/view_manager/public/interfaces/view_manager_root.mojom.h"
 #include "components/view_manager/server_view_delegate.h"
@@ -89,10 +88,8 @@ class ConnectionManager : public ServerViewDelegate,
   // See description of ViewManagerService::Embed() for details. This assumes
   // |transport_view_id| is valid.
   void EmbedAtView(mojo::ConnectionSpecificId creator_id,
-                   mojo::URLRequestPtr request,
                    const ViewId& view_id,
-                   mojo::InterfaceRequest<mojo::ServiceProvider> services,
-                   mojo::ServiceProviderPtr exposed_services);
+                   mojo::URLRequestPtr request);
   void EmbedAtView(mojo::ConnectionSpecificId creator_id,
                    const ViewId& view_id,
                    mojo::ViewManagerClientPtr client);
@@ -129,6 +126,9 @@ class ConnectionManager : public ServerViewDelegate,
         const_cast<const ConnectionManager*>(this)->GetConnectionWithRoot(id));
   }
   const ViewManagerServiceImpl* GetConnectionWithRoot(const ViewId& id) const;
+
+  // Returns the first ancestor of |service| that is marked as an embed root.
+  ViewManagerServiceImpl* GetEmbedRoot(ViewManagerServiceImpl* service);
 
   mojo::ViewManagerRootClient* view_manager_root_client() {
     return view_manager_root_client_.get();
@@ -171,7 +171,7 @@ class ConnectionManager : public ServerViewDelegate,
   void ProcessViewDeleted(const ViewId& view);
 
  private:
-  typedef std::map<mojo::ConnectionSpecificId, ClientConnection*> ConnectionMap;
+  using ConnectionMap = std::map<mojo::ConnectionSpecificId, ClientConnection*>;
 
   // Invoked when a connection is about to make a change.  Subsequently followed
   // by FinishChange() once the change is done.
@@ -189,12 +189,12 @@ class ConnectionManager : public ServerViewDelegate,
     return current_change_ && current_change_->connection_id() == connection_id;
   }
 
-  // Adds |connection| to internal maps.
-  void AddConnection(ClientConnection* connection);
-
   // Callback from animation timer.
   // TODO(sky): make this real (move to a different class).
   void DoAnimation();
+
+  // Adds |connection| to internal maps.
+  void AddConnection(ClientConnection* connection);
 
   // Overridden from ServerViewDelegate:
   void PrepareToDestroyView(ServerView* view) override;
@@ -250,6 +250,10 @@ class ConnectionManager : public ServerViewDelegate,
   // Set of ViewManagerServiceImpls.
   ConnectionMap connection_map_;
 
+  // DisplayManager holds a raw pointer to EventDispatcher and so it must be
+  // destroyed after DisplayManager (and thus created before).
+  EventDispatcher event_dispatcher_;
+
   scoped_ptr<DisplayManager> display_manager_;
 
   scoped_ptr<ServerView> root_;
@@ -264,10 +268,6 @@ class ConnectionManager : public ServerViewDelegate,
   base::RepeatingTimer<ConnectionManager> animation_timer_;
 
   AnimationRunner animation_runner_;
-
-  EventDispatcher event_dispatcher_;
-
-  mojo::Binding<mojo::NativeViewportEventDispatcher> event_dispatcher_binding_;
 
   scoped_ptr<FocusController> focus_controller_;
 

@@ -21,6 +21,13 @@ class MEDIA_EXPORT VideoFrameMetadata {
     CAPTURE_BEGIN_TIME,
     CAPTURE_END_TIME,
 
+    // Some VideoFrames have an indication of the color space used.  Use
+    // GetInteger()/SetInteger() and VideoFrame::ColorSpace enumeration.
+    COLOR_SPACE,
+
+    // Indicates if the current frame is the End of its current Stream.
+    END_OF_STREAM,
+
     // The estimated duration of this frame (i.e., the amount of time between
     // the media timestamp of this frame and the next).  Note that this is not
     // the same information provided by FRAME_RATE as the FRAME_DURATION can
@@ -36,9 +43,23 @@ class MEDIA_EXPORT VideoFrameMetadata {
     // key.
     FRAME_RATE,
 
-    // Some VideoFrames have an indication of the color space used.  Use
-    // GetInteger()/SetInteger() and VideoFrame::ColorSpace enumeration.
-    COLOR_SPACE,
+    // A feedback signal that indicates the fraction of the tolerable maximum
+    // amount of resources that were utilized to process this frame.  A producer
+    // can check this value after-the-fact, usually via a VideoFrame destruction
+    // observer, to determine whether the consumer can handle more or less data
+    // volume, and achieve the right quality versus performance trade-off.
+    //
+    // Use Get/SetDouble() for this key.  Values are interpreted as follows:
+    // Less than 0.0 is meaningless and should be ignored.  1.0 indicates a
+    // maximum sustainable utilization.  Greater than 1.0 indicates the consumer
+    // is likely to stall or drop frames if the data volume is not reduced.
+    //
+    // Example: In a system that encodes and transmits video frames over the
+    // network, this value can be used to indicate whether sufficient CPU
+    // is available for encoding and/or sufficient bandwidth is available for
+    // transmission over the network.  The maximum of the two utilization
+    // measurements would be used as feedback.
+    RESOURCE_UTILIZATION,
 
     NUM_KEYS
   };

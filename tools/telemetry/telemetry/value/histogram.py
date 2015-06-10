@@ -3,9 +3,10 @@
 # found in the LICENSE file.
 import json
 
-from telemetry import perf_tests_helper
+from telemetry.util import perf_tests_helper
 from telemetry import value as value_module
 from telemetry.value import histogram_util
+
 
 class HistogramValueBucket(object):
   def __init__(self, low, high, count=0):
@@ -48,7 +49,7 @@ class HistogramValue(value_module.Value):
 
   def __repr__(self):
     if self.page:
-      page_name = self.page.url
+      page_name = self.page.name
     else:
       page_name = None
     return ('HistogramValue(%s, %s, %s, raw_json_string="%s", '

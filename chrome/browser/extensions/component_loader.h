@@ -16,10 +16,7 @@
 
 class ExtensionServiceInterface;
 class PrefService;
-
-namespace content {
-class BrowserContext;
-}
+class Profile;
 
 namespace extensions {
 
@@ -29,7 +26,7 @@ class ComponentLoader {
   ComponentLoader(ExtensionServiceInterface* extension_service,
                   PrefService* prefs,
                   PrefService* local_state,
-                  content::BrowserContext* browser_context);
+                  Profile* browser_context);
   virtual ~ComponentLoader();
 
   size_t registered_extensions_count() const {
@@ -103,7 +100,7 @@ class ComponentLoader {
   // NOTE: |done_cb| is not called if the component loader is shut down
   // during loading.
   void AddChromeVoxExtension(const base::Closure& done_cb);
-  std::string AddChromeOsSpeechSynthesisExtension();
+  void AddChromeOsSpeechSynthesisExtension();
 #endif
 
   void set_ignore_whitelist_for_testing(bool value) {
@@ -147,6 +144,7 @@ class ComponentLoader {
   void AddHotwordHelperExtension();
   void AddImageLoaderExtension();
   void AddNetworkSpeechSynthesisExtension();
+  void AddGoogleNowExtension();
 
   void AddWithNameAndDescription(int manifest_resource_id,
                                  const base::FilePath& root_directory,
@@ -164,18 +162,27 @@ class ComponentLoader {
   void EnableFileSystemInGuestMode(const std::string& id);
 
 #if defined(OS_CHROMEOS)
-  // Used as a reply callback when loading the ChromeVox extension.
-  // Called with a |chromevox_path| and parsed |manifest| and invokes
+  // Adds an extension where the manifest file is stored on the file system.
+  // |manifest_filename| can be relative to the |root_directory|.
+  void AddWithManifestFile(
+      const base::FilePath::CharType* manifest_filename,
+      const base::FilePath& root_directory,
+      const char* extension_id,
+      const base::Closure& done_cb);
+
+  // Used as a reply callback by |AddWithManifestFile|.
+  // Called with a |root_directory| and parsed |manifest| and invokes
   // |done_cb| after adding the extension.
-  void AddChromeVoxExtensionWithManifest(
-      const base::FilePath& chromevox_path,
+  void FinishAddWithManifestFile(
+      const base::FilePath& root_directory,
+      const char* extension_id,
       const base::Closure& done_cb,
       scoped_ptr<base::DictionaryValue> manifest);
 #endif
 
   PrefService* profile_prefs_;
   PrefService* local_state_;
-  content::BrowserContext* browser_context_;
+  Profile* profile_;
 
   ExtensionServiceInterface* extension_service_;
 

@@ -9,6 +9,7 @@
 
 #include "base/containers/hash_tables.h"
 #include "base/metrics/histogram.h"
+#include "base/numerics/safe_math.h"
 #include "base/stl_util.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
@@ -48,6 +49,8 @@ class IdAllocator {
         ids_(new GLuint[id_allocation_chunk_size]),
         next_id_index_(id_allocation_chunk_size) {
     DCHECK(id_allocation_chunk_size_);
+    DCHECK_LE(id_allocation_chunk_size_,
+              static_cast<size_t>(std::numeric_limits<int>::max()));
   }
 
   GLES2Interface* gl_;
@@ -161,14 +164,15 @@ class TextureIdAllocator : public IdAllocator {
                      size_t texture_id_allocation_chunk_size)
       : IdAllocator(gl, texture_id_allocation_chunk_size) {}
   ~TextureIdAllocator() override {
-    gl_->DeleteTextures(id_allocation_chunk_size_ - next_id_index_,
-                        ids_.get() + next_id_index_);
+    gl_->DeleteTextures(
+        static_cast<int>(id_allocation_chunk_size_ - next_id_index_),
+        ids_.get() + next_id_index_);
   }
 
   // Overridden from IdAllocator:
   GLuint NextId() override {
     if (next_id_index_ == id_allocation_chunk_size_) {
-      gl_->GenTextures(id_allocation_chunk_size_, ids_.get());
+      gl_->GenTextures(static_cast<int>(id_allocation_chunk_size_), ids_.get());
       next_id_index_ = 0;
     }
 
@@ -184,14 +188,15 @@ class BufferIdAllocator : public IdAllocator {
   BufferIdAllocator(GLES2Interface* gl, size_t buffer_id_allocation_chunk_size)
       : IdAllocator(gl, buffer_id_allocation_chunk_size) {}
   ~BufferIdAllocator() override {
-    gl_->DeleteBuffers(id_allocation_chunk_size_ - next_id_index_,
-                       ids_.get() + next_id_index_);
+    gl_->DeleteBuffers(
+        static_cast<int>(id_allocation_chunk_size_ - next_id_index_),
+        ids_.get() + next_id_index_);
   }
 
   // Overridden from IdAllocator:
   GLuint NextId() override {
     if (next_id_index_ == id_allocation_chunk_size_) {
-      gl_->GenBuffers(id_allocation_chunk_size_, ids_.get());
+      gl_->GenBuffers(static_cast<int>(id_allocation_chunk_size_), ids_.get());
       next_id_index_ = 0;
     }
 
@@ -273,7 +278,6 @@ ResourceProvider::Resource::Resource(GLuint texture_id,
       allocated(false),
       read_lock_fences_enabled(false),
       has_shared_bitmap_id(false),
-      allow_overlay(false),
       read_lock_fence(NULL),
       size(size),
       origin(origin),
@@ -317,7 +321,6 @@ ResourceProvider::Resource::Resource(uint8_t* pixels,
       allocated(false),
       read_lock_fences_enabled(false),
       has_shared_bitmap_id(!!bitmap),
-      allow_overlay(false),
       read_lock_fence(NULL),
       size(size),
       origin(origin),
@@ -362,7 +365,6 @@ ResourceProvider::Resource::Resource(const SharedBitmapId& bitmap_id,
       allocated(false),
       read_lock_fences_enabled(false),
       has_shared_bitmap_id(true),
-      allow_overlay(false),
       read_lock_fence(NULL),
       size(size),
       origin(origin),
@@ -444,11 +446,6 @@ bool ResourceProvider::InUseByConsumer(ResourceId id) {
 bool ResourceProvider::IsLost(ResourceId id) {
   Resource* resource = GetResource(id);
   return resource->lost;
-}
-
-bool ResourceProvider::AllowOverlay(ResourceId id) {
-  Resource* resource = GetResource(id);
-  return resource->allow_overlay;
 }
 
 ResourceId ResourceProvider::CreateResource(const gfx::Size& size,
@@ -570,7 +567,7 @@ ResourceId ResourceProvider::CreateResourceFromTextureMailbox(
     uint8_t* pixels = shared_bitmap->pixels();
     DCHECK(pixels);
     resource = InsertResource(
-        id, Resource(pixels, shared_bitmap, mailbox.shared_memory_size(),
+        id, Resource(pixels, shared_bitmap, mailbox.size_in_pixels(),
                      Resource::EXTERNAL, GL_LINEAR, GL_CLAMP_TO_EDGE));
   }
   resource->allocated = true;
@@ -578,7 +575,6 @@ ResourceId ResourceProvider::CreateResourceFromTextureMailbox(
   resource->release_callback_impl =
       base::Bind(&SingleReleaseCallbackImpl::Run,
                  base::Owned(release_callback_impl.release()));
-  resource->allow_overlay = mailbox.allow_overlay();
   return id;
 }
 
@@ -768,11 +764,13 @@ void ResourceProvider::CopyToResource(ResourceId id,
     gl->BindTexture(GL_TEXTURE_2D, resource->gl_id);
 
     if (resource->format == ETC1) {
-      size_t num_bytes = static_cast<size_t>(image_size.width()) *
-                         image_size.height() * BitsPerPixel(ETC1) / 8;
+      base::CheckedNumeric<int> num_bytes = BitsPerPixel(ETC1);
+      num_bytes *= image_size.width();
+      num_bytes *= image_size.height();
+      num_bytes /= 8;
       gl->CompressedTexImage2D(GL_TEXTURE_2D, 0, GLInternalFormat(ETC1),
                                image_size.width(), image_size.height(), 0,
-                               num_bytes, image);
+                               num_bytes.ValueOrDie(), image);
     } else {
       gl->TexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image_size.width(),
                         image_size.height(), GLDataFormat(resource->format),
@@ -1382,7 +1380,6 @@ void ResourceProvider::ReceiveFromChild(
     // Don't allocate a texture for a child.
     resource->allocated = true;
     resource->imported_count = 1;
-    resource->allow_overlay = it->allow_overlay;
     child_info.parent_to_child_map[local_id] = it->id;
     child_info.child_to_parent_map[it->id] = local_id;
   }
@@ -1486,7 +1483,6 @@ void ResourceProvider::TransferResource(GLES2Interface* gl,
   resource->filter = source->filter;
   resource->size = source->size;
   resource->is_repeated = (source->wrap_mode == GL_REPEAT);
-  resource->allow_overlay = source->allow_overlay;
 
   if (source->type == RESOURCE_TYPE_BITMAP) {
     resource->mailbox_holder.mailbox = source->shared_bitmap_id;

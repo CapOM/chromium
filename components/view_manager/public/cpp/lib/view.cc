@@ -366,23 +366,16 @@ void View::SetFocus() {
     static_cast<ViewManagerClientImpl*>(manager_)->SetFocus(id_);
 }
 
-void View::Embed(const String& url) {
-  if (PrepareForEmbed())
-    static_cast<ViewManagerClientImpl*>(manager_)->Embed(url, id_);
-}
-
-void View::Embed(mojo::URLRequestPtr request,
-                 InterfaceRequest<ServiceProvider> services,
-                 ServiceProviderPtr exposed_services) {
-  if (PrepareForEmbed()) {
-    static_cast<ViewManagerClientImpl*>(manager_)
-        ->Embed(request.Pass(), id_, services.Pass(), exposed_services.Pass());
-  }
-}
-
 void View::Embed(ViewManagerClientPtr client) {
   if (PrepareForEmbed())
     static_cast<ViewManagerClientImpl*>(manager_)->Embed(id_, client.Pass());
+}
+
+void View::EmbedAllowingReembed(mojo::URLRequestPtr request) {
+  if (PrepareForEmbed()) {
+    static_cast<ViewManagerClientImpl*>(manager_)
+        ->EmbedAllowingReembed(request.Pass(), id_);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -392,7 +385,7 @@ namespace {
 
 ViewportMetricsPtr CreateEmptyViewportMetrics() {
   ViewportMetricsPtr metrics = ViewportMetrics::New();
-  metrics->size = Size::New();
+  metrics->size_in_pixels = Size::New();
   // TODO(vtl): The |.Pass()| below is only needed due to an MSVS bug; remove it
   // once that's fixed.
   return metrics.Pass();
@@ -591,8 +584,11 @@ void View::NotifyViewVisibilityChangedUp(View* target) {
 }
 
 bool View::PrepareForEmbed() {
-  if (!OwnsView(manager_, this))
+  // TODO(sky): this check isn't quite enough. See what service does.
+  if (!OwnsView(manager_, this) &&
+      !static_cast<ViewManagerClientImpl*>(manager_)->is_embed_root()) {
     return false;
+  }
 
   while (!children_.empty())
     RemoveChild(children_[0]);

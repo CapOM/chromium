@@ -16,7 +16,7 @@ by a child template that "extends" this file.
     tools:ignore="MissingVersion">
     <!-- android:versionCode and android:versionName is set through gyp. See build/common.gypi -->
 
-    <uses-sdk android:minSdkVersion="{{min_sdk_version}}" android:targetSdkVersion="22" />
+    <uses-sdk android:minSdkVersion="{{min_sdk_version}}" android:targetSdkVersion="{{target_sdk_version}}" />
     <uses-feature android:glEsVersion="0x00020000" />
 
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -84,7 +84,8 @@ by a child template that "extends" this file.
         android:label="@string/app_name"
         android:largeHeap="false"
         android:allowBackup="false"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        {% block extra_application_attributes %}{% endblock %}>
 
         <!-- Samsung MultiWindow Support -->
         <meta-data android:name="com.samsung.android.sdk.multiwindow.enable"
@@ -205,7 +206,7 @@ by a child template that "extends" this file.
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|mcc|mnc"
             android:hardwareAccelerated="true">
         </activity>
-        <activity android:name="org.chromium.chrome.browser.hosted.HostedActivity"
+        <activity android:name="org.chromium.chrome.browser.customtabs.CustomTabActivity"
             android:theme="@style/MainTheme"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
@@ -372,8 +373,8 @@ by a child template that "extends" this file.
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Sync adapter for browser sync. -->
-        <service android:name="org.chromium.chrome.browser.sync.ChromeBrowserSyncAdapterService"
+        <!-- Sync adapter for browser invalidation. -->
+        <service android:name="org.chromium.chrome.browser.invalidation.ChromeBrowserSyncAdapterService"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.content.SyncAdapter" />
@@ -515,7 +516,7 @@ by a child template that "extends" this file.
         <service android:name="org.chromium.chrome.browser.prerender.ChromePrerenderService"
             android:exported="true"
             tools:ignore="ExportedService" />
-        <service android:name="org.chromium.chrome.browser.hosted.ChromeConnectionService"
+        <service android:name="org.chromium.chrome.browser.customtabs.CustomTabsConnectionService"
              android:exported="{{ 'true' if channel in ['dev', 'canary', 'default'] else 'false' }}"
              tools:ignore="ExportedService">
             <intent-filter>
@@ -589,4 +590,3 @@ by a child template that "extends" this file.
         {% endblock %}
     </application>
 </manifest>
-

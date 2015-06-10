@@ -208,7 +208,7 @@ void GetResponseInfo(const WebURLResponse& response,
   WebString content_encoding =
       response.httpHeaderField(WebString::fromUTF8("Content-Encoding"));
   if (!content_encoding.isNull() &&
-      !EqualsASCII(content_encoding, "identity")) {
+      !base::EqualsASCII(content_encoding, "identity")) {
     // Don't send the compressed content length to the plugin, which only
     // cares about the decoded length.
     response_info->expected_length = 0;
@@ -942,7 +942,7 @@ void WebPluginImpl::willSendRequest(WebURLLoader* loader,
       // just block cross origin 307 POST redirects.
       if (!client_info->notify_redirects) {
         if (response.httpStatusCode() == 307 &&
-            LowerCaseEqualsASCII(request.httpMethod().utf8(), "post")) {
+            base::LowerCaseEqualsASCII(request.httpMethod().utf8(), "post")) {
           GURL original_request_url(response.url());
           GURL response_url(request.url());
           if (original_request_url.GetOrigin() != response_url.GetOrigin()) {

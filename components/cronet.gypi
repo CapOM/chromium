@@ -99,6 +99,41 @@
           ],
         },
         {
+          'target_name': 'cronet_version_header',
+          'type': 'none',
+          # Need to set hard_depency flag because cronet_version generates a
+          # header.
+          'hard_dependency': 1,
+          'direct_dependent_settings': {
+            'include_dirs': [
+              '<(SHARED_INTERMEDIATE_DIR)/',
+            ],
+          },
+          'actions': [
+            {
+              'action_name': 'version_header',
+              'message': 'Generating version header file: <@(_outputs)',
+              'inputs': [
+                '<(version_path)',
+                'cronet/version.h.in',
+              ],
+              'outputs': [
+                '<(SHARED_INTERMEDIATE_DIR)/components/cronet/version.h',
+              ],
+              'action': [
+                'python',
+                '<(version_py_path)',
+                '-e', 'VERSION_FULL="<(version_full)"',
+                'cronet/version.h.in',
+                '<@(_outputs)',
+              ],
+              'includes': [
+                '../build/util/version.gypi',
+              ],
+            },
+          ],
+        },
+        {
           # cronet_static_small target has reduced binary size through using
           # ICU alternatives which requires file and ftp support be disabled.
           'target_name': 'cronet_static_small',
@@ -152,9 +187,9 @@
             '../url/url.gyp:url_lib_use_icu_alternatives_on_android',
           ],
         },
-        { # cronet_stub.jar defines HttpUrlRequest interface and provides its
-          # its implementation using HttpUrlConnection (not the Chromium stack).
-          'target_name': 'cronet_stub',
+        { # cronet_api.jar defines Cronet API and provides implementation of
+          # legacy api using HttpUrlConnection (not the Chromium stack).
+          'target_name': 'cronet_api',
           'type': 'none',
           'dependencies': [
             'cronet_url_request_context_config_list',
@@ -190,7 +225,7 @@
           'type': 'none',
           'dependencies': [
             '../base/base.gyp:base',
-            'cronet_stub',
+            'cronet_api',
             'cronet_url_request_java',
             'libcronet',
             'net_request_priority_java',
@@ -229,7 +264,7 @@
           'type': 'none',
           'dependencies': [
             'cronet_java',
-            'cronet_stub',
+            'cronet_api',
           ],
           'variables': {
             'apk_name': 'CronetSample',
@@ -263,7 +298,7 @@
           'dependencies': [
             'cronet_java',
             'cronet_sample_apk_java',
-            'cronet_stub',
+            'cronet_api',
             '../base/base.gyp:base_java_test_support',
           ],
           'variables': {
@@ -381,7 +416,7 @@
           'type': 'none',
           'dependencies': [
             'cronet_java',
-            'cronet_stub',
+            'cronet_api',
           ],
           'variables': {
             'apk_name': 'CronetPerfTest',
@@ -401,13 +436,13 @@
           'dependencies': [
             'libcronet',
             'cronet_java',
-            'cronet_stub',
+            'cronet_api',
             '../net/net.gyp:net_unittests_apk',
           ],
           'variables': {
             'native_lib': 'libcronet.>(android_product_extension)',
             'java_lib': 'cronet.jar',
-            'java_stub_lib': 'cronet_stub.jar',
+            'java_api_lib': 'cronet_api.jar',
             'java_src_lib': 'cronet-src.jar',
             'java_sample_src_lib': 'cronet-sample-src.jar',
             'lib_java_dir': '<(PRODUCT_DIR)/lib.java',
@@ -500,6 +535,19 @@
                 '<@(_outputs)',
               ],
             },
+            {
+              'action_name': 'generate javadoc',
+              'inputs': ['cronet/tools/generate_javadoc.py'] ,
+              'outputs': ['<(package_dir)/javadoc'],
+              'action': [
+                'python',
+                '<@(_inputs)',
+                '--source-dir=src',
+                '--output-dir=<(package_dir)/javadoc',
+                '--working-dir=cronet/android/java',
+              ],
+              'message': 'Generating Javadoc',
+            },
           ],
           'copies': [
             {
@@ -508,7 +556,7 @@
                 '../AUTHORS',
                 '../chrome/VERSION',
                 'cronet/android/proguard.cfg',
-                '<(lib_java_dir)/<(java_stub_lib)'
+                '<(lib_java_dir)/<(java_api_lib)'
               ],
             },
             {

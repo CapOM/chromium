@@ -22,29 +22,29 @@ typedef NS_OPTIONS(NSUInteger, BrowsingDataTypes) {
   BROWSING_DATA_TYPE_ALL = BROWSING_DATA_TYPE_COOKIES,
 };
 
-}  // namespace web
-
-// Represents the modes that a CRWBrowsingDataStore is currently at.
-enum CRWBrowsingDataStoreMode {
+// Represents the modes that a CRWBrowsingDataStore can be in.
+typedef NS_ENUM(NSUInteger, BrowsingDataStoreMode) {
   // Web views (associated transitively through the BrowseState) are
   // flushing/reading their data from disk.
-  ACTIVE,
+  ACTIVE = 1,
   // The CRWBrowsingDataStore's mode is in the process of becoming either ACTIVE
   // or INACTIVE.
-  SYNCHRONIZING,
+  CHANGING,
   // Browsing data is stored in a path unique to the BrowserState and is
   // currently not being read or written to by web views.
-  INACTIVE
+  INACTIVE,
 };
+
+}  // namespace web
 
 // A CRWBrowsingDataStore represents various types of data that a web view
 // (UIWebView and WKWebView) uses.
 // All methods must be called on the UI thread.
 @interface CRWBrowsingDataStore : NSObject
 
-// Designated initializer. |browserState| cannot be a nullptr.
-// The |web::ActiveStateManager| associated with |browserState| needs to be in
-// active state.
+// Designated initializer. |browserState| cannot be null.
+// The initial mode of the CRWBrowsingDataStore is obtained from the active
+// state of the |web::ActiveStateManager| associated with |browserState|.
 - (instancetype)initWithBrowserState:(web::BrowserState*)browserState
     NS_DESIGNATED_INITIALIZER;
 
@@ -52,7 +52,7 @@ enum CRWBrowsingDataStoreMode {
 @property(nonatomic, weak) id<CRWBrowsingDataStoreDelegate> delegate;
 
 // The mode that the CRWBrowsingDataStore is in. KVO compliant.
-@property(nonatomic, assign, readonly) CRWBrowsingDataStoreMode mode;
+@property(nonatomic, assign, readonly) web::BrowsingDataStoreMode mode;
 
 // TODO(shreyasv): Verify the preconditions for the following 3 methods when
 // web::WebViewCounter class is implemented. crbug.com/480507

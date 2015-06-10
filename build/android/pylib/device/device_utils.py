@@ -290,7 +290,7 @@ class DeviceUtils(object):
     if 'needs_su' in self._cache:
       del self._cache['needs_su']
     self.adb.Root()
-    self.adb.WaitForDevice()
+    self.WaitUntilFullyBooted()
 
   @decorators.WithTimeoutAndRetriesFromInstance()
   def IsUserBuild(self, timeout=None, retries=None):
@@ -362,6 +362,28 @@ class DeviceUtils(object):
       raise device_errors.CommandFailedError('pm path returned: %r' % output,
                                              str(self))
     return output[len('package:'):]
+
+  @decorators.WithTimeoutAndRetriesFromInstance()
+  def GetApplicationDataDirectory(self, package, timeout=None, retries=None):
+    """Get the data directory on the device for the given package.
+
+    Args:
+      package: Name of the package.
+
+    Returns:
+      The package's data directory, or None if the package doesn't exist on the
+      device.
+    """
+    try:
+      output = self._RunPipedShellCommand(
+          'pm dump %s | grep dataDir=' % cmd_helper.SingleQuote(package))
+      for line in output:
+        _, _, dataDir = line.partition('dataDir=')
+        if dataDir:
+          return dataDir
+    except device_errors.CommandFailedError:
+      logging.exception('Could not find data directory for %s', package)
+    return None
 
   @decorators.WithTimeoutAndRetriesFromInstance()
   def WaitUntilFullyBooted(self, wifi=False, timeout=None, retries=None):

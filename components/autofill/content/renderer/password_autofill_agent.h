@@ -40,6 +40,12 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
   bool TextFieldHandlingKeyDown(const blink::WebInputElement& element,
                                 const blink::WebKeyboardEvent& event);
 
+  // Function that should be called whenever the value of |element| changes due
+  // to user input. This is separate from TextDidChangeInTextField() as that
+  // function may trigger UI and should only be called when other UI won't be
+  // shown.
+  void UpdateStateForTextChange(const blink::WebInputElement& element);
+
   // Fills the username and password fields of this form with the given values.
   // Returns true if the fields were filled, false otherwise.
   bool FillSuggestion(const blink::WebNode& node,
@@ -280,10 +286,6 @@ class PasswordAutofillAgent : public content::RenderFrameObserver {
 
   // True indicates that all frames in a page have been rendered.
   bool did_stop_loading_;
-
-  // True indicates that there is a command line flag to enable showing of
-  // save password prompt on in-page navigations.
-  bool save_password_on_in_page_navigation_;
 
   // Contains server predictions for username, password and/or new password
   // fields for individual forms.

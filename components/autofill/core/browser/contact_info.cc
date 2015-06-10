@@ -45,7 +45,7 @@ bool ContainsString(const char* const set[],
   base::TrimString(element, base::ASCIIToUTF16("."), &trimmed_element);
 
   for (size_t i = 0; i < set_size; ++i) {
-    if (LowerCaseEqualsASCII(trimmed_element, set[i]))
+    if (base::LowerCaseEqualsASCII(trimmed_element, set[i]))
       return true;
   }
 
@@ -160,7 +160,7 @@ NameInfo& NameInfo::operator=(const NameInfo& info) {
   return *this;
 }
 
-bool NameInfo::ParsedNamesAreEqual(const NameInfo& info) {
+bool NameInfo::ParsedNamesAreEqual(const NameInfo& info) const {
   l10n::CaseInsensitiveCompare compare;
   return compare.StringsEqual(given_, info.given_) &&
          compare.StringsEqual(middle_, info.middle_) &&

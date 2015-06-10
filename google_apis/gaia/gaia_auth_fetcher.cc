@@ -35,7 +35,7 @@ static bool CookiePartsContains(const std::vector<std::string>& parts,
                                 const char* part) {
   for (std::vector<std::string>::const_iterator it = parts.begin();
        it != parts.end(); ++it) {
-    if (LowerCaseEqualsASCII(*it, part))
+    if (base::LowerCaseEqualsASCII(*it, part))
       return true;
   }
   return false;
@@ -222,6 +222,10 @@ GaiaAuthFetcher::~GaiaAuthFetcher() {}
 
 bool GaiaAuthFetcher::HasPendingFetch() {
   return fetch_pending_;
+}
+
+void GaiaAuthFetcher::SetPendingFetch(bool pending_fetch) {
+  fetch_pending_ = pending_fetch;
 }
 
 void GaiaAuthFetcher::CancelRequest() {

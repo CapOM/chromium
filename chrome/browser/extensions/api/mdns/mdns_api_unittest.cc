@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "base/memory/scoped_ptr.h"
 #include "chrome/browser/extensions/api/mdns/mdns_api.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/browser/extensions/extension_service_test_base.h"
@@ -9,7 +10,8 @@
 #include "chrome/common/extensions/api/mdns.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/test/mock_render_process_host.h"
-#include "extensions/browser/extension_prefs_factory.h"
+#include "extensions/browser/event_router_factory.h"
+#include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/common/manifest_constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
@@ -19,8 +21,14 @@ namespace extensions {
 
 namespace {
 
-KeyedService* MDnsAPITestingFactoryFunction(content::BrowserContext* context) {
-  return new MDnsAPI(context);
+scoped_ptr<KeyedService> MDnsAPITestingFactoryFunction(
+    content::BrowserContext* context) {
+  return make_scoped_ptr(new MDnsAPI(context));
+}
+
+scoped_ptr<KeyedService> BuildEventRouter(content::BrowserContext* context) {
+  return make_scoped_ptr(
+      new extensions::EventRouter(context, ExtensionPrefs::Get(context)));
 }
 
 // For ExtensionService interface when it requires a path that is not used.
@@ -62,15 +70,12 @@ class MDnsAPITest : public extensions::ExtensionServiceTestBase {
         browser_context(),
         MDnsAPITestingFactoryFunction);
 
-    // Create an event router and associate it with the context.
-    extensions::EventRouter* event_router = CreateEventRouter_();
-    static_cast<TestExtensionSystem*>(
-        ExtensionSystem::Get(browser_context()))->SetEventRouter(
-            scoped_ptr<extensions::EventRouter>(event_router));
+    EventRouterFactory::GetInstance()->SetTestingFactory(browser_context(),
+                                                         &BuildEventRouter);
 
     // Do some sanity checking
-    ASSERT_EQ(event_router, EventRouter::Get(browser_context()));
     ASSERT_TRUE(MDnsAPI::Get(browser_context())); // constructs MDnsAPI
+    ASSERT_TRUE(EventRouter::Get(browser_context()));  // constructs EventRouter
 
     registry_ = new MockDnsSdRegistry(MDnsAPI::Get(browser_context()));
     EXPECT_CALL(*dns_sd_registry(),
@@ -89,11 +94,6 @@ class MDnsAPITest : public extensions::ExtensionServiceTestBase {
         .Times(1);
     render_process_host_.reset();
     extensions::ExtensionServiceTestBase::TearDown();
-    MDnsAPI::GetFactoryInstance()->SetTestingFactory(
-        browser_context(),
-        nullptr);
-
-    registry_ = nullptr;
   }
 
   virtual MockDnsSdRegistry* dns_sd_registry() {
@@ -128,14 +128,6 @@ class MDnsAPITest : public extensions::ExtensionServiceTestBase {
 
   content::RenderProcessHost* render_process_host() const {
     return render_process_host_.get();
-  }
-
- protected:
-  virtual extensions::EventRouter* CreateEventRouter_() {
-    return new extensions::EventRouter(
-        browser_context(),
-        ExtensionPrefsFactory::GetInstance()->GetForBrowserContext(
-            browser_context()));
   }
 
  private:
@@ -230,17 +222,16 @@ class MockEventRouter : public EventRouter {
   MOCK_METHOD1(BroadcastEventPtr, void(Event* event));
 };
 
+scoped_ptr<KeyedService> MockEventRouterFactoryFunction(
+    content::BrowserContext* context) {
+  return make_scoped_ptr(
+      new MockEventRouter(context, ExtensionPrefs::Get(context)));
+}
+
 class MDnsAPIMaxServicesTest : public MDnsAPITest {
  public:
   MockEventRouter* event_router() {
     return static_cast<MockEventRouter*>(EventRouter::Get(browser_context()));
-  }
- protected:
-  extensions::EventRouter* CreateEventRouter_() override {
-    return new MockEventRouter(
-        browser_context(),
-        ExtensionPrefsFactory::GetInstance()->GetForBrowserContext(
-            browser_context()));
   }
 };
 
@@ -296,6 +287,9 @@ inline testing::Matcher<const Event&> EventServiceListSize(
 }
 
 TEST_F(MDnsAPIMaxServicesTest, OnServiceListDoesNotExceedLimit) {
+  EventRouterFactory::GetInstance()->SetTestingFactory(
+      browser_context(), &MockEventRouterFactoryFunction);
+
    // This check should change when the [value=64] changes in the IDL file.
   EXPECT_EQ(64, api::mdns::MAX_SERVICE_INSTANCES_PER_EVENT);
 

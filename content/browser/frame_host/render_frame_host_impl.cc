@@ -19,6 +19,7 @@
 #include "content/browser/frame_host/cross_process_frame_connector.h"
 #include "content/browser/frame_host/cross_site_transferring_request.h"
 #include "content/browser/frame_host/frame_accessibility.h"
+#include "content/browser/frame_host/frame_mojo_shell.h"
 #include "content/browser/frame_host/frame_tree.h"
 #include "content/browser/frame_host/frame_tree_node.h"
 #include "content/browser/frame_host/navigation_request.h"
@@ -442,12 +443,8 @@ void RenderFrameHostImpl::AccessibilityDoDefaultAction(int object_id) {
   Send(new AccessibilityMsg_DoDefaultAction(routing_id_, object_id));
 }
 
-void RenderFrameHostImpl::AccessibilityShowMenu(
-    const gfx::Point& global_point) {
-  RenderWidgetHostViewBase* view = static_cast<RenderWidgetHostViewBase*>(
-      render_view_host_->GetView());
-  if (view)
-    view->AccessibilityShowMenu(global_point);
+void RenderFrameHostImpl::AccessibilityShowContextMenu(int acc_obj_id) {
+  Send(new AccessibilityMsg_ShowContextMenu(routing_id_, acc_obj_id));
 }
 
 void RenderFrameHostImpl::AccessibilityScrollToMakeVisible(
@@ -652,12 +649,6 @@ bool RenderFrameHostImpl::CreateRenderFrame(int parent_routing_id,
 bool RenderFrameHostImpl::IsRenderFrameLive() {
   bool is_live = GetProcess()->HasConnection() && render_frame_created_;
 
-  // If the process is for an isolated guest (e.g. <webview>), rely on the
-  // RenderViewHost liveness check. Once https://crbug.com/492830 is fixed,
-  // this can be removed.
-  if (GetProcess()->IsIsolatedGuest())
-    is_live = render_view_host_->IsRenderViewLive();
-
   // Sanity check: the RenderView should always be live if the RenderFrame is.
   DCHECK_IMPLIES(is_live, render_view_host_->IsRenderViewLive());
 
@@ -797,13 +788,21 @@ void RenderFrameHostImpl::OnDidFailLoadWithError(
 void RenderFrameHostImpl::OnDidCommitProvisionalLoad(const IPC::Message& msg) {
   // Read the parameters out of the IPC message directly to avoid making another
   // copy when we filter the URLs.
-  PickleIterator iter(msg);
+  ++commit_count_;
+  base::PickleIterator iter(msg);
   FrameHostMsg_DidCommitProvisionalLoad_Params validated_params;
   if (!IPC::ParamTraits<FrameHostMsg_DidCommitProvisionalLoad_Params>::
-      Read(&msg, &iter, &validated_params))
+      Read(&msg, &iter, &validated_params)) {
+    base::debug::SetCrashKeyValue("369661-earlyreturn",
+                                  CommitCountString() + "/badipc");
     return;
+  }
   TRACE_EVENT1("navigation", "RenderFrameHostImpl::OnDidCommitProvisionalLoad",
                "url", validated_params.url.possibly_invalid_spec());
+
+  // Sanity-check the page transition for frame type.
+  DCHECK_EQ(ui::PageTransitionIsMainFrame(validated_params.transition),
+            !GetParent());
 
   // If we're waiting for a cross-site beforeunload ack from this renderer and
   // we receive a Navigate message from the main frame, then the renderer was
@@ -813,9 +812,11 @@ void RenderFrameHostImpl::OnDidCommitProvisionalLoad(const IPC::Message& msg) {
   // to allow the pending navigation to continue.
   if (is_waiting_for_beforeunload_ack_ &&
       unload_ack_is_for_navigation_ &&
-      ui::PageTransitionIsMainFrame(validated_params.transition)) {
+      !GetParent()) {
     base::TimeTicks approx_renderer_start_time = send_before_unload_start_time_;
     OnBeforeUnloadACK(true, approx_renderer_start_time, base::TimeTicks::Now());
+    base::debug::SetCrashKeyValue("369661-earlyreturn",
+                                  CommitCountString() + "/beforeunloadwait");
     return;
   }
 
@@ -824,8 +825,11 @@ void RenderFrameHostImpl::OnDidCommitProvisionalLoad(const IPC::Message& msg) {
   // unload request.  It will either respond to the unload request soon or our
   // timer will expire.  Either way, we should ignore this message, because we
   // have already committed to closing this renderer.
-  if (IsWaitingForUnloadACK())
+  if (IsWaitingForUnloadACK()) {
+    base::debug::SetCrashKeyValue("369661-earlyreturn",
+                                  CommitCountString() + "/unloadwait");
     return;
+  }
 
   if (validated_params.report_type ==
       FrameMsg_UILoadMetricsReportType::REPORT_LINK) {
@@ -877,6 +881,8 @@ void RenderFrameHostImpl::OnDidCommitProvisionalLoad(const IPC::Message& msg) {
           validated_params.page_state)) {
     bad_message::ReceivedBadMessage(
         GetProcess(), bad_message::RFH_CAN_ACCESS_FILES_OF_PAGE_STATE);
+    base::debug::SetCrashKeyValue("369661-earlyreturn",
+                                  CommitCountString() + "/fileaccess");
     return;
   }
 
@@ -1218,9 +1224,23 @@ void RenderFrameHostImpl::OnDidAccessInitialDocument() {
 }
 
 void RenderFrameHostImpl::OnDidDisownOpener() {
-  // This message is only sent for top-level frames. TODO(avi): when frame tree
-  // mirroring works correctly, add a check here to enforce it.
-  delegate_->DidDisownOpener(this);
+  // This message is only sent for top-level frames for now.
+  // TODO(alexmos):  This should eventually support subframe openers as well,
+  // and it should allow openers to be updated to another frame (which can
+  // happen via window.open('','framename')) in addition to being disowned.
+
+  // No action is necessary if the opener has already been cleared.
+  if (!frame_tree_node_->opener())
+    return;
+
+  // Clear our opener so that future cross-process navigations don't have an
+  // opener assigned.
+  frame_tree_node_->SetOpener(nullptr);
+
+  // Notify all other RenderFrameHosts and RenderFrameProxies for this frame.
+  // This is important in case we go back to them, or if another window in
+  // those processes tries to access window.opener.
+  frame_tree_node_->render_manager()->DidDisownOpener(this);
 }
 
 void RenderFrameHostImpl::OnDidChangeName(const std::string& name) {
@@ -1554,6 +1574,12 @@ void RenderFrameHostImpl::RegisterMojoServices() {
   GetServiceRegistry()->AddService<mojo::MediaRenderer>(
       base::Bind(&CreateMediaRendererService));
 #endif
+
+  if (!frame_mojo_shell_)
+    frame_mojo_shell_.reset(new FrameMojoShell(this));
+
+  GetServiceRegistry()->AddService<mojo::Shell>(base::Bind(
+      &FrameMojoShell::BindRequest, base::Unretained(frame_mojo_shell_.get())));
 
   GetContentClient()->browser()->OverrideRenderFrameMojoServices(
       GetServiceRegistry(), this);
@@ -2071,6 +2097,13 @@ void RenderFrameHostImpl::UpdatePermissionsForNavigation(
   if (request_params.page_state.IsValid()) {
     render_view_host_->GrantFileAccessFromPageState(request_params.page_state);
   }
+}
+
+std::string RenderFrameHostImpl::CommitCountString() {
+  std::string result = base::Int64ToString(reinterpret_cast<int64_t>(this));
+  result += "/";
+  result += base::IntToString(commit_count_);
+  return result;
 }
 
 }  // namespace content

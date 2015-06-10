@@ -32,8 +32,6 @@
       'child/task_queue_manager.cc',
       'child/task_queue_manager.h',
       'child/task_queue_selector.h',
-      'child/time_source.cc',
-      'child/time_source.h',
       'child/web_scheduler_impl.cc',
       'child/web_scheduler_impl.h',
       'child/webthread_base.cc',
@@ -57,6 +55,10 @@
       'renderer/webthread_impl_for_renderer_scheduler.cc',
       'renderer/webthread_impl_for_renderer_scheduler.h',
       'scheduler_export.h',
+    ],
+    'scheduler_test_support_sources': [
+      'test/lazy_scheduler_message_loop_delegate_for_tests.cc',
+      'test/lazy_scheduler_message_loop_delegate_for_tests.h',
     ],
   },
 }

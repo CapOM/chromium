@@ -7,7 +7,6 @@ Chromoting</translation>
 <translation id="2676780859508944670">Przetwarzam…</translation>
 <translation id="6062854958530969723">Nie udało się zainicjować hosta.</translation>
 <translation id="5843054235973879827">Dlaczego to bezpieczne?</translation>
-<translation id="5895138241574237353">Uruchom ponownie</translation>
 <translation id="5619148062500147964">Z tym komputerem</translation>
 <translation id="4068946408131579958">Wszystkie połączenia</translation>
 <translation id="2208514473086078157">Ustawienia zasad nie zezwalają na udostępnianie tego komputera jako hosta Pulpitu zdalnego Chrome. Aby uzyskać pomoc, skontaktuj się z administratorem systemu.</translation>
@@ -255,8 +254,6 @@ zdalnego Chrome</translation>
 <translation id="6570205395680337606">Zresetuj aplikację. Niezapisane dane zostaną utracone.</translation>
 <translation id="6284412385303060032">Host uruchomiony na ekranie logowania konsoli został zamknięty, by umożliwić włączenie trybu kurtyny, przełączając się na hosta uruchomionego w sesji danego użytkownika.</translation>
 <translation id="3596628256176442606">Ta usługa umożliwia obsługę połączeń przychodzących z klientów funkcji Chromoting.</translation>
-<translation id="1978866438647250517">• Ulepszenia interfejsu użytkownika.
-• Ograniczenie wykorzystania przepustowości przez zadania uruchamiane w tle.</translation>
 <translation id="4741792197137897469">Uwierzytelnianie nie powiodło się. Zaloguj się ponownie do Chrome.</translation>
 <translation id="4277463233460010382">Ten komputer jest skonfigurowany do zezwalania jednemu lub wielu klientom na łączenie się bez podawania kodu PIN.</translation>
 <translation id="837021510621780684">Z tego komputera</translation>

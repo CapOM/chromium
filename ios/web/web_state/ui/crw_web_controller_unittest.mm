@@ -839,7 +839,8 @@ TEST_F(CRWWKWebViewWebControllerTest, SSLError) {
       [NSError errorWithDomain:NSURLErrorDomain
                           code:NSURLErrorServerCertificateHasUnknownRoot
                       userInfo:nil];
-  [static_cast<id<WKNavigationDelegate>>(webController_.get()) webView:nil
+  WKWebView* webView = static_cast<WKWebView*>([webController_ webView]);
+  [static_cast<id<WKNavigationDelegate>>(webController_.get()) webView:webView
                                           didFailProvisionalNavigation:nil
                                                              withError:error];
 
@@ -914,14 +915,10 @@ class CRWWKWebControllerPageScrollStateTest : public web::WKWebViewWebTest {
   }
 };
 
-// Helper function for comparing two CGFloats.
-bool CGFloatsAreEqual(CGFloat val1, CGFloat val2) {
-  return std::fabs(val1 - val2) < std::numeric_limits<CGFloat>::epsilon();
-}
-
+// TODO(iOS): Flaky on the bots. crbug/493427
 WEB_TEST_F(CRWUIWebControllerPageScrollStateTest,
            CRWWKWebControllerPageScrollStateTest,
-           SetPageStateWithUserScalableDisabled) {
+           FLAKY_SetPageStateWithUserScalableDisabled) {
 #if !TARGET_IPHONE_SIMULATOR
   // This test fails flakily on device with WKWebView, so skip it there.
   // crbug.com/453530
@@ -950,17 +947,18 @@ WEB_TEST_F(CRWUIWebControllerPageScrollStateTest,
   // setPageState: is async; wait for its completion.
   scrollView = [[[this->webController_ view] subviews][0] scrollView];
   base::test::ios::WaitUntilCondition(^bool() {
-    return CGFloatsAreEqual(scrollView.contentOffset.x, 1.0f);
+    return [scrollView contentOffset].x == 1.0f;
   });
 
-  ASSERT_CGFLOAT_EQ(originZoomScale, scrollView.zoomScale);
-  ASSERT_CGFLOAT_EQ(originMinimumZoomScale, scrollView.minimumZoomScale);
-  ASSERT_CGFLOAT_EQ(originMaximumZoomScale, scrollView.maximumZoomScale);
+  ASSERT_EQ(originZoomScale, scrollView.zoomScale);
+  ASSERT_EQ(originMinimumZoomScale, scrollView.minimumZoomScale);
+  ASSERT_EQ(originMaximumZoomScale, scrollView.maximumZoomScale);
 };
 
+// TODO(iOS): Flaky on the bots. crbug/493427
 WEB_TEST_F(CRWUIWebControllerPageScrollStateTest,
            CRWWKWebControllerPageScrollStateTest,
-           SetPageStateWithUserScalableEnabled) {
+           FLAKY_SetPageStateWithUserScalableEnabled) {
   this->LoadHtml(@"<html><head>"
                   "<meta name='viewport' content="
                   "'width=device-width,maximum-scale=10,initial-scale=1.0'"
@@ -979,15 +977,16 @@ WEB_TEST_F(CRWUIWebControllerPageScrollStateTest,
   id webView = [[this->webController_ view] subviews][0];
   UIScrollView* scrollView = [webView scrollView];
   base::test::ios::WaitUntilCondition(^bool() {
-    return CGFloatsAreEqual(scrollView.contentOffset.x, 1.0f);
+    return [scrollView contentOffset].x == 1.0f;
   });
 
-  ASSERT_FLOAT_EQ(3, scrollView.zoomScale / scrollView.minimumZoomScale);
+  EXPECT_FLOAT_EQ(3, scrollView.zoomScale / scrollView.minimumZoomScale);
 };
 
+// TODO(iOS): Flaky on the bots. crbug/493427
 WEB_TEST_F(CRWUIWebControllerPageScrollStateTest,
            CRWWKWebControllerPageScrollStateTest,
-           AtTop) {
+           FLAKY_AtTop) {
   // This test fails on iPhone 6/6+ with WKWebView; skip until it's fixed.
   // crbug.com/453105
   if ([this->webController_ webViewType] == web::WK_WEB_VIEW_TYPE &&
@@ -1011,7 +1010,7 @@ WEB_TEST_F(CRWUIWebControllerPageScrollStateTest,
   // setPageState: is async; wait for its completion.
   id webView = [[this->webController_ view] subviews][0];
   base::test::ios::WaitUntilCondition(^bool() {
-    return CGFloatsAreEqual([webView scrollView].contentOffset.y, 30.0f);
+    return [[webView scrollView] contentOffset].y == 30.0f;
   });
 
   ASSERT_FALSE([this->webController_ atTop]);

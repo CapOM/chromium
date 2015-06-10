@@ -19,12 +19,14 @@
 #include "base/debug/dump_without_crashing.h"
 #include "base/files/file.h"
 #include "base/lazy_instance.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/field_trial.h"
 #include "base/metrics/histogram.h"
 #include "base/process/process_handle.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/rand_util.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
@@ -182,6 +184,10 @@
 #include "content/common/sandbox_win.h"
 #include "sandbox/win/src/sandbox_policy.h"
 #include "ui/gfx/win/dpi.h"
+#endif
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+#include "content/browser/browser_io_surface_manager_mac.h"
 #endif
 
 #if defined(ENABLE_BROWSER_CDMS)
@@ -1286,13 +1292,13 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableSmoothScrolling,
     switches::kEnableStaleWhileRevalidate,
     switches::kEnableStatsTable,
-    switches::kEnableStrictSiteIsolation,
     switches::kEnableThreadedCompositing,
     switches::kEnableTouchDragDrop,
     switches::kEnableTouchEditing,
     switches::kEnableUnsafeES3APIs,
     switches::kEnableViewport,
     switches::kEnableViewportMeta,
+    switches::kInvertViewportScrollOrder,
     switches::kEnableVtune,
     switches::kEnableWebBluetooth,
     switches::kEnableWebGLDraftExtensions,
@@ -1561,6 +1567,13 @@ void RenderProcessHostImpl::OnChannelConnected(int32 peer_pid) {
   tracked_objects::ThreadData::Status status =
       tracked_objects::ThreadData::status();
   Send(new ChildProcessMsg_SetProfilerStatus(status));
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  io_surface_manager_token_ =
+      BrowserIOSurfaceManager::GetInstance()->GenerateChildProcessToken(
+          GetID());
+  Send(new ChildProcessMsg_SetIOSurfaceManagerToken(io_surface_manager_token_));
+#endif
 }
 
 void RenderProcessHostImpl::OnChannelError() {
@@ -1677,6 +1690,15 @@ void RenderProcessHostImpl::Cleanup() {
     // Remove ourself from the list of renderer processes so that we can't be
     // reused in between now and when the Delete task runs.
     UnregisterHost(GetID());
+
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+    if (!io_surface_manager_token_.IsZero()) {
+      BrowserIOSurfaceManager::GetInstance()->InvalidateChildProcessToken(
+          io_surface_manager_token_);
+      io_surface_manager_token_.SetZero();
+    }
+#endif
+
   }
 }
 
@@ -1920,16 +1942,14 @@ RenderProcessHost* RenderProcessHost::FromID(int render_process_id) {
 // static
 bool RenderProcessHost::ShouldTryToUseExistingProcessHost(
     BrowserContext* browser_context, const GURL& url) {
-  // Experimental:
-  // If --enable-strict-site-isolation or --site-per-process is enabled, do not
-  // try to reuse renderer processes when over the limit.  (We could allow pages
-  // from the same site to share, if we knew what the given process was
-  // dedicated to.  Allowing no sharing is simpler for now.)  This may cause
-  // resource exhaustion issues if too many sites are open at once.
+  // If --site-per-process is enabled, do not try to reuse renderer processes
+  // when over the limit.  (We could allow pages from the same site to share, if
+  // we knew what the given process was dedicated to.  Allowing no sharing is
+  // simpler for now.)  This may cause resource exhaustion issues if too many
+  // sites are open at once.
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
-  if (command_line.HasSwitch(switches::kEnableStrictSiteIsolation) ||
-      command_line.HasSwitch(switches::kSitePerProcess))
+  if (command_line.HasSwitch(switches::kSitePerProcess))
     return false;
 
   if (run_renderer_in_process())

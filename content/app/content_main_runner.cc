@@ -86,7 +86,9 @@
 #if !defined(OS_IOS)
 #include "base/power_monitor/power_monitor_device_source.h"
 #include "content/app/mac/mac_init.h"
+#include "content/browser/browser_io_surface_manager_mac.h"
 #include "content/browser/mach_broker_mac.h"
+#include "content/child/child_io_surface_manager_mac.h"
 #include "content/common/sandbox_init_mac.h"
 #endif  // !OS_IOS
 #endif  // OS_WIN
@@ -280,12 +282,7 @@ int RunZygote(const MainFunctionParams& main_function_params,
   ScopedVector<ZygoteForkDelegate> zygote_fork_delegates;
   if (delegate) {
     delegate->ZygoteStarting(&zygote_fork_delegates);
-    // Each Renderer we spawn will re-attempt initialization of the media
-    // libraries, at which point failure will be detected and handled, so
-    // we do not need to cope with initialization failures here.
-    base::FilePath media_path;
-    if (PathService::Get(DIR_MEDIA_LIBS, &media_path))
-      media::InitializeMediaLibrary(media_path);
+    media::InitializeMediaLibrary();
   }
 
   // This function call can return multiple times, once per fork().
@@ -628,13 +625,12 @@ class ContentMainRunnerImpl : public ContentMainRunner {
     // Enable startup tracing asap to avoid early TRACE_EVENT calls being
     // ignored.
     if (command_line.HasSwitch(switches::kTraceStartup)) {
-      base::trace_event::CategoryFilter category_filter(
-          command_line.GetSwitchValueASCII(switches::kTraceStartup));
+      base::trace_event::TraceConfig trace_config(
+          command_line.GetSwitchValueASCII(switches::kTraceStartup),
+          base::trace_event::RECORD_UNTIL_FULL);
       base::trace_event::TraceLog::GetInstance()->SetEnabled(
-          category_filter,
-          base::trace_event::TraceLog::RECORDING_MODE,
-          base::trace_event::TraceOptions(
-              base::trace_event::RECORD_UNTIL_FULL));
+          trace_config,
+          base::trace_event::TraceLog::RECORDING_MODE);
     }
 #if defined(OS_WIN)
     // Enable exporting of events to ETW if requested on the command line.
@@ -663,6 +659,18 @@ class ContentMainRunnerImpl : public ContentMainRunner {
     if (!process_type.empty() &&
         (!delegate_ || delegate_->ShouldSendMachPort(process_type))) {
       MachBroker::ChildSendTaskPortToParent();
+    }
+
+    if (!command_line.HasSwitch(switches::kSingleProcess) &&
+        !process_type.empty() && (process_type == switches::kRendererProcess ||
+                                  process_type == switches::kGpuProcess)) {
+      base::mac::ScopedMachSendRight service_port =
+          BrowserIOSurfaceManager::LookupServicePort(getppid());
+      if (service_port.is_valid()) {
+        ChildIOSurfaceManager::GetInstance()->set_service_port(
+            service_port.release());
+        IOSurfaceManager::SetInstance(ChildIOSurfaceManager::GetInstance());
+      }
     }
 #elif defined(OS_WIN)
     SetupCRT(command_line);
@@ -728,17 +736,23 @@ class ContentMainRunnerImpl : public ContentMainRunner {
 #endif  // !OS_ANDROID
     int v8_natives_fd = g_fds->MaybeGet(kV8NativesDataDescriptor);
     int v8_snapshot_fd = g_fds->MaybeGet(kV8SnapshotDataDescriptor);
-    if (v8_natives_fd != -1 && v8_snapshot_fd != -1) {
-      auto v8_natives_region = g_fds->GetRegion(kV8NativesDataDescriptor);
+    if (v8_snapshot_fd != -1) {
       auto v8_snapshot_region = g_fds->GetRegion(kV8SnapshotDataDescriptor);
-      CHECK(gin::V8Initializer::LoadV8SnapshotFromFD(
-          v8_natives_fd, v8_natives_region.offset, v8_natives_region.size,
-          v8_snapshot_fd, v8_snapshot_region.offset, v8_snapshot_region.size));
+      gin::V8Initializer::LoadV8SnapshotFromFD(
+          v8_snapshot_fd, v8_snapshot_region.offset, v8_snapshot_region.size);
     } else {
-      CHECK(gin::V8Initializer::LoadV8Snapshot());
+      gin::V8Initializer::LoadV8Snapshot();
+    }
+    if (v8_natives_fd != -1) {
+      auto v8_natives_region = g_fds->GetRegion(kV8NativesDataDescriptor);
+      gin::V8Initializer::LoadV8NativesFromFD(
+          v8_natives_fd, v8_natives_region.offset, v8_natives_region.size);
+    } else {
+      gin::V8Initializer::LoadV8Natives();
     }
 #else
-    CHECK(gin::V8Initializer::LoadV8Snapshot());
+    gin::V8Initializer::LoadV8Snapshot();
+    gin::V8Initializer::LoadV8Natives();
 #endif  // OS_POSIX && !OS_MACOSX
 #endif  // V8_USE_EXTERNAL_STARTUP_DATA
 

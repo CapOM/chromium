@@ -28,7 +28,7 @@
 namespace content {
 
 TestWebContents::TestWebContents(BrowserContext* browser_context)
-    : WebContentsImpl(browser_context, NULL),
+    : WebContentsImpl(browser_context),
       delegate_view_override_(NULL),
       expect_set_history_offset_and_length_(false),
       expect_set_history_offset_and_length_history_length_(0) {
@@ -130,6 +130,7 @@ bool TestWebContents::CreateRenderViewForRenderManager(
     RenderViewHost* render_view_host,
     int opener_route_id,
     int proxy_routing_id,
+    const FrameReplicationState& replicated_frame_state,
     bool for_main_frame) {
   UpdateMaxPageIDIfNecessary(render_view_host);
   // This will go to a TestRenderViewHost.
@@ -137,7 +138,9 @@ bool TestWebContents::CreateRenderViewForRenderManager(
       render_view_host)->CreateRenderView(base::string16(),
                                           opener_route_id,
                                           proxy_routing_id,
-                                          -1, false);
+                                          -1,
+                                          replicated_frame_state,
+                                          false);
   return true;
 }
 
@@ -216,10 +219,7 @@ RenderViewHostDelegateView* TestWebContents::GetDelegateView() {
 }
 
 void TestWebContents::SetOpener(TestWebContents* opener) {
-  // This is normally only set in the WebContents constructor, which also
-  // registers an observer for when the opener gets closed.
-  opener_ = opener;
-  AddDestructionObserver(opener_);
+  frame_tree_.root()->SetOpener(opener->GetFrameTree()->root());
 }
 
 void TestWebContents::AddPendingContents(TestWebContents* contents) {

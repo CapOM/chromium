@@ -630,7 +630,7 @@ public class WebViewContentsClientAdapter extends AwContentsClient {
         try {
             TraceEvent.begin("WebViewContentsClientAdapter.onReceivedTitle");
             if (mWebChromeClient != null) {
-                if (TRACE) Log.d(TAG, "onReceivedTitle");
+                if (TRACE) Log.d(TAG, "onReceivedTitle=\"" + title + "\"");
                 mWebChromeClient.onReceivedTitle(mWebView, title);
             }
         } finally {
@@ -1165,10 +1165,10 @@ public class WebViewContentsClientAdapter extends AwContentsClient {
                 result = mWebChromeClient.getDefaultVideoPoster();
             }
             if (result == null) {
-                // The ic_media_video_poster icon is transparent so we need to draw it on a gray
-                // background.
+                // The ic_play_circle_outline_black_48dp icon is transparent so we need to draw it
+                // on a gray background.
                 Bitmap poster = BitmapFactory.decodeResource(
-                        mContext.getResources(), R.drawable.ic_media_video_poster);
+                        mContext.getResources(), R.drawable.ic_play_circle_outline_black_48dp);
                 result = Bitmap.createBitmap(
                         poster.getWidth(), poster.getHeight(), poster.getConfig());
                 result.eraseColor(Color.GRAY);

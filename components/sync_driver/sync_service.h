@@ -31,7 +31,7 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
 
   // Whether sync is enabled by user or not. This does not necessarily mean
   // that sync is currently running (due to delayed startup, unrecoverable
-  // errors, or shutdown). See SyncActive below for checking whether sync
+  // errors, or shutdown). See IsSyncActive below for checking whether sync
   // is actually running.
   virtual bool HasSyncSetupCompleted() const = 0;
 
@@ -39,9 +39,9 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
   // an initial configuration has successfully completed, although there may
   // be datatype specific, auth, or other transient errors. To see which
   // datetypes are actually syncing, see GetActiveTypes() below.
-  // Note that if sync is in backup or rollback mode, SyncActive() will be
+  // Note that if sync is in backup or rollback mode, IsSyncActive() will be
   // false.
-  virtual bool SyncActive() const = 0;
+  virtual bool IsSyncActive() const = 0;
 
   // Get the set of current active data types (those chosen or configured by
   // the user which have not also encountered a runtime error).
@@ -75,11 +75,14 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
   // Disables sync for user. Use ShowLoginDialog to enable.
   virtual void DisableForUser() = 0;
 
-  // Stops the sync backend and sets the flag for suppressing sync startup.
-  virtual void StopAndSuppress() = 0;
+  // Stops sync at the user's request.
+  virtual void RequestStop() = 0;
 
-  // Resets the flag for suppressing sync startup and starts the sync backend.
-  virtual void UnsuppressAndStart() = 0;
+  // The user requests that sync start. This only actually starts sync if
+  // IsSyncAllowed is true and the user is signed in. Once sync starts,
+  // other things such as HasSyncSetupCompleted being false can still prevent
+  // it from moving into the "active" state.
+  virtual void RequestStart() = 0;
 
   // Returns the set of types which are preferred for enabling. This is a
   // superset of the active types (see GetActiveDataTypes()).

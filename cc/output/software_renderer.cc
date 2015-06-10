@@ -250,7 +250,9 @@ void SoftwareRenderer::DoDrawQuad(DrawingFrame* frame,
 
   TRACE_EVENT0("cc", "SoftwareRenderer::DoDrawQuad");
   gfx::Transform quad_rect_matrix;
-  QuadRectTransform(&quad_rect_matrix, quad->quadTransform(), quad->rect);
+  QuadRectTransform(&quad_rect_matrix,
+                    quad->shared_quad_state->content_to_target_transform,
+                    quad->rect);
   gfx::Transform contents_device_transform =
       frame->window_matrix * frame->projection_matrix * quad_rect_matrix;
   contents_device_transform.FlattenTo2d();
@@ -276,7 +278,7 @@ void SoftwareRenderer::DoDrawQuad(DrawingFrame* frame,
 
   if (quad->ShouldDrawWithBlending() ||
       quad->shared_quad_state->blend_mode != SkXfermode::kSrcOver_Mode) {
-    current_paint_.setAlpha(quad->opacity() * 255);
+    current_paint_.setAlpha(quad->shared_quad_state->opacity * 255);
     current_paint_.setXfermodeMode(quad->shared_quad_state->blend_mode);
   } else {
     current_paint_.setXfermodeMode(SkXfermode::kSrc_Mode);
@@ -351,7 +353,7 @@ void SoftwareRenderer::DrawCheckerboardQuad(const DrawingFrame* frame,
   gfx::RectF visible_quad_vertex_rect = MathUtil::ScaleRectProportional(
       QuadVertexRect(), quad->rect, quad->visible_rect);
   current_paint_.setColor(quad->color);
-  current_paint_.setAlpha(quad->opacity());
+  current_paint_.setAlpha(quad->shared_quad_state->opacity);
   current_canvas_->drawRect(gfx::RectFToSkRect(visible_quad_vertex_rect),
                             current_paint_);
 }
@@ -368,7 +370,8 @@ void SoftwareRenderer::DrawDebugBorderQuad(const DrawingFrame* frame,
   current_canvas_->resetMatrix();
 
   current_paint_.setColor(quad->color);
-  current_paint_.setAlpha(quad->opacity() * SkColorGetA(quad->color));
+  current_paint_.setAlpha(quad->shared_quad_state->opacity *
+                          SkColorGetA(quad->color));
   current_paint_.setStyle(SkPaint::kStroke_Style);
   current_paint_.setStrokeWidth(quad->width);
   current_canvas_->drawPoints(SkCanvas::kPolygon_PointMode,
@@ -387,10 +390,10 @@ void SoftwareRenderer::DrawPictureQuad(const DrawingFrame* frame,
   // TODO(aelias): This isn't correct in all cases. We should detect these
   // cases and fall back to a persistent bitmap backing
   // (http://crbug.com/280374).
-  skia::RefPtr<SkDrawFilter> opacity_filter =
-      skia::AdoptRef(new skia::OpacityDrawFilter(
-          quad->opacity(), frame->disable_picture_quad_image_filtering ||
-                               quad->nearest_neighbor));
+  skia::RefPtr<SkDrawFilter> opacity_filter = skia::AdoptRef(
+      new skia::OpacityDrawFilter(quad->shared_quad_state->opacity,
+                                  frame->disable_picture_quad_image_filtering ||
+                                      quad->nearest_neighbor));
   DCHECK(!current_canvas_->getDrawFilter());
   current_canvas_->setDrawFilter(opacity_filter.get());
 
@@ -408,21 +411,22 @@ void SoftwareRenderer::DrawSolidColorQuad(const DrawingFrame* frame,
   gfx::RectF visible_quad_vertex_rect = MathUtil::ScaleRectProportional(
       QuadVertexRect(), quad->rect, quad->visible_rect);
   current_paint_.setColor(quad->color);
-  current_paint_.setAlpha(quad->opacity() * SkColorGetA(quad->color));
+  current_paint_.setAlpha(quad->shared_quad_state->opacity *
+                          SkColorGetA(quad->color));
   current_canvas_->drawRect(gfx::RectFToSkRect(visible_quad_vertex_rect),
                             current_paint_);
 }
 
 void SoftwareRenderer::DrawTextureQuad(const DrawingFrame* frame,
                                        const TextureDrawQuad* quad) {
-  if (!IsSoftwareResource(quad->resource_id)) {
+  if (!IsSoftwareResource(quad->resource_id())) {
     DrawUnsupportedQuad(frame, quad);
     return;
   }
 
   // TODO(skaslev): Add support for non-premultiplied alpha.
   ResourceProvider::ScopedReadLockSoftware lock(resource_provider_,
-                                                quad->resource_id);
+                                                quad->resource_id());
   if (!lock.valid())
     return;
   const SkBitmap* bitmap = lock.sk_bitmap();
@@ -480,10 +484,10 @@ void SoftwareRenderer::DrawTileQuad(const DrawingFrame* frame,
   // |resource_provider_| can be NULL in resourceless software draws, which
   // should never produce tile quads in the first place.
   DCHECK(resource_provider_);
-  DCHECK(IsSoftwareResource(quad->resource_id));
+  DCHECK(IsSoftwareResource(quad->resource_id()));
 
   ResourceProvider::ScopedReadLockSoftware lock(resource_provider_,
-                                                quad->resource_id);
+                                                quad->resource_id());
   if (!lock.valid())
     return;
   DCHECK_EQ(GL_CLAMP_TO_EDGE, lock.wrap_mode());
@@ -560,9 +564,9 @@ void SoftwareRenderer::DrawRenderPassQuad(const DrawingFrame* frame,
   }
   current_paint_.setShader(shader.get());
 
-  if (quad->mask_resource_id) {
-    ResourceProvider::ScopedReadLockSoftware mask_lock(resource_provider_,
-                                                       quad->mask_resource_id);
+  if (quad->mask_resource_id()) {
+    ResourceProvider::ScopedReadLockSoftware mask_lock(
+        resource_provider_, quad->mask_resource_id());
     if (!lock.valid())
       return;
     SkShader::TileMode mask_tile_mode = WrapModeToTileMode(
@@ -607,7 +611,7 @@ void SoftwareRenderer::DrawUnsupportedQuad(const DrawingFrame* frame,
 #else
   current_paint_.setColor(SK_ColorMAGENTA);
 #endif
-  current_paint_.setAlpha(quad->opacity() * 255);
+  current_paint_.setAlpha(quad->shared_quad_state->opacity * 255);
   current_canvas_->drawRect(gfx::RectFToSkRect(QuadVertexRect()),
                             current_paint_);
 }

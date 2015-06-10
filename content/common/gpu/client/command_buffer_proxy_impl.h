@@ -118,6 +118,7 @@ class CommandBufferProxyImpl
   void SetSurfaceVisible(bool visible) override;
   uint32 CreateStreamTexture(uint32 texture_id) override;
   void SetLock(base::Lock* lock) override;
+  bool IsGpuChannelLost() override;
 
   int GetRouteID() const;
   bool ProduceFrontBuffer(const gpu::Mailbox& mailbox);
@@ -196,7 +197,7 @@ class CommandBufferProxyImpl
   base::Lock* lock_;
 
   // Unowned list of DeletionObservers.
-  ObserverList<DeletionObserver> deletion_observers_;
+  base::ObserverList<DeletionObserver> deletion_observers_;
 
   // The last cached state received from the service.
   State last_state_;

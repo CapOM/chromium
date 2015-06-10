@@ -28,11 +28,13 @@ remoting.AppHostResponse;
  * @param {Array<string>} appCapabilities Array of application capabilities.
  * @param {remoting.Application} app
  * @param {remoting.WindowShape} windowShape
+ * @param {string} subscriptionToken
  *
  * @constructor
  * @implements {remoting.Activity}
  */
-remoting.AppRemotingActivity = function(appCapabilities, app, windowShape) {
+remoting.AppRemotingActivity = function(appCapabilities, app, windowShape,
+                                        subscriptionToken) {
   /** @private */
   this.sessionFactory_ = new remoting.ClientSessionFactory(
       document.querySelector('#client-container .client-plugin-container'),
@@ -49,6 +51,9 @@ remoting.AppRemotingActivity = function(appCapabilities, app, windowShape) {
 
   /** @private */
   this.windowShape_ = windowShape;
+
+  /** @private */
+  this.subscriptionToken_ = subscriptionToken;
 };
 
 remoting.AppRemotingActivity.prototype.dispose = function() {
@@ -90,6 +95,7 @@ remoting.AppRemotingActivity.prototype.cleanup_ = function() {
 remoting.AppRemotingActivity.prototype.getAppHostInfo_ = function(token) {
   var url = remoting.settings.APP_REMOTING_API_BASE_URL + '/applications/' +
             remoting.settings.getAppRemotingApplicationId() + '/run';
+  // TODO(kelvinp): Passes |this.subscriptionToken_| to the XHR.
   return new remoting.AutoRetryXhr({
     method: 'POST',
     url: url,
@@ -182,7 +188,10 @@ remoting.AppRemotingActivity.prototype.onConnected = function(connectionInfo) {
   // Map Cmd to Ctrl on Mac since hosts typically use Ctrl for keyboard
   // shortcuts, but we want them to act as natively as possible.
   if (remoting.platformIsMac()) {
-    connectionInfo.plugin().setRemapKeys('0x0700e3>0x0700e0,0x0700e7>0x0700e4');
+    connectionInfo.plugin().setRemapKeys({
+      0x0700e3: 0x0700e0,
+      0x0700e7: 0x0700e4
+    });
   }
 
   // Drop the session after 30s of suspension as we cannot recover from a

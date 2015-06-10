@@ -42,6 +42,7 @@ class CC_EXPORT DisplayItemList
 
   void Raster(SkCanvas* canvas,
               SkPicture::AbortCallback* callback,
+              const gfx::Rect& canvas_target_playback_rect,
               float contents_scale) const;
 
   template <typename DisplayItemType>
@@ -52,6 +53,11 @@ class CC_EXPORT DisplayItemList
     ProcessAppendedItemsOnTheFly();
     return items_.AllocateAndConstruct<DisplayItemType>();
   }
+
+  // Removes the last item. This cannot be called on lists with cached pictures
+  // (since the data may already have been incorporated into cached picture
+  // sizes, etc).
+  void RemoveLast();
 
   // Called after all items are appended, to process the items and, if
   // applicable, create an internally cached SkPicture.

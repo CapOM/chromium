@@ -6,8 +6,7 @@
 # we ship with.
 
 import("//build/config/ui.gni")
-import("//third_party/mojo/src/mojo/public/mojo_application.gni")
-import("//testing/test.gni")
+import("//mojo/public/mojo_application.gni")
 
 if (is_android) {
   import("//build/config/android/rules.gni")
@@ -64,6 +63,7 @@ source_set("sources") {
   deps = [
     "//base",
     "//components/clipboard:lib",
+    "//components/filesystem:lib",
     "//components/resource_provider:lib",
     "//components/view_manager:lib",
     "//components/view_manager/surfaces:lib",
@@ -74,7 +74,7 @@ source_set("sources") {
     "//mojo/services/tracing:lib",
   ]
 
-  if (!is_android) {
+  if (use_aura) {
     deps += [
       "//components/view_manager/public/cpp",
       "//mandoline/ui/omnibox:lib",

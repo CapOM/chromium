@@ -176,8 +176,10 @@ class ASH_EXPORT ShelfLayoutManager
   void OnLockStateChanged(bool locked) override;
 
   // Overriden from aura::client::ActivationChangeObserver:
-  void OnWindowActivated(aura::Window* gained_active,
-                         aura::Window* lost_active) override;
+  void OnWindowActivated(
+      aura::client::ActivationChangeObserver::ActivationReason reason,
+      aura::Window* gained_active,
+      aura::Window* lost_active) override;
 
   // Overridden from ash::LockStateObserver:
   void OnLockStateEvent(LockStateObserver::EventType event) override;
@@ -376,7 +378,7 @@ class ASH_EXPORT ShelfLayoutManager
   // EventFilter used to detect when user issues a gesture on a bezel sensor.
   scoped_ptr<ShelfBezelEventFilter> bezel_event_filter_;
 
-  ObserverList<ShelfLayoutManagerObserver> observers_;
+  base::ObserverList<ShelfLayoutManagerObserver> observers_;
 
   // The shelf reacts to gesture-drags, and can be set to auto-hide for certain
   // gestures. Some shelf behaviour (e.g. visibility state, background color

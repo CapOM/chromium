@@ -11,6 +11,7 @@
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "net/base/host_port_pair.h"
+#include "net/base/ip_address_number.h"
 #include "net/base/net_util.h"
 
 namespace net {
@@ -263,7 +264,7 @@ bool ProxyBypassRules::AddRuleFromStringInternal(
 
   // This is the special syntax used by WinInet's bypass list -- we allow it
   // on all platforms and interpret it the same way.
-  if (LowerCaseEqualsASCII(raw, "<local>")) {
+  if (base::LowerCaseEqualsASCII(raw, "<local>")) {
     AddRuleToBypassLocal();
     return true;
   }

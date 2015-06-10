@@ -11,7 +11,7 @@
 CLANG_REVISION=238013
 
 # This is incremented when pushing a new build of Clang at the same revision.
-CLANG_SUB_REVISION=1
+CLANG_SUB_REVISION=3
 
 PACKAGE_VERSION="${CLANG_REVISION}-${CLANG_SUB_REVISION}"
 
@@ -206,20 +206,17 @@ fi
 
 if [[ -n "$if_needed" ]]; then
   if [[ "${OS}" == "Darwin" ]]; then
-    # clang is used on Mac.
+    # clang is always used on Mac.
+    true
+  elif [[ "${OS}" == "Linux" ]]; then
+    # clang is also aways used on Linux.
     true
   elif [[ "$GYP_DEFINES" =~ .*(clang|tsan|asan|lsan|msan)=1.* ]]; then
     # clang requested via $GYP_DEFINES.
     true
   elif [[ -d "${LLVM_BUILD_DIR}" ]]; then
-    # clang previously downloaded, remove third_party/llvm-build to prevent
-    # updating.
-    true
-  elif [[ "${OS}" == "Linux" ]]; then
-    # Temporarily use clang on linux. Leave a stamp file behind, so that
-    # this script can remove clang again on machines where it was autoinstalled.
-    mkdir -p "${LLVM_BUILD_DIR}"
-    touch "${LLVM_BUILD_DIR}/autoinstall_stamp"
+    # clang previously downloaded, keep it up-to-date.
+    # If you don't want this, delete third_party/llvm-build on your machine.
     true
   else
     # clang wasn't needed, not doing anything.
@@ -678,10 +675,10 @@ popd
 if [[ -n "${with_android}" ]]; then
   # Make a standalone Android toolchain.
   ${ANDROID_NDK_DIR}/build/tools/make-standalone-toolchain.sh \
-      --platform=android-14 \
+      --platform=android-19 \
       --install-dir="${LLVM_BUILD_DIR}/android-toolchain" \
       --system=linux-x86_64 \
-      --stl=libcxx \
+      --stl=stlport \
       --toolchain=arm-linux-androideabi-4.9
 
   # Android NDK r9d copies a broken unwind.h into the toolchain, see

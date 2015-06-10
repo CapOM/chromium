@@ -11,9 +11,9 @@ import StringIO
 import sys
 import tempfile
 
-from telemetry.timeline import trace_data as trace_data_module
+from catapult_base import cloud_storage
 from telemetry.core import util
-from telemetry.util import cloud_storage
+from telemetry.timeline import trace_data as trace_data_module
 from telemetry.util import file_handle
 from telemetry import value as value_module
 
@@ -56,7 +56,7 @@ class TraceValue(value_module.Value):
 
   def __repr__(self):
     if self.page:
-      page_name = self.page.url
+      page_name = self.page.name
     else:
       page_name = None
     return 'TraceValue(%s, %s)' % (page_name, self.name)

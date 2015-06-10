@@ -7,7 +7,6 @@ Host</translation>
 <translation id="2676780859508944670">Arbetar ...</translation>
 <translation id="6062854958530969723">Värdinitieringen misslyckades.</translation>
 <translation id="5843054235973879827">Varför är det säkert?</translation>
-<translation id="5895138241574237353">Starta om</translation>
 <translation id="5619148062500147964">Till den här datorn</translation>
 <translation id="4068946408131579958">Alla anslutningar</translation>
 <translation id="2208514473086078157">Enligt policyinställningarna får du inte dela den här datorn som en Chrome Remote Desktop-värd. Kontakta systemadministratören om du behöver hjälp.</translation>
@@ -255,8 +254,6 @@ Desktop Host</translation>
 <translation id="6570205395680337606">Återställ programmet. Ändringar som inte har sparats går förlorade.</translation>
 <translation id="6284412385303060032">Värden som kördes på konsolens inloggningsskärm har avslutats för att stödja Curtain Mode genom att byta till en värd som körs i en användarspecifik session.</translation>
 <translation id="3596628256176442606">Med den här tjänsten aktiveras inkommande anslutningar från Chromoting-klienter.</translation>
-<translation id="1978866438647250517">• Förbättringar i användargränssnittet.
-• Minskad nätverksanvändning när den körs i bakgrunden.</translation>
 <translation id="4741792197137897469">Autentiseringen misslyckades. Logga in i Chrome igen.</translation>
 <translation id="4277463233460010382">Den här datorn är konfigurerad för att tillåta att en eller flera klienter ansluter utan att en pinkod måste anges.</translation>
 <translation id="837021510621780684">Från den här datorn</translation>

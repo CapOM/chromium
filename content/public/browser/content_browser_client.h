@@ -53,6 +53,10 @@ namespace gfx {
 class ImageSkia;
 }
 
+namespace mojo {
+class ApplicationDelegate;
+}
+
 namespace net {
 class CookieOptions;
 class NetLog;
@@ -270,6 +274,12 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual void AppendExtraCommandLineSwitches(base::CommandLine* command_line,
                                               int child_process_id) {}
 
+  // This is called on the process launching thread, when files that should be
+  // passed to the client have been opened.  It allows command line switches to
+  // be added to tell the client where to find its files.
+  virtual void AppendMappedFileCommandLineSwitches(
+      base::CommandLine* command_line) {}
+
   // Returns the locale used by the application.
   // This is called on the UI and IO threads.
   virtual std::string GetApplicationLocale();
@@ -455,7 +465,8 @@ class CONTENT_EXPORT ContentBrowserClient {
                                bool opener_suppressed,
                                ResourceContext* context,
                                int render_process_id,
-                               int opener_id,
+                               int opener_render_view_id,
+                               int opener_render_frame_id,
                                bool* no_javascript_access);
 
   // Notifies the embedder that the ResourceDispatcherHost has been created.
@@ -577,6 +588,13 @@ class CONTENT_EXPORT ContentBrowserClient {
   virtual void OverrideRenderFrameMojoServices(
       ServiceRegistry* registry,
       RenderFrameHost* render_frame_host) {}
+
+  using StaticMojoApplicationMap =
+      std::map<GURL, base::Callback<scoped_ptr<mojo::ApplicationDelegate>()>>;
+
+  // Registers in-process Mojo application loaders with the browser's global
+  // Mojo shell.
+  virtual void RegisterMojoApplications(StaticMojoApplicationMap* apps) {}
 
   // Registers additional navigator.connect service factories available in a
   // particular NavigatorConnectContext.

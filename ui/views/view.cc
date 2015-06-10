@@ -83,9 +83,6 @@ const View* GetHierarchyRoot(const View* view) {
 }  // namespace
 
 // static
-ViewsDelegate* ViewsDelegate::views_delegate = NULL;
-
-// static
 const char View::kViewClassName[] = "View";
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -737,6 +734,8 @@ void View::SchedulePaintInRect(const gfx::Rect& rect) {
 void View::Paint(const ui::PaintContext& parent_context) {
   if (!visible_)
     return;
+  if (size().IsEmpty())
+    return;
 
   gfx::Vector2d offset_to_parent;
   if (!layer()) {
@@ -1283,8 +1282,8 @@ gfx::NativeViewAccessible View::GetNativeViewAccessible() {
 void View::NotifyAccessibilityEvent(
     ui::AXEvent event_type,
     bool send_native_event) {
-  if (ViewsDelegate::views_delegate)
-    ViewsDelegate::views_delegate->NotifyAccessibilityEvent(this, event_type);
+  if (ViewsDelegate::GetInstance())
+    ViewsDelegate::GetInstance()->NotifyAccessibilityEvent(this, event_type);
 
   if (send_native_event && GetWidget()) {
     if (!native_view_accessibility_)

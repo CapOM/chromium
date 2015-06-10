@@ -76,7 +76,6 @@
 #include "extensions/renderer/script_injection_manager.h"
 #include "extensions/renderer/send_request_natives.h"
 #include "extensions/renderer/set_icon_natives.h"
-#include "extensions/renderer/tab_finder.h"
 #include "extensions/renderer/test_features_native_handler.h"
 #include "extensions/renderer/user_gestures_native_handler.h"
 #include "extensions/renderer/utils_native_handler.h"
@@ -215,8 +214,8 @@ Dispatcher::Dispatcher(DispatcherDelegate* delegate)
 Dispatcher::~Dispatcher() {
 }
 
-void Dispatcher::OnRenderViewCreated(content::RenderView* render_view) {
-  script_injection_manager_->OnRenderViewCreated(render_view);
+void Dispatcher::OnRenderFrameCreated(content::RenderFrame* render_frame) {
+  script_injection_manager_->OnRenderFrameCreated(render_frame);
 }
 
 bool Dispatcher::IsExtensionActive(const std::string& extension_id) const {
@@ -473,6 +472,15 @@ std::vector<std::pair<std::string, int> > Dispatcher::GetJsResources() {
   resources.push_back(std::make_pair("guestViewDeny", IDR_GUEST_VIEW_DENY_JS));
   resources.push_back(std::make_pair("guestViewEvents",
                                      IDR_GUEST_VIEW_EVENTS_JS));
+
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          ::switches::kSitePerProcess)) {
+    resources.push_back(std::make_pair("guestViewIframe",
+                                       IDR_GUEST_VIEW_IFRAME_JS));
+    resources.push_back(std::make_pair("guestViewIframeContainer",
+                                       IDR_GUEST_VIEW_IFRAME_CONTAINER_JS));
+  }
+
   resources.push_back(std::make_pair("imageUtil", IDR_IMAGE_UTIL_JS));
   resources.push_back(std::make_pair("json_schema", IDR_JSON_SCHEMA_JS));
   resources.push_back(std::make_pair("lastError", IDR_LAST_ERROR_JS));
@@ -510,6 +518,11 @@ std::vector<std::pair<std::string, int> > Dispatcher::GetJsResources() {
   resources.push_back(std::make_pair("webViewEvents", IDR_WEB_VIEW_EVENTS_JS));
   resources.push_back(std::make_pair("webViewInternal",
                                      IDR_WEB_VIEW_INTERNAL_CUSTOM_BINDINGS_JS));
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          ::switches::kSitePerProcess)) {
+    resources.push_back(std::make_pair("webViewIframe",
+                                       IDR_WEB_VIEW_IFRAME_JS));
+  }
   resources.push_back(
       std::make_pair(mojo::kBindingsModuleName, IDR_MOJO_BINDINGS_JS));
   resources.push_back(
@@ -590,6 +603,14 @@ std::vector<std::pair<std::string, int> > Dispatcher::GetJsResources() {
 
   // Platform app sources that are not API-specific..
   resources.push_back(std::make_pair("platformApp", IDR_PLATFORM_APP_JS));
+
+#if defined(ENABLE_MEDIA_ROUTER)
+  resources.push_back(
+      std::make_pair("chrome/browser/media/router/media_router.mojom",
+                     IDR_MEDIA_ROUTER_MOJOM_JS));
+  resources.push_back(
+      std::make_pair("media_router_bindings", IDR_MEDIA_ROUTER_BINDINGS_JS));
+#endif  // defined(ENABLE_MEDIA_ROUTER)
 
   return resources;
 }
@@ -684,6 +705,10 @@ void Dispatcher::RegisterNativeHandlers(ModuleSystem* module_system,
       "runtime", scoped_ptr<NativeHandler>(new RuntimeCustomBindings(context)));
 }
 
+void Dispatcher::LoadExtensionForTest(const Extension* extension) {
+  CHECK(extensions_.Insert(extension));
+}
+
 bool Dispatcher::OnControlMessageReceived(const IPC::Message& message) {
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(Dispatcher, message)
@@ -732,12 +757,9 @@ void Dispatcher::WebKitInitialized() {
 
   // Initialize host permissions for any extensions that were activated before
   // WebKit was initialized.
-  for (std::set<std::string>::iterator iter = active_extension_ids_.begin();
-       iter != active_extension_ids_.end();
-       ++iter) {
-    const Extension* extension = extensions_.GetByID(*iter);
+  for (const std::string& extension_id : active_extension_ids_) {
+    const Extension* extension = extensions_.GetByID(extension_id);
     CHECK(extension);
-
     InitOriginPermissions(extension);
   }
 
@@ -784,7 +806,7 @@ void Dispatcher::OnActivateExtension(const std::string& extension_id) {
                    "e::dispatcher:%s:%s",
                    extension_id.c_str(),
                    error.c_str());
-    CHECK(extension) << extension_id << " was never loaded: " << error;
+    LOG(FATAL) << extension_id << " was never loaded: " << error;
   }
 
   active_extension_ids_.insert(extension_id);
@@ -848,24 +870,34 @@ void Dispatcher::OnDispatchOnDisconnect(int port_id,
 
 void Dispatcher::OnLoaded(
     const std::vector<ExtensionMsg_Loaded_Params>& loaded_extensions) {
-  std::vector<ExtensionMsg_Loaded_Params>::const_iterator i;
-  for (i = loaded_extensions.begin(); i != loaded_extensions.end(); ++i) {
+  for (const auto& param : loaded_extensions) {
     std::string error;
-    scoped_refptr<const Extension> extension = i->ConvertToExtension(&error);
+    scoped_refptr<const Extension> extension = param.ConvertToExtension(&error);
     if (!extension.get()) {
-      extension_load_errors_[i->id] = error;
+      NOTREACHED() << error;
+      // Note: in tests |param.id| has been observed to be empty (see comment
+      // just below) so this isn't all that reliable.
+      extension_load_errors_[param.id] = error;
       continue;
     }
-    OnLoadedInternal(extension);
+
+    // TODO(kalman): This test is deliberately not a CHECK (though I wish it
+    // could be) and uses extension->id() not params.id:
+    // 1. For some reason params.id can be empty. I've only seen it with
+    //    the webstore extension, in tests, and I've spent some time trying to
+    //    figure out why - but cost/benefit won.
+    // 2. The browser only sends this IPC to RenderProcessHosts once, but the
+    //    Dispatcher is attached to a RenderThread. Presumably there is a
+    //    mismatch there. In theory one would think it's possible for the
+    //    browser to figure this out itself - but again, cost/benefit.
+    if (!extensions_.Contains(extension->id()))
+      extensions_.Insert(extension);
   }
+
   // Update the available bindings for all contexts. These may have changed if
   // an externally_connectable extension was loaded that can connect to an
   // open webpage.
   UpdateBindings("");
-}
-
-void Dispatcher::OnLoadedInternal(scoped_refptr<const Extension> extension) {
-  extensions_.Insert(extension);
 }
 
 void Dispatcher::OnMessageInvoke(const std::string& extension_id,
@@ -919,7 +951,11 @@ void Dispatcher::OnTransferBlobs(const std::vector<std::string>& blob_uuids) {
 }
 
 void Dispatcher::OnUnloaded(const std::string& id) {
-  extensions_.Remove(id);
+  // See comment in OnLoaded for why it would be nice, but perhaps incorrect,
+  // to CHECK here rather than guarding.
+  if (!extensions_.Remove(id))
+    return;
+
   active_extension_ids_.erase(id);
 
   script_injection_manager_->OnExtensionUnloaded(id);
@@ -978,16 +1014,6 @@ void Dispatcher::OnUpdateTabSpecificPermissions(const GURL& visible_url,
                                                 const URLPatternSet& new_hosts,
                                                 bool update_origin_whitelist,
                                                 int tab_id) {
-  // Check against the URL to avoid races. If we can't find the tab, it's
-  // because this is an extension's background page (run in a different
-  // process) - in this case, we can't perform the security check. However,
-  // since activeTab is only granted via user action, this isn't a huge concern.
-  content::RenderView* render_view = TabFinder::Find(tab_id);
-  if (render_view &&
-      render_view->GetWebView()->mainFrame()->document().url() != visible_url) {
-    return;
-  }
-
   const Extension* extension = extensions_.GetByID(extension_id);
   if (!extension)
     return;
@@ -1405,6 +1431,11 @@ void Dispatcher::RequireGuestViewModules(ScriptContext* context) {
     module_system->Require("webView");
     module_system->Require("webViewApiMethods");
     module_system->Require("webViewAttributes");
+
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+            ::switches::kSitePerProcess)) {
+      module_system->Require("webViewIframe");
+    }
   }
 
   // The "guestViewDeny" module must always be loaded last. It registers

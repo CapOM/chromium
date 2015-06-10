@@ -1159,7 +1159,7 @@ void RenderTextHarfBuzz::ItemizeTextToRuns(
   // text. This is needed because leaving the runs set empty causes some clients
   // to misbehave since they expect non-zero text metrics from a non-empty text.
   base::i18n::BiDiLineIterator bidi_iterator;
-  if (!bidi_iterator.Open(text, is_text_rtl, false)) {
+  if (!bidi_iterator.Open(text, is_text_rtl)) {
     internal::TextRunHarfBuzz* run = new internal::TextRunHarfBuzz;
     run->range = Range(0, text.length());
     run_list_out->add(run);
@@ -1321,8 +1321,8 @@ void RenderTextHarfBuzz::ShapeRun(const base::string16& text,
   // http://crbug.com/467459. On some Windows configurations the default font
   // could be a raster font like System, which would not give us a reasonable
   // fallback font list.
-  if (!LowerCaseEqualsASCII(primary_family, "segoe ui") &&
-      !LowerCaseEqualsASCII(uniscribe_family, "segoe ui")) {
+  if (!base::LowerCaseEqualsASCII(primary_family, "segoe ui") &&
+      !base::LowerCaseEqualsASCII(uniscribe_family, "segoe ui")) {
     std::vector<std::string> default_fallback_families =
         GetFallbackFontFamilies("Segoe UI");
     fallback_families.insert(fallback_families.end(),

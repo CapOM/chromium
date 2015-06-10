@@ -43,15 +43,14 @@ namespace net {
 namespace {
 
 using NCryptFreeObjectFunc = SECURITY_STATUS(WINAPI*)(NCRYPT_HANDLE);
-using NCryptSignHashFunc =
-    SECURITY_STATUS(WINAPI*)(NCRYPT_KEY_HANDLE,  // hKey
-                             VOID*,  // pPaddingInfo
-                             PBYTE,  // pbHashValue
-                             DWORD,  // cbHashValue
-                             PBYTE,  // pbSignature
-                             DWORD,  // cbSignature
-                             DWORD*,  // pcbResult
-                             DWORD);  // dwFlags
+using NCryptSignHashFunc = SECURITY_STATUS(WINAPI*)(NCRYPT_KEY_HANDLE,  // hKey
+                                                    VOID*,   // pPaddingInfo
+                                                    BYTE*,   // pbHashValue
+                                                    DWORD,   // cbHashValue
+                                                    BYTE*,   // pbSignature
+                                                    DWORD,   // cbSignature
+                                                    DWORD*,  // pcbResult
+                                                    DWORD);  // dwFlags
 
 class CNGFunctions {
  public:
@@ -196,7 +195,7 @@ bool DoNCryptSignHash(NCRYPT_KEY_HANDLE key,
   // correct size. Some smartcards are buggy and do not write to it on the
   // second call.
   ncrypt_status = g_cng_functions.Get().ncrypt_sign_hash()(
-      key, padding, const_cast<PBYTE>(in), in_len, out, signature_len,
+      key, padding, const_cast<BYTE*>(in), in_len, out, signature_len,
       &signature_len, flags);
   if (FAILED(ncrypt_status)) {
     LOG(ERROR) << "NCryptSignHash failed: " << ncrypt_status;
@@ -293,16 +292,17 @@ int RsaMethodSign(int hash_nid,
       return 0;
   }
 
-  HCRYPTHASH hash;
-  if (!CryptCreateHash(ex_data->key->hCryptProv, hash_alg, 0, 0, &hash)) {
+  crypto::ScopedHCRYPTHASH hash;
+  if (!CryptCreateHash(ex_data->key->hCryptProv, hash_alg, 0, 0,
+                       hash.receive())) {
     PLOG(ERROR) << "CreateCreateHash failed";
     OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_SIGNATURE_FAILED);
     return 0;
   }
   DWORD hash_len;
   DWORD arg_len = sizeof(hash_len);
-  if (!CryptGetHashParam(hash, HP_HASHSIZE, reinterpret_cast<BYTE*>(&hash_len),
-                         &arg_len, 0)) {
+  if (!CryptGetHashParam(hash.get(), HP_HASHSIZE,
+                         reinterpret_cast<BYTE*>(&hash_len), &arg_len, 0)) {
     PLOG(ERROR) << "CryptGetHashParam HP_HASHSIZE failed";
     OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_SIGNATURE_FAILED);
     return 0;
@@ -311,13 +311,13 @@ int RsaMethodSign(int hash_nid,
     OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_SIGNATURE_FAILED);
     return 0;
   }
-  if (!CryptSetHashParam(hash, HP_HASHVAL, const_cast<BYTE*>(in), 0)) {
+  if (!CryptSetHashParam(hash.get(), HP_HASHVAL, const_cast<BYTE*>(in), 0)) {
     PLOG(ERROR) << "CryptSetHashParam HP_HASHVAL failed";
     OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_SIGNATURE_FAILED);
     return 0;
   }
   DWORD signature_len = RSA_size(rsa);
-  if (!CryptSignHash(hash, ex_data->key->dwKeySpec, nullptr, 0, out,
+  if (!CryptSignHash(hash.get(), ex_data->key->dwKeySpec, nullptr, 0, out,
                      &signature_len)) {
     PLOG(ERROR) << "CryptSignHash failed";
     OpenSSLPutNetError(FROM_HERE, ERR_SSL_CLIENT_AUTH_SIGNATURE_FAILED);

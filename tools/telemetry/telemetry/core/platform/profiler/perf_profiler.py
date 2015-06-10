@@ -12,11 +12,11 @@ import tempfile
 
 from pylib.device import device_errors  # pylint: disable=F0401
 
+from catapult_base import support_binaries
 from telemetry.core import platform
 from telemetry.core.platform import profiler
 from telemetry.core.platform.profiler import android_profiling_helper
 from telemetry.core import util
-from telemetry.util import support_binaries
 
 util.AddDirToPythonPath(util.GetChromiumSrcDir(), 'build', 'android')
 from pylib.perf import perf_control  # pylint: disable=F0401
@@ -128,7 +128,11 @@ Try rerunning this script under sudo or setting
                                   self._output_file)
     if self._is_android:
       device = self._browser_backend.adb.device()
-      device.PullFile(self._device_output_file, self._output_file)
+      try:
+        device.PullFile(self._device_output_file, self._output_file)
+      except:
+        logging.exception('New exception caused by DeviceUtils conversion')
+        raise
       required_libs = \
           android_profiling_helper.GetRequiredLibrariesForPerfProfile(
               self._output_file)

@@ -44,7 +44,6 @@ from pylib.device import device_errors  # pylint: disable=import-error
 from pylib.perf import cache_control  # pylint: disable=import-error
 from pylib.perf import perf_control  # pylint: disable=import-error
 from pylib.perf import thermal_throttle  # pylint: disable=import-error
-from pylib.utils import device_temp_file  # pylint: disable=import-error
 
 try:
   from pylib.perf import surface_stats_collector  # pylint: disable=import-error
@@ -84,8 +83,12 @@ class AndroidPlatformBackend(
     self._perf_tests_setup = perf_control.PerfControl(self._device)
     self._thermal_throttle = thermal_throttle.ThermalThrottle(self._device)
     self._raw_display_frame_rate_measurements = []
-    self._can_access_protected_file_contents = (
-        self._device.HasRoot() or self._device.NeedsSU())
+    try:
+      self._can_access_protected_file_contents = (
+          self._device.HasRoot() or self._device.NeedsSU())
+    except:
+      logging.exception('New exception caused by DeviceUtils conversion')
+      raise
     self._device_copy_script = None
     power_controller = power_monitor_controller.PowerMonitorController([
         monsoon_power_monitor.MonsoonPowerMonitor(self._device, self),
@@ -210,9 +213,12 @@ class AndroidPlatformBackend(
     if not android_prebuilt_profiler_helper.InstallOnDevice(
         self._device, 'purge_ashmem'):
       raise Exception('Error installing purge_ashmem.')
-    output = self._device.RunShellCommand(
-        android_prebuilt_profiler_helper.GetDevicePath('purge_ashmem'),
-        check_return=True)
+    try:
+      output = self._device.RunShellCommand(
+          android_prebuilt_profiler_helper.GetDevicePath('purge_ashmem'))
+    except:
+      logging.exception('New exception caused by DeviceUtils conversion')
+      raise
     for l in output:
       logging.info(l)
 
@@ -243,6 +249,10 @@ class AndroidPlatformBackend(
     if not ps:
       raise exceptions.ProcessGoneException()
     return ps[0][1]
+
+  @decorators.Cache
+  def GetArchName(self):
+    return self._device.GetABI()
 
   def GetOSName(self):
     return 'android'
@@ -375,11 +385,7 @@ class AndroidPlatformBackend(
     command = 'ps'
     if pid:
       command += ' -p %d' % pid
-    with device_temp_file.DeviceTempFile(self._device.adb) as ps_out:
-      command += ' > %s' % ps_out.name
-      self._device.RunShellCommand(command)
-      # Get rid of trailing new line and header.
-      ps = self._device.ReadFile(ps_out.name).split('\n')[1:-1]
+    ps = self._device.RunShellCommand(command, large_output=True)[1:]
     output = []
     for line in ps:
       data = line.split()
@@ -539,8 +545,12 @@ class AndroidPlatformBackend(
     self._device.PushChangedFiles([(new_profile_dir, saved_profile_location)])
 
     profile_dir = self._GetProfileDir(package)
-    self._EfficientDeviceDirectoryCopy(
-        saved_profile_location, profile_dir)
+    try:
+      self._EfficientDeviceDirectoryCopy(
+          saved_profile_location, profile_dir)
+    except:
+      logging.exception('New exception caused by DeviceUtils conversion')
+      raise
     dumpsys = self._device.RunShellCommand('dumpsys package %s' % package)
     id_line = next(line for line in dumpsys if 'userId=' in line)
     uid = re.search(r'\d+', id_line).group()
@@ -560,8 +570,7 @@ class AndroidPlatformBackend(
           _DEVICE_COPY_SCRIPT_LOCATION)
       self._device_copy_script = _DEVICE_COPY_SCRIPT_FILE
     self._device.RunShellCommand(
-        ['sh', self._device_copy_script, source, dest],
-        check_return=True)
+        ['sh', self._device_copy_script, source, dest])
 
   def RemoveProfile(self, package, ignore_list):
     """Delete application profile on device.
@@ -593,8 +602,11 @@ class AndroidPlatformBackend(
     # pulled down is really needed e.g. .pak files.
     if not os.path.exists(output_profile_path):
       os.makedirs(output_profile_path)
-    files = self._device.RunShellCommand(
-        ['ls', profile_dir], check_return=True)
+    try:
+      files = self._device.RunShellCommand(['ls', profile_dir])
+    except:
+      logging.exception('New exception caused by DeviceUtils conversion')
+      raise
     for f in files:
       # Don't pull lib, since it is created by the installer.
       if f != 'lib':

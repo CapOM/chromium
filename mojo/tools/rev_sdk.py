@@ -23,6 +23,7 @@ sdk_dirs_to_clone = [
 sdk_dirs_to_not_clone = [
   "mojo/public/cpp/application",
   "mojo/public/interfaces/application",
+  "mojo/public/interfaces/network",
   "mojo/public/java/application",
 ]
 
@@ -95,10 +96,5 @@ if len(sys.argv) < 2:
   sys.exit(1)
 
 # Allow override of the roll revision.
-if len(sys.argv) == 3:
-  mojo_revision = sys.argv[2]
-else:
-  mojo_revision = 'origin/HEAD'
-
-rev(sys.argv[1], chromium_root_dir, mojo_revision)
-
+revision = sys.argv[2] if len(sys.argv) == 3 else 'origin/HEAD'
+rev(sys.argv[1], chromium_root_dir, revision)

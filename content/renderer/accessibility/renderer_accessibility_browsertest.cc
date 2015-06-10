@@ -6,6 +6,7 @@
 #include "base/time/time.h"
 #include "content/common/frame_messages.h"
 #include "content/common/view_message_enums.h"
+#include "content/public/common/content_switches.h"
 #include "content/public/test/render_view_test.h"
 #include "content/renderer/accessibility/renderer_accessibility.h"
 #include "content/renderer/render_frame_impl.h"
@@ -48,6 +49,15 @@ class RendererAccessibilityTest : public RenderViewTest {
   void SetUp() override {
     RenderViewTest::SetUp();
     sink_ = &render_thread_->sink();
+  }
+
+  void TearDown() override {
+#if defined(LEAK_SANITIZER)
+     // Do this before shutting down V8 in RenderViewTest::TearDown().
+     // http://crbug.com/328552
+     __lsan_do_leak_check();
+#endif
+     RenderViewTest::TearDown();
   }
 
   void SetMode(AccessibilityMode mode) {
@@ -156,6 +166,14 @@ TEST_F(RendererAccessibilityTest, SendFullAccessibilityTreeOnReload) {
 
 TEST_F(RendererAccessibilityTest,
        MAYBE_AccessibilityMessagesQueueWhileSwappedOut) {
+  // This test breaks down in --site-per-process, as swapping out destroys
+  // the main frame and it cannot be further navigated.
+  // TODO(nasko): Figure out what this behavior looks like when swapped out
+  // no longer exists.
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSitePerProcess)) {
+    return;
+  }
   std::string html =
       "<body>"
       "  <p>Hello, world.</p>"

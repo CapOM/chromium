@@ -10,9 +10,9 @@ import random
 import sys
 import traceback
 
+from catapult_base import cloud_storage
 from telemetry.results import progress_reporter as progress_reporter_module
 from telemetry.results import user_story_run
-from telemetry.util import cloud_storage
 from telemetry import value as value_module
 from telemetry.value import failure
 from telemetry.value import skip
@@ -28,7 +28,7 @@ class PageTestResults(object):
       output_stream: The output stream to use to write test results.
       output_formatters: A list of output formatters. The output
           formatters are typically used to format the test results, such
-          as CsvOutputFormatter, which output the test results as CSV.
+          as CsvPivotTableOutputFormatter, which output the test results as CSV.
       progress_reporter: An instance of progress_reporter.ProgressReporter,
           to be used to output test status/results progressively.
       trace_tag: A string to append to the buildbot trace name. Currently only
@@ -36,10 +36,10 @@ class PageTestResults(object):
       output_dir: A string specified the directory where to store the test
           artifacts, e.g: trace, videos,...
       value_can_be_added_predicate: A function that takes two arguments:
-          a value.Value instance (except value.FailureValue & value.SkipValue)
-          and a boolean (True when the value is part of the first result for
-          the user story). It returns True if the value can be added to the
-          test results and False otherwise.
+          a value.Value instance (except failure.FailureValue, skip.SkipValue
+          or trace.TraceValue) and a boolean (True when the value is part of
+          the first result for the user story). It returns True if the value
+          can be added to the test results and False otherwise.
     """
     # TODO(chrishenry): Figure out if trace_tag is still necessary.
 
@@ -173,6 +173,7 @@ class PageTestResults(object):
       self._current_page_run.user_story not in self._all_user_stories)
     if not (isinstance(value, skip.SkipValue) or
             isinstance(value, failure.FailureValue) or
+            isinstance(value, trace.TraceValue) or
             self._value_can_be_added_predicate(value, is_first_result)):
       return
     # TODO(eakuefner/chrishenry): Add only one skip per pagerun assert here

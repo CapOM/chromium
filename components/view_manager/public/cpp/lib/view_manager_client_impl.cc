@@ -108,7 +108,8 @@ ViewManagerClientImpl::ViewManagerClientImpl(
       capture_view_(nullptr),
       focused_view_(nullptr),
       activated_view_(nullptr),
-      binding_(this, request.Pass()) {
+      binding_(this, request.Pass()),
+      is_embed_root_(false) {
 }
 
 ViewManagerClientImpl::~ViewManagerClientImpl() {
@@ -134,7 +135,7 @@ ViewManagerClientImpl::~ViewManagerClientImpl() {
   for (size_t i = 0; i < non_owned.size(); ++i)
     delete non_owned[i];
 
-  delegate_->OnViewManagerDisconnected(this);
+  delegate_->OnViewManagerDestroyed(this);
 }
 
 void ViewManagerClientImpl::DestroyView(Id view_id) {
@@ -201,24 +202,16 @@ void ViewManagerClientImpl::SetProperty(
                             ActionCompletedCallback());
 }
 
-void ViewManagerClientImpl::Embed(const String& url, Id view_id) {
-  mojo::URLRequestPtr request(mojo::URLRequest::New());
-  request->url = mojo::String::From(url);
-  Embed(request.Pass(), view_id, nullptr, nullptr);
-}
-
-void ViewManagerClientImpl::Embed(mojo::URLRequestPtr request,
-                                  Id view_id,
-                                  InterfaceRequest<ServiceProvider> services,
-                                  ServiceProviderPtr exposed_services) {
-  DCHECK(service_);
-  service_->EmbedRequest(request.Pass(), view_id, services.Pass(),
-                         exposed_services.Pass(), ActionCompletedCallback());
-}
-
 void ViewManagerClientImpl::Embed(Id view_id, ViewManagerClientPtr client) {
   DCHECK(service_);
   service_->Embed(view_id, client.Pass(), ActionCompletedCallback());
+}
+
+void ViewManagerClientImpl::EmbedAllowingReembed(mojo::URLRequestPtr request,
+                                                 Id view_id) {
+  DCHECK(service_);
+  service_->EmbedAllowingReembed(view_id, request.Pass(),
+                                 ActionCompletedCallback());
 }
 
 void ViewManagerClientImpl::AddView(View* view) {
@@ -254,10 +247,6 @@ Id ViewManagerClientImpl::CreateViewOnServer() {
   return view_id;
 }
 
-const std::string& ViewManagerClientImpl::GetEmbedderURL() const {
-  return creator_url_;
-}
-
 View* ViewManagerClientImpl::GetRoot() {
   return root_;
 }
@@ -277,15 +266,18 @@ View* ViewManagerClientImpl::CreateView() {
   return view;
 }
 
+void ViewManagerClientImpl::SetEmbedRoot() {
+  // TODO(sky): this isn't right. The server may ignore the call.
+  is_embed_root_ = true;
+  service_->SetEmbedRoot();
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // ViewManagerClientImpl, ViewManagerClient implementation:
 
 void ViewManagerClientImpl::OnEmbed(ConnectionSpecificId connection_id,
-                                    const String& creator_url,
                                     ViewDataPtr root_data,
                                     ViewManagerServicePtr view_manager_service,
-                                    InterfaceRequest<ServiceProvider> services,
-                                    ServiceProviderPtr exposed_services,
                                     Id focused_view_id) {
   if (view_manager_service) {
     DCHECK(!service_);
@@ -293,7 +285,6 @@ void ViewManagerClientImpl::OnEmbed(ConnectionSpecificId connection_id,
     service_.set_error_handler(this);
   }
   connection_id_ = connection_id;
-  creator_url_ = String::From(creator_url);
 
   DCHECK(!root_);
   root_ = AddViewToViewManager(this, nullptr, root_data);
@@ -301,7 +292,18 @@ void ViewManagerClientImpl::OnEmbed(ConnectionSpecificId connection_id,
 
   focused_view_ = GetViewById(focused_view_id);
 
-  delegate_->OnEmbed(root_, services.Pass(), exposed_services.Pass());
+  delegate_->OnEmbed(root_);
+}
+
+void ViewManagerClientImpl::OnEmbedForDescendant(
+    Id view_id,
+    mojo::URLRequestPtr request,
+    const OnEmbedForDescendantCallback& callback) {
+  View* view = GetViewById(view_id);
+  ViewManagerClientPtr client;
+  if (view)
+    delegate_->OnEmbedForDescendant(view, request.Pass(), &client);
+  callback.Run(client.Pass());
 }
 
 void ViewManagerClientImpl::OnEmbeddedAppDisconnected(Id view_id) {

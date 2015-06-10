@@ -4,9 +4,8 @@
 
 import("//build/module_args/v8.gni")
 import("//mojo/mojo_application_package.gni")
+import("//mojo/public/mojo_application.gni")
 import("//testing/test.gni")
-import("//third_party/mojo/src/mojo/public/mojo.gni")
-import("//third_party/mojo/src/mojo/public/mojo_application.gni")
 import("//tools/grit/grit_rule.gni")
 import("//tools/grit/repack.gni")
 
@@ -71,6 +70,8 @@ source_set("lib") {
     "blink_url_request_type_converters.h",
     "discardable_memory_allocator.cc",
     "discardable_memory_allocator.h",
+    "frame_tree_manager.cc",
+    "frame_tree_manager.h",
     "html_document.cc",
     "html_document.h",
     "media_factory.cc",
@@ -120,6 +121,7 @@ source_set("lib") {
     "//components/webcrypto",
     "//gin",
     "//mandoline/services/navigation/public/interfaces",
+    "//mandoline/tab/public/interfaces",
     "//media",
     "//media/blink",
     "//media/mojo",

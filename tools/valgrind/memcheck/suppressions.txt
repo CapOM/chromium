@@ -2540,14 +2540,6 @@
   fun:*content*ScreenshotData*EncodeOnWorker*
 }
 {
-  bug_363819
-  Memcheck:Uninitialized
-  fun:strlen
-  fun:*
-  fun:_ZN3net12_GLOBAL__N_114TestHttpClient4ReadEPSs
-  fun:_ZN3net*HttpServerTest*
-}
-{
   bug_364274
   Memcheck:Uninitialized
   fun:_ZN5blink21RenderLayerCompositor14updateIfNeededEv
@@ -3373,7 +3365,6 @@
    Memcheck:Uninitialized
    fun:av_packet_unpack_dictionary
    fun:add_metadata_from_side_data
-   fun:avcodec_decode_*
    fun:avcodec_decode_*
 }
 {

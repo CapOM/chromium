@@ -225,7 +225,7 @@ class ToolbarManager implements ToolbarTabController, UrlFocusChangeListener {
             }
 
             @Override
-            public void onPageLoadStarted(Tab tab) {
+            public void onPageLoadStarted(Tab tab, String url) {
                 updateButtonStatus();
                 updateTabLoadingState(true, true);
             }
@@ -238,6 +238,11 @@ class ToolbarManager implements ToolbarTabController, UrlFocusChangeListener {
             @Override
             public void onPageLoadFailed(Tab tab, int errorCode) {
                 ToolbarManager.this.onPageLoadFailed();
+            }
+
+            @Override
+            public void onTitleUpdated(Tab tab) {
+                mLocationBar.setTitleToPageTitle();
             }
 
             @Override
