@@ -9,6 +9,7 @@
 #include "base/sequenced_task_runner.h"
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
+#include "device/bluetooth/android/bluetooth_adapter_wrapper.h"
 #include "device/bluetooth/bluetooth_advertisement.h"
 #include "jni/ChromeBluetoothAdapter_jni.h"
 
@@ -20,19 +21,18 @@ namespace device {
 // static
 base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
     const InitCallback& init_callback) {
-  return BluetoothAdapterAndroid::Create(false, NULL);
+  ScopedJavaLocalRef<jobject> j_bluetooth_adapter_wrapper =
+      BluetoothAdapterWrapper::CreateWithDefaultAdapter();
+  return BluetoothAdapterAndroid::Create(j_bluetooth_adapter_wrapper.obj());
 }
 
 // static
 base::WeakPtr<BluetoothAdapterAndroid> BluetoothAdapterAndroid::Create(
-    bool assume_no_bluetooth_support_for_testing,
-    jobject java_bluetooth_adapter_wrapper_for_testing) {
+    jobject java_bluetooth_adapter_wrapper) {
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
 
   adapter->j_bluetooth_adapter_.Reset(Java_ChromeBluetoothAdapter_create(
-      AttachCurrentThread(), base::android::GetApplicationContext(),
-      assume_no_bluetooth_support_for_testing,
-      java_bluetooth_adapter_wrapper_for_testing));
+      AttachCurrentThread(), java_bluetooth_adapter_wrapper));
 
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }

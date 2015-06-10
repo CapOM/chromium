@@ -6,12 +6,15 @@
 #define DEVICE_BLUETOOTH_BLUETOOTH_ADAPTER_ANDROID_H_
 
 #include "base/android/jni_android.h"
+#include "base/android/scoped_java_ref.h"
 #include "base/memory/weak_ptr.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 
 namespace base {
 class SequencedTaskRunner;
 }  // namespace base
+
+using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
@@ -25,13 +28,13 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
  public:
   // Create a BluetoothAdapterAndroid instance.
   //
-  // For testing |assume_no_bluetooth_support_for_testing| or
-  // |java_bluetooth_adapter_wrapper_for_testing| can be set. The
-  // BluetoothAdapterAndroid instance will indirectly hold a Java reference to
-  // |java_bluetooth_adapter_wrapper_for_testing|.
+  // |java_bluetooth_adapter_wrapper| is optional. If it is NULL the adapter
+  // will return false for |IsPresent()| and not be functional.
+  //
+  // The BluetoothAdapterAndroid instance will indirectly hold a Java reference
+  // to |java_bluetooth_adapter_wrapper|.
   static base::WeakPtr<BluetoothAdapterAndroid> Create(
-      bool assume_no_bluetooth_support_for_testing,
-      jobject java_bluetooth_adapter_wrapper_for_testing);
+      jobject java_bluetooth_adapter_wrapper);
 
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);

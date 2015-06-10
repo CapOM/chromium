@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include "base/memory/ref_counted.h"
+#include "device/bluetooth/android/bluetooth_adapter_wrapper.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
 #include "jni/FakeBluetoothAdapter_jni.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -20,11 +21,13 @@ class BluetoothAdapterAndroidTest : public testing::Test {
   }
 
   void InitWithPermission() {
-    adapter_ = BluetoothAdapterAndroid::Create(false, NULL).get();
+    adapter_ =
+        BluetoothAdapterAndroid::Create(
+            BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj()).get();
   }
 
   void InitWithoutPermission() {
-    adapter_ = BluetoothAdapterAndroid::Create(true, NULL).get();
+    adapter_ = BluetoothAdapterAndroid::Create(NULL).get();
   }
 
   void InitWithFakeAdapter() {
@@ -32,7 +35,7 @@ class BluetoothAdapterAndroidTest : public testing::Test {
         Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
 
     adapter_ = BluetoothAdapterAndroid::Create(
-                   false, j_fake_bluetooth_adapter_.obj()).get();
+        j_fake_bluetooth_adapter_.obj()).get();
   }
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_;
