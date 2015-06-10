@@ -21,7 +21,7 @@ public class BluetoothAdapterWrapper {
         return new BluetoothAdapterWrapper(adapter);
     }
 
-    private BluetoothAdapterWrapper(BluetoothAdapter adapter) {
+    public BluetoothAdapterWrapper(BluetoothAdapter adapter) {
         assert adapter != null;
         mAdapter = adapter;
     }
