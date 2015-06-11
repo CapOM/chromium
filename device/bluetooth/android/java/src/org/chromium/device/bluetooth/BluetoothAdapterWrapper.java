@@ -50,7 +50,6 @@ public class BluetoothAdapterWrapper {
     }
 
     public BluetoothAdapterWrapper(BluetoothAdapter adapter) {
-        assert adapter != null;
         mAdapter = adapter;
     }
 
