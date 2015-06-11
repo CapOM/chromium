@@ -19,7 +19,7 @@ import org.chromium.base.Log;
  */
 @JNINamespace("device")
 public class BluetoothAdapterWrapper {
-    private static final String TAG = Log.makeTag("Bluetooth");
+    private static final String TAG = "cr.Bluetooth";
     private final BluetoothAdapter mAdapter;
 
     /***

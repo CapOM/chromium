@@ -11,7 +11,7 @@ import org.chromium.base.Log;
  * Fakes android.bluetooth.BluetoothAdapter.
  */
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
-    private static final String TAG = Log.makeTag("Bluetooth");
+    private static final String TAG = "cr.Bluetooth";
 
     /**
      * Creates a FakeBluetoothAdapter.
