@@ -22,7 +22,7 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
         return new FakeBluetoothAdapter();
     }
 
-    public FakeBluetoothAdapter() {
+    private FakeBluetoothAdapter() {
         super(null);
     }
 
