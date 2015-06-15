@@ -56,7 +56,7 @@ public class BluetoothAdapterWrapper {
                 && context.getPackageManager().hasSystemFeature(
                            PackageManager.FEATURE_BLUETOOTH_LE);
         if (!hasLowEnergyFeature) {
-            Log.i(TAG, "BluetoothAdapterWrapper.create failed: Low Energy not supported on system.");
+            Log.i(TAG, "BluetoothAdapterWrapper.create failed: No Low Energy support.");
             return null;
         }
 
