@@ -16,7 +16,7 @@ import org.chromium.base.Log;
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
-    private static final String TAG = Log.makeTag("Bluetooth");
+    private static final String TAG = "cr.Bluetooth";
 
     /**
      * Creates a FakeBluetoothAdapter.
@@ -27,7 +27,7 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
         return new FakeBluetoothAdapter();
     }
 
-    public FakeBluetoothAdapter() {
+    private FakeBluetoothAdapter() {
         super(null);
     }
 

@@ -23,7 +23,7 @@ import org.chromium.base.Log;
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class BluetoothAdapterWrapper {
-    private static final String TAG = Log.makeTag("Bluetooth");
+    private static final String TAG = "cr.Bluetooth";
     private final BluetoothAdapter mAdapter;
 
     /***
@@ -71,7 +71,6 @@ public class BluetoothAdapterWrapper {
     }
 
     public BluetoothAdapterWrapper(BluetoothAdapter adapter) {
-        assert adapter != null;
         mAdapter = adapter;
     }
 

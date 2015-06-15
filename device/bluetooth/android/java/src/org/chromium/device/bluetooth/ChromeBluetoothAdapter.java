@@ -25,7 +25,7 @@ import java.util.List;
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 final class ChromeBluetoothAdapter {
-    private static final String TAG = Log.makeTag("Bluetooth");
+    private static final String TAG = "cr.Bluetooth";
 
     private long mNativeBluetoothAdapterAndroid;
     private BluetoothAdapterWrapper mAdapter;
@@ -41,7 +41,7 @@ final class ChromeBluetoothAdapter {
      *                       but may be either null if an adapter is not available
      *                       or a fake for testing.
      */
-    public ChromeBluetoothAdapter(BluetoothAdapterWrapper adapterWrapper) {
+    private ChromeBluetoothAdapter(BluetoothAdapterWrapper adapterWrapper) {
         if (adapterWrapper == null) {
             Log.i(TAG, "ChromeBluetoothAdapter created with no adapterWrapper.");
         } else {
@@ -64,7 +64,7 @@ final class ChromeBluetoothAdapter {
 
     // Implements BluetoothAdapterAndroid::Create.
     @CalledByNative
-    private static ChromeBluetoothAdapter create(BluetoothAdapterWrapper adapterWrapper) {
+    public static ChromeBluetoothAdapter create(BluetoothAdapterWrapper adapterWrapper) {
         return new ChromeBluetoothAdapter(adapterWrapper);
     }
 
