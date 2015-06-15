@@ -143,8 +143,8 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
   // TODO(scheib): Support filters crbug.com/490401
-  if (Java_ChromeBluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
-                                                j_bluetooth_adapter_.obj())) {
+  if (Java_ChromeBluetoothAdapter_addDiscoverySession(
+          AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
     callback.Run();
   } else {
     error_callback.Run();
