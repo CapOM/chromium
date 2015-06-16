@@ -14,6 +14,7 @@ import android.os.Build;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.Log;
 
+import java.lang.Override;
 import java.util.List;
 
 /**
@@ -36,22 +37,27 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
         super(null, new FakeBluetoothLeScanner());
     }
 
+    @Override
     public boolean isEnabled() {
         return true;
     }
 
+    @Override
     public String getAddress() {
         return "A1:B2:C3:D4:E5:F6";
     }
 
+    @Override
     public String getName() {
         return "FakeBluetoothAdapter";
     }
 
+    @Override
     public int getScanMode() {
         return android.bluetooth.BluetoothAdapter.SCAN_MODE_NONE;
     }
 
+    @Override
     public boolean isDiscovering() {
         return false;
     }
@@ -66,6 +72,7 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
             super(null);
         }
 
+        @Override
         public void startScan(
                 List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
             if (callback != null) {
@@ -75,6 +82,7 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
             mCallback = callback;
         }
 
+        @Override
         public void stopScan(ScanCallback callback) {
             if (callback != mCallback) {
                 throw new IllegalArgumentException("No scan in progress.");
