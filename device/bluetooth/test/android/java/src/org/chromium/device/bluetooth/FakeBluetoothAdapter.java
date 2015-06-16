@@ -6,10 +6,15 @@ package org.chromium.device.bluetooth;
 
 import android.annotation.TargetApi;
 import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanSettings;
 import android.os.Build;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.Log;
+
+import java.util.List;
 
 /**
  * Fakes android.bluetooth.BluetoothAdapter.
@@ -17,7 +22,6 @@ import org.chromium.base.Log;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     private static final String TAG = "cr.Bluetooth";
-    private final FakeBluetoothLeScanner mScanner;
 
     /**
      * Creates a FakeBluetoothAdapter.
@@ -29,13 +33,7 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     }
 
     private FakeBluetoothAdapter() {
-        super(null);
-        mScanner = new FakeBluetoothLeScanner();
-    }
-
-    @CalledByNative
-    public BluetoothLeScanner getBluetoothLeScanner() {
-        return mScanner;
+        super(null, new FakeBluetoothLeScanner());
     }
 
     public boolean isEnabled() {
@@ -61,18 +59,18 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     /**
      * Fakes android.bluetooth.le.BluetoothLeScanner.
      */
-    public class FakeBluetoothLeScanner extends BluetoothLeScannerWrapper {
-        private static final String TAG = "cr.Bluetooth";
+    public static class FakeBluetoothLeScanner extends BluetoothAdapterWrapper.BluetoothLeScannerWrapper {
         private ScanCallback mCallback;
 
         private FakeBluetoothLeScanner() {
             super(null);
         }
 
-        public void startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback)
+        public void startScan(
+                List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
             if (callback != null) {
                 throw new IllegalArgumentException(
-                    "FakeBluetoothLeScanner implementation does not support multiple scans.");
+                        "FakeBluetoothLeScanner does not support multiple scans.");
             }
             mCallback = callback;
         }

@@ -8,6 +8,9 @@ import android.Manifest;
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.BluetoothLeScanner;
+import android.bluetooth.le.ScanCallback;
+import android.bluetooth.le.ScanFilter;
+import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -15,6 +18,8 @@ import android.os.Build;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
+
+import java.util.List;
 
 /**
  * Wraps android.bluetooth.BluetoothAdapter, pasing through to a provided
@@ -25,6 +30,7 @@ import org.chromium.base.Log;
 public class BluetoothAdapterWrapper {
     private static final String TAG = "cr.Bluetooth";
     private final BluetoothAdapter mAdapter;
+    private final BluetoothLeScannerWrapper mScanner;
 
     /***
      * Creates a BluetoothAdapterWrapper using the default android.bluetooth.BluetoothAdapter. May
@@ -66,16 +72,18 @@ public class BluetoothAdapterWrapper {
             return null;
         } else {
             Log.i(TAG, "BluetoothAdapterWrapper created with default adapter.");
-            return new BluetoothAdapterWrapper(adapter);
+            return new BluetoothAdapterWrapper(
+                    adapter, new BluetoothLeScannerWrapper(adapter.getBluetoothLeScanner()));
         }
     }
 
-    public BluetoothAdapterWrapper(BluetoothAdapter adapter) {
+    public BluetoothAdapterWrapper(BluetoothAdapter adapter, BluetoothLeScannerWrapper scanner) {
         mAdapter = adapter;
+        mScanner = scanner;
     }
 
-    public BluetoothLeScanner getBluetoothLeScanner() {
-        return mAdapter.getBluetoothLeScanner();
+    public BluetoothLeScannerWrapper getBluetoothLeScanner() {
+        return mScanner;
     }
 
     public boolean isEnabled() {
@@ -102,20 +110,20 @@ public class BluetoothAdapterWrapper {
      * Wraps android.bluetooth.BluetoothLeScanner, pasing through to a provided
      * object. This indirection enables fake implementations when running tests.
      */
-    public class BluetoothLeScannerWrapper {
-        private static final String TAG = "cr.Bluetooth";
+    public static class BluetoothLeScannerWrapper {
         private final BluetoothLeScanner mScanner;
 
         public BluetoothLeScannerWrapper(BluetoothLeScanner scanner) {
             mScanner = scanner;
         }
 
-        public void startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback)
-            scanner.startScan(filters, settings, callback);
+        public void startScan(
+                List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
+            mScanner.startScan(filters, settings, callback);
         }
 
         public void stopScan(ScanCallback callback) {
-            scanner.stopScan(callback);
+            mScanner.stopScan(callback);
         }
     }
 }
