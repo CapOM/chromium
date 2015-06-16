@@ -81,9 +81,4 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructFakeAdapter) {
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
 
-TEST_F(BluetoothAdapterAndroidTest, AddDiscoverySession) {
-  InitWithFakeAdapter();
-  ASSERT_TRUE(adapter_.get());
-}
-
 }  // namespace device

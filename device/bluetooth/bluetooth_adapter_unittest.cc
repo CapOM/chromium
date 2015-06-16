@@ -7,12 +7,19 @@
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
+#include "device/bluetooth/test/bluetooth_test.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+#if defined(OS_ANDROID)
+#include "device/bluetooth/test/bluetooth_test_android.h"
+#endif
 
 using device::BluetoothAdapter;
 using device::BluetoothDevice;
 
 namespace device {
+
+typedef BluetoothTestAndroid BluetoothTest;
 
 class TestBluetoothAdapter : public BluetoothAdapter {
  public:
@@ -393,5 +400,13 @@ TEST(BluetoothAdapterTest, GetMergedDiscoveryFilterAllFields) {
 
   adapter->CleanupSessions();
 }
+
+#if defined (OS_ANDROID)
+TEST_F(BluetoothTest, AddDiscoverySession) {
+  InitWithFakeAdapter();
+  ASSERT_TRUE(adapter_.get());
+  adapter_->StartDiscoverySession();
+}
+#endif
 
 }  // namespace device
