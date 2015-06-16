@@ -97,4 +97,25 @@ public class BluetoothAdapterWrapper {
     public boolean isDiscovering() {
         return mAdapter.isDiscovering();
     }
+
+    /**
+     * Wraps android.bluetooth.BluetoothLeScanner, pasing through to a provided
+     * object. This indirection enables fake implementations when running tests.
+     */
+    public class BluetoothLeScannerWrapper {
+        private static final String TAG = "cr.Bluetooth";
+        private final BluetoothLeScanner mScanner;
+
+        public BluetoothLeScannerWrapper(BluetoothLeScanner scanner) {
+            mScanner = scanner;
+        }
+
+        public void startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback)
+            scanner.startScan(filters, settings, callback);
+        }
+
+        public void stopScan(ScanCallback callback) {
+            scanner.stopScan(callback);
+        }
+    }
 }

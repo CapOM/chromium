@@ -17,6 +17,7 @@ import org.chromium.base.Log;
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     private static final String TAG = "cr.Bluetooth";
+    private final FakeBluetoothLeScanner mScanner;
 
     /**
      * Creates a FakeBluetoothAdapter.
@@ -29,10 +30,12 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
 
     private FakeBluetoothAdapter() {
         super(null);
+        mScanner = new FakeBluetoothLeScanner();
     }
 
+    @CalledByNative
     public BluetoothLeScanner getBluetoothLeScanner() {
-        return null;
+        return mScanner;
     }
 
     public boolean isEnabled() {
@@ -53,5 +56,32 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
 
     public boolean isDiscovering() {
         return false;
+    }
+
+    /**
+     * Fakes android.bluetooth.le.BluetoothLeScanner.
+     */
+    public class FakeBluetoothLeScanner extends BluetoothLeScannerWrapper {
+        private static final String TAG = "cr.Bluetooth";
+        private ScanCallback mCallback;
+
+        private FakeBluetoothLeScanner() {
+            super(null);
+        }
+
+        public void startScan(List<ScanFilter> filters, ScanSettings settings, ScanCallback callback)
+            if (callback != null) {
+                throw new IllegalArgumentException(
+                    "FakeBluetoothLeScanner implementation does not support multiple scans.");
+            }
+            mCallback = callback;
+        }
+
+        public void stopScan(ScanCallback callback) {
+            if (callback != mCallback) {
+                throw new IllegalArgumentException("No scan in progress.");
+            }
+            callback = null;
+        }
     }
 }
