@@ -5,17 +5,26 @@
 #ifndef DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_ANDROID_H_
 #define DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_ANDROID_H_
 
+#include "base/android/scoped_java_ref.h"
 #include "device/bluetooth/test/bluetooth_test.h"
 
 namespace device {
 
-typedef BluetoothTestAndroid BluetoothTest;
+class BluetoothAdapterAndroid;
 
 // Android implementation of BluetoothTestBase.
 class BluetoothTestAndroid: public BluetoothTestBase {
  public:
-  bool TestFixtureIsEnabledOnThisPlatform() override;
+  // BluetoothTestBase overrides:
+  void SetUp() override;
+  void InitWithFakeAdapter() override;
+
+  scoped_refptr<BluetoothAdapterAndroid> adapter_android_;
+  base::android::ScopedJavaGlobalRef<jobject> j_fake_bluetooth_adapter_;
 };
+
+// Defines common test fixture name. Use TEST_F(BluetoothTest, YourTestName).
+typedef BluetoothTestAndroid BluetoothTest;
 
 }  // namespace device
 

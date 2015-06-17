@@ -5,15 +5,15 @@
 #include "device/bluetooth/test/bluetooth_test.h"
 
 #include "base/logging.h"
+#include "device/bluetooth/bluetooth_adapter.h"
 
 namespace device {
 
-bool BluetoothTestBase::TestFixtureIsEnabledOnThisPlatform() {
-  LOG(INFO) << "Skipping test. "
-               "BluetoothTest fixture not implemented on this platform."
-  return false;
+BluetoothTestBase::BluetoothTestBase() {
+}
+
+BluetoothTestBase::~BluetoothTestBase() {
 }
 
 }  // namespace device
 
-#endif  // DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_H_

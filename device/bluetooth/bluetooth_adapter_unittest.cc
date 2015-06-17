@@ -402,10 +402,28 @@ TEST(BluetoothAdapterTest, GetMergedDiscoveryFilterAllFields) {
 }
 
 #if defined (OS_ANDROID)
-TEST_F(BluetoothTest, AddDiscoverySession) {
+TEST_F(BluetoothAdapterAndroidTest, ConstructWithoutDefaultAdapter) {
+  InitWithoutDefaultAdapter();
+  ASSERT_TRUE(adapter_.get());
+  EXPECT_EQ(adapter_->GetAddress(), "");
+  EXPECT_EQ(adapter_->GetName(), "");
+  EXPECT_FALSE(adapter_->IsPresent());
+  EXPECT_FALSE(adapter_->IsPowered());
+  EXPECT_FALSE(adapter_->IsDiscoverable());
+  EXPECT_FALSE(adapter_->IsDiscovering());
+}
+#endif
+
+#if defined (OS_ANDROID)
+TEST_F(BluetoothTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
   ASSERT_TRUE(adapter_.get());
-  adapter_->StartDiscoverySession();
+  EXPECT_EQ(adapter_->GetAddress(), "A1:B2:C3:D4:E5:F6");
+  EXPECT_EQ(adapter_->GetName(), "FakeBluetoothAdapter");
+  EXPECT_TRUE(adapter_->IsPresent());
+  EXPECT_TRUE(adapter_->IsPowered());
+  EXPECT_FALSE(adapter_->IsDiscoverable());
+  EXPECT_FALSE(adapter_->IsDiscovering());
 }
 #endif
 
