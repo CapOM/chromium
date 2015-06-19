@@ -19,14 +19,17 @@ class BluetoothTestBase : public testing::Test {
   BluetoothTestBase();
   ~BluetoothTestBase() override;
 
-  // TODO COMMENTS
-  virtual void InitWithDefaultAdapter() = 0;
+  // Initializes the BluetoothAdapter |adapter_| with the system adapter.
+  virtual void InitWithDefaultAdapter() {};
 
-  // TODO COMMENTS
-  virtual void InitWithoutDefaultAdapter() = 0;
+  // Initializes the BluetoothAdapter |adapter_| forcing the system adapter to
+  // be ignored as if it did not exist. This enables tests for when an adapter
+  // is not present on the system.
+  virtual void InitWithoutDefaultAdapter() {};
 
-  // TODO COMMENTS
-  virtual void InitWithFakeAdapter() = 0;
+  // Initializes the BluetoothAdapter |adapter_| with a fake system adapter
+  // that can be controlled by this test fixture.
+  virtual void InitWithFakeAdapter() {};
 
   scoped_refptr<BluetoothAdapter> adapter_;
 };

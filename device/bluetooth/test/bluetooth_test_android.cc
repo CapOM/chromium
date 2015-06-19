@@ -21,6 +21,7 @@ BluetoothTestAndroid::~BluetoothTestAndroid() {
 }
 
 void BluetoothTestAndroid::SetUp() {
+  // Register in SetUp so that ASSERT can be used.
   ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
 }
 
