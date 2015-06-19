@@ -33,19 +33,19 @@ void BluetoothTestBase::TearDown() {
 
 void BluetoothTestBase::Callback() {
   ++callback_count_;
-  QuitMessageLoop();
+  StopWaitingForCallbacks();
 }
 
 void BluetoothTestBase::DiscoverySessionCallback(
     scoped_ptr<BluetoothDiscoverySession> discovery_session) {
   ++callback_count_;
   discovery_sessions_.push_back(discovery_session.release());
-  QuitMessageLoop();
+  StopWaitingForCallbacks();
 }
 
 void BluetoothTestBase::ErrorCallback() {
   ++error_callback_count_;
-  QuitMessageLoop();
+  StopWaitingForCallbacks();
 }
 
 base::Closure BluetoothTestBase::GetCallback() {
@@ -62,10 +62,18 @@ BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
   return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
 }
 
-void BluetoothTestBase::QuitMessageLoop() {
+void BluetoothTestBase::StopWaitingForCallbacks() {
+  waiting_for_callbacks_ = false;
   if (base::MessageLoop::current() &&
       base::MessageLoop::current()->is_running())
     base::MessageLoop::current()->Quit();
+}
+
+void BluetoothTestBase::WaitForCallbacks() {
+  if (waiting_for_callbacks_) {
+    message_loop_.Run();
+  }
+  waiting_for_callbacks_ = true;
 }
 
 }  // namespace device

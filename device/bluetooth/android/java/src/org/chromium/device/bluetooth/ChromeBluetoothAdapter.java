@@ -189,7 +189,13 @@ final class ChromeBluetoothAdapter {
         if (mLeScanCallback == null) {
             return false;
         }
-        mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        try {
+            mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Cannot stop scan: " + e);
+            mLeScanCallback = null;
+            return false;
+        }
         mLeScanCallback = null;
         return true;
     }

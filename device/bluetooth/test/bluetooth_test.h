@@ -46,15 +46,19 @@ class BluetoothTestBase : public testing::Test {
   BluetoothAdapter::DiscoverySessionCallback GetDiscoverySessionCallback();
   BluetoothAdapter::ErrorCallback GetErrorCallback();
 
-  // Exits the current message loop if it is running. Enables tests to wait for
-  // asynchronous callbacks to be processed using message_loop_.Run();
-  void QuitMessageLoop();
+  // Waits until callbacks have been run, running a message loop if necessary.
+  void WaitForCallbacks();
+
+  // Stops waiting for callbacks, exiting the current message loop if it is
+  // running.
+  void StopWaitingForCallbacks();
 
   scoped_refptr<BluetoothAdapter> adapter_;
   base::MessageLoop message_loop_;
   ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
-  int callback_count_;
-  int error_callback_count_;
+  int callback_count_ = 0;
+  int error_callback_count_ = 0;
+  bool waiting_for_callbacks_ = true;
 };
 
 }  // namespace device

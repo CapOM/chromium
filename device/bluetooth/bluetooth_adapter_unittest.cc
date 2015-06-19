@@ -447,9 +447,9 @@ TEST_F(BluetoothTest, Discovery) {
   InitWithFakeAdapter();
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
-  message_loop_.Run();
-  EXPECT_EQ(1, callback_count_--);
-  EXPECT_EQ(0, error_callback_count_);
+  WaitForCallbacks();
+  ASSERT_EQ(1, callback_count_--);
+  ASSERT_EQ(0, error_callback_count_);
   EXPECT_TRUE(adapter_->IsDiscovering());
   ASSERT_EQ((size_t)1, discovery_sessions_.size());
   EXPECT_TRUE(discovery_sessions_[0]->IsActive());
