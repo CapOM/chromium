@@ -62,18 +62,19 @@ BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
   return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
 }
 
-void BluetoothTestBase::StopWaitingForCallbacks() {
-  waiting_for_callbacks_ = false;
-  if (base::MessageLoop::current() &&
-      base::MessageLoop::current()->is_running())
-    base::MessageLoop::current()->Quit();
-}
-
 void BluetoothTestBase::WaitForCallbacks() {
-  if (waiting_for_callbacks_) {
+  if (run_message_loop_to_wait_for_callbacks_) {
     message_loop_.Run();
   }
-  waiting_for_callbacks_ = true;
+  run_message_loop_to_wait_for_callbacks_ = true;
+}
+
+void BluetoothTestBase::StopWaitingForCallbacks() {
+  run_message_loop_to_wait_for_callbacks_ = false;
+  if (base::MessageLoop::current() &&
+      base::MessageLoop::current()->is_running()) {
+    base::MessageLoop::current()->Quit();
+  }
 }
 
 }  // namespace device

@@ -58,7 +58,7 @@ class BluetoothTestBase : public testing::Test {
   ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
   int callback_count_ = 0;
   int error_callback_count_ = 0;
-  bool waiting_for_callbacks_ = true;
+  bool run_message_loop_to_wait_for_callbacks_ = true;
 };
 
 }  // namespace device
