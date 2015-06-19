@@ -18,8 +18,10 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   BluetoothTestAndroid();
   ~BluetoothTestAndroid() override;
 
-  // BluetoothTestBase overrides:
+  // Test overrides:
   void SetUp() override;
+
+  // BluetoothTestBase overrides:
   void InitWithDefaultAdapter() override;
   void InitWithoutDefaultAdapter() override;
   void InitWithFakeAdapter() override;

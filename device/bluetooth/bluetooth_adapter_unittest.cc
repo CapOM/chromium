@@ -14,7 +14,6 @@
 #include "device/bluetooth/test/bluetooth_test_android.h"
 #endif
 
-using device::BluetoothAdapter;
 using device::BluetoothDevice;
 
 namespace device {
@@ -404,7 +403,6 @@ TEST(BluetoothAdapterTest, GetMergedDiscoveryFilterAllFields) {
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructDefaultAdapter) {
   InitWithDefaultAdapter();
-  ASSERT_TRUE(adapter_.get());
   if (!adapter_->IsPresent()) {
     LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
     return;
@@ -423,7 +421,6 @@ TEST_F(BluetoothTest, ConstructDefaultAdapter) {
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructWithoutDefaultAdapter) {
   InitWithoutDefaultAdapter();
-  ASSERT_TRUE(adapter_.get());
   EXPECT_EQ(adapter_->GetAddress(), "");
   EXPECT_EQ(adapter_->GetName(), "");
   EXPECT_FALSE(adapter_->IsPresent());
@@ -436,13 +433,26 @@ TEST_F(BluetoothTest, ConstructWithoutDefaultAdapter) {
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
-  ASSERT_TRUE(adapter_.get());
   EXPECT_EQ(adapter_->GetAddress(), "A1:B2:C3:D4:E5:F6");
   EXPECT_EQ(adapter_->GetName(), "FakeBluetoothAdapter");
   EXPECT_TRUE(adapter_->IsPresent());
   EXPECT_TRUE(adapter_->IsPowered());
   EXPECT_FALSE(adapter_->IsDiscoverable());
   EXPECT_FALSE(adapter_->IsDiscovering());
+}
+#endif
+
+#if defined(OS_ANDROID)
+TEST_F(BluetoothTest, Discovery) {
+  InitWithFakeAdapter();
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  message_loop_.Run();
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_TRUE(adapter_->IsDiscovering());
+  ASSERT_EQ((size_t)1, discovery_sessions_.size());
+  EXPECT_TRUE(discovery_sessions_[0]->IsActive());
 }
 #endif
 

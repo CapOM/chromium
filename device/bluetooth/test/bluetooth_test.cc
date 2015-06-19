@@ -4,6 +4,7 @@
 
 #include "device/bluetooth/test/bluetooth_test.h"
 
+#include "base/bind.h"
 #include "base/logging.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 
@@ -13,6 +14,58 @@ BluetoothTestBase::BluetoothTestBase() {
 }
 
 BluetoothTestBase::~BluetoothTestBase() {
+}
+
+void BluetoothTestBase::TearDown() {
+  for (ScopedVector<BluetoothDiscoverySession>::iterator iter =
+           discovery_sessions_.begin();
+       iter != discovery_sessions_.end(); ++iter) {
+    BluetoothDiscoverySession* session = *iter;
+    if (!session->IsActive())
+      continue;
+    callback_count_ = 0;
+    session->Stop(GetCallback(), GetErrorCallback());
+    message_loop_.Run();
+    ASSERT_EQ(1, callback_count_);
+  }
+  discovery_sessions_.clear();
+}
+
+void BluetoothTestBase::Callback() {
+  ++callback_count_;
+  QuitMessageLoop();
+}
+
+void BluetoothTestBase::DiscoverySessionCallback(
+    scoped_ptr<BluetoothDiscoverySession> discovery_session) {
+  ++callback_count_;
+  discovery_sessions_.push_back(discovery_session.release());
+  QuitMessageLoop();
+}
+
+void BluetoothTestBase::ErrorCallback() {
+  ++error_callback_count_;
+  QuitMessageLoop();
+}
+
+base::Closure BluetoothTestBase::GetCallback() {
+  return base::Bind(&BluetoothTestBase::Callback, base::Unretained(this));
+}
+
+BluetoothAdapter::DiscoverySessionCallback
+BluetoothTestBase::GetDiscoverySessionCallback() {
+  return base::Bind(&BluetoothTestBase::DiscoverySessionCallback,
+                    base::Unretained(this));
+}
+
+BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
+  return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
+}
+
+void BluetoothTestBase::QuitMessageLoop() {
+  if (base::MessageLoop::current() &&
+      base::MessageLoop::current()->is_running())
+    base::MessageLoop::current()->Quit();
 }
 
 }  // namespace device

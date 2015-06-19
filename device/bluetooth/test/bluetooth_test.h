@@ -6,6 +6,8 @@
 #define DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_H_
 
 #include "base/memory/ref_counted.h"
+#include "base/message_loop/message_loop.h"
+#include "device/bluetooth/bluetooth_discovery_session.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace device {
@@ -19,19 +21,40 @@ class BluetoothTestBase : public testing::Test {
   BluetoothTestBase();
   ~BluetoothTestBase() override;
 
+  // Test overrides:
+  void TearDown() override;
+
   // Initializes the BluetoothAdapter |adapter_| with the system adapter.
-  virtual void InitWithDefaultAdapter() {};
+  virtual void InitWithDefaultAdapter(){};
 
   // Initializes the BluetoothAdapter |adapter_| forcing the system adapter to
   // be ignored as if it did not exist. This enables tests for when an adapter
   // is not present on the system.
-  virtual void InitWithoutDefaultAdapter() {};
+  virtual void InitWithoutDefaultAdapter(){};
 
   // Initializes the BluetoothAdapter |adapter_| with a fake system adapter
   // that can be controlled by this test fixture.
-  virtual void InitWithFakeAdapter() {};
+  virtual void InitWithFakeAdapter(){};
+
+  // Callbacks that increment |callback_count_|, |error_callback_count_|:
+  void Callback();
+  void DiscoverySessionCallback(scoped_ptr<BluetoothDiscoverySession>);
+  void ErrorCallback();
+
+  // Accessors to get callbacks bound to this fixture:
+  base::Closure GetCallback();
+  BluetoothAdapter::DiscoverySessionCallback GetDiscoverySessionCallback();
+  BluetoothAdapter::ErrorCallback GetErrorCallback();
+
+  // Exits the current message loop if it is running. Enables tests to wait for
+  // asynchronous callbacks to be processed using message_loop_.Run();
+  void QuitMessageLoop();
 
   scoped_refptr<BluetoothAdapter> adapter_;
+  base::MessageLoop message_loop_;
+  ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
+  int callback_count_;
+  int error_callback_count_;
 };
 
 }  // namespace device
