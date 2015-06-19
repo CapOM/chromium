@@ -13,10 +13,12 @@ namespace device {
 class BluetoothAdapterAndroid;
 
 // Android implementation of BluetoothTestBase.
-class BluetoothTestAndroid: public BluetoothTestBase {
+class BluetoothTestAndroid : public BluetoothTestBase {
  public:
+  BluetoothTestAndroid();
+  ~BluetoothTestAndroid() override;
+
   // BluetoothTestBase overrides:
-  void SetUp() override;
   void InitWithFakeAdapter() override;
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_android_;

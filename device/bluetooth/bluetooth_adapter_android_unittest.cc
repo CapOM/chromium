@@ -9,7 +9,7 @@ namespace device {
 class BluetoothAdapterAndroidTest : public BluetoothTestAndroid {
  public:
   void InitWithDefaultAdapter() {
-    adapter_ = adapter_android_ = 
+    adapter_ = adapter_android_ =
         BluetoothAdapterAndroid::Create(
             BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj()).get();
   }

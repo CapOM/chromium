@@ -14,16 +14,19 @@ using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
-  void BluetoothTestAndroid::SetUp() {
-    ASSERT_TRUE(AttachCurrentThread());
-    ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
-  }
+void BluetoothTestAndroid::BluetoothTestAndroid() {
+  ASSERT_TRUE(AttachCurrentThread());
+  ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
+}
+
+void BluetoothTestAndroid::~BluetoothTestAndroid() {
+}
 
 void BluetoothTestAndroid::InitWithFakeAdapter() {
   j_fake_bluetooth_adapter_.Reset(
       Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
 
-  adapter_ = adapter_android_ = 
+  adapter_ = adapter_android_ =
       BluetoothAdapterAndroid::Create(j_fake_bluetooth_adapter_.obj()).get();
 }
 

@@ -65,7 +65,8 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
     /**
      * Fakes android.bluetooth.le.BluetoothLeScanner.
      */
-    public static class FakeBluetoothLeScanner extends BluetoothAdapterWrapper.BluetoothLeScannerWrapper {
+    public static class FakeBluetoothLeScanner
+            extends BluetoothAdapterWrapper.BluetoothLeScannerWrapper {
         private ScanCallback mCallback;
 
         private FakeBluetoothLeScanner() {

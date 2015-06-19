@@ -401,7 +401,7 @@ TEST(BluetoothAdapterTest, GetMergedDiscoveryFilterAllFields) {
   adapter->CleanupSessions();
 }
 
-#if defined (OS_ANDROID)
+#if defined(OS_ANDROID)
 TEST_F(BluetoothAdapterAndroidTest, ConstructWithoutDefaultAdapter) {
   InitWithoutDefaultAdapter();
   ASSERT_TRUE(adapter_.get());
@@ -414,7 +414,7 @@ TEST_F(BluetoothAdapterAndroidTest, ConstructWithoutDefaultAdapter) {
 }
 #endif
 
-#if defined (OS_ANDROID)
+#if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
   ASSERT_TRUE(adapter_.get());

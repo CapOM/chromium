@@ -16,4 +16,3 @@ BluetoothTestBase::~BluetoothTestBase() {
 }
 
 }  // namespace device
-
