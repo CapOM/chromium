@@ -76,7 +76,7 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
         @Override
         public void startScan(
                 List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
-            if (callback != null) {
+            if (mCallback != null) {
                 throw new IllegalArgumentException(
                         "FakeBluetoothLeScanner does not support multiple scans.");
             }
@@ -85,10 +85,10 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
 
         @Override
         public void stopScan(ScanCallback callback) {
-            if (callback != mCallback) {
+            if (mCallback != callback) {
                 throw new IllegalArgumentException("No scan in progress.");
             }
-            callback = null;
+            mCallback = null;
         }
     }
 }

@@ -25,8 +25,8 @@ void BluetoothTestBase::TearDown() {
       continue;
     callback_count_ = 0;
     session->Stop(GetCallback(), GetErrorCallback());
-    message_loop_.Run();
-    ASSERT_EQ(1, callback_count_);
+    WaitForCallbacks();
+    ASSERT_EQ(1, callback_count_--);
   }
   discovery_sessions_.clear();
 }
