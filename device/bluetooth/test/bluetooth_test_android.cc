@@ -14,12 +14,24 @@ using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
-void BluetoothTestAndroid::BluetoothTestAndroid() {
-  ASSERT_TRUE(AttachCurrentThread());
+BluetoothTestAndroid::BluetoothTestAndroid() {
+}
+
+BluetoothTestAndroid::~BluetoothTestAndroid() {
+}
+
+void BluetoothTestAndroid::SetUp() {
   ASSERT_TRUE(RegisterNativesImpl(AttachCurrentThread()));
 }
 
-void BluetoothTestAndroid::~BluetoothTestAndroid() {
+void BluetoothTestAndroid::InitWithDefaultAdapter() {
+  adapter_ = adapter_android_ =
+      BluetoothAdapterAndroid::Create(
+          BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj()).get();
+}
+
+void BluetoothTestAndroid::InitWithoutDefaultAdapter() {
+  adapter_ = adapter_android_ = BluetoothAdapterAndroid::Create(NULL).get();
 }
 
 void BluetoothTestAndroid::InitWithFakeAdapter() {
@@ -31,5 +43,3 @@ void BluetoothTestAndroid::InitWithFakeAdapter() {
 }
 
 }  // namespace device
-
-#endif  // DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_H_

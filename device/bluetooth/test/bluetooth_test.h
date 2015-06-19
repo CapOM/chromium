@@ -19,6 +19,13 @@ class BluetoothTestBase : public testing::Test {
   BluetoothTestBase();
   ~BluetoothTestBase() override;
 
+  // TODO COMMENTS
+  virtual void InitWithDefaultAdapter() = 0;
+
+  // TODO COMMENTS
+  virtual void InitWithoutDefaultAdapter() = 0;
+
+  // TODO COMMENTS
   virtual void InitWithFakeAdapter() = 0;
 
   scoped_refptr<BluetoothAdapter> adapter_;

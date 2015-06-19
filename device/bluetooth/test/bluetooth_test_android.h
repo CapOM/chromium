@@ -19,6 +19,9 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   ~BluetoothTestAndroid() override;
 
   // BluetoothTestBase overrides:
+  void SetUp() override;
+  void InitWithDefaultAdapter() override;
+  void InitWithoutDefaultAdapter() override;
   void InitWithFakeAdapter() override;
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_android_;
