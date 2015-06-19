@@ -12,7 +12,7 @@ namespace device {
 
 class BluetoothAdapter;
 
-// A test fixture for Bluetooth abstracting platform specifics for creating
+// A test fixture for Bluetooth that abstracts platform specifics for creating
 // and controlling fake low level objects.
 class BluetoothTestBase : public testing::Test {
  public:
