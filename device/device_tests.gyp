@@ -172,7 +172,7 @@
           'target_name': 'device_bluetooth_test_jni_headers',
           'type': 'none',
           'sources': [
-            'bluetooth/test/android/java/src/org/chromium/device/bluetooth/FakeBluetoothAdapter.java',
+            'bluetooth/test/android/java/src/org/chromium/device/bluetooth/Fakes.java',
           ],
           'variables': {
             'jni_gen_package': 'device_bluetooth',

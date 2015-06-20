@@ -43,7 +43,7 @@ public class Wrappers {
          * is not available or if the application does not have sufficient
          * permissions.
          */
-        @CalledByNative
+        @CalledByNative("BluetoothAdapterWrapper")
         public static BluetoothAdapterWrapper createWithDefaultAdapter(Context context) {
             final boolean hasMinAPI = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP;
             if (!hasMinAPI) {
