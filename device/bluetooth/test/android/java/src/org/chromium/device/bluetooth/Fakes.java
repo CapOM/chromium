@@ -48,7 +48,7 @@ public class Fakes {
             mFakeScanner.mCallback.onScanResultWrapper(
                     ScanSettings.CALLBACK_TYPE_ALL_MATCHES, // TODO(scheib) Check what the actual
                     // system is reporting and use that.
-                    new FakeScanResult());
+                    new FakeScanResult(new FakeBluetoothDevice()));
         }
 
         // ---------------------------------------------------------------------------------------------
@@ -113,8 +113,39 @@ public class Fakes {
      * Fakes android.bluetooth.le.ScanResult
      */
     public static class FakeScanResult extends Wrappers.ScanResultWrapper {
-        FakeScanResult() {
+        private final FakeBluetoothDevice mDevice;
+
+        FakeScanResult(FakeBluetoothDevice device) {
             super(null);
+            mDevice = device;
+        }
+
+        @Override
+        public Wrappers.BluetoothDeviceWrapper getDevice() {
+            return mDevice;
         }
     }
+
+    /**
+     * Fakes android.bluetooth.BluetoothDevice.
+     */
+    public static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
+        private final String mAddress = "A1:B2:C3:DD:DD:DD";
+        private String mName = "FakeBluetoothDevice";
+
+        public FakeBluetoothDevice() {
+            super(null);
+        }
+
+        @Override
+        public String getAddress() {
+            return mAddress;
+        }
+
+        @Override
+        public String getName() {
+            return mName;
+        }
+    }
+
 }
