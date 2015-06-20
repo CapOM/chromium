@@ -19,7 +19,8 @@ namespace device {
 bool WrappersRegisterJNI(JNIEnv* env);
 
 // Calls Java: BluetoothAdapterWrapper.createWithDefaultAdapter().
-ScopedJavaLocalRef<jobject> BluetoothAdapterWrapper_CreateWithDefaultAdapter();
+DEVICE_BLUETOOTH_EXPORT ScopedJavaLocalRef<jobject>
+BluetoothAdapterWrapper_CreateWithDefaultAdapter();
 
 }  // namespace device
 

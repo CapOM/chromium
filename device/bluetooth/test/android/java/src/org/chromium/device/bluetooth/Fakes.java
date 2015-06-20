@@ -37,7 +37,7 @@ public class Fakes {
 
         private FakeBluetoothAdapter() {
             super(null, new FakeBluetoothLeScanner());
-            mFakeScanner = (FakeBluetoothLeScanner)mScanner;
+            mFakeScanner = (FakeBluetoothLeScanner) mScanner;
         }
 
         /**
@@ -147,5 +147,4 @@ public class Fakes {
             return mName;
         }
     }
-
 }
