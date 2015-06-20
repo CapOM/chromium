@@ -26,7 +26,7 @@ void BluetoothTestBase::TearDown() {
       continue;
     callback_count_ = 0;
     session->Stop(GetCallback(), GetErrorCallback());
-    WaitForCallbacks();
+    base::RunLoop().RunUntilIdle();
     ASSERT_EQ(1, callback_count_--);
   }
   discovery_sessions_.clear();
@@ -58,15 +58,6 @@ BluetoothTestBase::GetDiscoverySessionCallback() {
 
 BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
   return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
-}
-
-void BluetoothTestBase::WaitForCallbacks() {
-  base::RunLoop().RunUntilIdle();
-
-//base::RunLoop run_loop;
-//message_loop_.task_runner()->PostTask(FROM_HERE, run_loop.QuitClosure());
-//run_loop.Run();
-  
 }
 
 }  // namespace device

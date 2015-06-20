@@ -46,9 +46,6 @@ class BluetoothTestBase : public testing::Test {
   BluetoothAdapter::DiscoverySessionCallback GetDiscoverySessionCallback();
   BluetoothAdapter::ErrorCallback GetErrorCallback();
 
-  // Waits until callbacks have been run, running a message loop if necessary.
-  void WaitForCallbacks();
-
   scoped_refptr<BluetoothAdapter> adapter_;
   base::MessageLoop message_loop_;
   ScopedVector<BluetoothDiscoverySession> discovery_sessions_;

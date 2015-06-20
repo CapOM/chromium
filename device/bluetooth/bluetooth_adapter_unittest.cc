@@ -4,6 +4,7 @@
 
 #include "base/bind.h"
 #include "base/memory/ref_counted.h"
+#include "base/run_loop.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
@@ -447,7 +448,7 @@ TEST_F(BluetoothTest, Discovery) {
   InitWithFakeAdapter();
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
-  WaitForCallbacks();
+  base::RunLoop().RunUntilIdle();
   ASSERT_EQ(1, callback_count_--);
   ASSERT_EQ(0, error_callback_count_);
   EXPECT_TRUE(adapter_->IsDiscovering());
