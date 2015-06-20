@@ -10,7 +10,7 @@
 #include "base/sequenced_task_runner.h"
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
-#include "device/bluetooth/android/bluetooth_adapter_wrapper.h"
+#include "device/bluetooth/android/wrappers.h"
 #include "device/bluetooth/bluetooth_advertisement.h"
 #include "jni/ChromeBluetoothAdapter_jni.h"
 
@@ -23,7 +23,7 @@ namespace device {
 base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
     const InitCallback& init_callback) {
   return BluetoothAdapterAndroid::Create(
-      BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj());
+      BluetoothAdapterWrapper_CreateWithDefaultAdapter().obj());
 }
 
 // static

@@ -23,10 +23,10 @@
       ],
       'sources': [
         # Note: file list duplicated in GN build.
-        'android/bluetooth_adapter_wrapper.cc',
-        'android/bluetooth_adapter_wrapper.h',
         'android/bluetooth_jni_registrar.cc',
         'android/bluetooth_jni_registrar.h',
+        'android/wrappers.cc',
+        'android/wrappers.h',
         'bluetooth_adapter.cc',
         'bluetooth_adapter.h',
         'bluetooth_adapter_android.cc',

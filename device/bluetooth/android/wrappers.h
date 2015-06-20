@@ -13,15 +13,11 @@ using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
-// Wraps Java class BluetoothAdapterWrapper.
-class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterWrapper {
- public:
-  // Calls Java: BluetoothAdapterWrapper.createWithDefaultAdapter().
-  static ScopedJavaLocalRef<jobject> CreateWithDefaultAdapter();
-
   // Register C++ methods exposed to Java using JNI.
-  static bool RegisterJNI(JNIEnv* env);
-};
+bool WrappersRegisterJNI(JNIEnv* env);
+
+// Calls Java: BluetoothAdapterWrapper.createWithDefaultAdapter().
+ScopedJavaLocalRef<jobject> BluetoothAdapterWrapper_CreateWithDefaultAdapter();
 
 }  // namespace device
 

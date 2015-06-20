@@ -61,11 +61,12 @@ final class ChromeBluetoothAdapter {
     // BluetoothAdapterAndroid methods implemented in java:
 
     // Implements BluetoothAdapterAndroid::Create.
-    // 'Object' type must be used because inner class Wrappers.BluetoothAdapterWrapper reference is not handled by jni_generator.py JavaToJni.
+    // 'Object' type must be used because inner class Wrappers.BluetoothAdapterWrapper reference is
+    // not handled by jni_generator.py JavaToJni.
     // FILE AN ISSUE.
     @CalledByNative
     public static ChromeBluetoothAdapter create(Object adapterWrapper) {
-        return new ChromeBluetoothAdapter((Wrappers.BluetoothAdapterWrapper)adapterWrapper);
+        return new ChromeBluetoothAdapter((Wrappers.BluetoothAdapterWrapper) adapterWrapper);
     }
 
     // Implements BluetoothAdapterAndroid::GetAddress.
@@ -212,7 +213,7 @@ final class ChromeBluetoothAdapter {
 
         @Override
         public void onScanResultWrapper(int callbackType, Wrappers.ScanResultWrapper result) {
-            Log.v(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
+            Log.v(TAG, "onScanResult %d %s %s", callbackType, result.getDevice().getAddress(),
                     result.getDevice().getName());
         }
 

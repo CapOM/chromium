@@ -5,9 +5,9 @@
 #include "device/bluetooth/test/bluetooth_test_android.h"
 
 #include "base/logging.h"
-#include "device/bluetooth/android/bluetooth_adapter_wrapper.h"
+#include "device/bluetooth/android/wrappers.h"
 #include "device/bluetooth/bluetooth_adapter_android.h"
-#include "jni/FakeBluetoothAdapter_jni.h"
+#include "jni/Fakes_jni.h"
 
 using base::android::AttachCurrentThread;
 using base::android::ScopedJavaLocalRef;
@@ -28,7 +28,7 @@ void BluetoothTestAndroid::SetUp() {
 void BluetoothTestAndroid::InitWithDefaultAdapter() {
   adapter_ = adapter_android_ =
       BluetoothAdapterAndroid::Create(
-          BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj()).get();
+          BluetoothAdapterWrapper_CreateWithDefaultAdapter().obj()).get();
 }
 
 void BluetoothTestAndroid::InitWithoutDefaultAdapter() {
@@ -44,6 +44,8 @@ void BluetoothTestAndroid::InitWithFakeAdapter() {
 }
 
 void BluetoothTestAndroid::DiscoverANewDevice() {
+  Java_FakeBluetoothAdapter_discoverANewDevice(AttachCurrentThread(),
+                                               j_fake_bluetooth_adapter_.obj());
 }
 
 }  // namespace device

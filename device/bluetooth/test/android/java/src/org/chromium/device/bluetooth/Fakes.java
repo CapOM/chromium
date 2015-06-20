@@ -4,26 +4,27 @@
 
 package org.chromium.device.bluetooth;
 
+import java.lang.Override;
+import java.util.List;
+
+import org.chromium.base.CalledByNative;
+import org.chromium.base.Log;
+import org.chromium.device.bluetooth.Wrappers.ScanResultWrapper;
+
 import android.annotation.TargetApi;
-import android.bluetooth.le.BluetoothLeScanner;
-import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
 
-import org.chromium.base.CalledByNative;
-import org.chromium.base.Log;
-
-import java.lang.Override;
-import java.util.List;
-
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class Fakes {
+    private static final String TAG = "cr.Bluetooth";
+
     /**
      * Fakes android.bluetooth.BluetoothAdapter.
      */
     public static class FakeBluetoothAdapter extends Wrappers.BluetoothAdapterWrapper {
-        private static final String TAG = "cr.Bluetooth";
+        private final FakeBluetoothLeScanner mFakeScanner;
 
         /**
          * Creates a FakeBluetoothAdapter.
@@ -36,13 +37,19 @@ public class Fakes {
 
         private FakeBluetoothAdapter() {
             super(null, new FakeBluetoothLeScanner());
+            mFakeScanner = (FakeBluetoothLeScanner)mScanner;
         }
 
         /**
          * Creates and discovers a new device.
          */
         @CalledByNative("FakeBluetoothAdapter")
-        public void DiscoverANewDevice() {}
+        public void discoverANewDevice() {
+            mFakeScanner.mCallback.onScanResultWrapper(
+                    ScanSettings.CALLBACK_TYPE_ALL_MATCHES, // TODO(scheib) Check what the actual
+                    // system is reporting and use that.
+                    new FakeScanResult());
+        }
 
         // ---------------------------------------------------------------------------------------------
         // BluetoothAdapterWrapper overrides:
@@ -76,17 +83,16 @@ public class Fakes {
     /**
      * Fakes android.bluetooth.le.BluetoothLeScanner.
      */
-    public static class FakeBluetoothLeScanner
-            extends Wrappers.BluetoothLeScannerWrapper {
-        private ScanCallback mCallback;
+    public static class FakeBluetoothLeScanner extends Wrappers.BluetoothLeScannerWrapper {
+        public Wrappers.ScanCallbackWrapper mCallback;
 
         private FakeBluetoothLeScanner() {
             super(null);
         }
 
         @Override
-        public void startScan(
-                List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
+        public void startScan(List<ScanFilter> filters, ScanSettings settings,
+                Wrappers.ScanCallbackWrapper callback) {
             if (mCallback != null) {
                 throw new IllegalArgumentException(
                         "FakeBluetoothLeScanner does not support multiple scans.");
@@ -95,7 +101,7 @@ public class Fakes {
         }
 
         @Override
-        public void stopScan(ScanCallback callback) {
+        public void stopScan(Wrappers.ScanCallbackWrapper callback) {
             if (mCallback != callback) {
                 throw new IllegalArgumentException("No scan in progress.");
             }

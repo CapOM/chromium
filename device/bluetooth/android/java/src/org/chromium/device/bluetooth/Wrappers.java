@@ -35,7 +35,7 @@ public class Wrappers {
      */
     public static class BluetoothAdapterWrapper {
         private final BluetoothAdapter mAdapter;
-        private final BluetoothLeScannerWrapper mScanner;
+        protected final BluetoothLeScannerWrapper mScanner;
 
         /***
          * Creates a BluetoothAdapterWrapper using the default
@@ -125,11 +125,11 @@ public class Wrappers {
         }
 
         public void startScan(
-                List<ScanFilter> filters, ScanSettings settings, ScanCallback callback) {
+                List<ScanFilter> filters, ScanSettings settings, ScanCallbackWrapper callback) {
             mScanner.startScan(filters, settings, callback);
         }
 
-        public void stopScan(ScanCallback callback) {
+        public void stopScan(ScanCallbackWrapper callback) {
             mScanner.stopScan(callback);
         }
     }
