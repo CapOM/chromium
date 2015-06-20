@@ -159,8 +159,6 @@ void BluetoothAdapterAndroid::RemoveDiscoverySession(
   if (Java_ChromeBluetoothAdapter_removeDiscoverySession(
           AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
     callback.Run();
-    base::MessageLoop::current()->PostTask(FROM_HERE, callback);
-    base::MessageLoop::current()->PostTask(FROM_HERE, callback);
   } else {
     error_callback.Run();
   }

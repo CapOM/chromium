@@ -46,8 +46,11 @@ class BluetoothTestBase : public testing::Test {
   BluetoothAdapter::DiscoverySessionCallback GetDiscoverySessionCallback();
   BluetoothAdapter::ErrorCallback GetErrorCallback();
 
-  scoped_refptr<BluetoothAdapter> adapter_;
+  // A Message loop is required by some implementations that will PostTasks and
+  // by base::RunLoop().RunUntilIdle() use in this fixuture.
   base::MessageLoop message_loop_;
+
+  scoped_refptr<BluetoothAdapter> adapter_;
   ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
   int callback_count_ = 0;
   int error_callback_count_ = 0;
