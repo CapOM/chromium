@@ -37,6 +37,15 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
         super(null, new FakeBluetoothLeScanner());
     }
 
+    /**
+     * Creates and discovers a new device.
+     */
+    @CalledByNative
+    public void DiscoverANewDevice() {}
+
+    // ---------------------------------------------------------------------------------------------
+    // BluetoothAdapterWrapper overrides:
+
     @Override
     public boolean isEnabled() {
         return true;
@@ -91,4 +100,9 @@ public class FakeBluetoothAdapter extends BluetoothAdapterWrapper {
             mCallback = null;
         }
     }
+
+    /**
+     * Fakes android.bluetooth.le.ScanResult
+     */
+    public static class FakeScanResult extends BluetoothAdapterWrapper.BluetoothScanResult {}
 }

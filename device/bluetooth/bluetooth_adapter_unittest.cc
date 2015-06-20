@@ -444,7 +444,7 @@ TEST_F(BluetoothTest, ConstructFakeAdapter) {
 #endif
 
 #if defined(OS_ANDROID)
-TEST_F(BluetoothTest, Discovery) {
+TEST_F(BluetoothTest, DiscoverySession) {
   InitWithFakeAdapter();
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
@@ -454,6 +454,8 @@ TEST_F(BluetoothTest, Discovery) {
   EXPECT_TRUE(adapter_->IsDiscovering());
   ASSERT_EQ((size_t)1, discovery_sessions_.size());
   EXPECT_TRUE(discovery_sessions_[0]->IsActive());
+
+  DiscoverANewDevice();
 }
 #endif
 

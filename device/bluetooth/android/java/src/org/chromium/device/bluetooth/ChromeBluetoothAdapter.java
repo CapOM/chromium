@@ -6,8 +6,6 @@ package org.chromium.device.bluetooth;
 
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.le.ScanCallback;
-import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
 
@@ -28,9 +26,9 @@ final class ChromeBluetoothAdapter {
     private static final String TAG = "cr.Bluetooth";
 
     private long mNativeBluetoothAdapterAndroid;
-    private BluetoothAdapterWrapper mAdapter;
+    private Wrappers.BluetoothAdapterWrapper mAdapter;
     private int mNumDiscoverySessions;
-    private ScanCallback mLeScanCallback;
+    private ScanCallback mScanCallback;
 
     // ---------------------------------------------------------------------------------------------
     // Construction and handler for C++ object destruction.
@@ -41,7 +39,7 @@ final class ChromeBluetoothAdapter {
      *                       but may be either null if an adapter is not available
      *                       or a fake for testing.
      */
-    private ChromeBluetoothAdapter(BluetoothAdapterWrapper adapterWrapper) {
+    private ChromeBluetoothAdapter(Wrappers.BluetoothAdapterWrapper adapterWrapper) {
         if (adapterWrapper == null) {
             Log.i(TAG, "ChromeBluetoothAdapter created with no adapterWrapper.");
         } else {
@@ -64,7 +62,7 @@ final class ChromeBluetoothAdapter {
 
     // Implements BluetoothAdapterAndroid::Create.
     @CalledByNative
-    public static ChromeBluetoothAdapter create(BluetoothAdapterWrapper adapterWrapper) {
+    public static ChromeBluetoothAdapter create(Wrappers.BluetoothAdapterWrapper adapterWrapper) {
         return new ChromeBluetoothAdapter(adapterWrapper);
     }
 
@@ -110,7 +108,7 @@ final class ChromeBluetoothAdapter {
     // Implements BluetoothAdapterAndroid::IsDiscovering.
     @CalledByNative
     private boolean isDiscovering() {
-        return isPresent() && (mAdapter.isDiscovering() || mLeScanCallback != null);
+        return isPresent() && (mAdapter.isDiscovering() || mScanCallback != null);
     }
 
     // Implements BluetoothAdapterAndroid::AddDiscoverySession.
@@ -168,12 +166,12 @@ final class ChromeBluetoothAdapter {
         ScanSettings scanSettings =
                 new ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build();
 
-        assert mLeScanCallback == null;
-        mLeScanCallback = new DiscoveryScanCallback();
+        assert mScanCallback == null;
+        mScanCallback = new ScanCallback();
 
         try {
             mAdapter.getBluetoothLeScanner().startScan(
-                    null /* filters */, scanSettings, mLeScanCallback);
+                    null /* filters */, scanSettings, mScanCallback);
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Cannot start scan: " + e);
             return false;
@@ -186,17 +184,17 @@ final class ChromeBluetoothAdapter {
      * @return True if a scan was in progress.
      */
     private boolean stopScan() {
-        if (mLeScanCallback == null) {
+        if (mScanCallback == null) {
             return false;
         }
         try {
-            mAdapter.getBluetoothLeScanner().stopScan(mLeScanCallback);
+            mAdapter.getBluetoothLeScanner().stopScan(mScanCallback);
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Cannot stop scan: " + e);
-            mLeScanCallback = null;
+            mScanCallback = null;
             return false;
         }
-        mLeScanCallback = null;
+        mScanCallback = null;
         return true;
     }
 
@@ -204,14 +202,14 @@ final class ChromeBluetoothAdapter {
      * Implements callbacks used during a Low Energy scan by notifying upon
      * devices discovered or detecting a scan failure.
      */
-    private class DiscoveryScanCallback extends ScanCallback {
+    private class ScanCallback extends Wrappers.ScanCallbackWrapper {
         @Override
-        public void onBatchScanResults(List<ScanResult> results) {
+        public void onBatchScanResultWrappers(List<Wrappers.ScanResultWrapper> results) {
             Log.v(TAG, "onBatchScanResults");
         }
 
         @Override
-        public void onScanResult(int callbackType, ScanResult result) {
+        public void onScanResultWrapper(int callbackType, Wrappers.ScanResultWrapper result) {
             Log.v(TAG, "onScanResult %s %s", result.getDevice().getAddress(),
                     result.getDevice().getName());
         }
