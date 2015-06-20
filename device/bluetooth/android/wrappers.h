@@ -13,7 +13,9 @@ using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
-  // Register C++ methods exposed to Java using JNI.
+// Bindings into Java methods in org.chromium.device.bluetooth.Wrappers classes:
+
+// Register C++ methods exposed to Java using JNI.
 bool WrappersRegisterJNI(JNIEnv* env);
 
 // Calls Java: BluetoothAdapterWrapper.createWithDefaultAdapter().

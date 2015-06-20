@@ -18,8 +18,8 @@ using base::android::ScopedJavaLocalRef;
 
 namespace device {
 
-// BluetoothAdapterAndroid along with the Java class
-// org.chromium.device.bluetooth.BluetoothAdapter implement BluetoothAdapter.
+// BluetoothAdapterAndroid, along with the Java class
+// org.chromium.device.bluetooth.BluetoothAdapter, implement BluetoothAdapter.
 //
 // The GATT Profile over Low Energy is supported, but not Classic Bluetooth at
 // this time. LE GATT support has been initially built out to support Web
