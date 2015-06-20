@@ -61,9 +61,11 @@ final class ChromeBluetoothAdapter {
     // BluetoothAdapterAndroid methods implemented in java:
 
     // Implements BluetoothAdapterAndroid::Create.
-    //@CalledByNative
-    public static ChromeBluetoothAdapter create(Wrappers.BluetoothAdapterWrapper adapterWrapper) {
-        return new ChromeBluetoothAdapter(adapterWrapper);
+    // 'Object' type must be used because inner class Wrappers.BluetoothAdapterWrapper reference is not handled by jni_generator.py JavaToJni.
+    // FILE AN ISSUE.
+    @CalledByNative
+    public static ChromeBluetoothAdapter create(Object adapterWrapper) {
+        return new ChromeBluetoothAdapter((Wrappers.BluetoothAdapterWrapper)adapterWrapper);
     }
 
     // Implements BluetoothAdapterAndroid::GetAddress.
