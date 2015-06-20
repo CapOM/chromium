@@ -6,6 +6,7 @@
 
 #include "base/bind.h"
 #include "base/logging.h"
+#include "base/run_loop.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 
 namespace device {
@@ -33,19 +34,16 @@ void BluetoothTestBase::TearDown() {
 
 void BluetoothTestBase::Callback() {
   ++callback_count_;
-  StopWaitingForCallbacks();
 }
 
 void BluetoothTestBase::DiscoverySessionCallback(
     scoped_ptr<BluetoothDiscoverySession> discovery_session) {
   ++callback_count_;
   discovery_sessions_.push_back(discovery_session.release());
-  StopWaitingForCallbacks();
 }
 
 void BluetoothTestBase::ErrorCallback() {
   ++error_callback_count_;
-  StopWaitingForCallbacks();
 }
 
 base::Closure BluetoothTestBase::GetCallback() {
@@ -63,18 +61,12 @@ BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
 }
 
 void BluetoothTestBase::WaitForCallbacks() {
-  if (run_message_loop_to_wait_for_callbacks_) {
-    message_loop_.Run();
-  }
-  run_message_loop_to_wait_for_callbacks_ = true;
-}
+  base::RunLoop().RunUntilIdle();
 
-void BluetoothTestBase::StopWaitingForCallbacks() {
-  run_message_loop_to_wait_for_callbacks_ = false;
-  if (base::MessageLoop::current() &&
-      base::MessageLoop::current()->is_running()) {
-    base::MessageLoop::current()->Quit();
-  }
+//base::RunLoop run_loop;
+//message_loop_.task_runner()->PostTask(FROM_HERE, run_loop.QuitClosure());
+//run_loop.Run();
+  
 }
 
 }  // namespace device

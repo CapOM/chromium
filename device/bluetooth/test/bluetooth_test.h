@@ -49,10 +49,6 @@ class BluetoothTestBase : public testing::Test {
   // Waits until callbacks have been run, running a message loop if necessary.
   void WaitForCallbacks();
 
-  // Stops waiting for callbacks, exiting the current message loop if it is
-  // running.
-  void StopWaitingForCallbacks();
-
   scoped_refptr<BluetoothAdapter> adapter_;
   base::MessageLoop message_loop_;
   ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
