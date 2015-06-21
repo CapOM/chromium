@@ -145,7 +145,7 @@ void BluetoothAdapterAndroid::OnDeviceAdded(JNIEnv* env,
     FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
                       DeviceAdded(this, device));
   } else {
-    LOG(WARNING) << "Redundant device found"; // TODO??? Need this log? Common?
+    LOG(WARNING) << "Redundant device found";  // TODO??? Need this log? Common?
     // TODO(scheib): Refactor to check first before constructing everything?
     delete device;
   }

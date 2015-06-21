@@ -7,7 +7,6 @@ package org.chromium.device.bluetooth;
 import android.annotation.TargetApi;
 import android.os.Build;
 
-
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
@@ -29,11 +28,12 @@ final class ChromeBluetoothDevice {
 
     /**
      * Constructs a ChromeBluetoothDevice wrapping device, and associate
-     * device::BluetoothDeviceAndroid. 
-     *  
+     * device::BluetoothDeviceAndroid.
+     *
      * Calls adapter.onDeviceAdded to ensure objects are owned.
      */
-    public ChromeBluetoothDevice(android.bluetooth.BluetoothDevice device, BluetoothAdapter adapter) {
+    public ChromeBluetoothDevice(
+            android.bluetooth.BluetoothDevice device, BluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
         adapter.onDeviceAdded(this);

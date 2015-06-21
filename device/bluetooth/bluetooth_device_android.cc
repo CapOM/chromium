@@ -19,8 +19,7 @@ static jlong Init(JNIEnv* env, jobject obj) {
 }
 
 // static
-BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(
-    jobject obj) {
+BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(jobject obj) {
   if (!obj)
     return NULL;
   return reinterpret_cast<BluetoothDeviceAndroid*>(

@@ -19,9 +19,9 @@ import java.util.List;
 /**
  * Exposes android.bluetooth.BluetoothAdapter as necessary for C++
  * device::BluetoothAdapterAndroid, which implements the cross platform
- * device::BluetoothAdapter. 
- *  
- * Lifetime is controlled by device::BluetoothAdapterAndroid. 
+ * device::BluetoothAdapter.
+ *
+ * Lifetime is controlled by device::BluetoothAdapterAndroid.
  */
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
