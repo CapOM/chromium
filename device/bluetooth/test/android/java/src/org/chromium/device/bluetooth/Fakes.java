@@ -24,7 +24,7 @@ class Fakes {
     /**
      * Fakes android.bluetooth.BluetoothAdapter.
      */
-    public static class FakeBluetoothAdapter extends Wrappers.BluetoothAdapterWrapper {
+    static class FakeBluetoothAdapter extends Wrappers.BluetoothAdapterWrapper {
         private final FakeBluetoothLeScanner mFakeScanner;
 
         /**
@@ -82,7 +82,7 @@ class Fakes {
     /**
      * Fakes android.bluetooth.le.BluetoothLeScanner.
      */
-    public static class FakeBluetoothLeScanner extends Wrappers.BluetoothLeScannerWrapper {
+    static class FakeBluetoothLeScanner extends Wrappers.BluetoothLeScannerWrapper {
         public Wrappers.ScanCallbackWrapper mCallback;
 
         private FakeBluetoothLeScanner() {
@@ -111,7 +111,7 @@ class Fakes {
     /**
      * Fakes android.bluetooth.le.ScanResult
      */
-    public static class FakeScanResult extends Wrappers.ScanResultWrapper {
+    static class FakeScanResult extends Wrappers.ScanResultWrapper {
         private final FakeBluetoothDevice mDevice;
 
         FakeScanResult(FakeBluetoothDevice device) {
@@ -128,7 +128,7 @@ class Fakes {
     /**
      * Fakes android.bluetooth.BluetoothDevice.
      */
-    public static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
+    static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
         private final String mAddress = "A1:B2:C3:DD:DD:DD";
         private String mName = "FakeBluetoothDevice";
 

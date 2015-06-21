@@ -37,7 +37,7 @@ class Wrappers {
      * Wraps android.bluetooth.BluetoothAdapter, pasing through to a provided
      * object. This indirection enables fake implementations when running tests.
      */
-    public static class BluetoothAdapterWrapper {
+    static class BluetoothAdapterWrapper {
         private final BluetoothAdapter mAdapter;
         protected final BluetoothLeScannerWrapper mScanner;
 
@@ -121,7 +121,7 @@ class Wrappers {
     /**
      * Wraps android.bluetooth.BluetoothLeScanner.
      */
-    public static class BluetoothLeScannerWrapper {
+    static class BluetoothLeScannerWrapper {
         private final BluetoothLeScanner mScanner;
 
         public BluetoothLeScannerWrapper(BluetoothLeScanner scanner) {
@@ -174,7 +174,7 @@ class Wrappers {
     /**
      * Wraps android.bluetooth.le.ScanResult.
      */
-    public static class ScanResultWrapper {
+    static class ScanResultWrapper {
         private final ScanResult mScanResult;
 
         public ScanResultWrapper(ScanResult scanResult) {
@@ -189,7 +189,7 @@ class Wrappers {
     /**
      * Wraps android.bluetooth.BluetoothDevice.
      */
-    public static class BluetoothDeviceWrapper {
+    static class BluetoothDeviceWrapper {
         private final BluetoothDevice mDevice;
 
         public BluetoothDeviceWrapper(BluetoothDevice device) {
