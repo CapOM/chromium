@@ -446,6 +446,8 @@ TEST_F(BluetoothTest, ConstructFakeAdapter) {
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, DiscoverySession) {
   InitWithFakeAdapter();
+  EXPECT_FALSE(adapter_->IsDiscovering());
+
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
   base::RunLoop().RunUntilIdle();
@@ -455,7 +457,12 @@ TEST_F(BluetoothTest, DiscoverySession) {
   ASSERT_EQ((size_t)1, discovery_sessions_.size());
   EXPECT_TRUE(discovery_sessions_[0]->IsActive());
 
-  DiscoverANewDevice();
+  discovery_sessions_[0]->Stop(GetCallback(), GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  ASSERT_EQ(1, callback_count_--);
+  ASSERT_EQ(0, error_callback_count_);
+  EXPECT_FALSE(adapter_->IsDiscovering());
+  EXPECT_FALSE(discovery_sessions_[0]->IsActive());
 }
 #endif
 

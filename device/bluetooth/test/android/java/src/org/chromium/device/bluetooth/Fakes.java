@@ -46,8 +46,7 @@ public class Fakes {
         @CalledByNative("FakeBluetoothAdapter")
         public void discoverANewDevice() {
             mFakeScanner.mCallback.onScanResultWrapper(
-                    ScanSettings.CALLBACK_TYPE_ALL_MATCHES, // TODO(scheib) Check what the actual
-                    // system is reporting and use that.
+                    ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
                     new FakeScanResult(new FakeBluetoothDevice()));
         }
 
