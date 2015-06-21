@@ -4,15 +4,15 @@
 
 package org.chromium.device.bluetooth;
 
-import java.util.List;
-
-import org.chromium.base.CalledByNative;
-import org.chromium.base.Log;
-
 import android.annotation.TargetApi;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
+
+import org.chromium.base.CalledByNative;
+import org.chromium.base.Log;
+
+import java.util.List;
 
 /**
  * Fake implementations of android.bluetooth.* classes for testing.
