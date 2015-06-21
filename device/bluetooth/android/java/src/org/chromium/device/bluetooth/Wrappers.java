@@ -25,8 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Wrapper classes around android.bluetooth.* classes that provide an 
- * indirection layer enabling fake implementations when running tests. 
+ * Wrapper classes around android.bluetooth.* classes that provide an
+ * indirection layer enabling fake implementations when running tests.
  */
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
