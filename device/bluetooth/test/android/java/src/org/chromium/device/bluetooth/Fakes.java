@@ -4,12 +4,10 @@
 
 package org.chromium.device.bluetooth;
 
-import java.lang.Override;
 import java.util.List;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.Log;
-import org.chromium.device.bluetooth.Wrappers.ScanResultWrapper;
 
 import android.annotation.TargetApi;
 import android.bluetooth.le.ScanFilter;
@@ -49,7 +47,7 @@ public class Fakes {
                     new FakeScanResult(new FakeBluetoothDevice()));
         }
 
-        // ---------------------------------------------------------------------------------------------
+        // -----------------------------------------------------------------------------------------
         // BluetoothAdapterWrapper overrides:
 
         @Override
