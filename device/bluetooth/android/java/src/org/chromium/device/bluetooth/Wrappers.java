@@ -151,7 +151,7 @@ class Wrappers {
      *  The Wrapper name variations are used because Java doesn't support
      *  overloading by differing Generics.
      */
-    public abstract class ScanCallbackWrapper extends ScanCallback {
+    public abstract static class ScanCallbackWrapper extends ScanCallback {
         public abstract void onBatchScanResultWrappers(List<ScanResultWrapper> results);
         public abstract void onScanResultWrapper(int callbackType, ScanResultWrapper result);
 
