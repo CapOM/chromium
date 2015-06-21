@@ -17,21 +17,6 @@ BluetoothTestBase::BluetoothTestBase() {
 BluetoothTestBase::~BluetoothTestBase() {
 }
 
-void BluetoothTestBase::TearDown() {
-  for (ScopedVector<BluetoothDiscoverySession>::iterator iter =
-           discovery_sessions_.begin();
-       iter != discovery_sessions_.end(); ++iter) {
-    BluetoothDiscoverySession* session = *iter;
-    if (!session->IsActive())
-      continue;
-    callback_count_ = 0;
-    session->Stop(GetCallback(), GetErrorCallback());
-    base::RunLoop().RunUntilIdle();
-    ASSERT_EQ(1, callback_count_--);
-  }
-  discovery_sessions_.clear();
-}
-
 void BluetoothTestBase::Callback() {
   ++callback_count_;
 }

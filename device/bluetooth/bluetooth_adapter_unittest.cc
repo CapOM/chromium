@@ -451,16 +451,16 @@ TEST_F(BluetoothTest, DiscoverySession) {
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
   base::RunLoop().RunUntilIdle();
-  ASSERT_EQ(1, callback_count_--);
-  ASSERT_EQ(0, error_callback_count_);
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
   EXPECT_TRUE(adapter_->IsDiscovering());
   ASSERT_EQ((size_t)1, discovery_sessions_.size());
   EXPECT_TRUE(discovery_sessions_[0]->IsActive());
 
   discovery_sessions_[0]->Stop(GetCallback(), GetErrorCallback());
   base::RunLoop().RunUntilIdle();
-  ASSERT_EQ(1, callback_count_--);
-  ASSERT_EQ(0, error_callback_count_);
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
   EXPECT_FALSE(adapter_->IsDiscovering());
   EXPECT_FALSE(discovery_sessions_[0]->IsActive());
 }

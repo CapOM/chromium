@@ -21,9 +21,6 @@ class BluetoothTestBase : public testing::Test {
   BluetoothTestBase();
   ~BluetoothTestBase() override;
 
-  // Test overrides:
-  void TearDown() override;
-
   // Initializes the BluetoothAdapter |adapter_| with the system adapter.
   virtual void InitWithDefaultAdapter(){};
 
