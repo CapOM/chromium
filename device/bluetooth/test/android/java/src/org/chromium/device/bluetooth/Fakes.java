@@ -14,8 +14,11 @@ import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
 
+/**
+ * Fake implementations of android.bluetooth.* classes for testing.
+ */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-public class Fakes {
+class Fakes {
     private static final String TAG = "cr.Bluetooth";
 
     /**

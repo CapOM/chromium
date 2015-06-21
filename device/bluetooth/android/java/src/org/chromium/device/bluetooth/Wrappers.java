@@ -30,7 +30,7 @@ import java.util.List;
  */
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-public class Wrappers {
+class Wrappers {
     private static final String TAG = "cr.Bluetooth";
 
     /**
