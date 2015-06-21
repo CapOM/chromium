@@ -21,19 +21,19 @@ import org.chromium.device.bluetooth.BluetoothAdapter;
  */
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-final class BluetoothDevice {
+final class ChromeBluetoothDevice {
     private static final String TAG = Log.makeTag("Bluetooth");
 
     private long mNativeBluetoothDeviceAndroid;
     private final android.bluetooth.BluetoothDevice mDevice;
 
     /**
-     * Constructs a BluetoothDevice wrapping device, and associated
+     * Constructs a ChromeBluetoothDevice wrapping device, and associate
      * device::BluetoothDeviceAndroid. 
      *  
      * Calls adapter.onDeviceAdded to ensure objects are owned.
      */
-    public BluetoothDevice(android.bluetooth.BluetoothDevice device, BluetoothAdapter adapter) {
+    public ChromeBluetoothDevice(android.bluetooth.BluetoothDevice device, BluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
         adapter.onDeviceAdded(this);
