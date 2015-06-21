@@ -134,9 +134,9 @@ void BluetoothAdapterAndroid::OnScanFailed(JNIEnv* env, jobject obj) {
 
 void BluetoothAdapterAndroid::OnDeviceAdded(JNIEnv* env,
                                             jobject obj,
-                                            jobject device_android) {
+                                            jobject chrome_bluetooth_device) {
   BluetoothDeviceAndroid* device =
-      BluetoothDeviceAndroid::FromJavaObject(device_android);
+      BluetoothDeviceAndroid::FromJavaObject(chrome_bluetooth_device);
 
   const std::string& address = device->GetAddress();
   if (devices_.count(address) == 0) {

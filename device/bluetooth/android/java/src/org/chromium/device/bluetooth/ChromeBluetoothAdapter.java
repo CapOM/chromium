@@ -12,7 +12,6 @@ import android.os.Build;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
-import org.chromium.device.bluetooth.BluetoothDevice;
 
 import java.util.List;
 
@@ -63,8 +62,8 @@ final class ChromeBluetoothAdapter {
     // ---------------------------------------------------------------------------------------------
     // Methods:
 
-    public void onDeviceAdded(BluetoothDevice bluetoothDevice) {
-        nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, bluetoothDevice);
+    public void onDeviceAdded(ChromeBluetoothDevice device) {
+        nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, device);
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -225,7 +224,7 @@ final class ChromeBluetoothAdapter {
         public void onScanResultWrapper(int callbackType, Wrappers.ScanResultWrapper result) {
             Log.v(TAG, "onScanResult %d %s %s", callbackType, result.getDevice().getAddress(),
                     result.getDevice().getName());
-            new BluetoothDevice(result.getDevice(), BluetoothAdapter.this);
+            new ChromeBluetoothDevice(result.getDevice(), ChromeBluetoothAdapter.this);
         }
 
         @Override
@@ -244,5 +243,5 @@ final class ChromeBluetoothAdapter {
 
     // Binds to BluetoothAdapterAndroid::OnDeviceAdded.
     private native void nativeOnDeviceAdded(
-            long nativeBluetoothAdapterAndroid, BluetoothDevice bluetoothDevice);
+            long nativeBluetoothAdapterAndroid, ChromeBluetoothDevice device);
 }

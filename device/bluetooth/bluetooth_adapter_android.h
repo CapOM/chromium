@@ -86,7 +86,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   void OnScanFailed(JNIEnv* env, jobject obj);
 
   // Adds a newly discovered device, taking ownership.
-  void OnDeviceAdded(JNIEnv* env, jobject obj, jobject device_android);
+  void OnDeviceAdded(JNIEnv* env, jobject obj, jobject chrome_bluetooth_device);
 
  protected:
   BluetoothAdapterAndroid();

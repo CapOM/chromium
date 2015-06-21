@@ -10,7 +10,6 @@ import android.os.Build;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
-import org.chromium.device.bluetooth.BluetoothAdapter;
 
 /**
  * Exposes android.bluetooth.BluetoothDevice as necessary for C++
@@ -24,7 +23,7 @@ final class ChromeBluetoothDevice {
     private static final String TAG = Log.makeTag("Bluetooth");
 
     private long mNativeBluetoothDeviceAndroid;
-    private final android.bluetooth.BluetoothDevice mDevice;
+    private final Wrappers.BluetoothDeviceWrapper mDevice;
 
     /**
      * Constructs a ChromeBluetoothDevice wrapping device, and associate
@@ -33,7 +32,7 @@ final class ChromeBluetoothDevice {
      * Calls adapter.onDeviceAdded to ensure objects are owned.
      */
     public ChromeBluetoothDevice(
-            android.bluetooth.BluetoothDevice device, BluetoothAdapter adapter) {
+            Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
         adapter.onDeviceAdded(this);

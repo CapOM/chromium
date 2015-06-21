@@ -6,7 +6,7 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
-#include "jni/BluetoothDevice_jni.h"
+#include "jni/ChromeBluetoothDevice_jni.h"
 
 using base::android::AttachCurrentThread;
 
@@ -23,7 +23,7 @@ BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(jobject obj) {
   if (!obj)
     return NULL;
   return reinterpret_cast<BluetoothDeviceAndroid*>(
-      Java_BluetoothDevice_getNativePointer(AttachCurrentThread(), obj));
+      Java_ChromeBluetoothDevice_getNativePointer(AttachCurrentThread(), obj));
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(JNIEnv* env, jobject obj) {
@@ -35,7 +35,7 @@ BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
 
 // static
 bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
-  return RegisterNativesImpl(env);  // Generated in BluetoothDevice_jni.h
+  return RegisterNativesImpl(env);  // Generated in ChromeBluetoothDevice_jni.h
 }
 
 uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
