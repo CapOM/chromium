@@ -4,15 +4,22 @@
 
 #include "base/bind.h"
 #include "base/memory/ref_counted.h"
+#include "base/run_loop.h"
 #include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
+#include "device/bluetooth/test/bluetooth_test.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
-using device::BluetoothAdapter;
+#if defined(OS_ANDROID)
+#include "device/bluetooth/test/bluetooth_test_android.h"
+#endif
+
 using device::BluetoothDevice;
 
 namespace device {
+
+typedef BluetoothTestAndroid BluetoothTest;
 
 class TestBluetoothAdapter : public BluetoothAdapter {
  public:
@@ -393,5 +400,70 @@ TEST(BluetoothAdapterTest, GetMergedDiscoveryFilterAllFields) {
 
   adapter->CleanupSessions();
 }
+
+#if defined(OS_ANDROID)
+TEST_F(BluetoothTest, ConstructDefaultAdapter) {
+  InitWithDefaultAdapter();
+  if (!adapter_->IsPresent()) {
+    LOG(WARNING) << "Bluetooth adapter not present; skipping unit test.";
+    return;
+  }
+  EXPECT_GT(adapter_->GetAddress().length(), 0u);
+  EXPECT_GT(adapter_->GetName().length(), 0u);
+  EXPECT_TRUE(adapter_->IsPresent());
+  // Don't know on test machines if adapter will be powered or not, but
+  // the call should be safe to make and consistent.
+  EXPECT_EQ(adapter_->IsPowered(), adapter_->IsPowered());
+  EXPECT_FALSE(adapter_->IsDiscoverable());
+  EXPECT_FALSE(adapter_->IsDiscovering());
+}
+#endif
+
+#if defined(OS_ANDROID)
+TEST_F(BluetoothTest, ConstructWithoutDefaultAdapter) {
+  InitWithoutDefaultAdapter();
+  EXPECT_EQ(adapter_->GetAddress(), "");
+  EXPECT_EQ(adapter_->GetName(), "");
+  EXPECT_FALSE(adapter_->IsPresent());
+  EXPECT_FALSE(adapter_->IsPowered());
+  EXPECT_FALSE(adapter_->IsDiscoverable());
+  EXPECT_FALSE(adapter_->IsDiscovering());
+}
+#endif
+
+#if defined(OS_ANDROID)
+TEST_F(BluetoothTest, ConstructFakeAdapter) {
+  InitWithFakeAdapter();
+  EXPECT_EQ(adapter_->GetAddress(), "A1:B2:C3:D4:E5:F6");
+  EXPECT_EQ(adapter_->GetName(), "FakeBluetoothAdapter");
+  EXPECT_TRUE(adapter_->IsPresent());
+  EXPECT_TRUE(adapter_->IsPowered());
+  EXPECT_FALSE(adapter_->IsDiscoverable());
+  EXPECT_FALSE(adapter_->IsDiscovering());
+}
+#endif
+
+#if defined(OS_ANDROID)
+TEST_F(BluetoothTest, DiscoverySession) {
+  InitWithFakeAdapter();
+  EXPECT_FALSE(adapter_->IsDiscovering());
+
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_TRUE(adapter_->IsDiscovering());
+  ASSERT_EQ((size_t)1, discovery_sessions_.size());
+  EXPECT_TRUE(discovery_sessions_[0]->IsActive());
+
+  discovery_sessions_[0]->Stop(GetCallback(), GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_FALSE(adapter_->IsDiscovering());
+  EXPECT_FALSE(discovery_sessions_[0]->IsActive());
+}
+#endif
 
 }  // namespace device

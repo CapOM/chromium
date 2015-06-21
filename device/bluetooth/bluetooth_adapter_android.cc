@@ -6,10 +6,11 @@
 
 #include "base/android/jni_android.h"
 #include "base/android/jni_string.h"
+#include "base/message_loop/message_loop.h"
 #include "base/sequenced_task_runner.h"
 #include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
-#include "device/bluetooth/android/bluetooth_adapter_wrapper.h"
+#include "device/bluetooth/android/wrappers.h"
 #include "device/bluetooth/bluetooth_advertisement.h"
 #include "device/bluetooth/bluetooth_device_android.h"
 #include "jni/ChromeBluetoothAdapter_jni.h"
@@ -23,7 +24,7 @@ namespace device {
 base::WeakPtr<BluetoothAdapter> BluetoothAdapter::CreateAdapter(
     const InitCallback& init_callback) {
   return BluetoothAdapterAndroid::Create(
-      BluetoothAdapterWrapper::CreateWithDefaultAdapter().obj());
+      BluetoothAdapterWrapper_CreateWithDefaultAdapter().obj());
 }
 
 // static
@@ -164,8 +165,8 @@ void BluetoothAdapterAndroid::AddDiscoverySession(
     const base::Closure& callback,
     const ErrorCallback& error_callback) {
   // TODO(scheib): Support filters crbug.com/490401
-  if (Java_ChromeBluetoothAdapter_addDiscoverySession(AttachCurrentThread(),
-                                                j_bluetooth_adapter_.obj())) {
+  if (Java_ChromeBluetoothAdapter_addDiscoverySession(
+          AttachCurrentThread(), j_bluetooth_adapter_.obj())) {
     callback.Run();
   } else {
     error_callback.Run();

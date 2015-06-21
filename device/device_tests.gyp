@@ -33,7 +33,6 @@
         'battery/battery_status_manager_linux_unittest.cc',
         'battery/battery_status_manager_win_unittest.cc',
         'battery/battery_status_service_unittest.cc',
-        'bluetooth/bluetooth_adapter_android_unittest.cc',
         'bluetooth/bluetooth_adapter_mac_unittest.mm',
         'bluetooth/bluetooth_adapter_profile_chromeos_unittest.cc',
         'bluetooth/bluetooth_adapter_unittest.cc',
@@ -52,6 +51,10 @@
         'bluetooth/bluetooth_uuid_unittest.cc',
         'bluetooth/test/test_bluetooth_adapter_observer.cc',
         'bluetooth/test/test_bluetooth_adapter_observer.h',
+        'bluetooth/test/bluetooth_test.cc',
+        'bluetooth/test/bluetooth_test.h',
+        'bluetooth/test/bluetooth_test_android.cc',
+        'bluetooth/test/bluetooth_test_android.h',
         'hid/hid_connection_unittest.cc',
         'hid/hid_device_filter_unittest.cc',
         'hid/hid_report_descriptor_unittest.cc',
@@ -169,7 +172,7 @@
           'target_name': 'device_bluetooth_test_jni_headers',
           'type': 'none',
           'sources': [
-            'bluetooth/test/android/java/src/org/chromium/device/bluetooth/FakeBluetoothAdapter.java',
+            'bluetooth/test/android/java/src/org/chromium/device/bluetooth/Fakes.java',
           ],
           'variables': {
             'jni_gen_package': 'device_bluetooth',
