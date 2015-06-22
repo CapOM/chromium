@@ -5,7 +5,14 @@
 #include "device/bluetooth/bluetooth_device.h"
 
 #include "base/macros.h"
+#include "base/run_loop.h"
+#include "base/strings/utf_string_conversions.h"
+#include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
 #include "testing/gtest/include/gtest/gtest.h"
+
+#if defined(OS_ANDROID)
+#include "device/bluetooth/test/bluetooth_test_android.h"
+#endif
 
 namespace device {
 
@@ -55,5 +62,23 @@ TEST(BluetoothDeviceTest, CanonicalizeAddressFormat_RejectsInvalidFormats) {
               BluetoothDevice::CanonicalizeAddress(kValidFormats[i]));
   }
 }
+
+#if defined(OS_ANDROID)
+// Verifies basic device properties, e.g. GetAddress, GetName, ...
+TEST_F(BluetoothTest, DeviceProperties) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  DiscoverANewDevice();
+  base::RunLoop().RunUntilIdle();
+  BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
+  ASSERT_TRUE(device);
+  EXPECT_EQ("A1:B2:C3:DD:DD:DD", device->GetAddress());
+  EXPECT_EQ(base::UTF8ToUTF16("FakeBluetoothDevice"), device->GetName());
+}
+#endif
 
 }  // namespace device
