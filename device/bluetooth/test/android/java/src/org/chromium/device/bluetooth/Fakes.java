@@ -15,6 +15,7 @@ import android.os.ParcelUuid;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.Log;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -125,6 +126,14 @@ class Fakes {
         @Override
         public Wrappers.BluetoothDeviceWrapper getDevice() {
             return mDevice;
+        }
+
+        @Override
+        public List<ParcelUuid> getScanRecord_getServiceUuids() {
+            ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>(2);
+            uuids.add(ParcelUuid.fromString("00001800-0000-1000-8000-00805f9b34fb"));
+            uuids.add(ParcelUuid.fromString("00001801-0000-1000-8000-00805f9b34fb"));
+            return uuids;
         }
     }
 

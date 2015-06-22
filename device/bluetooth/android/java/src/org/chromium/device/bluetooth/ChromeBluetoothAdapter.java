@@ -8,6 +8,7 @@ import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
+import android.os.ParcelUuid;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
@@ -230,6 +231,16 @@ final class ChromeBluetoothAdapter {
         public void onScanResultWrapper(int callbackType, Wrappers.ScanResultWrapper result) {
             Log.v(TAG, "onScanResult %d %s %s", callbackType, result.getDevice().getAddress(),
                     result.getDevice().getName());
+
+            List<ParcelUuid> uuids = result.getScanRecord_getServiceUuids();
+            if (uuids != null && uuids.size() > 0) {
+                for (ParcelUuid uuid : uuids) {
+                    Log.v(TAG, "uuid %s", uuid.toString());
+                }
+            } else {
+                Log.v(TAG, "No uuids found.");
+            }
+
             new ChromeBluetoothDevice(result.getDevice(), ChromeBluetoothAdapter.this);
         }
 

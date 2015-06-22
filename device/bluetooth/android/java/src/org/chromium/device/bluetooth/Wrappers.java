@@ -186,6 +186,10 @@ class Wrappers {
         public BluetoothDeviceWrapper getDevice() {
             return new BluetoothDeviceWrapper(mScanResult.getDevice());
         }
+
+        public List<ParcelUuid> getScanRecord_getServiceUuids() {
+            return mScanResult.getScanRecord().getServiceUuids();
+        }
     }
 
     /**
