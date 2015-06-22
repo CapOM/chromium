@@ -235,10 +235,10 @@ final class ChromeBluetoothAdapter {
             List<ParcelUuid> uuids = result.getScanRecord_getServiceUuids();
             if (uuids != null && uuids.size() > 0) {
                 for (ParcelUuid uuid : uuids) {
-                    Log.v(TAG, "uuid %s", uuid.toString());
+                    Log.v(TAG, "  uuid %s", uuid.toString());
                 }
             } else {
-                Log.v(TAG, "No uuids found.");
+                Log.v(TAG, "  uuids not in ScanResult.");
             }
 
             new ChromeBluetoothDevice(result.getDevice(), ChromeBluetoothAdapter.this);
