@@ -39,7 +39,7 @@ final class ChromeBluetoothDevice {
             Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
-        Log.i(TAG, "ChromeBluetoothDevice created.");
+        Log.v(TAG, "ChromeBluetoothDevice created.");
         adapter.onDeviceAdded(this);
     }
 
@@ -74,6 +74,10 @@ final class ChromeBluetoothDevice {
     @CalledByNative
     private int cacheUuidsAndReturnCount() {
         mUuids = mDevice.getUuids();
+        if (mUuids == null) {
+            Log.d(TAG, "getUuids returned null.");
+            return 0;
+        }
         return mUuids.length;
     }
 

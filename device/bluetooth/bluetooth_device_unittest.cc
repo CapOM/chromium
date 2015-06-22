@@ -87,6 +87,8 @@ TEST_F(BluetoothTest, DeviceProperties) {
   BluetoothDevice::UUIDList uuids = device->GetUUIDs();
   EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1800")));
   EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1801")));
+
+  // TODO(scheib): Test with a device with no name, causing BluetoothDevice::GetAddressWithLocalizedDeviceTypeName().
 }
 #endif
 
