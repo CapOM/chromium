@@ -486,8 +486,7 @@ TEST_F(BluetoothTest, DiscoverDevice) {
 
   DiscoverANewDevice();
   base::RunLoop().RunUntilIdle();
-  EXPECT_EQ("A1:B2:C3:DD:DD:DD",
-            observer.last_device_address());
+  EXPECT_EQ("A1:B2:C3:DD:DD:DD", observer.last_device_address());
   BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
   ASSERT_TRUE(device);
 }

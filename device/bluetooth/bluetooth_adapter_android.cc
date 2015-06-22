@@ -33,7 +33,8 @@ base::WeakPtr<BluetoothAdapterAndroid> BluetoothAdapterAndroid::Create(
   BluetoothAdapterAndroid* adapter = new BluetoothAdapterAndroid();
 
   adapter->j_bluetooth_adapter_.Reset(Java_ChromeBluetoothAdapter_create(
-      AttachCurrentThread(), java_bluetooth_adapter_wrapper));
+      AttachCurrentThread(), reinterpret_cast<intptr_t>(adapter),
+      java_bluetooth_adapter_wrapper));
 
   return adapter->weak_ptr_factory_.GetWeakPtr();
 }

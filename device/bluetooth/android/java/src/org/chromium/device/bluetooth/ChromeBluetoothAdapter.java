@@ -37,17 +37,21 @@ final class ChromeBluetoothAdapter {
 
     /**
      * Constructs a ChromeBluetoothAdapter.
+     * @param nativeBluetoothAdapterAndroid Is the paired C++
+     *                                      BluetoothAdapterAndroid pointer value.
      * @param adapterWrapper Wraps the default android.bluetooth.BluetoothAdapter,
      *                       but may be either null if an adapter is not available
      *                       or a fake for testing.
      */
-    private ChromeBluetoothAdapter(Wrappers.BluetoothAdapterWrapper adapterWrapper) {
+    private ChromeBluetoothAdapter(
+            long nativeBluetoothAdapterAndroid, Wrappers.BluetoothAdapterWrapper adapterWrapper) {
+        mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
+        mAdapter = adapterWrapper;
         if (adapterWrapper == null) {
             Log.i(TAG, "ChromeBluetoothAdapter created with no adapterWrapper.");
         } else {
             Log.i(TAG, "ChromeBluetoothAdapter created with provided adapterWrapper.");
         }
-        mAdapter = adapterWrapper;
     }
 
     /**
@@ -74,8 +78,10 @@ final class ChromeBluetoothAdapter {
     // not handled by jni_generator.py JavaToJni.
     // FILE AN ISSUE.
     @CalledByNative
-    public static ChromeBluetoothAdapter create(Object adapterWrapper) {
-        return new ChromeBluetoothAdapter((Wrappers.BluetoothAdapterWrapper) adapterWrapper);
+    public static ChromeBluetoothAdapter create(
+            long nativeBluetoothAdapterAndroid, Object adapterWrapper) {
+        return new ChromeBluetoothAdapter(
+                nativeBluetoothAdapterAndroid, (Wrappers.BluetoothAdapterWrapper) adapterWrapper);
     }
 
     // Implements BluetoothAdapterAndroid::GetAddress.

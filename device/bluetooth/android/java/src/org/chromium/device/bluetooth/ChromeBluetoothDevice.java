@@ -35,7 +35,7 @@ final class ChromeBluetoothDevice {
             Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
-        Log.i(TAG, "ChromeBluetoothDevice created nativeptr:%u.", mNativeBluetoothDeviceAndroid);
+        Log.i(TAG, "ChromeBluetoothDevice created.");
         adapter.onDeviceAdded(this);
     }
 
