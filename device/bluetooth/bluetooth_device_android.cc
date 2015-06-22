@@ -39,8 +39,8 @@ bool BluetoothDeviceAndroid::RegisterJNI(JNIEnv* env) {
 }
 
 uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
-  NOTIMPLEMENTED();
-  return 0;
+  return Java_ChromeBluetoothDevice_getBluetoothClass(AttachCurrentThread(),
+                                                      j_device_.obj());
 }
 
 std::string BluetoothDeviceAndroid::GetAddress() const {

@@ -7,6 +7,7 @@ package org.chromium.device.bluetooth;
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -198,6 +199,10 @@ class Wrappers {
 
         public String getAddress() {
             return mDevice.getAddress();
+        }
+
+        public int getBluetoothClass_getDeviceClass() {
+            return mDevice.getBluetoothClass().getDeviceClass();
         }
 
         public String getName() {

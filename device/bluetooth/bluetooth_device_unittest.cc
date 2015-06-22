@@ -78,6 +78,7 @@ TEST_F(BluetoothTest, DeviceProperties) {
   ASSERT_TRUE(device);
   EXPECT_EQ("A1:B2:C3:DD:DD:DD", device->GetAddress());
   EXPECT_EQ(base::UTF8ToUTF16("FakeBluetoothDevice"), device->GetName());
+  EXPECT_EQ(0x1F00u, device->GetBluetoothClass());
 }
 #endif
 

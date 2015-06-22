@@ -5,6 +5,7 @@
 package org.chromium.device.bluetooth;
 
 import android.annotation.TargetApi;
+import android.bluetooth.BluetoothClass;
 import android.os.Build;
 
 import org.chromium.base.CalledByNative;
@@ -46,6 +47,12 @@ final class ChromeBluetoothDevice {
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothDeviceAndroid methods implemented in java:
+
+    // Implements BluetoothAdapterAndroid::GetBluetoothClass.
+    @CalledByNative
+    private int getBluetoothClass() {
+        return mDevice.getBluetoothClass_getDeviceClass();
+    }
 
     // Implements BluetoothAdapterAndroid::GetAddress.
     @CalledByNative

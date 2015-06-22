@@ -5,6 +5,7 @@
 package org.chromium.device.bluetooth;
 
 import android.annotation.TargetApi;
+import android.bluetooth.BluetoothClass;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
@@ -139,6 +140,11 @@ class Fakes {
         @Override
         public String getAddress() {
             return mAddress;
+        }
+
+        @Override
+        public int getBluetoothClass_getDeviceClass() {
+            return 0x1F00;
         }
 
         @Override
