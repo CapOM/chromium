@@ -27,7 +27,7 @@ namespace device {
 // technical reason they can not be supported should a need arrise.
 //
 // BluetoothAdapterAndroid is reference counted, and owns the lifetime of the
-// Java class BluetoothAdapter via j_bluetooth_adapter_.
+// Java class BluetoothAdapter via j_adapter_.
 class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
     : public BluetoothAdapter {
  public:
@@ -100,8 +100,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   void RemovePairingDelegateInternal(
       BluetoothDevice::PairingDelegate* pairing_delegate) override;
 
-  // Java object org.chromium.device.bluetooth.BluetoothAdapter.
-  base::android::ScopedJavaGlobalRef<jobject> j_bluetooth_adapter_;
+  // Java object org.chromium.device.bluetooth.ChromeBluetoothAdapter.
+  base::android::ScopedJavaGlobalRef<jobject> j_adapter_;
 
   std::string address_;
   std::string name_;
