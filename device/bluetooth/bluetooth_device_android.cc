@@ -70,8 +70,8 @@ uint16 BluetoothDeviceAndroid::GetDeviceID() const {
 }
 
 bool BluetoothDeviceAndroid::IsPaired() const {
-  NOTIMPLEMENTED();
-  return false;
+  return Java_ChromeBluetoothDevice_isPaired(AttachCurrentThread(),
+                                             j_device_.obj());
 }
 
 bool BluetoothDeviceAndroid::IsConnected() const {

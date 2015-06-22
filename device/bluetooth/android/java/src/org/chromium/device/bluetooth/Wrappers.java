@@ -205,6 +205,10 @@ class Wrappers {
             return mDevice.getBluetoothClass().getDeviceClass();
         }
 
+        public int getBondState() {
+            return mDevice.getBondState();
+        }
+
         public String getName() {
             return mDevice.getName();
         }

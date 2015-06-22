@@ -6,6 +6,7 @@ package org.chromium.device.bluetooth;
 
 import android.annotation.TargetApi;
 import android.bluetooth.BluetoothClass;
+import android.bluetooth.BluetoothDevice;
 import android.os.Build;
 
 import org.chromium.base.CalledByNative;
@@ -58,6 +59,12 @@ final class ChromeBluetoothDevice {
     @CalledByNative
     private String getAddress() {
         return mDevice.getAddress();
+    }
+
+    // Implements BluetoothAdapterAndroid::IsPaired.
+    @CalledByNative
+    private boolean isPaired() {
+        return mDevice.getBondState() == BluetoothDevice.BOND_BONDED;
     }
 
     // Implements BluetoothAdapterAndroid::GetDeviceName.
