@@ -8,6 +8,7 @@ import android.annotation.TargetApi;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothDevice;
 import android.os.Build;
+import android.os.ParcelUuid;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
@@ -26,6 +27,7 @@ final class ChromeBluetoothDevice {
 
     private long mNativeBluetoothDeviceAndroid;
     private final Wrappers.BluetoothDeviceWrapper mDevice;
+    private ParcelUuid[] mUuids;
 
     /**
      * Constructs a ChromeBluetoothDevice wrapping device, and associate
@@ -65,6 +67,28 @@ final class ChromeBluetoothDevice {
     @CalledByNative
     private boolean isPaired() {
         return mDevice.getBondState() == BluetoothDevice.BOND_BONDED;
+    }
+
+    // Implements BluetoothAdapterAndroid::GetUUIDs.
+    // Caches UUID array and returns number of UUIDs.
+    @CalledByNative
+    private int cacheUuidsAndReturnCount() {
+        mUuids = mDevice.getUuids();
+        return mUuids.length;
+    }
+
+    // Implements BluetoothAdapterAndroid::GetUUIDs.
+    // Returns one UUID String from the array of UUIDs.
+    @CalledByNative
+    private String getUuid(int i) {
+        return mUuids[i].toString();
+    }
+
+    // Implements BluetoothAdapterAndroid::GetUUIDs.
+    // Clears UUID array.
+    @CalledByNative
+    private void clearUuids() {
+        mUuids = null;
     }
 
     // Implements BluetoothAdapterAndroid::GetDeviceName.

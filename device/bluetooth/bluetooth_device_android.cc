@@ -90,8 +90,18 @@ bool BluetoothDeviceAndroid::IsConnecting() const {
 }
 
 BluetoothDevice::UUIDList BluetoothDeviceAndroid::GetUUIDs() const {
-  NOTIMPLEMENTED();
-  return BluetoothDevice::UUIDList();
+  int number_of_uuids = Java_ChromeBluetoothDevice_cacheUuidsAndReturnCount(
+      AttachCurrentThread(), j_device_.obj());
+  BluetoothDevice::UUIDList uuids;
+  uuids.reserve(number_of_uuids);
+  for (int i = 0; i < number_of_uuids; i++) {
+    std::string uuid_string =
+        ConvertJavaStringToUTF8(Java_ChromeBluetoothDevice_getUuid(
+            AttachCurrentThread(), j_device_.obj(), i));
+    uuids.push_back(BluetoothUUID(uuid_string));
+  }
+  Java_ChromeBluetoothDevice_clearUuids(AttachCurrentThread(), j_device_.obj());
+  return uuids;
 }
 
 int16 BluetoothDeviceAndroid::GetInquiryRSSI() const {

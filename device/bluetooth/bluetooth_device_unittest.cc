@@ -84,6 +84,9 @@ TEST_F(BluetoothTest, DeviceProperties) {
   EXPECT_EQ(0, device->GetDeviceID());
   EXPECT_EQ(base::UTF8ToUTF16("FakeBluetoothDevice"), device->GetName());
   EXPECT_EQ(true, device->IsPaired());
+  BluetoothDevice::UUIDList uuids = device->GetUUIDs();
+  EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1800")));
+  EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1801")));
 }
 #endif
 

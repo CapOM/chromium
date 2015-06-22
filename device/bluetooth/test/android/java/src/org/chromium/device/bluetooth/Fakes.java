@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.ScanFilter;
 import android.bluetooth.le.ScanSettings;
 import android.os.Build;
+import android.os.ParcelUuid;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.Log;
@@ -156,6 +157,14 @@ class Fakes {
         @Override
         public String getName() {
             return mName;
+        }
+
+        @Override
+        public ParcelUuid[] getUuids() {
+            ParcelUuid[] uuids = new ParcelUuid[2];
+            uuids[0] = ParcelUuid.fromString("00001800-0000-1000-8000-00805f9b34fb");
+            uuids[1] = ParcelUuid.fromString("00001801-0000-1000-8000-00805f9b34fb");
+            return uuids;
         }
     }
 }

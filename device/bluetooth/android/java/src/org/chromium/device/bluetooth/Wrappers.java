@@ -17,6 +17,7 @@ import android.bluetooth.le.ScanSettings;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.os.ParcelUuid;
 
 import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
@@ -211,6 +212,10 @@ class Wrappers {
 
         public String getName() {
             return mDevice.getName();
+        }
+
+        public ParcelUuid[] getUuids() {
+            return mDevice.getUuids();
         }
     }
 }
