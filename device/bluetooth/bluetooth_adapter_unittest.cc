@@ -9,6 +9,7 @@
 #include "device/bluetooth/bluetooth_device.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
 #include "device/bluetooth/test/bluetooth_test.h"
+#include "device/bluetooth/test/test_bluetooth_adapter_observer.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 #if defined(OS_ANDROID)
@@ -444,8 +445,10 @@ TEST_F(BluetoothTest, ConstructFakeAdapter) {
 #endif
 
 #if defined(OS_ANDROID)
+// Starts and Stops a discovery session.
 TEST_F(BluetoothTest, DiscoverySession) {
   InitWithFakeAdapter();
+
   EXPECT_FALSE(adapter_->IsDiscovering());
 
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
@@ -463,6 +466,30 @@ TEST_F(BluetoothTest, DiscoverySession) {
   EXPECT_EQ(0, error_callback_count_);
   EXPECT_FALSE(adapter_->IsDiscovering());
   EXPECT_FALSE(discovery_sessions_[0]->IsActive());
+}
+#endif
+
+#if defined(OS_ANDROID)
+// Discovers a device.
+TEST_F(BluetoothTest, DiscoverDevice) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(1, callback_count_--);
+  EXPECT_EQ(0, error_callback_count_);
+  EXPECT_TRUE(adapter_->IsDiscovering());
+  ASSERT_EQ((size_t)1, discovery_sessions_.size());
+  EXPECT_TRUE(discovery_sessions_[0]->IsActive());
+
+  DiscoverANewDevice();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ("A1:B2:C3:DD:DD:DD",
+            observer.last_device_address());
+  BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
+  ASSERT_TRUE(device);
 }
 #endif
 

@@ -15,18 +15,18 @@ namespace device {
 // Create a BluetoothDeviceAndroid instance and return pointer for
 // an already created org.chromium.device.bluetooth.BluetoothDevice |obj|.
 static jlong Init(JNIEnv* env, jobject obj) {
-  return reinterpret_cast<jlong>(new BluetoothDeviceAndroid(env, obj));
+  return reinterpret_cast<intptr_t>(new BluetoothDeviceAndroid(env, obj));
 }
 
 // static
 BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(jobject obj) {
-  if (!obj)
-    return NULL;
+  CHECK(obj);
   return reinterpret_cast<BluetoothDeviceAndroid*>(
       Java_ChromeBluetoothDevice_getNativePointer(AttachCurrentThread(), obj));
 }
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(JNIEnv* env, jobject obj) {
+  CHECK(obj);
   j_bluetooth_device_.Reset(env, obj);
 }
 

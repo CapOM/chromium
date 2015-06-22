@@ -20,7 +20,7 @@ import org.chromium.base.Log;
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 final class ChromeBluetoothDevice {
-    private static final String TAG = Log.makeTag("Bluetooth");
+    private static final String TAG = "cr.Bluetooth";
 
     private long mNativeBluetoothDeviceAndroid;
     private final Wrappers.BluetoothDeviceWrapper mDevice;
@@ -35,6 +35,7 @@ final class ChromeBluetoothDevice {
             Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter) {
         mDevice = device;
         mNativeBluetoothDeviceAndroid = nativeInit();
+        Log.i(TAG, "ChromeBluetoothDevice created nativeptr:%u.", mNativeBluetoothDeviceAndroid);
         adapter.onDeviceAdded(this);
     }
 
