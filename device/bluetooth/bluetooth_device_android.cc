@@ -50,22 +50,22 @@ std::string BluetoothDeviceAndroid::GetAddress() const {
 
 BluetoothDevice::VendorIDSource BluetoothDeviceAndroid::GetVendorIDSource()
     const {
-  NOTIMPLEMENTED();
+  // Android API does not provide Vendor ID.
   return VENDOR_ID_UNKNOWN;
 }
 
 uint16 BluetoothDeviceAndroid::GetVendorID() const {
-  NOTIMPLEMENTED();
+  // Android API does not provide Vendor ID.
   return 0;
 }
 
 uint16 BluetoothDeviceAndroid::GetProductID() const {
-  NOTIMPLEMENTED();
+  // Android API does not provide Product ID.
   return 0;
 }
 
 uint16 BluetoothDeviceAndroid::GetDeviceID() const {
-  NOTIMPLEMENTED();
+  // Android API does not provide Device ID.
   return 0;
 }
 
