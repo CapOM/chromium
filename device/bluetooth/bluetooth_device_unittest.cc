@@ -76,13 +76,13 @@ TEST_F(BluetoothTest, DeviceProperties) {
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
   ASSERT_TRUE(device);
-  EXPECT_EQ("A1:B2:C3:DD:DD:DD", device->GetAddress());
-  EXPECT_EQ(base::UTF8ToUTF16("FakeBluetoothDevice"), device->GetName());
   EXPECT_EQ(0x1F00u, device->GetBluetoothClass());
+  EXPECT_EQ("A1:B2:C3:DD:DD:DD", device->GetAddress());
   EXPECT_EQ(BluetoothDevice::VENDOR_ID_UNKNOWN, device->GetVendorIDSource());
   EXPECT_EQ(0, device->GetVendorID());
   EXPECT_EQ(0, device->GetProductID());
   EXPECT_EQ(0, device->GetDeviceID());
+  EXPECT_EQ(base::UTF8ToUTF16("FakeBluetoothDevice"), device->GetName());
 }
 #endif
 
