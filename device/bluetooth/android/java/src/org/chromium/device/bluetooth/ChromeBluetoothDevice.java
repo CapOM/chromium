@@ -45,6 +45,15 @@ final class ChromeBluetoothDevice {
     }
 
     // ---------------------------------------------------------------------------------------------
+    // BluetoothDeviceAndroid methods implemented in java:
+
+    // Implements BluetoothAdapterAndroid::GetAddress.
+    @CalledByNative
+    private String getAddress() {
+        return mDevice.getAddress();
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // bluetooth_device_android.cc C++ methods declared for access from java:
 
     // Binds to Init().

@@ -27,7 +27,7 @@ BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(jobject obj) {
 
 BluetoothDeviceAndroid::BluetoothDeviceAndroid(JNIEnv* env, jobject obj) {
   CHECK(obj);
-  j_bluetooth_device_.Reset(env, obj);
+  j_device_.Reset(env, obj);
 }
 
 BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
@@ -44,8 +44,8 @@ uint32 BluetoothDeviceAndroid::GetBluetoothClass() const {
 }
 
 std::string BluetoothDeviceAndroid::GetAddress() const {
-  NOTIMPLEMENTED();
-  return "";
+  return ConvertJavaStringToUTF8(Java_ChromeBluetoothDevice_getAddress(
+      AttachCurrentThread(), j_device_.obj()));
 }
 
 BluetoothDevice::VendorIDSource BluetoothDeviceAndroid::GetVendorIDSource()
