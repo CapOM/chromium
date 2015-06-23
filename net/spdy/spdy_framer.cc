@@ -53,6 +53,27 @@ bool IsCookieEmpty(const base::StringPiece& cookie) {
   return (pos == 0) && ((cookie.size() - value_start) == 0);
 }
 
+// Pack parent stream ID and exclusive flag into the format used by HTTP/2
+// headers and priority frames.
+uint32 PackStreamDependencyValues(bool exclusive,
+                                  SpdyStreamId parent_stream_id) {
+  // Make sure the highest-order bit in the parent stream id is zeroed out.
+  uint32 parent = parent_stream_id & 0x7fffffff;
+  // Set the one-bit exclusivity flag.
+  uint32 e_bit = exclusive ? 0x80000000 : 0;
+  return parent | e_bit;
+}
+
+// Unpack parent stream ID and exclusive flag from the format used by HTTP/2
+// headers and priority frames.
+void UnpackStreamDependencyValues(uint32 packed,
+                                  bool* exclusive,
+                                  SpdyStreamId* parent_stream_id) {
+  *exclusive = (packed >> 31) != 0;
+  // Zero out the highest-order bit to get the parent stream id.
+  *parent_stream_id = packed & 0x7fffffff;
+}
+
 struct DictionaryIds {
   DictionaryIds()
     : v2_dictionary_id(CalculateDictionaryId(kV2Dictionary, kV2DictionarySize)),
@@ -979,7 +1000,7 @@ void SpdyFramer::ProcessControlFrameHeader(int control_frame_type_field) {
         }
         if (current_frame_length_ < min_size) {
           // TODO(mlavan): check here for HEADERS with no payload?
-          // (not allowed in SPDY4)
+          // (not allowed in HTTP2)
           set_error(SPDY_INVALID_CONTROL_FRAME);
         } else if (protocol_version() <= SPDY3 &&
                    current_frame_flags_ & ~CONTROL_FLAG_FIN) {
@@ -1493,9 +1514,15 @@ size_t SpdyFramer::ProcessControlFrameBeforeHeaderBlock(const char* data,
           const bool has_priority =
               (current_frame_flags_ & HEADERS_FLAG_PRIORITY) != 0;
           SpdyPriority priority = 0;
+          uint32 parent_stream_id = 0;
+          bool exclusive = false;
           if (protocol_version() > SPDY3 && has_priority) {
-            // TODO(jgraettinger): Process dependency rather than ignoring it.
-            reader.Seek(kPriorityDependencyPayloadSize);
+            uint32 stream_dependency;
+            successful_read = reader.ReadUInt32(&stream_dependency);
+            DCHECK(successful_read);
+            UnpackStreamDependencyValues(stream_dependency, &exclusive,
+                                         &parent_stream_id);
+
             uint8 weight = 0;
             successful_read = reader.ReadUInt8(&weight);
             if (successful_read) {
@@ -1517,6 +1544,7 @@ size_t SpdyFramer::ProcessControlFrameBeforeHeaderBlock(const char* data,
             visitor_->OnHeaders(
                 current_frame_stream_id_,
                 (current_frame_flags_ & HEADERS_FLAG_PRIORITY) != 0, priority,
+                parent_stream_id, exclusive,
                 (current_frame_flags_ & CONTROL_FLAG_FIN) != 0,
                 expect_continuation_ == 0);
           }
@@ -1865,16 +1893,15 @@ size_t SpdyFramer::ProcessControlFramePayload(const char* data, size_t len) {
         break;
       case PRIORITY: {
           DCHECK_LT(SPDY3, protocol_version());
+          uint32 stream_dependency;
           uint32 parent_stream_id;
-          uint8 weight;
           bool exclusive;
-          bool successful_read = true;
-          successful_read = reader.ReadUInt32(&parent_stream_id);
+          uint8 weight;
+          bool successful_read = reader.ReadUInt32(&stream_dependency);
           DCHECK(successful_read);
-          // Exclusivity is indicated by a single bit flag.
-          exclusive = (parent_stream_id >> 31) != 0;
-          // Zero out the highest-order bit to get the parent stream id.
-          parent_stream_id &= 0x7fffffff;
+          UnpackStreamDependencyValues(stream_dependency, &exclusive,
+                                       &parent_stream_id);
+
           successful_read = reader.ReadUInt8(&weight);
           DCHECK(successful_read);
           DCHECK(reader.IsDoneReading());
@@ -2056,14 +2083,15 @@ size_t SpdyFramer::ProcessAltSvcFramePayload(const char* data, size_t len) {
   StringPiece value(altsvc_scratch_.buffer.get() + reader.GetBytesConsumed(),
                     altsvc_scratch_.buffer_length - reader.GetBytesConsumed());
 
-  SpdyAltSvcWireFormat::AlternativeService altsvc;
-  bool success = SpdyAltSvcWireFormat::ParseHeaderFieldValue(value, &altsvc);
-  if (!success || altsvc.protocol_id.length() == 0) {
+  SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector;
+  bool success =
+      SpdyAltSvcWireFormat::ParseHeaderFieldValue(value, &altsvc_vector);
+  if (!success) {
     set_error(SPDY_INVALID_CONTROL_FRAME);
     return 0;
   }
 
-  visitor_->OnAltSvc(current_frame_stream_id_, origin, altsvc);
+  visitor_->OnAltSvc(current_frame_stream_id_, origin, altsvc_vector);
   CHANGE_STATE(SPDY_AUTO_RESET);
   return len;
 }
@@ -2111,7 +2139,7 @@ size_t SpdyFramer::ProcessFramePadding(const char* data, size_t len) {
     DCHECK_EQ(remaining_padding_payload_length_, remaining_data_length_);
     size_t amount_to_discard = std::min(remaining_padding_payload_length_, len);
     if (current_frame_type_ == DATA && amount_to_discard > 0) {
-      DCHECK_LE(SPDY4, protocol_version());
+      DCHECK_LE(HTTP2, protocol_version());
       visitor_->OnStreamPadding(current_frame_stream_id_, amount_to_discard);
     }
     data += amount_to_discard;
@@ -2408,7 +2436,7 @@ SpdySerializedFrame* SpdyFramer::SerializeRstStream(
   builder.WriteUInt32(SpdyConstants::SerializeRstStreamStatus(
       protocol_version(), rst_stream.status()));
 
-  // In SPDY4 and up, RST_STREAM frames may also specify opaque data.
+  // In HTTP2 and up, RST_STREAM frames may also specify opaque data.
   if (protocol_version() > SPDY3 && rst_stream.description().size() > 0) {
     builder.WriteBytes(rst_stream.description().data(),
                        rst_stream.description().size());
@@ -2523,7 +2551,7 @@ SpdySerializedFrame* SpdyFramer::SerializeGoAway(
                                                              goaway.status()));
   }
 
-  // In SPDY4 and up, GOAWAY frames may also specify opaque data.
+  // In HTTP2 and up, GOAWAY frames may also specify opaque data.
   if ((protocol_version() > SPDY3) && (goaway.description().size() > 0)) {
     builder.WriteBytes(goaway.description().data(),
                        goaway.description().size());
@@ -2609,8 +2637,8 @@ SpdySerializedFrame* SpdyFramer::SerializeHeaders(
       padding_payload_len = headers.padding_payload_len();
     }
     if (headers.has_priority()) {
-      // TODO(jgraettinger): Plumb priorities and stream dependencies.
-      builder.WriteUInt32(0);  // Non-exclusive bit and root stream ID.
+      builder.WriteUInt32(PackStreamDependencyValues(
+          headers.exclusive(), headers.parent_stream_id()));
       builder.WriteUInt8(MapPriorityToWeight(priority));
     }
     WritePayloadWithContinuation(&builder,
@@ -2623,7 +2651,7 @@ SpdySerializedFrame* SpdyFramer::SerializeHeaders(
   }
 
   if (debug_visitor_) {
-    // SPDY4 uses HPACK for header compression. However, continue to
+    // HTTP2 uses HPACK for header compression. However, continue to
     // use GetSerializedLength() for an apples-to-apples comparision of
     // compression performance between HPACK and SPDY w/ deflate.
     const size_t payload_len =
@@ -2717,7 +2745,7 @@ SpdyFrame* SpdyFramer::SerializePushPromise(
                                padding_payload_len);
 
   if (debug_visitor_) {
-    // SPDY4 uses HPACK for header compression. However, continue to
+    // HTTP2 uses HPACK for header compression. However, continue to
     // use GetSerializedLength() for an apples-to-apples comparision of
     // compression performance between HPACK and SPDY w/ deflate.
     const size_t payload_len =
@@ -2764,20 +2792,20 @@ SpdyFrame* SpdyFramer::SerializeContinuation(
   return builder.take();
 }
 
-SpdyFrame* SpdyFramer::SerializeAltSvc(const SpdyAltSvcIR& altsvc) {
+SpdyFrame* SpdyFramer::SerializeAltSvc(const SpdyAltSvcIR& altsvc_ir) {
   DCHECK_LT(SPDY3, protocol_version());
 
   size_t size = GetAltSvcMinimumSize();
-  size += altsvc.origin().length();
-  string value =
-      SpdyAltSvcWireFormat::SerializeHeaderFieldValue(altsvc.altsvc());
+  size += altsvc_ir.origin().length();
+  string value = SpdyAltSvcWireFormat::SerializeHeaderFieldValue(
+      altsvc_ir.altsvc_vector());
   size += value.length();
 
   SpdyFrameBuilder builder(size, protocol_version());
-  builder.BeginNewFrame(*this, ALTSVC, kNoFlags, altsvc.stream_id());
+  builder.BeginNewFrame(*this, ALTSVC, kNoFlags, altsvc_ir.stream_id());
 
-  builder.WriteUInt16(altsvc.origin().length());
-  builder.WriteBytes(altsvc.origin().data(), altsvc.origin().length());
+  builder.WriteUInt16(altsvc_ir.origin().length());
+  builder.WriteBytes(altsvc_ir.origin().data(), altsvc_ir.origin().length());
   builder.WriteBytes(value.data(), value.length());
   DCHECK_LT(GetAltSvcMinimumSize(), builder.length());
   return builder.take();
@@ -2790,12 +2818,8 @@ SpdyFrame* SpdyFramer::SerializePriority(const SpdyPriorityIR& priority) const {
   SpdyFrameBuilder builder(size, protocol_version());
   builder.BeginNewFrame(*this, PRIORITY, kNoFlags, priority.stream_id());
 
-  // Make sure the highest-order bit in the parent stream id is zeroed out.
-  uint32 parent_stream_id = priority.parent_stream_id() & 0x7fffffff;
-  uint32 exclusive = priority.exclusive() ? 0x80000000 : 0;
-  // Set the one-bit exclusivity flag.
-  uint32 flag_and_parent_id = parent_stream_id | exclusive;
-  builder.WriteUInt32(flag_and_parent_id);
+  builder.WriteUInt32(PackStreamDependencyValues(priority.exclusive(),
+                                                 priority.parent_stream_id()));
   builder.WriteUInt8(priority.weight());
   DCHECK_EQ(GetPrioritySize(), builder.length());
   return builder.take();

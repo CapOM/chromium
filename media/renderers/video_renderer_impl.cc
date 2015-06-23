@@ -36,7 +36,8 @@ static bool ShouldUseVideoRenderingPath() {
   const bool disabled_via_cli =
       base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kDisableNewVideoRenderer);
-  return !disabled_via_cli && !StartsWithASCII(group_name, "Disabled", true);
+  return !disabled_via_cli &&
+         !base::StartsWithASCII(group_name, "Disabled", true);
 }
 
 VideoRendererImpl::VideoRendererImpl(
@@ -486,7 +487,7 @@ void VideoRendererImpl::FrameReady(VideoFrameStream::Status status,
       return;
     }
 
-    if (frame->IsEndOfStream()) {
+    if (frame->metadata()->IsTrue(VideoFrameMetadata::END_OF_STREAM)) {
       DCHECK(!received_end_of_stream_);
       received_end_of_stream_ = true;
 
@@ -618,7 +619,7 @@ void VideoRendererImpl::AddReadyFrame_Locked(
     const scoped_refptr<VideoFrame>& frame) {
   DCHECK(task_runner_->BelongsToCurrentThread());
   lock_.AssertAcquired();
-  DCHECK(!frame->IsEndOfStream());
+  DCHECK(!frame->metadata()->IsTrue(VideoFrameMetadata::END_OF_STREAM));
 
   frames_decoded_++;
 

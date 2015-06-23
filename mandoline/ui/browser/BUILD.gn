@@ -3,10 +3,10 @@
 # found in the LICENSE file.
 
 import("//build/config/ui.gni")
-import("//mojo/mojo_application_package.gni")
+import("//mojo/public/mojo_application.gni")
 import("//third_party/mojo/src/mojo/public/tools/bindings/mojom.gni")
 
-mojo_application_package("browser") {
+mojo_native_application("browser") {
   sources = [
     "main.cc",
   ]
@@ -15,7 +15,10 @@ mojo_application_package("browser") {
     ":lib",
     "//mandoline/services/navigation/public/interfaces",
     "//mojo/application/public/cpp",
+    "//third_party/icu:icudata",
+    "//ui/resources:ui_test_pak",
   ]
+
   resources = [
     "$root_out_dir/icudtl.dat",
     "$root_out_dir/ui_test.pak",
@@ -26,12 +29,14 @@ source_set("lib") {
   sources = [
     "browser.cc",
     "browser.h",
+    "browser_manager.cc",
+    "browser_manager.h",
     "navigator_host_impl.cc",
     "navigator_host_impl.h",
   ]
 
   deps = [
-    ":interfaces",
+    "public/interfaces",
     "//base",
     "//components/view_manager/public/cpp",
     "//mandoline/services/navigation/public/interfaces",
@@ -57,18 +62,4 @@ source_set("lib") {
       "android/android_ui.h",
     ]
   }
-}
-
-mojom("interfaces") {
-  sources = [
-    "omnibox.mojom",
-    "view_embedder.mojom",
-  ]
-
-  import_dirs = [ "//mojo/services" ]
-
-  deps = [
-    "//mojo/application/public/interfaces",
-    "//mojo/services/network/public/interfaces",
-  ]
 }

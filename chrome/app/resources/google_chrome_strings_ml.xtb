@@ -80,6 +80,7 @@
 <translation id="8551886023433311834">എകദേശം കാലികമാണ്! അപ്‌ഡേറ്റ് ചെയ്യുന്നത് പൂർത്തിയാക്കുന്നതിന് ഉപകരണം പുനരാരംഭിക്കുക.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome - അറിയിപ്പുകൾ</translation>
+<translation id="6368805772029492593">അധിക സുരക്ഷയ്‌ക്ക്, Google Chrome നിങ്ങളുടെ ഡാറ്റ എന്‍‌ക്രിപ്റ്റ് ചെയ്യും.</translation>
 <translation id="7339898014177206373">പുതിയ വിന്‍ഡോ</translation>
 <translation id="3282568296779691940">Chrome-ലേക്ക് സൈൻ ഇൻ ചെയ്യുക</translation>
 <translation id="3089968997497233615">ഒരു പുതിയ സുരക്ഷിതമായGoogle Chrome ന്‍റെ പതിപ്പ് ലഭ്യമാണ്.</translation>
@@ -171,7 +172,6 @@
 <translation id="2290095356545025170">Google Chrome അണിന്‍സ്റ്റാള്‍ ചെയ്യണമെന്ന് നിങ്ങള്‍ക്കുറപ്പാണോ?</translation>
 <translation id="4273752058983339720">നിങ്ങൾ കമ്പ്യൂട്ടർ പ്രവർത്തിപ്പിച്ചുതുടങ്ങുമ്പോൾ യാന്ത്രികമായി സമാരംഭിക്കാൻ Google Chrome-നെ കോൺഫിഗർ  ചെയ്‌തു.</translation>
 <translation id="2316129865977710310">വേണ്ട, നന്ദി</translation>
-<translation id="415994390253732730">Chrome അസ്വാഭാവികമായി പ്രവർത്തിക്കുന്നുണ്ടോ?</translation>
 <translation id="1104959162601287462">&amp;Chrome OS-നെക്കുറിച്ച്</translation>
 <translation id="5328989068199000832">Google Chrome ബൈനറികൾ</translation>
 <translation id="7626032353295482388">Chrome-ലേക്ക് സ്വാഗതം</translation>
@@ -223,13 +223,13 @@
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome കൂടുതൽ മികച്ചതായി</translation>
 <translation id="2588322182880276190">Chrome ലോഗോ</translation>
+<translation id="4519152997629025674">നിങ്ങളുടെ ബ്രൗസിംഗ് അനുഭവം മെച്ചപ്പെടുത്താൻ Google Chrome <ph name="BEGIN_LINK"/>വെബ് സേവനങ്ങൾ<ph name="END_LINK"/> ഉപയോഗിക്കാം. എപ്പോൾ വേണമെങ്കിലും ഓപ്‌ഷണലായി ഈ സേവനങ്ങളെ പ്രവർത്തനരഹിതമാക്കാം.</translation>
 <translation id="4367618624832907428">നിങ്ങളുടെ കമ്പ്യൂട്ടർ ഇന്റർനെറ്റിൽ കണക്‌റ്റുചെയ്യാത്തതിനാൽ, Google Chrome-ന് വെബ്‌പേജ് പ്രദർശിപ്പിക്കാനാവില്ല.</translation>
 <translation id="174539241580958092">സൈൻ ഇൻ ചെയ്യുന്നതിലെ ഒരു പിശകിനാൽ Google Chrome-ന് നിങ്ങളുടെ ഡാറ്റ സമന്വയിപ്പിക്കാനായില്ല.</translation>
 <translation id="8255190535488645436">Google Chrome നിങ്ങളുടെ ക്യാമറയും മൈക്രോഫോണും ഉപയോഗിക്കുന്നു.</translation>
 <translation id="7396375882099008034">നിങ്ങളുടെ ഫയർവാളിലെ അല്ലെങ്കിൽ ആന്റിവൈറസ് ക്രമീകരണങ്ങളിലെ നെറ്റ്‌വർക്ക് ആക്‌സസ്സുചെയ്യാൻ Chrome-നെ അനുവദിക്കുക.</translation>
 <translation id="9102715433345326100">ഈ ഫയൽ ക്ഷുദ്രകരമായതിനാൽ Chrome അത് തടഞ്ഞു.</translation>
 <translation id="8205111949707227942">ഓപ്ഷണല്‍: Google ലേക്ക് ഉപയോഗ നിലയും ക്രാഷ് റിപ്പോര്‍ട്ടുകളും സ്വപ്രേരിതമായി അയച്ചുകൊണ്ട് Chrome OS മെച്ചപ്പെടുത്താന്‍ സഹായിക്കുക.</translation>
-<translation id="487887346205285304">Chrome അസ്വാഭാവികമായി പ്രവർത്തിക്കുന്നുണ്ടോ?</translation>
 <translation id="3622797965165704966">ഇപ്പോൾ നിങ്ങളുടെ Google അക്കൗണ്ട് ഉപയോഗിച്ച്, പങ്കിട്ട കമ്പ്യൂട്ടറുകളിൽ Chromium ഉപയോഗിക്കാൻ എളുപ്പമാണ്.</translation>
 <translation id="7196020411877309443">ഞാനെന്തിനാണ് ഇത് കാണുന്നത്</translation>
 <translation id="2769762047821873045">Google Chrome നിങ്ങളുടെ സ്ഥിരസ്ഥിതി ബ്രൌസറായിരുന്നില്ല.</translation>

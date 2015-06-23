@@ -7,6 +7,7 @@
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
 #include "chrome/browser/autocomplete/autocomplete_controller.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/predictors/predictor_database.h"
 #include "chrome/browser/search_engines/chrome_template_url_service_client.h"
@@ -14,7 +15,7 @@
 #include "chrome/browser/search_engines/ui_thread_search_terms_data.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
 #include "chrome/browser/ui/views/frame/browser_view.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 #include "chrome/test/base/browser_with_test_window_test.h"
 #include "chrome/test/base/scoped_testing_local_state.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -50,8 +51,9 @@ scoped_ptr<KeyedService> CreateAutocompleteClassifier(
   Profile* profile = static_cast<Profile*>(context);
   return make_scoped_ptr(new AutocompleteClassifier(
       make_scoped_ptr(new AutocompleteController(
-          profile, TemplateURLServiceFactory::GetForProfile(profile), nullptr,
-          AutocompleteClassifier::kDefaultOmniboxProviders)),
+          make_scoped_ptr(new ChromeAutocompleteProviderClient(profile)),
+
+          nullptr, AutocompleteClassifier::kDefaultOmniboxProviders)),
       scoped_ptr<AutocompleteSchemeClassifier>(new TestSchemeClassifier())));
 }
 

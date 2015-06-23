@@ -12,16 +12,16 @@ import android.os.Handler;
 import android.os.Message;
 import android.os.SystemClock;
 import android.view.View;
+import android.view.ViewGroup.MarginLayoutParams;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.ListPopupWindow;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.PerfTraceEvent;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.annotations.SuppressFBWarnings;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.compositor.layouts.ChromeAnimation;
 import org.chromium.chrome.browser.compositor.layouts.ChromeAnimation.Animatable;
@@ -1530,13 +1530,15 @@ public class StripLayoutHelper {
         // 3. Set the vertical offset to align the tab menu with bottom of the tab strip
         int verticalOffset =
                 -(tabView.getHeight()
-                        - (int) mContext.getResources().getDimension(R.dimen.tab_strip_height));
+                        - (int) mContext.getResources().getDimension(R.dimen.tab_strip_height))
+                - ((MarginLayoutParams) tabView.getLayoutParams()).topMargin;
         mTabMenu.setVerticalOffset(verticalOffset);
 
         // 4. Set the horizontal offset to align the tab menu with the right side of the tab
         int horizontalOffset = Math.round((anchorTab.getDrawX() + anchorTab.getWidth())
                                        * mContext.getResources().getDisplayMetrics().density)
-                - mTabMenu.getWidth();
+                - mTabMenu.getWidth()
+                - ((MarginLayoutParams) tabView.getLayoutParams()).leftMargin;
         mTabMenu.setHorizontalOffset(horizontalOffset);
 
         mTabMenu.show();

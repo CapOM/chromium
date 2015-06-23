@@ -4,11 +4,8 @@
 
 package org.chromium.chrome.browser.enhancedbookmarks;
 
-import android.annotation.SuppressLint;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.graphics.PorterDuff;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.util.AttributeSet;
 import android.view.View;
@@ -20,14 +17,11 @@ import android.widget.FrameLayout;
 import android.widget.ListPopupWindow;
 import android.widget.TextView;
 
-import com.google.android.apps.chrome.R;
-
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.enhanced_bookmarks.LaunchLocation;
 import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkItemsAdapter.BookmarkGrid;
-import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkSalientImageView.SalientImageDrawableFactory;
-import org.chromium.chrome.browser.widget.CustomShapeDrawable.CircularDrawable;
-import org.chromium.chrome.browser.widget.CustomShapeDrawable.TopRoundedCornerDrawable;
+import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkManager.UIState;
 import org.chromium.chrome.browser.widget.TintedImageButton;
 import org.chromium.components.bookmarks.BookmarkId;
 import org.chromium.components.bookmarks.BookmarkType;
@@ -37,49 +31,8 @@ import java.util.List;
 /**
  * A view that shows a bookmark's title, screenshot, URL, etc, shown in the enhanced bookmarks UI.
  */
-abstract class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookmarkUIObserver,
-        SalientImageDrawableFactory, BookmarkGrid {
-    /**
-     * The item to show in list view mode.
-     */
-    @SuppressLint("Instantiatable")
-    static class EnhancedBookmarkListItem extends EnhancedBookmarkItem {
-        public EnhancedBookmarkListItem(Context context, AttributeSet attrs) {
-            super(context, attrs);
-        }
-
-        @Override
-        public Drawable getSalientDrawable(int color) {
-            return new CircularDrawable(color);
-        }
-
-        @Override
-        public Drawable getSalientDrawable(Bitmap bitmap) {
-            return new CircularDrawable(bitmap);
-        }
-    }
-
-    /**
-     * The item to show in grid mode.
-     */
-    @SuppressLint("Instantiatable")
-    static class EnhancedBookmarkGridItem extends EnhancedBookmarkItem {
-        public EnhancedBookmarkGridItem(Context context, AttributeSet attrs) {
-            super(context, attrs);
-        }
-
-        @Override
-        public Drawable getSalientDrawable(int color) {
-            return new TopRoundedCornerDrawable(color, getResources().getDimensionPixelSize(
-                    R.dimen.enhanced_bookmark_item_corner_radius));
-        }
-
-        @Override
-        public Drawable getSalientDrawable(Bitmap bitmap) {
-            return new TopRoundedCornerDrawable(bitmap, getResources().getDimensionPixelSize(
-                    R.dimen.enhanced_bookmark_item_corner_radius));
-        }
-    }
+public class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookmarkUIObserver,
+        BookmarkGrid {
 
     private EnhancedBookmarkSalientImageView mSalientImageView;
     private TintedImageButton mMoreIcon;
@@ -180,7 +133,7 @@ abstract class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookm
                     if (position == 0) {
                         setChecked(mDelegate.toggleSelectionForBookmark(mBookmarkId));
                     } else if (position == 1) {
-                        mDelegate.startDetailActivity(mBookmarkId, mSalientImageView);
+                        EnhancedBookmarkUtils.startEditActivity(getContext(), mBookmarkId);
                     } else if (position == 2) {
                         EnhancedBookmarkFolderSelectActivity.startFolderSelectActivity(getContext(),
                                 mBookmarkId);
@@ -224,7 +177,7 @@ abstract class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookm
         mFolderTitleView.setVisibility(View.INVISIBLE);
         BookmarkId parentId = bookmarkItem.getParentId();
         // On folder mode, folder name is shown at top so no need to show it again.
-        if (mDelegate.getCurrentState() != EnhancedBookmarkDelegate.STATE_FOLDER
+        if (mDelegate.getCurrentState() != UIState.STATE_FOLDER
                 && parentId != null) {
             BookmarkItem parentItem = mDelegate.getModel().getBookmarkById(parentId);
             if (parentItem != null) {
@@ -234,7 +187,7 @@ abstract class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookm
         }
 
         mSalientImageView.load(mDelegate.getModel(), bookmarkItem.getUrl(),
-                EnhancedBookmarkUtils.generateBackgroundColor(bookmarkItem), this);
+                EnhancedBookmarkUtils.generateBackgroundColor(bookmarkItem));
     }
 
     @Override
@@ -244,16 +197,13 @@ abstract class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookm
         } else {
             int launchLocation = -1;
             switch (mDelegate.getCurrentState()) {
-                case EnhancedBookmarkDelegate.STATE_ALL_BOOKMARKS:
+                case UIState.STATE_ALL_BOOKMARKS:
                     launchLocation = LaunchLocation.ALL_ITEMS;
                     break;
-                case EnhancedBookmarkDelegate.STATE_FOLDER:
+                case UIState.STATE_FOLDER:
                     launchLocation = LaunchLocation.FOLDER;
                     break;
-                case EnhancedBookmarkDelegate.STATE_FILTER:
-                    launchLocation = LaunchLocation.FILTER;
-                    break;
-                case EnhancedBookmarkDelegate.STATE_LOADING:
+                case UIState.STATE_LOADING:
                     assert false :
                             "The main content shouldn't be inflated if it's still loading";
                     break;
@@ -319,14 +269,7 @@ abstract class EnhancedBookmarkItem extends FrameLayout implements EnhancedBookm
     }
 
     @Override
-    public void onFilterStateSet(String filter) {
-    }
-
-    @Override
     public void onSelectionStateChange(List<BookmarkId> selectedBookmarks) {
         updateSelectionState();
     }
-
-    @Override
-    public void onListModeChange(boolean isListModeEnabled) {}
 }

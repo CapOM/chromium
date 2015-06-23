@@ -4,10 +4,6 @@
 {
   'variables': {
     'chrome_unit_tests_sources': [
-      '../components/autofill/content/renderer/test_password_autofill_agent.cc',
-      '../components/autofill/content/renderer/test_password_autofill_agent.h',
-      '../components/autofill/content/renderer/test_password_generation_agent.cc',
-      '../components/autofill/content/renderer/test_password_generation_agent.h',
       # histograms.xml is analyzed by AboutFlagsHistogramTest, so this
       # dependency is needed to make commit bots run unit_tests on
       # histograms.xml changes.
@@ -16,9 +12,14 @@
       'browser/about_flags_unittest.cc',
       'browser/after_startup_task_utils_unittest.cc',
       'browser/android/bookmarks/partner_bookmarks_shim_unittest.cc',
+      'browser/android/contextualsearch/contextual_search_delegate_unittest.cc',
+      'browser/android/history_report/delta_file_commons_unittest.cc',
+      'browser/android/history_report/delta_file_backend_leveldb_unittest.cc',
+      'browser/android/history_report/usage_reports_buffer_backend_unittest.cc',
       # TODO(newt): move this to test_support_unit?
       'browser/android/mock_location_settings.cc',
       'browser/android/mock_location_settings.h',
+      'browser/android/policy/policy_manager_unittest.cc',
       'browser/android/preferences/pref_service_bridge_unittest.cc',
       'browser/android/thumbnail/scoped_ptr_expiring_cache_unittest.cc',
       'browser/app_controller_mac_unittest.mm',
@@ -85,6 +86,7 @@
       'browser/download/download_history_unittest.cc',
       'browser/download/download_item_model_unittest.cc',
       'browser/download/download_path_reservation_tracker_unittest.cc',
+      'browser/download/download_prefs_unittest.cc',
       'browser/download/download_query_unittest.cc',
       'browser/download/download_request_infobar_delegate_unittest.cc',
       'browser/download/download_request_limiter_unittest.cc',
@@ -127,6 +129,7 @@
       'browser/manifest/manifest_icon_selector_unittest.cc',
       'browser/media/native_desktop_media_list_unittest.cc',
       'browser/media/midi_permission_context_unittest.cc',
+      'browser/memory/oom_priority_manager_chromeos_unittest.cc',
       'browser/metrics/chrome_metrics_service_accessor_unittest.cc',
       'browser/metrics/cloned_install_detector_unittest.cc',
       'browser/metrics/drive_metrics_provider_unittest.cc',
@@ -157,6 +160,7 @@
       'browser/net/spdyproxy/data_reduction_proxy_settings_unittest_android.cc',
       'browser/net/ssl_config_service_manager_pref_unittest.cc',
       'browser/net/url_info_unittest.cc',
+      'browser/offline_pages/offline_page_metadata_store_impl_unittest.cc',
       'browser/password_manager/chrome_password_manager_client_unittest.cc',
       'browser/password_manager/password_manager_internals_service_unittest.cc',
       'browser/password_manager/password_manager_metrics_util_unittest.cc',
@@ -164,6 +168,7 @@
       'browser/password_manager/password_store_win_unittest.cc',
       'browser/password_manager/password_store_x_unittest.cc',
       'browser/password_manager/save_password_infobar_delegate_unittest.cc',
+      'browser/password_manager/simple_password_store_mac_unittest.cc',
       'browser/permissions/permission_manager_unittest.cc',
       'browser/predictors/autocomplete_action_predictor_table_unittest.cc',
       'browser/predictors/autocomplete_action_predictor_unittest.cc',
@@ -656,7 +661,10 @@
       'browser/extensions/api/declarative_content/chrome_content_rules_registry_unittest.cc',
       'browser/extensions/api/declarative_content/content_action_unittest.cc',
       'browser/extensions/api/declarative_content/content_condition_unittest.cc',
+      'browser/extensions/api/declarative_content/declarative_content_condition_tracker_test.cc',
+      'browser/extensions/api/declarative_content/declarative_content_condition_tracker_test.h',
       'browser/extensions/api/declarative_content/declarative_content_css_condition_tracker_unittest.cc',
+      'browser/extensions/api/declarative_content/declarative_content_page_url_condition_tracker_unittest.cc',
       'browser/extensions/api/declarative_webrequest/webrequest_action_unittest.cc',
       'browser/extensions/api/declarative_webrequest/webrequest_rules_registry_unittest.cc',
       'browser/extensions/api/developer_private/developer_private_api_unittest.cc',
@@ -992,6 +1000,7 @@
       'browser/safe_browsing/chunk_range_unittest.cc',
       'browser/safe_browsing/client_side_detection_host_unittest.cc',
       'browser/safe_browsing/client_side_detection_service_unittest.cc',
+      'browser/safe_browsing/client_side_model_loader_unittest.cc',
       'browser/safe_browsing/download_feedback_service_unittest.cc',
       'browser/safe_browsing/download_feedback_unittest.cc',
       'browser/safe_browsing/download_protection_service_unittest.cc',
@@ -1032,10 +1041,12 @@
       'browser/safe_browsing/test_database_manager.cc',
       'browser/safe_browsing/test_database_manager.h',
       'browser/safe_browsing/two_phase_uploader_unittest.cc',
+      'browser/safe_browsing/ui_manager_unittest.cc',
       'common/safe_browsing/binary_feature_extractor_unittest.cc',
       'common/safe_browsing/binary_feature_extractor_win_unittest.cc',
       'common/safe_browsing/ipc_protobuf_message_test_messages.h',
       'common/safe_browsing/ipc_protobuf_message_unittest.cc',
+      'common/safe_browsing/mach_o_image_reader_mac_unittest.cc',
       'common/safe_browsing/pe_image_reader_win_unittest.cc',
       'renderer/safe_browsing/features_unittest.cc',
       'renderer/safe_browsing/murmurhash3_util_unittest.cc',
@@ -1091,6 +1102,7 @@
       'browser/captive_portal/captive_portal_tab_reloader_unittest.cc',
     ],
     'chrome_unit_tests_session_service_sources': [
+      'browser/sessions/session_restore_stats_collector_unittest.cc',
       'browser/sessions/session_service_unittest.cc',
       'browser/ui/startup/session_crashed_infobar_delegate_unittest.cc',
     ],
@@ -1130,7 +1142,6 @@
       'browser/chromeos/attestation/fake_certificate.h',
       'browser/chromeos/attestation/platform_verification_flow_unittest.cc',
       'browser/chromeos/customization/customization_document_unittest.cc',
-      'browser/chromeos/dbus/printer_service_provider_unittest.cc',
       'browser/chromeos/display/display_preferences_unittest.cc',
       'browser/chromeos/drive/change_list_loader_unittest.cc',
       'browser/chromeos/drive/change_list_processor_unittest.cc',
@@ -1214,6 +1225,7 @@
       'browser/chromeos/file_system_provider/operations/create_directory_unittest.cc',
       'browser/chromeos/file_system_provider/operations/create_file_unittest.cc',
       'browser/chromeos/file_system_provider/operations/delete_entry_unittest.cc',
+      'browser/chromeos/file_system_provider/operations/get_actions_unittest.cc',
       'browser/chromeos/file_system_provider/operations/get_metadata_unittest.cc',
       'browser/chromeos/file_system_provider/operations/move_entry_unittest.cc',
       'browser/chromeos/file_system_provider/operations/open_file_unittest.cc',
@@ -1255,7 +1267,6 @@
       'browser/chromeos/login/users/multi_profile_user_controller_unittest.cc',
       'browser/chromeos/login/users/user_manager_unittest.cc',
       'browser/chromeos/login/users/wallpaper/wallpaper_manager_unittest.cc',
-      'browser/chromeos/memory/oom_priority_manager_unittest.cc',
       'browser/chromeos/mobile/mobile_activator_unittest.cc',
       'browser/chromeos/mobile_config_unittest.cc',
       'browser/chromeos/net/cert_verify_proc_chromeos_unittest.cc',
@@ -1302,6 +1313,7 @@
       'browser/chromeos/power/power_prefs_unittest.cc',
       'browser/chromeos/power/renderer_freezer_unittest.cc',
       'browser/chromeos/preferences_unittest.cc',
+      'browser/chromeos/printer_detector/printer_detector_unittest.cc',
       'browser/chromeos/profiles/profile_list_chromeos_unittest.cc',
       'browser/chromeos/proxy_config_service_impl_unittest.cc',
       'browser/chromeos/session_length_limiter_unittest.cc',
@@ -1319,7 +1331,7 @@
       'browser/chromeos/system/device_disabling_manager_unittest.cc',
       'browser/chromeos/ui/accessibility_focus_ring_controller_unittest.cc',
       'browser/chromeos/ui/idle_app_name_notification_view_unittest.cc',
-      'browser/download/notification/download_notification_item_unittest.cc',
+      'browser/download/notification/download_item_notification_unittest.cc',
       'browser/extensions/api/enterprise_platform_keys_private/enterprise_platform_keys_private_api_unittest.cc',
       'browser/extensions/api/log_private/syslog_parser_unittest.cc',
       'browser/extensions/updater/local_extension_cache_unittest.cc',
@@ -1350,13 +1362,20 @@
       'browser/profiles/profile_list_desktop_unittest.cc',
       'browser/shell_integration_linux_unittest.cc',
     ],
+    # Cross-platform views unit tests ready for toolkit-views on Mac.
+    # TODO(tapted): Enable toolkit-views unit_tests on Mac when their
+    # respective implementations are linked in. http://crbug.com/412234.
     'chrome_unit_tests_views_sources': [
+      'browser/ui/views/apps/app_info_dialog/app_info_dialog_views_unittest.cc',
+      'browser/ui/views/apps/app_info_dialog/app_info_permissions_panel_unittest.cc',
+    ],
+    # Cross-platform (except Mac) views unit tests. Assumes app list is enabled.
+    'chrome_unit_tests_views_non_mac_sources': [
       'browser/ui/views/accelerator_table_unittest.cc',
       # Views implies app list is enabled (only disabled on mobile).
       'browser/ui/views/app_list/linux/app_list_linux_unittest.cc',
       'browser/ui/views/app_list/win/app_list_win_unittest.cc',
-      'browser/ui/views/apps/app_info_dialog/app_info_dialog_views_unittest.cc',
-      'browser/ui/views/apps/app_info_dialog/app_info_permissions_panel_unittest.cc',
+      'browser/ui/views/apps/app_info_dialog/app_info_dialog_ash_unittest.cc',
       'browser/ui/views/apps/shaped_app_window_targeter_unittest.cc',
       'browser/ui/views/autofill/autofill_dialog_views_unittest.cc',
       'browser/ui/views/bookmarks/bookmark_bar_view_unittest.cc',
@@ -1434,6 +1453,7 @@
       'browser/supervised_user/supervised_user_whitelist_service_unittest.cc',
     ],
     'chrome_unit_tests_media_router_sources': [
+      'browser/media/router/create_session_request_unittest.cc',
       'browser/media/router/issue_manager_unittest.cc',
       'browser/media/router/issue_unittest.cc',
       'browser/media/router/media_router_mojo_impl_unittest.cc',
@@ -1448,6 +1468,7 @@
       'browser/ui/webui/media_router/media_router_dialog_controller_unittest.cc',
       'browser/ui/webui/media_router/media_router_test.cc',
       'browser/ui/webui/media_router/media_router_test.h',
+      'browser/ui/webui/media_router/media_router_webui_message_handler_unittest.cc',
       'browser/ui/webui/media_router/query_result_manager_unittest.cc',
     ],
     # Everything but Android and iOS (iOS is handled separately).
@@ -1510,6 +1531,7 @@
       'browser/ui/autofill/test_generated_credit_card_bubble_view.h',
       'browser/ui/bookmarks/bookmark_context_menu_controller_unittest.cc',
       'browser/ui/bookmarks/bookmark_unittest.cc',
+      'browser/ui/browser_close_unittest.cc',
       'browser/ui/browser_command_controller_unittest.cc',
       'browser/ui/browser_instant_controller_unittest.cc',
       'browser/ui/browser_iterator_unittest.cc',
@@ -2079,6 +2101,11 @@
             '../remoting/remoting.gyp:remoting_client_plugin',
           ],
         }],
+        ['toolkit_views==1', {
+          'dependencies': [
+            '../ui/views/views.gyp:views',
+          ],
+        }],
       ],
     },
     {
@@ -2191,8 +2218,8 @@
             '../ppapi/ppapi_internal.gyp:ppapi_unittest_shared',
             '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',
             '../third_party/libaddressinput/libaddressinput.gyp:libaddressinput',
-            '../third_party/libjingle/libjingle.gyp:libjingle',
             '../third_party/libphonenumber/libphonenumber.gyp:libphonenumber',
+            '../third_party/webrtc/modules/modules.gyp:desktop_capture',
             '../tools/json_schema_compiler/test/json_schema_compiler_tests.gyp:json_schema_compiler_tests',
             '../ui/gl/gl.gyp:gl',
             '../v8/tools/gyp/v8.gyp:v8',
@@ -2419,14 +2446,6 @@
             'browser/ui/views/frame/opaque_browser_frame_view_layout_unittest.cc',
             'browser/ui/views/sync/one_click_signin_bubble_view_unittest.cc',
           ],
-          'conditions': [
-            ['use_ozone==1', {
-              'sources!': [
-                # crbug.com/354036
-                'browser/chromeos/events/event_rewriter_unittest.cc',
-              ],
-            }],
-          ],
         }],
         ['use_x11==1', {
           'dependencies': [
@@ -2630,11 +2649,10 @@
             '../ui/views/views.gyp:views',
             '../ui/views/views.gyp:views_test_support',
           ],
+          'sources': [ '<@(chrome_unit_tests_views_sources)' ],
           'conditions': [
-            # TODO(tapted): Enable toolkit-views unit_tests on Mac when their
-            # respective implementations are linked in. http://crbug.com/412234.
             ['OS != "mac"', {
-              'sources': [ '<@(chrome_unit_tests_views_sources)' ],
+              'sources': [ '<@(chrome_unit_tests_views_non_mac_sources)' ],
             }],
           ],
         }],

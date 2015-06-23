@@ -7,6 +7,7 @@
 #include "cc/layers/picture_image_layer.h"
 #include "cc/test/fake_layer_tree_host.h"
 #include "cc/test/geometry_test_utils.h"
+#include "cc/test/test_task_graph_runner.h"
 #include "cc/trees/layer_tree_host_common.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "third_party/WebKit/public/platform/WebFloatPoint.h"
@@ -67,10 +68,10 @@ TEST(WebLayerImplFixedBoundsTest, BoundsScaleSimple) {
 }
 
 void ExpectEqualLayerRectsInTarget(cc::Layer* layer1, cc::Layer* layer2) {
-  gfx::RectF layer1_rect_in_target(layer1->content_bounds());
+  gfx::RectF layer1_rect_in_target(layer1->bounds());
   layer1->draw_transform().TransformRect(&layer1_rect_in_target);
 
-  gfx::RectF layer2_rect_in_target(layer2->content_bounds());
+  gfx::RectF layer2_rect_in_target(layer2->bounds());
   layer2->draw_transform().TransformRect(&layer2_rect_in_target);
 
   EXPECT_FLOAT_RECT_EQ(layer1_rect_in_target, layer2_rect_in_target);
@@ -105,8 +106,9 @@ void CompareFixedBoundsLayerAndNormalLayer(const WebFloatPoint& anchor_point,
   root_layer->addChild(normal_layer);
 
   cc::FakeLayerTreeHostClient client(cc::FakeLayerTreeHostClient::DIRECT_3D);
+  cc::TestTaskGraphRunner task_graph_runner;
   scoped_ptr<cc::FakeLayerTreeHost> host =
-      cc::FakeLayerTreeHost::Create(&client);
+      cc::FakeLayerTreeHost::Create(&client, &task_graph_runner);
   host->SetRootLayer(root_layer->layer());
 
   {

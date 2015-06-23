@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="iw">
 <translation id="2774256287122201187">אתה רשאי להמשיך. אם תמשיך אל הדף, האזהרה הזו לא תופיע שוב למשך חמש דקות.</translation>
+<translation id="3963721102035795474">מצב קורא</translation>
 <translation id="7485870689360869515">לא נמצאו נתונים.</translation>
 <translation id="3884278016824448484">מזהה מכשיר מתנגש</translation>
 <translation id="5172758083709347301">מכונה</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">התרגום ל<ph name="TARGET_LANGUAGE"/> נכשל.</translation>
 <translation id="4103249731201008433">המספר הסידורי של המכשיר אינו חוקי</translation>
 <translation id="3219579145727097045">‏הזן את תאריך סיום התוקף ו-CVC בן ארבע ספרות המופיע בחזית הכרטיס</translation>
-<translation id="3667681724235208644">הצג את המקור</translation>
+<translation id="59107663811261420">‏סוג הכרטיס הזה אינו נתמך על ידי Google Payments אצל הסוחר הזה. בחר כרטיס אחר.</translation>
 <translation id="4079302484614802869">‏תצורת ה-Proxy מוגדרת להשתמש בכתובת אתר של סקריפט מסוג ‎.Pac ולא בשרתי Proxy קבועים.</translation>
 <translation id="5540224163453853">לא ניתן היה למצוא את הפריט המבוקש.</translation>
 <translation id="8437238597147034694">&amp;ביטול העברה</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;הזן שאילתה&gt;</translation>
 <translation id="552553974213252141">האם הטקסט נשלף כראוי?</translation>
 <translation id="5317780077021120954">שמור</translation>
+<translation id="8530504477309582336">‏סוג הכרטיס הזה אינו נתמך על ידי Google Payments. בחר כרטיס אחר.</translation>
 <translation id="7610193165460212391">הערך מחוץ לטווח <ph name="VALUE"/>.</translation>
 <translation id="3739623965217189342">קישור שהעתקת</translation>
 <translation id="8790007591277257123">&amp;ביצוע מחדש של מחיקה</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">‏מצב שרת Proxy לא חוקי.</translation>
 <translation id="3105172416063519923">מזהה נכס:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">‏JavaScript צריך להיות מופעל כדי להשתמש בתכונה זו.</translation>
 <translation id="2587841377698384444">‏מזהה ממשק API של ספרייה:</translation>
 <translation id="7752995774971033316">ללא ניהול</translation>
 <translation id="3712624925041724820">אין מספיק רישיונות</translation>

@@ -37,9 +37,9 @@
 #include "content/browser/frame_host/navigation_request_info.h"
 #include "content/browser/frame_host/navigator.h"
 #include "content/browser/loader/async_resource_handler.h"
-#include "content/browser/loader/buffered_resource_handler.h"
 #include "content/browser/loader/cross_site_resource_handler.h"
 #include "content/browser/loader/detachable_resource_handler.h"
+#include "content/browser/loader/mime_type_resource_handler.h"
 #include "content/browser/loader/navigation_resource_handler.h"
 #include "content/browser/loader/navigation_url_loader_impl_core.h"
 #include "content/browser/loader/power_save_block_resource_throttle.h"
@@ -820,10 +820,10 @@ void ResourceDispatcherHostImpl::DidReceiveRedirect(ResourceLoader* loader,
 
 void ResourceDispatcherHostImpl::DidReceiveResponse(ResourceLoader* loader) {
   ResourceRequestInfoImpl* info = loader->GetRequestInfo();
-
-  if (loader->request()->was_fetched_via_proxy() &&
-      loader->request()->was_fetched_via_spdy() &&
-      loader->request()->url().SchemeIs(url::kHttpScheme)) {
+  net::URLRequest* request = loader->request();
+  if (request->was_fetched_via_proxy() &&
+      request->was_fetched_via_spdy() &&
+      request->url().SchemeIs(url::kHttpScheme)) {
     scheduler_->OnReceivedSpdyProxiedHttpResponse(
         info->GetChildID(), info->GetRouteID());
   }
@@ -834,8 +834,7 @@ void ResourceDispatcherHostImpl::DidReceiveResponse(ResourceLoader* loader) {
 
   // Notify the observers on the UI thread.
   scoped_ptr<ResourceRequestDetails> detail(new ResourceRequestDetails(
-      loader->request(),
-      GetCertID(loader->request(), info->GetChildID())));
+      request, GetCertID(request, info->GetChildID())));
   BrowserThread::PostTask(
       BrowserThread::UI, FROM_HERE,
       base::Bind(
@@ -1188,8 +1187,7 @@ void ResourceDispatcherHostImpl::BeginRequest(
   }
 
   // Construct the request.
-  scoped_ptr<net::URLRequest> new_request;
-  new_request = request_context->CreateRequest(
+  scoped_ptr<net::URLRequest> new_request = request_context->CreateRequest(
       request_data.url, request_data.priority, NULL);
 
   new_request->set_method(request_data.method);
@@ -1418,9 +1416,8 @@ scoped_ptr<ResourceHandler> ResourceDispatcherHostImpl::AddStandardHandlers(
   plugin_service = PluginService::GetInstance();
 #endif
   // Insert a buffered event handler before the actual one.
-  handler.reset(
-      new BufferedResourceHandler(
-          handler.Pass(), this, plugin_service, request));
+  handler.reset(new MimeTypeResourceHandler(handler.Pass(), this,
+                                            plugin_service, request));
 
   ScopedVector<ResourceThrottle> throttles;
   if (delegate_) {

@@ -651,6 +651,52 @@ public class AwContentsTest extends AwTestBase {
 
     @Feature({"AndroidWebView"})
     @SmallTest
+    public void testRequestAccessibilitySnapshotStrongStyle() throws Throwable {
+        final String data = "<html><body><p>foo</p><p><strong>bar</strong></p></body></html>";
+        AccessibilitySnapshotNode root = receiveAccessibilitySnapshot(data);
+        assertEquals(2, root.children.size());
+        assertEquals("", root.text);
+        AccessibilitySnapshotNode child1 = root.children.get(0);
+        assertEquals("foo", child1.text);
+        assertTrue(child1.hasStyle);
+        assertFalse(child1.bold);
+        AccessibilitySnapshotNode child2 = root.children.get(1);
+        AccessibilitySnapshotNode child2child = child2.children.get(0);
+        assertEquals("bar", child2child.text);
+        assertEquals(child1.textSize, child2child.textSize);
+        assertTrue(child2child.bold);
+    }
+
+    @Feature({"AndroidWebView"})
+    @SmallTest
+    public void testRequestAccessibilitySnapshotItalicStyle() throws Throwable {
+        final String data = "<html><body><i>foo</i></body></html>";
+        AccessibilitySnapshotNode root = receiveAccessibilitySnapshot(data);
+        assertEquals(1, root.children.size());
+        assertEquals("", root.text);
+        AccessibilitySnapshotNode child = root.children.get(0);
+        AccessibilitySnapshotNode grandchild = child.children.get(0);
+        assertEquals("foo", grandchild.text);
+        assertTrue(grandchild.hasStyle);
+        assertTrue(grandchild.italic);
+    }
+
+    @Feature({"AndroidWebView"})
+    @SmallTest
+    public void testRequestAccessibilitySnapshotBoldStyle() throws Throwable {
+        final String data = "<html><body><b>foo</b></body></html>";
+        AccessibilitySnapshotNode root = receiveAccessibilitySnapshot(data);
+        assertEquals(1, root.children.size());
+        assertEquals("", root.text);
+        AccessibilitySnapshotNode child = root.children.get(0);
+        AccessibilitySnapshotNode grandchild = child.children.get(0);
+        assertEquals("foo", grandchild.text);
+        assertTrue(grandchild.hasStyle);
+        assertTrue(grandchild.bold);
+    }
+
+    @Feature({"AndroidWebView"})
+    @SmallTest
     public void testRequestAccessibilitySnapshotNoStyle() throws Throwable {
         final String data = "<table><thead></thead></table>";
         AccessibilitySnapshotNode root = receiveAccessibilitySnapshot(data);

@@ -18,15 +18,13 @@ import android.view.ContextMenu;
 import android.view.KeyEvent;
 import android.view.View;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.Log;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.metrics.RecordUserAction;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeMobileApplication;
-import org.chromium.chrome.browser.CompositorChromeActivity;
 import org.chromium.chrome.browser.EmptyTabObserver;
 import org.chromium.chrome.browser.FrozenNativePage;
 import org.chromium.chrome.browser.IntentHandler.TabOpenType;
@@ -100,8 +98,7 @@ public class ChromeTab extends Tab {
     // URL didFailLoad error code. Should match the value in net_error_list.h.
     public static final int BLOCKED_BY_ADMINISTRATOR = -22;
 
-    public static final String PAGESPEED_PASSTHROUGH_HEADER =
-            "X-PSA-Client-Options: v=1,m=1\nCache-Control: no-cache";
+    public static final String PAGESPEED_PASSTHROUGH_HEADER = "Chrome-Proxy: pass-through";
 
     private static final int MSG_ID_ENABLE_FULLSCREEN_AFTER_LOAD = 1;
 
@@ -577,6 +574,11 @@ public class ChromeTab extends Tab {
         }
 
         @Override
+        public boolean isDataReductionProxyEnabledForURL(String url) {
+            return isSpdyProxyEnabledForUrl(url);
+        }
+
+        @Override
         public boolean startDownload(String url, boolean isLink) {
             if (isLink) {
                 RecordUserAction.record("MobileContextMenuDownloadLink");
@@ -989,7 +991,7 @@ public class ChromeTab extends Tab {
             mDownloadDelegate = new ChromeDownloadDelegate(mActivity,
                     mActivity.getTabModelSelector(), this);
             cvc.setDownloadDelegate(mDownloadDelegate);
-            setInterceptNavigationDelegate(new InterceptNavigationDelegateImpl());
+            setInterceptNavigationDelegate(createInterceptNavigationDelegate());
 
             if (mGestureStateListener == null) mGestureStateListener = createGestureStateListener();
             cvc.addGestureStateListener(mGestureStateListener);
@@ -1163,13 +1165,26 @@ public class ChromeTab extends Tab {
         return mTabRedirectHandler;
     }
 
-    private class InterceptNavigationDelegateImpl implements InterceptNavigationDelegate {
+    /**
+     * Delegate that handles intercepting top-level navigation.
+     */
+    protected class InterceptNavigationDelegateImpl implements InterceptNavigationDelegate {
         final ExternalNavigationHandler mExternalNavHandler;
         final AuthenticatorNavigationInterceptor mAuthenticatorHelper;
 
-        InterceptNavigationDelegateImpl() {
-            mExternalNavHandler = new ExternalNavigationHandler(mActivity);
+        /**
+         * Defualt constructor of {@link InterceptNavigationDelegateImpl}.
+         */
+        public InterceptNavigationDelegateImpl() {
+            this(new ExternalNavigationHandler(mActivity));
+        }
 
+        /**
+         * Constructs a new instance of {@link InterceptNavigationDelegateImpl} with the given
+         * {@link ExternalNavigationHandler}.
+         */
+        public InterceptNavigationDelegateImpl(ExternalNavigationHandler externalNavHandler) {
+            mExternalNavHandler = externalNavHandler;
             mAuthenticatorHelper = ((ChromeMobileApplication) getApplicationContext())
                     .createAuthenticatorNavigationInterceptor(ChromeTab.this);
         }
@@ -1318,6 +1333,15 @@ public class ChromeTab extends Tab {
         return (InterceptNavigationDelegateImpl) super.getInterceptNavigationDelegate();
     }
 
+    /**
+     * Factory method for {@link InterceptNavigationDelegateImpl}. Meant to be overridden by
+     * subclasses.
+     * @return A new instance of {@link InterceptNavigationDelegateImpl}.
+     */
+    protected InterceptNavigationDelegateImpl createInterceptNavigationDelegate() {
+        return new InterceptNavigationDelegateImpl();
+    }
+
     @Override
     public void setClosing(boolean closing) {
         if (closing) mBackgroundContentViewHelper.recordTabClose();
@@ -1332,8 +1356,7 @@ public class ChromeTab extends Tab {
     }
 
     public ReaderModeActivityDelegate getReaderModeActivityDelegate() {
-        if (!(mActivity instanceof CompositorChromeActivity)) return null;
-        return ((CompositorChromeActivity) mActivity).getReaderModeActivityDelegate();
+        return mActivity == null ? null : mActivity.getReaderModeActivityDelegate();
     }
 
     /**

@@ -113,6 +113,7 @@ GLES2Implementation::GLES2Implementation(
       current_trace_stack_(0),
       gpu_control_(gpu_control),
       capabilities_(gpu_control->GetCapabilities()),
+      aggressively_free_resources_(false),
       weak_ptr_factory_(this) {
   DCHECK(helper);
   DCHECK(transfer_buffer);
@@ -317,11 +318,19 @@ void GLES2Implementation::SignalQuery(uint32 query,
 void GLES2Implementation::SetSurfaceVisible(bool visible) {
   TRACE_EVENT1(
       "gpu", "GLES2Implementation::SetSurfaceVisible", "visible", visible);
-  // TODO(piman): This probably should be ShallowFlushCHROMIUM().
-  Flush();
+  ShallowFlushCHROMIUM();
   gpu_control_->SetSurfaceVisible(visible);
-  if (!visible)
-    FreeEverything();
+}
+
+void GLES2Implementation::SetAggressivelyFreeResources(
+    bool aggressively_free_resources) {
+  TRACE_EVENT1("gpu", "GLES2Implementation::SetAggressivelyFreeResources",
+               "aggressively_free_resources", aggressively_free_resources);
+  aggressively_free_resources_ = aggressively_free_resources;
+
+  // ShallowFlushCHROMIUM will free resources if |aggressively_free_resources_|
+  // is false.
+  ShallowFlushCHROMIUM();
 }
 
 void GLES2Implementation::WaitForCmd() {
@@ -1153,18 +1162,22 @@ void GLES2Implementation::Flush() {
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glFlush()");
   // Insert the cmd to call glFlush
   helper_->Flush();
-  // Flush our command buffer
-  // (tell the service to execute up to the flush cmd.)
-  helper_->CommandBufferHelper::Flush();
+  FlushHelper();
 }
 
 void GLES2Implementation::ShallowFlushCHROMIUM() {
   GPU_CLIENT_SINGLE_THREAD_CHECK();
   GPU_CLIENT_LOG("[" << GetLogPrefix() << "] glShallowFlushCHROMIUM()");
+  FlushHelper();
+}
+
+void GLES2Implementation::FlushHelper() {
   // Flush our command buffer
   // (tell the service to execute up to the flush cmd.)
   helper_->CommandBufferHelper::Flush();
-  // TODO(piman): Add the FreeEverything() logic here.
+
+  if (aggressively_free_resources_)
+    FreeEverything();
 }
 
 void GLES2Implementation::OrderingBarrierCHROMIUM() {
@@ -1185,6 +1198,9 @@ void GLES2Implementation::ShallowFinishCHROMIUM() {
   // Flush our command buffer (tell the service to execute up to the flush cmd
   // and don't return until it completes).
   helper_->CommandBufferHelper::Finish();
+
+  if (aggressively_free_resources_)
+    FreeEverything();
 }
 
 void GLES2Implementation::FinishHelper() {
@@ -1196,6 +1212,9 @@ void GLES2Implementation::FinishHelper() {
   // (tell the service to execute up to the Finish cmd and wait for it to
   // execute.)
   helper_->CommandBufferHelper::Finish();
+
+  if (aggressively_free_resources_)
+    FreeEverything();
 }
 
 void GLES2Implementation::SwapBuffers() {
@@ -2187,18 +2206,36 @@ void GLES2Implementation::TexImage2D(
   }
 
   // Check if we can send it all at once.
-  ScopedTransferBufferPtr buffer(size, helper_, transfer_buffer_);
-  if (!buffer.valid()) {
-    return;
+  int32_t shm_id = 0;
+  uint32_t shm_offset = 0;
+  void* buffer_pointer = nullptr;
+
+  ScopedTransferBufferPtr transfer_alloc(size, helper_, transfer_buffer_);
+  ScopedMappedMemoryPtr mapped_alloc(0, helper_, mapped_memory_.get());
+
+  if (transfer_alloc.valid() && transfer_alloc.size() >= size) {
+    shm_id = transfer_alloc.shm_id();
+    shm_offset = transfer_alloc.offset();
+    buffer_pointer = transfer_alloc.address();
+  } else {
+    mapped_alloc.Reset(size);
+    if (mapped_alloc.valid()) {
+      transfer_alloc.Discard();
+
+      mapped_alloc.SetFlushAfterRelease(true);
+      shm_id = mapped_alloc.shm_id();
+      shm_offset = mapped_alloc.offset();
+      buffer_pointer = mapped_alloc.address();
+    }
   }
 
-  if (buffer.size() >= size) {
+  if (buffer_pointer) {
     CopyRectToBuffer(
         pixels, height, unpadded_row_size, src_padded_row_size, unpack_flip_y_,
-        buffer.address(), padded_row_size);
+        buffer_pointer, padded_row_size);
     helper_->TexImage2D(
         target, level, internalformat, width, height, format, type,
-        buffer.shm_id(), buffer.offset());
+        shm_id, shm_offset);
     CheckGLError();
     return;
   }
@@ -2209,7 +2246,7 @@ void GLES2Implementation::TexImage2D(
      0, 0);
   TexSubImage2DImpl(
       target, level, 0, 0, width, height, format, type, unpadded_row_size,
-      pixels, src_padded_row_size, GL_TRUE, &buffer, padded_row_size);
+      pixels, src_padded_row_size, GL_TRUE, &transfer_alloc, padded_row_size);
   CheckGLError();
 }
 
@@ -2295,13 +2332,30 @@ void GLES2Implementation::TexImage3D(
   }
 
   // Check if we can send it all at once.
-  ScopedTransferBufferPtr buffer(size, helper_, transfer_buffer_);
-  if (!buffer.valid()) {
-    return;
+  int32_t shm_id = 0;
+  uint32_t shm_offset = 0;
+  void* buffer_pointer = nullptr;
+
+  ScopedTransferBufferPtr transfer_alloc(size, helper_, transfer_buffer_);
+  ScopedMappedMemoryPtr mapped_alloc(0, helper_, mapped_memory_.get());
+
+  if (transfer_alloc.valid() && transfer_alloc.size() >= size) {
+    shm_id = transfer_alloc.shm_id();
+    shm_offset = transfer_alloc.offset();
+    buffer_pointer = transfer_alloc.address();
+  } else {
+    mapped_alloc.Reset(size);
+    if (mapped_alloc.valid()) {
+      transfer_alloc.Discard();
+
+      mapped_alloc.SetFlushAfterRelease(true);
+      shm_id = mapped_alloc.shm_id();
+      shm_offset = mapped_alloc.offset();
+      buffer_pointer = mapped_alloc.address();
+    }
   }
 
-  if (buffer.size() >= size) {
-    void* buffer_pointer = buffer.address();
+  if (buffer_pointer) {
     for (GLsizei z = 0; z < depth; ++z) {
       // Only the last row of the last image is unpadded.
       uint32 src_unpadded_row_size =
@@ -2317,7 +2371,7 @@ void GLES2Implementation::TexImage3D(
     }
     helper_->TexImage3D(
         target, level, internalformat, width, height, depth, format, type,
-        buffer.shm_id(), buffer.offset());
+        shm_id, shm_offset);
     CheckGLError();
     return;
   }
@@ -2328,7 +2382,7 @@ void GLES2Implementation::TexImage3D(
      0, 0);
   TexSubImage3DImpl(
       target, level, 0, 0, 0, width, height, depth, format, type,
-      unpadded_row_size, pixels, src_padded_row_size, GL_TRUE, &buffer,
+      unpadded_row_size, pixels, src_padded_row_size, GL_TRUE, &transfer_alloc,
       padded_row_size);
   CheckGLError();
 }
@@ -3516,7 +3570,7 @@ void GLES2Implementation::BindBufferHelper(
 void GLES2Implementation::BindBufferStub(GLenum target, GLuint buffer) {
   helper_->BindBuffer(target, buffer);
   if (share_group_->bind_generates_resource())
-    helper_->CommandBufferHelper::Flush();
+    helper_->CommandBufferHelper::OrderingBarrier();
 }
 
 void GLES2Implementation::BindBufferBaseHelper(
@@ -3600,7 +3654,7 @@ void GLES2Implementation::BindFramebufferStub(GLenum target,
                                               GLuint framebuffer) {
   helper_->BindFramebuffer(target, framebuffer);
   if (share_group_->bind_generates_resource())
-    helper_->CommandBufferHelper::Flush();
+    helper_->CommandBufferHelper::OrderingBarrier();
 }
 
 void GLES2Implementation::BindRenderbufferHelper(
@@ -3630,7 +3684,7 @@ void GLES2Implementation::BindRenderbufferStub(GLenum target,
                                                GLuint renderbuffer) {
   helper_->BindRenderbuffer(target, renderbuffer);
   if (share_group_->bind_generates_resource())
-    helper_->CommandBufferHelper::Flush();
+    helper_->CommandBufferHelper::OrderingBarrier();
 }
 
 void GLES2Implementation::BindSamplerHelper(GLuint unit,
@@ -3677,7 +3731,7 @@ void GLES2Implementation::BindTextureHelper(GLenum target, GLuint texture) {
 void GLES2Implementation::BindTextureStub(GLenum target, GLuint texture) {
   helper_->BindTexture(target, texture);
   if (share_group_->bind_generates_resource())
-    helper_->CommandBufferHelper::Flush();
+    helper_->CommandBufferHelper::OrderingBarrier();
 }
 
 void GLES2Implementation::BindTransformFeedbackHelper(
@@ -3728,7 +3782,7 @@ void GLES2Implementation::BindValuebufferCHROMIUMStub(GLenum target,
                                                       GLuint valuebuffer) {
   helper_->BindValuebufferCHROMIUM(target, valuebuffer);
   if (share_group_->bind_generates_resource())
-    helper_->CommandBufferHelper::Flush();
+    helper_->CommandBufferHelper::OrderingBarrier();
 }
 
 void GLES2Implementation::UseProgramHelper(GLuint program) {

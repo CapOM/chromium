@@ -74,6 +74,26 @@ const char kBackgroundHelpers[] =
     "      reply(responseString);\n"
     "    });\n"
     "  });\n"
+    "};\n"
+    "\n"
+    "function addRules(rules, responseString) {\n"
+    "  onPageChanged.addRules(rules, function() {\n"
+    "    if (chrome.runtime.lastError) {\n"
+    "      reply(chrome.runtime.lastError.message);\n"
+    "      return;\n"
+    "    }\n"
+    "    reply(responseString);\n"
+    "  });\n"
+    "};\n"
+    "\n"
+    "function removeRule(id, responseString) {\n"
+    "  onPageChanged.removeRules([id], function() {\n"
+    "    if (chrome.runtime.lastError) {\n"
+    "      reply(chrome.runtime.lastError.message);\n"
+    "      return;\n"
+    "    }\n"
+    "    reply(responseString);\n"
+    "  });\n"
     "};\n";
 
 class DeclarativeContentApiTest : public ExtensionApiTest {
@@ -240,33 +260,7 @@ IN_PROC_BROWSER_TEST_F(DeclarativeContentApiTest, Overview) {
 // Tests that the rules are evaluated at the time they are added or removed.
 IN_PROC_BROWSER_TEST_F(DeclarativeContentApiTest, RulesEvaluatedOnAddRemove) {
   ext_dir_.WriteManifest(kDeclarativeContentManifest);
-  ext_dir_.WriteFile(
-      FILE_PATH_LITERAL("background.js"),
-      "var PageStateMatcher = chrome.declarativeContent.PageStateMatcher;\n"
-      "var ShowPageAction = chrome.declarativeContent.ShowPageAction;\n"
-      "var onPageChanged = chrome.declarativeContent.onPageChanged;\n"
-      "var reply = window.domAutomationController.send.bind(\n"
-      "    window.domAutomationController);\n"
-      "\n"
-      "function addRules(rules, responseString) {\n"
-      "  onPageChanged.addRules(rules, function() {\n"
-      "    if (chrome.runtime.lastError) {\n"
-      "      reply(chrome.runtime.lastError.message);\n"
-      "      return;\n"
-      "    }\n"
-      "    reply(responseString);\n"
-      "  });\n"
-      "};\n"
-      "\n"
-      "function removeRule(id, responseString) {\n"
-      "  onPageChanged.removeRules([id], function() {\n"
-      "    if (chrome.runtime.lastError) {\n"
-      "      reply(chrome.runtime.lastError.message);\n"
-      "      return;\n"
-      "    }\n"
-      "    reply(responseString);\n"
-      "  });\n"
-      "};\n");
+  ext_dir_.WriteFile(FILE_PATH_LITERAL("background.js"), kBackgroundHelpers);
   const Extension* extension = LoadExtension(ext_dir_.unpacked_path());
   ASSERT_TRUE(extension);
   const ExtensionAction* page_action =
@@ -311,6 +305,48 @@ IN_PROC_BROWSER_TEST_F(DeclarativeContentApiTest, RulesEvaluatedOnAddRemove) {
   EXPECT_EQ("remove_rule2",
             ExecuteScriptInBackgroundPage(extension->id(), kRemoveTestRule2));
 
+  EXPECT_FALSE(page_action->GetIsVisible(tab_id));
+}
+
+// Tests that rules from manifest are added and evaluated properly.
+IN_PROC_BROWSER_TEST_F(DeclarativeContentApiTest, RulesAddedFromManifest) {
+  const char manifest[] =
+      "{\n"
+      "  \"name\": \"Declarative Content apitest\",\n"
+      "  \"version\": \"0.1\",\n"
+      "  \"manifest_version\": 2,\n"
+      "  \"page_action\": {},\n"
+      "  \"permissions\": [\n"
+      "    \"declarativeContent\"\n"
+      "  ],\n"
+      "  \"event_rules\": [{\n"
+      "    \"event\": \"declarativeContent.onPageChanged\",\n"
+      "    \"actions\": [{\n"
+      "      \"type\": \"declarativeContent.ShowPageAction\"\n"
+      "    }],\n"
+      "    \"conditions\": [{\n"
+      "      \"type\": \"declarativeContent.PageStateMatcher\",\n"
+      "      \"pageUrl\": {\"hostPrefix\": \"test1\"}\n"
+      "    }]\n"
+      "  }]\n"
+      "}\n";
+  ext_dir_.WriteManifest(manifest);
+  const Extension* extension = LoadExtension(ext_dir_.unpacked_path());
+  ASSERT_TRUE(extension);
+  const ExtensionAction* page_action =
+      ExtensionActionManager::Get(browser()->profile())
+          ->GetPageAction(*extension);
+  ASSERT_TRUE(page_action);
+
+  content::WebContents* const tab =
+      browser()->tab_strip_model()->GetWebContentsAt(0);
+  const int tab_id = ExtensionTabUtil::GetTabId(tab);
+
+  NavigateInRenderer(tab, GURL("http://blank/"));
+  EXPECT_FALSE(page_action->GetIsVisible(tab_id));
+  NavigateInRenderer(tab, GURL("http://test1/"));
+  EXPECT_TRUE(page_action->GetIsVisible(tab_id));
+  NavigateInRenderer(tab, GURL("http://test2/"));
   EXPECT_FALSE(page_action->GetIsVisible(tab_id));
 }
 
@@ -637,5 +673,65 @@ IN_PROC_BROWSER_TEST_F(DeclarativeContentApiTest,
   ASSERT_TRUE(LoadExtension(ext_dir_.unpacked_path()));
 }
 
+// https://crbug.com/501225
+IN_PROC_BROWSER_TEST_F(DeclarativeContentApiTest,
+                       PendingWebContentsClearedOnRemoveRules) {
+  ext_dir_.WriteManifest(kDeclarativeContentManifest);
+  ext_dir_.WriteFile(FILE_PATH_LITERAL("background.js"), kBackgroundHelpers);
+  const Extension* extension = LoadExtension(ext_dir_.unpacked_path());
+  ASSERT_TRUE(extension);
+  const ExtensionAction* page_action = ExtensionActionManager::Get(
+      browser()->profile())->GetPageAction(*extension);
+  ASSERT_TRUE(page_action);
+
+  // Create two tabs.
+  content::WebContents* const tab1 =
+      browser()->tab_strip_model()->GetWebContentsAt(0);
+
+  AddTabAtIndex(1, GURL("http://test2/"), ui::PAGE_TRANSITION_LINK);
+  scoped_ptr<content::WebContents> tab2(
+      browser()->tab_strip_model()->GetWebContentsAt(1));
+
+  // Add a rule matching the second tab.
+  const std::string kAddTestRules =
+      "addRules([{\n"
+      "  id: '1',\n"
+      "  conditions: [new PageStateMatcher({\n"
+      "                   pageUrl: {hostPrefix: \"test1\"}})],\n"
+      "  actions: [new ShowPageAction()]\n"
+      "}, {\n"
+      "  id: '2',\n"
+      "  conditions: [new PageStateMatcher({\n"
+      "                   pageUrl: {hostPrefix: \"test2\"}})],\n"
+      "  actions: [new ShowPageAction()]\n"
+      "}], 'add_rules');\n";
+  EXPECT_EQ("add_rules",
+            ExecuteScriptInBackgroundPage(extension->id(), kAddTestRules));
+  EXPECT_TRUE(page_action->GetIsVisible(
+      ExtensionTabUtil::GetTabId(tab2.get())));
+
+  // Remove the rule.
+  const std::string kRemoveTestRule1 = "removeRule('2', 'remove_rule1');\n";
+  EXPECT_EQ("remove_rule1",
+            ExecuteScriptInBackgroundPage(extension->id(), kRemoveTestRule1));
+
+  // Remove the second tab, then trigger a rule evaluation for the remaining
+  // tab.
+  tab2.reset();
+  NavigateInRenderer(tab1, GURL("http://test1/"));
+  EXPECT_TRUE(page_action->GetIsVisible(ExtensionTabUtil::GetTabId(tab1)));
+}
+
+
+// TODO(wittman): Once ChromeContentRulesRegistry operates on condition and
+// action interfaces, add a test that checks that a navigation always evaluates
+// consistent URL state for all conditions. i.e.: if condition1 evaluates to
+// false on url0 and true on url1, and condition2 evaluates to true on url0 and
+// false on url1, navigate from url0 to url1 and validate that no action is
+// triggered. Do the same when navigating back to url0. This kind of test is
+// unfortunately not feasible with the current implementation and the existing
+// supported conditions and actions.
+
 }  // namespace
 }  // namespace extensions
+

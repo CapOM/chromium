@@ -57,7 +57,6 @@ LayerTreeImpl::LayerTreeImpl(
       max_page_scale_factor_(0),
       elastic_overscroll_(elastic_overscroll),
       scrolling_layer_id_from_previous_tree_(0),
-      contents_textures_purged_(false),
       viewport_size_invalid_(false),
       needs_update_draw_properties_(true),
       needs_full_tree_sync_(true),
@@ -235,11 +234,6 @@ void LayerTreeImpl::PushPropertiesTo(LayerTreeImpl* target_tree) {
   target_tree->set_background_color(background_color());
   target_tree->set_has_transparent_background(has_transparent_background());
 
-  if (ContentsTexturesPurged())
-    target_tree->SetContentsTexturesPurged();
-  else
-    target_tree->ResetContentsTexturesPurged();
-
   if (ViewportSizeInvalid())
     target_tree->SetViewportSizeInvalid();
   else
@@ -313,6 +307,20 @@ float LayerTreeImpl::ClampPageScaleFactorToLimits(
   return page_scale_factor;
 }
 
+void LayerTreeImpl::UpdatePropertyTreeScrollingFromMainThread() {
+  // TODO(enne): This should get replaced by pulling out scrolling into its own
+  // tree.  Then scrolls would have their own way of synchronizing across
+  // commits.  This occurs to push updates from scrolling deltas on the
+  // compositor thread that have occurred after begin frame to a newly-committed
+  // property tree.
+  if (!root_layer())
+    return;
+  LayerTreeHostCommon::CallFunctionForSubtree(
+      root_layer(), [](LayerImpl* layer) {
+        layer->UpdatePropertyTreeForScrollingIfNeeded();
+      });
+}
+
 void LayerTreeImpl::SetPageScaleOnActiveTree(float active_page_scale) {
   DCHECK(IsActiveTree());
   if (page_scale_factor()->SetCurrent(
@@ -334,11 +342,21 @@ void LayerTreeImpl::PushPageScaleFactorAndLimits(const float* page_scale_factor,
   bool changed_page_scale = false;
   if (page_scale_factor) {
     DCHECK(!IsActiveTree() || !layer_tree_host_impl_->pending_tree());
+    changed_page_scale |= page_scale_factor_->Delta() != 1.f;
+    // TODO(enne): Once CDP goes away, ignore this call below.  The only time
+    // the property trees will differ is if there's been a page scale on the
+    // compositor thread after the begin frame, which is the delta check above.
     changed_page_scale |=
         page_scale_factor_->PushFromMainThread(*page_scale_factor);
   }
-  if (IsActiveTree())
+  if (IsActiveTree()) {
+    // TODO(enne): Pushing from pending to active should never require
+    // DidUpdatePageScale.  The values should already be set by the fully
+    // computed property trees being synced from one tree to another.  Remove
+    // this once CDP goes away.
     changed_page_scale |= page_scale_factor_->PushPendingToActive();
+  }
+
   changed_page_scale |=
       SetPageScaleFactorLimits(min_page_scale_factor, max_page_scale_factor);
 
@@ -479,7 +497,7 @@ gfx::Rect LayerTreeImpl::RootScrollLayerDeviceViewportBounds() const {
     return gfx::Rect();
   LayerImpl* layer = root_scroll_layer->children()[0];
   return MathUtil::MapEnclosingClippedRect(layer->screen_space_transform(),
-                                           gfx::Rect(layer->content_bounds()));
+                                           gfx::Rect(layer->bounds()));
 }
 
 void LayerTreeImpl::ApplySentScrollAndScaleDeltasFromAbortedCommit() {
@@ -576,7 +594,7 @@ bool LayerTreeImpl::UpdateDrawProperties(bool update_lcd_text) {
     TRACE_EVENT2("cc", "LayerTreeImpl::UpdateDrawProperties::Occlusion",
                  "IsActive", IsActiveTree(), "SourceFrameNumber",
                  source_frame_number_);
-    OcclusionTracker<LayerImpl> occlusion_tracker(
+    OcclusionTracker occlusion_tracker(
         root_layer()->render_surface()->content_rect());
     occlusion_tracker.set_minimum_tracking_size(
         settings().minimum_occlusion_tracking_size);
@@ -584,8 +602,8 @@ bool LayerTreeImpl::UpdateDrawProperties(bool update_lcd_text) {
     // LayerIterator is used here instead of CallFunctionForSubtree to only
     // UpdateTilePriorities on layers that will be visible (and thus have valid
     // draw properties) and not because any ordering is required.
-    auto end = LayerIterator<LayerImpl>::End(&render_surface_layer_list_);
-    for (auto it = LayerIterator<LayerImpl>::Begin(&render_surface_layer_list_);
+    LayerIterator end = LayerIterator::End(&render_surface_layer_list_);
+    for (LayerIterator it = LayerIterator::Begin(&render_surface_layer_list_);
          it != end; ++it) {
       occlusion_tracker.EnterLayer(it);
 
@@ -771,24 +789,6 @@ void LayerTreeImpl::DidBecomeActive() {
     swap_promise->DidActivate();
   devtools_instrumentation::DidActivateLayerTree(layer_tree_host_impl_->id(),
                                                  source_frame_number_);
-}
-
-bool LayerTreeImpl::ContentsTexturesPurged() const {
-  return contents_textures_purged_;
-}
-
-void LayerTreeImpl::SetContentsTexturesPurged() {
-  if (contents_textures_purged_)
-    return;
-  contents_textures_purged_ = true;
-  layer_tree_host_impl_->OnCanDrawStateChangedForTree();
-}
-
-void LayerTreeImpl::ResetContentsTexturesPurged() {
-  if (!contents_textures_purged_)
-    return;
-  contents_textures_purged_ = false;
-  layer_tree_host_impl_->OnCanDrawStateChangedForTree();
 }
 
 bool LayerTreeImpl::RequiresHighResToDraw() const {
@@ -982,12 +982,9 @@ AnimationRegistrar* LayerTreeImpl::GetAnimationRegistrar() const {
 
 void LayerTreeImpl::GetAllPrioritizedTilesForTracing(
     std::vector<PrioritizedTile>* prioritized_tiles) const {
-  typedef LayerIterator<LayerImpl> LayerIteratorType;
-  LayerIteratorType end = LayerIteratorType::End(&render_surface_layer_list_);
-  for (LayerIteratorType it =
-           LayerIteratorType::Begin(&render_surface_layer_list_);
-       it != end;
-       ++it) {
+  LayerIterator end = LayerIterator::End(&render_surface_layer_list_);
+  for (LayerIterator it = LayerIterator::Begin(&render_surface_layer_list_);
+       it != end; ++it) {
     if (!it.represents_itself())
       continue;
     LayerImpl* layer_impl = *it;
@@ -1004,10 +1001,9 @@ void LayerTreeImpl::AsValueInto(base::trace_event::TracedValue* state) const {
   state->EndDictionary();
 
   state->BeginArray("render_surface_layer_list");
-  typedef LayerIterator<LayerImpl> LayerIteratorType;
-  LayerIteratorType end = LayerIteratorType::End(&render_surface_layer_list_);
-  for (LayerIteratorType it = LayerIteratorType::Begin(
-           &render_surface_layer_list_); it != end; ++it) {
+  LayerIterator end = LayerIterator::End(&render_surface_layer_list_);
+  for (LayerIterator it = LayerIterator::Begin(&render_surface_layer_list_);
+       it != end; ++it) {
     if (!it.represents_itself())
       continue;
     TracedValue::AppendIDRef(*it, state);
@@ -1259,9 +1255,7 @@ static bool PointHitsRect(
 
 static bool PointHitsRegion(const gfx::PointF& screen_space_point,
                             const gfx::Transform& screen_space_transform,
-                            const Region& layer_space_region,
-                            float layer_content_scale_x,
-                            float layer_content_scale_y) {
+                            const Region& layer_space_region) {
   // If the transform is not invertible, then assume that this point doesn't hit
   // this region.
   gfx::Transform inverse_screen_space_transform(
@@ -1272,12 +1266,8 @@ static bool PointHitsRegion(const gfx::PointF& screen_space_point,
   // Transform the hit test point from screen space to the local space of the
   // given region.
   bool clipped = false;
-  gfx::PointF hit_test_point_in_content_space = MathUtil::ProjectPoint(
+  gfx::PointF hit_test_point_in_layer_space = MathUtil::ProjectPoint(
       inverse_screen_space_transform, screen_space_point, &clipped);
-  gfx::PointF hit_test_point_in_layer_space =
-      gfx::ScalePoint(hit_test_point_in_content_space,
-                      1.f / layer_content_scale_x,
-                      1.f / layer_content_scale_y);
 
   // If ProjectPoint could not project to a valid value, then we assume that
   // this point doesn't hit this region.
@@ -1310,10 +1300,8 @@ static bool PointIsClippedBySurfaceOrClipRect(
       return true;
 
     if (LayerClipsSubtree(layer) &&
-        !PointHitsRect(screen_space_point,
-                       layer->screen_space_transform(),
-                       gfx::Rect(layer->content_bounds()),
-                       NULL))
+        !PointHitsRect(screen_space_point, layer->screen_space_transform(),
+                       gfx::Rect(layer->bounds()), NULL))
       return true;
   }
 
@@ -1325,7 +1313,7 @@ static bool PointIsClippedBySurfaceOrClipRect(
 static bool PointHitsLayer(const LayerImpl* layer,
                            const gfx::PointF& screen_space_point,
                            float* distance_to_intersection) {
-  gfx::RectF content_rect(layer->content_bounds());
+  gfx::RectF content_rect(layer->bounds());
   if (!PointHitsRect(screen_space_point,
                      layer->screen_space_transform(),
                      content_rect,
@@ -1441,11 +1429,8 @@ static bool LayerHasTouchEventHandlersAt(const gfx::PointF& screen_space_point,
   if (layer_impl->touch_event_handler_region().IsEmpty())
     return false;
 
-  if (!PointHitsRegion(screen_space_point,
-                       layer_impl->screen_space_transform(),
-                       layer_impl->touch_event_handler_region(),
-                       layer_impl->contents_scale_x(),
-                       layer_impl->contents_scale_y()))
+  if (!PointHitsRegion(screen_space_point, layer_impl->screen_space_transform(),
+                       layer_impl->touch_event_handler_region()))
     return false;
 
   // At this point, we think the point does hit the touch event handler region
@@ -1513,18 +1498,14 @@ static ViewportSelectionBound ComputeViewportSelectionBound(
   if (!layer || layer_bound.type == SELECTION_BOUND_EMPTY)
     return viewport_bound;
 
-  gfx::PointF layer_scaled_top = gfx::ScalePoint(layer_bound.edge_top,
-                                                 layer->contents_scale_x(),
-                                                 layer->contents_scale_y());
-  gfx::PointF layer_scaled_bottom = gfx::ScalePoint(layer_bound.edge_bottom,
-                                                    layer->contents_scale_x(),
-                                                    layer->contents_scale_y());
+  gfx::PointF layer_top = layer_bound.edge_top;
+  gfx::PointF layer_bottom = layer_bound.edge_bottom;
 
   bool clipped = false;
-  gfx::PointF screen_top = MathUtil::MapPoint(
-      layer->screen_space_transform(), layer_scaled_top, &clipped);
+  gfx::PointF screen_top =
+      MathUtil::MapPoint(layer->screen_space_transform(), layer_top, &clipped);
   gfx::PointF screen_bottom = MathUtil::MapPoint(
-      layer->screen_space_transform(), layer_scaled_bottom, &clipped);
+      layer->screen_space_transform(), layer_bottom, &clipped);
 
   const float inv_scale = 1.f / device_scale_factor;
   viewport_bound.edge_top = gfx::ScalePoint(screen_top, inv_scale);
@@ -1535,9 +1516,9 @@ static ViewportSelectionBound ComputeViewportSelectionBound(
   // Shifting the visibility point fractionally inward ensures that neighboring
   // or logically coincident layers aligned to integral DPI coordinates will not
   // spuriously occlude the bound.
-  gfx::Vector2dF visibility_offset = layer_scaled_top - layer_scaled_bottom;
+  gfx::Vector2dF visibility_offset = layer_top - layer_bottom;
   visibility_offset.Scale(device_scale_factor / visibility_offset.Length());
-  gfx::PointF visibility_point = layer_scaled_bottom + visibility_offset;
+  gfx::PointF visibility_point = layer_bottom + visibility_offset;
   if (visibility_point.x() <= 0)
     visibility_point.set_x(visibility_point.x() + device_scale_factor);
   visibility_point = MathUtil::MapPoint(

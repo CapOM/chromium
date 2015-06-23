@@ -54,7 +54,6 @@ class BlockingTaskRunner;
 class IdAllocator;
 class SharedBitmap;
 class SharedBitmapManager;
-class TextureUploader;
 
 // This class is not thread-safe and can only be called from the thread it was
 // created on (in practice, the impl thread).
@@ -96,6 +95,9 @@ class CC_EXPORT ResourceProvider {
     return use_rgba_4444_texture_format_ ? RGBA_4444 : best_texture_format_;
   }
   ResourceFormat best_texture_format() const { return best_texture_format_; }
+  ResourceFormat best_render_buffer_format() const {
+    return best_render_buffer_format_;
+  }
   ResourceFormat yuv_resource_format() const { return yuv_resource_format_; }
   bool use_sync_query() const { return use_sync_query_; }
   bool use_persistent_map_for_gpu_memory_buffers() const {
@@ -107,6 +109,8 @@ class CC_EXPORT ResourceProvider {
   bool InUseByConsumer(ResourceId id);
 
   bool IsLost(ResourceId id);
+
+  void EnableReadLockFencesForTesting(ResourceId id);
 
   // Producer interface.
 
@@ -145,27 +149,18 @@ class CC_EXPORT ResourceProvider {
       const TextureMailbox& mailbox,
       scoped_ptr<SingleReleaseCallbackImpl> release_callback_impl);
 
+  ResourceId CreateResourceFromTextureMailbox(
+      const TextureMailbox& mailbox,
+      scoped_ptr<SingleReleaseCallbackImpl> release_callback_impl,
+      bool read_lock_fences_enabled);
+
   void DeleteResource(ResourceId id);
 
   // Update pixels from image, copying source_rect (in image) to dest_offset (in
   // the resource).
-  // NOTE: DEPRECATED. Use CopyToResource() instead.
-  void SetPixels(ResourceId id,
-                 const uint8_t* image,
-                 const gfx::Rect& image_rect,
-                 const gfx::Rect& source_rect,
-                 const gfx::Vector2d& dest_offset);
   void CopyToResource(ResourceId id,
                       const uint8_t* image,
                       const gfx::Size& image_size);
-
-  // Check upload status.
-  size_t NumBlockingUploads();
-  void MarkPendingUploadsAsNonBlocking();
-  size_t EstimatedUploadsPerTick();
-  void FlushUploads();
-  void ReleaseCachedData();
-  base::TimeTicks EstimatedUploadCompletionTime(size_t uploads_per_tick);
 
   // Only flush the command buffer if supported.
   // Returns true if the shallow flush occurred, false otherwise.
@@ -591,9 +586,9 @@ class CC_EXPORT ResourceProvider {
   bool use_texture_usage_hint_;
   bool use_compressed_texture_etc1_;
   ResourceFormat yuv_resource_format_;
-  scoped_ptr<TextureUploader> texture_uploader_;
   int max_texture_size_;
   ResourceFormat best_texture_format_;
+  ResourceFormat best_render_buffer_format_;
 
   base::ThreadChecker thread_checker_;
 

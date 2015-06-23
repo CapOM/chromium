@@ -69,7 +69,6 @@ namespace browser_sync {
 class BackendMigrator;
 class FaviconCache;
 class JsController;
-class OpenTabsUIDelegate;
 
 namespace sessions {
 class SyncSessionSnapshot;
@@ -81,6 +80,7 @@ class ChangeProcessor;
 class DataTypeManager;
 class DeviceInfoSyncService;
 class LocalDeviceInfoProvider;
+class OpenTabsUIDelegate;
 }  // namespace sync_driver
 
 namespace syncer {
@@ -275,10 +275,10 @@ class ProfileSyncService : public sync_driver::SyncService,
 
   // sync_driver::SyncService implementation
   bool HasSyncSetupCompleted() const override;
+  bool IsSyncAllowed() const override;
   bool IsSyncActive() const override;
-  bool IsSyncEnabledAndLoggedIn() override;
-  void DisableForUser() override;
-  void RequestStop() override;
+  bool CanSyncStart() const override;
+  void RequestStop(SyncStopDataFate data_fate) override;
   void RequestStart() override;
   syncer::ModelTypeSet GetActiveDataTypes() const override;
   syncer::ModelTypeSet GetPreferredDataTypes() const override;
@@ -292,6 +292,7 @@ class ProfileSyncService : public sync_driver::SyncService,
   const GoogleServiceAuthError& GetAuthError() const override;
   bool HasUnrecoverableError() const override;
   bool backend_initialized() const override;
+  sync_driver::OpenTabsUIDelegate* GetOpenTabsUIDelegate() override;
   bool IsPassphraseRequiredForDecryption() const override;
   base::Time GetExplicitPassphraseTime() const override;
   bool IsUsingSecondaryPassphrase() const override;
@@ -362,10 +363,6 @@ class ProfileSyncService : public sync_driver::SyncService,
       const scoped_refptr<base::SequencedTaskRunner>& task_runner,
       const base::WeakPtr<syncer::ModelTypeSyncProxyImpl>& proxy);
 
-  // Return the active OpenTabsUIDelegate. If sessions is not enabled or not
-  // currently syncing, returns NULL.
-  virtual browser_sync::OpenTabsUIDelegate* GetOpenTabsUIDelegate();
-
   // Returns the SyncedWindowDelegatesGetter from the embedded sessions manager.
   virtual browser_sync::SyncedWindowDelegatesGetter*
   GetSyncedWindowDelegatesGetter() const;
@@ -386,9 +383,6 @@ class ProfileSyncService : public sync_driver::SyncService,
   // sync, as well as their states.
   void GetDataTypeControllerStates(
       sync_driver::DataTypeController::StateMap* state_map) const;
-
-  // Disables sync for the user and prevents it from starting on next restart.
-  virtual void StopSyncingPermanently();
 
   // SyncFrontend implementation.
   void OnBackendInitialized(
@@ -419,6 +413,8 @@ class ProfileSyncService : public sync_driver::SyncService,
   void OnMigrationNeededForTypes(syncer::ModelTypeSet types) override;
   void OnExperimentsChanged(const syncer::Experiments& experiments) override;
   void OnActionableError(const syncer::SyncProtocolError& error) override;
+  void OnLocalSetPassphraseEncryption(
+      const syncer::SyncEncryptionHandler::NigoriState& nigori_state) override;
 
   // DataTypeManagerObserver implementation.
   void OnConfigureDone(
@@ -494,7 +490,7 @@ class ProfileSyncService : public sync_driver::SyncService,
   static void SyncEvent(SyncEventCodes code);
 
   // Returns whether sync is allowed to run based on command-line switches.
-  // Profile::IsSyncAccessible() is probably a better signal than this function.
+  // Profile::IsSyncAllowed() is probably a better signal than this function.
   // This function can be called from any thread, and the implementation doesn't
   // assume it's running on the UI thread.
   static bool IsSyncAllowedByFlag();
@@ -783,6 +779,11 @@ class ProfileSyncService : public sync_driver::SyncService,
   friend class SyncTest;
   friend class TestProfileSyncService;
   FRIEND_TEST_ALL_PREFIXES(ProfileSyncServiceTest, InitialState);
+
+  // Stops the sync engine. Does NOT set IsSyncRequested to false. Use
+  // RequestStop for that. |data_fate| controls whether the local sync data is
+  // deleted or kept when the engine shuts down.
+  void StopImpl(SyncStopDataFate data_fate);
 
   // Update the last auth error and notify observers of error state.
   void UpdateAuthErrorState(const GoogleServiceAuthError& error);
@@ -1085,6 +1086,9 @@ class ProfileSyncService : public sync_driver::SyncService,
 
   // Listens for the system being under memory pressure.
   scoped_ptr<base::MemoryPressureListener> memory_pressure_listener_;
+
+  // Used to save/restore nigori state across backend instances. May be null.
+  scoped_ptr<syncer::SyncEncryptionHandler::NigoriState> saved_nigori_state_;
 
   base::WeakPtrFactory<ProfileSyncService> weak_factory_;
 

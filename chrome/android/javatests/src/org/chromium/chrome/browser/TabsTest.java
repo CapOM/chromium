@@ -19,8 +19,6 @@ import android.test.suitebuilder.annotation.Smoke;
 import android.util.Log;
 import android.view.View;
 
-import com.google.android.apps.chrome.R;
-
 import junit.framework.Assert;
 
 import org.chromium.base.CommandLine;
@@ -30,6 +28,7 @@ import org.chromium.base.test.util.DisabledTest;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Restriction;
 import org.chromium.base.test.util.UrlUtils;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.compositor.CompositorViewHolder;
 import org.chromium.chrome.browser.compositor.layouts.Layout;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManager;
@@ -66,6 +65,7 @@ import org.chromium.content.common.ContentSwitches;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
 
+import java.util.Locale;
 import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -234,7 +234,7 @@ public class TabsTest extends ChromeTabbedActivityTestBase {
             @Override
             public boolean isSatisfied() {
                 Tab tab = getActivity().getCurrentTabModel().getTabAt(1);
-                String title = tab.getTitle().toLowerCase();
+                String title = tab.getTitle().toLowerCase(Locale.US);
                 String expectedTitle = "new tab";
                 return title.startsWith(expectedTitle);
             }
@@ -681,7 +681,8 @@ public class TabsTest extends ChromeTabbedActivityTestBase {
         for (int i = 1; i < count; i++) {
             float y = getLayoutTabInStackXY(false, i)[1];
             assertTrue(
-                    String.format("Tab %d's final draw Y, %f, should exceed the view height, %f.",
+                    String.format(Locale.US,
+                            "Tab %d's final draw Y, %f, should exceed the view height, %f.",
                             i, y, mTabsViewHeightDp),
                     y >= mTabsViewHeightDp);
         }
@@ -704,7 +705,8 @@ public class TabsTest extends ChromeTabbedActivityTestBase {
         for (int i = 1; i < count; i++) {
             float x = getLayoutTabInStackXY(false, i)[0];
             assertTrue(
-                    String.format("Tab %d's final draw X, %f, should exceed the view width, %f.",
+                    String.format(Locale.US,
+                            "Tab %d's final draw X, %f, should exceed the view width, %f.",
                             i, x, mTabsViewWidthDp),
                     x >= mTabsViewWidthDp);
         }
@@ -1092,7 +1094,7 @@ public class TabsTest extends ChromeTabbedActivityTestBase {
             @Override
             public void run() {
                 ContentViewCore view = getActivity().getActivityTab().getContentViewCore();
-                view.fling(SystemClock.uptimeMillis(), 0, 0, 0, -2000);
+                view.flingViewport(SystemClock.uptimeMillis(), 0, -2000);
             }
         });
         ChromeTabUtils.closeCurrentTab(getInstrumentation(), getActivity());

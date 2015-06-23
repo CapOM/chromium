@@ -777,6 +777,9 @@ std::vector<Suggestion> PersonalDataManager::GetProfileSuggestions(
     const base::string16& field_contents,
     bool field_is_autofilled,
     const std::vector<ServerFieldType>& other_field_types) {
+  if (IsInAutofillSuggestionsDisabledExperiment())
+    return std::vector<Suggestion>();
+
   base::string16 field_contents_canon =
       AutofillProfile::CanonicalizeProfileString(field_contents);
 
@@ -792,7 +795,7 @@ std::vector<Suggestion> PersonalDataManager::GetProfileSuggestions(
       continue;
     base::string16 value_canon =
         AutofillProfile::CanonicalizeProfileString(value);
-    if (StartsWith(value_canon, field_contents_canon, true)) {
+    if (base::StartsWith(value_canon, field_contents_canon, true)) {
       // Prefix match, add suggestion.
       matched_profiles.push_back(profile);
       suggestions.push_back(Suggestion(value));
@@ -847,6 +850,9 @@ std::vector<Suggestion> PersonalDataManager::GetProfileSuggestions(
 std::vector<Suggestion> PersonalDataManager::GetCreditCardSuggestions(
     const AutofillType& type,
     const base::string16& field_contents) {
+  if (IsInAutofillSuggestionsDisabledExperiment())
+    return std::vector<Suggestion>();
+
   std::list<const CreditCard*> cards_to_suggest;
   for (const CreditCard* credit_card : GetCreditCards()) {
     // The value of the stored data for this field type in the |credit_card|.
@@ -866,7 +872,8 @@ std::vector<Suggestion> PersonalDataManager::GetCreditCardSuggestions(
            field_contents.size() >= 6)) {
         continue;
       }
-    } else if (!StartsWith(creditcard_field_value, field_contents, false)) {
+    } else if (!base::StartsWith(creditcard_field_value, field_contents,
+                                 false)) {
       continue;
     }
 

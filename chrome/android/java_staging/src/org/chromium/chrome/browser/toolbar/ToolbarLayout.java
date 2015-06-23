@@ -18,8 +18,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.ProgressBar;
 
-import com.google.android.apps.chrome.R;
-
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.appmenu.AppMenuButtonHelper;
 import org.chromium.chrome.browser.compositor.Invalidator;
@@ -59,13 +58,15 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
 
     protected final int mToolbarHeightWithoutShadow;
 
+    private boolean mFindInPageToolbarShowing;
+
     /**
      * Basic constructor for {@link ToolbarLayout}.
      */
     public ToolbarLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
         mToolbarHeightWithoutShadow = getResources().getDimensionPixelOffset(
-                R.dimen.toolbar_height_no_shadow);
+                getToolbarHeightWithoutShadowResId());
     }
 
     @Override
@@ -137,6 +138,13 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
      */
     protected FrameLayout.LayoutParams getFrameLayoutParams(View view) {
         return ((FrameLayout.LayoutParams) view.getLayoutParams());
+    }
+
+    /**
+     * @return The resource id to be used while getting the toolbar height with no shadow.
+     */
+    protected int getToolbarHeightWithoutShadowResId() {
+        return R.dimen.toolbar_height_no_shadow;
     }
 
     @Override
@@ -238,6 +246,15 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
         }
     }
 
+    /**
+     * Gives inheriting classes the chance to respond to
+     * {@link org.chromium.chrome.browser.widget.findinpage.FindToolbar} state changes.
+     * @param showing Whether or not the {@code FindToolbar} will be showing.
+     */
+    protected void handleFindToolbarStateChange(boolean showing) {
+        mFindInPageToolbarShowing = showing;
+    }
+
     @Override
     public void setOnTabSwitcherClickHandler(OnClickListener listener) { }
 
@@ -277,13 +294,6 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
      * @param isBookmarked Whether or not the current tab is already bookmarked.
      */
     protected void updateBookmarkButtonVisibility(boolean isBookmarked) { }
-
-    /**
-     * Gives inheriting classes the chance to respond to
-     * {@link org.chromium.chrome.browser.widget.findinpage.FindToolbar} state changes.
-     * @param showing Whether or not the {@code FindToolbar} will be showing.
-     */
-    protected void handleFindToolbarStateChange(boolean showing) { }
 
     /**
      * Gives inheriting classes the chance to respond to accessibility state changes.
@@ -392,7 +402,8 @@ abstract class ToolbarLayout extends FrameLayout implements Toolbar {
     @Override
     public boolean shouldIgnoreSwipeGesture() {
         return mUrlHasFocus
-                || (mAppMenuButtonHelper != null && mAppMenuButtonHelper.isAppMenuActive());
+                || (mAppMenuButtonHelper != null && mAppMenuButtonHelper.isAppMenuActive())
+                || mFindInPageToolbarShowing;
     }
 
     /**

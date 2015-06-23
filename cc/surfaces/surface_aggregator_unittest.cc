@@ -690,9 +690,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, RenderPassIdMapping) {
 void AddSolidColorQuadWithBlendMode(const gfx::Size& size,
                                     RenderPass* pass,
                                     const SkXfermode::Mode blend_mode) {
-  const gfx::Transform content_to_target_transform;
-  const gfx::Size content_bounds(size);
-  const gfx::Rect visible_content_rect(size);
+  const gfx::Transform layer_to_target_transform;
+  const gfx::Size layer_bounds(size);
+  const gfx::Rect visible_layer_rect(size);
   const gfx::Rect clip_rect(size);
 
   bool is_clipped = false;
@@ -700,21 +700,13 @@ void AddSolidColorQuadWithBlendMode(const gfx::Size& size,
 
   bool force_anti_aliasing_off = false;
   SharedQuadState* sqs = pass->CreateAndAppendSharedQuadState();
-  sqs->SetAll(content_to_target_transform,
-              content_bounds,
-              visible_content_rect,
-              clip_rect,
-              is_clipped,
-              opacity,
-              blend_mode,
-              0);
+  sqs->SetAll(layer_to_target_transform, layer_bounds, visible_layer_rect,
+              clip_rect, is_clipped, opacity, blend_mode, 0);
 
   SolidColorDrawQuad* color_quad =
       pass->CreateAndAppendDrawQuad<SolidColorDrawQuad>();
-  color_quad->SetNew(pass->shared_quad_state_list.back(),
-                     visible_content_rect,
-                     visible_content_rect,
-                     SK_ColorGREEN,
+  color_quad->SetNew(pass->shared_quad_state_list.back(), visible_layer_rect,
+                     visible_layer_rect, SK_ColorGREEN,
                      force_anti_aliasing_off);
 }
 
@@ -889,12 +881,12 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateMultiplePassWithTransform) {
     child_nonroot_pass->transform_to_root_target.Translate(8, 0);
     SharedQuadState* child_nonroot_pass_sqs =
         child_nonroot_pass->shared_quad_state_list.front();
-    child_nonroot_pass_sqs->content_to_target_transform.Translate(5, 0);
+    child_nonroot_pass_sqs->quad_to_target_transform.Translate(5, 0);
 
     RenderPass* child_root_pass = child_pass_list.at(1u);
     SharedQuadState* child_root_pass_sqs =
         child_root_pass->shared_quad_state_list.front();
-    child_root_pass_sqs->content_to_target_transform.Translate(8, 0);
+    child_root_pass_sqs->quad_to_target_transform.Translate(8, 0);
     child_root_pass_sqs->is_clipped = true;
     child_root_pass_sqs->clip_rect = gfx::Rect(0, 0, 5, 5);
 
@@ -927,7 +919,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateMultiplePassWithTransform) {
         gfx::Rect(0, 1, 100, 7);
     SharedQuadState* middle_root_pass_sqs =
         middle_root_pass->shared_quad_state_list.front();
-    middle_root_pass_sqs->content_to_target_transform.Scale(2, 3);
+    middle_root_pass_sqs->quad_to_target_transform.Scale(2, 3);
 
     scoped_ptr<DelegatedFrameData> middle_frame_data(new DelegatedFrameData);
     middle_pass_list.swap(middle_frame_data->render_pass_list);
@@ -956,10 +948,10 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateMultiplePassWithTransform) {
 
   root_pass_list.at(0)
       ->shared_quad_state_list.front()
-      ->content_to_target_transform.Translate(0, 7);
+      ->quad_to_target_transform.Translate(0, 7);
   root_pass_list.at(0)
       ->shared_quad_state_list.ElementAt(1)
-      ->content_to_target_transform.Translate(0, 10);
+      ->quad_to_target_transform.Translate(0, 10);
   root_pass_list.at(0)->quad_list.ElementAt(1)->visible_rect =
       gfx::Rect(0, 0, 8, 100);
 
@@ -1005,7 +997,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateMultiplePassWithTransform) {
   gfx::Transform expected_aggregated_first_pass_sqs_transform;
   expected_aggregated_first_pass_sqs_transform.Translate(5, 0);
   EXPECT_EQ(expected_aggregated_first_pass_sqs_transform.ToString(),
-            aggregated_first_pass_sqs->content_to_target_transform.ToString());
+            aggregated_first_pass_sqs->quad_to_target_transform.ToString());
 
   // The first pass's transform to the root target should include the aggregated
   // transform, including the transform from the child pass to the root.
@@ -1036,7 +1028,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateMultiplePassWithTransform) {
        iter != aggregated_pass_list[1]->quad_list.cend();
        ++iter) {
     EXPECT_EQ(expected_root_pass_quad_transforms[iter.index()].ToString(),
-              iter->shared_quad_state->content_to_target_transform.ToString())
+              iter->shared_quad_state->quad_to_target_transform.ToString())
         << iter.index();
   }
 
@@ -1057,12 +1049,9 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateMultiplePassWithTransform) {
 
 // Tests that damage rects are aggregated correctly when surfaces change.
 TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
-  SurfaceId child_surface_id = allocator_.GenerateId();
-  factory_.Create(child_surface_id);
-  RenderPassId child_pass_id = RenderPassId(1, 1);
-  test::Quad child_quads[] = {test::Quad::RenderPassQuad(child_pass_id)};
+  test::Quad child_quads[] = {test::Quad::RenderPassQuad(RenderPassId(1, 1))};
   test::Pass child_passes[] = {
-      test::Pass(child_quads, arraysize(child_quads), child_pass_id)};
+      test::Pass(child_quads, arraysize(child_quads), RenderPassId(1, 1))};
 
   RenderPassList child_pass_list;
   AddPasses(&child_pass_list,
@@ -1073,7 +1062,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
   RenderPass* child_root_pass = child_pass_list.at(0u);
   SharedQuadState* child_root_pass_sqs =
       child_root_pass->shared_quad_state_list.front();
-  child_root_pass_sqs->content_to_target_transform.Translate(8, 0);
+  child_root_pass_sqs->quad_to_target_transform.Translate(8, 0);
 
   scoped_ptr<DelegatedFrameData> child_frame_data(new DelegatedFrameData);
   child_pass_list.swap(child_frame_data->render_pass_list);
@@ -1081,16 +1070,47 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
   scoped_ptr<CompositorFrame> child_frame(new CompositorFrame);
   child_frame->delegated_frame_data = child_frame_data.Pass();
 
+  SurfaceId child_surface_id = allocator_.GenerateId();
+  factory_.Create(child_surface_id);
   factory_.SubmitFrame(child_surface_id, child_frame.Pass(),
                        SurfaceFactory::DrawCallback());
 
-  RenderPassId pass_id(5, 10);
-  test::Quad first_quads[] = {test::Quad::SurfaceQuad(child_surface_id, 1.f)};
-  test::Quad root_quads[] = {test::Quad::RenderPassQuad(pass_id)};
+  test::Quad parent_surface_quads[] = {
+      test::Quad::SurfaceQuad(child_surface_id, 1.f)};
+  test::Pass parent_surface_passes[] = {
+      test::Pass(parent_surface_quads, arraysize(parent_surface_quads),
+                 RenderPassId(1, 1))};
+
+  RenderPassList parent_surface_pass_list;
+  AddPasses(&parent_surface_pass_list,
+            gfx::Rect(SurfaceSize()),
+            parent_surface_passes,
+            arraysize(parent_surface_passes));
+
+  // Parent surface is only used to test if the transform is applied correctly
+  // to the child surface's damage.
+  scoped_ptr<DelegatedFrameData> parent_surface_frame_data(
+      new DelegatedFrameData);
+  parent_surface_pass_list.swap(parent_surface_frame_data->render_pass_list);
+
+  scoped_ptr<CompositorFrame> parent_surface_frame(new CompositorFrame);
+  parent_surface_frame->delegated_frame_data = parent_surface_frame_data.Pass();
+
+  SurfaceId parent_surface_id = allocator_.GenerateId();
+  factory_.Create(parent_surface_id);
+  factory_.SubmitFrame(parent_surface_id, parent_surface_frame.Pass(),
+                       SurfaceFactory::DrawCallback());
+
+  test::Quad root_surface_quads[] = {
+      test::Quad::SurfaceQuad(parent_surface_id, 1.f)};
+  test::Quad root_render_pass_quads[] = {
+      test::Quad::RenderPassQuad(RenderPassId(1, 1))};
 
   test::Pass root_passes[] = {
-      test::Pass(first_quads, arraysize(first_quads), pass_id),
-      test::Pass(root_quads, arraysize(root_quads))};
+      test::Pass(root_surface_quads, arraysize(root_surface_quads),
+                 RenderPassId(1, 1)),
+      test::Pass(root_render_pass_quads, arraysize(root_render_pass_quads),
+                 RenderPassId(2, 1))};
 
   RenderPassList root_pass_list;
   AddPasses(&root_pass_list,
@@ -1100,7 +1120,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
 
   root_pass_list.at(0)
       ->shared_quad_state_list.front()
-      ->content_to_target_transform.Translate(0, 10);
+      ->quad_to_target_transform.Translate(0, 10);
   root_pass_list.at(0)->damage_rect = gfx::Rect(5, 5, 10, 10);
   root_pass_list.at(1)->damage_rect = gfx::Rect(5, 5, 100, 100);
 
@@ -1138,7 +1158,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
     RenderPass* child_root_pass = child_pass_list.at(0u);
     SharedQuadState* child_root_pass_sqs =
         child_root_pass->shared_quad_state_list.front();
-    child_root_pass_sqs->content_to_target_transform.Translate(8, 0);
+    child_root_pass_sqs->quad_to_target_transform.Translate(8, 0);
     child_root_pass->damage_rect = gfx::Rect(10, 10, 10, 10);
 
     scoped_ptr<DelegatedFrameData> child_frame_data(new DelegatedFrameData);
@@ -1178,7 +1198,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
 
     root_pass_list.at(0)
         ->shared_quad_state_list.front()
-        ->content_to_target_transform.Translate(0, 10);
+        ->quad_to_target_transform.Translate(0, 10);
     root_pass_list.at(0)->damage_rect = gfx::Rect(0, 0, 1, 1);
 
     scoped_ptr<DelegatedFrameData> root_frame_data(new DelegatedFrameData);
@@ -1200,7 +1220,7 @@ TEST_F(SurfaceAggregatorValidSurfaceTest, AggregateDamageRect) {
 
     root_pass_list.at(0)
         ->shared_quad_state_list.front()
-        ->content_to_target_transform.Translate(0, 10);
+        ->quad_to_target_transform.Translate(0, 10);
     root_pass_list.at(0)->damage_rect = gfx::Rect(1, 1, 1, 1);
 
     scoped_ptr<DelegatedFrameData> root_frame_data(new DelegatedFrameData);

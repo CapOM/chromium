@@ -25,7 +25,6 @@ import android.os.Message;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Base64;
-import android.util.FloatMath;
 import android.util.Log;
 import android.util.Pair;
 import android.view.KeyEvent;
@@ -485,7 +484,11 @@ public class AwContents implements SmartClipProvider,
                 // If this is used for all navigations in future, cases for application initiated
                 // load, redirect and backforward should also be filtered out.
                 if (!navigationParams.isPost) {
-                    ignoreNavigation = mContentsClient.shouldOverrideUrlLoading(url);
+                    if (!mContentsClient.hasWebViewClient()) {
+                        ignoreNavigation = AwContentsClient.sendBrowsingIntent(mContext, url);
+                    } else {
+                        ignoreNavigation = mContentsClient.shouldOverrideUrlLoading(url);
+                    }
                 }
             }
             // The shouldOverrideUrlLoading call might have resulted in posting messages to the
@@ -673,7 +676,7 @@ public class AwContents implements SmartClipProvider,
         mLayoutSizer.setDIPScale(mDIPScale);
         mWebContentsDelegate = new AwWebContentsDelegateAdapter(
                 this, contentsClient, mContentViewClient, mContext, mContainerView);
-        mContentsClientBridge = new AwContentsClientBridge(contentsClient,
+        mContentsClientBridge = new AwContentsClientBridge(mContext, contentsClient,
                 mBrowserContext.getKeyStore(), AwContentsStatics.getClientCertLookupTable());
         mZoomControls = new AwZoomControls(this);
         mIoThreadClient = new IoThreadClientImpl();
@@ -1432,7 +1435,8 @@ public class AwContents implements SmartClipProvider,
         if (extraHeaders != null) {
             for (String header : extraHeaders.keySet()) {
                 if (referer.equals(header.toLowerCase(Locale.US))) {
-                    params.setReferrer(new Referrer(extraHeaders.remove(header), 1));
+                    params.setReferrer(new Referrer(extraHeaders.remove(header),
+                            Referrer.REFERRER_POLICY_DEFAULT));
                     params.setExtraHeaders(extraHeaders);
                     break;
                 }
@@ -1946,7 +1950,7 @@ public class AwContents implements SmartClipProvider,
         // should add a method flingRootLayer to ContentViewCore
         // and call it here to specifically target the scroll at
         // the root layer.
-        mContentViewCore.fling(SystemClock.uptimeMillis(), 0, 0, -velocityX, -velocityY);
+        mContentViewCore.flingViewport(SystemClock.uptimeMillis(), -velocityX, -velocityY);
     }
 
     /**
@@ -2580,7 +2584,6 @@ public class AwContents implements SmartClipProvider,
         client.init(mContentViewCore);
     }
 
-    @SuppressLint("NewApi") // FloatMath#hypot requires API level 17.
     @CalledByNative
     private void didOverscroll(int deltaX, int deltaY, float velocityX, float velocityY) {
         mScrollOffsetManager.overScrollBy(deltaX, deltaY);
@@ -2594,8 +2597,9 @@ public class AwContents implements SmartClipProvider,
         final int y = oldY + deltaY;
         final int scrollRangeX = mScrollOffsetManager.computeMaximumHorizontalScrollOffset();
         final int scrollRangeY = mScrollOffsetManager.computeMaximumVerticalScrollOffset();
+        // absorbGlow() will release the glow if it is not finished.
         mOverScrollGlow.absorbGlow(x, y, oldX, oldY, scrollRangeX, scrollRangeY,
-                FloatMath.hypot(velocityX, velocityY));
+                (float) Math.hypot(velocityX, velocityY));
 
         if (mOverScrollGlow.isAnimating()) {
             postInvalidateOnAnimation();

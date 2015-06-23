@@ -553,10 +553,18 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
                 && (status != ReaderModeManager.POSSIBLE || !isReaderModeCurrentlyAllowed())) {
             // Unfortunately, dismiss() couldn't be used because it might attempt to remove a view
             // while in onLayout, thus causing crash.
-            mReaderModeButtonView.removeFromParentView();
+            final ReaderModeButtonView buttonView = mReaderModeButtonView;
+            final boolean horizontally = true;
+            mReaderModeButtonView.post(new Runnable() {
+                @Override
+                public void run() {
+                    buttonView.dismiss(horizontally);
+                }
+            });
             mReaderModeButtonView = null;
             return;
         }
+
         if (mReaderModeButtonView == null
                 && (status == ReaderModeManager.POSSIBLE && isReaderModeCurrentlyAllowed())) {
             mReaderModeButtonView = ReaderModeButtonView.create(tab.getContentViewCore(),
@@ -609,9 +617,12 @@ public class ReaderModePanel implements ChromeAnimation.Animatable<ReaderModePan
 
     private ContentViewCore createDistillerContentViewCore(
             Context context, WindowAndroid windowAndroid) {
+        boolean isHostTabIncognito =
+                mReaderModeHost.getTab().getContentViewCore().getWebContents().isIncognito();
         ContentViewCore cvc = new ContentViewCore(context);
         ContentView cv = new ContentView(context, cvc);
-        cvc.initialize(cv, cv, WebContentsFactory.createWebContents(false, true), windowAndroid);
+        cvc.initialize(cv, cv, WebContentsFactory.createWebContents(isHostTabIncognito, true),
+                windowAndroid);
         cvc.setContentViewClient(new ContentViewClient() {
             @Override
             public void onOffsetsForFullscreenChanged(float topControlsOffsetYPix,

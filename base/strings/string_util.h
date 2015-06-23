@@ -138,10 +138,12 @@ BASE_EXPORT const std::string& EmptyString();
 BASE_EXPORT const string16& EmptyString16();
 
 // Contains the set of characters representing whitespace in the corresponding
-// encoding. Null-terminated.
-BASE_EXPORT extern const wchar_t kWhitespaceWide[];
-BASE_EXPORT extern const char16 kWhitespaceUTF16[];
+// encoding. Null-terminated. The ASCII versions are the whitespaces as defined
+// by HTML5, and don't include control characters.
+BASE_EXPORT extern const wchar_t kWhitespaceWide[];  // Includes Unicode.
+BASE_EXPORT extern const char16 kWhitespaceUTF16[];  // Includes Unicode.
 BASE_EXPORT extern const char kWhitespaceASCII[];
+BASE_EXPORT extern const char16 kWhitespaceASCIIAs16[];  // No unicode.
 
 // Null-terminated string representing the UTF-8 byte order mark.
 BASE_EXPORT extern const char kUtf8ByteOrderMark[];
@@ -170,15 +172,33 @@ BASE_EXPORT bool ReplaceChars(const std::string& input,
                               const std::string& replace_with,
                               std::string* output);
 
+enum TrimPositions {
+  TRIM_NONE     = 0,
+  TRIM_LEADING  = 1 << 0,
+  TRIM_TRAILING = 1 << 1,
+  TRIM_ALL      = TRIM_LEADING | TRIM_TRAILING,
+};
+
 // Removes characters in |trim_chars| from the beginning and end of |input|.
-// |trim_chars| must be null-terminated.
-// NOTE: Safe to use the same variable for both |input| and |output|.
+// The 8-bit version only works on 8-bit characters, not UTF-8.
+//
+// It is safe to use the same variable for both |input| and |output| (this is
+// the normal usage to trim in-place).
 BASE_EXPORT bool TrimString(const string16& input,
-                            const base::StringPiece16& trim_chars,
+                            base::StringPiece16 trim_chars,
                             string16* output);
 BASE_EXPORT bool TrimString(const std::string& input,
-                            const base::StringPiece& trim_chars,
+                            base::StringPiece trim_chars,
                             std::string* output);
+
+// StringPiece versions of the above. The returned pieces refer to the original
+// buffer.
+BASE_EXPORT StringPiece16 TrimString(StringPiece16 input,
+                                     const base::StringPiece16& trim_chars,
+                                     TrimPositions positions);
+BASE_EXPORT StringPiece TrimString(StringPiece input,
+                                   const base::StringPiece& trim_chars,
+                                   TrimPositions positions);
 
 // Truncates a string to the nearest UTF-8 character that will leave
 // the string less than or equal to the specified byte size.
@@ -193,12 +213,6 @@ BASE_EXPORT void TruncateUTF8ToByteSize(const std::string& input,
 //   This function is for ASCII strings and only looks for ASCII whitespace;
 // Please choose the best one according to your usage.
 // NOTE: Safe to use the same variable for both input and output.
-enum TrimPositions {
-  TRIM_NONE     = 0,
-  TRIM_LEADING  = 1 << 0,
-  TRIM_TRAILING = 1 << 1,
-  TRIM_ALL      = TRIM_LEADING | TRIM_TRAILING,
-};
 BASE_EXPORT TrimPositions TrimWhitespace(const string16& input,
                                          TrimPositions positions,
                                          base::string16* output);
@@ -315,6 +329,54 @@ BASE_EXPORT bool LowerCaseEqualsASCII(const char16* a_begin,
 // strings are not ASCII.
 BASE_EXPORT bool EqualsASCII(const string16& a, const StringPiece& b);
 
+// Indicates case sensitivity of comparisons. Only ASCII case insensitivity
+// is supported. Full Unicode case-insensitive conversions would need to go in
+// base/i18n so it can use ICU.
+//
+// If you need to do Unicode-aware case-insensitive StartsWith/EndsWith, it's
+// best to just call base::i18n::ToLower() on the arguements, and then use the
+// results to a case-sensitive comparison.
+enum class CompareCase {
+  SENSITIVE,
+  INSENSITIVE_ASCII,
+};
+
+BASE_EXPORT bool StartsWith(StringPiece str,
+                            StringPiece search_for,
+                            CompareCase case_sensitivity);
+BASE_EXPORT bool StartsWith(StringPiece16 str,
+                            StringPiece16 search_for,
+                            CompareCase case_sensitivity);
+BASE_EXPORT bool EndsWith(StringPiece str,
+                          StringPiece search_for,
+                          CompareCase case_sensitivity);
+BASE_EXPORT bool EndsWith(StringPiece16 str,
+                          StringPiece16 search_for,
+                          CompareCase case_sensitivity);
+
+// DEPRECATED. Returns true if str starts/ends with search, or false otherwise.
+// TODO(brettw) remove in favor of the "enum" versions above.
+inline bool StartsWithASCII(const std::string& str,
+                            const std::string& search,
+                            bool case_sensitive) {
+  return StartsWith(StringPiece(str), StringPiece(search),
+                    case_sensitive ? CompareCase::SENSITIVE
+                                   : CompareCase::INSENSITIVE_ASCII);
+}
+BASE_EXPORT bool StartsWith(const string16& str,
+                            const string16& search,
+                            bool case_sensitive);
+inline bool EndsWith(const std::string& str,
+                     const std::string& search,
+                     bool case_sensitive) {
+  return EndsWith(StringPiece(str), StringPiece(search),
+                  case_sensitive ? CompareCase::SENSITIVE
+                                 : CompareCase::INSENSITIVE_ASCII);
+}
+BASE_EXPORT bool EndsWith(const string16& str,
+                          const string16& search,
+                          bool case_sensitive);
+
 }  // namespace base
 
 #if defined(OS_WIN)
@@ -324,23 +386,6 @@ BASE_EXPORT bool EqualsASCII(const string16& a, const StringPiece& b);
 #else
 #error Define string operations appropriately for your platform
 #endif
-
-// Returns true if str starts with search, or false otherwise.
-BASE_EXPORT bool StartsWithASCII(const std::string& str,
-                                 const std::string& search,
-                                 bool case_sensitive);
-BASE_EXPORT bool StartsWith(const base::string16& str,
-                            const base::string16& search,
-                            bool case_sensitive);
-
-// Returns true if str ends with search, or false otherwise.
-BASE_EXPORT bool EndsWith(const std::string& str,
-                          const std::string& search,
-                          bool case_sensitive);
-BASE_EXPORT bool EndsWith(const base::string16& str,
-                          const base::string16& search,
-                          bool case_sensitive);
-
 
 // Determines the type of ASCII character, independent of locale (the C
 // library versions will change based on locale).
@@ -450,6 +495,9 @@ inline typename string_type::value_type* WriteInto(string_type* str,
 // Splits a string into its fields delimited by any of the characters in
 // |delimiters|.  Each field is added to the |tokens| vector.  Returns the
 // number of tokens found.
+//
+// DEPRECATED. Use SplitStringUsingSet for new code (these just forward).
+// TODO(brettw) convert callers and delete these forwarders.
 BASE_EXPORT size_t Tokenize(const base::string16& str,
                             const base::string16& delimiters,
                             std::vector<base::string16>* tokens);

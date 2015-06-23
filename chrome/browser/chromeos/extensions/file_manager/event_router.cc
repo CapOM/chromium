@@ -15,6 +15,7 @@
 #include "base/values.h"
 #include "chrome/browser/app_mode/app_mode_utils.h"
 #include "chrome/browser/chromeos/drive/drive_integration_service.h"
+#include "chrome/browser/chromeos/drive/drive_pref_names.h"
 #include "chrome/browser/chromeos/drive/file_change.h"
 #include "chrome/browser/chromeos/drive/file_system_interface.h"
 #include "chrome/browser/chromeos/drive/file_system_util.h"
@@ -187,9 +188,9 @@ CopyProgressTypeToCopyProgressStatusType(
 file_manager_private::ChangeType ConvertChangeTypeFromDriveToApi(
     drive::FileChange::ChangeType type) {
   switch (type) {
-    case drive::FileChange::ADD_OR_UPDATE:
+    case drive::FileChange::CHANGE_TYPE_ADD_OR_UPDATE:
       return file_manager_private::CHANGE_TYPE_ADD_OR_UPDATE;
-    case drive::FileChange::DELETE:
+    case drive::FileChange::CHANGE_TYPE_DELETE:
       return file_manager_private::CHANGE_TYPE_DELETE;
   }
   NOTREACHED();
@@ -435,9 +436,11 @@ void EventRouter::ObserveEvents() {
   base::Closure callback =
       base::Bind(&EventRouter::OnFileManagerPrefsChanged,
                  weak_factory_.GetWeakPtr());
-  pref_change_registrar_->Add(prefs::kDisableDriveOverCellular, callback);
-  pref_change_registrar_->Add(prefs::kDisableDriveHostedFiles, callback);
-  pref_change_registrar_->Add(prefs::kDisableDrive, callback);
+  pref_change_registrar_->Add(drive::prefs::kDisableDriveOverCellular,
+                              callback);
+  pref_change_registrar_->Add(drive::prefs::kDisableDriveHostedFiles, callback);
+  pref_change_registrar_->Add(drive::prefs::kDisableDrive, callback);
+  pref_change_registrar_->Add(prefs::kSearchSuggestEnabled, callback);
   pref_change_registrar_->Add(prefs::kUse24HourClock, callback);
 }
 
@@ -646,7 +649,7 @@ void EventRouter::OnFileChanged(const drive::FileChange& changed_files) {
           map[file_watchers_it->first].Update(
               file_watchers_it->first,
               drive::FileChange::FileType::FILE_TYPE_DIRECTORY,
-              drive::FileChange::ChangeType::DELETE);
+              drive::FileChange::ChangeType::CHANGE_TYPE_DELETE);
         }
       }
     }

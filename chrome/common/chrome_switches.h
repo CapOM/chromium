@@ -132,6 +132,7 @@ extern const char kEnableLinkableEphemeralApps[];
 extern const char kEnableMaterialDesignSettings[];
 extern const char kEnableMediaRouter[];
 extern const char kEnableNaCl[];
+extern const char kEnableNavigationTracing[];
 extern const char kEnableNetBenchmarking[];
 extern const char kEnableNewBookmarkApps[];
 extern const char kEnableOfflineAutoReload[];
@@ -291,6 +292,7 @@ extern const char kSyncServiceURL[];
 extern const char kSyncDisableDeferredStartup[];
 extern const char kSyncDeferredStartupTimeoutSeconds[];
 extern const char kSyncEnableGetUpdateAvoidance[];
+extern const char kSyncEnableClearDataOnPassphraseEncryption[];
 extern const char kSyncDisableBackup[];
 extern const char kSyncDisableRollback[];
 extern const char kTestName[];
@@ -389,10 +391,6 @@ extern const char kAllowNaClFileHandleAPI[];
 extern const char kAllowNaClSocketAPI[];
 extern const char kDisablePluginPowerSaver[];
 extern const char kEnablePluginPowerSaver[];
-#endif
-
-#ifndef NDEBUG
-extern const char kFileManagerExtensionPath[];
 #endif
 
 bool AboutInSettingsEnabled();

@@ -208,12 +208,8 @@ void PaintedScrollbarLayer::UpdateInternalContentScale() {
           ->settings()
           .layer_transforms_should_scale_layer_contents) {
     gfx::Transform transform;
-    if (layer_tree_host()->using_only_property_trees()) {
-      transform = DrawTransformFromPropertyTrees(
-          this, layer_tree_host()->property_trees()->transform_tree);
-    } else {
-      transform = draw_transform();
-    }
+    transform = DrawTransformFromPropertyTrees(
+        this, layer_tree_host()->property_trees()->transform_tree);
 
     gfx::Vector2dF transform_scales =
         MathUtil::ComputeTransform2dScaleComponents(transform, scale);
@@ -231,12 +227,11 @@ void PaintedScrollbarLayer::UpdateInternalContentScale() {
   }
 }
 
-bool PaintedScrollbarLayer::Update(ResourceUpdateQueue* queue,
-                                   const OcclusionTracker<Layer>* occlusion) {
+bool PaintedScrollbarLayer::Update() {
   {
     base::AutoReset<bool> ignore_set_needs_commit(&ignore_set_needs_commit_,
                                                   true);
-    Layer::Update(queue, occlusion);
+    Layer::Update();
     UpdateInternalContentScale();
   }
 

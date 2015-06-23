@@ -63,6 +63,7 @@ v8.log
 /buildtools
 # The Chrome OS build creates a /c symlink due to http://crbug.com/54866.
 /c
+/cdm
 /ceee/internal/
 /chrome/angle_unittests_run.xml
 /chrome/content_gl_tests_run.xml
@@ -277,6 +278,7 @@ v8.log
 /third_party/bison
 /third_party/boringssl/src
 /third_party/cacheinvalidation/cacheinvalidation_unittests_run.xml
+/third_party/cardboard-java/src
 /third_party/chromeos_login_manager
 /third_party/chromeos_text_input
 /third_party/chromite
@@ -286,6 +288,7 @@ v8.log
 /third_party/crashpad/crashpad
 /third_party/cros
 /third_party/cros_system_api
+/third_party/custom_tabs_client/src
 /third_party/cygwin
 /third_party/directxsdk
 /third_party/dom_distiller_js/dist
@@ -380,6 +383,7 @@ v8.log
 /third_party/syzygy/binaries
 /third_party/trace-viewer
 /third_party/tsan/
+/third_party/ub-uiautomator/lib
 /third_party/usb_ids
 /third_party/usrsctp/usrsctplib
 /third_party/v8-i18n

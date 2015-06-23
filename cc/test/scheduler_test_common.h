@@ -28,15 +28,20 @@ class FakeTimeSourceClient : public TimeSourceClient {
 
  protected:
   bool tick_called_;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(FakeTimeSourceClient);
 };
 
 class FakeDelayBasedTimeSource : public DelayBasedTimeSource {
  public:
-  static scoped_refptr<FakeDelayBasedTimeSource> Create(
-      base::TimeDelta interval, base::SingleThreadTaskRunner* task_runner) {
-    return make_scoped_refptr(new FakeDelayBasedTimeSource(interval,
-                                                           task_runner));
+  static scoped_ptr<FakeDelayBasedTimeSource> Create(
+      base::TimeDelta interval,
+      base::SingleThreadTaskRunner* task_runner) {
+    return make_scoped_ptr(new FakeDelayBasedTimeSource(interval, task_runner));
   }
+
+  ~FakeDelayBasedTimeSource() override {}
 
   void SetNow(base::TimeTicks time) { now_ = time; }
   base::TimeTicks Now() const override;
@@ -45,36 +50,45 @@ class FakeDelayBasedTimeSource : public DelayBasedTimeSource {
   FakeDelayBasedTimeSource(base::TimeDelta interval,
                            base::SingleThreadTaskRunner* task_runner)
       : DelayBasedTimeSource(interval, task_runner) {}
-  ~FakeDelayBasedTimeSource() override {}
 
   base::TimeTicks now_;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(FakeDelayBasedTimeSource);
 };
 
 class TestDelayBasedTimeSource : public DelayBasedTimeSource {
  public:
-  static scoped_refptr<TestDelayBasedTimeSource> Create(
-      scoped_refptr<TestNowSource> now_src,
+  static scoped_ptr<TestDelayBasedTimeSource> Create(
+      base::SimpleTestTickClock* now_src,
       base::TimeDelta interval,
       OrderedSimpleTaskRunner* task_runner) {
-    return make_scoped_refptr(
+    return make_scoped_ptr(
         new TestDelayBasedTimeSource(now_src, interval, task_runner));
   }
 
+  ~TestDelayBasedTimeSource() override;
+
  protected:
-  TestDelayBasedTimeSource(scoped_refptr<TestNowSource> now_src,
+  TestDelayBasedTimeSource(base::SimpleTestTickClock* now_src,
                            base::TimeDelta interval,
                            OrderedSimpleTaskRunner* task_runner);
 
   // Overridden from DelayBasedTimeSource
-  ~TestDelayBasedTimeSource() override;
   base::TimeTicks Now() const override;
   std::string TypeString() const override;
 
-  scoped_refptr<TestNowSource> now_src_;
+  // Not owned.
+  base::SimpleTestTickClock* now_src_;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestDelayBasedTimeSource);
 };
 
-struct FakeBeginFrameSource : public BeginFrameSourceMixIn {
-  bool remaining_frames_ = false;
+class FakeBeginFrameSource : public BeginFrameSourceBase {
+ public:
+  FakeBeginFrameSource() : remaining_frames_(false) {}
+  ~FakeBeginFrameSource() override {}
 
   BeginFrameObserver* GetObserver() { return observer_; }
 
@@ -84,6 +98,7 @@ struct FakeBeginFrameSource : public BeginFrameSourceMixIn {
     }
     return BeginFrameArgs();
   }
+
   void TestOnBeginFrame(const BeginFrameArgs& args) {
     return CallOnBeginFrame(args);
   }
@@ -92,7 +107,10 @@ struct FakeBeginFrameSource : public BeginFrameSourceMixIn {
   void DidFinishFrame(size_t remaining_frames) override;
   void AsValueInto(base::trace_event::TracedValue* dict) const override;
 
-  ~FakeBeginFrameSource() override {}
+ private:
+  bool remaining_frames_;
+
+  DISALLOW_COPY_AND_ASSIGN(FakeBeginFrameSource);
 };
 
 class TestBackToBackBeginFrameSource : public BackToBackBeginFrameSource {
@@ -100,19 +118,22 @@ class TestBackToBackBeginFrameSource : public BackToBackBeginFrameSource {
   ~TestBackToBackBeginFrameSource() override;
 
   static scoped_ptr<TestBackToBackBeginFrameSource> Create(
-      scoped_refptr<TestNowSource> now_src,
+      base::SimpleTestTickClock* now_src,
       base::SingleThreadTaskRunner* task_runner) {
     return make_scoped_ptr(
         new TestBackToBackBeginFrameSource(now_src, task_runner));
   }
 
  protected:
-  TestBackToBackBeginFrameSource(scoped_refptr<TestNowSource> now_src,
+  TestBackToBackBeginFrameSource(base::SimpleTestTickClock* now_src,
                                  base::SingleThreadTaskRunner* task_runner);
 
   base::TimeTicks Now() override;
+  // Not owned.
+  base::SimpleTestTickClock* now_src_;
 
-  scoped_refptr<TestNowSource> now_src_;
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestBackToBackBeginFrameSource);
 };
 
 class TestSyntheticBeginFrameSource : public SyntheticBeginFrameSource {
@@ -120,60 +141,33 @@ class TestSyntheticBeginFrameSource : public SyntheticBeginFrameSource {
   ~TestSyntheticBeginFrameSource() override;
 
   static scoped_ptr<TestSyntheticBeginFrameSource> Create(
-      scoped_refptr<TestNowSource> now_src,
+      base::SimpleTestTickClock* now_src,
       OrderedSimpleTaskRunner* task_runner,
       base::TimeDelta initial_interval) {
+    scoped_ptr<TestDelayBasedTimeSource> time_source =
+        TestDelayBasedTimeSource::Create(now_src, initial_interval,
+                                         task_runner);
     return make_scoped_ptr(
-        new TestSyntheticBeginFrameSource(TestDelayBasedTimeSource::Create(
-            now_src, initial_interval, task_runner)));
+        new TestSyntheticBeginFrameSource(time_source.Pass()));
   }
 
  protected:
-  TestSyntheticBeginFrameSource(
-      scoped_refptr<DelayBasedTimeSource> time_source);
-};
+  explicit TestSyntheticBeginFrameSource(
+      scoped_ptr<DelayBasedTimeSource> time_source);
 
-class TestScheduler;
-class TestSchedulerFrameSourcesConstructor
-    : public SchedulerFrameSourcesConstructor {
- public:
-  ~TestSchedulerFrameSourcesConstructor() override;
-
- protected:
-  BeginFrameSource* ConstructPrimaryFrameSource(Scheduler* scheduler) override;
-  BeginFrameSource* ConstructUnthrottledFrameSource(
-      Scheduler* scheduler) override;
-
-  OrderedSimpleTaskRunner* test_task_runner_;
-  TestNowSource* now_src_;
-
- protected:
-  explicit TestSchedulerFrameSourcesConstructor(
-      OrderedSimpleTaskRunner* test_task_runner,
-      TestNowSource* now_src);
-  friend class TestScheduler;
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestSyntheticBeginFrameSource);
 };
 
 class TestScheduler : public Scheduler {
  public:
   static scoped_ptr<TestScheduler> Create(
-      scoped_refptr<TestNowSource> now_src,
+      base::SimpleTestTickClock* now_src,
       SchedulerClient* client,
       const SchedulerSettings& scheduler_settings,
       int layer_tree_host_id,
       const scoped_refptr<OrderedSimpleTaskRunner>& task_runner,
-      scoped_ptr<BeginFrameSource> external_begin_frame_source) {
-    TestSchedulerFrameSourcesConstructor frame_sources_constructor(
-        task_runner.get(), now_src.get());
-    return make_scoped_ptr(new TestScheduler(
-                                   now_src,
-                                   client,
-                                   scheduler_settings,
-                                   layer_tree_host_id,
-                                   task_runner,
-                                   &frame_sources_constructor,
-                                   external_begin_frame_source.Pass()));
-  }
+      BeginFrameSource* external_frame_source);
 
   // Extra test helper functionality
   bool IsBeginRetroFrameArgsEmpty() const {
@@ -187,13 +181,6 @@ class TestScheduler : public Scheduler {
 
   ~TestScheduler() override;
 
-  void NotifyReadyToCommitThenActivateIfNeeded() {
-    NotifyReadyToCommit();
-    if (settings_.impl_side_painting) {
-      NotifyReadyToActivate();
-    }
-  }
-
   base::TimeDelta BeginImplFrameInterval() {
     return begin_impl_frame_tracker_.Interval();
   }
@@ -204,15 +191,19 @@ class TestScheduler : public Scheduler {
 
  private:
   TestScheduler(
-      scoped_refptr<TestNowSource> now_src,
+      base::SimpleTestTickClock* now_src,
       SchedulerClient* client,
       const SchedulerSettings& scheduler_settings,
       int layer_tree_host_id,
-      const scoped_refptr<OrderedSimpleTaskRunner>& test_task_runner,
-      TestSchedulerFrameSourcesConstructor* frame_sources_constructor,
-      scoped_ptr<BeginFrameSource> external_begin_frame_source);
+      const scoped_refptr<OrderedSimpleTaskRunner>& task_runner,
+      BeginFrameSource* external_frame_source,
+      scoped_ptr<TestSyntheticBeginFrameSource> synthetic_frame_source,
+      scoped_ptr<TestBackToBackBeginFrameSource> unthrottled_frame_source);
 
-  scoped_refptr<TestNowSource> now_src_;
+  // Not owned.
+  base::SimpleTestTickClock* now_src_;
+
+  DISALLOW_COPY_AND_ASSIGN(TestScheduler);
 };
 
 }  // namespace cc

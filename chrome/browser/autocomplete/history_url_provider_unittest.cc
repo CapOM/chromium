@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/autocomplete/history_url_provider.h"
+#include "components/omnibox/history_url_provider.h"
 
 #include <algorithm>
 
@@ -12,8 +12,8 @@
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/time/time.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
-#include "chrome/browser/autocomplete/history_quick_provider.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/search_engines/chrome_template_url_service_client.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
@@ -28,6 +28,7 @@
 #include "components/omnibox/autocomplete_provider.h"
 #include "components/omnibox/autocomplete_provider_listener.h"
 #include "components/omnibox/autocomplete_result.h"
+#include "components/omnibox/history_quick_provider.h"
 #include "components/search_engines/default_search_manager.h"
 #include "components/search_engines/search_terms_data.h"
 #include "components/search_engines/template_url.h"
@@ -218,6 +219,7 @@ class HistoryURLProviderTest : public testing::Test,
   content::TestBrowserThreadBundle thread_bundle_;
   ACMatches matches_;
   scoped_ptr<TestingProfile> profile_;
+  scoped_ptr<ChromeAutocompleteProviderClient> client_;
   history::HistoryService* history_service_;
   scoped_refptr<HistoryURLProvider> autocomplete_;
   // Should the matches be sorted and duplicates removed?
@@ -251,6 +253,7 @@ void HistoryURLProviderTest::OnProviderUpdate(bool updated_matches) {
 
 bool HistoryURLProviderTest::SetUpImpl(bool no_db) {
   profile_.reset(new TestingProfile());
+  client_.reset(new ChromeAutocompleteProviderClient(profile_.get()));
   if (!(profile_->CreateHistoryService(true, no_db)))
     return false;
   if (!no_db) {
@@ -261,7 +264,7 @@ bool HistoryURLProviderTest::SetUpImpl(bool no_db) {
   history_service_ = HistoryServiceFactory::GetForProfile(
       profile_.get(), ServiceAccessType::EXPLICIT_ACCESS);
 
-  autocomplete_ = new HistoryURLProvider(this, profile_.get());
+  autocomplete_ = new HistoryURLProvider(client_.get(), this);
   TemplateURLServiceFactory::GetInstance()->SetTestingFactoryAndUse(
       profile_.get(), &HistoryURLProviderTest::CreateTemplateURLService);
   FillData();
@@ -307,10 +310,10 @@ void HistoryURLProviderTest::RunTest(
     metrics::OmniboxInputType::Type* identified_input_type) {
   AutocompleteInput input(text, base::string16::npos, desired_tld, GURL(),
                           metrics::OmniboxEventProto::INVALID_SPEC,
-                          prevent_inline_autocomplete, false, true, true,
+                          prevent_inline_autocomplete, false, true, true, false,
                           ChromeAutocompleteSchemeClassifier(profile_.get()));
   *identified_input_type = input.type();
-  autocomplete_->Start(input, false, false);
+  autocomplete_->Start(input, false);
   if (!autocomplete_->done())
     base::MessageLoop::current()->Run();
 
@@ -632,12 +635,11 @@ TEST_F(HistoryURLProviderTest, EmptyVisits) {
   // Wait for history to create the in memory DB.
   profile_->BlockUntilHistoryProcessesPendingRequests();
 
-  AutocompleteInput input(ASCIIToUTF16("p"), base::string16::npos,
-                          std::string(), GURL(),
-                          metrics::OmniboxEventProto::INVALID_SPEC, false,
-                          false, true, true,
-                          ChromeAutocompleteSchemeClassifier(profile_.get()));
-  autocomplete_->Start(input, false, false);
+  AutocompleteInput input(
+      ASCIIToUTF16("p"), base::string16::npos, std::string(), GURL(),
+      metrics::OmniboxEventProto::INVALID_SPEC, false, false, true, true, false,
+      ChromeAutocompleteSchemeClassifier(profile_.get()));
+  autocomplete_->Start(input, false);
   // HistoryURLProvider shouldn't be done (waiting on async results).
   EXPECT_FALSE(autocomplete_->done());
 
@@ -675,12 +677,11 @@ TEST_F(HistoryURLProviderTestNoDB, NavigateWithoutDB) {
 }
 
 TEST_F(HistoryURLProviderTest, DontAutocompleteOnTrailingWhitespace) {
-  AutocompleteInput input(ASCIIToUTF16("slash "), base::string16::npos,
-                          std::string(), GURL(),
-                          metrics::OmniboxEventProto::INVALID_SPEC, false,
-                          false, true, true,
-                          ChromeAutocompleteSchemeClassifier(profile_.get()));
-  autocomplete_->Start(input, false, false);
+  AutocompleteInput input(
+      ASCIIToUTF16("slash "), base::string16::npos, std::string(), GURL(),
+      metrics::OmniboxEventProto::INVALID_SPEC, false, false, true, true, false,
+      ChromeAutocompleteSchemeClassifier(profile_.get()));
+  autocomplete_->Start(input, false);
   if (!autocomplete_->done())
     base::MessageLoop::current()->Run();
 
@@ -813,24 +814,22 @@ TEST_F(HistoryURLProviderTest, CrashDueToFixup) {
     "view-source:x",
   };
   for (size_t i = 0; i < arraysize(test_cases); ++i) {
-    AutocompleteInput input(ASCIIToUTF16(test_cases[i]), base::string16::npos,
-                            std::string(), GURL(),
-                            metrics::OmniboxEventProto::INVALID_SPEC,
-                            false, false, true, true,
-                            ChromeAutocompleteSchemeClassifier(profile_.get()));
-    autocomplete_->Start(input, false, false);
+    AutocompleteInput input(
+        ASCIIToUTF16(test_cases[i]), base::string16::npos, std::string(),
+        GURL(), metrics::OmniboxEventProto::INVALID_SPEC, false, false, true,
+        true, false, ChromeAutocompleteSchemeClassifier(profile_.get()));
+    autocomplete_->Start(input, false);
     if (!autocomplete_->done())
       base::MessageLoop::current()->Run();
   }
 }
 
 TEST_F(HistoryURLProviderTest, DoesNotProvideMatchesOnFocus) {
-  AutocompleteInput input(ASCIIToUTF16("foo"), base::string16::npos,
-                          std::string(), GURL(),
-                          metrics::OmniboxEventProto::INVALID_SPEC,
-                          false, false, true, true,
-                          ChromeAutocompleteSchemeClassifier(profile_.get()));
-  autocomplete_->Start(input, false, true);
+  AutocompleteInput input(
+      ASCIIToUTF16("foo"), base::string16::npos, std::string(), GURL(),
+      metrics::OmniboxEventProto::INVALID_SPEC, false, false, true, true, true,
+      ChromeAutocompleteSchemeClassifier(profile_.get()));
+  autocomplete_->Start(input, false);
   EXPECT_TRUE(autocomplete_->matches().empty());
 }
 
@@ -942,14 +941,13 @@ TEST_F(HistoryURLProviderTest, SuggestExactInput) {
                                     << test_cases[i].input << ", trim_http: "
                                     << test_cases[i].trim_http);
 
-    AutocompleteInput input(ASCIIToUTF16(test_cases[i].input),
-                            base::string16::npos, std::string(),
-                            GURL("about:blank"),
-                            metrics::OmniboxEventProto::INVALID_SPEC, false,
-                            false, true, true,
-                            ChromeAutocompleteSchemeClassifier(profile_.get()));
+    AutocompleteInput input(
+        ASCIIToUTF16(test_cases[i].input), base::string16::npos, std::string(),
+        GURL("about:blank"), metrics::OmniboxEventProto::INVALID_SPEC, false,
+        false, true, true, false,
+        ChromeAutocompleteSchemeClassifier(profile_.get()));
     AutocompleteMatch match(autocomplete_->SuggestExactInput(
-        input.text(), input.canonicalized_url(), test_cases[i].trim_http));
+        input, input.canonicalized_url(), test_cases[i].trim_http));
     EXPECT_EQ(ASCIIToUTF16(test_cases[i].contents), match.contents);
     for (size_t match_index = 0; match_index < match.contents_class.size();
          ++match_index) {

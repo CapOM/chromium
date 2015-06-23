@@ -6,7 +6,6 @@
 
 #include "base/bind.h"
 #include "base/location.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/threading/worker_pool.h"
 #include "gin/per_isolate_data.h"
 
@@ -35,7 +34,7 @@ void V8Platform::CallOnBackgroundThread(
 }
 
 void V8Platform::CallOnForegroundThread(v8::Isolate* isolate, v8::Task* task) {
-  PerIsolateData::From(isolate)->message_loop_proxy()->PostTask(
+  PerIsolateData::From(isolate)->task_runner()->PostTask(
       FROM_HERE, base::Bind(&v8::Task::Run, base::Owned(task)));
 }
 

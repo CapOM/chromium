@@ -44,7 +44,8 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         if (!TextUtils.isEmpty(params.getLinkUrl()) && !params.getLinkUrl().equals(BLANK_URL)) {
             menu.setHeaderTitle(params.getLinkUrl());
         } else if (!TextUtils.isEmpty(params.getTitleText())) {
-            menu.setHeaderTitle(params.getTitleText());
+            ContextMenuTitleView title = new ContextMenuTitleView(context, params.getTitleText());
+            menu.setHeaderView(title);
         }
 
         if (mMenuInflater == null) mMenuInflater = new MenuInflater(context);
@@ -72,10 +73,36 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         menu.findItem(R.id.contextmenu_save_link_as).setVisible(
                 UrlUtilities.isDownloadableScheme(params.getLinkUrl()));
 
+        if (params.imageWasFetchedLoFi()
+                || !DataReductionProxySettings.getInstance().wasLoFiModeActiveOnMainFrame()
+                || !DataReductionProxySettings.getInstance().canUseDataReductionProxy(
+                        params.getPageUrl())) {
+            menu.findItem(R.id.contextmenu_load_images).setVisible(false);
+        } else {
+            // Links can have images as backgrounds that aren't recognized here as images. CSS
+            // properties can also prevent an image underlying a link from being clickable.
+            // When Lo-Fi is active, provide the user with a "Load images" option on links
+            // to get the images in these cases.
+            DataReductionProxyUma.dataReductionProxyLoFiUIAction(
+                    DataReductionProxyUma.ACTION_LOAD_IMAGES_CONTEXT_MENU_SHOWN);
+        }
+
         if (params.isVideo()) {
             menu.findItem(R.id.contextmenu_save_video).setVisible(
                     UrlUtilities.isDownloadableScheme(params.getSrcUrl()));
-        } else if (params.isImage()) {
+        } else if (params.isImage() && params.imageWasFetchedLoFi()) {
+            DataReductionProxyUma.dataReductionProxyLoFiUIAction(
+                    DataReductionProxyUma.ACTION_LOAD_IMAGE_CONTEXT_MENU_SHOWN);
+            // All image context menu items other than "Load image," "Open original image in
+            // new tab," and "Copy image URL" should be disabled on Lo-Fi images.
+            menu.findItem(R.id.contextmenu_save_image).setVisible(false);
+            menu.findItem(R.id.contextmenu_open_image).setVisible(false);
+            menu.findItem(R.id.contextmenu_open_image_in_new_tab).setVisible(false);
+            menu.findItem(R.id.contextmenu_search_by_image).setVisible(false);
+            menu.findItem(R.id.contextmenu_copy_image).setVisible(false);
+        } else if (params.isImage() && !params.imageWasFetchedLoFi()) {
+            menu.findItem(R.id.contextmenu_load_original_image).setVisible(false);
+
             menu.findItem(R.id.contextmenu_save_image).setVisible(
                     UrlUtilities.isDownloadableScheme(params.getSrcUrl()));
 
@@ -83,13 +110,6 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
                 menu.findItem(R.id.contextmenu_open_image_in_new_tab).setVisible(false);
             } else {
                 menu.findItem(R.id.contextmenu_open_original_image_in_new_tab).setVisible(false);
-            }
-
-            if (!params.imageWasFetchedLoFi()) {
-                menu.findItem(R.id.contextmenu_show_original_image).setVisible(false);
-            } else {
-                DataReductionProxyUma.dataReductionProxyLoFiUIAction(
-                        DataReductionProxyUma.ACTION_LOAD_IMAGE_CONTEXT_MENU_SHOWN);
             }
 
             // Avoid showing open image option for same image which is already opened.
@@ -125,29 +145,37 @@ public class ChromeContextMenuPopulator implements ContextMenuPopulator {
         } else if (itemId == R.id.contextmenu_open_image_in_new_tab
                 || itemId == R.id.contextmenu_open_original_image_in_new_tab) {
             mDelegate.onOpenImageInNewTab(params.getSrcUrl(), params.getReferrer());
-        } else if (itemId == R.id.contextmenu_show_original_image) {
+        } else if (itemId == R.id.contextmenu_load_images) {
+            DataReductionProxyUma.dataReductionProxyLoFiUIAction(
+                    DataReductionProxyUma.ACTION_LOAD_IMAGES_CONTEXT_MENU_CLICKED);
+            mDelegate.onReloadIgnoringCache();
+        } else if (itemId == R.id.contextmenu_load_original_image) {
             DataReductionProxyUma.dataReductionProxyLoFiUIAction(
                     DataReductionProxyUma.ACTION_LOAD_IMAGE_CONTEXT_MENU_CLICKED);
-            if (!DataReductionProxySettings.getInstance().wasLoFiShowImageRequestedBefore()) {
+            if (!DataReductionProxySettings.getInstance().wasLoFiLoadImageRequestedBefore()) {
                 DataReductionProxyUma.dataReductionProxyLoFiUIAction(
                         DataReductionProxyUma.ACTION_LOAD_IMAGE_CONTEXT_MENU_CLICKED_ON_PAGE);
-                DataReductionProxySettings.getInstance().setLoFiShowImageRequested();
+                DataReductionProxySettings.getInstance().setLoFiLoadImageRequested();
             }
-            mDelegate.onShowOriginalImage();
+            mDelegate.onLoadOriginalImage();
         } else if (itemId == R.id.contextmenu_copy_link_address_text) {
             mDelegate.onSaveToClipboard(params.getUnfilteredLinkUrl(), true);
         } else if (itemId == R.id.contextmenu_copy_email_address) {
             mDelegate.onSaveToClipboard(MailTo.parse(params.getLinkUrl()).getTo(), false);
         } else if (itemId == R.id.contextmenu_copy_link_text) {
             mDelegate.onSaveToClipboard(params.getLinkText(), false);
-        } else if (itemId == R.id.contextmenu_save_image
-                || itemId == R.id.contextmenu_save_video) {
+        } else if (itemId == R.id.contextmenu_save_image) {
             if (mDelegate.startDownload(params.getSrcUrl(), false)) {
-                helper.startContextMenuDownload(false);
+                helper.startContextMenuDownload(
+                        false, mDelegate.isDataReductionProxyEnabledForURL(params.getSrcUrl()));
+            }
+        } else if (itemId == R.id.contextmenu_save_video) {
+            if (mDelegate.startDownload(params.getSrcUrl(), false)) {
+                helper.startContextMenuDownload(false, false);
             }
         } else if (itemId == R.id.contextmenu_save_link_as) {
             if (mDelegate.startDownload(params.getUnfilteredLinkUrl(), true)) {
-                helper.startContextMenuDownload(true);
+                helper.startContextMenuDownload(true, false);
             }
         } else if (itemId == R.id.contextmenu_search_by_image) {
             mDelegate.onSearchByImageInNewTab();

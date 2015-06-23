@@ -41,16 +41,33 @@ class MockMojoMediaRouterService : public interfaces::MediaRouter {
   MockMojoMediaRouterService();
   ~MockMojoMediaRouterService() override;
 
-  MOCK_METHOD3(CreateRoute,
-               void(const mojo::String& source,
+  MOCK_METHOD6(CreateRoute,
+               void(const mojo::String& source_urn,
                     const mojo::String& sink_id,
+                    const mojo::String& presentation_id,
+                    const mojo::String& origin,
+                    int tab_id,
                     const CreateRouteCallback& callback));
+  MOCK_METHOD5(JoinRoute,
+               void(const mojo::String& source_urn,
+                    const mojo::String& presentation_id,
+                    const mojo::String& origin,
+                    int tab_id,
+                    const JoinRouteCallback& callback));
   MOCK_METHOD1(CloseRoute, void(const mojo::String& route_id));
   MOCK_METHOD1(StartObservingMediaSinks, void(const mojo::String& source));
   MOCK_METHOD1(StopObservingMediaSinks, void(const mojo::String& source));
-  MOCK_METHOD2(PostMessage,
+  MOCK_METHOD3(SendRouteMessage,
                void(const mojo::String& media_route_id,
-                    const mojo::String& message));
+                    const mojo::String& message,
+                    const SendRouteMessageCallback& callback));
+  void ListenForRouteMessages(mojo::Array<mojo::String> route_ids,
+                              const ListenForRouteMessagesCallback& callback) {
+    ListenForRouteMessagesInteral(route_ids.storage(), callback);
+  }
+  MOCK_METHOD2(ListenForRouteMessagesInteral,
+               void(const std::vector<mojo::String>& route_ids,
+                    const ListenForRouteMessagesCallback& callback));
   MOCK_METHOD1(ClearIssue, void(const mojo::String& issue_id));
   MOCK_METHOD0(StartObservingMediaRoutes, void());
   MOCK_METHOD0(StopObservingMediaRoutes, void());

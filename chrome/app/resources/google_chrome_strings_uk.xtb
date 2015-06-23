@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">Майже оновлено! Перезапустіть пристрій, щоб завершити оновлення.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome – сповіщення</translation>
+<translation id="6368805772029492593">Задля підвищення безпеки Google Chrome шифруватиме ваші дані.</translation>
 <translation id="7339898014177206373">Нове вікно</translation>
 <translation id="3282568296779691940">Вхід у Chrome</translation>
 <translation id="3089968997497233615">Доступна нова, безпечніша версія Google Chrome.</translation>
@@ -166,7 +167,6 @@
 <translation id="2290095356545025170">Ви дійсно хочете видалити Google Chrome?</translation>
 <translation id="4273752058983339720">Google Chrome налаштовано на автоматичний запуск після ввімкнення комп’ютера.</translation>
 <translation id="2316129865977710310">Ні, дякую</translation>
-<translation id="415994390253732730">Chrome працює неналежним чином?</translation>
 <translation id="1104959162601287462">Про &amp;ОС Chrome</translation>
 <translation id="5328989068199000832">Бінарні файли Google Chrome</translation>
 <translation id="7626032353295482388">Вітаємо у Chrome!</translation>
@@ -219,6 +219,7 @@
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome став ще кращим</translation>
 <translation id="2588322182880276190">Логотип Chrome</translation>
+<translation id="4519152997629025674">Google Chrome може покращувати веб-перегляд за допомогою <ph name="BEGIN_LINK"/>веб-служб<ph name="END_LINK"/>. Ви можете будь-коли вимкнути ці служби.</translation>
 <translation id="4367618624832907428">Google Chrome не може показати веб-сторінку, оскільки ваш комп’ютер не під’єднано до Інтернету.</translation>
 <translation id="174539241580958092">Google Chrome не вдалося синхронізувати ваші дані через помилку входу.</translation>
 <translation id="8255190535488645436">Google Chrome використовує вашу камеру та мікрофон.</translation>
@@ -226,7 +227,6 @@
         антивірусного програмного забезпечення.</translation>
 <translation id="9102715433345326100">Цей файл шкідливий, тому Chrome заблокував його.</translation>
 <translation id="8205111949707227942">Додатково. Допоможіть покращити ОС Chrome, автоматично надсилаючи статистику використання та звіти про аварійне завершення роботи до Google.</translation>
-<translation id="487887346205285304">Chrome працює неналежним чином?</translation>
 <translation id="3622797965165704966">Користуватися Chrome у своєму обліковому записі Google на спільних комп’ютерах стало легше.</translation>
 <translation id="7196020411877309443">Чому відображається це повідомлення?</translation>
 <translation id="2769762047821873045">Google Chrome не є веб-переглядачем за умовчанням.</translation>

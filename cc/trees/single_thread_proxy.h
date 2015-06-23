@@ -23,7 +23,6 @@ class BeginFrameSource;
 class ContextProvider;
 class LayerTreeHost;
 class LayerTreeHostSingleThreadClient;
-class ResourceUpdateQueue;
 
 class CC_EXPORT SingleThreadProxy : public Proxy,
                                     NON_EXPORTED_BASE(LayerTreeHostImplClient),
@@ -57,7 +56,6 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   void MainThreadHasStoppedFlinging() override {}
   void Start() override;
   void Stop() override;
-  size_t MaxPartialTextureUpdates() const override;
   void ForceSerializeOnSwapBuffers() override;
   bool SupportsImplScrolling() const override;
   bool MainFrameWillHappenForTesting() override;
@@ -76,7 +74,6 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   void ScheduledActionBeginOutputSurfaceCreation() override;
   void ScheduledActionPrepareTiles() override;
   void ScheduledActionInvalidateOutputSurface() override;
-  void DidAnticipatedDrawTimeChange(base::TimeTicks time) override;
   base::TimeDelta DrawDurationEstimate() override;
   base::TimeDelta BeginMainFrameToCommitDurationEstimate() override;
   base::TimeDelta CommitToActivateDurationEstimate() override;
@@ -103,8 +100,6 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   void SetVideoNeedsBeginFrames(bool needs_begin_frames) override;
   void PostAnimationEventsToMainThreadOnImplThread(
       scoped_ptr<AnimationEventsVector> events) override;
-  bool ReduceContentsTextureMemoryOnImplThread(size_t limit_bytes,
-                                               int priority_cutoff) override;
   bool IsInsideDraw() override;
   void RenewTreePriority() override {}
   void PostDelayedAnimationTaskOnImplThread(const base::Closure& task,
@@ -156,11 +151,11 @@ class CC_EXPORT SingleThreadProxy : public Proxy,
   RendererCapabilities renderer_capabilities_for_main_thread_;
 
   // Accessed from both threads.
+  scoped_ptr<BeginFrameSource> external_begin_frame_source_;
   scoped_ptr<Scheduler> scheduler_on_impl_thread_;
   ProxyTimingHistory timing_history_;
 
   scoped_ptr<BlockingTaskRunner::CapturePostTasks> commit_blocking_task_runner_;
-  scoped_ptr<ResourceUpdateQueue> queue_for_commit_;
   bool next_frame_is_newly_committed_frame_;
 
 #if DCHECK_IS_ON()

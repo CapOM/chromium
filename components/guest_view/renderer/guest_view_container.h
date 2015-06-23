@@ -33,7 +33,9 @@ class GuestViewContainer : public content::BrowserPluginDelegate {
   bool OnMessageReceived(const IPC::Message& message);
 
   // Destroys this GuestViewContainer after performing necessary cleanup.
-  void Destroy();
+  // |embedder_frame_destroyed| is true if this destruction is due to the
+  // embedding frame of the container being destroyed.
+  void Destroy(bool embedder_frame_destroyed);
 
   // Called when the embedding RenderFrame is destroyed.
   virtual void OnRenderFrameDestroyed() {}
@@ -48,7 +50,7 @@ class GuestViewContainer : public content::BrowserPluginDelegate {
   // Called to perform actions when a GuestViewContainer is about to be
   // destroyed.
   // Note that this should be called exactly once.
-  virtual void OnDestroy() {}
+  virtual void OnDestroy(bool embedder_frame_destroyed) {}
 
  protected:
   ~GuestViewContainer() override;
@@ -69,6 +71,7 @@ class GuestViewContainer : public content::BrowserPluginDelegate {
   void Ready() final;
   void SetElementInstanceID(int element_instance_id) final;
   void DidDestroyElement() final;
+  base::WeakPtr<BrowserPluginDelegate> GetWeakPtr() final;
 
   int element_instance_id_;
   content::RenderFrame* render_frame_;
@@ -79,6 +82,8 @@ class GuestViewContainer : public content::BrowserPluginDelegate {
 
   std::deque<linked_ptr<GuestViewRequest> > pending_requests_;
   linked_ptr<GuestViewRequest> pending_response_;
+
+  base::WeakPtrFactory<GuestViewContainer> weak_ptr_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(GuestViewContainer);
 };

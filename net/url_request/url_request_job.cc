@@ -6,15 +6,19 @@
 
 #include "base/bind.h"
 #include "base/compiler_specific.h"
-#include "base/message_loop/message_loop.h"
+#include "base/location.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/power_monitor/power_monitor.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 #include "net/base/auth.h"
 #include "net/base/host_port_pair.h"
 #include "net/base/io_buffer.h"
+#include "net/base/load_flags.h"
 #include "net/base/load_states.h"
 #include "net/base/net_errors.h"
 #include "net/base/network_delegate.h"
@@ -541,14 +545,31 @@ void URLRequestJob::NotifyDone(const URLRequestStatus &status) {
       }
       request_->set_status(status);
     }
+
+    // If the request succeeded (And wasn't cancelled) and the response code was
+    // 4xx or 5xx, record whether or not the main frame was blank.  This is
+    // intended to be a short-lived histogram, used to figure out how important
+    // fixing http://crbug.com/331745 is.
+    if (request_->status().is_success()) {
+      int response_code = GetResponseCode();
+      if (400 <= response_code && response_code <= 599) {
+        bool page_has_content = (postfilter_bytes_read_ != 0);
+        if (request_->load_flags() & net::LOAD_MAIN_FRAME) {
+          UMA_HISTOGRAM_BOOLEAN("Net.ErrorResponseHasContentMainFrame",
+                                page_has_content);
+        } else {
+          UMA_HISTOGRAM_BOOLEAN("Net.ErrorResponseHasContentNonMainFrame",
+                                page_has_content);
+        }
+      }
+    }
   }
 
   // Complete this notification later.  This prevents us from re-entering the
   // delegate if we're done because of a synchronous call.
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE,
-      base::Bind(&URLRequestJob::CompleteNotifyDone,
-                 weak_factory_.GetWeakPtr()));
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE, base::Bind(&URLRequestJob::CompleteNotifyDone,
+                            weak_factory_.GetWeakPtr()));
 }
 
 void URLRequestJob::CompleteNotifyDone() {
@@ -818,7 +839,7 @@ void URLRequestJob::RecordBytesRead(int bytes_read) {
   // Service Worker jobs twice.
   if (request_ && request_->context()->network_quality_estimator()) {
     request_->context()->network_quality_estimator()->NotifyDataReceived(
-        *request_, prefilter_bytes_read_);
+        *request_, prefilter_bytes_read_, bytes_read);
   }
 
   if (!filter_.get())

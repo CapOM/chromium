@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="ja">
 <translation id="2774256287122201187">続行できますが、このページに移動するとこの警告は今後 5 分間表示されません。</translation>
+<translation id="3963721102035795474">リーダーモード</translation>
 <translation id="7485870689360869515">データが見つかりません。</translation>
 <translation id="3884278016824448484">競合するデバイス識別子です</translation>
 <translation id="5172758083709347301">マシン</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076"><ph name="TARGET_LANGUAGE"/>に翻訳できませんでした。</translation>
 <translation id="4103249731201008433">デバイスのシリアル番号が無効です</translation>
 <translation id="3219579145727097045">カードの表側に記載されている有効期限と 4 桁の CVC を入力します</translation>
-<translation id="3667681724235208644">元のページを表示</translation>
+<translation id="59107663811261420">この販売者に対し、この種類のカードは Google ペイメントでご利用いただけません。別のカードを選択してください。</translation>
 <translation id="4079302484614802869">プロキシは固定プロキシ サーバーではなく .pac スクリプト URL を使用するように設定されています。</translation>
 <translation id="5540224163453853">リクエストされた記事が見つかりませんでした。</translation>
 <translation id="8437238597147034694">移動の取り消し（&amp;U）</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;検索キーワードを入力&gt;</translation>
 <translation id="552553974213252141">テキストは正しく抽出されましたか？</translation>
 <translation id="5317780077021120954">保存</translation>
+<translation id="8530504477309582336">この種類のカードは Google ペイメントでご利用いただけません。別のカードを選択してください。</translation>
 <translation id="7610193165460212391">値（<ph name="VALUE"/>）が範囲外です。</translation>
 <translation id="3739623965217189342">コピーしたリンク</translation>
 <translation id="8790007591277257123">削除のやり直し（&amp;R）</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">プロキシ モードが無効です。</translation>
 <translation id="3105172416063519923">アセット ID:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">この機能を使用するには JavaScript を有効にする必要があります。</translation>
 <translation id="2587841377698384444">Directory API ID:</translation>
 <translation id="7752995774971033316">管理されていません</translation>
 <translation id="3712624925041724820">ライセンスを使い切りました</translation>

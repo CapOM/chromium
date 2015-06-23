@@ -8,6 +8,7 @@
 #include "base/logging.h"
 #include "base/memory/singleton.h"
 #include "content/public/browser/render_view_host.h"
+#include "content/public/browser/security_style_explanations.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/bindings_policy.h"
 #include "content/public/common/security_style.h"
@@ -227,7 +228,8 @@ bool WebContentsDelegate::SaveFrame(const GURL& url, const Referrer& referrer) {
 }
 
 SecurityStyle WebContentsDelegate::GetSecurityStyle(
-    const WebContents* web_contents) {
+    WebContents* web_contents,
+    SecurityStyleExplanations* security_style_explanations) {
   return content::SECURITY_STYLE_UNKNOWN;
 }
 

@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import tempfile
 
-from telemetry.core.backends import adb_commands
 from telemetry.core import exceptions
 from telemetry.core.forwarders import android_forwarder
 from telemetry.core import platform
@@ -25,8 +24,9 @@ from telemetry.core.platform.profiler import android_prebuilt_profiler_helper
 from telemetry.core import util
 from telemetry.core import video
 from telemetry import decorators
-from telemetry.util import exception_formatter
-from telemetry.util import external_modules
+from telemetry.internal.backends import adb_commands
+from telemetry.internal.util import exception_formatter
+from telemetry.internal.util import external_modules
 
 psutil = external_modules.ImportOptionalModule('psutil')
 util.AddDirToPythonPath(util.GetChromiumSrcDir(),
@@ -256,6 +256,9 @@ class AndroidPlatformBackend(
 
   def GetOSName(self):
     return 'android'
+
+  def GetDeviceTypeName(self):
+    return self._device.product_model()
 
   @decorators.Cache
   def GetOSVersionName(self):

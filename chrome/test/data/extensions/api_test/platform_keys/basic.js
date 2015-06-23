@@ -174,7 +174,8 @@ function checkPropertyIsReadOnly(object, key) {
   var original = object[key];
   try {
     object[key] = {};
-    fail('Expected the property to be read-only and an exception to be thrown');
+    fail('Expected the property ' + key +
+         ' to be read-only and an exception to be thrown');
   } catch (error) {
     assertEq(original, object[key]);
   }
@@ -250,6 +251,13 @@ function testInteractiveSelectNoCerts() {
 function testInteractiveSelectClient1() {
   assertCertsSelected({interactive: true, request: requestAll},
                       [data.client_1]);
+}
+
+function testInteractiveSelectClient2() {
+  var expectedCerts = [];
+  if (systemTokenEnabled)
+    expectedCerts.push(data.client_2);
+  assertCertsSelected({interactive: true, request: requestAll}, expectedCerts);
 }
 
 function testMatchResultCA1() {
@@ -508,13 +516,20 @@ function testVerifyUntrusted() {
 }
 
 var testSuites = {
-  // These tests assume already granted permissions for client_1 and client_2.
   // On interactive selectClientCertificates calls, the simulated user does not
   // select any cert.
   basicTests: function() {
     var tests = [
       testStaticMethods,
+
+      // Interactively select client_1 and client_2 to grant permissions for
+      // these certificates.
+      testInteractiveSelectClient1,
+      testInteractiveSelectClient2,
+
+      // In non-interactive calls both certs must be returned now.
       testSelectAllCerts,
+
       testBackgroundNoninteractiveSelect,
       testBackgroundInteractiveSelect,
       testSelectCA1Certs,
@@ -536,7 +551,6 @@ var testSuites = {
     chrome.test.runTests(tests);
   },
 
-  // This test suite starts without any granted permissions.
   // On interactive selectClientCertificates calls, the simulated user selects
   // client_1, if matching.
   permissionTests: function() {
@@ -549,7 +563,7 @@ var testSuites = {
       testSelectAllReturnsNoCerts,
 
       testInteractiveSelectClient1,
-      // Now that the permission for client_1 is granted.
+      // Now the permission for client_1 is granted.
 
       // Verify that signing with client_1 is possible and with client_2 still
       // fails.
@@ -565,7 +579,53 @@ var testSuites = {
     ];
 
     chrome.test.runTests(tests);
-  }
+  },
+
+  managedProfile: function() {
+    var tests = [
+      // If the profile is managed, the user cannot grant permissions for any
+      // certificates.
+      testInteractiveSelectNoCerts
+    ];
+    chrome.test.runTests(tests);
+  },
+
+  corporateKeyWithoutPermissionTests: function() {
+    var tests = [
+      // Directly trying to sign must fail
+      testSignClient1Fails,
+
+      // Interactively selecting must not show any cert to the user.
+      testInteractiveSelectNoCerts,
+    ];
+    chrome.test.runTests(tests);
+  },
+
+  corporateKeyWithPermissionTests: function() {
+    var tests = [
+      // The extension has non-interactive access to all corporate keys, even
+      // without previous additional consent of the user.
+      testSignSha1Client1,
+
+      // Interactively selecting for client_1 will work as well.
+      testInteractiveSelectClient1,
+    ];
+    chrome.test.runTests(tests);
+  },
+
+  policyDoesGrantAccessToNonCorporateKey: function() {
+    // The permission from policy must not affect usage of non-corproate keys.
+    var tests = [
+      // Attempts to sign must fail.
+      testSignClient1Fails,
+
+      // Interactive selection must not prompt the user and not return any
+      // certificate.
+      testInteractiveSelectNoCerts,
+    ];
+    chrome.test.runTests(tests);
+  },
+
 };
 
 setUp(testSuites[selectedTestSuite]);

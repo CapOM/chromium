@@ -19,6 +19,7 @@
 #include "ios/web/public/web_client.h"
 #import "ios/web/public/web_state/js/crw_js_injection_manager.h"
 #import "ios/web/public/web_state/ui/crw_native_content_provider.h"
+#import "ios/web/public/web_state/ui/crw_web_view_content_view.h"
 #import "ios/web/ui_web_view_util.h"
 #include "ios/web/web_state/blocked_popup_info.h"
 #include "ios/web/web_state/frame_info.h"
@@ -199,11 +200,6 @@ NSString* const kScriptImmediateName = @"crwebinvokeimmediate";
 // Attempts to handle a script message. Returns YES on success, NO otherwise.
 - (BOOL)respondToWKScriptMessage:(WKScriptMessage*)scriptMessage;
 
-// Handles 'window.history.willChangeState' message.
-- (BOOL)handleWindowHistoryWillChangeStateMessage:
-    (base::DictionaryValue*)message
-                                          context:(NSDictionary*)context;
-
 #if !defined(ENABLE_CHROME_NET_STACK_FOR_WKWEBVIEW)
 // Called when WKWebView estimatedProgress has been changed.
 - (void)webViewEstimatedProgressDidChange;
@@ -273,9 +269,9 @@ NSString* const kScriptImmediateName = @"crwebinvokeimmediate";
 #pragma mark -
 #pragma mark Testing-Only Methods
 
-- (void)injectWebView:(id)webView {
-  [super injectWebView:webView];
-  [self setWebView:webView];
+- (void)injectWebViewContentView:(CRWWebViewContentView*)webViewContentView {
+  [super injectWebViewContentView:webViewContentView];
+  [self setWebView:static_cast<WKWebView*>(webViewContentView.webView)];
 }
 
 #pragma mark - Protected property implementations
@@ -397,23 +393,18 @@ NSString* const kScriptImmediateName = @"crwebinvokeimmediate";
   [self evaluateJavaScript:script stringResultHandler:nil];
 }
 
-- (CGFloat)absoluteZoomScaleForScrollState:
-    (const web::PageScrollState&)scrollState {
-  return scrollState.zoom_scale();
-}
-
-- (void)applyWebViewScrollZoomScaleFromScrollState:
-    (const web::PageScrollState&)scrollState {
+- (void)applyWebViewScrollZoomScaleFromZoomState:
+    (const web::PageZoomState&)zoomState {
   // After rendering a web page, WKWebView keeps the |minimumZoomScale| and
   // |maximumZoomScale| properties of its scroll view constant while adjusting
   // the |zoomScale| property accordingly.  The maximum-scale or minimum-scale
   // meta tags of a page may have changed since the state was recorded, so clamp
   // the zoom scale to the current range if necessary.
-  DCHECK(scrollState.IsZoomScaleValid());
+  DCHECK(zoomState.IsValid());
   // Legacy-format scroll states cannot be applied to WKWebViews.
-  if (scrollState.IsZoomScaleLegacyFormat())
+  if (zoomState.IsLegacyFormat())
     return;
-  CGFloat zoomScale = scrollState.zoom_scale();
+  CGFloat zoomScale = zoomState.zoom_scale();
   if (zoomScale < self.webScrollView.minimumZoomScale)
     zoomScale = self.webScrollView.minimumZoomScale;
   if (zoomScale > self.webScrollView.maximumZoomScale)
@@ -789,7 +780,8 @@ NSString* const kScriptImmediateName = @"crwebinvokeimmediate";
     (base::DictionaryValue*)message
                                           context:(NSDictionary*)context {
   _changingHistoryState = YES;
-  return YES;
+  return
+      [super handleWindowHistoryWillChangeStateMessage:message context:context];
 }
 
 - (BOOL)handleWindowHistoryDidPushStateMessage:(base::DictionaryValue*)message

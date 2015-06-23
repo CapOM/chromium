@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">Hampir selesai diperbarui! Nyalakan ulang perangkat untuk menyelesaikan pembaruan.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome - Notifikasi</translation>
+<translation id="6368805772029492593">Untuk keamanan tambahan, Google Chrome akan mengenkripsi data Anda.</translation>
 <translation id="7339898014177206373">Jendela baru</translation>
 <translation id="3282568296779691940">Masuk ke Chrome</translation>
 <translation id="3089968997497233615">Tersedia versi Google Chrome yang baru dan lebih aman.</translation>
@@ -166,7 +167,6 @@ Tetap masuk akan menggabungkan informasi Chrome seperti bookmark, riwayat, dan s
 <translation id="2290095356545025170">Apakah Anda yakin ingin mencopot penginstalan Google Chrome?</translation>
 <translation id="4273752058983339720">Google Chrome dikonfigurasikan untuk diluncurkan secara otomatis ketika Anda memulai komputer.</translation>
 <translation id="2316129865977710310">Lain kali</translation>
-<translation id="415994390253732730">Chrome Berperilaku Aneh?</translation>
 <translation id="1104959162601287462">Tentang OS &amp;Chrome</translation>
 <translation id="5328989068199000832">Biner Google Chrome</translation>
 <translation id="7626032353295482388">Selamat Datang di Chrome</translation>
@@ -219,6 +219,7 @@ Tetap masuk akan menggabungkan informasi Chrome seperti bookmark, riwayat, dan s
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome menjadi lebih baik</translation>
 <translation id="2588322182880276190">Logo Chrome</translation>
+<translation id="4519152997629025674">Google Chrome mungkin akan menggunakan <ph name="BEGIN_LINK"/>layanan web<ph name="END_LINK"/> untuk meningkatkan pengalaman penjelajahan. Anda dapat menonaktifkan layanan ini kapan saja secara opsional.</translation>
 <translation id="4367618624832907428">Google Chrome tidak dapat menampilkan laman web karena komputer Anda tidak tersambung ke internet.</translation>
 <translation id="174539241580958092">Google Chrome tidak dapat menyinkronkan data Anda karena kesalahan saat masuk.</translation>
 <translation id="8255190535488645436">Google Chrome menggunakan kamera dan mikrofon Anda.</translation>
@@ -226,7 +227,6 @@ Tetap masuk akan menggabungkan informasi Chrome seperti bookmark, riwayat, dan s
         Anda.</translation>
 <translation id="9102715433345326100">File ini berbahaya dan Chrome memblokirnya.</translation>
 <translation id="8205111949707227942">Opsional: Bantu kami membuat Chrome OS lebih baik dengan mengirim statistik penggunaan dan laporan kerusakan ke Google secara otomatis.</translation>
-<translation id="487887346205285304">Chrome berperilaku aneh?</translation>
 <translation id="3622797965165704966">Kini, menggunakan Chrome dengan Akun Google Anda dan di komputer bersama jadi lebih mudah.</translation>
 <translation id="7196020411877309443">Mengapa saya melihat ini?</translation>
 <translation id="2769762047821873045">Google Chrome bukan browser default.</translation>

@@ -299,8 +299,13 @@ void BrowserOptionsHandler::GetLocalizedValues(base::DictionaryValue* values) {
     { "improveBrowsingExperience", IDS_OPTIONS_IMPROVE_BROWSING_EXPERIENCE },
     { "languageAndSpellCheckSettingsButton",
       IDS_OPTIONS_SETTINGS_LANGUAGE_AND_INPUT_SETTINGS },
+#if defined(OS_CHROMEOS)
+    { "languageSectionLabel", IDS_OPTIONS_ADVANCED_LANGUAGE_LABEL,
+      IDS_SHORT_PRODUCT_OS_NAME },
+#else
     { "languageSectionLabel", IDS_OPTIONS_ADVANCED_LANGUAGE_LABEL,
       IDS_SHORT_PRODUCT_NAME },
+#endif
     { "linkDoctorPref", IDS_OPTIONS_LINKDOCTOR_PREF },
     { "manageAutofillSettings", IDS_OPTIONS_MANAGE_AUTOFILL_SETTINGS_LINK },
     { "manageLanguages", IDS_OPTIONS_TRANSLATE_MANAGE_LANGUAGES },
@@ -1149,6 +1154,10 @@ void BrowserOptionsHandler::SetDefaultWebClientUIState(
 
   if (state == ShellIntegration::STATE_IS_DEFAULT) {
     status_string_id = IDS_OPTIONS_DEFAULTBROWSER_DEFAULT;
+    // Notify the user in the future if Chrome ceases to be the user's chosen
+    // default browser.
+    PrefService* prefs = Profile::FromWebUI(web_ui())->GetPrefs();
+    prefs->SetBoolean(prefs::kCheckDefaultBrowser, true);
   } else if (state == ShellIntegration::STATE_NOT_DEFAULT) {
     if (ShellIntegration::CanSetAsDefaultBrowser() ==
             ShellIntegration::SET_DEFAULT_NOT_ALLOWED) {

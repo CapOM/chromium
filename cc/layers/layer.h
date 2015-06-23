@@ -69,8 +69,6 @@ class ResourceUpdateQueue;
 class ScrollbarLayerInterface;
 class SimpleEnclosedRegion;
 struct AnimationEvent;
-template <typename LayerType>
-class OcclusionTracker;
 
 // Base class for composited layers. Special layer types are derived from
 // this class.
@@ -256,8 +254,8 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   gfx::Rect drawable_content_rect() const {
     return draw_properties_.drawable_content_rect;
   }
-  gfx::Rect visible_content_rect() const {
-    return draw_properties_.visible_content_rect;
+  gfx::Rect visible_layer_rect() const {
+    return draw_properties_.visible_layer_rect;
   }
   Layer* render_target() {
     DCHECK(!draw_properties_.render_target ||
@@ -376,9 +374,8 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
 
   // This methods typically need to be overwritten by derived classes.
   virtual void SavePaintProperties();
-  // Returns true iff any resources were updated that need to be committed.
-  virtual bool Update(ResourceUpdateQueue* queue,
-                      const OcclusionTracker<Layer>* occlusion);
+  // Returns true iff anything was updated that needs to be committed.
+  virtual bool Update();
   virtual bool NeedMoreUpdates();
   virtual void SetIsMask(bool is_mask) {}
   virtual void ReduceMemoryUsage() {}
@@ -396,19 +393,6 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void ClearRenderSurface();
 
   void ClearRenderSurfaceLayerList();
-
-  // The contents scale converts from logical, non-page-scaled pixels to target
-  // pixels. The contents scale is 1 for the root layer as it is already in
-  // physical pixels. By default contents scale is forced to be 1 except for
-  // subclasses of ContentsScalingLayer.
-  float contents_scale_x() const { return draw_properties_.contents_scale_x; }
-  float contents_scale_y() const { return draw_properties_.contents_scale_y; }
-  gfx::Size content_bounds() const { return draw_properties_.content_bounds; }
-
-  virtual void CalculateContentsScale(float ideal_contents_scale,
-                                      float* contents_scale_x,
-                                      float* contents_scale_y,
-                                      gfx::Size* content_bounds);
 
   LayerTreeHost* layer_tree_host() { return layer_tree_host_; }
   const LayerTreeHost* layer_tree_host() const { return layer_tree_host_; }
@@ -440,11 +424,7 @@ class CC_EXPORT Layer : public base::RefCounted<Layer>,
   void RemoveLayerAnimationEventObserver(
       LayerAnimationEventObserver* animation_observer);
 
-  virtual SimpleEnclosedRegion VisibleContentOpaqueRegion() const;
-
   virtual ScrollbarLayerInterface* ToScrollbarLayer();
-
-  gfx::Rect LayerRectToContentRect(const gfx::Rect& layer_rect) const;
 
   virtual skia::RefPtr<SkPicture> GetPicture() const;
 

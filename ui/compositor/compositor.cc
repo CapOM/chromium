@@ -98,9 +98,6 @@ Compositor::Compositor(gfx::AcceleratedWidget widget,
       command_line->HasSwitch(switches::kDisableGpuVsync);
   settings.renderer_settings.partial_swap_enabled =
       !command_line->HasSwitch(cc::switches::kUIDisablePartialSwap);
-#if defined(OS_CHROMEOS)
-  settings.per_tile_painting_enabled = true;
-#endif
 #if defined(OS_WIN)
   settings.renderer_settings.finish_rendering_on_resize = true;
 #endif
@@ -126,7 +123,6 @@ Compositor::Compositor(gfx::AcceleratedWidget widget,
   settings.initial_debug_state.SetRecordRenderingStats(
       command_line->HasSwitch(cc::switches::kEnableGpuBenchmarking));
 
-  settings.impl_side_painting = IsUIImplSidePaintingEnabled();
   settings.use_display_lists = IsUISlimmingPaintEnabled();
 
   settings.use_zero_copy = IsUIZeroCopyEnabled();

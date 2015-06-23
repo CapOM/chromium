@@ -14,7 +14,6 @@
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/event_router.h"
-#include "extensions/browser/extension_function_dispatcher.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/browser/view_type_utils.h"
 #include "extensions/common/api/virtual_keyboard_private.h"
@@ -115,13 +114,7 @@ AshKeyboardControllerProxy::AshKeyboardControllerProxy(
 }
 
 AshKeyboardControllerProxy::~AshKeyboardControllerProxy() {
-  DCHECK(!keyboard_controller_);
-}
-
-void AshKeyboardControllerProxy::OnRequest(
-    const ExtensionHostMsg_Request_Params& params) {
-  extension_function_dispatcher_->Dispatch(
-      params, web_contents()->GetRenderViewHost());
+  DCHECK(!keyboard_controller());
 }
 
 ui::InputMethod* AshKeyboardControllerProxy::GetInputMethod() {
@@ -149,47 +142,24 @@ void AshKeyboardControllerProxy::RequestAudioInput(
 
 void AshKeyboardControllerProxy::SetupWebContents(
     content::WebContents* contents) {
-  extension_function_dispatcher_.reset(
-      new extensions::ExtensionFunctionDispatcher(browser_context(), this));
   extensions::SetViewType(contents, extensions::VIEW_TYPE_VIRTUAL_KEYBOARD);
   extensions::ChromeExtensionWebContentsObserver::CreateForWebContents(
       contents);
   Observe(contents);
 }
 
-extensions::WindowController*
-    AshKeyboardControllerProxy::GetExtensionWindowController() const {
-  // The keyboard doesn't have a window controller.
-  return NULL;
-}
-
 void AshKeyboardControllerProxy::SetController(
     keyboard::KeyboardController* controller) {
   // During KeyboardController destruction, controller can be set to null.
   if (!controller) {
-    DCHECK(keyboard_controller_);
-    keyboard_controller_->RemoveObserver(observer_.get());
-    keyboard_controller_ = nullptr;
+    DCHECK(keyboard_controller());
+    keyboard_controller()->RemoveObserver(observer_.get());
+    KeyboardControllerProxy::SetController(nullptr);
     return;
   }
-  keyboard_controller_ = controller;
+  KeyboardControllerProxy::SetController(controller);
   observer_.reset(new AshKeyboardControllerObserver(browser_context()));
-  keyboard_controller_->AddObserver(observer_.get());
-}
-
-content::WebContents*
-    AshKeyboardControllerProxy::GetAssociatedWebContents() const {
-  return web_contents();
-}
-
-bool AshKeyboardControllerProxy::OnMessageReceived(
-    const IPC::Message& message) {
-  bool handled = true;
-  IPC_BEGIN_MESSAGE_MAP(AshKeyboardControllerProxy, message)
-    IPC_MESSAGE_HANDLER(ExtensionHostMsg_Request, OnRequest)
-    IPC_MESSAGE_UNHANDLED(handled = false)
-  IPC_END_MESSAGE_MAP()
-  return handled;
+  keyboard_controller()->AddObserver(observer_.get());
 }
 
 void AshKeyboardControllerProxy::RenderViewCreated(

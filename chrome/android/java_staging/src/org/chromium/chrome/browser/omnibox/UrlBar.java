@@ -31,9 +31,8 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputConnectionWrapper;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.VisibleForTesting;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.omnibox.LocationBarLayout.OmniboxLivenessListener;
 import org.chromium.chrome.browser.tab.ChromeTab;
@@ -110,6 +109,7 @@ public class UrlBar extends VerticallyFixedEditText {
     private long mFirstFocusTimeMs;
 
     private boolean mInBatchEditMode;
+    private boolean mSelectionChangedInBatchMode;
 
     /**
      * Implement this to get updates when the direction of the text in the URL bar changes.
@@ -311,12 +311,19 @@ public class UrlBar extends VerticallyFixedEditText {
     public void onEndBatchEdit() {
         super.onEndBatchEdit();
         mInBatchEditMode = false;
-        validateSelection(getSelectionStart(), getSelectionEnd());
+        if (mSelectionChangedInBatchMode) {
+            validateSelection(getSelectionStart(), getSelectionEnd());
+            mSelectionChangedInBatchMode = false;
+        }
     }
 
     @Override
     protected void onSelectionChanged(int selStart, int selEnd) {
-        if (!mInBatchEditMode) validateSelection(selStart, selEnd);
+        if (!mInBatchEditMode) {
+            validateSelection(selStart, selEnd);
+        } else {
+            mSelectionChangedInBatchMode = true;
+        }
         super.onSelectionChanged(selStart, selEnd);
     }
 

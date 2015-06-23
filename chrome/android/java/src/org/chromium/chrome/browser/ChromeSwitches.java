@@ -69,17 +69,13 @@ public abstract class ChromeSwitches {
     /** Enable Contextual Search. */
     public static final String ENABLE_CONTEXTUAL_SEARCH = "enable-contextual-search";
 
-    /** Disable Contextual Search first-run flow, for testing. Not exposed to user. */
-    public static final String DISABLE_CONTEXTUAL_SEARCH_PROMO_FOR_TESTING =
-            "disable-contextual-search-promo-for-testing";
-
     /** Enable Contextual Search for instrumentation testing. Not exposed to user. */
     public static final String ENABLE_CONTEXTUAL_SEARCH_FOR_TESTING =
             "enable-contextual-search-for-testing";
 
     /** Enable new Website Settings UI, which does not have controls for editing settings */
-    public static final String ENABLE_READ_ONLY_WEBSITE_SETTINGS_POPUP =
-            "enable-read-only-website-settings-popup";
+    public static final String DISABLE_READ_ONLY_WEBSITE_SETTINGS_POPUP =
+            "disable-read-only-website-settings-popup";
 
     // How many thumbnails should we allow in the cache (per tab stack)?
     public static final String THUMBNAILS = "thumbnails";
@@ -159,6 +155,12 @@ public abstract class ChromeSwitches {
      * Native switch - switches::kEnableReaderModeToolbarIcon
      */
     public static final String ENABLE_READER_MODE_BUTTON = "enable-reader-mode-toolbar-icon";
+
+    /**
+     * Disable domain reliability
+     * Native switch - switches::kDisableDomainReliability
+     */
+    public static final String DISABLE_DOMAIN_RELIABILITY = "disable-domain-reliability";
 
     // Prevent instantiation.
     private ChromeSwitches() {}

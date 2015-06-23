@@ -12,7 +12,7 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkModelObserver;
-import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksBridge.FiltersObserver;
+import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkManager.UIState;
 import org.chromium.components.bookmarks.BookmarkId;
 
 import java.util.List;
@@ -28,13 +28,6 @@ class EnhancedBookmarkDrawerListView extends ListView implements EnhancedBookmar
     private BookmarkModelObserver mBookmarkModelObserver = new BookmarkModelObserver() {
         @Override
         public void bookmarkModelChanged() {
-            mDelegate.notifyStateChange(EnhancedBookmarkDrawerListView.this);
-        }
-    };
-
-    private FiltersObserver mFiltersObserver = new FiltersObserver() {
-        @Override
-        public void onFiltersChanged() {
             mDelegate.notifyStateChange(EnhancedBookmarkDrawerListView.this);
         }
     };
@@ -61,9 +54,6 @@ class EnhancedBookmarkDrawerListView extends ListView implements EnhancedBookmar
                     case EnhancedBookmarkDrawerListViewAdapter.TYPE_ALL_ITEMS:
                         mDelegate.openAllBookmarks();
                         break;
-                    case EnhancedBookmarkDrawerListViewAdapter.TYPE_FILTER:
-                        mDelegate.openFilter(item.mFilter);
-                        break;
                     default:
                         assert false;
                 }
@@ -83,7 +73,6 @@ class EnhancedBookmarkDrawerListView extends ListView implements EnhancedBookmar
     public void onEnhancedBookmarkDelegateInitialized(EnhancedBookmarkDelegate delegate) {
         mDelegate = delegate;
         delegate.getModel().addModelObserver(mBookmarkModelObserver);
-        delegate.getModel().addFiltersObserver(mFiltersObserver);
         mAdapter.setEnhancedBookmarkUIDelegate(delegate);
         delegate.addUIObserver(this);
     }
@@ -91,35 +80,24 @@ class EnhancedBookmarkDrawerListView extends ListView implements EnhancedBookmar
     @Override
     public void onDestroy() {
         mDelegate.getModel().removeModelObserver(mBookmarkModelObserver);
-        mDelegate.getModel().removeFiltersObserver(mFiltersObserver);
         mDelegate.removeUIObserver(this);
     }
 
     @Override
     public void onAllBookmarksStateSet() {
         mAdapter.updateList();
-        setItemChecked(mAdapter.getItemPosition(EnhancedBookmarkDelegate.STATE_ALL_BOOKMARKS, null),
+        setItemChecked(mAdapter.getItemPosition(UIState.STATE_ALL_BOOKMARKS, null),
                 true);
     }
 
     @Override
     public void onFolderStateSet(BookmarkId folder) {
         mAdapter.updateList();
-        setItemChecked(mAdapter.getItemPosition(EnhancedBookmarkDelegate.STATE_FOLDER, folder),
-                true);
-    }
-
-    @Override
-    public void onFilterStateSet(String filter) {
-        mAdapter.updateList();
-        setItemChecked(mAdapter.getItemPosition(EnhancedBookmarkDelegate.STATE_FILTER, filter),
+        setItemChecked(mAdapter.getItemPosition(UIState.STATE_FOLDER, folder),
                 true);
     }
 
     @Override
     public void onSelectionStateChange(List<BookmarkId> selectedBookmarks) {
     }
-
-    @Override
-    public void onListModeChange(boolean isListModeEnabled) {}
 }

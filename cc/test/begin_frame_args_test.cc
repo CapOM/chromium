@@ -19,7 +19,8 @@ BeginFrameArgs CreateBeginFrameArgsForTesting(
     base::TimeTicks frame_time) {
   return BeginFrameArgs::Create(
       location, frame_time,
-      frame_time + (BeginFrameArgs::DefaultInterval() / 2),
+      frame_time + BeginFrameArgs::DefaultInterval() -
+          BeginFrameArgs::DefaultEstimatedParentDrawTime(),
       BeginFrameArgs::DefaultInterval(), BeginFrameArgs::NORMAL);
 }
 
@@ -56,17 +57,18 @@ BeginFrameArgs CreateExpiredBeginFrameArgsForTesting(
 
 BeginFrameArgs CreateBeginFrameArgsForTesting(
     BeginFrameArgs::CreationLocation location,
-    scoped_refptr<TestNowSource> now_src) {
-  base::TimeTicks now = now_src->Now();
+    base::SimpleTestTickClock* now_src) {
+  base::TimeTicks now = now_src->NowTicks();
   return BeginFrameArgs::Create(
-      location, now, now + (BeginFrameArgs::DefaultInterval() / 2),
+      location, now, now + BeginFrameArgs::DefaultInterval() -
+                         BeginFrameArgs::DefaultEstimatedParentDrawTime(),
       BeginFrameArgs::DefaultInterval(), BeginFrameArgs::NORMAL);
 }
 
 BeginFrameArgs CreateExpiredBeginFrameArgsForTesting(
     BeginFrameArgs::CreationLocation location,
-    scoped_refptr<TestNowSource> now_src) {
-  base::TimeTicks now = now_src->Now();
+    base::SimpleTestTickClock* now_src) {
+  base::TimeTicks now = now_src->NowTicks();
   return BeginFrameArgs::Create(
       location, now, now - BeginFrameArgs::DefaultInterval(),
       BeginFrameArgs::DefaultInterval(), BeginFrameArgs::NORMAL);

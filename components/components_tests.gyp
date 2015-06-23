@@ -58,6 +58,7 @@
       'autofill/core/browser/ui/card_unmask_prompt_controller_impl_unittest.cc',
       'autofill/core/browser/validation_unittest.cc',
       'autofill/core/browser/webdata/autofill_profile_syncable_service_unittest.cc',
+      'autofill/core/browser/webdata/autofill_wallet_metadata_syncable_service_unittest.cc',
       'autofill/core/browser/webdata/autofill_table_unittest.cc',
       'autofill/core/browser/webdata/web_data_service_unittest.cc',
       'autofill/core/common/autofill_regexes_unittest.cc',
@@ -339,6 +340,7 @@
       'omnibox/autocomplete_match_unittest.cc',
       'omnibox/autocomplete_result_unittest.cc',
       'omnibox/base_search_provider_unittest.cc',
+      'omnibox/in_memory_url_index_types_unittest.cc',
       'omnibox/keyword_provider_unittest.cc',
       'omnibox/omnibox_field_trial_unittest.cc',
       'omnibox/suggestion_answer_unittest.cc',
@@ -454,6 +456,7 @@
       'proximity_auth/cryptauth/fake_secure_message_delegate_unittest.cc',
       'proximity_auth/cryptauth/sync_scheduler_impl_unittest.cc',
       'proximity_auth/logging/logging_unittest.cc',
+      'proximity_auth/proximity_monitor_impl_unittest.cc',
       'proximity_auth/proximity_auth_system_unittest.cc',
       'proximity_auth/remote_status_update_unittest.cc',
       'proximity_auth/throttled_bluetooth_connection_finder_unittest.cc',
@@ -487,6 +490,8 @@
       'scheduler/renderer/deadline_task_runner_unittest.cc',
       'scheduler/renderer/renderer_scheduler_impl_unittest.cc',
       'scheduler/renderer/webthread_impl_for_renderer_scheduler_unittest.cc',
+      'scheduler/test/test_always_fail_time_source.cc',
+      'scheduler/test/test_always_fail_time_source.h',
     ],
     'search_unittest_sources': [
       'search/search_android_unittest.cc',
@@ -554,6 +559,7 @@
     'translate_unittest_sources': [
       'translate/core/browser/language_state_unittest.cc',
       'translate/core/browser/translate_browser_metrics_unittest.cc',
+      'translate/core/browser/translate_language_list_unittest.cc',
       'translate/core/browser/translate_prefs_unittest.cc',
       'translate/core/browser/translate_script_unittest.cc',
       'translate/core/common/translate_metrics_unittest.cc',
@@ -847,6 +853,7 @@
             'constrained_window/constrained_window_views_unittest.cc',
           ],
           'dependencies': [
+            '<(DEPTH)/ui/views/views.gyp:views',
             '<(DEPTH)/ui/views/views.gyp:views_test_support',
             'components.gyp:constrained_window',
           ]
@@ -1235,6 +1242,7 @@
             '../content/content.gyp:content_java',
             '../content/content.gyp:content_v8_external_data',
             '../content/content_shell_and_tests.gyp:content_java_test_support',
+            '../content/content_shell_and_tests.gyp:content_shell_browsertests_java',
             '../content/content_shell_and_tests.gyp:content_shell_java',
             'components_browsertests_paks_copy',
             'components_browsertests',

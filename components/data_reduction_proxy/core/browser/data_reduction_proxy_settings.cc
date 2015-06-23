@@ -6,7 +6,7 @@
 
 #include "base/bind.h"
 #include "base/command_line.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_member.h"
 #include "base/prefs/pref_service.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_compression_stats.h"
@@ -23,6 +23,10 @@ namespace {
 const char kUMAProxyStartupStateHistogram[] =
     "DataReductionProxy.StartupState";
 
+// Key of the UMA DataReductionProxy.LoFi.ImplicitOptOutAction histogram.
+const char kUMALoFiImplicitOptOutAction[] =
+    "DataReductionProxy.LoFi.ImplicitOptOutAction";
+
 }  // namespace
 
 namespace data_reduction_proxy {
@@ -37,9 +41,15 @@ DataReductionProxySettings::DataReductionProxySettings()
       alternative_allowed_(false),
       promo_allowed_(false),
       lo_fi_mode_active_(false),
-      lo_fi_show_image_requested_(false),
+      lo_fi_load_image_requested_(false),
       prefs_(NULL),
       config_(nullptr) {
+  lo_fi_user_requests_for_images_per_session_ =
+      params::GetFieldTrialParameterAsInteger(
+          params::GetLoFiFieldTrialName(), "load_images_requests_per_session",
+          3, 0);
+  lo_fi_consecutive_session_disables_ = params::GetFieldTrialParameterAsInteger(
+      params::GetLoFiFieldTrialName(), "consecutive_session_disables", 3, 0);
 }
 
 DataReductionProxySettings::~DataReductionProxySettings() {
@@ -107,7 +117,7 @@ void DataReductionProxySettings::SetCallbackToRegisterSyntheticFieldTrial(
 
 bool DataReductionProxySettings::IsDataReductionProxyEnabled() const {
   return spdy_proxy_auth_enabled_.GetValue() ||
-         DataReductionProxyParams::ShouldForceEnableDataReductionProxy();
+         params::ShouldForceEnableDataReductionProxy();
 }
 
 bool DataReductionProxySettings::CanUseDataReductionProxy(
@@ -172,7 +182,7 @@ PrefService* DataReductionProxySettings::GetOriginalProfilePrefs() {
 
 void DataReductionProxySettings::SetLoFiModeActiveOnMainFrame(
     bool lo_fi_mode_active) {
-  lo_fi_show_image_requested_ = false;
+  lo_fi_load_image_requested_ = false;
   lo_fi_mode_active_ = lo_fi_mode_active;
   if (!register_synthetic_field_trial_.is_null()) {
     RegisterLoFiFieldTrial();
@@ -183,12 +193,32 @@ bool DataReductionProxySettings::WasLoFiModeActiveOnMainFrame() const {
   return lo_fi_mode_active_;
 }
 
-bool DataReductionProxySettings::WasLoFiShowImageRequestedBefore() {
-  return lo_fi_show_image_requested_;
+bool DataReductionProxySettings::WasLoFiLoadImageRequestedBefore() {
+  return lo_fi_load_image_requested_;
 }
 
-void DataReductionProxySettings::SetLoFiShowImageRequested() {
-  lo_fi_show_image_requested_ = true;
+void DataReductionProxySettings::SetLoFiLoadImageRequested() {
+  lo_fi_load_image_requested_ = true;
+}
+
+void DataReductionProxySettings::IncrementLoFiUserRequestsForImages() {
+  if (!prefs_ || params::IsLoFiAlwaysOnViaFlags())
+    return;
+  prefs_->SetInteger(prefs::kLoFiLoadImagesPerSession,
+                     prefs_->GetInteger(prefs::kLoFiLoadImagesPerSession) + 1);
+  if (prefs_->GetInteger(prefs::kLoFiLoadImagesPerSession) >=
+      lo_fi_user_requests_for_images_per_session_) {
+    data_reduction_proxy_service_->SetLoFiModeOff();
+    prefs_->SetInteger(
+        prefs::kLoFiConsecutiveSessionDisables,
+        prefs_->GetInteger(prefs::kLoFiConsecutiveSessionDisables) + 1);
+    RecordLoFiImplicitOptOutAction(LO_FI_OPT_OUT_ACTION_DISABLED_FOR_SESSION);
+    if (prefs_->GetInteger(prefs::kLoFiConsecutiveSessionDisables) >=
+        lo_fi_consecutive_session_disables_) {
+      RecordLoFiImplicitOptOutAction(
+          LO_FI_OPT_OUT_ACTION_DISABLED_UNTIL_NEXT_EPOCH);
+    }
+  }
 }
 
 void DataReductionProxySettings::RegisterDataReductionProxyFieldTrial() {
@@ -286,6 +316,12 @@ void DataReductionProxySettings::RecordStartupState(ProxyStartupState state) {
   UMA_HISTOGRAM_ENUMERATION(kUMAProxyStartupStateHistogram,
                             state,
                             PROXY_STARTUP_STATE_COUNT);
+}
+
+void DataReductionProxySettings::RecordLoFiImplicitOptOutAction(
+    LoFiImplicitOptOutAction action) {
+  UMA_HISTOGRAM_ENUMERATION(kUMALoFiImplicitOptOutAction, action,
+                            LO_FI_OPT_OUT_ACTION_INDEX_BOUNDARY);
 }
 
 ContentLengthList

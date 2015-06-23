@@ -7,7 +7,6 @@
 #include "base/bind.h"
 #include "base/logging.h"
 #include "base/message_loop/message_loop.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/stl_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/threading/thread.h"
@@ -201,7 +200,7 @@ Bus::Bus(const Options& options)
   // The origin message loop is unnecessary if the client uses synchronous
   // functions only.
   if (base::MessageLoop::current())
-    origin_task_runner_ = base::MessageLoop::current()->message_loop_proxy();
+    origin_task_runner_ = base::MessageLoop::current()->task_runner();
 }
 
 Bus::~Bus() {

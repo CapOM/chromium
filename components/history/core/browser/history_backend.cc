@@ -18,7 +18,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/scoped_vector.h"
 #include "base/message_loop/message_loop.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/rand_util.h"
 #include "base/sequenced_task_runner.h"
 #include "base/strings/string_util.h"
@@ -27,8 +27,8 @@
 #include "components/favicon_base/select_favicon_frames.h"
 #include "components/history/core/browser/download_constants.h"
 #include "components/history/core/browser/download_row.h"
+#include "components/history/core/browser/history_backend_client.h"
 #include "components/history/core/browser/history_backend_observer.h"
-#include "components/history/core/browser/history_client.h"
 #include "components/history/core/browser/history_constants.h"
 #include "components/history/core/browser/history_database.h"
 #include "components/history/core/browser/history_database_params.h"
@@ -199,15 +199,15 @@ HistoryBackendHelper::~HistoryBackendHelper() {
 
 HistoryBackend::HistoryBackend(
     Delegate* delegate,
-    HistoryClient* history_client,
+    scoped_ptr<HistoryBackendClient> backend_client,
     scoped_refptr<base::SequencedTaskRunner> task_runner)
     : delegate_(delegate),
       scheduled_kill_db_(false),
-      expirer_(this, history_client, task_runner),
+      expirer_(this, backend_client.get(), task_runner),
       recent_redirects_(kMaxRedirectCount),
       backend_destroy_message_loop_(nullptr),
       segment_queried_(false),
-      history_client_(history_client),
+      backend_client_(backend_client.Pass()),
       task_runner_(task_runner) {
 }
 
@@ -229,8 +229,10 @@ HistoryBackend::~HistoryBackend() {
     backend_destroy_message_loop_->PostTask(FROM_HERE, backend_destroy_task_);
   }
 
-  if (history_client_ && !history_dir_.empty())
-    history_client_->OnHistoryBackendDestroyed(this, history_dir_);
+#if defined(OS_ANDROID)
+  if (backend_client_ && !history_dir_.empty())
+    backend_client_->OnHistoryBackendDestroyed(this, history_dir_);
+#endif
 }
 
 void HistoryBackend::Init(
@@ -622,6 +624,10 @@ void HistoryBackend::InitImpl(
   switch (status) {
     case sql::INIT_OK:
       break;
+    case sql::INIT_TOO_NEW:
+      delegate_->NotifyProfileError(status);
+      db_.reset();
+      return;
     case sql::INIT_FAILURE: {
       // A null db_ will cause all calls on this object to notice this error
       // and to not continue. If the error callback scheduled killing the
@@ -653,7 +659,7 @@ void HistoryBackend::InitImpl(
   // favicons.  Thumbnails are stored in "top sites".  Consider
   // renaming "thumbnail" references to "favicons" or something of the
   // sort.
-  thumbnail_db_.reset(new ThumbnailDatabase(history_client_));
+  thumbnail_db_.reset(new ThumbnailDatabase(backend_client_.get()));
   if (thumbnail_db_->Init(thumbnail_name) != sql::INIT_OK) {
     // Unlike the main database, we don't error out when the database is too
     // new because this error is much less severe. Generally, this shouldn't
@@ -692,10 +698,12 @@ void HistoryBackend::InitImpl(
   // Start expiring old stuff.
   expirer_.StartExpiringOldStuff(TimeDelta::FromDays(kExpireDaysThreshold));
 
-  if (history_client_) {
-    history_client_->OnHistoryBackendInitialized(
+#if defined(OS_ANDROID)
+  if (backend_client_) {
+    backend_client_->OnHistoryBackendInitialized(
         this, db_.get(), thumbnail_db_.get(), history_dir_);
   }
+#endif
 
   LOCAL_HISTOGRAM_TIMES("History.InitTime", TimeTicks::Now() - beginning_time);
 }
@@ -1810,7 +1818,6 @@ void HistoryBackend::SetImportedFavicons(
     }
 
     // Save the mapping from all the URLs to the favicon.
-    HistoryClient* history_client = GetHistoryClient();
     for (std::set<GURL>::const_iterator url = favicon_usage[i].urls.begin();
          url != favicon_usage[i].urls.end(); ++url) {
       URLRow url_row;
@@ -1820,7 +1827,7 @@ void HistoryBackend::SetImportedFavicons(
         // for regular bookmarked URLs with favicons - when history db is
         // cleaned, we keep an entry in the db with 0 visits as long as that
         // url is bookmarked.
-        if (history_client && history_client->IsBookmarked(*url)) {
+        if (backend_client_ && backend_client_->IsBookmarked(*url)) {
           URLRow url_info(*url);
           url_info.set_visit_count(0);
           url_info.set_typed_count(0);
@@ -2085,12 +2092,28 @@ bool HistoryBackend::SetFaviconMappingsForPageAndRedirects(
   // all the pages in the redirect chain if it redirected.
   RedirectList redirects;
   GetCachedRecentRedirects(page_url, &redirects);
+  bool mappings_changed = SetFaviconMappingsForPages(redirects, icon_type,
+                                                     icon_ids);
+  if (page_url.has_ref()) {
+    // Refs often gets added by Javascript, but the redirect chain is keyed to
+    // the URL without a ref.
+    GURL::Replacements replacements;
+    replacements.ClearRef();
+    GURL page_url_without_ref = page_url.ReplaceComponents(replacements);
+    GetCachedRecentRedirects(page_url_without_ref, &redirects);
+    mappings_changed |= SetFaviconMappingsForPages(redirects, icon_type,
+                                                   icon_ids);
+  }
 
+  return mappings_changed;
+}
+
+bool HistoryBackend::SetFaviconMappingsForPages(
+    const std::vector<GURL>& page_urls,
+    favicon_base::IconType icon_type,
+    const std::vector<favicon_base::FaviconID>& icon_ids) {
   bool mappings_changed = false;
-
-  // Save page <-> favicon associations.
-  for (RedirectList::const_iterator i(redirects.begin()); i != redirects.end();
-       ++i) {
+  for (auto i(page_urls.begin()); i != page_urls.end(); ++i) {
     mappings_changed |= SetFaviconMappingsForPage(*i, icon_type, icon_ids);
   }
   return mappings_changed;
@@ -2538,9 +2561,8 @@ void HistoryBackend::DeleteAllHistory() {
 
   // Get the bookmarked URLs.
   std::vector<URLAndTitle> starred_url_and_titles;
-  HistoryClient* history_client = GetHistoryClient();
-  if (history_client)
-    history_client->GetBookmarks(&starred_url_and_titles);
+  if (backend_client_)
+    backend_client_->GetBookmarks(&starred_url_and_titles);
 
   URLRows kept_url_rows;
   std::vector<GURL> starred_urls;
@@ -2648,12 +2670,6 @@ bool HistoryBackend::ClearAllMainHistory(const URLRows& kept_urls) {
   db_->GetStartDate(&first_recorded_time_);
 
   return true;
-}
-
-HistoryClient* HistoryBackend::GetHistoryClient() {
-  if (history_client_)
-    history_client_->BlockUntilBookmarksLoaded();
-  return history_client_;
 }
 
 }  // namespace history

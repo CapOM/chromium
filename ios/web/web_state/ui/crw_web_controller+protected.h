@@ -9,7 +9,7 @@
 
 #include "base/mac/scoped_nsobject.h"
 #include "ios/web/public/referrer.h"
-#include "ios/web/public/web_state/page_scroll_state.h"
+#include "ios/web/public/web_state/page_display_state.h"
 
 @class CRWSessionController;
 namespace web {
@@ -156,16 +156,9 @@ struct NewWindowInfo {
 // |command|. Subclasses may override to handle class-specific messages.
 - (SEL)selectorToHandleJavaScriptCommand:(const std::string&)command;
 
-// Extracts the absolute zoom scale of content displayed with |scrollState|,
-// given the differing ways in which UIWebView and WKWebView use UIScrollView's
-// zoom scale properties.  See comments in
-// |applyWebViewScrollZoomScaleFromScrollState:| implementations for details.
-- (CGFloat)absoluteZoomScaleForScrollState:
-    (const web::PageScrollState&)scrollState;
-
-// Sets zoom scale value for webview scroll view from |scrollState|.
-- (void)applyWebViewScrollZoomScaleFromScrollState:
-    (const web::PageScrollState&)scrollState;
+// Sets zoom scale value for webview scroll view from |zoomState|.
+- (void)applyWebViewScrollZoomScaleFromZoomState:
+    (const web::PageZoomState&)zoomState;
 
 // Returns YES if load should be aborted when NSURLCancelledError is
 // encountered for |cancelledURL|.
@@ -179,6 +172,10 @@ struct NewWindowInfo {
 // TODO(stuartmorgan): Remove once the hook points are driven from the subclass.
 - (BOOL)checkForUnexpectedURLChange;
 
+// Handles 'window.history.willChangeState' message.
+- (BOOL)handleWindowHistoryWillChangeStateMessage:
+            (base::DictionaryValue*)message
+                                          context:(NSDictionary*)context;
 // Handles 'window.history.didPushState' message.
 - (BOOL)handleWindowHistoryDidPushStateMessage:(base::DictionaryValue*)message
                                        context:(NSDictionary*)context;

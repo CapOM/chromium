@@ -4,7 +4,9 @@
 
 #include "content/browser/tracing/background_tracing_manager_impl.h"
 
+#include "base/json/json_writer.h"
 #include "base/macros.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/time/time.h"
 #include "content/public/browser/background_tracing_preemptive_config.h"
 #include "content/public/browser/background_tracing_reactive_config.h"
@@ -19,6 +21,28 @@ namespace {
 
 base::LazyInstance<BackgroundTracingManagerImpl>::Leaky g_controller =
     LAZY_INSTANCE_INITIALIZER;
+
+const char kMetaDataConfigKey[] = "config";
+const char kMetaDataVersionKey[] = "product_version";
+
+// These values are used for a histogram. Do not reorder.
+enum BackgroundTracingMetrics {
+  SCENARIO_ACTIVATION_REQUESTED = 0,
+  SCENARIO_ACTIVATED_SUCCESSFULLY = 1,
+  RECORDING_ENABLED = 2,
+  PREEMPTIVE_TRIGGERED = 3,
+  REACTIVE_TRIGGERED = 4,
+  FINALIZATION_ALLOWED = 5,
+  FINALIZATION_DISALLOWED = 6,
+  FINALIZATION_STARTED = 7,
+  FINALIZATION_COMPLETE = 8,
+  NUMBER_OF_BACKGROUND_TRACING_METRICS,
+};
+
+void RecordBackgroundTracingMetric(BackgroundTracingMetrics metric) {
+  UMA_HISTOGRAM_ENUMERATION("Tracing.Background.ScenarioState", metric,
+                            NUMBER_OF_BACKGROUND_TRACING_METRICS);
+}
 
 }  // namespace
 
@@ -136,16 +160,28 @@ bool BackgroundTracingManagerImpl::SetActiveScenario(
     const BackgroundTracingManager::ReceiveCallback& receive_callback,
     DataFiltering data_filtering) {
   CHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
+  RecordBackgroundTracingMetric(SCENARIO_ACTIVATION_REQUESTED);
+
   if (is_tracing_)
     return false;
 
   bool requires_anonymized_data = (data_filtering == ANONYMIZE_DATA);
 
-  // TODO(oysteine): Retry when time_until_allowed has elapsed.
-  if (config && delegate_ &&
-      !delegate_->IsAllowedToBeginBackgroundScenario(
-          *config.get(), requires_anonymized_data)) {
-    return false;
+  // If the I/O thread isn't running, this is a startup scenario and
+  // we have to wait until initialization is finished to validate that the
+  // scenario can run.
+  if (BrowserThread::IsThreadInitialized(BrowserThread::IO)) {
+    // TODO(oysteine): Retry when time_until_allowed has elapsed.
+    if (config && delegate_ &&
+        !delegate_->IsAllowedToBeginBackgroundScenario(
+            *config.get(), requires_anonymized_data)) {
+      return false;
+    }
+  } else {
+    base::MessageLoop::current()->PostTask(
+        FROM_HERE,
+        base::Bind(&BackgroundTracingManagerImpl::ValidateStartupScenario,
+                   base::Unretained(this)));
   }
 
   if (!IsSupportedConfig(config.get()))
@@ -161,19 +197,27 @@ bool BackgroundTracingManagerImpl::SetActiveScenario(
 
   EnableRecordingIfConfigNeedsIt();
 
+  RecordBackgroundTracingMetric(SCENARIO_ACTIVATED_SUCCESSFULLY);
   return true;
+}
+
+bool BackgroundTracingManagerImpl::HasActiveScenarioForTesting() {
+  return config_;
+}
+
+void BackgroundTracingManagerImpl::ValidateStartupScenario() {
+  if (!config_ || !delegate_)
+    return;
+
+  if (!delegate_->IsAllowedToBeginBackgroundScenario(
+          *config_.get(), requires_anonymized_data_)) {
+    AbortScenario();
+  }
 }
 
 void BackgroundTracingManagerImpl::EnableRecordingIfConfigNeedsIt() {
   if (!config_)
     return;
-
-  // TODO(oysteine): Retry later.
-  if (delegate_ &&
-      !delegate_->IsAllowedToBeginBackgroundScenario(
-          *config_.get(), requires_anonymized_data_)) {
-    return;
-  }
 
   if (config_->mode == BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE) {
     EnableRecording(GetCategoryFilterStringForCategoryPreset(
@@ -253,8 +297,10 @@ void BackgroundTracingManagerImpl::TriggerNamedEvent(
   }
 
   if (config_->mode == BackgroundTracingConfig::PREEMPTIVE_TRACING_MODE) {
+    RecordBackgroundTracingMetric(PREEMPTIVE_TRIGGERED);
     BeginFinalizing(callback);
   } else {
+    RecordBackgroundTracingMetric(REACTIVE_TRIGGERED);
     if (is_tracing_) {
       tracing_timer_->CancelTimer();
       BeginFinalizing(callback);
@@ -334,17 +380,23 @@ void BackgroundTracingManagerImpl::EnableRecording(
 
   is_tracing_ = TracingController::GetInstance()->EnableRecording(
       trace_config, tracing_enabled_callback_for_testing_);
+  RecordBackgroundTracingMetric(RECORDING_ENABLED);
 }
 
 void BackgroundTracingManagerImpl::OnFinalizeStarted(
     scoped_refptr<base::RefCountedString> file_contents) {
   CHECK(content::BrowserThread::CurrentlyOn(content::BrowserThread::UI));
 
-  if (!receive_callback_.is_null())
+  RecordBackgroundTracingMetric(FINALIZATION_STARTED);
+  UMA_HISTOGRAM_MEMORY_KB("Tracing.Background.FinalizingTraceSizeInKB",
+                          file_contents->size() / 1024);
+
+  if (!receive_callback_.is_null()) {
     receive_callback_.Run(
-        file_contents,
+        file_contents, GenerateMetadataDict(),
         base::Bind(&BackgroundTracingManagerImpl::OnFinalizeComplete,
                    base::Unretained(this)));
+  }
 }
 
 void BackgroundTracingManagerImpl::OnFinalizeComplete() {
@@ -364,7 +416,31 @@ void BackgroundTracingManagerImpl::OnFinalizeComplete() {
     idle_callback_.Run();
 
   // Now that a trace has completed, we may need to enable recording again.
-  EnableRecordingIfConfigNeedsIt();
+  // TODO(oysteine): Retry later if IsAllowedToBeginBackgroundScenario fails.
+  if (!delegate_ ||
+      delegate_->IsAllowedToBeginBackgroundScenario(
+          *config_.get(), requires_anonymized_data_)) {
+    EnableRecordingIfConfigNeedsIt();
+  }
+
+  RecordBackgroundTracingMetric(FINALIZATION_COMPLETE);
+}
+
+scoped_ptr<base::DictionaryValue>
+BackgroundTracingManagerImpl::GenerateMetadataDict() const {
+  // Grab the product version.
+  std::string product_version = GetContentClient()->GetProduct();
+
+  // Serialize the config into json.
+  scoped_ptr<base::DictionaryValue> config_dict(new base::DictionaryValue());
+
+  BackgroundTracingConfig::IntoDict(config_.get(), config_dict.get());
+
+  scoped_ptr<base::DictionaryValue> metadata_dict(new base::DictionaryValue());
+  metadata_dict->Set(kMetaDataConfigKey, config_dict.Pass());
+  metadata_dict->SetString(kMetaDataVersionKey, product_version);
+
+  return metadata_dict.Pass();
 }
 
 void BackgroundTracingManagerImpl::BeginFinalizing(
@@ -381,12 +457,28 @@ void BackgroundTracingManagerImpl::BeginFinalizing(
   if (is_allowed_finalization) {
     trace_data_sink = content::TracingController::CreateCompressedStringSink(
         data_endpoint_wrapper_);
+    RecordBackgroundTracingMetric(FINALIZATION_ALLOWED);
+
+    if (auto metadata_dict = GenerateMetadataDict()) {
+      std::string results;
+      if (base::JSONWriter::Write(*metadata_dict.get(), &results))
+        trace_data_sink->SetMetadata(results);
+    }
+  } else {
+    RecordBackgroundTracingMetric(FINALIZATION_DISALLOWED);
   }
 
   content::TracingController::GetInstance()->DisableRecording(trace_data_sink);
 
   if (!callback.is_null())
     callback.Run(is_allowed_finalization);
+}
+
+void BackgroundTracingManagerImpl::AbortScenario() {
+  is_tracing_ = false;
+  config_.reset();
+
+  content::TracingController::GetInstance()->DisableRecording(nullptr);
 }
 
 std::string
@@ -398,7 +490,7 @@ BackgroundTracingManagerImpl::GetCategoryFilterStringForCategoryPreset(
              "disabled-by-default-toplevel.flow,"
              "disabled-by-default-ipc.flow";
     case BackgroundTracingConfig::CategoryPreset::BENCHMARK_DEEP:
-      return "*,disabled-by-default-blink.debug.layout";
+      return "*,disabled-by-default-benchmark.detailed";
   }
   NOTREACHED();
   return "";

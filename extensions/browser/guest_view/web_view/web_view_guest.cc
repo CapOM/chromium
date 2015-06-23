@@ -55,6 +55,7 @@
 #include "url/url_constants.h"
 
 using base::UserMetricsAction;
+using content::GlobalRequestID;
 using content::RenderFrameHost;
 using content::ResourceType;
 using content::StoragePartition;
@@ -147,11 +148,11 @@ void ParsePartitionParam(const base::DictionaryValue& create_params,
     return;
   }
 
-  // Since the "persist:" prefix is in ASCII, StartsWith will work fine on
+  // Since the "persist:" prefix is in ASCII, base::StartsWith will work fine on
   // UTF-8 encoded |partition_id|. If the prefix is a match, we can safely
   // remove the prefix without splicing in the middle of a multi-byte codepoint.
   // We can use the rest of the string as UTF-8 encoded one.
-  if (StartsWithASCII(partition_str, "persist:", true)) {
+  if (base::StartsWithASCII(partition_str, "persist:", true)) {
     size_t index = partition_str.find(":");
     CHECK(index != std::string::npos);
     // It is safe to do index + 1, since we tested for the full prefix above.
@@ -199,6 +200,15 @@ void WebViewGuest::CleanUp(int embedder_process_id, int view_instance_id) {
   GuestViewBase::CleanUp(embedder_process_id, view_instance_id);
 
   auto rph = content::RenderProcessHost::FromID(embedder_process_id);
+  // TODO(paulmeyer): It should be impossible for rph to be nullptr here, but
+  // this check is needed here for now as there seems to be occasional crashes
+  // because of this (http//crbug.com/499438). This should be removed once the
+  // cause is discovered and fixed.
+  DCHECK(rph != nullptr)
+      << "Cannot find RenderProcessHost for embedder process ID# "
+      << embedder_process_id;
+  if (rph == nullptr)
+    return;
   auto browser_context = rph->GetBrowserContext();
 
   // Clean up rules registries for the WebView.
@@ -220,6 +230,10 @@ void WebViewGuest::CleanUp(int embedder_process_id, int view_instance_id) {
           browser_context,
           embedder_process_id,
           view_instance_id));
+
+  // Clean up content scripts for the WebView.
+  auto csm = WebViewContentScriptManager::Get(browser_context);
+  csm->RemoveAllContentScriptsForWebView(embedder_process_id, view_instance_id);
 }
 
 // static
@@ -362,7 +376,8 @@ void WebViewGuest::DidInitialize(const base::DictionaryValue& create_params) {
 
   if (web_view_guest_delegate_)
     web_view_guest_delegate_->OnDidInitialize();
-  AttachWebViewHelpers(web_contents());
+  ExtensionsAPIClient::Get()->AttachWebContentsHelpers(web_contents());
+  web_view_permission_helper_.reset(new WebViewPermissionHelper(this));
 
   rules_registry_id_ = GetOrGenerateRulesRegistryID(
       owner_web_contents()->GetRenderProcessHost()->GetID(),
@@ -374,12 +389,6 @@ void WebViewGuest::DidInitialize(const base::DictionaryValue& create_params) {
   PushWebViewStateToIOThread();
 
   ApplyAttributes(create_params);
-}
-
-void WebViewGuest::AttachWebViewHelpers(WebContents* contents) {
-  if (web_view_guest_delegate_)
-    web_view_guest_delegate_->OnAttachWebViewHelpers(contents);
-  web_view_permission_helper_.reset(new WebViewPermissionHelper(this));
 }
 
 void WebViewGuest::ClearDataInternal(base::Time remove_since,
@@ -433,7 +442,7 @@ void WebViewGuest::GuestDestroyed() {
 
 void WebViewGuest::GuestReady() {
   // The guest RenderView should always live in an isolated guest process.
-  CHECK(web_contents()->GetRenderProcessHost()->IsIsolatedGuest());
+  CHECK(web_contents()->GetRenderProcessHost()->IsForGuestsOnly());
   Send(new ExtensionMsg_SetFrameName(web_contents()->GetRoutingID(), name_));
 
   // We don't want to accidentally set the opacity of an interstitial page.
@@ -990,14 +999,14 @@ void WebViewGuest::NavigateGuest(const std::string& src,
   // if the navigation is embedder-initiated. For browser-initiated navigations,
   // content scripts will be ready.
   if (force_navigation) {
-    SignalWhenReady(
-        base::Bind(&WebViewGuest::LoadURLWithParams,
-                   weak_ptr_factory_.GetWeakPtr(), url, content::Referrer(),
-                   ui::PAGE_TRANSITION_AUTO_TOPLEVEL, force_navigation));
+    SignalWhenReady(base::Bind(
+        &WebViewGuest::LoadURLWithParams, weak_ptr_factory_.GetWeakPtr(), url,
+        content::Referrer(), ui::PAGE_TRANSITION_AUTO_TOPLEVEL,
+        GlobalRequestID(), force_navigation));
     return;
   }
   LoadURLWithParams(url, content::Referrer(), ui::PAGE_TRANSITION_AUTO_TOPLEVEL,
-                    force_navigation);
+                    GlobalRequestID(), force_navigation);
 }
 
 bool WebViewGuest::HandleKeyboardShortcuts(
@@ -1259,6 +1268,7 @@ content::WebContents* WebViewGuest::OpenURLFromTab(
   // about:blank.
   if (params.disposition == CURRENT_TAB) {
     LoadURLWithParams(params.url, params.referrer, params.transition,
+                      params.transferred_global_request_id,
                       true /* force_navigation */);
     return web_contents();
   }
@@ -1314,10 +1324,12 @@ bool WebViewGuest::IsFullscreenForTabOrPending(
   return is_guest_fullscreen_;
 }
 
-void WebViewGuest::LoadURLWithParams(const GURL& url,
-                                     const content::Referrer& referrer,
-                                     ui::PageTransition transition_type,
-                                     bool force_navigation) {
+void WebViewGuest::LoadURLWithParams(
+    const GURL& url,
+    const content::Referrer& referrer,
+    ui::PageTransition transition_type,
+    const GlobalRequestID& transferred_global_request_id,
+    bool force_navigation) {
   // Do not allow navigating a guest to schemes other than known safe schemes.
   // This will block the embedder trying to load unwanted schemes, e.g.
   // chrome://.
@@ -1346,6 +1358,7 @@ void WebViewGuest::LoadURLWithParams(const GURL& url,
   load_url_params.referrer = referrer;
   load_url_params.transition_type = transition_type;
   load_url_params.extra_headers = std::string();
+  load_url_params.transferred_global_request_id = transferred_global_request_id;
   if (is_overriding_user_agent_) {
     load_url_params.override_user_agent =
         content::NavigationController::UA_OVERRIDE_TRUE;

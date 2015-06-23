@@ -445,12 +445,19 @@ const char kEnableLinkableEphemeralApps[]   = "enable-linkable-ephemeral-apps";
 // Enables the material design Settings feature.
 const char kEnableMaterialDesignSettings[]  = "enable-md-settings";
 
+#if defined(ENABLE_MEDIA_ROUTER)
 // Enables Media Router.
 const char kEnableMediaRouter[]             = "enable-media-router";
+#endif
 
 // Runs the Native Client inside the renderer process and enables GPU plugin
 // (internally adds lEnableGpuPlugin to the command line).
 const char kEnableNaCl[]                    = "enable-nacl";
+
+// Enables tracing for each navigation. It will attempt to trace each navigation
+// for 10s, until the buffer is full, or until the next navigation.
+// It only works if a URL was provided by --trace-upload-url.
+const char kEnableNavigationTracing[] = "enable-navigation-tracing";
 
 // Enables the network-related benchmarking extensions.
 const char kEnableNetBenchmarking[]         = "enable-net-benchmarking";
@@ -1059,6 +1066,10 @@ const char kSyncDeferredStartupTimeoutSeconds[] =
 const char kSyncEnableGetUpdateAvoidance[]   =
     "sync-enable-get-update-avoidance";
 
+// Enables clearing of sync data when a user enables passphrase encryption.
+const char kSyncEnableClearDataOnPassphraseEncryption[] =
+    "enable-clear-sync-data-on-passphrase-encryption";
+
 // Disable data backup when user's not signed in.
 const char kSyncDisableBackup[] = "disable-sync-backup";
 
@@ -1310,11 +1321,6 @@ const char kIpcFuzzerTestcase[]             = "ipc-fuzzer-testcase";
 #if defined(ENABLE_PRINT_PREVIEW) && !defined(OFFICIAL_BUILD)
 // Enables support to debug printing subsystem.
 const char kDebugPrint[] = "debug-print";
-#endif
-
-#ifndef NDEBUG
-// Enables overriding the path of file manager extension.
-const char kFileManagerExtensionPath[]      = "filemgr-ext-path";
 #endif
 
 bool AboutInSettingsEnabled() {

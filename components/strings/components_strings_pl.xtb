@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="pl">
 <translation id="2774256287122201187">Możesz kontynuować. Jeśli otworzysz tę stronę, ostrzeżenie nie będzie wyświetlane przez pięć minut.</translation>
+<translation id="3963721102035795474">Tryb czytnika</translation>
 <translation id="7485870689360869515">Nie znaleziono danych.</translation>
 <translation id="3884278016824448484">Konflikt identyfikatorów urządzeń</translation>
 <translation id="5172758083709347301">Komputer</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">Tłumaczenie na <ph name="TARGET_LANGUAGE"/> nie powiodło się.</translation>
 <translation id="4103249731201008433">Numer seryjny urządzenia jest nieprawidłowy</translation>
 <translation id="3219579145727097045">Wpisz datę ważności i czterocyfrowy kod CVC widoczny na przodzie karty</translation>
-<translation id="3667681724235208644">Wyświetl oryginał</translation>
+<translation id="59107663811261420">Karty tego typu nie są obsługiwane w Google Payments w przypadku tego sprzedawcy. Wybierz inną.</translation>
 <translation id="4079302484614802869">Proxy skonfigurowano do używania URL-a skryptu PAC, a nie ustalonych serwerów proxy.</translation>
 <translation id="5540224163453853">Nie udało się znaleźć tego artykułu.</translation>
 <translation id="8437238597147034694">&amp;Cofnij przeniesienie</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;wprowadź zapytanie&gt;</translation>
 <translation id="552553974213252141">Czy tekst został prawidłowo wyodrębniony?</translation>
 <translation id="5317780077021120954">Zapisz</translation>
+<translation id="8530504477309582336">Karty tego typu nie są obsługiwane w Google Payments. Wybierz inną.</translation>
 <translation id="7610193165460212391">Wartość spoza zakresu (<ph name="VALUE"/>)</translation>
 <translation id="3739623965217189342">Skopiowany link</translation>
 <translation id="8790007591277257123">&amp;Ponów usunięcie</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">Nieprawidłowy tryb proxy</translation>
 <translation id="3105172416063519923">Identyfikator zasobu:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">Aby można było korzystać z tej funkcji, musi być włączony JavaScript.</translation>
 <translation id="2587841377698384444">Identyfikator interfejsu API katalogu:</translation>
 <translation id="7752995774971033316">Niezarządzany</translation>
 <translation id="3712624925041724820">Brak wolnych licencji</translation>

@@ -10,9 +10,9 @@
 
 #include "base/command_line.h"
 #include "base/metrics/field_trial.h"
-#include "base/values.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_params_test_utils.h"
 #include "components/data_reduction_proxy/core/common/data_reduction_proxy_switches.h"
+#include "components/data_reduction_proxy/proto/client_config.pb.h"
 #include "net/proxy/proxy_server.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -575,9 +575,9 @@ TEST_F(DataReductionProxyParamsTest, InvalidConfigurations) {
 }
 
 TEST_F(DataReductionProxyParamsTest, AndroidOnePromoFieldTrial) {
-  EXPECT_TRUE(DataReductionProxyParams::IsIncludedInAndroidOnePromoFieldTrial(
+  EXPECT_TRUE(params::IsIncludedInAndroidOnePromoFieldTrial(
       "google/sprout/sprout:4.4.4/KPW53/1379542:user/release-keys"));
-  EXPECT_FALSE(DataReductionProxyParams::IsIncludedInAndroidOnePromoFieldTrial(
+  EXPECT_FALSE(params::IsIncludedInAndroidOnePromoFieldTrial(
       "google/hammerhead/hammerhead:5.0/LRX210/1570415:user/release-keys"));
 }
 
@@ -623,8 +623,7 @@ TEST_F(DataReductionProxyParamsTest, IsClientConfigEnabled) {
       base::FieldTrialList::CreateFieldTrial(kConfigServiceFieldTrial,
                                              test.trial_group_value);
     }
-    EXPECT_EQ(test.expected, DataReductionProxyParams::IsConfigClientEnabled())
-        << test.test_case;
+    EXPECT_EQ(test.expected, params::IsConfigClientEnabled()) << test.test_case;
   }
 }
 
@@ -673,7 +672,7 @@ TEST_F(DataReductionProxyParamsTest, SecureProxyCheckDefault) {
     }
 
     EXPECT_EQ(test_case.expected_use_by_default,
-              DataReductionProxyParams::ShouldUseSecureProxyByDefault())
+              params::ShouldUseSecureProxyByDefault())
         << test_index;
     test_index++;
   }
@@ -682,28 +681,20 @@ TEST_F(DataReductionProxyParamsTest, SecureProxyCheckDefault) {
 TEST_F(DataReductionProxyParamsTest, PopulateConfigResponse) {
   DataReductionProxyParams params(DataReductionProxyParams::kAllowed |
                                   DataReductionProxyParams::kFallbackAllowed);
-  scoped_ptr<base::DictionaryValue> values(new base::DictionaryValue());
-  params.PopulateConfigResponse(values.get());
-  base::DictionaryValue* proxy_config;
-  EXPECT_TRUE(values->GetDictionary("proxyConfig", &proxy_config));
-  base::ListValue* proxy_servers;
-  EXPECT_TRUE(proxy_config->GetList("httpProxyServers", &proxy_servers));
-  EXPECT_TRUE(proxy_servers->GetSize() == 2);
-  base::DictionaryValue* server;
-  EXPECT_TRUE(proxy_servers->GetDictionary(0, &server));
-  std::string host;
-  int port;
+  ClientConfig config;
+  params.PopulateConfigResponse(&config);
+  EXPECT_TRUE(config.has_proxy_config());
+  EXPECT_EQ(2, config.proxy_config().http_proxy_servers_size());
   const std::vector<net::ProxyServer>& proxies_for_http =
       params.proxies_for_http(false);
-  EXPECT_TRUE(server->GetString("host", &host));
-  EXPECT_TRUE(server->GetInteger("port", &port));
-  EXPECT_EQ(proxies_for_http[0].host_port_pair().host(), host);
-  EXPECT_EQ(proxies_for_http[0].host_port_pair().port(), port);
-  EXPECT_TRUE(proxy_servers->GetDictionary(1, &server));
-  EXPECT_TRUE(server->GetString("host", &host));
-  EXPECT_TRUE(server->GetInteger("port", &port));
-  EXPECT_EQ(proxies_for_http[1].host_port_pair().host(), host);
-  EXPECT_EQ(proxies_for_http[1].host_port_pair().port(), port);
+  EXPECT_EQ(proxies_for_http[0].host_port_pair().host(),
+            config.proxy_config().http_proxy_servers(0).host());
+  EXPECT_EQ(proxies_for_http[0].host_port_pair().host(),
+            config.proxy_config().http_proxy_servers(0).host());
+  EXPECT_EQ(proxies_for_http[1].host_port_pair().host(),
+            config.proxy_config().http_proxy_servers(1).host());
+  EXPECT_EQ(proxies_for_http[1].host_port_pair().host(),
+            config.proxy_config().http_proxy_servers(1).host());
 }
 
 }  // namespace data_reduction_proxy

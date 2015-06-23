@@ -7,7 +7,7 @@ package org.chromium.chrome.browser.gcore;
 import org.chromium.base.Log;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.VisibleForTesting;
-import org.chromium.base.annotations.NoSideEffects;
+import org.chromium.base.annotations.RemovableInRelease;
 
 import java.util.concurrent.TimeUnit;
 
@@ -32,7 +32,7 @@ import java.util.concurrent.TimeUnit;
  * @param <T> type of {@link ChromeGoogleApiClient} to use for the tasks
  */
 public abstract class ConnectedTask<T extends ChromeGoogleApiClient> implements Runnable {
-    private static final String TAG = Log.makeTag("GCore");
+    private static final String TAG = "cr.GCore";
 
     public static final long CONNECTION_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(5);
     public static final long CONNECTION_RETRY_TIME_MS = TimeUnit.SECONDS.toMillis(10);
@@ -76,7 +76,7 @@ public abstract class ConnectedTask<T extends ChromeGoogleApiClient> implements 
      * Returns a name of a task. Implementations should not have side effects
      * as we want to have the logging related calls removed.
      */
-    @NoSideEffects
+    @RemovableInRelease
     protected abstract String getName();
 
     /**

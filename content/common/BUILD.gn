@@ -143,6 +143,7 @@ source_set("common") {
     "//base",
     "//build/util:webkit_version",
     "//components/tracing",
+    "//components/tracing:startup_tracing",
     "//gpu/command_buffer/client:gles2_interface",
     "//gpu/command_buffer/common:gles2_utils",
     "//net",
@@ -382,6 +383,10 @@ source_set("common") {
     if (current_cpu != "arm") {
       sources += [
                    "gpu/media/va_surface.h",
+                   "gpu/media/vaapi_jpeg_decode_accelerator.cc",
+                   "gpu/media/vaapi_jpeg_decode_accelerator.h",
+                   "gpu/media/vaapi_jpeg_decoder.cc",
+                   "gpu/media/vaapi_jpeg_decoder.h",
                    "gpu/media/vaapi_picture.cc",
                    "gpu/media/vaapi_picture.h",
                    "gpu/media/vaapi_video_decode_accelerator.cc",
@@ -488,6 +493,7 @@ mojom("mojo_bindings") {
     "presentation/presentation_service.mojom",
     "process_control.mojom",
     "render_frame_setup.mojom",
+    "vr_service.mojom",
   ]
 
   import_dirs = [ "//mojo/services" ]

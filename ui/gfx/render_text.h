@@ -26,6 +26,7 @@
 #include "ui/gfx/geometry/size_f.h"
 #include "ui/gfx/geometry/vector2d.h"
 #include "ui/gfx/range/range.h"
+#include "ui/gfx/range/range_f.h"
 #include "ui/gfx/selection_model.h"
 #include "ui/gfx/shadow_value.h"
 #include "ui/gfx/text_constants.h"
@@ -146,18 +147,16 @@ struct LineSegment {
   ~LineSegment();
 
   // X coordinates of this line segment in text space.
-  Range x_range;
+  RangeF x_range;
 
   // The character range this segment corresponds to.
   Range char_range;
 
-  // The width of this line segment in text space. This could be slightly
-  // different from x_range.length().
-  // TODO(mukai): Fix Range to support float values and merge it into x_range.
-  float width;
-
   // Index of the text run that generated this segment.
   size_t run;
+
+  // Returns the width of this line segment in text space.
+  float width() const { return x_range.length(); }
 };
 
 // A line of display text, comprised of a line segment list and some metrics.
@@ -637,6 +636,10 @@ class GFX_EXPORT RenderText {
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_SufficientWidth);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_Newline);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_WordWrapBehavior);
+  FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_LineBreakerBehavior);
+  FRIEND_TEST_ALL_PREFIXES(RenderTextTest,
+                           Multiline_SurrogatePairsOrCombiningChars);
+  FRIEND_TEST_ALL_PREFIXES(RenderTextTest, Multiline_ZeroWidthChars);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, NewlineWithoutMultilineFlag);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, GlyphBounds);
   FRIEND_TEST_ALL_PREFIXES(RenderTextTest, HarfBuzz_GlyphBounds);

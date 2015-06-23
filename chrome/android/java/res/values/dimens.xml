@@ -210,6 +210,9 @@
     <dimen name="omnibox_suggestion_list_padding_bottom">0dp</dimen>
     <dimen name="location_bar_icon_width">36dp</dimen>
     <dimen name="tablet_toolbar_end_padding">6dp</dimen>
+    <!-- Offset applied to the toolbar menu button in document mode to align with the menu
+         positioned inside the omnibox. -->
+    <dimen name="document_toolbar_menu_offset">5dp</dimen>
 
     <!-- NTP dimensions -->
     <dimen name="most_visited_spacing">16dp</dimen>
@@ -267,10 +270,8 @@
     <dimen name="reader_mode_text_size">14sp</dimen>
 
     <!-- Enhanced bookmarks dimensions -->
-    <dimen name="enhanced_bookmark_min_grid_width">135dp</dimen>
     <dimen name="enhanced_bookmark_item_corner_radius">3dp</dimen>
     <dimen name="enhanced_bookmark_item_popup_width">140dp</dimen>
-    <dimen name="enhanced_bookmark_item_half_space">4dp</dimen>
     <dimen name="enhanced_bookmark_folder_item_left">16dp</dimen>
     <dimen name="enhanced_bookmark_folder_item_icon_size">40dp</dimen>
     <dimen name="enhanced_bookmark_detail_image_height">232dp</dimen>

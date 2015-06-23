@@ -8,12 +8,11 @@ import android.test.suitebuilder.annotation.SmallTest;
 import android.text.TextUtils;
 import android.view.View;
 
-import com.google.android.apps.chrome.R;
-
 import junit.framework.Assert;
 
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.CommandLineFlags;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkModelObserver;
 import org.chromium.chrome.browser.ChromeActivity;
@@ -112,10 +111,10 @@ public class EnhancedBookmarkTest extends ChromeActivityTestCaseBase<ChromeActiv
             @Override
             public Boolean call() throws Exception {
                 for (int i = 0; i < mItemsContainer.getAdapter().getItemCount(); i++) {
-                    if (mItemsContainer.getAdapter().isHeader(i)) continue;
+                    BookmarkId item = mItemsContainer.getAdapter().getItem(i);
+                    if (item == null) continue;
 
-                    String actualTitle = mBookmarkModel.getBookmarkTitle(
-                            mItemsContainer.getAdapter().getItem(i));
+                    String actualTitle = mBookmarkModel.getBookmarkTitle(item);
                     if (TextUtils.equals(actualTitle, expectedTitle)) {
                         return true;
                     }

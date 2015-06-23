@@ -132,6 +132,7 @@ source_set("renderer") {
       "//third_party/webrtc/modules/audio_processing",
       "//third_party/libjingle:libjingle_webrtc",
       "//third_party/libjingle:libpeerconnection",
+      "//third_party/libjingle:libstunprober",
     ]
   } else {
     sources += [
@@ -193,10 +194,15 @@ source_set("renderer") {
   }
 
   if (enable_media_mojo_renderer) {
-    sources += [
-      "media/content_media_service_provider.cc",
-      "media/content_media_service_provider.h",
-    ]
     deps += [ "//media/mojo/services:proxy" ]
+  }
+
+  if (enable_webvr) {
+    sources += [
+      "vr/vr_dispatcher.cc",
+      "vr/vr_dispatcher.h",
+      "vr/vr_type_converters.cc",
+      "vr/vr_type_converters.h",
+    ]
   }
 }

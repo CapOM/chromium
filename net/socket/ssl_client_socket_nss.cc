@@ -69,7 +69,7 @@
 #include "base/callback_helpers.h"
 #include "base/compiler_specific.h"
 #include "base/logging.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
@@ -2433,6 +2433,7 @@ bool SSLClientSocketNSS::GetSSLInfo(SSLInfo* ssl_info) {
 
   ssl_info->cert_status = server_cert_verify_result_.cert_status;
   ssl_info->cert = server_cert_verify_result_.verified_cert;
+  ssl_info->unverified_cert = core_->state().server_cert;
 
   AddSCTInfoToSSLInfo(ssl_info);
 
@@ -2758,6 +2759,22 @@ int SSLClientSocketNSS::InitializeSSLOptions() {
   if (rv != SECSuccess) {
     LogFailedNSSFunction(net_log_, "SSL_VersionRangeSet", "");
     return ERR_NO_SSL_VERSIONS_ENABLED;
+  }
+
+  if (ssl_config_.require_ecdhe) {
+    const PRUint16* const ssl_ciphers = SSL_GetImplementedCiphers();
+    const PRUint16 num_ciphers = SSL_GetNumImplementedCiphers();
+
+    // Iterate over the cipher suites and disable those that don't use ECDHE.
+    for (unsigned i = 0; i < num_ciphers; i++) {
+      SSLCipherSuiteInfo info;
+      if (SSL_GetCipherSuiteInfo(ssl_ciphers[i], &info, sizeof(info)) ==
+          SECSuccess) {
+        if (strcmp(info.keaTypeName, "ECDHE") != 0) {
+          SSL_CipherPrefSet(nss_fd_, ssl_ciphers[i], PR_FALSE);
+        }
+      }
+    }
   }
 
   if (ssl_config_.version_fallback) {
@@ -3172,11 +3189,6 @@ void SSLClientSocketNSS::AddSCTInfoToSSLInfo(SSLInfo* ssl_info) const {
         SignedCertificateTimestampAndStatus(*iter,
                                             ct::SCT_STATUS_LOG_UNKNOWN));
   }
-}
-
-scoped_refptr<X509Certificate>
-SSLClientSocketNSS::GetUnverifiedServerCertificateChain() const {
-  return core_->state().server_cert.get();
 }
 
 ChannelIDService* SSLClientSocketNSS::GetChannelIDService() const {

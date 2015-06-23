@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "chrome/browser/tracing/background_tracing_field_trial.h"
+
 #include <string>
 
 #include "base/json/json_reader.h"
@@ -13,6 +15,7 @@
 #include "content/public/browser/background_tracing_config.h"
 #include "content/public/browser/background_tracing_manager.h"
 #include "content/public/browser/browser_thread.h"
+#include "url/gurl.h"
 
 namespace tracing {
 
@@ -20,37 +23,51 @@ namespace {
 
 const char kBackgroundTracingFieldTrial[] = "BackgroundTracing";
 const char kBackgroundTracingConfig[] = "config";
+const char kBackgroundTracingUploadUrl[] = "upload_url";
 
-void OnUploadProgress(int64, int64) {
-  // We don't actually care about the progress, but TraceUploader::DoUpload
-  // requires we pass something valid.
-}
+ConfigTextFilterForTesting g_config_text_filter_for_testing = nullptr;
 
 void OnUploadComplete(TraceCrashServiceUploader* uploader,
-                      base::Closure done_callback,
+                      const base::Closure& done_callback,
                       bool success,
                       const std::string& feedback) {
   DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
   done_callback.Run();
 }
 
-void UploadCallback(const scoped_refptr<base::RefCountedString>& file_contents,
+void UploadCallback(const std::string& upload_url,
+                    const scoped_refptr<base::RefCountedString>& file_contents,
+                    scoped_ptr<base::DictionaryValue> metadata,
                     base::Closure callback) {
   TraceCrashServiceUploader* uploader = new TraceCrashServiceUploader(
       g_browser_process->system_request_context());
 
+  if (GURL(upload_url).is_valid())
+    uploader->SetUploadURL(upload_url);
+
   uploader->DoUpload(
-      file_contents->data(), base::Bind(&OnUploadProgress),
+      file_contents->data(), metadata.Pass(),
+      content::TraceUploader::UploadProgressCallback(),
       base::Bind(&OnUploadComplete, base::Owned(uploader), callback));
 }
 
 }  // namespace
 
+void SetConfigTextFilterForTesting(ConfigTextFilterForTesting predicate) {
+  g_config_text_filter_for_testing = predicate;
+}
+
 void SetupBackgroundTracingFieldTrial() {
   std::string config_text = variations::GetVariationParamValue(
       kBackgroundTracingFieldTrial, kBackgroundTracingConfig);
+  std::string upload_url = variations::GetVariationParamValue(
+      kBackgroundTracingFieldTrial, kBackgroundTracingUploadUrl);
+
   if (config_text.empty())
     return;
+
+  if (g_config_text_filter_for_testing)
+    (*g_config_text_filter_for_testing)(&config_text);
 
   scoped_ptr<base::Value> value = base::JSONReader::Read(config_text);
   if (!value)
@@ -66,7 +83,7 @@ void SetupBackgroundTracingFieldTrial() {
     return;
 
   content::BackgroundTracingManager::GetInstance()->SetActiveScenario(
-      config.Pass(), base::Bind(&UploadCallback),
+      config.Pass(), base::Bind(&UploadCallback, upload_url),
       content::BackgroundTracingManager::ANONYMIZE_DATA);
 }
 

@@ -8,6 +8,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "components/metrics/proto/omnibox_event.pb.h"
 #include "components/omnibox/autocomplete_scheme_classifier.h"
+#include "components/omnibox/omnibox_field_trial.h"
 #include "components/url_fixer/url_fixer.h"
 #include "net/base/net_util.h"
 #include "net/base/registry_controlled_domains/registry_controlled_domain.h"
@@ -38,7 +39,8 @@ AutocompleteInput::AutocompleteInput()
       prevent_inline_autocomplete_(false),
       prefer_keyword_(false),
       allow_exact_keyword_match_(true),
-      want_asynchronous_matches_(true) {
+      want_asynchronous_matches_(true),
+      from_omnibox_focus_(false) {
 }
 
 AutocompleteInput::AutocompleteInput(
@@ -51,6 +53,7 @@ AutocompleteInput::AutocompleteInput(
     bool prefer_keyword,
     bool allow_exact_keyword_match,
     bool want_asynchronous_matches,
+    bool from_omnibox_focus,
     const AutocompleteSchemeClassifier& scheme_classifier)
     : cursor_position_(cursor_position),
       current_url_(current_url),
@@ -58,7 +61,8 @@ AutocompleteInput::AutocompleteInput(
       prevent_inline_autocomplete_(prevent_inline_autocomplete),
       prefer_keyword_(prefer_keyword),
       allow_exact_keyword_match_(allow_exact_keyword_match),
-      want_asynchronous_matches_(want_asynchronous_matches) {
+      want_asynchronous_matches_(want_asynchronous_matches),
+      from_omnibox_focus_(from_omnibox_focus) {
   DCHECK(cursor_position <= text.length() ||
          cursor_position == base::string16::npos)
       << "Text: '" << text << "', cp: " << cursor_position;
@@ -398,7 +402,8 @@ metrics::OmniboxInputType::Type AutocompleteInput::Parse(
   // intranet host, and by placing this check late enough that other tests
   // (e.g., for a non-empty TLD or a non-empty scheme) will have already
   // returned URL.
-  if (!parts->path.is_valid() && !canonicalized_url->has_query() &&
+  if (!OmniboxFieldTrial::PreventUWYTDefaultForNonURLInputs() &&
+      !parts->path.is_valid() && !canonicalized_url->has_query() &&
       canonicalized_url->has_ref())
     return metrics::OmniboxInputType::QUERY;
 
@@ -532,4 +537,5 @@ void AutocompleteInput::Clear() {
   prefer_keyword_ = false;
   allow_exact_keyword_match_ = false;
   want_asynchronous_matches_ = true;
+  from_omnibox_focus_ = false;
 }

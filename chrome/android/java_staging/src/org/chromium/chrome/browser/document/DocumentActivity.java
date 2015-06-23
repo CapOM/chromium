@@ -5,7 +5,6 @@
 package org.chromium.chrome.browser.document;
 
 import android.annotation.TargetApi;
-import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
 import android.graphics.Bitmap;
@@ -18,8 +17,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.Log;
@@ -27,31 +24,31 @@ import org.chromium.base.SysUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.metrics.RecordUserAction;
+import org.chromium.chrome.R;
+import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeMobileApplication;
-import org.chromium.chrome.browser.CompositorChromeActivity;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.KeyboardShortcuts;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.TabState;
-import org.chromium.chrome.browser.UrlConstants;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.appmenu.AppMenuObserver;
 import org.chromium.chrome.browser.appmenu.ChromeAppMenuPropertiesDelegate;
+import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerDocument;
 import org.chromium.chrome.browser.document.DocumentTab.DocumentTabObserver;
 import org.chromium.chrome.browser.enhancedbookmarks.EnhancedBookmarkUtils;
 import org.chromium.chrome.browser.firstrun.FirstRunSignInProcessor;
 import org.chromium.chrome.browser.firstrun.FirstRunStatus;
 import org.chromium.chrome.browser.metrics.UmaUtils;
-import org.chromium.chrome.browser.ntp.DocumentNewTabPage;
 import org.chromium.chrome.browser.ntp.NewTabPage;
 import org.chromium.chrome.browser.preferences.ChromePreferenceManager;
 import org.chromium.chrome.browser.preferences.PrefServiceBridge;
 import org.chromium.chrome.browser.preferences.bandwidth.BandwidthReductionPreferences;
 import org.chromium.chrome.browser.preferences.bandwidth.DataReductionPromoScreen;
 import org.chromium.chrome.browser.signin.SigninPromoScreen;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelperSecurityLevel;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tabmodel.SingleTabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
@@ -60,8 +57,9 @@ import org.chromium.chrome.browser.tabmodel.document.DocumentTabModel;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModel.InitializationObserver;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelImpl;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelSelector;
+import org.chromium.chrome.browser.tabmodel.document.TabDelegate;
 import org.chromium.chrome.browser.toolbar.ToolbarControlContainer;
-import org.chromium.chrome.browser.toolbar.ToolbarHelper;
+import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.IntentUtils;
 import org.chromium.chrome.browser.widget.ControlContainer;
@@ -73,7 +71,6 @@ import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.NavigationEntry;
 import org.chromium.content_public.browser.navigation_controller.LoadURLType;
-import org.chromium.content_public.common.Referrer;
 import org.chromium.ui.base.PageTransition;
 
 /**
@@ -84,7 +81,7 @@ import org.chromium.ui.base.PageTransition;
  * Tab switching is handled via the system wide Android task management system.
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-public class DocumentActivity extends CompositorChromeActivity {
+public class DocumentActivity extends ChromeActivity {
     protected static final String KEY_INITIAL_URL = "DocumentActivity.KEY_INITIAL_URL";
 
     private static final String TAG = "DocumentActivity";
@@ -110,7 +107,7 @@ public class DocumentActivity extends CompositorChromeActivity {
     private int mDefaultThemeColor;
 
     private DocumentTab mDocumentTab;
-    private ToolbarHelper mToolbarHelper;
+    private ToolbarManager mToolbarManager;
 
     private ChromeAppMenuPropertiesDelegate mChromeAppMenuPropertiesDelegate;
     private AppMenuHandler mAppMenuHandler;
@@ -156,30 +153,14 @@ public class DocumentActivity extends CompositorChromeActivity {
             @Override
             public Tab openNewTab(LoadUrlParams loadUrlParams, TabLaunchType type, Tab parent,
                     boolean incognito) {
-                PendingDocumentData params = null;
-                if (loadUrlParams.getPostData() != null
-                        || loadUrlParams.getVerbatimHeaders() != null
-                        || loadUrlParams.getReferrer() != null) {
-                    params = new PendingDocumentData();
-                    params.postData = loadUrlParams.getPostData();
-                    params.extraHeaders = loadUrlParams.getVerbatimHeaders();
-                    params.referrer = loadUrlParams.getReferrer();
-                }
-
-                // Incognito never opens in the background.
-                int launchMode = type == TabLaunchType.FROM_LONGPRESS_BACKGROUND && !incognito
-                        ? ChromeLauncherActivity.LAUNCH_MODE_AFFILIATED
-                        : ChromeLauncherActivity.LAUNCH_MODE_FOREGROUND;
-                Activity parentActivity =
-                        parent == null ? null : parent.getWindowAndroid().getActivity().get();
-                ChromeLauncherActivity.launchDocumentInstance(parentActivity, incognito,
-                        launchMode, loadUrlParams.getUrl(),
-                        DocumentMetricIds.STARTED_BY_WINDOW_OPEN,
-                        loadUrlParams.getTransitionType(), false, params);
-                return null;
+                // Triggered via open in new tab context menu on NTP.
+                return ChromeMobileApplication.getDocumentTabModelSelector().openNewTab(
+                        loadUrlParams, type, parent, incognito);
             }
         };
         setTabModelSelector(selector);
+        setTabCreators(ChromeMobileApplication.getDocumentTabModelSelector().getTabCreator(false),
+                ChromeMobileApplication.getDocumentTabModelSelector().getTabCreator(true));
 
         super.preInflationStartup();
 
@@ -200,7 +181,7 @@ public class DocumentActivity extends CompositorChromeActivity {
         mChromeAppMenuPropertiesDelegate = new ChromeAppMenuPropertiesDelegate(this);
         mAppMenuHandler = new AppMenuHandler(this, mChromeAppMenuPropertiesDelegate,
                 R.menu.main_menu);
-        mToolbarHelper = new ToolbarHelper(this, controlContainer, mAppMenuHandler,
+        mToolbarManager = new ToolbarManager(this, controlContainer, mAppMenuHandler,
                 mChromeAppMenuPropertiesDelegate, getCompositorViewHolder().getInvalidator());
 
         final int tabId = ActivityDelegate.getTabIdFromIntent(getIntent());
@@ -297,12 +278,12 @@ public class DocumentActivity extends CompositorChromeActivity {
     @Override
     protected void onDeferredStartup() {
         super.onDeferredStartup();
-        mToolbarHelper.onDeferredStartup();
+        mToolbarManager.onDeferredStartup(getOnCreateTimestampMs(), getClass().getSimpleName());
     }
 
     @Override
     public boolean hasDoneFirstDraw() {
-        return mToolbarHelper.hasDoneFirstDraw();
+        return mToolbarManager.hasDoneFirstDraw();
     }
 
     /**
@@ -429,18 +410,13 @@ public class DocumentActivity extends CompositorChromeActivity {
 
     @Override
     protected void onDestroyInternal() {
-        if (mToolbarHelper != null) mToolbarHelper.destroy();
+        if (mToolbarManager != null) mToolbarManager.destroy();
 
         super.onDestroyInternal();
     }
 
     @Override
     public void onStopWithNative() {
-        if (mDocumentTab != null) {
-            mDocumentTab.setShouldPreserve(!IntentUtils.safeGetBooleanExtra(getIntent(),
-                    IntentHandler.EXTRA_APPEND_TASK, false));
-            mTabModel.updateEntry(getIntent(), mDocumentTab);
-        }
         if (mAppMenuHandler != null) mAppMenuHandler.hideAppMenu();
         super.onStopWithNative();
     }
@@ -459,13 +435,13 @@ public class DocumentActivity extends CompositorChromeActivity {
     @Override
     public void onOrientationChange(int orientation) {
         super.onOrientationChange(orientation);
-        mToolbarHelper.onOrientationChange();
+        mToolbarManager.onOrientationChange();
     }
 
     @Override
     protected void onAccessibilityModeChanged(boolean enabled) {
         super.onAccessibilityModeChanged(enabled);
-        mToolbarHelper.onAccessibilityStatusChanged(enabled);
+        mToolbarManager.onAccessibilityStatusChanged(enabled);
     }
 
     private void loadLastKnownUrl(PendingDocumentData pendingData) {
@@ -498,15 +474,7 @@ public class DocumentActivity extends CompositorChromeActivity {
             loadUrlParams.setIntentReceivedTimestamp(getOnCreateTimestampUptimeMs());
         }
 
-        String refererUrl = IntentHandler.getReferrerUrl(intent, this);
-        if (refererUrl != null) {
-            loadUrlParams.setReferrer(new Referrer(refererUrl, 1 /* WebReferrerPolicyDefault */));
-        }
-
-        String extraHeaders = IntentHandler.getExtraHeadersFromIntent(intent, refererUrl != null);
-        if (extraHeaders != null) {
-            loadUrlParams.setVerbatimHeaders(extraHeaders);
-        }
+        IntentHandler.addReferrerAndHeaders(loadUrlParams, intent, this);
 
         if (pendingData != null) {
             if (pendingData.postData != null) {
@@ -613,14 +581,10 @@ public class DocumentActivity extends CompositorChromeActivity {
                 (ViewGroup) findViewById(android.R.id.content), controlContainer);
 
         mFindToolbarManager = new FindToolbarManager(this, getTabModelSelector(),
-                mToolbarHelper.getContextualMenuBar()
+                mToolbarManager.getContextualMenuBar()
                         .getCustomSelectionActionModeCallback());
-        controlContainer.setFindToolbarManager(mFindToolbarManager);
-        if (getContextualSearchManager() != null) {
-            getContextualSearchManager().setFindToolbarManager(mFindToolbarManager);
-        }
 
-        mToolbarHelper.initializeControls(
+        mToolbarManager.initializeWithNative(getTabModelSelector(), getFullscreenManager(),
                 mFindToolbarManager, null, layoutDriver, null, null, null, null);
 
         mDocumentTab.setFullscreenManager(getFullscreenManager());
@@ -747,10 +711,9 @@ public class DocumentActivity extends CompositorChromeActivity {
 
             private boolean hasSecurityWarningOrError(Tab tab) {
                 int securityLevel = tab.getSecurityLevel();
-                return securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR
-                        || securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING
-                        || securityLevel
-                                   == ConnectionSecurityHelperSecurityLevel.SECURITY_POLICY_WARNING;
+                return securityLevel == ConnectionSecurityLevel.SECURITY_ERROR
+                        || securityLevel == ConnectionSecurityLevel.SECURITY_WARNING
+                        || securityLevel == ConnectionSecurityLevel.SECURITY_POLICY_WARNING;
             }
         });
 
@@ -800,17 +763,22 @@ public class DocumentActivity extends CompositorChromeActivity {
         return true;
     }
 
+
+    @Override
+    public TabDelegate getTabCreator(boolean incognito) {
+        return (TabDelegate) super.getTabCreator(incognito);
+    }
+
     @Override
     public boolean createContextualSearchTab(ContentViewCore searchContentViewCore) {
         NavigationEntry entry =
                 searchContentViewCore.getWebContents().getNavigationController().getPendingEntry();
         String url = entry != null
                 ? entry.getUrl() : searchContentViewCore.getWebContents().getUrl();
-        PendingDocumentData documentData = new PendingDocumentData();
-        ChromeLauncherActivity.launchDocumentInstance(this, false,
-                ChromeLauncherActivity.LAUNCH_MODE_FOREGROUND, url,
-                DocumentMetricIds.STARTED_BY_CONTEXTUAL_SEARCH,
-                PageTransition.LINK, false, documentData);
+        getTabCreator(false).createNewDocumentTab(new LoadUrlParams(url, PageTransition.LINK),
+                TabLaunchType.FROM_MENU_OR_OVERVIEW, getActivityTab(),
+                ChromeLauncherActivity.LAUNCH_MODE_FOREGROUND,
+                DocumentMetricIds.STARTED_BY_CONTEXTUAL_SEARCH, null);
         return false;
     }
 
@@ -838,26 +806,29 @@ public class DocumentActivity extends CompositorChromeActivity {
             }, MENU_EXIT_ANIMATION_WAIT_MS);
         } else if (id == R.id.all_bookmarks_menu_id) {
             if (!EnhancedBookmarkUtils.showEnhancedBookmarkIfEnabled(this)) {
-                DocumentNewTabPage.launchBookmarksDialog(this, mDocumentTab, getTabModelSelector());
+                NewTabPage.launchBookmarksDialog(this, mDocumentTab, getTabModelSelector());
             }
             RecordUserAction.record("MobileMenuAllBookmarks");
         } else if (id == R.id.recent_tabs_menu_id) {
-            DocumentNewTabPage.launchRecentTabsDialog(this, mDocumentTab, false);
+            NewTabPage.launchRecentTabsDialog(this, mDocumentTab, false);
             RecordUserAction.record("MobileMenuOpenTabs");
         } else if (id == R.id.find_in_page_id) {
             mFindToolbarManager.showToolbar();
+            if (getContextualSearchManager() != null) {
+                getContextualSearchManager().hideContextualSearch(StateChangeReason.UNKNOWN);
+            }
             if (fromMenu) {
                 RecordUserAction.record("MobileMenuFindInPage");
             } else {
                 RecordUserAction.record("MobileShortcutFindInPage");
             }
         } else if (id == R.id.show_menu) {
-            if (mToolbarHelper.isInitialized()) {
-                mAppMenuHandler.showAppMenu(mToolbarHelper.getMenuAnchor(), true,
+            if (mToolbarManager.isInitialized()) {
+                mAppMenuHandler.showAppMenu(mToolbarManager.getMenuAnchor(), true,
                         false);
             }
         } else if (id == R.id.focus_url_bar) {
-            if (mToolbarHelper.isInitialized()) mToolbarHelper.setUrlBarFocus(true);
+            if (mToolbarManager.isInitialized()) mToolbarManager.setUrlBarFocus(true);
         } else {
             return super.onMenuOrKeyboardAction(id, fromMenu);
         }
@@ -867,20 +838,20 @@ public class DocumentActivity extends CompositorChromeActivity {
     @Override
     public boolean dispatchKeyEvent(KeyEvent event) {
         Boolean result = KeyboardShortcuts.dispatchKeyEvent(event, this,
-                mToolbarHelper.isInitialized());
+                mToolbarManager.isInitialized());
         return result != null ? result : super.dispatchKeyEvent(event);
     }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (!mToolbarHelper.isInitialized()) return false;
+        if (!mToolbarManager.isInitialized()) return false;
         return KeyboardShortcuts.onKeyDown(event, this, true, false)
                 || super.onKeyDown(keyCode, event);
     }
 
     @Override
     public boolean shouldShowAppMenu() {
-        if (mDocumentTab == null || !mToolbarHelper.isInitialized()) {
+        if (mDocumentTab == null || !mToolbarManager.isInitialized()) {
             return false;
         }
 
@@ -941,7 +912,7 @@ public class DocumentActivity extends CompositorChromeActivity {
         int color = getThemeColor();
         DocumentUtils.updateTaskDescription(this, label, icon, color,
                 shouldUseDefaultStatusBarColor());
-        mToolbarHelper.setThemeColor(color);
+        mToolbarManager.updatePrimaryColor(color);
 
         ControlContainer controlContainer =
                 (ControlContainer) findViewById(R.id.control_container);
@@ -992,9 +963,6 @@ public class DocumentActivity extends CompositorChromeActivity {
      */
     private void launchNtp(boolean incognito) {
         if (incognito && !PrefServiceBridge.getInstance().isIncognitoModeEnabled()) return;
-        ChromeLauncherActivity.launchDocumentInstance(this, incognito,
-                ChromeLauncherActivity.LAUNCH_MODE_RETARGET, UrlConstants.NTP_URL,
-                DocumentMetricIds.STARTED_BY_OPTIONS_MENU, PageTransition.AUTO_TOPLEVEL, false,
-                null);
+        getTabCreator(incognito).launchNTP();
     }
 }

@@ -11,7 +11,7 @@
 #include "base/files/file_path.h"
 #include "base/location.h"
 #include "base/logging.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/sequenced_task_runner.h"
 #include "base/threading/sequenced_worker_pool.h"
@@ -926,6 +926,28 @@ void GCMDriverDesktop::AddInstanceIDData(
     const std::string& extra_data) {
   DCHECK(ui_thread_->RunsTasksOnCurrentThread());
 
+  GCMClient::Result result = EnsureStarted(GCMClient::IMMEDIATE_START);
+  if (result != GCMClient::SUCCESS)
+    return;
+
+  // Delay the operation until GCMClient is ready.
+  if (!delayed_task_controller_->CanRunTaskWithoutDelay()) {
+    delayed_task_controller_->AddTask(
+        base::Bind(&GCMDriverDesktop::DoAddInstanceIDData,
+                   weak_ptr_factory_.GetWeakPtr(),
+                   app_id,
+                   instance_id,
+                   extra_data));
+    return;
+  }
+
+  DoAddInstanceIDData(app_id, instance_id, extra_data);
+}
+
+void GCMDriverDesktop::DoAddInstanceIDData(
+    const std::string& app_id,
+    const std::string& instance_id,
+    const std::string& extra_data) {
   io_thread_->PostTask(
       FROM_HERE,
       base::Bind(&GCMDriverDesktop::IOWorker::AddInstanceIDData,
@@ -938,6 +960,23 @@ void GCMDriverDesktop::AddInstanceIDData(
 void GCMDriverDesktop::RemoveInstanceIDData(const std::string& app_id) {
   DCHECK(ui_thread_->RunsTasksOnCurrentThread());
 
+  GCMClient::Result result = EnsureStarted(GCMClient::IMMEDIATE_START);
+  if (result != GCMClient::SUCCESS)
+    return;
+
+  // Delay the operation until GCMClient is ready.
+  if (!delayed_task_controller_->CanRunTaskWithoutDelay()) {
+    delayed_task_controller_->AddTask(
+        base::Bind(&GCMDriverDesktop::DoRemoveInstanceIDData,
+                   weak_ptr_factory_.GetWeakPtr(),
+                   app_id));
+    return;
+  }
+
+  DoRemoveInstanceIDData(app_id);
+}
+
+void GCMDriverDesktop::DoRemoveInstanceIDData(const std::string& app_id) {
   io_thread_->PostTask(
       FROM_HERE,
       base::Bind(&GCMDriverDesktop::IOWorker::RemoveInstanceIDData,
@@ -949,7 +988,29 @@ void GCMDriverDesktop::GetInstanceIDData(
     const std::string& app_id,
     const GetInstanceIDDataCallback& callback) {
   DCHECK(!get_instance_id_data_callbacks_.count(app_id));
+  DCHECK(ui_thread_->RunsTasksOnCurrentThread());
+
+  GCMClient::Result result = EnsureStarted(GCMClient::IMMEDIATE_START);
+  if (result != GCMClient::SUCCESS) {
+    callback.Run(std::string(), std::string());
+    return;
+  }
+
   get_instance_id_data_callbacks_[app_id] = callback;
+
+  // Delay the operation until GCMClient is ready.
+  if (!delayed_task_controller_->CanRunTaskWithoutDelay()) {
+    delayed_task_controller_->AddTask(
+        base::Bind(&GCMDriverDesktop::DoGetInstanceIDData,
+                   weak_ptr_factory_.GetWeakPtr(),
+                   app_id));
+    return;
+  }
+
+  DoGetInstanceIDData(app_id);
+}
+
+void GCMDriverDesktop::DoGetInstanceIDData(const std::string& app_id) {
   io_thread_->PostTask(
       FROM_HERE,
       base::Bind(&GCMDriverDesktop::IOWorker::GetInstanceIDData,
@@ -1223,11 +1284,10 @@ void GCMDriverDesktop::GetGCMStatisticsFinished(
     const GCMClient::GCMStatistics& stats) {
   DCHECK(ui_thread_->RunsTasksOnCurrentThread());
 
-  // Normally request_gcm_statistics_callback_ would not be null.
+  // request_gcm_statistics_callback_ could be null when an activity, i.e.
+  // network activity, is triggered while gcm-intenals page is not open.
   if (!request_gcm_statistics_callback_.is_null())
     request_gcm_statistics_callback_.Run(stats);
-  else
-    LOG(WARNING) << "request_gcm_statistics_callback_ is NULL.";
 }
 
 bool GCMDriverDesktop::TokenTupleComparer::operator()(

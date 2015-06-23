@@ -9,7 +9,7 @@
 
 #include "base/bind.h"
 #include "base/callback.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/strings/string_number_conversions.h"
@@ -281,7 +281,7 @@ AddressFamily GetRealAddressFamily(const IPAddressNumber& address) {
 }  // namespace
 
 QuicConnectionLogger::QuicConnectionLogger(
-    QuicSession* session,
+    QuicSpdySession* session,
     const char* const connection_description,
     const BoundNetLog& net_log)
     : net_log_(net_log),

@@ -42,11 +42,12 @@
 #include "media/audio/audio_manager.h"
 #include "media/audio/audio_manager_factory.h"
 #include "media/base/browser_cdm_factory.h"
+#include "media/base/media.h"
 #include "ui/compositor/compositor_switches.h"
 
 #if defined(OS_ANDROID)
+#include "chromecast/app/android/crash_handler.h"
 #include "chromecast/browser/media/cast_media_client_android.h"
-#include "chromecast/crash/android/crash_handler.h"
 #include "components/crash/browser/crash_dump_manager_android.h"
 #include "media/base/android/media_client_android.h"
 #include "net/android/network_change_notifier_factory_android.h"
@@ -321,6 +322,7 @@ void CastBrowserMainParts::PreMainMessageLoopRun() {
       make_scoped_ptr(new RemoteDebuggingServer()));
 
   media::CastMediaShlib::Initialize(cmd_line->argv());
+  ::media::InitializeMediaLibrary();
 
   cast_browser_process_->SetCastService(CastService::Create(
       cast_browser_process_->browser_context(),

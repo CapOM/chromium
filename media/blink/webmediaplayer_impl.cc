@@ -43,6 +43,8 @@
 #include "third_party/WebKit/public/platform/WebSize.h"
 #include "third_party/WebKit/public/platform/WebString.h"
 #include "third_party/WebKit/public/platform/WebURL.h"
+#include "third_party/WebKit/public/web/WebDocument.h"
+#include "third_party/WebKit/public/web/WebFrame.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
 #include "third_party/WebKit/public/web/WebSecurityOrigin.h"
@@ -211,7 +213,8 @@ void WebMediaPlayerImpl::DoLoad(LoadType load_type,
   DCHECK(main_task_runner_->BelongsToCurrentThread());
 
   GURL gurl(url);
-  ReportMediaSchemeUma(gurl);
+  ReportMetrics(load_type, gurl,
+                GURL(frame_->document().securityOrigin().toString()));
 
   // Set subresource URL for crash reporting.
   base::debug::SetCrashKeyValue("subresource_url", gurl.spec());
@@ -383,6 +386,18 @@ void WebMediaPlayerImpl::setVolume(double volume) {
   pipeline_.SetVolume(volume);
 }
 
+void WebMediaPlayerImpl::setSinkId(const blink::WebString& device_id,
+                                   WebSetSinkIdCB* web_callbacks) {
+  DCHECK(main_task_runner_->BelongsToCurrentThread());
+  std::string device_id_str(device_id.utf8());
+  GURL security_origin(frame_->securityOrigin().toString().utf8());
+  DVLOG(1) << __FUNCTION__
+           << "(" << device_id_str << ", " << security_origin << ")";
+  audio_source_provider_->SwitchOutputDevice(
+      device_id_str, security_origin,
+      ConvertToSwitchOutputDeviceCB(web_callbacks));
+}
+
 #define STATIC_ASSERT_MATCHING_ENUM(webkit_name, chromium_name) \
     static_assert(static_cast<int>(WebMediaPlayer::webkit_name) == \
                   static_cast<int>(BufferedDataSource::chromium_name), \
@@ -540,8 +555,7 @@ void WebMediaPlayerImpl::paint(blink::WebCanvas* canvas,
 
   gfx::Rect gfx_rect(rect);
   Context3D context_3d;
-  if (video_frame.get() &&
-      video_frame->storage_type() == VideoFrame::STORAGE_TEXTURE) {
+  if (video_frame.get() && video_frame->HasTextures()) {
     if (!context_3d_cb_.is_null())
       context_3d = context_3d_cb_.Run();
     // GPU Process crashed.
@@ -599,19 +613,6 @@ unsigned WebMediaPlayerImpl::videoDecodedByteCount() const {
 bool WebMediaPlayerImpl::copyVideoTextureToPlatformTexture(
     blink::WebGraphicsContext3D* web_graphics_context,
     unsigned int texture,
-    unsigned int level,
-    unsigned int internal_format,
-    unsigned int type,
-    bool premultiply_alpha,
-    bool flip_y) {
-  return copyVideoTextureToPlatformTexture(web_graphics_context, texture,
-                                           internal_format, type,
-                                           premultiply_alpha, flip_y);
-}
-
-bool WebMediaPlayerImpl::copyVideoTextureToPlatformTexture(
-    blink::WebGraphicsContext3D* web_graphics_context,
-    unsigned int texture,
     unsigned int internal_format,
     unsigned int type,
     bool premultiply_alpha,
@@ -620,8 +621,8 @@ bool WebMediaPlayerImpl::copyVideoTextureToPlatformTexture(
 
   scoped_refptr<VideoFrame> video_frame = GetCurrentFrameFromCompositor();
 
-  if (!video_frame.get() ||
-      video_frame->storage_type() != VideoFrame::STORAGE_TEXTURE) {
+  if (!video_frame.get() || !video_frame->HasTextures() ||
+      media::VideoFrame::NumPlanes(video_frame->format()) != 1) {
     return false;
   }
 
@@ -630,7 +631,7 @@ bool WebMediaPlayerImpl::copyVideoTextureToPlatformTexture(
   gpu::gles2::GLES2Interface* gl =
       static_cast<gpu_blink::WebGraphicsContext3DImpl*>(web_graphics_context)
           ->GetGLInterface();
-  SkCanvasVideoRenderer::CopyVideoFrameTextureToGLTexture(
+  SkCanvasVideoRenderer::CopyVideoFrameSingleTextureToGLTexture(
       gl, video_frame.get(), texture, internal_format, type, premultiply_alpha,
       flip_y);
   return true;
@@ -894,11 +895,6 @@ void WebMediaPlayerImpl::NotifyDownloading(bool is_downloading) {
 void WebMediaPlayerImpl::StartPipeline() {
   DCHECK(main_task_runner_->BelongsToCurrentThread());
 
-  // Keep track if this is a MSE or non-MSE playback.
-  UMA_HISTOGRAM_BOOLEAN("Media.MSE.Playback",
-                        (load_type_ == LoadTypeMediaSource));
-
-  LogCB mse_log_cb;
   Demuxer::EncryptedMediaInitDataCB encrypted_media_init_data_cb =
       BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnEncryptedMediaInitData);
 
@@ -913,11 +909,10 @@ void WebMediaPlayerImpl::StartPipeline() {
     DCHECK(!chunk_demuxer_);
     DCHECK(!data_source_);
 
-    mse_log_cb = base::Bind(&MediaLog::AddLogEvent, media_log_);
-
     chunk_demuxer_ = new ChunkDemuxer(
         BIND_TO_RENDER_LOOP(&WebMediaPlayerImpl::OnDemuxerOpened),
-        encrypted_media_init_data_cb, mse_log_cb, media_log_, true);
+        encrypted_media_init_data_cb,
+        base::Bind(&MediaLog::AddLogEvent, media_log_), media_log_, true);
     demuxer_.reset(chunk_demuxer_);
   }
 

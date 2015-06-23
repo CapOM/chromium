@@ -26,7 +26,7 @@
 #include "chrome/browser/ui/autofill/mock_address_validator.h"
 #include "chrome/browser/ui/autofill/mock_new_credit_card_bubble_controller.h"
 #include "chrome/browser/ui/autofill/test_generated_credit_card_bubble_controller.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/render_messages.h"
@@ -1398,18 +1398,18 @@ TEST_F(AutofillDialogControllerTest, BillingVsShippingStreetAddress) {
   EXPECT_EQ(ADDRESS_BILLING, form_structure()->field(1)->Type().group());
   // Inexact matching; single-line inputs get the address data concatenated but
   // separated by commas.
-  EXPECT_TRUE(StartsWith(form_structure()->field(0)->value,
-                         shipping_profile.GetRawInfo(ADDRESS_HOME_LINE1),
-                         true));
-  EXPECT_TRUE(EndsWith(form_structure()->field(0)->value,
-                       shipping_profile.GetRawInfo(ADDRESS_HOME_LINE2),
-                       true));
-  EXPECT_TRUE(StartsWith(form_structure()->field(1)->value,
-                         billing_profile.GetRawInfo(ADDRESS_HOME_LINE1),
-                         true));
-  EXPECT_TRUE(EndsWith(form_structure()->field(1)->value,
-                       billing_profile.GetRawInfo(ADDRESS_HOME_LINE2),
-                       true));
+  EXPECT_TRUE(base::StartsWith(form_structure()->field(0)->value,
+                               shipping_profile.GetRawInfo(ADDRESS_HOME_LINE1),
+                               true));
+  EXPECT_TRUE(base::EndsWith(form_structure()->field(0)->value,
+                             shipping_profile.GetRawInfo(ADDRESS_HOME_LINE2),
+                             true));
+  EXPECT_TRUE(base::StartsWith(form_structure()->field(1)->value,
+                               billing_profile.GetRawInfo(ADDRESS_HOME_LINE1),
+                               true));
+  EXPECT_TRUE(base::EndsWith(form_structure()->field(1)->value,
+                             billing_profile.GetRawInfo(ADDRESS_HOME_LINE2),
+                             true));
   // The textareas should be an exact match.
   EXPECT_EQ(shipping_profile.GetRawInfo(ADDRESS_HOME_STREET_ADDRESS),
             form_structure()->field(2)->value);

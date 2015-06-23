@@ -7,7 +7,7 @@
 #include "base/bind.h"
 #include "base/bind_helpers.h"
 #include "base/compiler_specific.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
@@ -958,8 +958,7 @@ int FtpNetworkTransaction::ProcessResponseEPSV(
       if (!ExtractPortFromEPSVResponse(response, &port))
         return Stop(ERR_INVALID_RESPONSE);
       if (IsWellKnownPort(port) ||
-          !IsPortAllowedForScheme(port, url::kFtpScheme,
-                                  PORT_OVERRIDES_IGNORED)) {
+          !IsPortAllowedForScheme(port, url::kFtpScheme)) {
         return Stop(ERR_UNSAFE_PORT);
       }
       data_connection_port_ = static_cast<uint16>(port);
@@ -997,8 +996,7 @@ int FtpNetworkTransaction::ProcessResponsePASV(
       if (!ExtractPortFromPASVResponse(response, &port))
         return Stop(ERR_INVALID_RESPONSE);
       if (IsWellKnownPort(port) ||
-          !IsPortAllowedForScheme(port, url::kFtpScheme,
-                                  PORT_OVERRIDES_IGNORED)) {
+          !IsPortAllowedForScheme(port, url::kFtpScheme)) {
         return Stop(ERR_UNSAFE_PORT);
       }
       data_connection_port_ = static_cast<uint16>(port);

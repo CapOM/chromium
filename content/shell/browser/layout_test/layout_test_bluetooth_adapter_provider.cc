@@ -23,6 +23,7 @@ using device::BluetoothUUID;
 using device::MockBluetoothAdapter;
 using device::MockBluetoothDevice;
 using device::MockBluetoothDiscoverySession;
+using device::MockBluetoothGattCharacteristic;
 using device::MockBluetoothGattConnection;
 using device::MockBluetoothGattService;
 using testing::Between;
@@ -64,7 +65,8 @@ ACTION_P(GetMockDevice, adapter) {
   }
   return NULL;
 }
-}
+
+}  // namespace
 
 namespace content {
 
@@ -174,10 +176,29 @@ LayoutTestBluetoothAdapterProvider::GetEmptyDevice(
   list.push_back(BluetoothUUID("1801"));
   ON_CALL(*empty_device, GetUUIDs()).WillByDefault(Return(list));
 
-  empty_device->AddMockService(
-      GetMockService(empty_device.get(), "1800" /* Generic Access */));
-  empty_device->AddMockService(
-      GetMockService(empty_device.get(), "1801" /* Generic Attribute */));
+  scoped_ptr<NiceMock<MockBluetoothGattService>> generic_access(
+      GetGattService(empty_device.get(), "1800" /* Generic Access */));
+  scoped_ptr<NiceMock<MockBluetoothGattCharacteristic>> device_name(
+      GetGattCharacteristic(generic_access.get(), "2A00" /* Device Name */));
+
+  std::string value_str("Empty Mock Device name");
+  std::vector<uint8_t> value(value_str.begin(), value_str.end());
+  ON_CALL(*device_name, ReadRemoteCharacteristic(_, _))
+      .WillByDefault(RunCallback<0>(value));
+
+  generic_access->AddMockCharacteristic(device_name.Pass());
+
+  scoped_ptr<NiceMock<MockBluetoothGattCharacteristic>> reconnection_address(
+      GetGattCharacteristic(generic_access.get(),
+                            "2A03" /* Reconnection Address */));
+
+  ON_CALL(*reconnection_address, ReadRemoteCharacteristic(_, _))
+      .WillByDefault(
+          RunCallback<1>(BluetoothGattService::GATT_ERROR_NOT_PERMITTED));
+
+  generic_access->AddMockCharacteristic(reconnection_address.Pass());
+
+  empty_device->AddMockService(generic_access.Pass());
 
   // Using Invoke allows the device returned from this method to be futher
   // modified and have more services added to it. The call to ::GetGattServices
@@ -186,6 +207,13 @@ LayoutTestBluetoothAdapterProvider::GetEmptyDevice(
   ON_CALL(*empty_device, GetGattServices())
       .WillByDefault(
           Invoke(empty_device.get(), &MockBluetoothDevice::GetMockServices));
+
+  // The call to BluetoothDevice::GetGattService will invoke ::GetMockService
+  // which returns a service matching the identifier provided if the service
+  // was added to the mock.
+  ON_CALL(*empty_device, GetGattService(_))
+      .WillByDefault(
+          Invoke(empty_device.get(), &MockBluetoothDevice::GetMockService));
 
   return empty_device.Pass();
 }
@@ -223,11 +251,32 @@ LayoutTestBluetoothAdapterProvider::GetUnconnectableDevice(
 
 // static
 scoped_ptr<NiceMock<MockBluetoothGattService>>
-LayoutTestBluetoothAdapterProvider::GetMockService(MockBluetoothDevice* device,
+LayoutTestBluetoothAdapterProvider::GetGattService(MockBluetoothDevice* device,
                                                    const std::string& uuid) {
-  return make_scoped_ptr(new NiceMock<MockBluetoothGattService>(
-      device, uuid /* identifier */, BluetoothUUID(uuid), true /* is_primary */,
-      false /* is_local */));
+  scoped_ptr<NiceMock<MockBluetoothGattService>> service(
+      new NiceMock<MockBluetoothGattService>(
+          device, uuid /* identifier */, BluetoothUUID(uuid),
+          true /* is_primary */, false /* is_local */));
+
+  ON_CALL(*service, GetCharacteristics())
+      .WillByDefault(Invoke(service.get(),
+                            &MockBluetoothGattService::GetMockCharacteristics));
+
+  ON_CALL(*service, GetCharacteristic(_))
+      .WillByDefault(Invoke(service.get(),
+                            &MockBluetoothGattService::GetMockCharacteristic));
+
+  return service.Pass();
+}
+
+// static
+scoped_ptr<NiceMock<MockBluetoothGattCharacteristic>>
+LayoutTestBluetoothAdapterProvider::GetGattCharacteristic(
+    MockBluetoothGattService* service,
+    const std::string& uuid) {
+  return make_scoped_ptr(new NiceMock<MockBluetoothGattCharacteristic>(
+      service, uuid /* identifier */, BluetoothUUID(uuid), false /* is_local */,
+      NULL /* properties */, NULL /* permissions */));
 }
 
 }  // namespace content

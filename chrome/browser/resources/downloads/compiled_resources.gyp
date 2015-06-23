@@ -22,7 +22,7 @@
           'focus_row.js',
         ],
         'externs': [
-          '<(CLOSURE_DIR)/externs/chrome_send_externs.js',
+          '<(EXTERNS_DIR)/chrome_send.js',
           'externs.js',
         ],
       },

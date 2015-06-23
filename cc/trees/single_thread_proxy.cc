@@ -13,7 +13,6 @@
 #include "cc/output/output_surface.h"
 #include "cc/quads/draw_quad.h"
 #include "cc/resources/prioritized_resource_manager.h"
-#include "cc/resources/resource_update_controller.h"
 #include "cc/scheduler/commit_earlyout_reason.h"
 #include "cc/trees/layer_tree_host.h"
 #include "cc/trees/layer_tree_host_single_thread_client.h"
@@ -42,6 +41,7 @@ SingleThreadProxy::SingleThreadProxy(
     : Proxy(main_task_runner, NULL),
       layer_tree_host_(layer_tree_host),
       client_(client),
+      external_begin_frame_source_(external_begin_frame_source.Pass()),
       timing_history_(layer_tree_host->rendering_stats_instrumentation()),
       next_frame_is_newly_committed_frame_(false),
 #if DCHECK_IS_ON()
@@ -62,11 +62,10 @@ SingleThreadProxy::SingleThreadProxy(
       !scheduler_on_impl_thread_) {
     SchedulerSettings scheduler_settings(
         layer_tree_host->settings().ToSchedulerSettings());
-    // SingleThreadProxy should run in main thread low latency mode.
-    scheduler_settings.main_thread_should_always_be_low_latency = true;
+    scheduler_settings.commit_to_active_tree = CommitToActiveTree();
     scheduler_on_impl_thread_ = Scheduler::Create(
         this, scheduler_settings, layer_tree_host_->id(),
-        MainThreadTaskRunner(), external_begin_frame_source.Pass());
+        MainThreadTaskRunner(), external_begin_frame_source_.get());
   }
 }
 
@@ -152,8 +151,6 @@ void SingleThreadProxy::SetOutputSurface(
   {
     DebugScopedSetMainThreadBlocked main_thread_blocked(this);
     DebugScopedSetImplThread impl(this);
-    layer_tree_host_->DeleteContentsTexturesOnImplThread(
-        layer_tree_host_impl_->resource_provider());
     success = layer_tree_host_impl_->InitializeRenderer(output_surface.Pass());
   }
 
@@ -242,36 +239,7 @@ void SingleThreadProxy::DoCommit() {
         blocking_main_thread_task_runner()));
 
     layer_tree_host_impl_->BeginCommit();
-
-    if (PrioritizedResourceManager* contents_texture_manager =
-        layer_tree_host_->contents_texture_manager()) {
-      // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
-      // is fixed.
-      tracked_objects::ScopedTracker tracking_profile3(
-          FROM_HERE_WITH_EXPLICIT_FUNCTION(
-              "461509 SingleThreadProxy::DoCommit3"));
-      contents_texture_manager->PushTexturePrioritiesToBackings();
-    }
     layer_tree_host_->BeginCommitOnImplThread(layer_tree_host_impl_.get());
-
-    // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
-    // is fixed.
-    tracked_objects::ScopedTracker tracking_profile4(
-        FROM_HERE_WITH_EXPLICIT_FUNCTION(
-            "461509 SingleThreadProxy::DoCommit4"));
-    scoped_ptr<ResourceUpdateController> update_controller =
-        ResourceUpdateController::Create(
-            NULL,
-            MainThreadTaskRunner(),
-            queue_for_commit_.Pass(),
-            layer_tree_host_impl_->resource_provider());
-
-    // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
-    // is fixed.
-    tracked_objects::ScopedTracker tracking_profile5(
-        FROM_HERE_WITH_EXPLICIT_FUNCTION(
-            "461509 SingleThreadProxy::DoCommit5"));
-    update_controller->Finalize();
 
     // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
     // is fixed.
@@ -297,26 +265,17 @@ void SingleThreadProxy::DoCommit() {
     DCHECK_EQ(1.f, scroll_info->page_scale_delta);
 #endif
 
-    if (layer_tree_host_->settings().impl_side_painting) {
-      // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
-      // is fixed.
-      tracked_objects::ScopedTracker tracking_profile8(
-          FROM_HERE_WITH_EXPLICIT_FUNCTION(
-              "461509 SingleThreadProxy::DoCommit8"));
-      // Commit goes directly to the active tree, but we need to synchronously
-      // "activate" the tree still during commit to satisfy any potential
-      // SetNextCommitWaitsForActivation calls.  Unfortunately, the tree
-      // might not be ready to draw, so DidActivateSyncTree must set
-      // the flag to force the tree to not draw until textures are ready.
-      NotifyReadyToActivate();
-    } else {
-      // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
-      // is fixed.
-      tracked_objects::ScopedTracker tracking_profile9(
-          FROM_HERE_WITH_EXPLICIT_FUNCTION(
-              "461509 SingleThreadProxy::DoCommit9"));
-      CommitComplete();
-    }
+    // TODO(robliao): Remove ScopedTracker below once https://crbug.com/461509
+    // is fixed.
+    tracked_objects::ScopedTracker tracking_profile8(
+        FROM_HERE_WITH_EXPLICIT_FUNCTION(
+            "461509 SingleThreadProxy::DoCommit8"));
+    // Commit goes directly to the active tree, but we need to synchronously
+    // "activate" the tree still during commit to satisfy any potential
+    // SetNextCommitWaitsForActivation calls.  Unfortunately, the tree
+    // might not be ready to draw, so DidActivateSyncTree must set
+    // the flag to force the tree to not draw until textures are ready.
+    NotifyReadyToActivate();
   }
 }
 
@@ -393,10 +352,6 @@ bool SingleThreadProxy::BeginMainFrameRequested() const {
   return commit_requested_;
 }
 
-size_t SingleThreadProxy::MaxPartialTextureUpdates() const {
-  return std::numeric_limits<size_t>::max();
-}
-
 void SingleThreadProxy::Stop() {
   TRACE_EVENT0("cc", "SingleThreadProxy::stop");
   DCHECK(Proxy::IsMainThread());
@@ -406,8 +361,6 @@ void SingleThreadProxy::Stop() {
 
     BlockingTaskRunner::CapturePostTasks blocked(
         blocking_main_thread_task_runner());
-    layer_tree_host_->DeleteContentsTexturesOnImplThread(
-        layer_tree_host_impl_->resource_provider());
     scheduler_on_impl_thread_ = nullptr;
     layer_tree_host_impl_ = nullptr;
   }
@@ -483,45 +436,23 @@ void SingleThreadProxy::PostAnimationEventsToMainThreadOnImplThread(
   layer_tree_host_->SetAnimationEvents(events.Pass());
 }
 
-bool SingleThreadProxy::ReduceContentsTextureMemoryOnImplThread(
-    size_t limit_bytes,
-    int priority_cutoff) {
-  DCHECK(IsImplThread());
-  PrioritizedResourceManager* contents_texture_manager =
-      layer_tree_host_->contents_texture_manager();
-
-  ResourceProvider* resource_provider =
-      layer_tree_host_impl_->resource_provider();
-
-  if (!contents_texture_manager || !resource_provider)
-    return false;
-
-  return contents_texture_manager->ReduceMemoryOnImplThread(
-      limit_bytes, priority_cutoff, resource_provider);
-}
-
 bool SingleThreadProxy::IsInsideDraw() { return inside_draw_; }
 
 void SingleThreadProxy::DidActivateSyncTree() {
-  // Non-impl-side painting finishes commit in DoCommit.  Impl-side painting
-  // defers until here to simulate SetNextCommitWaitsForActivation.
-  if (layer_tree_host_impl_->settings().impl_side_painting) {
-    // This is required because NotifyReadyToActivate gets called immediately
-    // after commit since single thread commits directly to the active tree.
-    if (scheduler_on_impl_thread_)
-      scheduler_on_impl_thread_->SetWaitForReadyToDraw();
+  // This is required because NotifyReadyToActivate gets called immediately
+  // after commit since single thread commits directly to the active tree.
+  if (scheduler_on_impl_thread_)
+    scheduler_on_impl_thread_->SetWaitForReadyToDraw();
 
-    // Synchronously call to CommitComplete. Resetting
-    // |commit_blocking_task_runner| would make sure all tasks posted during
-    // commit/activation before CommitComplete.
-    CommitComplete();
-  }
+  // Synchronously call to CommitComplete. Resetting
+  // |commit_blocking_task_runner| would make sure all tasks posted during
+  // commit/activation before CommitComplete.
+  CommitComplete();
 
   timing_history_.DidActivateSyncTree();
 }
 
 void SingleThreadProxy::DidPrepareTiles() {
-  DCHECK(layer_tree_host_impl_->settings().impl_side_painting);
   DCHECK(Proxy::IsImplThread());
   if (scheduler_on_impl_thread_)
     scheduler_on_impl_thread_->DidPrepareTiles();
@@ -633,13 +564,11 @@ void SingleThreadProxy::CompositeImmediately(base::TimeTicks frame_begin_time) {
   // Finish the impl frame.
   {
     DebugScopedSetImplThread impl(this);
-    if (layer_tree_host_impl_->settings().impl_side_painting) {
-      layer_tree_host_impl_->ActivateSyncTree();
-      DCHECK(!layer_tree_host_impl_->active_tree()
-                  ->needs_update_draw_properties());
-      layer_tree_host_impl_->PrepareTiles();
-      layer_tree_host_impl_->SynchronouslyInitializeAllTiles();
-    }
+    layer_tree_host_impl_->ActivateSyncTree();
+    DCHECK(
+        !layer_tree_host_impl_->active_tree()->needs_update_draw_properties());
+    layer_tree_host_impl_->PrepareTiles();
+    layer_tree_host_impl_->SynchronouslyInitializeAllTiles();
 
     DoAnimate();
 
@@ -889,22 +818,10 @@ void SingleThreadProxy::DoBeginMainFrame(
   layer_tree_host_->AnimateLayers(begin_frame_args.frame_time);
   layer_tree_host_->Layout();
 
-  if (PrioritizedResourceManager* contents_texture_manager =
-          layer_tree_host_->contents_texture_manager()) {
-    contents_texture_manager->UnlinkAndClearEvictedBackings();
-    contents_texture_manager->SetMaxMemoryLimitBytes(
-        layer_tree_host_impl_->memory_allocation_limit_bytes());
-    contents_texture_manager->SetExternalPriorityCutoff(
-        layer_tree_host_impl_->memory_allocation_priority_cutoff());
-  }
-
-  DCHECK(!queue_for_commit_);
-  queue_for_commit_ = make_scoped_ptr(new ResourceUpdateQueue);
-
   // New commits requested inside UpdateLayers should be respected.
   commit_requested_ = false;
 
-  layer_tree_host_->UpdateLayers(queue_for_commit_.get());
+  layer_tree_host_->UpdateLayers();
 
   timing_history_.DidBeginMainFrame();
 
@@ -970,16 +887,12 @@ void SingleThreadProxy::ScheduledActionBeginOutputSurfaceCreation() {
 
 void SingleThreadProxy::ScheduledActionPrepareTiles() {
   TRACE_EVENT0("cc", "SingleThreadProxy::ScheduledActionPrepareTiles");
-  DCHECK(layer_tree_host_impl_->settings().impl_side_painting);
   DebugScopedSetImplThread impl(this);
   layer_tree_host_impl_->PrepareTiles();
 }
 
 void SingleThreadProxy::ScheduledActionInvalidateOutputSurface() {
   NOTREACHED();
-}
-
-void SingleThreadProxy::DidAnticipatedDrawTimeChange(base::TimeTicks time) {
 }
 
 base::TimeDelta SingleThreadProxy::DrawDurationEstimate() {

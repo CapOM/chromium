@@ -120,7 +120,8 @@ class PlatformBackend(object):
     return port
 
   def DidCreateBrowser(self, browser, browser_backend):
-    self.SetFullPerformanceModeEnabled(True)
+    browser_options = browser_backend.browser_options
+    self.SetFullPerformanceModeEnabled(browser_options.full_performance_mode)
 
     # TODO(slamm): Remove this call when replay browser_backend dependencies
     # get moved to platform. https://crbug.com/423962
@@ -199,6 +200,9 @@ class PlatformBackend(object):
     raise NotImplementedError()
 
   def GetCommandLine(self, pid):
+    raise NotImplementedError()
+
+  def GetDeviceTypeName(self):
     raise NotImplementedError()
 
   def GetArchName(self):

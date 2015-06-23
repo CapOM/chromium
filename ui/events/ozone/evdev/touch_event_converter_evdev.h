@@ -38,7 +38,8 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
   bool HasTouchscreen() const override;
   gfx::Size GetTouchscreenSize() const override;
   int GetTouchPoints() const override;
-  void OnStopped() override;
+  void OnEnabled() override;
+  void OnDisabled() override;
 
   // Unsafe part of initialization.
   virtual void Initialize(const EventDeviceInfo& info);
@@ -49,7 +50,7 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
   // Overidden from base::MessagePumpLibevent::Watcher.
   void OnFileCanReadWithoutBlocking(int fd) override;
 
-  virtual bool Reinitialize();
+  virtual void Reinitialize();
 
   void ProcessMultitouchEvent(const input_event& input);
   void EmulateMultitouchEvent(const input_event& input);
@@ -77,11 +78,14 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
   // Dispatcher for events.
   DeviceEventDispatcherEvdev* dispatcher_;
 
-  // Set if we have seen a SYN_DROPPED and not yet re-synced with the device.
-  bool syn_dropped_;
+  // Set if we drop events in kernel (SYN_DROPPED) or in process.
+  bool dropped_events_ = false;
 
   // Device has multitouch capability.
-  bool has_mt_;
+  bool has_mt_ = false;
+
+  // Use BTN_LEFT instead of BT_TOUCH.
+  bool quirk_left_mouse_button_ = false;
 
   // Pressure values.
   int pressure_min_;
@@ -96,13 +100,13 @@ class EVENTS_OZONE_EVDEV_EXPORT TouchEventConverterEvdev
   float y_num_tuxels_;
 
   // Number of touch points reported by driver
-  int touch_points_;
+  int touch_points_ = 0;
 
   // Tracking id counter.
-  int next_tracking_id_;
+  int next_tracking_id_ = 0;
 
   // Touch point currently being updated from the /dev/input/event* stream.
-  size_t current_slot_;
+  size_t current_slot_ = 0;
 
   // In-progress touch points.
   std::vector<InProgressTouchEvdev> events_;

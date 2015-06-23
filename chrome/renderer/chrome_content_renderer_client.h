@@ -133,7 +133,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
       blink::WebSpeechSynthesizerClient* client) override;
   bool ShouldReportDetailedMessageForSource(
       const base::string16& source) const override;
-  bool ShouldEnableSiteIsolationPolicy() const override;
+  bool ShouldGatherSiteIsolationStats() const override;
   blink::WebWorkerContentSettingsClientProxy*
   CreateWorkerContentSettingsClientProxy(content::RenderFrame* render_frame,
                                          blink::WebFrame* frame) override;
@@ -168,11 +168,13 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
   void SetSpellcheck(SpellCheck* spellcheck);
 #endif
 
+#if defined(ENABLE_PLUGINS)
   static blink::WebPlugin* CreatePlugin(
       content::RenderFrame* render_frame,
       blink::WebLocalFrame* frame,
       const blink::WebPluginParams& params,
       const ChromeViewHostMsg_GetPluginInfo_Output& output);
+#endif
 
 #if defined(ENABLE_PLUGINS) && defined(ENABLE_EXTENSIONS)
   static bool IsExtensionOrSharedModuleWhitelisted(
@@ -194,7 +196,7 @@ class ChromeContentRendererClient : public content::ContentRendererClient {
 
   // Returns true if the frame is navigating to an URL either into or out of an
   // extension app's extent.
-  bool CrossesExtensionExtents(blink::WebFrame* frame,
+  bool CrossesExtensionExtents(blink::WebLocalFrame* frame,
                                const GURL& new_url,
                                const extensions::ExtensionSet& extensions,
                                bool is_extension_url,

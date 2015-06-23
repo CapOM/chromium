@@ -4,7 +4,7 @@
 
 #include "net/http/http_cache_transaction.h"
 
-#include "build/build_config.h"
+#include "build/build_config.h"  // For OS_POSIX
 
 #if defined(OS_POSIX)
 #include <unistd.h>
@@ -16,36 +16,30 @@
 #include "base/bind.h"
 #include "base/compiler_specific.h"
 #include "base/format_macros.h"
-#include "base/memory/ref_counted.h"
-#include "base/memory/scoped_ptr.h"
-#include "base/metrics/field_trial.h"
-#include "base/metrics/histogram.h"
+#include "base/location.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/profiler/scoped_tracker.h"
-#include "base/rand_util.h"
-#include "base/strings/string_number_conversions.h"
+#include "base/single_thread_task_runner.h"
+#include "base/strings/string_number_conversions.h"  // For HexEncode.
 #include "base/strings/string_piece.h"
-#include "base/strings/string_util.h"
+#include "base/strings/string_util.h"  // For LowerCaseEqualsASCII.
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/time/clock.h"
-#include "base/time/time.h"
 #include "base/values.h"
-#include "net/base/completion_callback.h"
-#include "net/base/io_buffer.h"
+#include "net/base/auth.h"
 #include "net/base/load_flags.h"
 #include "net/base/load_timing_info.h"
 #include "net/base/net_errors.h"
 #include "net/base/upload_data_stream.h"
 #include "net/cert/cert_status_flags.h"
+#include "net/cert/x509_certificate.h"
 #include "net/disk_cache/disk_cache.h"
 #include "net/http/disk_based_cert_cache.h"
 #include "net/http/http_network_session.h"
 #include "net/http/http_request_info.h"
-#include "net/http/http_response_headers.h"
-#include "net/http/http_transaction.h"
 #include "net/http/http_util.h"
-#include "net/http/partial_data.h"
-#include "net/log/net_log.h"
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/ssl/ssl_config_service.h"
 
@@ -180,18 +174,6 @@ void RecordNoStoreHeaderHistogram(int load_flags,
         "Net.MainFrameNoStore",
         response->headers->HasHeaderValue("cache-control", "no-store"));
   }
-}
-
-scoped_ptr<base::Value> NetLogAsyncRevalidationInfoCallback(
-    const NetLog::Source& source,
-    const HttpRequestInfo* request,
-    NetLogCaptureMode capture_mode) {
-  scoped_ptr<base::DictionaryValue> dict(new base::DictionaryValue());
-  source.AddToEventParameters(dict.get());
-
-  dict->SetString("url", request->url.possibly_invalid_spec());
-  dict->SetString("method", request->method);
-  return dict.Pass();
 }
 
 enum ExternallyConditionalizedType {
@@ -1385,7 +1367,7 @@ int HttpCache::Transaction::DoAddToEntry() {
         // the cache if at all possible. See http://crbug.com/408765
         timeout_milliseconds = 25;
       }
-      base::MessageLoop::current()->PostDelayedTask(
+      base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
           FROM_HERE,
           base::Bind(&HttpCache::Transaction::OnAddToEntryTimeout,
                      weak_factory_.GetWeakPtr(), entry_lock_waiting_since_),
@@ -2136,13 +2118,6 @@ int HttpCache::Transaction::BeginCacheValidation() {
 
   bool skip_validation = (required_validation == VALIDATION_NONE);
 
-  if (required_validation == VALIDATION_ASYNCHRONOUS &&
-      !(request_->method == "GET" && (truncated_ || partial_)) && cache_ &&
-      cache_->use_stale_while_revalidate()) {
-    TriggerAsyncValidation();
-    skip_validation = true;
-  }
-
   if (request_->method == "HEAD" &&
       (truncated_ || response_.headers->response_code() == 206)) {
     DCHECK(!partial_);
@@ -2171,7 +2146,6 @@ int HttpCache::Transaction::BeginCacheValidation() {
   }
 
   if (skip_validation) {
-    // TODO(ricea): Is this pattern okay for asynchronous revalidations?
     UpdateTransactionPattern(PATTERN_ENTRY_USED);
     return SetupEntryForRead();
   } else {
@@ -2351,7 +2325,7 @@ ValidationType HttpCache::Transaction::RequiresValidation() {
     return VALIDATION_NONE;
   }
 
-  if (effective_load_flags_ & (LOAD_VALIDATE_CACHE | LOAD_ASYNC_REVALIDATION))
+  if (effective_load_flags_ & LOAD_VALIDATE_CACHE)
     return VALIDATION_SYNCHRONOUS;
 
   if (request_->method == "PUT" || request_->method == "DELETE")
@@ -2603,25 +2577,6 @@ void HttpCache::Transaction::FixHeadersForHead() {
     response_.headers->RemoveHeader("Content-Range");
     response_.headers->ReplaceStatusLine("HTTP/1.1 200 OK");
   }
-}
-
-void HttpCache::Transaction::TriggerAsyncValidation() {
-  DCHECK(!request_->upload_data_stream);
-  BoundNetLog async_revalidation_net_log(
-      BoundNetLog::Make(net_log_.net_log(), NetLog::SOURCE_ASYNC_REVALIDATION));
-  net_log_.AddEvent(
-      NetLog::TYPE_HTTP_CACHE_VALIDATE_RESOURCE_ASYNC,
-      async_revalidation_net_log.source().ToEventParametersCallback());
-  async_revalidation_net_log.BeginEvent(
-      NetLog::TYPE_ASYNC_REVALIDATION,
-      base::Bind(
-          &NetLogAsyncRevalidationInfoCallback, net_log_.source(), request_));
-  base::MessageLoop::current()->PostTask(
-      FROM_HERE,
-      base::Bind(&HttpCache::PerformAsyncValidation,
-                 cache_,  // cache_ is a weak pointer.
-                 *request_,
-                 async_revalidation_net_log));
 }
 
 void HttpCache::Transaction::FailRangeRequest() {

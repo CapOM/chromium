@@ -6,16 +6,14 @@
 
 #include "cc/resources/prioritized_resource_manager.h"
 #include "cc/resources/resource_provider.h"
-#include "cc/resources/resource_update_queue.h"
 #include "cc/resources/scoped_ui_resource.h"
 #include "cc/test/fake_layer_tree_host.h"
 #include "cc/test/fake_layer_tree_host_client.h"
 #include "cc/test/fake_output_surface.h"
 #include "cc/test/fake_output_surface_client.h"
 #include "cc/test/geometry_test_utils.h"
-#include "cc/test/test_shared_bitmap_manager.h"
+#include "cc/test/test_task_graph_runner.h"
 #include "cc/trees/layer_tree_host.h"
-#include "cc/trees/occlusion_tracker.h"
 #include "cc/trees/single_thread_proxy.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -35,7 +33,8 @@ class NinePatchLayerTest : public testing::Test {
 
  protected:
   void SetUp() override {
-    layer_tree_host_ = FakeLayerTreeHost::Create(&fake_client_);
+    layer_tree_host_ =
+        FakeLayerTreeHost::Create(&fake_client_, &task_graph_runner_);
   }
 
   void TearDown() override {
@@ -43,6 +42,7 @@ class NinePatchLayerTest : public testing::Test {
   }
 
   FakeLayerTreeHostClient fake_client_;
+  TestTaskGraphRunner task_graph_runner_;
   scoped_ptr<FakeLayerTreeHost> layer_tree_host_;
 };
 
@@ -57,11 +57,9 @@ TEST_F(NinePatchLayerTest, SetLayerProperties) {
   Mock::VerifyAndClearExpectations(layer_tree_host_.get());
   EXPECT_EQ(test_layer->layer_tree_host(), layer_tree_host_.get());
 
-  ResourceUpdateQueue queue;
   gfx::Rect screen_space_clip_rect;
-  OcclusionTracker<Layer> occlusion_tracker(screen_space_clip_rect);
   test_layer->SavePaintProperties();
-  test_layer->Update(&queue, &occlusion_tracker);
+  test_layer->Update();
 
   EXPECT_FALSE(test_layer->DrawsContent());
 
@@ -73,7 +71,7 @@ TEST_F(NinePatchLayerTest, SetLayerProperties) {
   test_layer->SetAperture(aperture);
   test_layer->SetUIResourceId(resource->id());
   test_layer->SetFillCenter(fill_center);
-  test_layer->Update(&queue, &occlusion_tracker);
+  test_layer->Update();
 
   EXPECT_TRUE(test_layer->DrawsContent());
 }

@@ -45,6 +45,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "base/sys_byteorder.h"
 #include "base/values.h"
+#include "net/base/address_list.h"
 #include "net/base/dns_util.h"
 #include "net/base/ip_address_number.h"
 #include "net/base/net_module.h"
@@ -146,14 +147,32 @@ static const int kAllowedFtpPorts[] = {
   22,   // ssh
 };
 
+std::string NormalizeHostname(const std::string& host) {
+  std::string result = base::StringToLowerASCII(host);
+  if (!result.empty() && *result.rbegin() == '.')
+    result.resize(result.size() - 1);
+  return result;
+}
+
+bool IsNormalizedLocalhostTLD(const std::string& host) {
+  return base::EndsWith(host, ".localhost", true);
+}
+
+// |host| should be normalized.
+bool IsLocalHostname(const std::string& host) {
+  return host == "localhost" || host == "localhost.localdomain" ||
+         IsNormalizedLocalhostTLD(host);
+}
+
+// |host| should be normalized.
+bool IsLocal6Hostname(const std::string& host) {
+  return host == "localhost6" || host == "localhost6.localdomain6";
+}
+
 }  // namespace
 
 static base::LazyInstance<std::multiset<int> >::Leaky
     g_explicitly_allowed_ports = LAZY_INSTANCE_INITIALIZER;
-
-size_t GetCountOfExplicitlyAllowedPorts() {
-  return g_explicitly_allowed_ports.Get().size();
-}
 
 std::string GetSpecificHeader(const std::string& headers,
                               const std::string& name) {
@@ -260,7 +279,7 @@ bool IsCanonicalizedHostCompliant(const std::string& host) {
 
 base::string16 StripWWW(const base::string16& text) {
   const base::string16 www(base::ASCIIToUTF16("www."));
-  return StartsWith(text, www, true) ? text.substr(www.length()) : text;
+  return base::StartsWith(text, www, true) ? text.substr(www.length()) : text;
 }
 
 base::string16 StripWWWFromHost(const GURL& url) {
@@ -276,18 +295,14 @@ bool IsWellKnownPort(int port) {
   return port >= 0 && port < 1024;
 }
 
-NET_EXPORT bool IsPortAllowedForScheme(int port,
-                                       const std::string& url_scheme,
-                                       PortOverrideMode port_override_mode) {
+bool IsPortAllowedForScheme(int port, const std::string& url_scheme) {
   // Reject invalid ports.
   if (!IsPortValid(port))
     return false;
 
   // Allow explitly allowed ports for any scheme.
-  if (port_override_mode == PORT_OVERRIDES_ALLOWED &&
-      g_explicitly_allowed_ports.Get().count(port) > 0) {
+  if (g_explicitly_allowed_ports.Get().count(port) > 0)
     return true;
-  }
 
   // FTP requests have an extra set of whitelisted schemes.
   if (base::LowerCaseEqualsASCII(url_scheme, url::kFtpScheme)) {
@@ -305,6 +320,55 @@ NET_EXPORT bool IsPortAllowedForScheme(int port,
   }
 
   return true;
+}
+
+size_t GetCountOfExplicitlyAllowedPorts() {
+  return g_explicitly_allowed_ports.Get().size();
+}
+
+// Specifies a comma separated list of port numbers that should be accepted
+// despite bans. If the string is invalid no allowed ports are stored.
+void SetExplicitlyAllowedPorts(const std::string& allowed_ports) {
+  if (allowed_ports.empty())
+    return;
+
+  std::multiset<int> ports;
+  size_t last = 0;
+  size_t size = allowed_ports.size();
+  // The comma delimiter.
+  const std::string::value_type kComma = ',';
+
+  // Overflow is still possible for evil user inputs.
+  for (size_t i = 0; i <= size; ++i) {
+    // The string should be composed of only digits and commas.
+    if (i != size && !IsAsciiDigit(allowed_ports[i]) &&
+        (allowed_ports[i] != kComma))
+      return;
+    if (i == size || allowed_ports[i] == kComma) {
+      if (i > last) {
+        int port;
+        base::StringToInt(base::StringPiece(allowed_ports.begin() + last,
+                                            allowed_ports.begin() + i),
+                          &port);
+        ports.insert(port);
+      }
+      last = i + 1;
+    }
+  }
+  g_explicitly_allowed_ports.Get() = ports;
+}
+
+ScopedPortException::ScopedPortException(int port) : port_(port) {
+  g_explicitly_allowed_ports.Get().insert(port);
+}
+
+ScopedPortException::~ScopedPortException() {
+  std::multiset<int>::iterator it =
+      g_explicitly_allowed_ports.Get().find(port_);
+  if (it != g_explicitly_allowed_ports.Get().end())
+    g_explicitly_allowed_ports.Get().erase(it);
+  else
+    NOTREACHED();
 }
 
 int SetNonBlocking(int fd) {
@@ -585,51 +649,6 @@ GURL SimplifyUrlForRequest(const GURL& url) {
   return url.ReplaceComponents(replacements);
 }
 
-// Specifies a comma separated list of port numbers that should be accepted
-// despite bans. If the string is invalid no allowed ports are stored.
-void SetExplicitlyAllowedPorts(const std::string& allowed_ports) {
-  if (allowed_ports.empty())
-    return;
-
-  std::multiset<int> ports;
-  size_t last = 0;
-  size_t size = allowed_ports.size();
-  // The comma delimiter.
-  const std::string::value_type kComma = ',';
-
-  // Overflow is still possible for evil user inputs.
-  for (size_t i = 0; i <= size; ++i) {
-    // The string should be composed of only digits and commas.
-    if (i != size && !IsAsciiDigit(allowed_ports[i]) &&
-        (allowed_ports[i] != kComma))
-      return;
-    if (i == size || allowed_ports[i] == kComma) {
-      if (i > last) {
-        int port;
-        base::StringToInt(base::StringPiece(allowed_ports.begin() + last,
-                                            allowed_ports.begin() + i),
-                          &port);
-        ports.insert(port);
-      }
-      last = i + 1;
-    }
-  }
-  g_explicitly_allowed_ports.Get() = ports;
-}
-
-ScopedPortException::ScopedPortException(int port) : port_(port) {
-  g_explicitly_allowed_ports.Get().insert(port);
-}
-
-ScopedPortException::~ScopedPortException() {
-  std::multiset<int>::iterator it =
-      g_explicitly_allowed_ports.Get().find(port_);
-  if (it != g_explicitly_allowed_ports.Get().end())
-    g_explicitly_allowed_ports.Get().erase(it);
-  else
-    NOTREACHED();
-}
-
 bool HaveOnlyLoopbackAddresses() {
 #if defined(OS_ANDROID)
   return android::HaveOnlyLoopbackAddresses();
@@ -730,10 +749,38 @@ int GetPortFromSockaddr(const struct sockaddr* address, socklen_t address_len) {
   return base::NetToHost16(*port_field);
 }
 
+bool ResolveLocalHostname(const std::string& host,
+                          uint16_t port,
+                          AddressList* address_list) {
+  static const unsigned char kLocalhostIPv4[] = {127, 0, 0, 1};
+  static const unsigned char kLocalhostIPv6[] = {
+      0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1};
+
+  std::string normalized_host = NormalizeHostname(host);
+
+  address_list->clear();
+
+  bool is_local6 = IsLocal6Hostname(normalized_host);
+  if (!is_local6 && !IsLocalHostname(normalized_host))
+    return false;
+
+  address_list->push_back(
+      IPEndPoint(IPAddressNumber(kLocalhostIPv6,
+                                 kLocalhostIPv6 + arraysize(kLocalhostIPv6)),
+                 port));
+  if (!is_local6) {
+    address_list->push_back(
+        IPEndPoint(IPAddressNumber(kLocalhostIPv4,
+                                   kLocalhostIPv4 + arraysize(kLocalhostIPv4)),
+                   port));
+  }
+
+  return true;
+}
+
 bool IsLocalhost(const std::string& host) {
-  if (host == "localhost" || host == "localhost.localdomain" ||
-      host == "localhost6" || host == "localhost6.localdomain6" ||
-      IsLocalhostTLD(host))
+  std::string normalized_host = NormalizeHostname(host);
+  if (IsLocalHostname(normalized_host) || IsLocal6Hostname(normalized_host))
     return true;
 
   IPAddressNumber ip_number;
@@ -764,21 +811,7 @@ bool IsLocalhost(const std::string& host) {
 }
 
 bool IsLocalhostTLD(const std::string& host) {
-  const char kLocalhostTLD[] = ".localhost";
-  const size_t kLocalhostTLDLength = arraysize(kLocalhostTLD) - 1;
-
-  if (host.empty())
-    return false;
-
-  size_t host_len = host.size();
-  if (*host.rbegin() == '.')
-    --host_len;
-  if (host_len < kLocalhostTLDLength)
-    return false;
-
-  const char* host_suffix = host.data() + host_len - kLocalhostTLDLength;
-  return base::strncasecmp(host_suffix, kLocalhostTLD, kLocalhostTLDLength) ==
-         0;
+  return IsNormalizedLocalhostTLD(NormalizeHostname(host));
 }
 
 bool HasGoogleHost(const GURL& url) {
@@ -798,7 +831,7 @@ bool HasGoogleHost(const GURL& url) {
   };
   const std::string& host = url.host();
   for (const char* suffix : kGoogleHostSuffixes) {
-    if (EndsWith(host, suffix, false))
+    if (base::EndsWith(host, suffix, false))
       return true;
   }
   return false;

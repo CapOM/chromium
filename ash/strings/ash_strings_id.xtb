@@ -31,8 +31,6 @@
 <translation id="2297568595583585744">Baki status</translation>
 <translation id="2248649616066688669">Anda dapat tetap menggunakan Chromebook saat perangkat tersambung ke layar eksternal, bahkan dengan penutup yang tertutup.</translation>
 <translation id="2946640296642327832">Aktifkan Bluetooth</translation>
-<translation id="478959186716341421">Mentransmisi</translation>
-<translation id="5537725057119320332">Cast</translation>
 <translation id="6459472438155181876">Memperpanjang layar ke <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Seluler</translation>
 <translation id="6596816719288285829">Alamat IP</translation>
@@ -40,6 +38,7 @@
 <translation id="1812696562331527143">Metode masukan Anda telah berubah menjadi <ph name="INPUT_METHOD_ID"/>*(<ph name="BEGIN_LINK"/>pihak ketiga<ph name="END_LINK"/>).
 Tekan Shift + Alt untuk beralih.</translation>
 <translation id="6043994281159824495">Keluar sekarang</translation>
+<translation id="5168181903108465623">Perangkat transmisi tersedia</translation>
 <translation id="2127372758936585790">Pengisi daya rendah</translation>
 <translation id="3799026279081545374">Mungkin Anda memiliki pengisi daya yang tidak bagus. Apabila Anda tinggal di AS, hubungi 866-628-1371 untuk mendapatkan bantuan dan pengganti. Apabila Anda tinggal di Inggris, hubungi 0800-026-0613. Apabila Anda tinggal di Irlandia, hubungi 1-800-832-664. Apabila Anda tinggal di Kanada, hubungi 866-628-1372. Apabila Anda tinggal di Australia, hubungi 1-800-067-460.</translation>
 <translation id="3891340733213178823">Tekan Ctrl+Shift+Q dua kali untuk keluar.</translation>
@@ -73,7 +72,6 @@ Tekan Shift + Alt untuk beralih.</translation>
 <translation id="2509468283778169019">CAPS LOCK aktif</translation>
 <translation id="3892641579809465218">Tampilan Internal</translation>
 <translation id="7823564328645135659">Bahasa telah diubah dari &quot;<ph name="FROM_LOCALE"/>&quot; menjadi &quot;<ph name="TO_LOCALE"/>&quot; setelah menyinkronkan setelan Anda.</translation>
-<translation id="7113420380180868673">Mentransmisi $1</translation>
 <translation id="3606978283550408104">Layar Braille tersambung.</translation>
 <translation id="8654520615680304441">Aktifkan Wi-Fi...</translation>
 <translation id="4421231901400348175">Berbagi kontrol layar dengan <ph name="HELPER_NAME"/> via Remote Assistance.</translation>
@@ -98,8 +96,8 @@ Tekan Shift + Alt untuk beralih.</translation>
 <translation id="3626637461649818317">Sisa <ph name="PERCENTAGE"/>%</translation>
 <translation id="9089416786594320554">Metode masukan</translation>
 <translation id="2700058918926273959">Sesi berakhir dalam <ph name="SESSION_TIME_REMAINING"/>. Anda akan keluar.</translation>
-<translation id="5807965672380739016">Transmisikan desktop ke</translation>
 <translation id="6247708409970142803"><ph name="PERCENTAGE"/>%</translation>
+<translation id="1963814843110128691">Mentransmisi $1 ke $2</translation>
 <translation id="3963445509666917109">Pengeras Suara (Internal)</translation>
 <translation id="1747827819627189109">Keyboard di layar diaktifkan</translation>
 <translation id="2208323208084708176">Mode desktop terpadu</translation>
@@ -119,7 +117,6 @@ Tekan Shift + Alt untuk beralih.</translation>
 <translation id="8528322925433439945">Seluler ...</translation>
 <translation id="3157169093162779309">Aktifkan penguncian rotasi</translation>
 <translation id="8428213095426709021">Setelan</translation>
-<translation id="6592705765268910579">Penerima tak diketahui</translation>
 <translation id="2372145515558759244">Menyinkronkan aplikasi...</translation>
 <translation id="1987317783729300807">Akun</translation>
 <translation id="8456362689280298700"><ph name="HOUR"/>.<ph name="MINUTE"/> sampai penuh</translation>
@@ -184,6 +181,7 @@ Tekan Shift + Alt untuk beralih.</translation>
 <translation id="6785414152754474415">Baterai sudah terisi <ph name="PERCENTAGE"/>% dan masih mengisi.</translation>
 <translation id="4895488851634969361">Baterai penuh.</translation>
 <translation id="615957422585914272">Tampilkan keyboard di layar</translation>
+<translation id="8443356412772935865">Mentransmisi layar ke $1</translation>
 <translation id="5947494881799873997">Kembalikan</translation>
 <translation id="7593891976182323525">Telusuri atau Shift</translation>
 <translation id="7649070708921625228">Bantuan</translation>
@@ -192,9 +190,11 @@ Tekan Telusuri atau Shift untuk membatalkan.</translation>
 <translation id="397105322502079400">Menghitung...</translation>
 <translation id="1013923882670373915">Perangkat Bluetooth &quot;<ph name="DEVICE_NAME"/>&quot; meminta izin untuk bersanding. Masukan kode PIN ini pada perangkat tersebut: <ph name="PINCODE"/></translation>
 <translation id="2819276065543622893">Anda akan dikeluarkan sekarang.</translation>
+<translation id="4961318399572185831">Transmisikan layar</translation>
 <translation id="5507786745520522457">Siapkan data seluler</translation>
 <translation id="6165508094623778733">Pelajari lebih lanjut</translation>
 <translation id="7168224885072002358">Mengembalikan ke resolusi lama dalam <ph name="TIMEOUT_SECONDS"/></translation>
+<translation id="5927132638760172455">Mentransmisi ke penerima tak dikenal</translation>
 <translation id="743058460480092004">Kamera dan mikrofon sedang digunakan.</translation>
 <translation id="6550675742724504774">Opsi</translation>
 <translation id="6406704438230478924">altgr</translation>
@@ -212,7 +212,6 @@ Tekan Alt+Telusuri atau Shift untuk membatalkan.</translation>
 <translation id="3009178788565917040">Keluaran</translation>
 <translation id="3147142846278915599">Peluncur (menyinkronkan aplikasi...)</translation>
 <translation id="6911468394164995108">Bergabung dengan lainnya...</translation>
-<translation id="4373966964907728675">Mentransmisi desktop</translation>
 <translation id="3678715477168044796"><ph name="DISPLAY_NAME"/>: <ph name="ANNOTATION"/></translation>
 <translation id="412065659894267608"><ph name="HOUR"/>j <ph name="MINUTE"/>m sampai penuh</translation>
 <translation id="3077734595579995578">shift</translation>

@@ -13,16 +13,16 @@
 #include "components/omnibox/autocomplete_match.h"
 #include "components/omnibox/autocomplete_provider.h"
 
+class AutocompleteProviderClient;
+
 // This is the provider for built-in URLs, such as about:settings and
 // chrome://version.
 class BuiltinProvider : public AutocompleteProvider {
  public:
-  BuiltinProvider();
+  explicit BuiltinProvider(AutocompleteProviderClient* client);
 
   // AutocompleteProvider:
-  void Start(const AutocompleteInput& input,
-             bool minimal_changes,
-             bool called_due_to_focus) override;
+  void Start(const AutocompleteInput& input, bool minimal_changes) override;
 
  private:
   ~BuiltinProvider() override;
@@ -35,6 +35,7 @@ class BuiltinProvider : public AutocompleteProvider {
                 const base::string16& inline_completion,
                 const ACMatchClassifications& styles);
 
+  AutocompleteProviderClient* client_;
   Builtins builtins_;
 
   DISALLOW_COPY_AND_ASSIGN(BuiltinProvider);

@@ -106,6 +106,9 @@ class MockSyncFrontend : public sync_driver::SyncFrontend {
   MOCK_METHOD1(OnActionableError,
       void(const syncer::SyncProtocolError& sync_error));
   MOCK_METHOD0(OnSyncConfigureRetry, void());
+  MOCK_METHOD1(
+      OnLocalSetPassphraseEncryption,
+      void(const syncer::SyncEncryptionHandler::NigoriState& nigori_state));
 };
 
 class FakeSyncManagerFactory : public syncer::SyncManagerFactory {
@@ -215,7 +218,8 @@ class SyncBackendHostTest : public testing::Test {
         fake_manager_factory_.Pass(),
         make_scoped_ptr(new syncer::TestUnrecoverableErrorHandler),
         base::Closure(),
-        network_resources_.get());
+        network_resources_.get(),
+        saved_nigori_state_.Pass());
     base::RunLoop run_loop;
     BrowserThread::PostDelayedTask(BrowserThread::UI, FROM_HERE,
                                    run_loop.QuitClosure(),
@@ -289,6 +293,7 @@ class SyncBackendHostTest : public testing::Test {
   FakeSyncManager* fake_manager_;
   syncer::ModelTypeSet enabled_types_;
   scoped_ptr<syncer::NetworkResources> network_resources_;
+  scoped_ptr<syncer::SyncEncryptionHandler::NigoriState> saved_nigori_state_;
 };
 
 // Test basic initialization with no initial types (first time initialization).

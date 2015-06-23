@@ -472,18 +472,6 @@ const char kUse24HourClock[] = "settings.clock.use_24hour_clock";
 const char kResolveTimezoneByGeolocation[] =
     "settings.resolve_timezone_by_geolocation";
 
-// A boolean pref to disable Google Drive integration.
-// The pref prefix should remain as "gdata" for backward compatibility.
-const char kDisableDrive[] = "gdata.disabled";
-
-// A boolean pref to disable Drive over cellular connections.
-// The pref prefix should remain as "gdata" for backward compatibility.
-const char kDisableDriveOverCellular[] = "gdata.cellular.disabled";
-
-// A boolean pref to disable hosted files on Drive.
-// The pref prefix should remain as "gdata" for backward compatibility.
-const char kDisableDriveHostedFiles[] = "gdata.hosted_files.disabled";
-
 // A string pref set to the current input method.
 const char kLanguageCurrentInputMethod[] =
     "settings.language.current_input_method";
@@ -819,6 +807,10 @@ const char kCaptivePortalAuthenticationIgnoresProxy[] =
 // unconditionally maximized, overriding the heuristic that normally chooses the
 // window size.
 const char kForceMaximizeOnFirstRun[] = "ui.force_maximize_on_first_run";
+
+// A dictionary pref mapping public keys that identify platform keys to its
+// properties like whether it's meant for corporate usage.
+const char kPlatformKeys[] = "platform_keys";
 #endif  // defined(OS_CHROMEOS)
 
 // A boolean pref set to true if a Home button to open the Home pages should be
@@ -1207,9 +1199,6 @@ const char kEasyUnlockPairing[] = "easy_unlock.pairing";
 // in order to use Easy Unlock.
 const char kEasyUnlockProximityRequired[] = "easy_unlock.proximity_required";
 
-// A cache of zero suggest results using JSON serialized into a string.
-const char kZeroSuggestCachedResults[] = "zerosuggest.cachedresults";
-
 #if defined(ENABLE_EXTENSIONS) && !defined(OS_ANDROID) && !defined(OS_IOS)
 // These device IDs are used by the copresence component, to uniquely identify
 // this device to the server. For privacy, authenticated and unauthenticated
@@ -1538,9 +1527,6 @@ const char kNtpCollapsedSnapshotDocument[] = "ntp.collapsed_snapshot_document";
 // Keeps track of sync promo collapsed state in the Other Devices menu.
 const char kNtpCollapsedSyncPromo[] = "ntp.collapsed_sync_promo";
 #endif
-
-// New Tab Page URLs that should not be shown as most visited thumbnails.
-const char kNtpMostVisitedURLsBlacklist[] = "ntp.most_visited_blacklist";
 
 // Which page should be visible on the new tab page v4
 const char kNtpShownPage[] = "ntp.shown_page";
@@ -1889,9 +1875,6 @@ const char kLogoutStartedLast[] = "chromeos.logout-started";
 // value is defined in:
 //   chrome/browser/chromeos/policy/consumer_management_stage.h
 const char kConsumerManagementStage[] = "consumer_management.stage";
-
-// A boolean pref. If set to true, new experimental OOBE UI is displayed.
-const char kNewOobe[] = "NewOobe";
 
 // A boolean pref. If set to true, experimental webview based signin flow
 // is deactivated.

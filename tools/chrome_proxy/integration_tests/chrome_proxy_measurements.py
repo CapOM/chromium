@@ -250,7 +250,7 @@ class ChromeProxyLoFi(ChromeProxyValidation):
 
   def CustomizeBrowserOptions(self, options):
     super(ChromeProxyLoFi, self).CustomizeBrowserOptions(options)
-    options.AppendExtraBrowserArgs('--enable-data-reduction-proxy-lo-fi')
+    options.AppendExtraBrowserArgs('--data-reduction-proxy-lo-fi=always-on')
 
   def AddResults(self, tab, results):
     self._metrics.AddResultsForLoFi(tab, results)
@@ -272,7 +272,7 @@ class ChromeProxyExpDirective(ChromeProxyValidation):
     options.AppendExtraBrowserArgs('--data-reduction-proxy-experiment=test')
 
   def AddResults(self, tab, results):
-    self._metrics.AddResultsForBypass(tab, results, url_pattern='/exptest/')
+    self._metrics.AddResultsForBypass(tab, results, url_pattern='/exp/')
 
 class ChromeProxyPassThrough(ChromeProxyValidation):
   """Correctness measurement for Chrome-Proxy pass-through directives.
@@ -377,6 +377,22 @@ class ChromeProxySmoke(ChromeProxyValidation):
 
 PROXIED = metrics.PROXIED
 DIRECT = metrics.DIRECT
+
+class ChromeProxyClientConfig(ChromeProxyValidation):
+  """Chrome proxy client configuration service validation."""
+
+  def __init__(self):
+    super(ChromeProxyClientConfig, self).__init__(
+        restart_after_each_page=True,
+        metrics=metrics.ChromeProxyMetric())
+
+  def CustomizeBrowserOptions(self, options):
+    super(ChromeProxyClientConfig, self).CustomizeBrowserOptions(options)
+    options.AppendExtraBrowserArgs(
+      '--enable-data-reduction-proxy-config-client')
+
+  def AddResults(self, tab, results):
+    self._metrics.AddResultsForClientConfig(tab, results)
 
 class ChromeProxyVideoValidation(page_test.PageTest):
   """Validation for video pages.

@@ -18,7 +18,6 @@
 #include "ui/aura/window_observer.h"
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/dragdrop/os_exchange_data.h"
-#include "ui/base/ui_base_switches_util.h"
 #include "ui/base/ui_base_types.h"
 #include "ui/compositor/layer.h"
 #include "ui/events/event.h"
@@ -271,9 +270,6 @@ InputMethod* NativeWidgetAura::CreateInputMethod() {
   if (!window_)
     return NULL;
 
-  if (switches::IsTextInputFocusManagerEnabled())
-    return new NullInputMethod();
-
   return new InputMethodBridge(this, GetHostInputMethod(), true);
 }
 
@@ -431,7 +427,7 @@ void NativeWidgetAura::StackBelow(gfx::NativeView native_view) {
     window_->parent()->StackChildBelow(window_, native_view);
 }
 
-void NativeWidgetAura::SetShape(gfx::NativeRegion region) {
+void NativeWidgetAura::SetShape(SkRegion* region) {
   if (window_)
     window_->layer()->SetAlphaShape(make_scoped_ptr(region));
   else
@@ -889,12 +885,6 @@ void NativeWidgetAura::OnKeyEvent(ui::KeyEvent* event) {
   if (!input_method)
     return;
   input_method->DispatchKeyEvent(*event);
-  if (switches::IsTextInputFocusManagerEnabled()) {
-    FocusManager* focus_manager = GetWidget()->GetFocusManager();
-    delegate_->OnKeyEvent(event);
-    if (!event->handled() && focus_manager)
-      focus_manager->OnKeyEvent(*event);
-  }
   event->SetHandled();
 }
 

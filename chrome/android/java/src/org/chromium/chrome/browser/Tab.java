@@ -18,6 +18,7 @@ import android.view.ViewGroup.LayoutParams;
 import android.widget.FrameLayout;
 
 import org.chromium.base.ActivityState;
+import org.chromium.base.ApplicationState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.ObserverList;
@@ -36,14 +37,16 @@ import org.chromium.chrome.browser.contextmenu.ContextMenuParams;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulator;
 import org.chromium.chrome.browser.contextmenu.ContextMenuPopulatorWrapper;
 import org.chromium.chrome.browser.contextmenu.EmptyChromeContextMenuItemDelegate;
+import org.chromium.chrome.browser.feedback.FeedbackCollector;
 import org.chromium.chrome.browser.fullscreen.FullscreenManager;
+import org.chromium.chrome.browser.help.HelpAndFeedback;
 import org.chromium.chrome.browser.infobar.InfoBarContainer;
 import org.chromium.chrome.browser.metrics.UmaSessionStats;
 import org.chromium.chrome.browser.metrics.UmaUtils;
 import org.chromium.chrome.browser.printing.TabPrinter;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelper;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelperSecurityLevel;
+import org.chromium.chrome.browser.ssl.ConnectionSecurity;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.SadTabViewFactory;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabSelectionType;
@@ -109,6 +112,12 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         View.OnSystemUiVisibilityChangeListener {
     public static final int INVALID_TAB_ID = -1;
     private static final long INVALID_TIMESTAMP = -1;
+
+    // TabRendererCrashStatus defined in tools/metrics/histograms/histograms.xml.
+    private static final int TAB_RENDERER_CRASH_STATUS_SHOWN_IN_FOREGROUND_APP = 0;
+    private static final int TAB_RENDERER_CRASH_STATUS_HIDDEN_IN_FOREGROUND_APP = 1;
+    private static final int TAB_RENDERER_CRASH_STATUS_HIDDEN_IN_BACKGROUND_APP = 2;
+    private static final int TAB_RENDERER_CRASH_STATUS_MAX = 3;
 
     /**
      * The required page load percentage for the page to be considered ready assuming the
@@ -345,8 +354,13 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         }
 
         @Override
-        public void onShowOriginalImage() {
-            if (mNativeTabAndroid != 0) nativeShowOriginalImage(mNativeTabAndroid);
+        public void onReloadIgnoringCache() {
+            reloadIgnoringCache();
+        }
+
+        @Override
+        public void onLoadOriginalImage() {
+            if (mNativeTabAndroid != 0) nativeLoadOriginalImage(mNativeTabAndroid);
         }
 
         @Override
@@ -558,6 +572,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
 
             int activityState = ApplicationStatus.getStateForActivity(
                     mWindowAndroid.getActivity().get());
+            int rendererCrashStatus = TAB_RENDERER_CRASH_STATUS_MAX;
             if (!processWasOomProtected
                     || activityState == ActivityState.PAUSED
                     || activityState == ActivityState.STOPPED
@@ -565,10 +580,21 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
                 // The tab crashed in background or was killed by the OS out-of-memory killer.
                 //setNeedsReload(true);
                 mNeedsReload = true;
+                if (ApplicationStatus.getStateForApplication()
+                        == ApplicationState.HAS_RUNNING_ACTIVITIES) {
+                    rendererCrashStatus = TAB_RENDERER_CRASH_STATUS_HIDDEN_IN_FOREGROUND_APP;
+                } else {
+                    rendererCrashStatus = TAB_RENDERER_CRASH_STATUS_HIDDEN_IN_BACKGROUND_APP;
+                }
             } else {
+                rendererCrashStatus = TAB_RENDERER_CRASH_STATUS_SHOWN_IN_FOREGROUND_APP;
                 showSadTab();
+                // TODO(jaekyun): This isn't needed anymore because a histogram
+                // "Tab.RendererCrashStatus" is recorded.
                 UmaSessionStats.logRendererCrash(mWindowAndroid.getActivity().get());
             }
+            RecordHistogram.recordEnumeratedHistogram(
+                    "Tab.RendererCrashStatus", rendererCrashStatus, TAB_RENDERER_CRASH_STATUS_MAX);
 
             mIsLoading = false;
             mIsBeingRestored = false;
@@ -1154,11 +1180,11 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     }
 
     /**
-     * @return The current {@link ConnectionSecurityHelperSecurityLevel} for the tab.
+     * @return The current {@link ConnectionSecurityLevel} for the tab.
      */
     // TODO(tedchoc): Remove this and transition all clients to use ToolbarModel directly.
     public int getSecurityLevel() {
-        return ConnectionSecurityHelper.getSecurityLevelForWebContents(getWebContents());
+        return ConnectionSecurity.getSecurityLevelForWebContents(getWebContents());
     }
 
     /**
@@ -1412,9 +1438,16 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
         initializeNative();
 
         if (AppBannerManager.isEnabled()) {
-            mAppBannerManager = new AppBannerManager(this, mContext);
-            addObserver(mAppBannerManager);
+            mAppBannerManager = createAppBannerManager();
+            if (mAppBannerManager != null) addObserver(mAppBannerManager);
         }
+    }
+
+    /**
+     * @return {@link AppBannerManager} to be used for this tab. May be null.
+     */
+    protected AppBannerManager createAppBannerManager() {
+        return new AppBannerManager(this, mContext);
     }
 
     /**
@@ -1651,7 +1684,11 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
             OnClickListener suggestionAction = new OnClickListener() {
                 @Override
                 public void onClick(View view) {
-                    loadUrl(new LoadUrlParams(UrlConstants.CRASH_REASON_URL));
+                    Activity activity = mWindowAndroid.getActivity().get();
+                    assert activity != null;
+                    HelpAndFeedback.getInstance(activity).show(
+                            activity, activity.getString(R.string.help_context_sad_tab),
+                            FeedbackCollector.create(Profile.getLastUsedProfile(), null));
                 }
             };
             OnClickListener reloadButtonAction = new OnClickListener() {
@@ -2405,11 +2442,11 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * Push state about whether or not the top controls can show or hide to the renderer.
      */
     public void updateFullscreenEnabledState() {
-        if (isFrozen() || mFullscreenManager == null) return;
+        if (isFrozen()) return;
 
         updateTopControlsState(getTopControlsStateConstraints(), TopControlsState.BOTH, true);
 
-        if (getContentViewCore() != null) {
+        if (getContentViewCore() != null && mFullscreenManager != null) {
             getContentViewCore().updateMultiTouchZoomSupport(
                     !mFullscreenManager.getPersistentFullscreenMode());
         }
@@ -2457,20 +2494,23 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
      * @return Whether hiding top controls is enabled or not.
      */
     protected boolean isHidingTopControlsEnabled() {
+        WebContents webContents = getWebContents();
+        if (webContents == null || webContents.isDestroyed()) return false;
+
         String url = getUrl();
         boolean enableHidingTopControls = url != null && !url.startsWith(UrlConstants.CHROME_SCHEME)
                 && !url.startsWith(UrlConstants.CHROME_NATIVE_SCHEME);
 
         int securityState = getSecurityLevel();
-        enableHidingTopControls &=
-                (securityState != ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR
-                        && securityState != ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING);
+        enableHidingTopControls &= (securityState != ConnectionSecurityLevel.SECURITY_ERROR
+                && securityState != ConnectionSecurityLevel.SECURITY_WARNING);
 
         enableHidingTopControls &=
                 !AccessibilityUtil.isAccessibilityEnabled(getApplicationContext());
         enableHidingTopControls &= !mIsImeShowing;
         enableHidingTopControls &= !mIsShowingErrorPage;
-        enableHidingTopControls &= !getWebContents().isShowingInterstitialPage();
+        enableHidingTopControls &= !webContents.isShowingInterstitialPage();
+        enableHidingTopControls &= (mFullscreenManager != null);
 
         return enableHidingTopControls;
     }
@@ -2780,7 +2820,7 @@ public class Tab implements ViewGroup.OnHierarchyChangeListener,
     private native void nativeCreateHistoricalTab(long nativeTabAndroid);
     private native void nativeUpdateTopControlsState(
             long nativeTabAndroid, int constraints, int current, boolean animate);
-    private native void nativeShowOriginalImage(long nativeTabAndroid);
+    private native void nativeLoadOriginalImage(long nativeTabAndroid);
     private native void nativeSearchByImageInNewTabAsync(long nativeTabAndroid);
     private native long nativeGetBookmarkId(long nativeTabAndroid, boolean onlyEditable);
     private native void nativeSetInterceptNavigationDelegate(long nativeTabAndroid,

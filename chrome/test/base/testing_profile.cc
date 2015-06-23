@@ -15,7 +15,6 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/thread_task_runner_handle.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
-#include "chrome/browser/autocomplete/in_memory_url_index.h"
 #include "chrome/browser/autocomplete/in_memory_url_index_factory.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/bookmarks/chrome_bookmark_client.h"
@@ -23,11 +22,9 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/favicon/chrome_fallback_icon_client_factory.h"
-#include "chrome/browser/favicon/chrome_favicon_client_factory.h"
 #include "chrome/browser/favicon/fallback_icon_service_factory.h"
 #include "chrome/browser/favicon/favicon_service_factory.h"
 #include "chrome/browser/history/chrome_history_client.h"
-#include "chrome/browser/history/chrome_history_client_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/history/web_history_service_factory.h"
 #include "chrome/browser/net/pref_proxy_config_tracker.h"
@@ -45,7 +42,7 @@
 #include "chrome/browser/search_engines/template_url_fetcher_factory.h"
 #include "chrome/browser/sync/glue/sync_start_util.h"
 #include "chrome/browser/ui/zoom/chrome_zoom_level_prefs.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
@@ -67,6 +64,7 @@
 #include "components/history/core/browser/history_service.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
 #include "components/keyed_service/core/refcounted_keyed_service.h"
+#include "components/omnibox/in_memory_url_index.h"
 #include "components/policy/core/common/policy_service.h"
 #include "components/ui/zoom/zoom_event_manager.h"
 #include "components/user_prefs/user_prefs.h"
@@ -189,20 +187,12 @@ scoped_ptr<KeyedService> CreateTestDesktopNotificationService(
 }
 #endif
 
-scoped_ptr<KeyedService> BuildFaviconService(content::BrowserContext* context) {
-  Profile* profile = Profile::FromBrowserContext(context);
-  return make_scoped_ptr(new favicon::FaviconService(
-      ChromeFaviconClientFactory::GetForProfile(profile),
-      HistoryServiceFactory::GetForProfile(
-          profile, ServiceAccessType::EXPLICIT_ACCESS)));
-}
-
 scoped_ptr<KeyedService> BuildHistoryService(content::BrowserContext* context) {
   Profile* profile = Profile::FromBrowserContext(context);
   return make_scoped_ptr(new history::HistoryService(
-      ChromeHistoryClientFactory::GetForProfile(profile),
-      scoped_ptr<history::VisitDelegate>(
-          new history::ContentVisitDelegate(profile))));
+      make_scoped_ptr(new ChromeHistoryClient(
+          BookmarkModelFactory::GetForProfile(profile))),
+      make_scoped_ptr(new history::ContentVisitDelegate(profile))));
 }
 
 scoped_ptr<KeyedService> BuildInMemoryURLIndex(
@@ -212,8 +202,9 @@ scoped_ptr<KeyedService> BuildInMemoryURLIndex(
       BookmarkModelFactory::GetForProfile(profile),
       HistoryServiceFactory::GetForProfile(profile,
                                            ServiceAccessType::IMPLICIT_ACCESS),
-      profile->GetPath(),
-      profile->GetPrefs()->GetString(prefs::kAcceptLanguages)));
+      content::BrowserThread::GetBlockingPool(), profile->GetPath(),
+      profile->GetPrefs()->GetString(prefs::kAcceptLanguages),
+      SchemeSet()));
   in_memory_url_index->Init();
   return in_memory_url_index.Pass();
 }
@@ -237,13 +228,6 @@ scoped_ptr<KeyedService> BuildChromeBookmarkClient(
     content::BrowserContext* context) {
   return make_scoped_ptr(
       new ChromeBookmarkClient(static_cast<Profile*>(context)));
-}
-
-scoped_ptr<KeyedService> BuildChromeHistoryClient(
-    content::BrowserContext* context) {
-  Profile* profile = static_cast<Profile*>(context);
-  return make_scoped_ptr(
-      new ChromeHistoryClient(BookmarkModelFactory::GetForProfile(profile)));
 }
 
 void TestProfileErrorCallback(WebDataServiceWrapper::ErrorType error_type,
@@ -548,7 +532,7 @@ TestingProfile::~TestingProfile() {
 void TestingProfile::CreateFaviconService() {
   // It is up to the caller to create the history service if one is needed.
   FaviconServiceFactory::GetInstance()->SetTestingFactory(
-      this, BuildFaviconService);
+      this, FaviconServiceFactory::GetDefaultFactory());
 }
 
 bool TestingProfile::CreateHistoryService(bool delete_file, bool no_db) {
@@ -608,8 +592,6 @@ void TestingProfile::CreateBookmarkModel(bool delete_file) {
     base::FilePath path = GetPath().Append(bookmarks::kBookmarksFileName);
     base::DeleteFile(path, false);
   }
-  ChromeHistoryClientFactory::GetInstance()->SetTestingFactory(
-      this, BuildChromeHistoryClient);
   ChromeBookmarkClientFactory::GetInstance()->SetTestingFactory(
       this, BuildChromeBookmarkClient);
   // This creates the BookmarkModel.

@@ -17,7 +17,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/history/history_service_factory.h"
-#include "chrome/browser/omnibox/omnibox_log.h"
 #include "chrome/browser/predictors/autocomplete_action_predictor_factory.h"
 #include "chrome/browser/predictors/predictor_database.h"
 #include "chrome/browser/predictors/predictor_database_factory.h"
@@ -31,6 +30,7 @@
 #include "components/history/core/browser/in_memory_database.h"
 #include "components/omnibox/autocomplete_match.h"
 #include "components/omnibox/autocomplete_result.h"
+#include "components/omnibox/omnibox_log.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_service.h"
@@ -344,7 +344,7 @@ void AutocompleteActionPredictor::OnOmniboxOpenedUrl(const OmniboxLog& log) {
   for (std::vector<TransitionalMatch>::const_iterator it =
         transitional_matches_.begin(); it != transitional_matches_.end();
         ++it) {
-    if (!StartsWith(lower_user_text, it->user_text, true))
+    if (!base::StartsWith(lower_user_text, it->user_text, true))
       continue;
 
     // Add entries to the database for those matches.

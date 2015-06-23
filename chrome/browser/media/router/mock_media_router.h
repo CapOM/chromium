@@ -23,17 +23,29 @@ class MockMediaRouter : public MediaRouter {
   MockMediaRouter();
   virtual ~MockMediaRouter();
 
-  MOCK_METHOD3(CreateRoute,
+  MOCK_METHOD5(CreateRoute,
                void(const MediaSource::Id& source,
                     const MediaSink::Id& sink_id,
+                    const GURL& origin,
+                    int tab_id,
+                    const MediaRouteResponseCallback& callback));
+  MOCK_METHOD5(JoinRoute,
+               void(const MediaSource::Id& source,
+                    const std::string& presentation_id,
+                    const GURL& origin,
+                    int tab_id,
                     const MediaRouteResponseCallback& callback));
   MOCK_METHOD1(CloseRoute, void(const MediaRoute::Id& route_id));
-  MOCK_METHOD2(PostMessage,
+  MOCK_METHOD3(SendRouteMessage,
                void(const MediaRoute::Id& route_id,
-                    const std::string& message));
+                    const std::string& message,
+                    const SendRouteMessageCallback& callback));
+  MOCK_METHOD2(ListenForRouteMessages,
+               void(const std::vector<MediaRoute::Id>& route_ids,
+                    const PresentationSessionMessageCallback& message_cb));
   MOCK_METHOD1(ClearIssue, void(const Issue::Id& issue_id));
-  MOCK_METHOD1(AddIssuesObserver, void(IssuesObserver* observer));
-  MOCK_METHOD1(RemoveIssuesObserver, void(IssuesObserver* observer));
+  MOCK_METHOD1(RegisterIssuesObserver, void(IssuesObserver* observer));
+  MOCK_METHOD1(UnregisterIssuesObserver, void(IssuesObserver* observer));
 
   MOCK_METHOD1(RegisterMediaSinksObserver, void(MediaSinksObserver* observer));
   MOCK_METHOD1(UnregisterMediaSinksObserver,

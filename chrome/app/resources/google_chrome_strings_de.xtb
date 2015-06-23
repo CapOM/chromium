@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">Fast fertig! Starten Sie Ihr Gerät neu, um die Aktualisierung abzuschließen.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome-Benachrichtigungen</translation>
+<translation id="6368805772029492593">Google Chrome verschlüsselt Ihre Daten zur Erhöhung der Sicherheit.</translation>
 <translation id="7339898014177206373">Neues Fenster</translation>
 <translation id="3282568296779691940">In Chrome anmelden</translation>
 <translation id="3089968997497233615">Es gibt eine neue, sicherere Version von Google Chrome.</translation>
@@ -158,7 +159,6 @@ Sollten Sie sich trotzdem anmelden, werden die Chrome-Daten wie Lesezeichen, Ver
 <translation id="2290095356545025170">Möchten Sie Google Chrome wirklich deinstallieren?</translation>
 <translation id="4273752058983339720">Google Chrome ist so konfiguriert, dass es beim Hochfahren Ihres Computers automatisch gestartet wird.</translation>
 <translation id="2316129865977710310">Kein Interesse</translation>
-<translation id="415994390253732730">Verhält Chrome sich ungewöhnlich?</translation>
 <translation id="1104959162601287462">Über &amp;Chrome OS</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Willkommen bei Chrome</translation>
@@ -209,13 +209,13 @@ Sollten Sie sich trotzdem anmelden, werden die Chrome-Daten wie Lesezeichen, Ver
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome ist jetzt noch besser</translation>
 <translation id="2588322182880276190">Chrome-Logo</translation>
+<translation id="4519152997629025674">Google Chrome nutzt möglicherweise <ph name="BEGIN_LINK"/>Webdienste<ph name="END_LINK"/> zur Verbesserung Ihrer Browsererfahrung. Sie können diese Dienste jederzeit deaktivieren.</translation>
 <translation id="4367618624832907428">Die Webseite kann nicht in Google Chrome angezeigt werden, weil Ihr Computer nicht mit dem Internet verbunden ist.</translation>
 <translation id="174539241580958092">Google Chrome konnte Ihre Daten aufgrund eines Fehlers bei der Anmeldung nicht synchronisieren.</translation>
 <translation id="8255190535488645436">Google Chrome verwendet Ihre Kamera und Ihr Mikrofon.</translation>
 <translation id="7396375882099008034">Erlauben Sie Chrome in Ihren Firewall- und Virenschutzeinstellungen den Zugriff auf das Netzwerk.</translation>
 <translation id="9102715433345326100">Diese Datei ist schädlich und wurde von Chrome blockiert.</translation>
 <translation id="8205111949707227942">Optional: Nutzungsstatistiken und Absturzberichte zur Verbesserung von Chrome OS automatisch an Google senden</translation>
-<translation id="487887346205285304">Verhält Chrome sich ungewöhnlich?</translation>
 <translation id="3622797965165704966">Sie können Chrome jetzt noch einfacher mit Ihrem Google-Konto und auf gemeinsam genutzten Computern verwenden.</translation>
 <translation id="7196020411877309443">Warum wird diese Meldung angezeigt?</translation>
 <translation id="2769762047821873045">Google Chrome ist nicht als Ihr Standardbrowser festgelegt.</translation>

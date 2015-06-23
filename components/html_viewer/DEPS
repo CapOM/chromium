@@ -4,7 +4,9 @@ include_rules = [
   "+blink/public/resources",
   "+cc",
   "+components/clipboard",
+  "+components/devtools_service/public",
   "+components/gpu",
+  "+components/message_port",
   "+components/mime_util",
   "+components/resource_provider/public",
   "+components/scheduler",
@@ -34,6 +36,7 @@ include_rules = [
   "+ui/gfx",
   "+ui/mojo/events",
   "+ui/mojo/geometry",
+  "+ui/mojo/init",
   "+ui/native_theme",
   "+v8/include",
 ]

@@ -24,8 +24,6 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.CommandLine;
 import org.chromium.base.MemoryPressureListener;
 import org.chromium.base.TraceEvent;
@@ -33,6 +31,7 @@ import org.chromium.base.VisibleForTesting;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ContextualMenuBar.ActionBarDelegate;
 import org.chromium.chrome.browser.IntentHandler.IntentHandlerDelegate;
 import org.chromium.chrome.browser.IntentHandler.TabOpenType;
@@ -40,6 +39,7 @@ import org.chromium.chrome.browser.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.appmenu.AppMenuObserver;
 import org.chromium.chrome.browser.appmenu.ChromeAppMenuPropertiesDelegate;
 import org.chromium.chrome.browser.compositor.CompositorViewHolder;
+import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
 import org.chromium.chrome.browser.compositor.layouts.Layout;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerChrome;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerChrome.OverviewLayoutFactoryDelegate;
@@ -76,7 +76,6 @@ import org.chromium.chrome.browser.sync.SyncController;
 import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.tabmodel.ChromeTabCreator;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModelObserver;
-import org.chromium.chrome.browser.tabmodel.TabCreatorManager.TabCreator;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
@@ -85,7 +84,7 @@ import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.tabmodel.TabWindowManager;
 import org.chromium.chrome.browser.toolbar.ToolbarControlContainer;
-import org.chromium.chrome.browser.toolbar.ToolbarHelper;
+import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.widget.emptybackground.EmptyBackgroundViewWrapper;
 import org.chromium.chrome.browser.widget.findinpage.FindToolbarManager;
@@ -101,7 +100,7 @@ import org.chromium.ui.base.PageTransition;
  * This is the main activity for ChromeMobile when not running in document mode.  All the tabs
  * are accessible via a chrome specific tab switching UI.
  */
-public class ChromeTabbedActivity extends CompositorChromeActivity implements ActionBarDelegate,
+public class ChromeTabbedActivity extends ChromeActivity implements ActionBarDelegate,
         OverviewModeObserver {
 
     private static final int FIRST_RUN_EXPERIENCE_RESULT = 101;
@@ -144,7 +143,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
     private static final String ACTION_CLOSE_TABS =
             "com.google.android.apps.chrome.ACTION_CLOSE_TABS";
 
-    private ToolbarHelper mToolbarHelper;
+    private ToolbarManager mToolbarManager;
 
     private FindToolbarManager mFindToolbarManager;
 
@@ -428,11 +427,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             });
 
             mFindToolbarManager = new FindToolbarManager(this, getTabModelSelector(),
-                    mToolbarHelper.getContextualMenuBar().getCustomSelectionActionModeCallback());
-            mControlContainer.setFindToolbarManager(mFindToolbarManager);
-            if (getContextualSearchManager() != null) {
-                getContextualSearchManager().setFindToolbarManager(mFindToolbarManager);
-            }
+                    mToolbarManager.getContextualMenuBar().getCustomSelectionActionModeCallback());
 
             OnClickListener tabSwitcherClickHandler = new OnClickListener() {
                 @Override
@@ -455,14 +450,15 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
                 }
             };
 
-            mToolbarHelper.initializeControls(mFindToolbarManager, mLayoutManager, mLayoutManager,
+            mToolbarManager.initializeWithNative(mTabModelSelectorImpl, getFullscreenManager(),
+                    mFindToolbarManager, mLayoutManager, mLayoutManager,
                     tabSwitcherClickHandler, newTabClickHandler, bookmarkClickHandler, null);
 
             mMenuAnchor = findViewById(R.id.menu_anchor_stub);
 
             removeWindowBackground();
 
-            if (mIsTablet) {
+            if (isTablet()) {
                 EmptyBackgroundViewWrapper bgViewWrapper = new EmptyBackgroundViewWrapper(
                         getTabModelSelector(), getTabCreator(false), ChromeTabbedActivity.this,
                         mAppMenuHandler, mLayoutManager);
@@ -589,19 +585,19 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
     @Override
     public void onOrientationChange(int orientation) {
         super.onOrientationChange(orientation);
-        mToolbarHelper.onOrientationChange();
+        mToolbarManager.onOrientationChange();
     }
 
     @Override
     public void onAccessibilityModeChanged(boolean enabled) {
         super.onAccessibilityModeChanged(enabled);
-        if (mToolbarHelper != null) mToolbarHelper.onAccessibilityStatusChanged(enabled);
+        if (mToolbarManager != null) mToolbarManager.onAccessibilityStatusChanged(enabled);
 
         if (mLayoutManager != null) {
             mLayoutManager.setEnableAnimations(
                     DeviceClassManager.enableAnimations(getApplicationContext()));
         }
-        if (mIsTablet) {
+        if (isTablet()) {
             if (getCompositorViewHolder() != null) {
                 getCompositorViewHolder().onAccessibilityStatusChanged(enabled);
             }
@@ -713,7 +709,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
                     assert false : "Unknown TabOpenType: " + tabOpenType;
                     break;
             }
-            mToolbarHelper.setUrlBarFocus(false);
+            mToolbarManager.setUrlBarFocus(false);
         }
 
         @Override
@@ -806,7 +802,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
         mChromeAppMenuPropertiesDelegate = new ChromeAppMenuPropertiesDelegate(this);
         mAppMenuHandler = new AppMenuHandler(ChromeTabbedActivity.this,
                 mChromeAppMenuPropertiesDelegate, R.menu.main_menu);
-        mToolbarHelper = new ToolbarHelper(this, mControlContainer, mAppMenuHandler,
+        mToolbarManager = new ToolbarManager(this, mControlContainer, mAppMenuHandler,
                 mChromeAppMenuPropertiesDelegate, getCompositorViewHolder().getInvalidator());
     }
 
@@ -827,9 +823,11 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             return;
         }
 
+        final boolean isIntentActionMain = getIntent() != null
+                && TextUtils.equals(getIntent().getAction(), Intent.ACTION_MAIN);
         android.util.Log.i(TAG, "begin FirstRunFlowSequencer.checkIfFirstRunIsNecessary");
         final Intent freIntent = FirstRunFlowSequencer.checkIfFirstRunIsNecessary(
-                this, getIntent());
+                this, getIntent(), isIntentActionMain);
         android.util.Log.i(TAG, "end FirstRunFlowSequencer.checkIfFirstRunIsNecessary");
         if (freIntent == null) return;
 
@@ -853,7 +851,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             TraceEvent.begin("ChromeTabbedActivity.onDeferredStartup");
             super.onDeferredStartup();
 
-            mToolbarHelper.onDeferredStartup();
+            mToolbarManager.onDeferredStartup(getOnCreateTimestampMs(), getClass().getSimpleName());
 
             ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
             RecordHistogram.recordSparseSlowlyHistogram(
@@ -918,8 +916,8 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
                     fromMenu ? TabLaunchType.FROM_MENU_OR_OVERVIEW : TabLaunchType.FROM_KEYBOARD);
             RecordUserAction.record("MobileMenuNewTab");
             RecordUserAction.record("MobileNewTabOpened");
-            if (mIsTablet && !fromMenu && !launchedTab.isHidden()) {
-                mToolbarHelper.setUrlBarFocus(true);
+            if (isTablet() && !fromMenu && !launchedTab.isHidden()) {
+                mToolbarManager.setUrlBarFocus(true);
             }
         } else if (id == R.id.new_incognito_tab_menu_id) {
             if (PrefServiceBridge.getInstance().isIncognitoModeEnabled()) {
@@ -931,8 +929,8 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
                         UrlConstants.NTP_URL,
                         fromMenu ? TabLaunchType.FROM_MENU_OR_OVERVIEW
                                 : TabLaunchType.FROM_KEYBOARD);
-                if (mIsTablet && !fromMenu && !launchedTab.isHidden()) {
-                    mToolbarHelper.setUrlBarFocus(true);
+                if (isTablet() && !fromMenu && !launchedTab.isHidden()) {
+                    mToolbarManager.setUrlBarFocus(true);
                 }
             }
         } else if (id == R.id.all_bookmarks_menu_id) {
@@ -968,6 +966,9 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             RecordUserAction.record("MobileMenuCloseAllTabs");
         } else if (id == R.id.find_in_page_id) {
             mFindToolbarManager.showToolbar();
+            if (getContextualSearchManager() != null) {
+                getContextualSearchManager().hideContextualSearch(StateChangeReason.UNKNOWN);
+            }
             if (fromMenu) {
                 RecordUserAction.record("MobileMenuFindInPage");
             } else {
@@ -977,9 +978,9 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             showMenu();
         } else if (id == R.id.focus_url_bar) {
             boolean isUrlBarVisible = !mLayoutManager.overviewVisible()
-                    && (!mIsTablet || getCurrentTabModel().getCount() != 0);
+                    && (!isTablet() || getCurrentTabModel().getCount() != 0);
             if (isUrlBarVisible) {
-                mToolbarHelper.setUrlBarFocus(true);
+                mToolbarManager.setUrlBarFocus(true);
             }
         } else {
             return super.onMenuOrKeyboardAction(id, fromMenu);
@@ -993,7 +994,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
         final Tab currentTab = getActivityTab();
 
         if (currentTab == null) {
-            if (mToolbarHelper.back()) {
+            if (mToolbarManager.back()) {
                 RecordUserAction.record("SystemBackForNavigation");
                 RecordUserAction.record("MobileTabClobbered");
             } else {
@@ -1004,7 +1005,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
         }
 
         // If we are in overview mode and not a tablet, then leave overview mode on back.
-        if (mLayoutManager.overviewVisible() && !mIsTablet) {
+        if (mLayoutManager.overviewVisible() && !isTablet()) {
             mLayoutManager.hideOverview(true);
             // TODO(benm): Record any user metrics in this case?
             return true;
@@ -1020,7 +1021,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             return true;
         }
 
-        if (!mToolbarHelper.back()) {
+        if (!mToolbarManager.back()) {
             final TabLaunchType type = currentTab.getLaunchType();
             final String associatedApp = currentTab.getAppAssociatedWith();
             final int parentId = currentTab.getParentId();
@@ -1091,7 +1092,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
             String externalAppId, boolean forceNewTab, Intent intent) {
         if (mUIInitialized) {
             mLayoutManager.hideOverview(false);
-            mToolbarHelper.finishAnimations();
+            mToolbarManager.finishAnimations();
         }
         if (TextUtils.equals(externalAppId, getPackageName())) {
             // If the intent was launched by chrome, open the new tab in the current model.
@@ -1153,7 +1154,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
                 model.removeObserver(mTabModelObserver);
             }
         }
-        if (mToolbarHelper != null) mToolbarHelper.destroy();
+        if (mToolbarManager != null) mToolbarManager.destroy();
         if (mUndoBarPopupController != null) mUndoBarPopupController.destroy();
         super.onDestroyInternal();
     }
@@ -1179,7 +1180,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (!mUIInitialized) return false;
         boolean isCurrentTabVisible = !mLayoutManager.overviewVisible()
-                && (!mIsTablet || getCurrentTabModel().getCount() != 0);
+                && (!isTablet() || getCurrentTabModel().getCount() != 0);
         return KeyboardShortcuts.onKeyDown(event, this, isCurrentTabVisible, true)
                 || super.onKeyDown(keyCode, event);
     }
@@ -1264,7 +1265,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
         if (!mUIInitialized) return false;
 
         // Do not show the menu if we are in find in page view.
-        if (mFindToolbarManager != null && mFindToolbarManager.isShowing() && !mIsTablet) {
+        if (mFindToolbarManager != null && mFindToolbarManager.isShowing() && !isTablet()) {
             return false;
         }
 
@@ -1300,7 +1301,7 @@ public class ChromeTabbedActivity extends CompositorChromeActivity implements Ac
 
     @Override
     public boolean hasDoneFirstDraw() {
-        return mToolbarHelper.hasDoneFirstDraw();
+        return mToolbarManager.hasDoneFirstDraw();
     }
 
     @Override

@@ -9,7 +9,6 @@ import unittest
 from telemetry.core import browser_credentials
 from telemetry.core import discover
 from telemetry.page import page_set as page_set_module
-from telemetry.util import classes
 from telemetry.wpr import archive_info
 
 
@@ -72,6 +71,11 @@ class PageSetSmokeTest(unittest.TestCase):
           isinstance(page_set.base_dir, str),
           msg='page_set %\'s base_dir must have type string')
 
+    self.assertIsNone(
+        page_set.user_agent_type,
+        msg='page_set %s has non None user_agent_type. '
+        'The user_agent_type field is deprecated (crbug.com/439512)' % page_set)
+
     self.assertTrue(
         isinstance(page_set.archive_data_file, str),
         msg='page_set\'s archive_data_file path must have type string')
@@ -131,13 +135,12 @@ class PageSetSmokeTest(unittest.TestCase):
     Subclass of PageSetSmokeTest is supposed to call this in some test
     method to run smoke test.
     """
+    # We can't test page sets that aren't directly constructable since we
+    # don't know what arguments to put for the constructor.
     page_sets = discover.DiscoverClasses(page_sets_dir, top_level_dir,
-                                         page_set_module.PageSet).values()
+                                         page_set_module.PageSet,
+                                         directly_constructable=True).values()
     for page_set_class in page_sets:
-      if not classes.IsDirectlyConstructable(page_set_class):
-        # We can't test page sets that aren't directly constructable since we
-        # don't know what arguments to put for the constructor.
-        continue
       page_set = page_set_class()
       logging.info('Testing %s', page_set.file_path)
       self.CheckArchive(page_set)

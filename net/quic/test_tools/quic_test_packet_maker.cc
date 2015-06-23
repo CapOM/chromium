@@ -24,8 +24,8 @@ QuicTestPacketMaker::QuicTestPacketMaker(QuicVersion version,
       connection_id_(connection_id),
       clock_(clock),
       host_(host),
-      spdy_request_framer_(SPDY4),
-      spdy_response_framer_(SPDY4) {
+      spdy_request_framer_(HTTP2),
+      spdy_response_framer_(HTTP2) {
 }
 
 QuicTestPacketMaker::~QuicTestPacketMaker() {
@@ -94,8 +94,8 @@ scoped_ptr<QuicEncryptedPacket> QuicTestPacketMaker::MakeAckAndRstPacket(
       BuildUnsizedDataPacket(&framer, header, frames));
   char buffer[kMaxPacketSize];
   scoped_ptr<QuicEncryptedPacket> encrypted(
-      framer.EncryptPacket(ENCRYPTION_NONE, header.packet_sequence_number,
-                           *packet, buffer, kMaxPacketSize));
+      framer.EncryptPayload(ENCRYPTION_NONE, header.packet_sequence_number,
+                            *packet, buffer, kMaxPacketSize));
   EXPECT_TRUE(encrypted != nullptr);
   return scoped_ptr<QuicEncryptedPacket>(encrypted->Clone());
 }
@@ -152,8 +152,8 @@ scoped_ptr<QuicEncryptedPacket> QuicTestPacketMaker::MakeAckPacket(
       BuildUnsizedDataPacket(&framer, header, frames));
   char buffer[kMaxPacketSize];
   scoped_ptr<QuicEncryptedPacket> encrypted(
-      framer.EncryptPacket(ENCRYPTION_NONE, header.packet_sequence_number,
-                           *packet, buffer, kMaxPacketSize));
+      framer.EncryptPayload(ENCRYPTION_NONE, header.packet_sequence_number,
+                            *packet, buffer, kMaxPacketSize));
   EXPECT_TRUE(encrypted != nullptr);
   return scoped_ptr<QuicEncryptedPacket>(encrypted->Clone());
 }
@@ -266,8 +266,8 @@ scoped_ptr<QuicEncryptedPacket> QuicTestPacketMaker::MakePacket(
       BuildUnsizedDataPacket(&framer, header, frames));
   char buffer[kMaxPacketSize];
   scoped_ptr<QuicEncryptedPacket> encrypted(
-      framer.EncryptPacket(ENCRYPTION_NONE, header.packet_sequence_number,
-                           *packet, buffer, kMaxPacketSize));
+      framer.EncryptPayload(ENCRYPTION_NONE, header.packet_sequence_number,
+                            *packet, buffer, kMaxPacketSize));
   EXPECT_TRUE(encrypted != nullptr);
   return scoped_ptr<QuicEncryptedPacket>(encrypted->Clone());
 }

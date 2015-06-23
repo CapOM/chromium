@@ -62,7 +62,7 @@ void HistoryController::GoToEntry(
   HistoryFrameLoadVector same_document_loads;
   HistoryFrameLoadVector different_document_loads;
 
-  provisional_entry_ = target_entry.Pass();
+  set_provisional_entry(target_entry.Pass());
   navigation_params_ = navigation_params.Pass();
 
   WebFrame* main_frame = render_view_->GetMainRenderFrame()->GetWebFrame();
@@ -184,6 +184,10 @@ void HistoryController::UpdateForCommit(RenderFrameImpl* frame,
       if (current_entry_) {
         if (HistoryEntry::HistoryNode* node =
                 current_entry_->GetHistoryNodeForFrame(frame)) {
+          // Inert commits that reset the page without changing the item (e.g.,
+          // reloads, location.replace) shouldn't keep the old subtree.
+          if (!navigation_within_page)
+            node->RemoveChildren();
           node->set_item(item);
         }
       }

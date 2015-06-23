@@ -924,6 +924,7 @@ PasswordStoreMac::PasswordStoreMac(
       login_metadata_db_(login_db.Pass()) {
   DCHECK(keychain_.get());
   DCHECK(login_metadata_db_.get());
+  login_metadata_db_->set_clear_password_values(true);
 }
 
 PasswordStoreMac::~PasswordStoreMac() {}
@@ -963,7 +964,7 @@ void PasswordStoreMac::Shutdown() {
 // thread.
 scoped_refptr<base::SingleThreadTaskRunner>
 PasswordStoreMac::GetBackgroundTaskRunner() {
-  return (thread_.get()) ? thread_->message_loop_proxy() : NULL;
+  return (thread_.get()) ? thread_->task_runner() : NULL;
 }
 
 void PasswordStoreMac::ReportMetricsImpl(const std::string& sync_username,

@@ -27,6 +27,11 @@ public class EmptyChromeContextMenuItemDelegate implements ChromeContextMenuItem
     }
 
     @Override
+    public boolean isDataReductionProxyEnabledForURL(String url) {
+        return false;
+    }
+
+    @Override
     public boolean startDownload(String url, boolean isLink) {
         return false;
     }
@@ -36,7 +41,11 @@ public class EmptyChromeContextMenuItemDelegate implements ChromeContextMenuItem
     }
 
     @Override
-    public void onShowOriginalImage() {
+    public void onReloadIgnoringCache() {
+    }
+
+    @Override
+    public void onLoadOriginalImage() {
     }
 
     @Override

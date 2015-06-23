@@ -54,7 +54,7 @@ scoped_refptr<media::VideoFrame> CopyFrameToYV12(
                                      frame->natural_size(),
                                      frame->timestamp());
 
-  if (frame->storage_type() == media::VideoFrame::STORAGE_TEXTURE) {
+  if (frame->HasTextures()) {
     DCHECK(frame->format() == media::VideoFrame::ARGB ||
            frame->format() == media::VideoFrame::XRGB);
     SkBitmap bitmap;
@@ -78,7 +78,7 @@ scoped_refptr<media::VideoFrame> CopyFrameToYV12(
                                frame->visible_rect(),
                                new_frame.get());
   } else {
-    DCHECK(media::VideoFrame::IsMappable(frame->storage_type()));
+    DCHECK(frame->IsMappable());
     DCHECK(frame->format() == media::VideoFrame::YV12 ||
            frame->format() == media::VideoFrame::I420);
     for (size_t i = 0; i < media::VideoFrame::NumPlanes(frame->format()); ++i) {
@@ -256,6 +256,23 @@ void WebMediaPlayerMS::setVolume(double volume) {
     audio_renderer_->SetVolume(volume_);
 }
 
+void WebMediaPlayerMS::setSinkId(const blink::WebString& device_id,
+                                 media::WebSetSinkIdCB* web_callback) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  std::string device_id_str(device_id.utf8());
+  GURL security_origin(frame_->securityOrigin().toString().utf8());
+  DVLOG(1) << __FUNCTION__
+           << "(" << device_id_str << ", " << security_origin << ")";
+  media::SwitchOutputDeviceCB callback =
+      media::ConvertToSwitchOutputDeviceCB(web_callback);
+  if (audio_renderer_.get()) {
+    audio_renderer_->SwitchOutputDevice(device_id_str, security_origin,
+                                        callback);
+  } else {
+    callback.Run(media::SWITCH_OUTPUT_DEVICE_RESULT_ERROR_NOT_SUPPORTED);
+  }
+}
+
 void WebMediaPlayerMS::setPreload(WebMediaPlayer::Preload preload) {
   DCHECK(thread_checker_.CalledOnValidThread());
 }
@@ -340,8 +357,7 @@ void WebMediaPlayerMS::paint(blink::WebCanvas* canvas,
   DCHECK(thread_checker_.CalledOnValidThread());
 
   media::Context3D context_3d;
-  if (current_frame_.get() &&
-      current_frame_->storage_type() == media::VideoFrame::STORAGE_TEXTURE) {
+  if (current_frame_.get() && current_frame_->HasTextures()) {
     cc::ContextProvider* provider =
         RenderThreadImpl::current()->SharedMainThreadContextProvider().get();
     // GPU Process crashed.
@@ -402,19 +418,6 @@ unsigned WebMediaPlayerMS::videoDecodedByteCount() const {
 bool WebMediaPlayerMS::copyVideoTextureToPlatformTexture(
     blink::WebGraphicsContext3D* web_graphics_context,
     unsigned int texture,
-    unsigned int level,
-    unsigned int internal_format,
-    unsigned int type,
-    bool premultiply_alpha,
-    bool flip_y) {
-  return copyVideoTextureToPlatformTexture(web_graphics_context, texture,
-                                           internal_format, type,
-                                           premultiply_alpha, flip_y);
-}
-
-bool WebMediaPlayerMS::copyVideoTextureToPlatformTexture(
-    blink::WebGraphicsContext3D* web_graphics_context,
-    unsigned int texture,
     unsigned int internal_format,
     unsigned int type,
     bool premultiply_alpha,
@@ -428,8 +431,8 @@ bool WebMediaPlayerMS::copyVideoTextureToPlatformTexture(
     video_frame = current_frame_;
   }
 
-  if (!video_frame.get() ||
-      video_frame->storage_type() != media::VideoFrame::STORAGE_TEXTURE) {
+  if (!video_frame.get() || video_frame->HasTextures() ||
+      media::VideoFrame::NumPlanes(video_frame->format()) != 1) {
     return false;
   }
 
@@ -438,7 +441,7 @@ bool WebMediaPlayerMS::copyVideoTextureToPlatformTexture(
   gpu::gles2::GLES2Interface* gl =
       static_cast<gpu_blink::WebGraphicsContext3DImpl*>(web_graphics_context)
           ->GetGLInterface();
-  media::SkCanvasVideoRenderer::CopyVideoFrameTextureToGLTexture(
+  media::SkCanvasVideoRenderer::CopyVideoFrameSingleTextureToGLTexture(
       gl, video_frame.get(), texture, internal_format, type, premultiply_alpha,
       flip_y);
   return true;

@@ -344,7 +344,7 @@ bool RenderViewHostImpl::CreateRenderView(
 
   // If it's enabled, tell the renderer to set up the Javascript bindings for
   // sending messages back to the browser.
-  if (GetProcess()->IsIsolatedGuest())
+  if (GetProcess()->IsForGuestsOnly())
     DCHECK_EQ(0, enabled_bindings_);
   Send(new ViewMsg_AllowBindings(GetRoutingID(), enabled_bindings_));
   // Let our delegate know that we created a RenderView.
@@ -431,10 +431,8 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
   prefs.accelerated_2d_canvas_msaa_sample_count =
       atoi(command_line.GetSwitchValueASCII(
       switches::kAcceleratedCanvas2dMSAASampleCount).c_str());
-  // Text blobs rely on impl-side painting for proper LCD handling.
-  prefs.text_blobs_enabled = command_line.HasSwitch(switches::kForceTextBlobs)
-      || (content::IsImplSidePaintingEnabled() &&
-          !command_line.HasSwitch(switches::kDisableTextBlobs));
+  prefs.text_blobs_enabled =
+      !command_line.HasSwitch(switches::kDisableTextBlobs);
 
   prefs.pinch_overlay_scrollbar_thickness = 10;
   prefs.use_solid_color_scrollbars = ui::IsOverlayScrollbarEnabled();
@@ -469,8 +467,9 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
   prefs.touch_adjustment_enabled =
       !command_line.HasSwitch(switches::kDisableTouchAdjustment);
 
-  prefs.slimming_paint_enabled =
-      command_line.HasSwitch(switches::kEnableSlimmingPaint);
+  prefs.slimming_paint_enabled = command_line.HasSwitch(
+      switches::kEnableSlimmingPaint) ||
+      !command_line.HasSwitch(switches::kDisableSlimmingPaint);
 
 #if defined(OS_MACOSX) || defined(OS_CHROMEOS)
   bool default_enable_scroll_animator = true;
@@ -507,10 +506,6 @@ WebPreferences RenderViewHostImpl::ComputeWebkitPrefs() {
 
   prefs.main_frame_resizes_are_orientation_changes =
       command_line.HasSwitch(switches::kMainFrameResizesAreOrientationChanges);
-
-  prefs.deferred_image_decoding_enabled =
-      command_line.HasSwitch(switches::kEnableDeferredImageDecoding) ||
-      content::IsImplSidePaintingEnabled();
 
   prefs.image_color_profiles_enabled =
       command_line.HasSwitch(switches::kEnableImageColorProfiles);
@@ -732,7 +727,7 @@ RenderFrameHost* RenderViewHostImpl::GetMainFrame() {
 
 void RenderViewHostImpl::AllowBindings(int bindings_flags) {
   // Never grant any bindings to browser plugin guests.
-  if (GetProcess()->IsIsolatedGuest()) {
+  if (GetProcess()->IsForGuestsOnly()) {
     NOTREACHED() << "Never grant bindings to a guest process.";
     return;
   }

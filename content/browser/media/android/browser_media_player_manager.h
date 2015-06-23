@@ -54,6 +54,13 @@ class CONTENT_EXPORT BrowserMediaPlayerManager
   static void RegisterMediaUrlInterceptor(
       media::MediaUrlInterceptor* media_url_interceptor);
 
+  // Pass a java surface object to the MediaPlayerAndroid object
+  // identified by render process handle, render frame ID and player ID.
+  static void SetSurfacePeer(scoped_refptr<gfx::SurfaceTexture> surface_texture,
+                             base::ProcessHandle render_process_handle,
+                             int render_frame_id,
+                             int player_id);
+
   // Returns a new instance using the registered factory if available.
   static BrowserMediaPlayerManager* Create(
       RenderFrameHost* rfh,
@@ -98,7 +105,6 @@ class CONTENT_EXPORT BrowserMediaPlayerManager
   media::MediaUrlInterceptor* GetMediaUrlInterceptor() override;
   media::MediaPlayerAndroid* GetFullscreenPlayer() override;
   media::MediaPlayerAndroid* GetPlayer(int player_id) override;
-  void RequestFullScreen(int player_id) override;
   bool RequestPlay(int player_id) override;
 #if defined(VIDEO_HOLE)
   void AttachExternalVideoSurface(int player_id, jobject surface);

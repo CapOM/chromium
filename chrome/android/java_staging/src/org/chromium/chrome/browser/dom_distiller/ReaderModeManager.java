@@ -8,14 +8,13 @@ import android.app.Activity;
 import android.content.Context;
 import android.text.TextUtils;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.CommandLine;
 import org.chromium.base.ObserverList;
 import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.chrome.R;
+import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ChromeVersionInfo;
-import org.chromium.chrome.browser.CompositorChromeActivity;
 import org.chromium.chrome.browser.EmptyTabObserver;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.contextualsearch.ContextualSearchManager;
@@ -329,8 +328,8 @@ public class ReaderModeManager extends EmptyTabObserver
     private ContextualSearchManager getContextualSearchManager(Tab tab) {
         if (tab == null || tab.getWindowAndroid() == null) return null;
         Activity activity = tab.getWindowAndroid().getActivity().get();
-        if (!(activity instanceof CompositorChromeActivity)) return null;
-        return ((CompositorChromeActivity) activity).getContextualSearchManager();
+        if (!(activity instanceof ChromeActivity)) return null;
+        return ((ChromeActivity) activity).getContextualSearchManager();
     }
 
     /**

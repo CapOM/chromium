@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">Den er næsten opdateret. Genstart din enhed for at fuldføre opdateringen.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> – Google Chrome</translation>
 <translation id="1073391069195728457">Chrome – Underretninger</translation>
+<translation id="6368805772029492593">Som et ekstra sikkerhedsniveau krypterer Google Chrome dine data.</translation>
 <translation id="7339898014177206373">Nyt vindue</translation>
 <translation id="3282568296779691940">Log ind på Chrome</translation>
 <translation id="3089968997497233615">Der findes en ny, sikker version af Google Chrome.</translation>
@@ -165,7 +166,6 @@ Hvis du logger ind alligevel, flettes Chrome-oplysninger, som f.eks. bogmærker,
 <translation id="2290095356545025170">Er du sikker på, at du vil afinstallere Google Chrome?</translation>
 <translation id="4273752058983339720">Google Chrome er konfigureret til at åbne automatisk, når du starter computeren.</translation>
 <translation id="2316129865977710310">Nej tak</translation>
-<translation id="415994390253732730">Opfører Chrome sig mærkeligt?</translation>
 <translation id="1104959162601287462">Om &amp;Chrome OS</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Velkommen til Chrome</translation>
@@ -218,6 +218,7 @@ Hvis du logger ind alligevel, flettes Chrome-oplysninger, som f.eks. bogmærker,
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome er blevet bedre</translation>
 <translation id="2588322182880276190">Chrome-logo</translation>
+<translation id="4519152997629025674">Google Chrome kan bruge <ph name="BEGIN_LINK"/>webtjenester<ph name="END_LINK"/> for at forbedre din browseroplevelse. Du kan deaktivere disse tjenester til enhver tid.</translation>
 <translation id="4367618624832907428">Google Chrome kan ikke vise websiden, fordi computeren ikke har forbindelse til internettet.</translation>
 <translation id="174539241580958092">Google Chrome kunne ikke synkronisere dine data på grund af en loginfejl.</translation>
 <translation id="8255190535488645436">Google Chrome bruger dit kamera og din mikrofon.</translation>
@@ -225,7 +226,6 @@ Hvis du logger ind alligevel, flettes Chrome-oplysninger, som f.eks. bogmærker,
        antivirus.</translation>
 <translation id="9102715433345326100">Denne fil er skadelig, og Chrome har blokeret den.</translation>
 <translation id="8205111949707227942">Valgfrit: Vær med til at gøre Chrome OS bedre ved automatisk at sende brugsstatistikker og rapporter om nedbrud til Google.</translation>
-<translation id="487887346205285304">Opfører Chrome sig mærkeligt?</translation>
 <translation id="3622797965165704966">Nu er det blevet nemmere at bruge Chrome med din Google-konto og på delte computere.</translation>
 <translation id="7196020411877309443">Hvorfor får jeg vist dette?</translation>
 <translation id="2769762047821873045">Google Chrome er ikke din standardbrowser.</translation>

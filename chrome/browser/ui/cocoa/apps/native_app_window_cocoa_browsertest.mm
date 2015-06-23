@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This file tests whichever implementation of NativeAppWindow is used.
-// I.e. it could be NativeAppWindowCocoa or ChromeNativeAppWindowViewsMac.
 #include "extensions/browser/app_window/native_app_window.h"
 
 #import <Cocoa/Cocoa.h>
@@ -20,12 +18,14 @@
 #include "chrome/browser/ui/extensions/app_launch_params.h"
 #include "chrome/browser/ui/extensions/application_launch.h"
 #import "chrome/browser/ui/test/scoped_fake_nswindow_main_status.h"
+#include "chrome/common/chrome_switches.h"
 #include "content/public/browser/notification_service.h"
 #include "content/public/test/test_utils.h"
 #include "extensions/browser/app_window/app_window_registry.h"
 #include "extensions/common/constants.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #import "ui/base/test/nswindow_fullscreen_notification_waiter.h"
+#import "ui/gfx/mac/nswindow_frame_controls.h"
 
 using extensions::AppWindow;
 using extensions::PlatformAppBrowserTest;
@@ -36,9 +36,20 @@ using ::testing::Return;
 
 namespace {
 
-class NativeAppWindowCocoaBrowserTest : public PlatformAppBrowserTest {
+// The param selects whether to use ChromeNativeAppWindowViewsMac, otherwise it
+// will use NativeAppWindowCocoa.
+class NativeAppWindowCocoaBrowserTest
+    : public testing::WithParamInterface<bool>,
+      public PlatformAppBrowserTest {
  protected:
   NativeAppWindowCocoaBrowserTest() {}
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    PlatformAppBrowserTest::SetUpCommandLine(command_line);
+    command_line->AppendSwitch(
+        GetParam() ? switches::kEnableMacViewsNativeAppWindows
+                   : switches::kDisableMacViewsNativeAppWindows);
+  }
 
   void SetUpAppWithWindows(int num_windows) {
     app_ = InstallExtension(
@@ -65,7 +76,7 @@ class NativeAppWindowCocoaBrowserTest : public PlatformAppBrowserTest {
 }  // namespace
 
 // Test interaction of Hide/Show() with Hide/ShowWithApp().
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, HideShowWithApp) {
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest, HideShowWithApp) {
   SetUpAppWithWindows(2);
   extensions::AppWindowRegistry::AppWindowList windows =
       extensions::AppWindowRegistry::Get(profile())->app_windows();
@@ -160,7 +171,7 @@ class MockExtensionAppShimHandler : public apps::ExtensionAppShimHandler {
 }  // namespace
 
 // Test Hide/Show and Hide/ShowWithApp() behavior when shims are enabled.
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest,
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest,
                        HideShowWithAppWithShim) {
   test::AppShimHostManagerTestApi test_api(
       g_browser_process->platform_part()->app_shim_host_manager());
@@ -240,12 +251,12 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest,
 
 // Test that NativeAppWindow and AppWindow fullscreen state is updated when
 // the window is fullscreened natively.
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Fullscreen) {
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest, Fullscreen) {
   if (!base::mac::IsOSLionOrLater())
     return;
 
-  SetUpAppWithWindows(1);
-  AppWindow* app_window = GetFirstAppWindow();
+  extensions::AppWindow* app_window =
+      CreateTestAppWindow("{\"alwaysOnTop\": true }");
   extensions::NativeAppWindow* window = app_window->GetBaseWindow();
   NSWindow* ns_window = app_window->GetNativeWindow();
   base::scoped_nsobject<ScopedNotificationWatcher> watcher;
@@ -254,6 +265,7 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Fullscreen) {
             app_window->fullscreen_types_for_test());
   EXPECT_FALSE(window->IsFullscreen());
   EXPECT_FALSE([ns_window styleMask] & NSFullScreenWindowMask);
+  EXPECT_TRUE(gfx::IsNSWindowAlwaysOnTop(ns_window));
 
   watcher.reset([[ScopedNotificationWatcher alloc]
       initWithNotification:NSWindowDidEnterFullScreenNotification
@@ -264,6 +276,7 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Fullscreen) {
               AppWindow::FULLSCREEN_TYPE_OS);
   EXPECT_TRUE(window->IsFullscreen());
   EXPECT_TRUE([ns_window styleMask] & NSFullScreenWindowMask);
+  EXPECT_FALSE(gfx::IsNSWindowAlwaysOnTop(ns_window));
 
   watcher.reset([[ScopedNotificationWatcher alloc]
       initWithNotification:NSWindowDidExitFullScreenNotification
@@ -275,6 +288,7 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Fullscreen) {
             app_window->fullscreen_types_for_test());
   EXPECT_FALSE(window->IsFullscreen());
   EXPECT_FALSE([ns_window styleMask] & NSFullScreenWindowMask);
+  EXPECT_TRUE(gfx::IsNSWindowAlwaysOnTop(ns_window));
 
   watcher.reset([[ScopedNotificationWatcher alloc]
       initWithNotification:NSWindowDidEnterFullScreenNotification
@@ -286,6 +300,7 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Fullscreen) {
               AppWindow::FULLSCREEN_TYPE_WINDOW_API);
   EXPECT_TRUE(window->IsFullscreen());
   EXPECT_TRUE([ns_window styleMask] & NSFullScreenWindowMask);
+  EXPECT_FALSE(gfx::IsNSWindowAlwaysOnTop(ns_window));
 
   watcher.reset([[ScopedNotificationWatcher alloc]
       initWithNotification:NSWindowDidExitFullScreenNotification
@@ -296,11 +311,12 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Fullscreen) {
             app_window->fullscreen_types_for_test());
   EXPECT_FALSE(window->IsFullscreen());
   EXPECT_FALSE([ns_window styleMask] & NSFullScreenWindowMask);
+  EXPECT_TRUE(gfx::IsNSWindowAlwaysOnTop(ns_window));
 }
 
 // Test that, in frameless windows, the web contents has the same size as the
 // window.
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Frameless) {
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest, Frameless) {
   AppWindow* app_window = CreateTestAppWindow("{\"frame\": \"none\"}");
   NSWindow* ns_window = app_window->GetNativeWindow();
   NSView* web_contents = app_window->web_contents()->GetNativeView();
@@ -398,16 +414,16 @@ void TestControls(AppWindow* app_window) {
 
 }  // namespace
 
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, Controls) {
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest, Controls) {
   TestControls(CreateTestAppWindow("{}"));
 }
 
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, ControlsFrameless) {
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest, ControlsFrameless) {
   TestControls(CreateTestAppWindow("{\"frame\": \"none\"}"));
 }
 
 // Test that the colored frames have the correct color when active and inactive.
-IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, FrameColor) {
+IN_PROC_BROWSER_TEST_P(NativeAppWindowCocoaBrowserTest, FrameColor) {
   // The hex values indicate an RGB color. When we get the NSColor later, the
   // components are CGFloats in the range [0, 1].
   extensions::AppWindow* app_window = CreateTestAppWindow(
@@ -437,3 +453,7 @@ IN_PROC_BROWSER_TEST_F(NativeAppWindowCocoaBrowserTest, FrameColor) {
   EXPECT_EQ(0, [color greenComponent]);
   EXPECT_EQ(0, [color blueComponent]);
 }
+
+INSTANTIATE_TEST_CASE_P(NativeAppWindowCocoaBrowserTestInstance,
+                        NativeAppWindowCocoaBrowserTest,
+                        ::testing::Bool());

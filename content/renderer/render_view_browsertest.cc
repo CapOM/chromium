@@ -57,6 +57,7 @@
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebPerformance.h"
 #include "third_party/WebKit/public/web/WebRuntimeFeatures.h"
+#include "third_party/WebKit/public/web/WebSettings.h"
 #include "third_party/WebKit/public/web/WebView.h"
 #include "third_party/WebKit/public/web/WebWindowFeatures.h"
 #include "ui/events/event.h"
@@ -370,6 +371,26 @@ class DevToolsAgentTest : public RenderViewImplTest {
   }
 };
 
+class RenderViewImplBlinkSettingsTest : public RenderViewImplTest {
+ public:
+  void DoSetUp() {
+    RenderViewImplTest::SetUp();
+  }
+
+  const blink::WebSettings* settings() {
+    return view()->webview()->settings();
+  }
+
+ protected:
+  // Blink settings may be specified on the command line, which must
+  // be configured before RenderViewImplTest::SetUp runs. Thus we make
+  // SetUp() a no-op, and expose RenderViewImplTest::SetUp() via
+  // DoSetUp(), to allow tests to perform command line modifications
+  // before RenderViewImplTest::SetUp is run. Each test must invoke
+  // DoSetUp manually once pre-SetUp configuration is complete.
+  void SetUp() override {}
+};
+
 // Ensure that the main RenderFrame is deleted and cleared from the RenderView
 // after closing it.
 TEST_F(RenderViewImplTest, RenderFrameClearedAfterClose) {
@@ -519,7 +540,20 @@ TEST_F(RenderViewImplTest, DecideNavigationPolicy) {
   policy_info.defaultPolicy = blink::WebNavigationPolicyCurrentTab;
   blink::WebNavigationPolicy policy = frame()->decidePolicyForNavigation(
           policy_info);
-  EXPECT_EQ(blink::WebNavigationPolicyCurrentTab, policy);
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kEnableBrowserSideNavigation)) {
+    EXPECT_EQ(blink::WebNavigationPolicyCurrentTab, policy);
+  } else {
+    // If this is a renderer-initiated navigation that just begun, it should
+    // stop and be sent to the browser.
+    EXPECT_EQ(blink::WebNavigationPolicyIgnore, policy);
+
+    // If this a navigation that is ready to commit, it should be handled
+    // locally.
+    request.setCheckForBrowserSideNavigation(false);
+    policy = frame()->decidePolicyForNavigation(policy_info);
+    EXPECT_EQ(blink::WebNavigationPolicyCurrentTab, policy);
+  }
 
   // Verify that form posts to WebUI URLs will be sent to the browser process.
   blink::WebURLRequest form_request(GURL("chrome://foo"));
@@ -642,8 +676,7 @@ TEST_F(RenderViewImplTest, DecideNavigationPolicyForWebUI) {
 TEST_F(RenderViewImplTest, SendSwapOutACK) {
   // This test is invalid in --site-per-process mode, as swapped-out is no
   // longer used.
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (RenderFrameProxy::IsSwappedOutStateForbidden()) {
     return;
   }
   LoadHTML("<div>Page A</div>");
@@ -694,8 +727,7 @@ TEST_F(RenderViewImplTest, SendSwapOutACK) {
 TEST_F(RenderViewImplTest, ReloadWhileSwappedOut) {
   // This test is invalid in --site-per-process mode, as swapped-out is no
   // longer used.
-  if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-          switches::kSitePerProcess)) {
+  if (RenderFrameProxy::IsSwappedOutStateForbidden()) {
     return;
   }
 
@@ -921,86 +953,6 @@ TEST_F(RenderViewImplTest,  DISABLED_LastCommittedUpdateState) {
   EXPECT_NE(state_A, state);
   EXPECT_NE(state_B, state);
   EXPECT_EQ(state_C, state);
-}
-
-// Test that stale back/forward navigations arriving from the browser are
-// ignored.  See http://crbug.com/86758.
-TEST_F(RenderViewImplTest, StaleNavigationsIgnored) {
-  // Load page A.
-  LoadHTML("<div id=pagename>Page A</div>");
-  EXPECT_EQ(1, view()->history_list_length_);
-  EXPECT_EQ(0, view()->history_list_offset_);
-
-  // Load page B, which will trigger an UpdateState message for page A.
-  LoadHTML("<div id=pagename>Page B</div>");
-  EXPECT_EQ(2, view()->history_list_length_);
-  EXPECT_EQ(1, view()->history_list_offset_);
-
-  // Check for a valid UpdateState message for page A.
-  ProcessPendingMessages();
-  const IPC::Message* msg_A = render_thread_->sink().GetUniqueMessageMatching(
-      ViewHostMsg_UpdateState::ID);
-  ASSERT_TRUE(msg_A);
-  ViewHostMsg_UpdateState::Param param;
-  ViewHostMsg_UpdateState::Read(msg_A, &param);
-  int page_id_A = base::get<0>(param);
-  PageState state_A = base::get<1>(param);
-  EXPECT_EQ(1, page_id_A);
-  render_thread_->sink().ClearMessages();
-
-  // Back to page A (nav_entry_id 1) and commit.
-  CommonNavigationParams common_params_A;
-  RequestNavigationParams request_params_A;
-  common_params_A.navigation_type = FrameMsg_Navigate_Type::NORMAL;
-  common_params_A.transition = ui::PAGE_TRANSITION_FORWARD_BACK;
-  request_params_A.current_history_list_length = 2;
-  request_params_A.current_history_list_offset = 1;
-  request_params_A.pending_history_list_offset = 0;
-  request_params_A.page_id = 1;
-  request_params_A.nav_entry_id = 1;
-  request_params_A.page_state = state_A;
-  NavigateMainFrame(common_params_A, StartNavigationParams(), request_params_A);
-  ProcessPendingMessages();
-
-  // A new navigation commits, clearing the forward history.
-  LoadHTML("<div id=pagename>Page C</div>");
-  EXPECT_EQ(2, view()->history_list_length_);
-  EXPECT_EQ(1, view()->history_list_offset_);
-  EXPECT_EQ(3, view()->page_id_); // page C is now page id 3
-  int was_page_c = -1;
-  base::string16 check_page_c = base::ASCIIToUTF16(
-      "Number(document.getElementById('pagename').innerHTML == 'Page C')");
-  EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_c, &was_page_c));
-  EXPECT_EQ(1, was_page_c);
-
-  // The browser then sends a stale navigation to B, which should be ignored.
-  CommonNavigationParams common_params_B;
-  RequestNavigationParams request_params_B;
-  common_params_B.navigation_type = FrameMsg_Navigate_Type::NORMAL;
-  common_params_B.transition = ui::PAGE_TRANSITION_FORWARD_BACK;
-  request_params_B.current_history_list_length = 2;
-  request_params_B.current_history_list_offset = 0;
-  request_params_B.pending_history_list_offset = 1;
-  request_params_B.page_id = 2;
-  request_params_B.nav_entry_id = 2;
-  request_params_B.page_state =
-      state_A;  // Doesn't matter, just has to be present.
-  NavigateMainFrame(common_params_B, StartNavigationParams(), request_params_B);
-
-  // State should be unchanged.
-  EXPECT_EQ(2, view()->history_list_length_);
-  EXPECT_EQ(1, view()->history_list_offset_);
-  EXPECT_EQ(3, view()->page_id_); // page C, not page B
-  was_page_c = -1;
-  EXPECT_TRUE(ExecuteJavaScriptAndReturnIntValue(check_page_c, &was_page_c));
-  EXPECT_EQ(1, was_page_c);
-
-  // Check for a valid DidDropNavigation message.
-  ProcessPendingMessages();
-  const IPC::Message* msg = render_thread_->sink().GetUniqueMessageMatching(
-      FrameHostMsg_DidDropNavigation::ID);
-  ASSERT_TRUE(msg);
-  render_thread_->sink().ClearMessages();
 }
 
 // Test that our IME backend sends a notification message when the input focus
@@ -1307,16 +1259,9 @@ TEST_F(RenderViewImplTest, OnSetTextDirection) {
   }
 }
 
-// see http://crbug.com/238750
-#if defined(OS_WIN)
-#define MAYBE_OnHandleKeyboardEvent DISABLED_OnHandleKeyboardEvent
-#else
-#define MAYBE_OnHandleKeyboardEvent OnHandleKeyboardEvent
-#endif
-
 // Test that we can receive correct DOM events when we send input events
 // through the RenderWidget::OnHandleInputEvent() function.
-TEST_F(RenderViewImplTest, MAYBE_OnHandleKeyboardEvent) {
+TEST_F(RenderViewImplTest, OnHandleKeyboardEvent) {
 #if !defined(OS_MACOSX)
   // Load an HTML page consisting of one <input> element and three
   // contentediable <div> elements.
@@ -2394,6 +2339,20 @@ TEST_F(RenderViewImplTest, HistoryIsProperlyUpdatedOnNavigation) {
   EXPECT_EQ(1, view()->historyBackListCount());
   EXPECT_EQ(2, view()->historyBackListCount() +
       view()->historyForwardListCount() + 1);
+}
+
+TEST_F(RenderViewImplBlinkSettingsTest, Default) {
+  DoSetUp();
+  EXPECT_EQ(blink::WebSettings::HoverTypeNone, settings()->primaryHoverType());
+  EXPECT_FALSE(settings()->viewportEnabled());
+}
+
+TEST_F(RenderViewImplBlinkSettingsTest, CommandLine) {
+  base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+      switches::kBlinkSettings, "primaryHoverType=4,viewportEnabled=true");
+  DoSetUp();
+  EXPECT_EQ(blink::WebSettings::HoverTypeHover, settings()->primaryHoverType());
+  EXPECT_TRUE(settings()->viewportEnabled());
 }
 
 TEST_F(DevToolsAgentTest, DevToolsResumeOnClose) {

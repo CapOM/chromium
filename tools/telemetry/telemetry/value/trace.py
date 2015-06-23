@@ -13,8 +13,8 @@ import tempfile
 
 from catapult_base import cloud_storage
 from telemetry.core import util
+from telemetry.internal.util import file_handle
 from telemetry.timeline import trace_data as trace_data_module
-from telemetry.util import file_handle
 from telemetry import value as value_module
 
 # Bring in tv module for transforming raw trace to html form.
@@ -56,9 +56,9 @@ class TraceValue(value_module.Value):
 
   def __repr__(self):
     if self.page:
-      page_name = self.page.name
+      page_name = self.page.display_name
     else:
-      page_name = None
+      page_name = 'None'
     return 'TraceValue(%s, %s)' % (page_name, self.name)
 
   def CleanUp(self):

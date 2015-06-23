@@ -14,6 +14,7 @@ import org.chromium.base.VisibleForTesting;
 import org.chromium.components.invalidation.SerializedInvalidation.Invalidation;
 
 import java.io.IOException;
+import java.util.Locale;
 
 import javax.annotation.Nullable;
 
@@ -23,7 +24,7 @@ import javax.annotation.Nullable;
  * (storing in prefStore) and Bundle (ContentProvider).
  */
 public class PendingInvalidation {
-    private static final String TAG = Log.makeTag("invalidation");
+    private static final String TAG = "cr.invalidation";
 
     private static final String INVALIDATION_OBJECT_SOURCE_KEY = "objectSource";
     private static final String INVALIDATION_OBJECT_ID_KEY = "objectId";
@@ -129,7 +130,7 @@ public class PendingInvalidation {
 
     @Override
     public String toString() {
-        return String.format("objectSrc:%d,objectId:%s,version:%d,payload:%s", mObjectSource,
-                mObjectId, mVersion, mPayload);
+        return String.format(Locale.US, "objectSrc:%d,objectId:%s,version:%d,payload:%s",
+                mObjectSource, mObjectId, mVersion, mPayload);
     }
 }

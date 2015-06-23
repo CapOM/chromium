@@ -79,12 +79,14 @@ class NET_EXPORT_PRIVATE QuicPacketCreator {
   bool HasRoomForStreamFrame(QuicStreamId id, QuicStreamOffset offset) const;
 
   // Converts a raw payload to a frame which fits into the currently open
-  // packet if there is one.  Returns the number of bytes consumed from data.
+  // packet.  The payload begins at |iov_offset| into the |iov|.
+  // Returns the number of bytes consumed from data.
   // If data is empty and fin is true, the expected behavior is to consume the
   // fin but return 0.  If any data is consumed, it will be copied into a
   // new buffer that |frame| will point to and will be stored in |buffer|.
   size_t CreateStreamFrame(QuicStreamId id,
-                           IOVector* data,
+                           const QuicIOVector& iov,
+                           size_t iov_offset,
                            QuicStreamOffset offset,
                            bool fin,
                            QuicFrame* frame,
@@ -155,6 +157,10 @@ class NET_EXPORT_PRIVATE QuicPacketCreator {
   // true.
   bool AddSavedFrame(const QuicFrame& frame, char* buffer);
 
+  // Identical to AddSavedFrame, but takes ownership of the buffer if it returns
+  // true, and allows to cause the packet to be padded.
+  bool AddPaddedSavedFrame(const QuicFrame& frame, char* buffer);
+
   // Serializes all frames which have been added and adds any which should be
   // retransmitted to |retransmittable_frames| if it's not nullptr. All frames
   // must fit into a single packet. Sets the entropy hash of the serialized
@@ -208,6 +214,10 @@ class NET_EXPORT_PRIVATE QuicPacketCreator {
   // plaintext size.
   void SetEncrypter(EncryptionLevel level, QuicEncrypter* encrypter);
 
+  // Indicates whether the packet creator is in a state where it can change
+  // current maximum packet length.
+  bool CanSetMaxPacketLength() const;
+
   // Sets the maximum packet length.
   void SetMaxPacketLength(QuicByteCount length);
 
@@ -232,6 +242,14 @@ class NET_EXPORT_PRIVATE QuicPacketCreator {
 
   static bool ShouldRetransmit(const QuicFrame& frame);
 
+  // Copies |length| bytes from iov starting at offset |iov_offset| into buffer.
+  // |iov| must be at least iov_offset+length total length and buffer must be
+  // at least |length| long.
+  static void CopyToBuffer(const QuicIOVector& iov,
+                           size_t iov_offset,
+                           size_t length,
+                           char* buffer);
+
   // Updates lengths and also starts an FEC group if FEC protection is on and
   // there is not already an FEC group open.
   InFecGroup MaybeUpdateLengthsAndStartFec();
@@ -249,6 +267,7 @@ class NET_EXPORT_PRIVATE QuicPacketCreator {
   // Particularly useful for retransmits using SerializeAllFrames().
   bool AddFrame(const QuicFrame& frame,
                 bool save_retransmittable_frames,
+                bool needs_padding,
                 char* buffer);
 
   // Adds a padding frame to the current packet only if the current packet
@@ -289,6 +308,8 @@ class NET_EXPORT_PRIVATE QuicPacketCreator {
   mutable size_t max_plaintext_size_;
   QuicFrames queued_frames_;
   scoped_ptr<RetransmittableFrames> queued_retransmittable_frames_;
+  // If true, the packet will be padded up to |max_packet_length_|.
+  bool needs_padding_;
 
   DISALLOW_COPY_AND_ASSIGN(QuicPacketCreator);
 };

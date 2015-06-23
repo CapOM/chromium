@@ -143,9 +143,11 @@ class SingleThreadTaskGraphRunner
       public base::DelegateSimpleThread::Delegate {
  public:
   SingleThreadTaskGraphRunner()
-      : worker_thread_(this, "CompositorTileWorker1") {
+      : worker_thread_(
+            this,
+            "CompositorTileWorker1",
+            base::SimpleThread::Options(base::ThreadPriority::BACKGROUND)) {
     worker_thread_.Start();
-    worker_thread_.SetThreadPriority(base::ThreadPriority::BACKGROUND);
   }
 
   ~SingleThreadTaskGraphRunner() override {
@@ -429,8 +431,8 @@ void CompositorImpl::CreateLayerTreeHost() {
   settings.renderer_settings.refresh_rate = 60.0;
   settings.renderer_settings.allow_antialiasing = false;
   settings.renderer_settings.highp_threshold_min = 2048;
-  settings.impl_side_painting = true;
   settings.use_zero_copy = true;
+  settings.use_one_copy = false;
 
   base::CommandLine* command_line = base::CommandLine::ForCurrentProcess();
   settings.initial_debug_state.SetRecordRenderingStats(
@@ -497,6 +499,10 @@ void CompositorImpl::SetVisible(bool visible) {
     CreateLayerTreeHost();
     ui_resource_provider_.SetLayerTreeHost(host_.get());
   }
+  // TODO(jdduke): Consider using View.onWindowVisibilityChange() to drive
+  // WindowAndroid visibility updates. CompositorImpl::SetVisible changes can
+  // occur while the visibile surface is temporarily changing, e.g., when
+  // transitioning to fullscreen video. See crbug.com/471262.
   root_window_->OnVisibilityChanged(visible);
 }
 

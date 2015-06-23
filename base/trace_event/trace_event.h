@@ -1140,8 +1140,8 @@ TRACE_EVENT_API_CLASS_EXPORT extern \
 #define TRACE_EVENT_FLAG_SCOPE_OFFSET (static_cast<unsigned char>(1 << 3))
 #define TRACE_EVENT_FLAG_SCOPE_EXTRA  (static_cast<unsigned char>(1 << 4))
 #define TRACE_EVENT_FLAG_EXPLICIT_TIMESTAMP (static_cast<unsigned char>(1 << 5))
-#define TRACE_EVENT_FLAG_BIND_TO_ENCLOSING (static_cast<unsigned char>(1 << 6))
 #define TRACE_EVENT_FLAG_ASYNC_TTS    (static_cast<unsigned char>(1 << 6))
+#define TRACE_EVENT_FLAG_BIND_TO_ENCLOSING (static_cast<unsigned char>(1 << 7))
 
 #define TRACE_EVENT_FLAG_SCOPE_MASK   (static_cast<unsigned char>( \
     TRACE_EVENT_FLAG_SCOPE_OFFSET | TRACE_EVENT_FLAG_SCOPE_EXTRA))

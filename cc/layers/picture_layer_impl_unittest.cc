@@ -223,7 +223,6 @@ class PictureLayerImplTest : public testing::Test {
     pending_root->SetHasRenderSurface(true);
     // The bounds() just mirror the pile size.
     pending_layer->SetBounds(raster_source->GetSize());
-    pending_layer->SetContentBounds(raster_source->GetSize());
     pending_layer->SetRasterSourceOnPending(raster_source, invalidation);
 
     pending_root->AddChild(pending_layer.Pass());
@@ -356,7 +355,7 @@ class NoLowResPictureLayerImplTest : public PictureLayerImplTest {
 
 TEST_F(PictureLayerImplTest, TileGridAlignment) {
   // Layer to span 4 raster tiles in x and in y
-  ImplSidePaintingSettings settings;
+  LayerTreeSettings settings;
   gfx::Size layer_size(settings.default_tile_size.width() * 7 / 2,
                        settings.default_tile_size.height() * 7 / 2);
 
@@ -428,10 +427,7 @@ TEST_F(PictureLayerImplTest, CloneNoInvalidation) {
 }
 
 TEST_F(PictureLayerImplTest, ExternalViewportRectForPrioritizingTiles) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(400, 400);
 
@@ -445,9 +441,7 @@ TEST_F(PictureLayerImplTest, ExternalViewportRectForPrioritizingTiles) {
   SetupDrawPropertiesAndUpdateTiles(active_layer_, 1.f, 1.f, 1.f, 1.f, 0.f,
                                     false);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
 
   // Update tiles with viewport for tile priority as (0, 0, 100, 100) and the
   // identify transform for tile priority.
@@ -484,9 +478,7 @@ TEST_F(PictureLayerImplTest, ExternalViewportRectForPrioritizingTiles) {
   // screen space and the transform for tile priority is translated and
   // rotated. The actual viewport for tile priority used by PictureLayerImpl
   // should be (200, 200, 100, 100) applied with the said transform.
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
 
   viewport_rect_for_tile_priority = gfx::Rect(200, 200, 100, 100);
   transform_for_tile_priority.Translate(100, 100);
@@ -524,10 +516,7 @@ TEST_F(PictureLayerImplTest, ExternalViewportRectForPrioritizingTiles) {
 }
 
 TEST_F(PictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(400, 400);
@@ -554,7 +543,7 @@ TEST_F(PictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
                                         viewport,
                                         transform,
                                         resourceless_software_draw);
-  active_layer_->draw_properties().visible_content_rect = viewport;
+  active_layer_->draw_properties().visible_layer_rect = viewport;
   active_layer_->draw_properties().screen_space_transform = transform;
   active_layer_->UpdateTiles(resourceless_software_draw);
 
@@ -566,13 +555,11 @@ TEST_F(PictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
 
   // Expand viewport and set it as invalid for prioritizing tiles.
   // Should update viewport and transform, but not update visible rect.
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   resourceless_software_draw = true;
   viewport = gfx::ScaleToEnclosingRect(viewport, 2);
   transform.Translate(1.f, 1.f);
-  active_layer_->draw_properties().visible_content_rect = viewport;
+  active_layer_->draw_properties().visible_layer_rect = viewport;
   active_layer_->draw_properties().screen_space_transform = transform;
   host_impl_.SetExternalDrawConstraints(transform,
                                         viewport,
@@ -590,9 +577,7 @@ TEST_F(PictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
             active_layer_->visible_rect_for_tile_priority());
 
   // Keep expanded viewport but mark it valid. Should update tile viewport.
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   resourceless_software_draw = false;
   host_impl_.SetExternalDrawConstraints(transform,
                                         viewport,
@@ -608,10 +593,7 @@ TEST_F(PictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
 }
 
 TEST_F(PictureLayerImplTest, ViewportRectForTilePriorityIsCached) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(400, 400);
 
@@ -625,9 +607,7 @@ TEST_F(PictureLayerImplTest, ViewportRectForTilePriorityIsCached) {
   SetupDrawPropertiesAndUpdateTiles(active_layer_, 1.f, 1.f, 1.f, 1.f, 0.f,
                                     false);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
 
   bool resourceless_software_draw = false;
   gfx::Rect viewport = gfx::Rect(layer_bounds);
@@ -643,9 +623,7 @@ TEST_F(PictureLayerImplTest, ViewportRectForTilePriorityIsCached) {
   EXPECT_EQ(viewport_rect_for_tile_priority,
             active_layer_->viewport_rect_for_tile_priority_in_content_space());
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
 
   gfx::Rect another_viewport_rect_for_tile_priority(11, 11, 50, 50);
   host_impl_.SetExternalDrawConstraints(
@@ -1316,7 +1294,6 @@ TEST_F(PictureLayerImplTest, DontAddLowResForSmallLayers) {
       FakePictureLayerImpl::CreateMaskWithRasterSource(
           host_impl_.pending_tree(), 3, pending_pile);
   mask->SetBounds(layer_bounds);
-  mask->SetContentBounds(layer_bounds);
   mask->SetDrawsContent(true);
 
   SetupDrawPropertiesAndUpdateTiles(
@@ -1327,10 +1304,7 @@ TEST_F(PictureLayerImplTest, DontAddLowResForSmallLayers) {
 }
 
 TEST_F(PictureLayerImplTest, HugeMasksGetScaledDown) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(1000, 1000);
@@ -1343,14 +1317,11 @@ TEST_F(PictureLayerImplTest, HugeMasksGetScaledDown) {
       FakePictureLayerImpl::CreateMaskWithRasterSource(
           host_impl_.pending_tree(), 3, valid_pile);
   mask_ptr->SetBounds(layer_bounds);
-  mask_ptr->SetContentBounds(layer_bounds);
   mask_ptr->SetDrawsContent(true);
   pending_layer_->SetMaskLayer(mask_ptr.Pass());
   pending_layer_->SetHasRenderSurface(true);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
@@ -1397,12 +1368,9 @@ TEST_F(PictureLayerImplTest, HugeMasksGetScaledDown) {
 
   SetupPendingTree(huge_pile);
   pending_mask->SetBounds(huge_bounds);
-  pending_mask->SetContentBounds(huge_bounds);
   pending_mask->SetRasterSourceOnPending(huge_pile, Region());
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   // The mask tiling gets scaled down.
@@ -1452,24 +1420,18 @@ TEST_F(PictureLayerImplTest, HugeMasksGetScaledDown) {
 
   SetupPendingTree(extra_huge_pile);
   pending_mask->SetBounds(extra_huge_bounds);
-  pending_mask->SetContentBounds(extra_huge_bounds);
   pending_mask->SetRasterSourceOnPending(extra_huge_pile, Region());
 
   EXPECT_FALSE(pending_mask->CanHaveTilings());
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   EXPECT_EQ(0u, pending_mask->num_tilings());
 }
 
 TEST_F(PictureLayerImplTest, ScaledMaskLayer) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(1000, 1000);
@@ -1484,14 +1446,11 @@ TEST_F(PictureLayerImplTest, ScaledMaskLayer) {
       FakePictureLayerImpl::CreateMaskWithRasterSource(
           host_impl_.pending_tree(), 3, valid_pile);
   mask_ptr->SetBounds(layer_bounds);
-  mask_ptr->SetContentBounds(layer_bounds);
   mask_ptr->SetDrawsContent(true);
   pending_layer_->SetMaskLayer(mask_ptr.Pass());
   pending_layer_->SetHasRenderSurface(true);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
@@ -1662,8 +1621,7 @@ TEST_F(PictureLayerImplTest, DisallowTileDrawQuads) {
   gfx::Rect layer_invalidation(150, 200, 30, 180);
   SetupTreesWithInvalidation(pending_pile, active_pile, layer_invalidation);
 
-  active_layer_->draw_properties().visible_content_rect =
-      gfx::Rect(layer_bounds);
+  active_layer_->draw_properties().visible_layer_rect = gfx::Rect(layer_bounds);
 
   AppendQuadsData data;
   active_layer_->WillDraw(DRAW_MODE_RESOURCELESS_SOFTWARE, nullptr);
@@ -1693,7 +1651,7 @@ TEST_F(PictureLayerImplTest, SolidColorLayerHasVisibleFullCoverage) {
 
   SetupTrees(pending_pile, active_pile);
 
-  active_layer_->draw_properties().visible_content_rect = visible_rect;
+  active_layer_->draw_properties().visible_layer_rect = visible_rect;
 
   AppendQuadsData data;
   active_layer_->WillDraw(DRAW_MODE_SOFTWARE, nullptr);
@@ -1754,9 +1712,7 @@ TEST_F(NoLowResPictureLayerImplTest, MarkRequiredOffscreenTiles) {
   EXPECT_EQ(viewport, pending_layer_->visible_rect_for_tile_priority());
 
   base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   pending_layer_->UpdateTiles(resourceless_software_draw);
 
   int num_visible = 0;
@@ -1782,15 +1738,12 @@ TEST_F(NoLowResPictureLayerImplTest, MarkRequiredOffscreenTiles) {
 
 TEST_F(NoLowResPictureLayerImplTest,
        TileOutsideOfViewportForTilePriorityNotRequired) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(400, 400);
   gfx::Rect external_viewport_for_tile_priority(400, 200);
-  gfx::Rect visible_content_rect(200, 400);
+  gfx::Rect visible_layer_rect(200, 400);
 
   scoped_refptr<FakePicturePileImpl> active_pile =
       FakePicturePileImpl::CreateFilledPile(tile_size, layer_bounds);
@@ -1812,25 +1765,21 @@ TEST_F(NoLowResPictureLayerImplTest,
                                         external_viewport_for_tile_priority,
                                         transform_for_tile_priority,
                                         resourceless_software_draw);
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   // Set visible content rect that is different from
   // external_viewport_for_tile_priority.
-  pending_layer_->draw_properties().visible_content_rect = visible_content_rect;
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  pending_layer_->draw_properties().visible_layer_rect = visible_layer_rect;
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   pending_layer_->UpdateTiles(resourceless_software_draw);
 
   // Intersect the two rects. Any tile outside should not be required for
   // activation.
   gfx::Rect viewport_for_tile_priority =
       pending_layer_->viewport_rect_for_tile_priority_in_content_space();
-  viewport_for_tile_priority.Intersect(pending_layer_->visible_content_rect());
+  viewport_for_tile_priority.Intersect(pending_layer_->visible_layer_rect());
 
   EXPECT_TRUE(pending_layer_->HighResTiling()->AllTilesForTesting().empty());
 
@@ -1859,7 +1808,7 @@ TEST_F(NoLowResPictureLayerImplTest,
   // Activate and draw active layer.
   host_impl_.ActivateSyncTree();
   host_impl_.active_tree()->UpdateDrawProperties(update_lcd_text);
-  active_layer_->draw_properties().visible_content_rect = visible_content_rect;
+  active_layer_->draw_properties().visible_layer_rect = visible_layer_rect;
 
   scoped_ptr<RenderPass> render_pass = RenderPass::Create();
   AppendQuadsData data;
@@ -1874,10 +1823,7 @@ TEST_F(NoLowResPictureLayerImplTest,
 }
 
 TEST_F(PictureLayerImplTest, HighResTileIsComplete) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -1907,10 +1853,7 @@ TEST_F(PictureLayerImplTest, HighResTileIsComplete) {
 }
 
 TEST_F(PictureLayerImplTest, HighResTileIsIncomplete) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -1933,10 +1876,7 @@ TEST_F(PictureLayerImplTest, HighResTileIsIncomplete) {
 }
 
 TEST_F(PictureLayerImplTest, HighResTileIsIncompleteLowResComplete) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -1963,10 +1903,7 @@ TEST_F(PictureLayerImplTest, HighResTileIsIncompleteLowResComplete) {
 }
 
 TEST_F(PictureLayerImplTest, LowResTileIsIncomplete) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -2002,10 +1939,7 @@ TEST_F(PictureLayerImplTest, LowResTileIsIncomplete) {
 
 TEST_F(PictureLayerImplTest,
        HighResAndIdealResTileIsCompleteWhenRasterScaleIsNotIdeal) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -2423,10 +2357,7 @@ TEST_F(PictureLayerImplTest, RecreateInvalidPendingTreeTiles) {
 }
 
 TEST_F(PictureLayerImplTest, SyncTilingAfterGpuRasterizationToggles) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(10, 10);
@@ -2452,9 +2383,7 @@ TEST_F(PictureLayerImplTest, SyncTilingAfterGpuRasterizationToggles) {
 
   // Make sure that we can still add tiling to the pending layer,
   // that gets synced to the active layer.
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
   EXPECT_TRUE(pending_layer_->tilings()->FindTilingWithScale(1.f));
@@ -2901,10 +2830,7 @@ TEST_F(PictureLayerImplTest, HighResTilingDuringAnimationForGpuRasterization) {
 }
 
 TEST_F(PictureLayerImplTest, TilingSetRasterQueue) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   host_impl_.SetViewportSize(gfx::Size(500, 500));
 
@@ -2986,11 +2912,9 @@ TEST_F(PictureLayerImplTest, TilingSetRasterQueue) {
   EXPECT_EQ(high_res_now_tiles, required_for_activation_count);
 
   // No NOW tiles.
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
 
-  pending_layer_->draw_properties().visible_content_rect =
+  pending_layer_->draw_properties().visible_layer_rect =
       gfx::Rect(1100, 1100, 500, 500);
   bool resourceless_software_draw = false;
   pending_layer_->UpdateTiles(resourceless_software_draw);
@@ -3018,11 +2942,9 @@ TEST_F(PictureLayerImplTest, TilingSetRasterQueue) {
   EXPECT_EQ(16, high_res_tile_count);
   EXPECT_EQ(high_res_tile_count, static_cast<int>(unique_tiles.size()));
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
 
-  pending_layer_->draw_properties().visible_content_rect =
+  pending_layer_->draw_properties().visible_layer_rect =
       gfx::Rect(0, 0, 500, 500);
   pending_layer_->UpdateTiles(resourceless_software_draw);
 
@@ -3059,10 +2981,7 @@ TEST_F(PictureLayerImplTest, TilingSetRasterQueue) {
 }
 
 TEST_F(PictureLayerImplTest, TilingSetRasterQueueActiveTree) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   host_impl_.SetViewportSize(gfx::Size(500, 500));
 
@@ -3145,11 +3064,8 @@ TEST_F(PictureLayerImplTest, TilingSetEvictionQueue) {
   for (size_t i = 0; i < pending_layer_->num_tilings(); ++i) {
     PictureLayerTiling* tiling = pending_layer_->tilings()->tiling_at(i);
     for (PictureLayerTiling::CoverageIterator iter(
-             tiling,
-             pending_layer_->contents_scale_x(),
-             pending_layer_->visible_content_rect());
-         iter;
-         ++iter) {
+             tiling, 1.f, pending_layer_->visible_layer_rect());
+         iter; ++iter) {
       if (mark_required) {
         number_of_marked_tiles++;
         iter->set_required_for_activation(true);
@@ -3291,7 +3207,7 @@ TEST_F(PictureLayerImplTest, Occlusion) {
 
   {
     SCOPED_TRACE("Full occlusion");
-    gfx::Rect occluded(active_layer_->visible_content_rect());
+    gfx::Rect occluded(active_layer_->visible_layer_rect());
     impl.AppendQuadsWithOcclusion(active_layer_, occluded);
 
     LayerTestCommon::VerifyQuadsExactlyCoverRect(impl.quad_list(), gfx::Rect());
@@ -3623,10 +3539,7 @@ TEST_F(NoLowResPictureLayerImplTest, NothingRequiredIfActiveMissingTiles) {
 }
 
 TEST_F(NoLowResPictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(400, 400);
@@ -3653,7 +3566,7 @@ TEST_F(NoLowResPictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
                                         viewport,
                                         transform,
                                         resourceless_software_draw);
-  active_layer_->draw_properties().visible_content_rect = viewport;
+  active_layer_->draw_properties().visible_layer_rect = viewport;
   active_layer_->draw_properties().screen_space_transform = transform;
   active_layer_->UpdateTiles(resourceless_software_draw);
 
@@ -3665,13 +3578,11 @@ TEST_F(NoLowResPictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
 
   // Expand viewport and set it as invalid for prioritizing tiles.
   // Should update viewport and transform, but not update visible rect.
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   resourceless_software_draw = true;
   viewport = gfx::ScaleToEnclosingRect(viewport, 2);
   transform.Translate(1.f, 1.f);
-  active_layer_->draw_properties().visible_content_rect = viewport;
+  active_layer_->draw_properties().visible_layer_rect = viewport;
   active_layer_->draw_properties().screen_space_transform = transform;
   host_impl_.SetExternalDrawConstraints(transform,
                                         viewport,
@@ -3689,9 +3600,7 @@ TEST_F(NoLowResPictureLayerImplTest, InvalidViewportForPrioritizingTiles) {
             active_layer_->visible_rect_for_tile_priority());
 
   // Keep expanded viewport but mark it valid. Should update tile viewport.
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   resourceless_software_draw = false;
   host_impl_.SetExternalDrawConstraints(transform,
                                         viewport,
@@ -3888,21 +3797,21 @@ TEST_F(PictureLayerImplTest, SharedQuadStateContainsMaxTilingScale) {
 
   // SharedQuadState should have be of size 1, as we are doing AppenQuad once.
   EXPECT_EQ(1u, render_pass->shared_quad_state_list.size());
-  // The content_to_target_transform should be scaled by the
+  // The quad_to_target_transform should be scaled by the
   // MaximumTilingContentsScale on the layer.
   EXPECT_EQ(scaled_draw_transform.ToString(),
             render_pass->shared_quad_state_list.front()
-                ->content_to_target_transform.ToString());
+                ->quad_to_target_transform.ToString());
   // The content_bounds should be scaled by the
   // MaximumTilingContentsScale on the layer.
-  EXPECT_EQ(
-      gfx::Size(2500u, 5000u).ToString(),
-      render_pass->shared_quad_state_list.front()->content_bounds.ToString());
-  // The visible_content_rect should be scaled by the
+  EXPECT_EQ(gfx::Size(2500u, 5000u).ToString(),
+            render_pass->shared_quad_state_list.front()
+                ->quad_layer_bounds.ToString());
+  // The visible_layer_rect should be scaled by the
   // MaximumTilingContentsScale on the layer.
   EXPECT_EQ(gfx::Rect(0u, 0u, 2500u, 5000u).ToString(),
             render_pass->shared_quad_state_list.front()
-                ->visible_content_rect.ToString());
+                ->visible_quad_layer_rect.ToString());
 }
 
 class PictureLayerImplTestWithDelegatingRenderer : public PictureLayerImplTest {
@@ -4019,10 +3928,7 @@ class OcclusionTrackingPictureLayerImplTest : public PictureLayerImplTest {
 
 TEST_F(OcclusionTrackingPictureLayerImplTest,
        OccludedTilesSkippedDuringRasterization) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -4049,7 +3955,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
     // Some tiles may not be visible (i.e. outside the viewport). The rest are
     // visible and at least partially unoccluded, verified by the above expect.
     bool tile_is_visible =
-        tile->content_rect().Intersects(pending_layer_->visible_content_rect());
+        tile->content_rect().Intersects(pending_layer_->visible_layer_rect());
     if (tile_is_visible)
       unoccluded_tile_count++;
     queue->Pop();
@@ -4060,14 +3966,11 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   pending_layer_->AddChild(LayerImpl::Create(host_impl_.pending_tree(), 1));
   LayerImpl* layer1 = pending_layer_->children()[0];
   layer1->SetBounds(layer_bounds);
-  layer1->SetContentBounds(layer_bounds);
   layer1->SetDrawsContent(true);
   layer1->SetContentsOpaque(true);
   layer1->SetPosition(occluding_layer_position);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
@@ -4081,7 +3984,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
     EXPECT_FALSE(prioritized_tile.is_occluded());
 
     bool tile_is_visible =
-        tile->content_rect().Intersects(pending_layer_->visible_content_rect());
+        tile->content_rect().Intersects(pending_layer_->visible_layer_rect());
     if (tile_is_visible)
       unoccluded_tile_count++;
     queue->Pop();
@@ -4091,9 +3994,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   // Full occlusion.
   layer1->SetPosition(gfx::Point(0, 0));
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   unoccluded_tile_count = 0;
@@ -4106,7 +4007,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
     EXPECT_FALSE(prioritized_tile.is_occluded());
 
     bool tile_is_visible =
-        tile->content_rect().Intersects(pending_layer_->visible_content_rect());
+        tile->content_rect().Intersects(pending_layer_->visible_layer_rect());
     if (tile_is_visible)
       unoccluded_tile_count++;
     queue->Pop();
@@ -4116,10 +4017,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
 
 TEST_F(OcclusionTrackingPictureLayerImplTest,
        OccludedTilesNotMarkedAsRequired) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -4140,12 +4038,9 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
         tiling->UpdateAndGetAllPrioritizedTilesForTesting();
 
     occluded_tile_count = 0;
-    for (PictureLayerTiling::CoverageIterator iter(
-             tiling,
-             pending_layer_->contents_scale_x(),
-             gfx::Rect(layer_bounds));
-         iter;
-         ++iter) {
+    for (PictureLayerTiling::CoverageIterator iter(tiling, 1.f,
+                                                   gfx::Rect(layer_bounds));
+         iter; ++iter) {
       if (!*iter)
         continue;
       const Tile* tile = *iter;
@@ -4163,14 +4058,11 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   pending_layer_->AddChild(LayerImpl::Create(host_impl_.pending_tree(), 1));
   LayerImpl* layer1 = pending_layer_->children()[0];
   layer1->SetBounds(layer_bounds);
-  layer1->SetContentBounds(layer_bounds);
   layer1->SetDrawsContent(true);
   layer1->SetContentsOpaque(true);
   layer1->SetPosition(occluding_layer_position);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
@@ -4180,12 +4072,9 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
         tiling->UpdateAndGetAllPrioritizedTilesForTesting();
 
     occluded_tile_count = 0;
-    for (PictureLayerTiling::CoverageIterator iter(
-             tiling,
-             pending_layer_->contents_scale_x(),
-             gfx::Rect(layer_bounds));
-         iter;
-         ++iter) {
+    for (PictureLayerTiling::CoverageIterator iter(tiling, 1.f,
+                                                   gfx::Rect(layer_bounds));
+         iter; ++iter) {
       if (!*iter)
         continue;
       const Tile* tile = *iter;
@@ -4210,9 +4099,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   // Full occlusion.
   layer1->SetPosition(gfx::PointF(0, 0));
 
-  time_ticks += base::TimeDelta::FromMilliseconds(200);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(200));
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   for (size_t i = 0; i < pending_layer_->num_tilings(); ++i) {
@@ -4221,12 +4108,9 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
         tiling->UpdateAndGetAllPrioritizedTilesForTesting();
 
     occluded_tile_count = 0;
-    for (PictureLayerTiling::CoverageIterator iter(
-             tiling,
-             pending_layer_->contents_scale_x(),
-             gfx::Rect(layer_bounds));
-         iter;
-         ++iter) {
+    for (PictureLayerTiling::CoverageIterator iter(tiling, 1.f,
+                                                   gfx::Rect(layer_bounds));
+         iter; ++iter) {
       if (!*iter)
         continue;
       const Tile* tile = *iter;
@@ -4250,10 +4134,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
 }
 
 TEST_F(OcclusionTrackingPictureLayerImplTest, OcclusionForDifferentScales) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -4271,7 +4152,6 @@ TEST_F(OcclusionTrackingPictureLayerImplTest, OcclusionForDifferentScales) {
   pending_layer_->AddChild(LayerImpl::Create(host_impl_.pending_tree(), 1));
   LayerImpl* layer1 = pending_layer_->children()[0];
   layer1->SetBounds(layer_bounds);
-  layer1->SetContentBounds(layer_bounds);
   layer1->SetDrawsContent(true);
   layer1->SetContentsOpaque(true);
   layer1->SetPosition(occluding_layer_position);
@@ -4284,9 +4164,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest, OcclusionForDifferentScales) {
   pending_layer_->AddTiling(1.0f);
   pending_layer_->AddTiling(2.0f);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   // UpdateDrawProperties with the occluding layer.
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
@@ -4349,7 +4227,6 @@ TEST_F(OcclusionTrackingPictureLayerImplTest, DifferentOcclusionOnTrees) {
   pending_layer_->AddChild(LayerImpl::Create(host_impl_.pending_tree(), 2));
   LayerImpl* layer1 = pending_layer_->children()[0];
   layer1->SetBounds(layer_bounds);
-  layer1->SetContentBounds(layer_bounds);
   layer1->SetDrawsContent(true);
   layer1->SetContentsOpaque(true);
   layer1->SetPosition(occluding_layer_position);
@@ -4361,10 +4238,9 @@ TEST_F(OcclusionTrackingPictureLayerImplTest, DifferentOcclusionOnTrees) {
     auto prioritized_tiles =
         tiling->UpdateAndGetAllPrioritizedTilesForTesting();
 
-    for (
-        PictureLayerTiling::CoverageIterator iter(
-            tiling, active_layer_->contents_scale_x(), gfx::Rect(layer_bounds));
-        iter; ++iter) {
+    for (PictureLayerTiling::CoverageIterator iter(tiling, 1.f,
+                                                   gfx::Rect(layer_bounds));
+         iter; ++iter) {
       if (!*iter)
         continue;
       const Tile* tile = *iter;
@@ -4386,12 +4262,9 @@ TEST_F(OcclusionTrackingPictureLayerImplTest, DifferentOcclusionOnTrees) {
     auto prioritized_tiles =
         tiling->UpdateAndGetAllPrioritizedTilesForTesting();
 
-    for (PictureLayerTiling::CoverageIterator iter(
-             tiling,
-             active_layer_->contents_scale_x(),
-             gfx::Rect(layer_bounds));
-         iter;
-         ++iter) {
+    for (PictureLayerTiling::CoverageIterator iter(tiling, 1.f,
+                                                   gfx::Rect(layer_bounds));
+         iter; ++iter) {
       if (!*iter)
         continue;
       const Tile* tile = *iter;
@@ -4420,10 +4293,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest, DifferentOcclusionOnTrees) {
 
 TEST_F(OcclusionTrackingPictureLayerImplTest,
        OccludedTilesConsideredDuringEviction) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -4446,7 +4316,6 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   pending_layer_->AddChild(LayerImpl::Create(host_impl_.pending_tree(), 2));
   LayerImpl* active_occluding_layer = pending_layer_->children()[0];
   active_occluding_layer->SetBounds(layer_bounds);
-  active_occluding_layer->SetContentBounds(layer_bounds);
   active_occluding_layer->SetDrawsContent(true);
   active_occluding_layer->SetContentsOpaque(true);
   active_occluding_layer->SetPosition(active_occluding_layer_position);
@@ -4461,7 +4330,6 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   pending_layer_->AddChild(LayerImpl::Create(host_impl_.pending_tree(), 3));
   LayerImpl* pending_occluding_layer = pending_layer_->children()[0];
   pending_occluding_layer->SetBounds(layer_bounds);
-  pending_occluding_layer->SetContentBounds(layer_bounds);
   pending_occluding_layer->SetDrawsContent(true);
   pending_occluding_layer->SetContentsOpaque(true);
   pending_occluding_layer->SetPosition(pending_occluding_layer_position);
@@ -4469,9 +4337,7 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
   EXPECT_EQ(2u, pending_layer_->num_tilings());
   EXPECT_EQ(2u, active_layer_->num_tilings());
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   // UpdateDrawProperties with the occluding layer.
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
@@ -4516,12 +4382,9 @@ TEST_F(OcclusionTrackingPictureLayerImplTest,
         tiling->UpdateAndGetAllPrioritizedTilesForTesting();
 
     size_t occluded_tile_count_on_active = 0u;
-    for (PictureLayerTiling::CoverageIterator iter(
-             tiling,
-             pending_layer_->contents_scale_x(),
-             gfx::Rect(layer_bounds));
-         iter;
-         ++iter) {
+    for (PictureLayerTiling::CoverageIterator iter(tiling, 1.f,
+                                                   gfx::Rect(layer_bounds));
+         iter; ++iter) {
       Tile* tile = *iter;
 
       if (!tile)
@@ -4604,10 +4467,7 @@ TEST_F(PictureLayerImplTest, PendingOrActiveTwinLayer) {
 }
 
 void PictureLayerImplTest::TestQuadsForSolidColor(bool test_for_solid) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -4617,7 +4477,9 @@ void PictureLayerImplTest::TestQuadsForSolidColor(bool test_for_solid) {
   scoped_refptr<PictureLayer> layer =
       PictureLayer::Create(layer_settings_, &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
-  scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
+  TestTaskGraphRunner task_graph_runner;
+  scoped_ptr<FakeLayerTreeHost> host =
+      FakeLayerTreeHost::Create(&host_client, &task_graph_runner);
   host->SetRootLayer(layer);
   RecordingSource* recording_source = layer->GetRecordingSourceForTesting();
 
@@ -4668,10 +4530,7 @@ TEST_F(PictureLayerImplTest, DrawNonSolidQuads) {
 }
 
 TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(200, 200);
@@ -4681,7 +4540,9 @@ TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
   scoped_refptr<PictureLayer> layer =
       PictureLayer::Create(layer_settings_, &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
-  scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
+  TestTaskGraphRunner task_graph_runner;
+  scoped_ptr<FakeLayerTreeHost> host =
+      FakeLayerTreeHost::Create(&host_client, &task_graph_runner);
   host->SetRootLayer(layer);
   RecordingSource* recording_source = layer->GetRecordingSourceForTesting();
 
@@ -4725,10 +4586,7 @@ TEST_F(PictureLayerImplTest, NonSolidToSolidNoTilings) {
 }
 
 TEST_F(PictureLayerImplTest, ChangeInViewportAllowsTilingUpdates) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(100, 100);
   gfx::Size layer_bounds(400, 4000);
@@ -4747,7 +4605,7 @@ TEST_F(PictureLayerImplTest, ChangeInViewportAllowsTilingUpdates) {
   host_impl_.SetRequiresHighResToDraw();
 
   // Update tiles.
-  pending_layer_->draw_properties().visible_content_rect = viewport;
+  pending_layer_->draw_properties().visible_layer_rect = viewport;
   pending_layer_->draw_properties().screen_space_transform = transform;
   SetupDrawPropertiesAndUpdateTiles(pending_layer_, 1.f, 1.f, 1.f, 1.f, 0.f,
                                     false);
@@ -4761,7 +4619,7 @@ TEST_F(PictureLayerImplTest, ChangeInViewportAllowsTilingUpdates) {
   viewport = gfx::Rect(0, 2000, 100, 100);
 
   // Update tiles.
-  pending_layer_->draw_properties().visible_content_rect = viewport;
+  pending_layer_->draw_properties().visible_layer_rect = viewport;
   pending_layer_->draw_properties().screen_space_transform = transform;
   SetupDrawPropertiesAndUpdateTiles(pending_layer_, 1.f, 1.f, 1.f, 1.f, 0.f,
                                     false);
@@ -4859,10 +4717,7 @@ TEST_F(PictureLayerImplTest, CloneMissingRecordings) {
 }
 
 TEST_F(PictureLayerImplTest, ScrollPastLiveTilesRectAndBack) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(100, 100);
@@ -4915,10 +4770,7 @@ TEST_F(PictureLayerImplTest, ScrollPastLiveTilesRectAndBack) {
 }
 
 TEST_F(PictureLayerImplTest, ScrollPropagatesToPending) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -4950,10 +4802,7 @@ TEST_F(PictureLayerImplTest, ScrollPropagatesToPending) {
 }
 
 TEST_F(PictureLayerImplTest, UpdateLCDInvalidatesPendingTree) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(100, 100);

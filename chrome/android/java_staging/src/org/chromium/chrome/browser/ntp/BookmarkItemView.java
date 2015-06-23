@@ -23,9 +23,8 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnCreateContextMenuListener;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ApiCompatibilityUtils;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ntp.BookmarksPageView.BookmarksPageManager;
 import org.chromium.chrome.browser.widget.TintedDrawable;
 import org.chromium.components.bookmarks.BookmarkId;
@@ -190,7 +189,7 @@ class BookmarkItemView extends AppCompatTextView implements OnCreateContextMenuL
             int iconSize;
             if (mIsFolder) {
                 faviconDrawable = TintedDrawable.constructTintedDrawable(getResources(),
-                        mIsManaged ? R.drawable.eb_managed : R.drawable.eb_others);
+                        mIsManaged ? R.drawable.eb_managed : R.drawable.eb_folder);
                 iconSize = mDrawingData.mFaviconContainerSize;
             } else {
                 faviconDrawable = new BitmapDrawable(getResources(), favicon);
@@ -220,9 +219,9 @@ class BookmarkItemView extends AppCompatTextView implements OnCreateContextMenuL
                      R.string.contextmenu_open_in_incognito_tab).setOnMenuItemClickListener(this);
         }
         if (mIsEditable && !mManager.isIncognito()) {
-            menu.add(Menu.NONE, ID_EDIT, Menu.NONE, mIsFolder
-                    ? R.string.contextmenu_edit_folder : R.string.contextmenu_edit_bookmark)
-                            .setOnMenuItemClickListener(this);
+            menu.add(Menu.NONE, ID_EDIT, Menu.NONE,
+                    mIsFolder ? R.string.contextmenu_edit_folder : R.string.edit_bookmark)
+                    .setOnMenuItemClickListener(this);
             menu.add(Menu.NONE, ID_DELETE, Menu.NONE, mIsFolder
                     ? R.string.contextmenu_delete_folder : R.string.contextmenu_delete_bookmark)
                             .setOnMenuItemClickListener(this);

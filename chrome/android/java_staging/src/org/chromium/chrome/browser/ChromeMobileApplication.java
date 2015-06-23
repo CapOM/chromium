@@ -24,6 +24,8 @@ import org.chromium.base.ResourceExtractor;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.annotations.SuppressFBWarnings;
+import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.accessibility.FontSizePrefs;
 import org.chromium.chrome.browser.banners.AppBannerManager;
 import org.chromium.chrome.browser.banners.AppDetailsDelegate;
@@ -59,14 +61,18 @@ import org.chromium.chrome.browser.smartcard.EmptyPKCS11AuthenticationManager;
 import org.chromium.chrome.browser.smartcard.PKCS11AuthenticationManager;
 import org.chromium.chrome.browser.sync.SyncController;
 import org.chromium.chrome.browser.tab.AuthenticatorNavigationInterceptor;
+import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.document.ActivityDelegate;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModelSelector;
+import org.chromium.chrome.browser.tabmodel.document.StorageDelegate;
+import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.content.browser.ChildProcessLauncher;
 import org.chromium.content.browser.ContentViewStatics;
 import org.chromium.content.browser.DownloadController;
 import org.chromium.printing.PrintingController;
 import org.chromium.ui.UiUtils;
 
+import java.lang.ref.WeakReference;
 import java.util.Locale;
 
 /**
@@ -126,8 +132,8 @@ public class ChromeMobileApplication extends ChromiumApplication {
     }
 
     private static final String[] CHROME_MANDATORY_PAKS = {
-        "en-US.pak", "resources.pak", "chrome_100_percent.pak", "icudtl.dat",
-        "natives_blob.bin", "snapshot_blob.bin"
+        "resources.pak",
+        "chrome_100_percent.pak",
     };
     private static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "chrome";
     private static final String DEV_TOOLS_SERVER_SOCKET_PREFIX = "chrome";
@@ -196,7 +202,7 @@ public class ChromeMobileApplication extends ChromiumApplication {
     protected void initializeLibraryDependencies() {
         // The ResourceExtractor is only needed by the browser process, but this will have no
         // impact on the renderer process construction.
-        ResourceExtractor.setMandatoryPaksToExtract(CHROME_MANDATORY_PAKS);
+        ResourceExtractor.setMandatoryPaksToExtract(R.array.locale_paks, CHROME_MANDATORY_PAKS);
         PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, this);
     }
 
@@ -219,6 +225,7 @@ public class ChromeMobileApplication extends ChromiumApplication {
         mInitializedSharedClasses = true;
 
         GoogleServicesManager.get(this).onMainActivityStart();
+        SyncController.get(this).onMainActivityStart();
         RevenueStats.getInstance();
         ShortcutHelper.setFullScreenAction(ChromeLauncherActivity.ACTION_START_WEBAPP);
 
@@ -394,6 +401,27 @@ public class ChromeMobileApplication extends ChromiumApplication {
 
         ChildProcessLauncher.onSentToBackground();
         IntentHandler.clearPendingReferrer();
+
+        if (FeatureUtilities.isDocumentMode(this)) {
+            if (sDocumentTabModelSelector != null) {
+                RecordHistogram.recordCountHistogram("Tab.TotalTabCount.BeforeLeavingApp",
+                        sDocumentTabModelSelector.getTotalTabCount());
+            }
+        } else {
+            int totalTabCount = 0;
+            for (WeakReference<Activity> reference : ApplicationStatus.getRunningActivities()) {
+                Activity activity = reference.get();
+                if (activity instanceof ChromeActivity) {
+                    TabModelSelector tabModelSelector =
+                            ((ChromeActivity) activity).getTabModelSelector();
+                    if (tabModelSelector != null) {
+                        totalTabCount += tabModelSelector.getTotalTabCount();
+                    }
+                }
+            }
+            RecordHistogram.recordCountHistogram(
+                    "Tab.TotalTabCount.BeforeLeavingApp", totalTabCount);
+        }
     }
 
     /**
@@ -583,7 +611,7 @@ public class ChromeMobileApplication extends ChromiumApplication {
         if (sDocumentTabModelSelector == null) {
             sDocumentTabModelSelector = new DocumentTabModelSelector(
                     new ActivityDelegate(DocumentActivity.class, IncognitoDocumentActivity.class),
-                    new TabDelegateImpl());
+                    new StorageDelegate(), new TabDelegateImpl(false), new TabDelegateImpl(true));
         }
         return sDocumentTabModelSelector;
     }

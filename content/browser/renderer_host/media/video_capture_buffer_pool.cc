@@ -45,8 +45,8 @@ VideoFrame::StorageType VideoPixelFormatToVideoFrameStorageType(
     VideoFrame::StorageType storage_type;
   } const kVideoPixelFormatToVideoFrameStorageType[] = {
       {media::PIXEL_FORMAT_I420, VideoFrame::STORAGE_SHMEM},
-      {media::PIXEL_FORMAT_TEXTURE, VideoFrame::STORAGE_TEXTURE},
-      {media::PIXEL_FORMAT_GPUMEMORYBUFFER, VideoFrame::STORAGE_TEXTURE},
+      {media::PIXEL_FORMAT_TEXTURE, VideoFrame::STORAGE_OPAQUE},
+      {media::PIXEL_FORMAT_GPUMEMORYBUFFER, VideoFrame::STORAGE_OPAQUE},
   };
 
   for (const auto& format_pair : kVideoPixelFormatToVideoFrameStorageType) {
@@ -61,19 +61,27 @@ VideoFrame::StorageType VideoPixelFormatToVideoFrameStorageType(
 // A simple holder of a memory-backed buffer and accesors to it.
 class SimpleBufferHandle final : public VideoCaptureBufferPool::BufferHandle {
  public:
-  SimpleBufferHandle(void* data, size_t size) : data_(data), size_(size) {}
+  SimpleBufferHandle(void* data, size_t size, base::SharedMemoryHandle handle)
+      : data_(data), size_(size), handle_(handle) {}
   ~SimpleBufferHandle() override {}
 
   size_t size() const override { return size_; }
   void* data() override { return data_; }
-  gfx::GpuMemoryBufferType GetType() override {
-    return gfx::SHARED_MEMORY_BUFFER;
-  }
   ClientBuffer AsClientBuffer() override { return nullptr; }
+#if defined(OS_POSIX)
+  base::FileDescriptor AsPlatformFile() override {
+#if defined(OS_MACOSX)
+    return handle_.GetFileDescriptor();
+#else
+    return handle_;
+#endif  // defined(OS_MACOSX)
+  }
+#endif
 
  private:
   void* const data_;
   const size_t size_;
+  const base::SharedMemoryHandle handle_;
 };
 
 // A holder of a GpuMemoryBuffer-backed buffer, Map()ed on ctor and Unmap()ed on
@@ -95,10 +103,16 @@ class GpuMemoryBufferBufferHandle
 
   size_t size() const override { return size_; }
   void* data() override { return data_[0]; }
-  gfx::GpuMemoryBufferType GetType() override {
-    return gmb_->GetHandle().type;
-  }
   ClientBuffer AsClientBuffer() override { return gmb_->AsClientBuffer(); }
+#if defined(OS_POSIX)
+  base::FileDescriptor AsPlatformFile() override {
+#if defined(OS_MACOSX)
+    return gmb_->GetHandle().handle.GetFileDescriptor();
+#else
+    return gmb_->GetHandle().handle;
+#endif  // defined(OS_MACOSX)
+  }
+#endif
 
  private:
   gfx::GpuMemoryBuffer* const gmb_;
@@ -117,8 +131,8 @@ class VideoCaptureBufferPool::SharedMemTracker final : public Tracker {
   size_t mapped_size() const override { return shared_memory_.mapped_size(); }
 
   scoped_ptr<BufferHandle> GetBufferHandle() override {
-    return make_scoped_ptr(
-        new SimpleBufferHandle(shared_memory_.memory(), mapped_size()));
+    return make_scoped_ptr(new SimpleBufferHandle(
+        shared_memory_.memory(), mapped_size(), shared_memory_.handle()));
   }
 
   bool ShareToProcess(base::ProcessHandle process_handle,
@@ -313,6 +327,17 @@ void VideoCaptureBufferPool::RelinquishConsumerHold(int buffer_id,
 
   tracker->set_consumer_hold_count(tracker->consumer_hold_count() -
                                    num_clients);
+}
+
+double VideoCaptureBufferPool::GetBufferPoolUtilization() const {
+  base::AutoLock lock(lock_);
+  int num_buffers_held = 0;
+  for (const auto& entry : trackers_) {
+    Tracker* const tracker = entry.second;
+    if (tracker->held_by_producer() || tracker->consumer_hold_count() > 0)
+      ++num_buffers_held;
+  }
+  return static_cast<double>(num_buffers_held) / count_;
 }
 
 int VideoCaptureBufferPool::ReserveForProducerInternal(

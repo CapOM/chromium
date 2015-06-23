@@ -112,14 +112,13 @@ class VideoResourceUpdaterTest : public testing::Test {
     const unsigned sync_point = 7;
     const unsigned target = GL_TEXTURE_2D;
     return media::VideoFrame::WrapNativeTexture(
+        media::VideoFrame::ARGB,
         gpu::MailboxHolder(mailbox, target, sync_point),
         base::Bind(&ReleaseMailboxCB),
-        size,               // coded_size
-        gfx::Rect(size),    // visible_rect
-        size,               // natural_size
-        base::TimeDelta(),  // timestamp
-        false,              // allow_overlay
-        true);              // has_alpha
+        size,                // coded_size
+        gfx::Rect(size),     // visible_rect
+        size,                // natural_size
+        base::TimeDelta());  // timestamp
   }
 
   scoped_refptr<media::VideoFrame> CreateTestYUVHardareVideoFrame() {
@@ -141,11 +140,10 @@ class VideoResourceUpdaterTest : public testing::Test {
         gpu::MailboxHolder(mailbox[media::VideoFrame::kVPlane], target,
                            sync_point),
         base::Bind(&ReleaseMailboxCB),
-        size,               // coded_size
-        gfx::Rect(size),    // visible_rect
-        size,               // natural_size
-        base::TimeDelta(),  // timestamp
-        false);             // allow_overlay
+        size,                // coded_size
+        gfx::Rect(size),     // visible_rect
+        size,                // natural_size
+        base::TimeDelta());  // timestamp
   }
 
   WebGraphicsContext3DUploadCounter* context3d_;
@@ -311,6 +309,7 @@ TEST_F(VideoResourceUpdaterTest, CreateForHardwarePlanes) {
 
   resources = updater.CreateExternalResourcesFromVideoFrame(video_frame);
   EXPECT_EQ(VideoFrameExternalResources::YUV_RESOURCE, resources.type);
+  EXPECT_TRUE(resources.read_lock_fences_enabled);
   EXPECT_EQ(3u, resources.mailboxes.size());
   EXPECT_EQ(3u, resources.release_callbacks.size());
   EXPECT_EQ(0u, resources.software_resources.size());

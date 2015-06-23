@@ -28,6 +28,7 @@
 #include "media/base/demuxer_stream.h"
 #include "media/base/media_keys.h"
 #include "media/base/time_delta_interpolator.h"
+#include "media/blink/webmediaplayer_util.h"
 #include "media/cdm/proxy_decryptor.h"
 #include "third_party/WebKit/public/platform/WebGraphicsContext3D.h"
 #include "third_party/WebKit/public/platform/WebMediaPlayer.h"
@@ -113,6 +114,8 @@ class WebMediaPlayerAndroid : public blink::WebMediaPlayer,
   virtual bool supportsSave() const;
   virtual void setRate(double rate);
   virtual void setVolume(double volume);
+  virtual void setSinkId(const blink::WebString& device_id,
+                         media::WebSetSinkIdCB* raw_web_callbacks);
   virtual void requestRemotePlayback();
   virtual void requestRemotePlaybackControl();
   virtual blink::WebTimeRanges buffered() const;
@@ -131,22 +134,13 @@ class WebMediaPlayerAndroid : public blink::WebMediaPlayer,
                      unsigned char alpha,
                      SkXfermode::Mode mode);
 
-  // TODO(dshwang): remove |level|. crbug.com/443151
-  virtual bool copyVideoTextureToPlatformTexture(
-      blink::WebGraphicsContext3D* web_graphics_context,
-      unsigned int texture,
-      unsigned int level,
-      unsigned int internal_format,
-      unsigned int type,
-      bool premultiply_alpha,
-      bool flip_y);
-  virtual bool copyVideoTextureToPlatformTexture(
+  bool copyVideoTextureToPlatformTexture(
       blink::WebGraphicsContext3D* web_graphics_context,
       unsigned int texture,
       unsigned int internal_format,
       unsigned int type,
       bool premultiply_alpha,
-      bool flip_y);
+      bool flip_y) override;
 
   // True if the loaded media has a playable video/audio track.
   virtual bool hasVideo() const;
@@ -212,7 +206,6 @@ class WebMediaPlayerAndroid : public blink::WebMediaPlayer,
   void OnDidExitFullscreen();
   void OnMediaPlayerPlay();
   void OnMediaPlayerPause();
-  void OnRequestFullscreen();
   void OnRemoteRouteAvailabilityChanged(bool routes_available);
 
   // StreamTextureFactoryContextObserver implementation.

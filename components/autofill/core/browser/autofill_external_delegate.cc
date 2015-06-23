@@ -7,7 +7,7 @@
 #include "base/bind.h"
 #include "base/command_line.h"
 #include "base/message_loop/message_loop.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -199,7 +199,8 @@ void AutofillExternalDelegate::DidSelectSuggestion(
 }
 
 void AutofillExternalDelegate::DidAcceptSuggestion(const base::string16& value,
-                                                   int identifier) {
+                                                   int identifier,
+                                                   int position) {
   if (identifier == POPUP_ITEM_ID_AUTOFILL_OPTIONS) {
     // User selected 'Autofill Options'.
     manager_->ShowAutofillSettings();
@@ -254,6 +255,9 @@ void AutofillExternalDelegate::DidAcceptSuggestion(const base::string16& value,
     manager_->client()->ScanCreditCard(base::Bind(
         &AutofillExternalDelegate::OnCreditCardScanned, GetWeakPtr()));
   } else {
+    if (identifier > 0)  // Denotes an Autofill suggestion.
+      AutofillMetrics::LogSuggestionAcceptedIndex(position);
+
     FillAutofillFormData(identifier, false);
   }
 
