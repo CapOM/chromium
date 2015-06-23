@@ -20,14 +20,11 @@ LayerSettings::~LayerSettings() {
 }
 
 LayerTreeSettings::LayerTreeSettings()
-    : impl_side_painting(false),
-      raster_enabled(true),
-      single_thread_proxy_scheduler(true),
+    : single_thread_proxy_scheduler(true),
       use_external_begin_frame_source(false),
       main_frame_before_activation_enabled(false),
       using_synchronous_renderer_compositor(false),
       report_overscroll_only_for_scrollable_axes(false),
-      per_tile_painting_enabled(false),
       accelerated_animation_enabled(true),
       can_use_lcd_text(true),
       use_distance_field_text(false),
@@ -43,7 +40,6 @@ LayerTreeSettings::LayerTreeSettings()
       scrollbar_show_scale_threshold(1.0f),
       solid_color_scrollbar_color(SK_ColorWHITE),
       timeout_and_draw_when_animation_checkerboards(true),
-      maximum_number_of_failed_draws_before_draw_is_forced_(3),
       layer_transforms_should_scale_layer_contents(false),
       layers_always_allowed_lcd_text(false),
       minimum_contents_scale(0.0625f),
@@ -62,7 +58,7 @@ LayerTreeSettings::LayerTreeSettings()
       max_unused_resource_memory_percentage(100),
       max_memory_for_prepaint_percentage(100),
       strict_layer_property_change_checking(false),
-      use_one_copy(false),
+      use_one_copy(true),
       use_zero_copy(false),
       use_persistent_map_for_gpu_memory_buffers(false),
       enable_elastic_overscroll(false),
@@ -86,16 +82,12 @@ SchedulerSettings LayerTreeSettings::ToSchedulerSettings() const {
       use_external_begin_frame_source;
   scheduler_settings.main_frame_before_activation_enabled =
       main_frame_before_activation_enabled;
-  scheduler_settings.impl_side_painting = impl_side_painting;
   scheduler_settings.timeout_and_draw_when_animation_checkerboards =
       timeout_and_draw_when_animation_checkerboards;
-  scheduler_settings.maximum_number_of_failed_draws_before_draw_is_forced_ =
-      maximum_number_of_failed_draws_before_draw_is_forced_;
   scheduler_settings.using_synchronous_renderer_compositor =
       using_synchronous_renderer_compositor;
   scheduler_settings.throttle_frame_production =
       !renderer_settings.disable_gpu_vsync;
-  scheduler_settings.main_thread_should_always_be_low_latency = false;
   scheduler_settings.background_frame_interval =
       base::TimeDelta::FromSecondsD(1.0 / background_animation_rate);
   return scheduler_settings;

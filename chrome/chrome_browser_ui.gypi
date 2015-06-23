@@ -1066,6 +1066,8 @@
       'browser/ui/cocoa/infobars/infobar_gradient_view.mm',
       'browser/ui/cocoa/infobars/infobar_utilities.h',
       'browser/ui/cocoa/infobars/infobar_utilities.mm',
+      'browser/ui/cocoa/infobars/save_password_infobar_controller.h',
+      'browser/ui/cocoa/infobars/save_password_infobar_controller.mm',
       'browser/ui/cocoa/infobars/translate_infobar_base.h',
       'browser/ui/cocoa/infobars/translate_infobar_base.mm',
       'browser/ui/cocoa/infobars/translate_message_infobar_controller.h',
@@ -1080,8 +1082,6 @@
       'browser/ui/cocoa/location_bar/autocomplete_text_field_editor.mm',
       'browser/ui/cocoa/location_bar/bubble_decoration.h',
       'browser/ui/cocoa/location_bar/bubble_decoration.mm',
-      'browser/ui/cocoa/location_bar/button_decoration.h',
-      'browser/ui/cocoa/location_bar/button_decoration.mm',
       'browser/ui/cocoa/location_bar/content_setting_decoration.h',
       'browser/ui/cocoa/location_bar/content_setting_decoration.mm',
       'browser/ui/cocoa/location_bar/ev_bubble_decoration.h',
@@ -2810,9 +2810,7 @@
             '../storage/storage_common.gyp:storage_common',
             '../third_party/expat/expat.gyp:expat',
             '../third_party/leveldatabase/leveldatabase.gyp:leveldatabase',
-            '../third_party/libjingle/libjingle.gyp:libjingle',
             '../third_party/mojo/mojo_edk.gyp:mojo_system_impl',
-            '../third_party/npapi/npapi.gyp:npapi',
             '../third_party/re2/re2.gyp:re2',
             '../ui/base/ime/ui_base_ime.gyp:ui_base_ime',
             '../ui/compositor/compositor.gyp:compositor',
@@ -2905,7 +2903,6 @@
           'sources': [ '<@(chrome_browser_ui_views_sources)' ],
           'dependencies': [
             '<(DEPTH)/components/components.gyp:constrained_window',
-            '<(DEPTH)/extensions/components/extensions_components.gyp:native_app_window',
           ],
           'conditions': [
             ['chromeos == 0 and (OS!="mac" or mac_views_browser==1)', {
@@ -2919,10 +2916,12 @@
               'conditions': [
                 ['enable_extensions==1', {
                   'sources': [ '<@(chrome_browser_ui_views_extensions_non_mac_sources)' ],
-                  'dependencies': [
-                    '<(DEPTH)/extensions/components/extensions_components.gyp:native_app_window',
-                  ],
                 }],
+              ],
+            }],
+            ['enable_extensions==1', {
+              'dependencies': [
+                '<(DEPTH)/extensions/components/extensions_components.gyp:native_app_window',
               ],
             }],
           ],

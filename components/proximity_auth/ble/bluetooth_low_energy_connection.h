@@ -6,6 +6,7 @@
 #define COMPONENTS_PROXIMITY_AUTH_BLUETOOTH_LOW_ENERGY_CONNECTION_H
 
 #include <queue>
+#include <string>
 
 #include "base/macros.h"
 #include "base/memory/ref_counted.h"
@@ -133,6 +134,12 @@ class BluetoothLowEnergyConnection : public Connection,
     bool is_last_write_for_wire_message;
     int number_of_failed_attempts;
   };
+
+  // Called when the remote device is successfully disconnected.
+  void OnDisconnected();
+
+  // Called when there is an error disconnecting the remote device.
+  void OnDisconnectError();
 
   // Called when a GATT connection is created or received by the constructor.
   void OnGattConnectionCreated(
@@ -262,6 +269,12 @@ class BluetoothLowEnergyConnection : public Connection,
   // ControlSignal::kSendSignal was received from the remote device.
   bool receiving_bytes_;
 
+  // Total number of bytes expected for the current receive operation.
+  std::size_t expected_number_of_incoming_bytes_;
+
+  // Bytes already received for the current receive operation.
+  std::string incoming_bytes_buffer_;
+
   // Indicates there is a BluetoothGattCharacteristic::WriteRemoteCharacteristic
   // operation pending.
   bool write_remote_characteristic_pending_;
@@ -270,6 +283,13 @@ class BluetoothLowEnergyConnection : public Connection,
 
   // Maximum number of tries to send any write request.
   int max_number_of_write_attempts_;
+
+  // Maximum number of bytes that fit in a single chunk to be written in
+  // |to_peripheral_char_|. Ideally, this should be the maximum value the
+  // peripheral supports and it should be agreed when the GATT connection is
+  // created. Currently, there is no API to find this value. The implementation
+  // uses a hard-coded constant.
+  int max_chunk_size_;
 
   // Stores when the instace was created.
   base::TimeTicks start_time_;

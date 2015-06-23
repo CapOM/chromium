@@ -54,7 +54,7 @@
 #include "chrome/browser/ui/tabs/pinned_tab_service_factory.h"
 #include "chrome/browser/ui/webui/ntp/ntp_resource_cache_factory.h"
 #include "chrome/browser/undo/bookmark_undo_service_factory.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 
 #if defined(ENABLE_EXTENSIONS)
 #include "apps/browser_context_keyed_service_factories.h"
@@ -117,6 +117,7 @@
 #endif
 
 #if defined(OS_CHROMEOS)
+#include "chrome/browser/chromeos/printer_detector/printer_detector_factory.h"
 #include "chrome/browser/extensions/api/platform_keys/verify_trust_api.h"
 #endif
 
@@ -208,6 +209,7 @@ EnsureBrowserContextKeyedServiceFactoriesBuilt() {
   EnhancedBookmarkKeyServiceFactory::GetInstance();
 #endif
 #if defined(OS_CHROMEOS)
+  chromeos::PrinterDetectorFactory::GetInstance();
   extensions::VerifyTrustAPI::GetFactoryInstance();
 #endif
   FaviconServiceFactory::GetInstance();

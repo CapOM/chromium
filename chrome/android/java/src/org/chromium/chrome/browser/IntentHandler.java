@@ -14,6 +14,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.Browser;
 import android.provider.MediaStore;
 import android.speech.RecognizerResultsIntent;
@@ -29,6 +30,8 @@ import org.chromium.chrome.browser.omnibox.AutocompleteController;
 import org.chromium.chrome.browser.search_engines.TemplateUrlService;
 import org.chromium.chrome.browser.tabmodel.document.ActivityDelegate;
 import org.chromium.chrome.browser.util.IntentUtils;
+import org.chromium.content_public.browser.LoadUrlParams;
+import org.chromium.content_public.common.Referrer;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -39,7 +42,7 @@ import java.util.Locale;
  * Handles all browser-related Intents.
  */
 public class IntentHandler {
-    private static final String TAG = Log.makeTag("IntentHandler");
+    private static final String TAG = "cr.IntentHandler";
 
     /**
      * Document mode: If true, Chrome is launched into the same Task.
@@ -110,6 +113,11 @@ public class IntentHandler {
      * A referrer id used for Chrome to Chrome referrer passing.
      */
     public static final String EXTRA_REFERRER_ID = "org.chromium.chrome.browser.referrer_id";
+
+    /**
+     * Key to associate a timestamp with an intent.
+     */
+    private static final String EXTRA_TIMESTAMP_MS = "org.chromium.chrome.browser.timestamp";
 
     /**
      * Fake ComponentName used in constructing TRUSTED_APPLICATION_CODE_EXTRA.
@@ -341,6 +349,21 @@ public class IntentHandler {
     }
 
     /**
+     * Add referrer and extra headers to a {@link LoadUrlParams}, if we managed to parse them from
+     * the intent.
+     * @param params The {@link LoadUrlParams} to add referrer and headers.
+     * @param intent The intent we use to parse the extras.
+     */
+    public static void addReferrerAndHeaders(LoadUrlParams params, Intent intent, Context context) {
+        String referrer = getReferrerUrl(intent, context);
+        if (referrer != null) {
+            params.setReferrer(new Referrer(referrer, Referrer.REFERRER_POLICY_DEFAULT));
+        }
+        String headers = getExtraHeadersFromIntent(intent, referrer != null);
+        if (headers != null) params.setVerbatimHeaders(headers);
+    }
+
+    /**
      * @return Whether that the given referrer is of the format that Chrome allows external
      * apps to specify.
      */
@@ -509,6 +532,23 @@ public class IntentHandler {
             extraHeaders.append(value);
         }
         return extraHeaders.length() == 0 ? null : extraHeaders.toString();
+    }
+
+    /**
+     * Adds a timestamp to an intent, as returned by {@link SystemClock#elapsedRealtime()}.
+     *
+     * To track page load time, this needs to be called as close as possible to
+     * the entry point (in {@link Activity#onCreate()} for instance).
+     */
+    public static void addTimestampToIntent(Intent intent) {
+        intent.putExtra(EXTRA_TIMESTAMP_MS, SystemClock.elapsedRealtime());
+    }
+
+    /**
+     * @return the timestamp associated with an intent, or -1.
+     */
+    public static long getTimestampFromIntent(Intent intent) {
+        return intent.getLongExtra(EXTRA_TIMESTAMP_MS, -1);
     }
 
     /**

@@ -84,12 +84,6 @@ bool ChromeNetworkDelegate::g_allow_file_access_ = false;
 bool ChromeNetworkDelegate::g_allow_file_access_ = true;
 #endif
 
-#if defined(ENABLE_EXTENSIONS)
-// This remains false unless the --disable-extensions-http-throttling
-// flag is passed to the browser.
-bool ChromeNetworkDelegate::g_never_throttle_requests_ = false;
-#endif
-
 namespace {
 
 const char kDNTHeader[] = "DNT";
@@ -187,9 +181,9 @@ bool CanRequestBeDeltaEncoded(const net::URLRequest* request) {
   for (size_t i = 0; i < arraysize(kEligibleMasks); i++) {
     const char *prefix = kEligibleMasks[i].prefix;
     const char *suffix = kEligibleMasks[i].suffix;
-    if (prefix && !StartsWithASCII(mime_type, prefix, kCaseSensitive))
+    if (prefix && !base::StartsWithASCII(mime_type, prefix, kCaseSensitive))
       continue;
-    if (suffix && !EndsWith(mime_type, suffix, kCaseSensitive))
+    if (suffix && !base::EndsWith(mime_type, suffix, kCaseSensitive))
       continue;
     return true;
   }
@@ -322,13 +316,6 @@ void ChromeNetworkDelegate::set_predictor(
   connect_interceptor_.reset(
       new chrome_browser_net::ConnectInterceptor(predictor));
 }
-
-// static
-#if defined(ENABLE_EXTENSIONS)
-void ChromeNetworkDelegate::NeverThrottleRequests() {
-  g_never_throttle_requests_ = true;
-}
-#endif
 
 // static
 void ChromeNetworkDelegate::InitializePrefsOnUIThread(
@@ -674,18 +661,6 @@ bool ChromeNetworkDelegate::OnCanAccessFile(const net::URLRequest& request,
   DVLOG(1) << "File access denied - " << path.value().c_str();
   return false;
 #endif  // !defined(OS_CHROMEOS) && !defined(OS_ANDROID)
-}
-
-bool ChromeNetworkDelegate::OnCanThrottleRequest(
-    const net::URLRequest& request) const {
-#if defined(ENABLE_EXTENSIONS)
-  if (g_never_throttle_requests_)
-    return false;
-  return request.first_party_for_cookies().scheme() ==
-      extensions::kExtensionScheme;
-#else
-  return false;
-#endif
 }
 
 bool ChromeNetworkDelegate::OnCanEnablePrivacyMode(

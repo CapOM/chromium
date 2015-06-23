@@ -80,6 +80,7 @@ Nekatere funkcije morda niso na voljo in spremembe nastavitev ne bodo shranjene.
 <translation id="8551886023433311834">Posodobitev je skoraj končana. Znova zaženite napravo.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> – Google Chrome</translation>
 <translation id="1073391069195728457">Chrome – Obvestila</translation>
+<translation id="6368805772029492593">Zaradi večje varnosti bo Google Chrome šifriral vaše podatke.</translation>
 <translation id="7339898014177206373">Novo okno</translation>
 <translation id="3282568296779691940">Prijava v Google Chrome</translation>
 <translation id="3089968997497233615">Na voljo je nova, varnejša različica Google Chroma.</translation>
@@ -173,7 +174,6 @@ Nekatere funkcije morda ne bodo na voljo. Navedite drug imenik profila ali upora
 <translation id="2290095356545025170">Ali ste prepričani, da želite odstraniti Google Chrome?</translation>
 <translation id="4273752058983339720">Google Chrome se samodejno zažene ob zagonu računalnika.</translation>
 <translation id="2316129865977710310">Ne, hvala</translation>
-<translation id="415994390253732730">Ali se Chrome čudno obnaša?</translation>
 <translation id="1104959162601287462">O &amp;sistemu Chrome OS</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Dobrodošli v brskalniku Chrome</translation>
@@ -226,6 +226,7 @@ Nekatere funkcije morda ne bodo na voljo. Navedite drug imenik profila ali upora
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome je pravkar postal še boljši</translation>
 <translation id="2588322182880276190">Chromov logotip</translation>
+<translation id="4519152997629025674">Google Chrome lahko za izboljšanje izkušnje brskanja uporablja <ph name="BEGIN_LINK"/>spletne storitve<ph name="END_LINK"/>. Te storitve lahko kadar koli onemogočite, če želite.</translation>
 <translation id="4367618624832907428">Google Chrome ne more prikazati spletne strani, ker računalnik nima internetne povezave.</translation>
 <translation id="174539241580958092">Google Chrome ni mogel sinhronizirati podatkov zaradi napake pri prijavi.</translation>
 <translation id="8255190535488645436">Google Chrome uporablja vašo kamero in mikrofon.</translation>
@@ -233,7 +234,6 @@ Nekatere funkcije morda ne bodo na voljo. Navedite drug imenik profila ali upora
         omrežja.</translation>
 <translation id="9102715433345326100">Ta datoteka je zlonamerna, zato jo je Chrome blokiral.</translation>
 <translation id="8205111949707227942">Izbirno: Pomagajte nam narediti Chrome OS boljši, tako da Googlu samodejno pošiljate statistične podatke o uporabi in poročila o zrušitvah.</translation>
-<translation id="487887346205285304">Ali se Chromium čudno obnaša?</translation>
 <translation id="3622797965165704966">Zdaj je Chrome lažje uporabljati z Google Računom in v računalnikih, ki so v skupni rabi.</translation>
 <translation id="7196020411877309443">Zakaj je to prikazano?</translation>
 <translation id="2769762047821873045">Google Chrome ni privzeti brskalnik.</translation>

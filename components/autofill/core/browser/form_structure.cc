@@ -43,6 +43,7 @@ const char kAttributeClientVersion[] = "clientversion";
 const char kAttributeDataPresent[] = "datapresent";
 const char kAttributeFieldID[] = "fieldid";
 const char kAttributeFieldType[] = "fieldtype";
+const char kAttributeFieldLabel[] = "label";
 const char kAttributeFormSignature[] = "formsignature";
 const char kAttributeName[] = "name";
 const char kAttributeSignature[] = "signature";
@@ -70,7 +71,7 @@ const int kNumberOfMismatchesThreshold = 3;
 bool IsAutofillFieldMetadataEnabled() {
   const std::string group_name =
       base::FieldTrialList::FindFullName("AutofillFieldMetadata");
-  return StartsWithASCII(group_name, "Enabled", true);
+  return base::StartsWithASCII(group_name, "Enabled", true);
 }
 
 // Helper for |EncodeUploadRequest()| that creates a bit field corresponding to
@@ -126,6 +127,10 @@ buzz::XmlElement* EncodeFieldForQuery(const AutofillField& field,
     }
     field_element->SetAttr(buzz::QName(kAttributeControlType),
                            field.form_control_type);
+    if (!field.label.empty()) {
+      field_element->SetAttr(buzz::QName(kAttributeFieldLabel),
+                             base::UTF16ToUTF8(field.label));
+    }
   }
   parent->AddElement(field_element);
   return field_element;
@@ -1145,7 +1150,7 @@ void FormStructure::ParseFieldTypesFromAutocompleteAttributes(
     // The preceding token, if any, may be a named section.
     const std::string kSectionPrefix = "section-";
     if (!tokens.empty() &&
-        StartsWithASCII(tokens.back(), kSectionPrefix, true)) {
+        base::StartsWithASCII(tokens.back(), kSectionPrefix, true)) {
       // Prepend this section name to the suffix set in the preceding block.
       section = tokens.back().substr(kSectionPrefix.size()) + section;
       tokens.pop_back();

@@ -88,6 +88,8 @@ enum MaliciousExtensionType {
   EXTENSION_DMG,
   EXTENSION_PKG,
   EXTENSION_TORRENT,
+  EXTENSION_WEBSITE,
+  EXTENSION_URL,
   EXTENSION_MAX,
 };
 
@@ -116,6 +118,9 @@ MaliciousExtensionType GetExtensionType(const base::FilePath& f) {
   if (f.MatchesExtension(FILE_PATH_LITERAL(".pkg"))) return EXTENSION_PKG;
   if (f.MatchesExtension(FILE_PATH_LITERAL(".torrent")))
     return EXTENSION_TORRENT;
+  if (f.MatchesExtension(FILE_PATH_LITERAL(".website")))
+    return EXTENSION_WEBSITE;
+  if (f.MatchesExtension(FILE_PATH_LITERAL(".url"))) return EXTENSION_URL;
   return EXTENSION_OTHER;
 }
 
@@ -819,15 +824,6 @@ class DownloadProtectionService::CheckClientDownloadRequest
         UMA_HISTOGRAM_TIMES("SBClientDownload.DownloadRequestTimeoutDuration",
                             base::TimeTicks::Now() - timeout_start_time_);
       }
-    }
-    if (result == SAFE && (reason == REASON_WHITELISTED_URL ||
-                           reason == REASON_TRUSTED_EXECUTABLE)) {
-      // Due to the short-circuit logic in CheckWhitelists (see TODOs there), a
-      // ClientDownloadRequest was not generated for this download and callbacks
-      // were not run. Run them now with null to indicate that a download has
-      // taken place.
-      // TODO(grt): persist metadata for these downloads as well.
-      service_->client_download_request_callbacks_.Notify(item_, nullptr);
     }
     if (service_) {
       DVLOG(2) << "SafeBrowsing download verdict for: "

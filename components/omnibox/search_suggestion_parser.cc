@@ -10,7 +10,7 @@
 #include "base/json/json_string_value_serializer.h"
 #include "base/json/json_writer.h"
 #include "base/logging.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
@@ -148,8 +148,8 @@ void SearchSuggestionParser::SuggestResult::ClassifyMatchContents(
         suggestion_.length() - match_contents_.length();
     // Ensure the query starts with the input text, and ends with the match
     // contents, and the input text has an overlap with contents.
-    if (StartsWith(suggestion_, input_text, true) &&
-        EndsWith(suggestion_, match_contents_, true) &&
+    if (base::StartsWith(suggestion_, input_text, true) &&
+        base::EndsWith(suggestion_, match_contents_, true) &&
         (input_text.length() > contents_index)) {
       lookup_text = input_text.substr(contents_index);
     }

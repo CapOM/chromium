@@ -7,13 +7,12 @@
 #include "base/thread_task_runner_handle.h"
 #include "cc/layers/content_layer_client.h"
 #include "cc/layers/picture_layer_impl.h"
-#include "cc/resources/resource_update_queue.h"
 #include "cc/test/fake_layer_tree_host.h"
 #include "cc/test/fake_picture_layer.h"
 #include "cc/test/fake_picture_layer_impl.h"
 #include "cc/test/fake_proxy.h"
-#include "cc/test/impl_side_painting_settings.h"
-#include "cc/trees/occlusion_tracker.h"
+#include "cc/test/test_shared_bitmap_manager.h"
+#include "cc/test/test_task_graph_runner.h"
 #include "cc/trees/single_thread_proxy.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -41,14 +40,13 @@ TEST(PictureLayerTest, NoTilesIfEmptyBounds) {
   layer->SetBounds(gfx::Size(10, 10));
 
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
-  scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
+  TestTaskGraphRunner task_graph_runner;
+  scoped_ptr<FakeLayerTreeHost> host =
+      FakeLayerTreeHost::Create(&host_client, &task_graph_runner);
   host->SetRootLayer(layer);
   layer->SetIsDrawable(true);
   layer->SavePaintProperties();
-
-  OcclusionTracker<Layer> occlusion(gfx::Rect(0, 0, 1000, 1000));
-  scoped_ptr<ResourceUpdateQueue> queue(new ResourceUpdateQueue);
-  layer->Update(queue.get(), &occlusion);
+  layer->Update();
 
   EXPECT_EQ(0, host->source_frame_number());
   host->CommitComplete();
@@ -64,8 +62,8 @@ TEST(PictureLayerTest, NoTilesIfEmptyBounds) {
     DebugScopedSetImplThread impl_thread(&proxy);
 
     TestSharedBitmapManager shared_bitmap_manager;
-    FakeLayerTreeHostImpl host_impl(ImplSidePaintingSettings(), &proxy,
-                                    &shared_bitmap_manager, nullptr);
+    FakeLayerTreeHostImpl host_impl(LayerTreeSettings(), &proxy,
+                                    &shared_bitmap_manager, &task_graph_runner);
     host_impl.CreatePendingTree();
     scoped_ptr<FakePictureLayerImpl> layer_impl =
         FakePictureLayerImpl::Create(host_impl.pending_tree(), 1);
@@ -83,7 +81,9 @@ TEST(PictureLayerTest, SuitableForGpuRasterization) {
   scoped_refptr<PictureLayer> layer =
       PictureLayer::Create(LayerSettings(), &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
-  scoped_ptr<FakeLayerTreeHost> host = FakeLayerTreeHost::Create(&host_client);
+  TestTaskGraphRunner task_graph_runner;
+  scoped_ptr<FakeLayerTreeHost> host =
+      FakeLayerTreeHost::Create(&host_client, &task_graph_runner);
   host->SetRootLayer(layer);
   RecordingSource* recording_source = layer->GetRecordingSourceForTesting();
 
@@ -105,8 +105,9 @@ TEST(PictureLayerTest, UseTileGridSize) {
   scoped_refptr<PictureLayer> layer =
       PictureLayer::Create(LayerSettings(), &client);
   FakeLayerTreeHostClient host_client(FakeLayerTreeHostClient::DIRECT_3D);
+  TestTaskGraphRunner task_graph_runner;
   scoped_ptr<FakeLayerTreeHost> host =
-      FakeLayerTreeHost::Create(&host_client, settings);
+      FakeLayerTreeHost::Create(&host_client, &task_graph_runner, settings);
   host->SetRootLayer(layer);
 
   // Tile-grid is set according to its setting.
@@ -123,11 +124,13 @@ TEST(PictureLayerTest, UseTileGridSize) {
 TEST(PictureLayerTest, NonMonotonicSourceFrameNumber) {
   LayerTreeSettings settings;
   settings.single_thread_proxy_scheduler = false;
+  settings.use_zero_copy = true;
+  settings.use_one_copy = false;
 
   FakeLayerTreeHostClient host_client1(FakeLayerTreeHostClient::DIRECT_3D);
   FakeLayerTreeHostClient host_client2(FakeLayerTreeHostClient::DIRECT_3D);
-  scoped_ptr<SharedBitmapManager> shared_bitmap_manager(
-      new TestSharedBitmapManager());
+  TestSharedBitmapManager shared_bitmap_manager;
+  TestTaskGraphRunner task_graph_runner;
 
   MockContentLayerClient client;
   scoped_refptr<FakePictureLayer> layer =
@@ -135,8 +138,9 @@ TEST(PictureLayerTest, NonMonotonicSourceFrameNumber) {
 
   LayerTreeHost::InitParams params;
   params.client = &host_client1;
-  params.shared_bitmap_manager = shared_bitmap_manager.get();
+  params.shared_bitmap_manager = &shared_bitmap_manager;
   params.settings = &settings;
+  params.task_graph_runner = &task_graph_runner;
   params.main_task_runner = base::ThreadTaskRunnerHandle::Get();
   scoped_ptr<LayerTreeHost> host1 =
       LayerTreeHost::CreateSingleThreaded(&host_client1, &params);

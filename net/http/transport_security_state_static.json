@@ -192,6 +192,7 @@
     { "name": "accounts.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "profiles.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "mail.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
+    { "name": "mail-settings.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "inbox.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "talkgadget.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "talk.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
@@ -213,6 +214,7 @@
     { "name": "contributor.google.com", "include_subdomains": true, "mode": "force-https", "pins": "google" },
 
     // Other Google-related domains that must use HTTPS.
+    { "name": "google", "include_subdomains": true, "mode": "force-https", "pins": "google" },
     { "name": "gmail.com", "mode": "force-https", "pins": "google" },
     { "name": "googlemail.com", "mode": "force-https", "pins": "google" },
     { "name": "www.gmail.com", "mode": "force-https", "pins": "google" },
@@ -832,10 +834,7 @@
     { "name": "hackerone-user-content.com", "include_subdomains": true, "mode": "force-https" },
     { "name": "gamesdepartment.co.uk", "mode": "force-https" },
     { "name": "www.gamesdepartment.co.uk", "include_subdomains": true, "mode": "force-https" },
-    { "name": "schokokeks.org", "mode": "force-https" },
-    { "name": "www.schokokeks.org", "include_subdomains": true, "mode": "force-https" },
-    { "name": "config.schokokeks.org", "include_subdomains": true, "mode": "force-https" },
-    { "name": "webmail.schokokeks.org", "include_subdomains": true, "mode": "force-https" },
+    { "name": "schokokeks.org", "include_subdomains": true, "mode": "force-https" },
     { "name": "mwe.st", "include_subdomains": true, "mode": "force-https" },
     { "name": "ub3rk1tten.com", "include_subdomains": true, "mode": "force-https" },
     { "name": "addvocate.com", "include_subdomains": true, "mode": "force-https" },
@@ -3125,6 +3124,7 @@
     "BLOGGER_COM",
     "CHROME_COM",
     "GVT3_COM",
-    "GVT2_COM"
+    "GVT2_COM",
+    "GOOGLE"
   ]
 }

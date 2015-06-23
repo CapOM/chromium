@@ -10,11 +10,9 @@
 
 #include "base/callback.h"
 #include "base/compiler_specific.h"
-#include "base/debug/crash_logging.h"
 #include "base/gtest_prod_util.h"
 #include "base/memory/weak_ptr.h"
 #include "base/strings/string16.h"
-#include "base/strings/string_number_conversions.h"  // Temporary
 #include "base/time/time.h"
 #include "content/browser/accessibility/browser_accessibility_manager.h"
 #include "content/browser/site_instance_impl.h"
@@ -152,6 +150,7 @@ class CONTENT_EXPORT RenderFrameHostImpl
   blink::WebPageVisibilityState GetVisibilityState() override;
   void InsertVisualStateCallback(
       const VisualStateCallback& callback) override;
+  bool IsRenderFrameLive() override;
 
   // IPC::Sender
   bool Send(IPC::Message* msg) override;
@@ -167,6 +166,8 @@ class CONTENT_EXPORT RenderFrameHostImpl
                                         const gfx::Rect& subfocus) override;
   void AccessibilityScrollToPoint(int acc_obj_id,
                                   const gfx::Point& point) override;
+  void AccessibilitySetScrollOffset(int acc_obj_id,
+                                    const gfx::Point& offset) override;
   void AccessibilitySetTextSelection(int acc_obj_id,
                                      int start_offset,
                                      int end_offset) override;
@@ -192,10 +193,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   bool CreateRenderFrame(int parent_routing_id,
                          int previous_sibling_routing_id,
                          int proxy_routing_id);
-
-  // Returns whether the RenderFrame in the renderer process has been created
-  // and still has a connection.  This is valid for all frames.
-  bool IsRenderFrameLive();
 
   // Tracks whether the RenderFrame for this RenderFrameHost has been created in
   // the renderer process.  This is currently only used for subframes.
@@ -349,6 +346,11 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // PlzNavigate: this call happens on all browser-initiated navigations.
   void DispatchBeforeUnload(bool for_navigation);
 
+  // Returns true if a call to DispatchBeforeUnload will actually send the
+  // BeforeUnload IPC. This is the case if the current renderer is live and this
+  // frame is the main frame.
+  bool ShouldDispatchBeforeUnload();
+
   // Set the frame's opener to null in the renderer process in response to an
   // action in another renderer process.
   void DisownOpener();
@@ -440,9 +442,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
   // is the parent chain of the focused frame within the frame tree. In
   // addition, its associated RenderWidgetHost has to be focused.
   bool IsFocused();
-
-  // Temporary for http://crbug.com/369661.
-  std::string CommitCountString();
 
  protected:
   friend class RenderFrameHostFactory;
@@ -732,9 +731,6 @@ class CONTENT_EXPORT RenderFrameHostImpl
 
   // The frame's Mojo Shell service.
   scoped_ptr<FrameMojoShell> frame_mojo_shell_;
-
-  // Temporary for http://crbug.com/369661
-  int commit_count_ = 0;
 
   // NOTE: This must be the last member.
   base::WeakPtrFactory<RenderFrameHostImpl> weak_ptr_factory_;

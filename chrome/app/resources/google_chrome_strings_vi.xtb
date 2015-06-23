@@ -76,6 +76,7 @@
 <translation id="8551886023433311834">Gần như cập nhật! Khởi động lại thiết bị của bạn để hoàn tất cập nhật.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome - Thông báo</translation>
+<translation id="6368805772029492593">Để bảo mật hơn, Google Chrome sẽ mã hóa dữ liệu của bạn.</translation>
 <translation id="7339898014177206373">Cửa sổ mới</translation>
 <translation id="3282568296779691940">Đăng nhập Chrome</translation>
 <translation id="3089968997497233615">Đã có phiên bản Google Chrome mới và an toàn hơn.</translation>
@@ -170,7 +171,6 @@ Một số tính năng có thể không khả dụng. Vui lòng chỉ định th
 <translation id="2290095356545025170">Bạn có chắc chắn muốn gỡ cài đặt Google Chrome không?</translation>
 <translation id="4273752058983339720">Google Chrome được định cấu hình để tự động chạy khi bạn khởi động máy tính của mình.</translation>
 <translation id="2316129865977710310">Không, cảm ơn</translation>
-<translation id="415994390253732730">Chrome hoạt động không bình thường?</translation>
 <translation id="1104959162601287462">Giới thiệu về &amp;hệ điều hành Chrome</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Chào mừng bạn đến với Chrome</translation>
@@ -223,6 +223,7 @@ Một số tính năng có thể không khả dụng. Vui lòng chỉ định th
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome được cải tiến hơn</translation>
 <translation id="2588322182880276190">Biểu trưng Chrome</translation>
+<translation id="4519152997629025674">Google Chrome có thể sử dụng <ph name="BEGIN_LINK"/>các dịch vụ web<ph name="END_LINK"/> để cải thiện trải nghiệm duyệt web của bạn. Bạn có thể tắt các dịch vụ này bất cứ lúc nào, nếu muốn.</translation>
 <translation id="4367618624832907428">Google Chrome không thể hiển thị trang web vì máy tính của bạn chưa kết nối Internet.</translation>
 <translation id="174539241580958092">Google Chrome không thể đồng bộ hóa dữ liệu của bạn do lỗi khi đăng nhập.</translation>
 <translation id="8255190535488645436">Google Chrome đang sử dụng máy ảnh và micrô của bạn.</translation>
@@ -230,7 +231,6 @@ Một số tính năng có thể không khả dụng. Vui lòng chỉ định th
         của bạn.</translation>
 <translation id="9102715433345326100">Đây là tệp độc hại và Chrome đã chặn tệp này.</translation>
 <translation id="8205111949707227942">Tùy chọn: Giúp cải thiện Hệ điều hành Chrome bằng cách tự động gửi về Google thống kê sử dụng và báo cáo sự cố.</translation>
-<translation id="487887346205285304">Chrome hoạt động không bình thường?</translation>
 <translation id="3622797965165704966">Giờ đây, việc sử dụng Chrome bằng tài khoản Google của bạn và trên máy tính được chia sẻ trở nên dễ dàng hơn.</translation>
 <translation id="7196020411877309443">Tại sao tôi nhìn thấy thông báo này?</translation>
 <translation id="2769762047821873045">Google Chrome không phải là trình duyệt mặc định của bạn.</translation>

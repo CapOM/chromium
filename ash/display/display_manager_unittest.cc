@@ -1505,10 +1505,7 @@ TEST_F(DisplayManagerTest, UnifiedDesktopBasic) {
 
   UpdateDisplay("300x200,400x500");
 
-  // Switch to unified desktop.
-  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
-  display_manager()->ReconfigureDisplays();
-
+  // Defaults to the unified desktop.
   gfx::Screen* screen =
       gfx::Screen::GetScreenByType(gfx::SCREEN_TYPE_ALTERNATE);
   EXPECT_EQ("700x500", screen->GetPrimaryDisplay().size().ToString());
@@ -1542,7 +1539,6 @@ TEST_F(DisplayManagerTest, ConfigureUnifiedTwice) {
   // Don't check root window destruction in unified mode.
   Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
-  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
   UpdateDisplay("300x200,400x500");
   // Mirror windows are created in a posted task.
   RunAllPendingInMessageLoop();
@@ -1559,8 +1555,6 @@ TEST_F(DisplayManagerTest, RotateUnifiedDesktop) {
   // Don't check root window destruction in unified mode.
   Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
-  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
-  display_manager()->SetMultiDisplayMode(DisplayManager::UNIFIED);
   UpdateDisplay("300x200,400x500");
 
   gfx::Screen* screen =
@@ -1579,7 +1573,7 @@ TEST_F(DisplayManagerTest, RotateUnifiedDesktop) {
 }
 
 // Makes sure the transition from unified to single won't crash
-// with docked wnidows.
+// with docked windows.
 TEST_F(DisplayManagerTest, UnifiedWithDockWindows) {
   if (!SupportsMultipleDisplays())
     return;
@@ -1588,19 +1582,18 @@ TEST_F(DisplayManagerTest, UnifiedWithDockWindows) {
   // Don't check root window destruction in unified mode.
   Shell::GetPrimaryRootWindow()->RemoveObserver(this);
 
-  display_manager()->SetDefaultMultiDisplayMode(DisplayManager::UNIFIED);
-  display_manager()->SetMultiDisplayMode(DisplayManager::UNIFIED);
   UpdateDisplay("300x200,400x500");
 
   scoped_ptr<aura::Window> docked(
       CreateTestWindowInShellWithBounds(gfx::Rect(10, 10, 50, 50)));
   docked->SetProperty(aura::client::kShowStateKey, ui::SHOW_STATE_DOCKED);
   ASSERT_TRUE(wm::GetWindowState(docked.get())->IsDocked());
+  // 47 pixels reserved for launcher shelf height.
   EXPECT_EQ("0,0 250x453", docked->bounds().ToString());
-  UpdateDisplay("300x200");
+  UpdateDisplay("300x300");
   // Make sure the window is still docked.
   EXPECT_TRUE(wm::GetWindowState(docked.get())->IsDocked());
-  EXPECT_EQ("0,0 250x250", docked->bounds().ToString());
+  EXPECT_EQ("0,0 250x253", docked->bounds().ToString());
 }
 
 class ScreenShutdownTest : public test::AshTestBase {
@@ -1759,6 +1752,20 @@ TEST_F(DisplayManagerFontTest,
   EXPECT_EQ(gfx::FontRenderParams::HINTING_NONE, GetFontHintingParams());
 
   DisplayInfo::SetUse125DSFForUIScaling(false);
+}
+
+TEST_F(DisplayManagerTest, CheckInitializationOfRotationProperty) {
+  int64_t id = display_manager()->GetDisplayAt(0).id();
+  display_manager()->RegisterDisplayProperty(id, gfx::Display::ROTATE_90, 1.0f,
+                                             nullptr, gfx::Size(), 1.0f,
+                                             ui::COLOR_PROFILE_STANDARD);
+
+  const DisplayInfo& info = display_manager()->GetDisplayInfo(id);
+
+  EXPECT_EQ(gfx::Display::ROTATE_90,
+            info.GetRotation(gfx::Display::ROTATION_SOURCE_USER));
+  EXPECT_EQ(gfx::Display::ROTATE_90,
+            info.GetRotation(gfx::Display::ROTATION_SOURCE_ACTIVE));
 }
 
 #endif  // OS_CHROMEOS

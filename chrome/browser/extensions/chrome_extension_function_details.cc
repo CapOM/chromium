@@ -10,8 +10,8 @@
 #include "chrome/browser/ui/browser.h"
 #include "chrome/browser/ui/browser_finder.h"
 #include "chrome/browser/ui/tabs/tab_strip_model.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/browser/render_view_host.h"
 #include "extensions/browser/extension_function.h"
 #include "extensions/browser/extension_function_dispatcher.h"
 
@@ -54,7 +54,7 @@ Browser* ChromeExtensionFunctionDetails::GetCurrentBrowser() const {
   // If the delegate has an associated browser, return it.
   if (function_->dispatcher()) {
     extensions::WindowController* window_controller =
-        function_->dispatcher()->delegate()->GetExtensionWindowController();
+        function_->dispatcher()->GetExtensionWindowController();
     if (window_controller) {
       Browser* browser = window_controller->GetBrowser();
       if (browser)
@@ -69,9 +69,9 @@ Browser* ChromeExtensionFunctionDetails::GetCurrentBrowser() const {
   // |include_incognito|. Look only for browsers on the active desktop as it is
   // preferable to pretend no browser is open then to return a browser on
   // another desktop.
-  if (function_->render_view_host()) {
+  if (function_->render_frame_host()) {
     Profile* profile = Profile::FromBrowserContext(
-        function_->render_view_host()->GetProcess()->GetBrowserContext());
+        function_->render_frame_host()->GetProcess()->GetBrowserContext());
     Browser* browser = chrome::FindAnyBrowser(
         profile, function_->include_incognito(), chrome::GetActiveDesktop());
     if (browser)
@@ -93,7 +93,7 @@ ChromeExtensionFunctionDetails::GetExtensionWindowController() const {
   // If the delegate has an associated window controller, return it.
   if (function_->dispatcher()) {
     extensions::WindowController* window_controller =
-        function_->dispatcher()->delegate()->GetExtensionWindowController();
+        function_->dispatcher()->GetExtensionWindowController();
     if (window_controller)
       return window_controller;
   }

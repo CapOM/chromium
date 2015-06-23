@@ -215,8 +215,12 @@
       'browser/extensions/api/declarative_content/content_condition.h',
       'browser/extensions/api/declarative_content/content_constants.cc',
       'browser/extensions/api/declarative_content/content_constants.h',
+      'browser/extensions/api/declarative_content/declarative_content_condition_tracker_delegate.cc',
+      'browser/extensions/api/declarative_content/declarative_content_condition_tracker_delegate.h',
       'browser/extensions/api/declarative_content/declarative_content_css_condition_tracker.cc',
       'browser/extensions/api/declarative_content/declarative_content_css_condition_tracker.h',
+      'browser/extensions/api/declarative_content/declarative_content_page_url_condition_tracker.cc',
+      'browser/extensions/api/declarative_content/declarative_content_page_url_condition_tracker.h',
       'browser/extensions/api/desktop_capture/desktop_capture_api.cc',
       'browser/extensions/api/desktop_capture/desktop_capture_api.h',
       'browser/extensions/api/desktop_capture/desktop_capture_base.cc',
@@ -380,6 +384,15 @@
       'browser/extensions/api/page_capture/page_capture_api.h',
       'browser/extensions/api/passwords_private/passwords_private_api.cc',
       'browser/extensions/api/passwords_private/passwords_private_api.h',
+      'browser/extensions/api/passwords_private/passwords_private_delegate_impl.cc',
+      'browser/extensions/api/passwords_private/passwords_private_delegate_impl.h',
+      'browser/extensions/api/passwords_private/passwords_private_delegate.h',
+      'browser/extensions/api/passwords_private/passwords_private_delegate_factory.cc',
+      'browser/extensions/api/passwords_private/passwords_private_delegate_factory.h',
+      'browser/extensions/api/passwords_private/passwords_private_event_router.cc',
+      'browser/extensions/api/passwords_private/passwords_private_event_router.h',
+      'browser/extensions/api/passwords_private/passwords_private_event_router_factory.cc',
+      'browser/extensions/api/passwords_private/passwords_private_event_router_factory.h',
       'browser/extensions/api/permissions/permissions_api.cc',
       'browser/extensions/api/permissions/permissions_api.h',
       'browser/extensions/api/permissions/permissions_api_helpers.cc',
@@ -493,8 +506,6 @@
       'browser/extensions/api/tabs/windows_util.h',
       'browser/extensions/api/top_sites/top_sites_api.cc',
       'browser/extensions/api/top_sites/top_sites_api.h',
-      'browser/extensions/api/users_private/users_private_api.cc',
-      'browser/extensions/api/users_private/users_private_api.h',
       'browser/extensions/api/web_navigation/frame_navigation_state.cc',
       'browser/extensions/api/web_navigation/frame_navigation_state.h',
       'browser/extensions/api/web_navigation/web_navigation_api.cc',
@@ -550,6 +561,8 @@
       'browser/extensions/chrome_component_extension_resource_manager.h',
       'browser/extensions/chrome_content_browser_client_extensions_part.cc',
       'browser/extensions/chrome_content_browser_client_extensions_part.h',
+      'browser/extensions/chrome_content_verifier_delegate.cc',
+      'browser/extensions/chrome_content_verifier_delegate.h',
       'browser/extensions/chrome_extension_function.cc',
       'browser/extensions/chrome_extension_function.h',
       'browser/extensions/chrome_extension_function_details.cc',
@@ -972,9 +985,6 @@
       ],
       'conditions': [
         ['chromeos==1', {
-          'include_dirs': [
-            '../third_party/libjingle/source',
-          ],
           'dependencies': [
             '../build/linux/system.gyp:dbus',
             '../chromeos/ime/input_method.gyp:gencode',
@@ -1003,6 +1013,11 @@
           'dependencies': [
             '../ui/keyboard/keyboard.gyp:keyboard',
             '../ui/keyboard/keyboard.gyp:keyboard_resources',
+          ],
+        }],
+        ['toolkit_views==1', {
+          'dependencies': [
+            '../ui/views/views.gyp:views',
           ],
         }],
         ['OS=="linux"', {

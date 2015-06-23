@@ -7,7 +7,6 @@ package org.chromium.chrome.browser.help;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
 import android.net.Uri;
 import android.provider.Browser;
 import android.text.TextUtils;
@@ -18,6 +17,9 @@ import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromiumApplication;
 import org.chromium.chrome.browser.UrlConstants;
 import org.chromium.chrome.browser.UrlUtilities;
+import org.chromium.chrome.browser.feedback.FeedbackCollector;
+
+import javax.annotation.Nonnull;
 
 /**
  * Launches an activity that displays a relevant support page and has an option to provide feedback.
@@ -48,13 +50,9 @@ public class HelpAndFeedback {
      *                 screenshot of.
      * @param helpContext One of the CONTEXT_* constants. This should describe the user's current
      *                    context and will be used to show a more relevant help page.
-     * @param screenshot A screenshot of the current activity to include in the feedback the
-     *                   user sends, if any. If null, this method will take a screenshot of the
-     *                   activity (which will show a rendered page as black).
-     * @param url The URL of the current tab to include in the feedback the user sends, if any.
-     *            This parameter can be null.
+     * @param collector the {@link FeedbackCollector} to use for extra data. Must not be null.
      */
-    public void show(Activity activity, String helpContext, Bitmap screenshot, String url) {
+    public void show(Activity activity, String helpContext, @Nonnull FeedbackCollector collector) {
         launchFallbackSupportUri(activity);
     }
 

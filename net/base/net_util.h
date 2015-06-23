@@ -42,6 +42,8 @@ struct Parsed;
 
 namespace net {
 
+class AddressList;
+
 // This is a "forward declaration" to avoid including ip_address_number.h
 // Keep this in sync.
 typedef std::vector<unsigned char> IPAddressNumber;
@@ -70,9 +72,6 @@ NET_EXPORT extern const FormatUrlType kFormatUrlOmitTrailingSlashOnBareHostname;
 
 // Convenience for omitting all unecessary types.
 NET_EXPORT extern const FormatUrlType kFormatUrlOmitAll;
-
-// Returns the number of explicitly allowed ports; for testing.
-NET_EXPORT_PRIVATE extern size_t GetCountOfExplicitlyAllowedPorts();
 
 // Splits an input of the form <host>[":"<port>] into its consitituent parts.
 // Saves the result into |*host| and |*port|. If the input did not have
@@ -226,15 +225,26 @@ NET_EXPORT bool IsPortValid(int port);
 // registered by IANA and typically need root access to listen on.
 bool IsWellKnownPort(int port);
 
-enum PortOverrideMode { PORT_OVERRIDES_IGNORED, PORT_OVERRIDES_ALLOWED };
-
-// Checks if the port is allowed for the specified scheme.  If PortOverrideMode
-// is PORT_OVERIDES_ALLOWED, then ports set as allowed with
-// SetExplicitlyAllowedPorts() or by using ScopedPortException() will be
+// Checks if the port is allowed for the specified scheme.  Ports set as allowed
+// with SetExplicitlyAllowedPorts() or by using ScopedPortException() will be
 // considered allowed for any scheme.
-NET_EXPORT bool IsPortAllowedForScheme(int port,
-                                       const std::string& url_scheme,
-                                       PortOverrideMode port_override_mode);
+NET_EXPORT bool IsPortAllowedForScheme(int port, const std::string& url_scheme);
+
+// Returns the number of explicitly allowed ports; for testing.
+NET_EXPORT_PRIVATE size_t GetCountOfExplicitlyAllowedPorts();
+
+NET_EXPORT void SetExplicitlyAllowedPorts(const std::string& allowed_ports);
+
+class NET_EXPORT ScopedPortException {
+ public:
+  explicit ScopedPortException(int port);
+  ~ScopedPortException();
+
+ private:
+  int port_;
+
+  DISALLOW_COPY_AND_ASSIGN(ScopedPortException);
+};
 
 // Set socket to non-blocking mode
 NET_EXPORT int SetNonBlocking(int fd);
@@ -322,19 +332,6 @@ NET_EXPORT bool CanStripTrailingSlash(const GURL& url);
 //   - reference section
 NET_EXPORT_PRIVATE GURL SimplifyUrlForRequest(const GURL& url);
 
-NET_EXPORT void SetExplicitlyAllowedPorts(const std::string& allowed_ports);
-
-class NET_EXPORT ScopedPortException {
- public:
-  explicit ScopedPortException(int port);
-  ~ScopedPortException();
-
- private:
-  int port_;
-
-  DISALLOW_COPY_AND_ASSIGN(ScopedPortException);
-};
-
 // Returns true if it can determine that only loopback addresses are configured.
 // i.e. if only 127.0.0.1 and ::1 are routable.
 // Also returns false if it cannot determine this.
@@ -354,8 +351,17 @@ const uint16_t* GetPortFieldFromSockaddr(const struct sockaddr* address,
 NET_EXPORT_PRIVATE int GetPortFromSockaddr(const struct sockaddr* address,
                                            socklen_t address_len);
 
-// Returns true if |host| is one of the names (e.g. "localhost") or IP
-// addresses (IPv4 127.0.0.0/8 or IPv6 ::1) that indicate a loopback.
+// Resolves a local hostname (such as "localhost" or "localhost6") into
+// IP endpoints with the given port. Returns true if |host| is a local
+// hostname and false otherwise. Special IPv6 names (e.g. "localhost6")
+// will resolve to an IPv6 address only, whereas other names will
+// resolve to both IPv4 and IPv6.
+NET_EXPORT_PRIVATE bool ResolveLocalHostname(const std::string& host,
+                                             uint16_t port,
+                                             AddressList* address_list);
+
+// Returns true if |host| is one of the local hostnames
+// (e.g. "localhost") or IP addresses (IPv4 127.0.0.0/8 or IPv6 ::1).
 //
 // Note that this function does not check for IP addresses other than
 // the above, although other IP addresses may point to the local

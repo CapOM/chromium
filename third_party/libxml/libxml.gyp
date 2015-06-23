@@ -68,9 +68,11 @@
                 ],
               },
               'link_settings': {
-                'libraries': [
-                  '$(SDKROOT)/usr/lib/libxml2.dylib',
-                ],
+                'xcode_settings': {
+                  'OTHER_LDFLAGS': [
+                    '-lxml2',
+                  ],
+                },
               },
             }],
           ],
@@ -130,6 +132,8 @@
             'src/include/win32config.h',
             'src/include/wsockcompat.h',
             'src/acconfig.h',
+            'src/buf.c',
+            'src/buf.h',
             'src/c14n.c',
             'src/catalog.c',
             'src/chvalid.c',

@@ -391,6 +391,8 @@ void ContentViewCoreImpl::UpdateFrameInfo(
   window_android_->set_content_offset(
       gfx::ScaleVector2d(content_offset, dpi_scale_));
 
+  page_scale_ = page_scale_factor;
+
   Java_ContentViewCore_updateFrameInfo(
       env, obj.obj(),
       scroll_offset.x(),
@@ -1018,11 +1020,13 @@ void ContentViewCoreImpl::ScrollBegin(JNIEnv* env,
                                       jfloat x,
                                       jfloat y,
                                       jfloat hintx,
-                                      jfloat hinty) {
+                                      jfloat hinty,
+                                      jboolean target_viewport) {
   WebGestureEvent event = MakeGestureEvent(
       WebInputEvent::GestureScrollBegin, time_ms, x, y);
   event.data.scrollBegin.deltaXHint = hintx / dpi_scale();
   event.data.scrollBegin.deltaYHint = hinty / dpi_scale();
+  event.data.scrollBegin.targetViewport = target_viewport;
 
   SendGestureEvent(event);
 }
@@ -1043,12 +1047,19 @@ void ContentViewCoreImpl::ScrollBy(JNIEnv* env, jobject obj, jlong time_ms,
   SendGestureEvent(event);
 }
 
-void ContentViewCoreImpl::FlingStart(JNIEnv* env, jobject obj, jlong time_ms,
-                                     jfloat x, jfloat y, jfloat vx, jfloat vy) {
+void ContentViewCoreImpl::FlingStart(JNIEnv* env,
+                                     jobject obj,
+                                     jlong time_ms,
+                                     jfloat x,
+                                     jfloat y,
+                                     jfloat vx,
+                                     jfloat vy,
+                                     jboolean target_viewport) {
   WebGestureEvent event = MakeGestureEvent(
       WebInputEvent::GestureFlingStart, time_ms, x, y);
   event.data.flingStart.velocityX = vx / dpi_scale();
   event.data.flingStart.velocityY = vy / dpi_scale();
+  event.data.flingStart.targetViewport = target_viewport;
 
   SendGestureEvent(event);
 }
@@ -1216,6 +1227,15 @@ long ContentViewCoreImpl::GetNativeImeAdapter(JNIEnv* env, jobject obj) {
   return rwhva->GetNativeImeAdapter();
 }
 
+void ContentViewCoreImpl::ForceUpdateImeAdapter(long native_ime_adapter) {
+  JNIEnv* env = AttachCurrentThread();
+  ScopedJavaLocalRef<jobject> obj = java_ref_.get(env);
+  if (obj.is_null())
+    return;
+  Java_ContentViewCore_forceUpdateImeAdapter(env, obj.obj(),
+                                             native_ime_adapter);
+}
+
 void ContentViewCoreImpl::UpdateImeAdapter(long native_ime_adapter,
                                            int text_input_type,
                                            int text_input_flags,
@@ -1380,6 +1400,10 @@ void ContentViewCoreImpl::OnShowUnhandledTapUIIfNeeded(int x_dip, int y_dip) {
   Java_ContentViewCore_onShowUnhandledTapUIIfNeeded(
       env, obj.obj(), static_cast<jint>(x_dip * dpi_scale()),
       static_cast<jint>(y_dip * dpi_scale()));
+}
+
+float ContentViewCoreImpl::GetScaleFactor() const {
+  return page_scale_ * dpi_scale_;
 }
 
 void ContentViewCoreImpl::OnSmartClipDataExtracted(

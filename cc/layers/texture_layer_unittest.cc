@@ -54,9 +54,12 @@ gpu::Mailbox MailboxFromChar(char value) {
 
 class MockLayerTreeHost : public LayerTreeHost {
  public:
-  static scoped_ptr<MockLayerTreeHost> Create(FakeLayerTreeHostClient* client) {
+  static scoped_ptr<MockLayerTreeHost> Create(
+      FakeLayerTreeHostClient* client,
+      TaskGraphRunner* task_graph_runner) {
     LayerTreeHost::InitParams params;
     params.client = client;
+    params.task_graph_runner = task_graph_runner;
     LayerTreeSettings settings;
     params.settings = &settings;
     return make_scoped_ptr(new MockLayerTreeHost(client, &params));
@@ -190,7 +193,8 @@ class TextureLayerTest : public testing::Test {
 
  protected:
   void SetUp() override {
-    layer_tree_host_ = MockLayerTreeHost::Create(&fake_client_);
+    layer_tree_host_ =
+        MockLayerTreeHost::Create(&fake_client_, &task_graph_runner_);
     EXPECT_CALL(*layer_tree_host_, SetNeedsCommit()).Times(AnyNumber());
     layer_tree_host_->SetViewportSize(gfx::Size(10, 10));
     Mock::VerifyAndClearExpectations(layer_tree_host_.get());
@@ -229,34 +233,6 @@ TEST_F(TextureLayerTest, CheckPropertyChangeCausesCorrectBehavior) {
       0.5f, 0.5f, 0.5f, 0.5f));
   EXPECT_SET_NEEDS_COMMIT(1, test_layer->SetPremultipliedAlpha(false));
   EXPECT_SET_NEEDS_COMMIT(1, test_layer->SetBlendBackgroundColor(true));
-}
-
-TEST_F(TextureLayerTest, VisibleContentOpaqueRegion) {
-  const gfx::Size layer_bounds(100, 100);
-  const gfx::Rect layer_rect(layer_bounds);
-  const Region layer_region(layer_rect);
-
-  scoped_refptr<TextureLayer> layer =
-      TextureLayer::CreateForMailbox(layer_settings_, nullptr);
-  layer->SetBounds(layer_bounds);
-  layer->draw_properties().visible_content_rect = layer_rect;
-  layer->SetBlendBackgroundColor(true);
-
-  // Verify initial conditions.
-  EXPECT_FALSE(layer->contents_opaque());
-  EXPECT_EQ(0u, layer->background_color());
-  EXPECT_EQ(Region().ToString(),
-            layer->VisibleContentOpaqueRegion().ToString());
-
-  // Opaque background.
-  layer->SetBackgroundColor(SK_ColorWHITE);
-  EXPECT_EQ(layer_region.ToString(),
-            layer->VisibleContentOpaqueRegion().ToString());
-
-  // Transparent background.
-  layer->SetBackgroundColor(SkColorSetARGB(100, 255, 255, 255));
-  EXPECT_EQ(Region().ToString(),
-            layer->VisibleContentOpaqueRegion().ToString());
 }
 
 TEST_F(TextureLayerTest, RateLimiter) {
@@ -762,17 +738,13 @@ class TextureLayerImplWithMailboxThreadedCallback : public LayerTreeTest {
         layer_->SetTextureMailbox(TextureMailbox(), nullptr);
         break;
       case 4:
-        if (layer_tree_host()->settings().impl_side_painting) {
-          // With impl painting, the texture mailbox will still be on the impl
-          // thread when the commit finishes, because the layer is not drawble
-          // when it has no texture mailbox, and thus does not block the commit
-          // on activation. So, we wait for activation.
-          // TODO(danakj): fix this. crbug.com/277953
-          layer_tree_host()->SetNeedsCommit();
-          break;
-        } else {
-          ++commit_count_;
-        }
+        // With impl painting, the texture mailbox will still be on the impl
+        // thread when the commit finishes, because the layer is not drawble
+        // when it has no texture mailbox, and thus does not block the commit
+        // on activation. So, we wait for activation.
+        // TODO(danakj): fix this. crbug.com/277953
+        layer_tree_host()->SetNeedsCommit();
+        break;
       case 5:
         EXPECT_EQ(4, callback_count_);
         // Restore a mailbox for the next step.
@@ -785,16 +757,12 @@ class TextureLayerImplWithMailboxThreadedCallback : public LayerTreeTest {
         layer_->RemoveFromParent();
         break;
       case 7:
-        if (layer_tree_host()->settings().impl_side_painting) {
-          // With impl painting, the texture mailbox will still be on the impl
-          // thread when the commit finishes, because the layer is not around to
-          // block the commit on activation anymore. So, we wait for activation.
-          // TODO(danakj): fix this. crbug.com/277953
-          layer_tree_host()->SetNeedsCommit();
-          break;
-        } else {
-          ++commit_count_;
-        }
+        // With impl painting, the texture mailbox will still be on the impl
+        // thread when the commit finishes, because the layer is not around to
+        // block the commit on activation anymore. So, we wait for activation.
+        // TODO(danakj): fix this. crbug.com/277953
+        layer_tree_host()->SetNeedsCommit();
+        break;
       case 8:
         EXPECT_EQ(4, callback_count_);
         // Resetting the mailbox will call the callback now.
@@ -919,7 +887,8 @@ class TextureLayerImplWithMailboxTest : public TextureLayerTest {
 
   void SetUp() override {
     TextureLayerTest::SetUp();
-    layer_tree_host_ = MockLayerTreeHost::Create(&fake_client_);
+    layer_tree_host_ =
+        MockLayerTreeHost::Create(&fake_client_, &task_graph_runner_);
     EXPECT_TRUE(host_impl_.InitializeRenderer(FakeOutputSurface::Create3d()));
   }
 

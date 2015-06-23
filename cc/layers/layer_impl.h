@@ -57,8 +57,6 @@ class LayerTreeHostImpl;
 class LayerTreeImpl;
 class MicroBenchmarkImpl;
 class Occlusion;
-template <typename LayerType>
-class OcclusionTracker;
 class OpacityTree;
 class PrioritizedTile;
 class RenderPass;
@@ -393,8 +391,8 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   gfx::Rect drawable_content_rect() const {
     return draw_properties_.drawable_content_rect;
   }
-  gfx::Rect visible_content_rect() const {
-    return draw_properties_.visible_content_rect;
+  gfx::Rect visible_layer_rect() const {
+    return draw_properties_.visible_layer_rect;
   }
   LayerImpl* render_target() {
     DCHECK(!draw_properties_.render_target ||
@@ -422,13 +420,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   gfx::SizeF BoundsForScrolling() const;
   void SetBoundsDelta(const gfx::Vector2dF& bounds_delta);
   gfx::Vector2dF bounds_delta() const { return bounds_delta_; }
-
-  void SetContentBounds(const gfx::Size& content_bounds);
-  gfx::Size content_bounds() const { return draw_properties_.content_bounds; }
-
-  float contents_scale_x() const { return draw_properties_.contents_scale_x; }
-  float contents_scale_y() const { return draw_properties_.contents_scale_y; }
-  void SetContentsScale(float contents_scale_x, float contents_scale_y);
 
   bool IsExternalScrollActive() const;
 
@@ -567,7 +558,7 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
     return layer_animation_controller_.get();
   }
 
-  virtual SimpleEnclosedRegion VisibleContentOpaqueRegion() const;
+  virtual SimpleEnclosedRegion VisibleOpaqueRegion() const;
 
   virtual void DidBecomeActive();
 
@@ -595,8 +586,6 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   int clip_height() {
     return scroll_clip_layer_ ? scroll_clip_layer_->bounds().height() : 0;
   }
-
-  gfx::Rect LayerRectToContentRect(const gfx::RectF& layer_rect) const;
 
   virtual skia::RefPtr<SkPicture> GetPicture();
 
@@ -662,6 +651,8 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
 
   bool sorted_for_recursion() { return sorted_for_recursion_; }
 
+  void UpdatePropertyTreeForScrollingIfNeeded();
+
  protected:
   LayerImpl(LayerTreeImpl* layer_impl,
             int id,
@@ -672,11 +663,11 @@ class CC_EXPORT LayerImpl : public LayerAnimationValueObserver,
   virtual void GetDebugBorderProperties(SkColor* color, float* width) const;
 
   void AppendDebugBorderQuad(RenderPass* render_pass,
-                             const gfx::Size& content_bounds,
+                             const gfx::Size& bounds,
                              const SharedQuadState* shared_quad_state,
                              AppendQuadsData* append_quads_data) const;
   void AppendDebugBorderQuad(RenderPass* render_pass,
-                             const gfx::Size& content_bounds,
+                             const gfx::Size& bounds,
                              const SharedQuadState* shared_quad_state,
                              AppendQuadsData* append_quads_data,
                              SkColor color,

@@ -185,6 +185,9 @@ IPC_STRUCT_BEGIN(ExtensionMsg_ExternalConnectionInfo)
 
   // The process ID of the webview that initiated the request.
   IPC_STRUCT_MEMBER(int, guest_process_id)
+
+  // The render frame routing ID of the webview that initiated the request.
+  IPC_STRUCT_MEMBER(int, guest_render_frame_routing_id)
 IPC_STRUCT_END()
 
 IPC_STRUCT_TRAITS_BEGIN(extensions::DraggableRegion)
@@ -426,7 +429,7 @@ IPC_MESSAGE_CONTROL1(ExtensionMsg_ActivateExtension,
 
 // Notifies the renderer that the current tab is an extension page (we limit
 // what other extensions can do on these pages).
-IPC_MESSAGE_ROUTED1(ExtensionMsg_SetTabExtensionOwner,
+IPC_MESSAGE_ROUTED1(ExtensionMsg_SetMainFrameExtensionOwner,
                     std::string /* extension_id */)
 
 // Notifies the renderer that extensions were loaded in the browser.

@@ -221,6 +221,21 @@ gfx::GpuMemoryBufferHandle ShareGpuMemoryBufferToGpuThread(
   }
 }
 
+scoped_refptr<InProcessCommandBuffer::Service> GetInitialService(
+    const scoped_refptr<InProcessCommandBuffer::Service>& service) {
+  if (service)
+    return service;
+
+  // Call base::ThreadTaskRunnerHandle::IsSet() to ensure that it is
+  // instantiated before we create the GPU thread, otherwise shutdown order will
+  // delete the ThreadTaskRunnerHandle before the GPU thread's message loop,
+  // and when the message loop is shutdown, it will recreate
+  // ThreadTaskRunnerHandle, which will re-add a new task to the, AtExitManager,
+  // which causes a deadlock because it's already locked.
+  base::ThreadTaskRunnerHandle::IsSet();
+  return g_default_service.Get().gpu_thread;
+}
+
 }  // anonyous namespace
 
 InProcessCommandBuffer::Service::Service() {}
@@ -271,7 +286,7 @@ InProcessCommandBuffer::InProcessCommandBuffer(
       last_put_offset_(-1),
       gpu_memory_buffer_manager_(nullptr),
       flush_event_(false, false),
-      service_(service.get() ? service : g_default_service.Get().gpu_thread),
+      service_(GetInitialService(service)),
       gpu_thread_weak_ptr_factory_(this) {
   DCHECK(service_.get());
   next_image_id_.GetNext();
@@ -645,15 +660,26 @@ void InProcessCommandBuffer::SetGetBuffer(int32 shm_id) {
   if (last_state_.error != gpu::error::kNoError)
     return;
 
-  {
-    base::AutoLock lock(command_buffer_lock_);
-    command_buffer_->SetGetBuffer(shm_id);
-    last_put_offset_ = 0;
-  }
+  base::WaitableEvent completion(true, false);
+  base::Closure task =
+      base::Bind(&InProcessCommandBuffer::SetGetBufferOnGpuThread,
+                 base::Unretained(this), shm_id, &completion);
+  QueueTask(task);
+  completion.Wait();
+
   {
     base::AutoLock lock(state_after_last_flush_lock_);
     state_after_last_flush_ = command_buffer_->GetLastState();
   }
+}
+
+void InProcessCommandBuffer::SetGetBufferOnGpuThread(
+    int32 shm_id,
+    base::WaitableEvent* completion) {
+  base::AutoLock lock(command_buffer_lock_);
+  command_buffer_->SetGetBuffer(shm_id);
+  last_put_offset_ = 0;
+  completion->Signal();
 }
 
 scoped_refptr<Buffer> InProcessCommandBuffer::CreateTransferBuffer(size_t size,

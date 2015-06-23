@@ -14,7 +14,6 @@
 #include "base/time/time.h"
 #include "cc/base/cc_export.h"
 #include "cc/output/begin_frame_args.h"
-#include "cc/output/vsync_parameter_observer.h"
 #include "cc/scheduler/begin_frame_source.h"
 #include "cc/scheduler/begin_frame_tracker.h"
 #include "cc/scheduler/delay_based_time_source.h"
@@ -43,7 +42,6 @@ class SchedulerClient {
   virtual void ScheduledActionBeginOutputSurfaceCreation() = 0;
   virtual void ScheduledActionPrepareTiles() = 0;
   virtual void ScheduledActionInvalidateOutputSurface() = 0;
-  virtual void DidAnticipatedDrawTimeChange(base::TimeTicks time) = 0;
   virtual base::TimeDelta DrawDurationEstimate() = 0;
   virtual base::TimeDelta BeginMainFrameToCommitDurationEstimate() = 0;
   virtual base::TimeDelta CommitToActivateDurationEstimate() = 0;
@@ -55,45 +53,19 @@ class SchedulerClient {
   virtual ~SchedulerClient() {}
 };
 
-class Scheduler;
-// This class exists to allow tests to override the frame source construction.
-// A virtual method can't be used as this needs to happen in the constructor
-// (see C++ FAQ / Section 23 - http://goo.gl/fnrwom for why).
-// This class exists solely long enough to construct the frame sources.
-class CC_EXPORT SchedulerFrameSourcesConstructor {
- public:
-  virtual ~SchedulerFrameSourcesConstructor() {}
-  virtual BeginFrameSource* ConstructPrimaryFrameSource(Scheduler* scheduler);
-  virtual BeginFrameSource* ConstructUnthrottledFrameSource(
-      Scheduler* scheduler);
-
- protected:
-  SchedulerFrameSourcesConstructor() {}
-
-  friend class Scheduler;
-};
-
-class CC_EXPORT Scheduler : public BeginFrameObserverMixIn {
+class CC_EXPORT Scheduler : public BeginFrameObserverBase {
  public:
   static scoped_ptr<Scheduler> Create(
       SchedulerClient* client,
       const SchedulerSettings& scheduler_settings,
       int layer_tree_host_id,
       const scoped_refptr<base::SingleThreadTaskRunner>& task_runner,
-      scoped_ptr<BeginFrameSource> external_begin_frame_source) {
-    SchedulerFrameSourcesConstructor frame_sources_constructor;
-    return make_scoped_ptr(new Scheduler(client,
-                                         scheduler_settings,
-                                         layer_tree_host_id,
-                                         task_runner,
-                                         external_begin_frame_source.Pass(),
-                                         &frame_sources_constructor));
-  }
+      BeginFrameSource* external_frame_source);
 
   ~Scheduler() override;
 
-  // BeginFrameObserverMixin
-  bool OnBeginFrameMixInDelegate(const BeginFrameArgs& args) override;
+  // BeginFrameObserverBase
+  bool OnBeginFrameDerivedImpl(const BeginFrameArgs& args) override;
 
   void OnDrawForOutputSurface();
 
@@ -156,8 +128,6 @@ class CC_EXPORT Scheduler : public BeginFrameObserverMixIn {
     return state_machine_.impl_latency_takes_priority();
   }
 
-  base::TimeTicks AnticipatedDrawTime() const;
-
   void NotifyBeginMainFrameStarted();
 
   base::TimeTicks LastBeginImplFrameTime();
@@ -181,31 +151,27 @@ class CC_EXPORT Scheduler : public BeginFrameObserverMixIn {
             const SchedulerSettings& scheduler_settings,
             int layer_tree_host_id,
             const scoped_refptr<base::SingleThreadTaskRunner>& task_runner,
-            scoped_ptr<BeginFrameSource> external_begin_frame_source,
-            SchedulerFrameSourcesConstructor* frame_sources_constructor);
+            BeginFrameSource* external_frame_source,
+            scoped_ptr<SyntheticBeginFrameSource> synthetic_frame_source,
+            scoped_ptr<BackToBackBeginFrameSource> unthrottled_frame_source);
 
   // virtual for testing - Don't call these in the constructor or
   // destructor!
   virtual base::TimeTicks Now() const;
 
-  scoped_ptr<BeginFrameSourceMultiplexer> frame_source_;
-  BeginFrameSource* primary_frame_source_;
-  BeginFrameSource* unthrottled_frame_source_;
-
-  // Storage when frame sources are internal
-  scoped_ptr<BeginFrameSource> primary_frame_source_internal_;
-  scoped_ptr<BeginFrameSource> unthrottled_frame_source_internal_;
-
-  VSyncParameterObserver* vsync_observer_;
-  base::TimeDelta authoritative_vsync_interval_;
-  base::TimeTicks last_vsync_timebase_;
-
-  bool throttle_frame_production_;
-
   const SchedulerSettings settings_;
   SchedulerClient* client_;
   int layer_tree_host_id_;
   scoped_refptr<base::SingleThreadTaskRunner> task_runner_;
+  BeginFrameSource* external_frame_source_;
+  scoped_ptr<SyntheticBeginFrameSource> synthetic_frame_source_;
+  scoped_ptr<BackToBackBeginFrameSource> unthrottled_frame_source_;
+
+  scoped_ptr<BeginFrameSourceMultiplexer> frame_source_;
+  bool throttle_frame_production_;
+
+  base::TimeDelta authoritative_vsync_interval_;
+  base::TimeTicks last_vsync_timebase_;
 
   base::TimeDelta estimated_parent_draw_time_;
 
@@ -216,10 +182,8 @@ class CC_EXPORT Scheduler : public BeginFrameObserverMixIn {
 
   base::Closure begin_retro_frame_closure_;
   base::Closure begin_impl_frame_deadline_closure_;
-  base::Closure advance_commit_state_closure_;
   base::CancelableClosure begin_retro_frame_task_;
   base::CancelableClosure begin_impl_frame_deadline_task_;
-  base::CancelableClosure advance_commit_state_task_;
 
   SchedulerStateMachine state_machine_;
   bool inside_process_scheduled_actions_;
@@ -230,7 +194,6 @@ class CC_EXPORT Scheduler : public BeginFrameObserverMixIn {
   void ScheduleBeginImplFrameDeadlineIfNeeded();
   void SetupNextBeginFrameIfNeeded();
   void PostBeginRetroFrameIfNeeded();
-  void SetupPollingMechanisms();
   void DrawAndSwapIfPossible();
   void ProcessScheduledActions();
   bool CanCommitAndActivateBeforeDeadline() const;
@@ -252,10 +215,15 @@ class CC_EXPORT Scheduler : public BeginFrameObserverMixIn {
     return inside_action_ == action;
   }
 
-  base::WeakPtrFactory<Scheduler> weak_factory_;
+  BeginFrameSource* primary_frame_source() {
+    if (settings_.use_external_begin_frame_source) {
+      DCHECK(external_frame_source_);
+      return external_frame_source_;
+    }
+    return synthetic_frame_source_.get();
+  }
 
-  friend class SchedulerFrameSourcesConstructor;
-  friend class TestSchedulerFrameSourcesConstructor;
+  base::WeakPtrFactory<Scheduler> weak_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(Scheduler);
 };

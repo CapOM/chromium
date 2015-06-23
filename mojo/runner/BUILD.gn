@@ -45,6 +45,7 @@ source_set("mojo_runner_lib") {
       "desktop/launcher_process.h",
       "desktop/main.cc",
     ]
+    deps += [ "//components/tracing:startup_tracing" ]
   } else {
     sources += [
       "android/context_init.h",
@@ -121,6 +122,7 @@ source_set("lib") {
     "//base",
     "//base/third_party/dynamic_annotations",
     "//base:base_static",
+    "//components/devtools_service/public/cpp",
     "//components/devtools_service/public/interfaces",
     "//mojo/application/public/cpp",
     "//mojo/common:tracing_impl",
@@ -288,9 +290,12 @@ if (is_android) {
     ]
     sources = [
       "$root_out_dir/lib.stripped/libbootstrap.so",
-      "$root_out_dir/network_service.mojo",
       "$root_out_dir/obj/mojo/runner/bootstrap_java.dex.jar",
     ]
+
+    # Directories can't be specified as sources so pass manually to the script.
+    args = [ "--files=" +
+             rebase_path("$root_out_dir/network_service", root_build_dir) ]
   }
 
   generate_mojo_shell_assets_list("build_mojo_runner_assets") {
@@ -315,13 +320,16 @@ if (is_android) {
   copy_ex("copy_mojo_runner_test_assets") {
     clear_dir = true
     dest = mojo_runner_test_assets_dir
-    sources = [
-      "$root_out_dir/test_app.mojo",
-      "$root_out_dir/test_request_tracker_app.mojo",
-    ]
     deps = [
       "//mojo/services/test_service:test_app",
       "//mojo/services/test_service:test_request_tracker_app",
+    ]
+
+    # Directories can't be specified as sources so pass manually to the script.
+    args = [
+      "--files=" + rebase_path("$root_out_dir/test_app", root_build_dir),
+      "--files=" +
+          rebase_path("$root_out_dir/test_request_tracker_app", root_build_dir),
     ]
   }
 
@@ -340,8 +348,8 @@ if (is_android) {
       ":java",
       ":resources",
       "//base:base_java",
-      "//components/view_manager:view_manager_java",
       "//third_party/android_tools:google_play_services_default_resources",
+      "//ui/platform_window/android:platform_window_java",
     ]
   }
 
@@ -375,8 +383,7 @@ mojom("child_process_bindings") {
   import_dirs = [ "//mojo/services" ]
 }
 
-test("tests") {
-  output_name = "mojo_runner_unittests"
+test("mojo_runner_unittests") {
   sources = [
     "child_process_host_unittest.cc",
     "data_pipe_peek_unittest.cc",

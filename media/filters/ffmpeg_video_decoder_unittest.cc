@@ -48,7 +48,7 @@ ACTION_P(ReturnBuffer, buffer) {
 class FFmpegVideoDecoderTest : public testing::Test {
  public:
   FFmpegVideoDecoderTest()
-      : decoder_(new FFmpegVideoDecoder(message_loop_.message_loop_proxy())),
+      : decoder_(new FFmpegVideoDecoder(message_loop_.task_runner())),
         decode_cb_(base::Bind(&FFmpegVideoDecoderTest::DecodeDone,
                               base::Unretained(this))) {
     FFmpegGlue::InitializeFFmpeg();
@@ -188,7 +188,7 @@ class FFmpegVideoDecoderTest : public testing::Test {
   }
 
   void FrameReady(const scoped_refptr<VideoFrame>& frame) {
-    DCHECK(!frame->IsEndOfStream());
+    DCHECK(!frame->metadata()->IsTrue(VideoFrameMetadata::END_OF_STREAM));
     output_frames_.push_back(frame);
   }
 

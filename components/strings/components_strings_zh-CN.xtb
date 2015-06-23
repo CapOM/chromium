@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="zh-CN">
 <translation id="2774256287122201187">您可以继续。如果您继续前往该页面，那么在接下来的 5 分钟内将不会再看到此警告。</translation>
+<translation id="3963721102035795474">阅读器模式</translation>
 <translation id="7485870689360869515">找不到数据。</translation>
 <translation id="3884278016824448484">设备标识符存在冲突</translation>
 <translation id="5172758083709347301">本机</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">无法翻译成<ph name="TARGET_LANGUAGE"/>。</translation>
 <translation id="4103249731201008433">设备序列号无效</translation>
 <translation id="3219579145727097045">输入信用卡正面显示的到期日期和 4 位数银行卡验证码 (CVC)</translation>
-<translation id="3667681724235208644">查看原始页面</translation>
+<translation id="59107663811261420">Google Payments 不支持使用这种类型的信用卡向此商家付款，请选择其他卡。</translation>
 <translation id="4079302484614802869">代理配置已设置为使用 .pac 脚本网址，而不是固定的代理服务器。</translation>
 <translation id="5540224163453853">找不到请求的文章。</translation>
 <translation id="8437238597147034694">撤消移动(&amp;U)</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;输入查询&gt;</translation>
 <translation id="552553974213252141">提取的内容是否正确？</translation>
 <translation id="5317780077021120954">保存</translation>
+<translation id="8530504477309582336">Google Payments 不支持这种类型的信用卡，请选择其他卡。</translation>
 <translation id="7610193165460212391">值超出了范围 (<ph name="VALUE"/>)。</translation>
 <translation id="3739623965217189342">您复制的链接</translation>
 <translation id="8790007591277257123">恢复删除(&amp;R)</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">代理模式无效。</translation>
 <translation id="3105172416063519923">资产 ID：</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">必须启用 JavaScript 才能使用此功能。</translation>
 <translation id="2587841377698384444">Directory API ID：</translation>
 <translation id="7752995774971033316">非托管</translation>
 <translation id="3712624925041724820">许可已用尽</translation>
@@ -232,7 +235,7 @@
 <translation id="106701514854093668">桌面书签</translation>
 <translation id="6154808779448689242">返回的策略令牌与当前令牌不匹配</translation>
 <translation id="7995512525968007366">未指定</translation>
-<translation id="7961015016161918242">永不保存</translation>
+<translation id="7961015016161918242">一律不</translation>
 <translation id="2835170189407361413">清除表单</translation>
 <translation id="6550675742724504774">选项</translation>
 <translation id="8804164990146287819">隐私权政策</translation>

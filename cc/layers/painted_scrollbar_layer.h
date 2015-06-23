@@ -10,7 +10,6 @@
 #include "cc/layers/layer.h"
 #include "cc/layers/scrollbar_layer_interface.h"
 #include "cc/layers/scrollbar_theme_painter.h"
-#include "cc/resources/layer_updater.h"
 #include "cc/resources/scoped_ui_resource.h"
 
 namespace cc {
@@ -37,8 +36,7 @@ class CC_EXPORT PaintedScrollbarLayer : public ScrollbarLayerInterface,
   ScrollbarOrientation orientation() const override;
 
   // Layer interface
-  bool Update(ResourceUpdateQueue* queue,
-              const OcclusionTracker<Layer>* occlusion) override;
+  bool Update() override;
   void SetLayerTreeHost(LayerTreeHost* host) override;
   void PushPropertiesTo(LayerImpl* layer) override;
   void PushScrollClipPropertiesTo(LayerImpl* layer) override;

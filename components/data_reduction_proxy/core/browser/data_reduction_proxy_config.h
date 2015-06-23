@@ -234,6 +234,9 @@ class DataReductionProxyConfig
   // Should be called on all URL requests (main frame and non main frame).
   bool ShouldUseLoFiHeaderForRequests() const;
 
+  // Sets |lofi_status_| to LOFI_STATUS_OFF.
+  void SetLoFiModeOff();
+
   // Updates |lofi_status_| based on the arguments provided and the current
   // value of |lofi_status_|.
   // |network_quality_estimator| may be NULL.
@@ -382,7 +385,7 @@ class DataReductionProxyConfig
 
   // If the expected throughput in Kbps is lower than
   // |auto_lofi_maximum_kbps_|, auto Lo-Fi would be turned on.
-  uint64_t auto_lofi_maximum_kbps_;
+  int32_t auto_lofi_maximum_kbps_;
 
   // State of auto Lo-Fi is not changed more than once in any period of
   // duration shorter than |auto_lofi_hysteresis_|.

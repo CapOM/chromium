@@ -76,6 +76,9 @@ class MetaBuildWrapper(object):
                             help='analyze whether changes to a set of files '
                                  'will cause a set of binaries to be rebuilt.')
     AddCommonOptions(subp)
+    subp.add_argument('--swarming-targets-file',
+                      help='save runtime dependencies for targets listed '
+                           'in file.')
     subp.add_argument('path', nargs=1,
                       help='path build was generated into.')
     subp.add_argument('input_path', nargs=1,
@@ -95,19 +98,6 @@ class MetaBuildWrapper(object):
     subp.add_argument('path', nargs=1,
                       help='path to generate build into')
     subp.set_defaults(func=self.CmdGen)
-
-    subp = subps.add_parser('isolate',
-                            help='build isolates')
-    AddCommonOptions(subp)
-    subp.add_argument('path', nargs=1,
-                      help='path build was generated into.')
-    subp.add_argument('input_path', nargs=1,
-                      help='path to a file containing the input arguments '
-                           'as a JSON object.')
-    subp.add_argument('output_path', nargs=1,
-                      help='path to a file containing the output arguments '
-                           'as a JSON object.')
-    subp.set_defaults(func=self.CmdIsolate)
 
     subp = subps.add_parser('lookup',
                             help='look up the command for a given config or '
@@ -140,21 +130,10 @@ class MetaBuildWrapper(object):
   def CmdGen(self):
     vals = self.GetConfig()
     if vals['type'] == 'gn':
-      return self.RunGNGen(self.args.path[0], vals)
+      return self.RunGNGen(vals)
     if vals['type'] == 'gyp':
-      return self.RunGYPGen(self.args.path[0], vals)
+      return self.RunGYPGen(vals)
 
-    raise MBErr('Unknown meta-build type "%s"' % vals['type'])
-
-  def CmdIsolate(self):
-    vals = self.GetConfig()
-    if vals['type'] == 'gn':
-      return self.RunGNIsolate(vals)
-    if vals['type'] == 'gyp':
-      # For GYP builds the .isolate files are checked in and the
-      # .isolate.gen.json files are generated during the compile,
-      # so there is no work to do here.
-      return 0
     raise MBErr('Unknown meta-build type "%s"' % vals['type'])
 
   def CmdLookup(self):
@@ -337,7 +316,9 @@ class MetaBuildWrapper(object):
         self.FlattenMixins(mixin_vals['mixins'], vals, visited)
     return vals
 
-  def RunGNGen(self, path, vals):
+  def RunGNGen(self, vals):
+    path = self.args.path[0]
+
     cmd = self.GNCmd('gen', path, vals['gn_args'])
 
     swarming_targets = []
@@ -368,6 +349,35 @@ class MetaBuildWrapper(object):
       if not self.Exists(deps_path):
           raise MBErr('did not generate %s' % deps_path)
 
+      command, extra_files = self.GetIsolateCommand(target, vals)
+
+      runtime_deps = self.ReadFile(deps_path).splitlines()
+
+      isolate_path = self.ToAbsPath(path, target + '.isolate')
+      self.WriteFile(isolate_path,
+        pprint.pformat({
+          'variables': {
+            'command': command,
+            'files': sorted(runtime_deps + extra_files),
+            'read_only': 1,
+          }
+        }) + '\n')
+
+      self.WriteJSON(
+        {
+          'args': [
+            '--isolated',
+            self.ToSrcRelPath('%s/%s.isolated' % (path, target)),
+            '--isolate',
+            self.ToSrcRelPath('%s/%s.isolate' % (path, target)),
+          ],
+          'dir': self.chromium_src_dir,
+          'version': 1,
+        },
+        isolate_path + 'd.gen.json',
+      )
+
+
     return ret
 
   def GNCmd(self, subcommand, path, gn_args=''):
@@ -387,7 +397,9 @@ class MetaBuildWrapper(object):
       cmd.append('--args=%s' % gn_args)
     return cmd
 
-  def RunGYPGen(self, path, vals):
+  def RunGYPGen(self, vals):
+    path = self.args.path[0]
+
     output_dir, gyp_config = self.ParseGYPConfigPath(path)
     if gyp_config != vals['gyp_config']:
       raise MBErr('The last component of the path (%s) must match the '
@@ -466,14 +478,12 @@ class MetaBuildWrapper(object):
           'dir': self.chromium_src_dir,
           'version': 1,
         },
-        isolate_path + '.gen.json',
+        isolate_path + 'd.gen.json',
       )
 
     return 0
 
   def GetIsolateCommand(self, target, vals):
-    output_path = self.args.output_path[0]
-
     extra_files = []
 
     # TODO(dpranke): We should probably pull this from
@@ -526,11 +536,9 @@ class MetaBuildWrapper(object):
           '--tsan=%d' % tsan,
         ]
     else:
-      # TODO(dpranke): Handle script_tests and other types of
-      # swarmed tests.
+      # TODO(dpranke): Handle script_tests and other types of swarmed tests.
       self.WriteFailureAndRaise('unknown test type "%s" for %s' %
-                                (test_type, target),
-                                output_path)
+                                (test_type, target), output_path=None)
 
 
     return cmdline, extra_files
@@ -573,7 +581,13 @@ class MetaBuildWrapper(object):
       cmd += ['-D', d]
     return cmd
 
-  def RunGNAnalyze(self, _vals):
+  def RunGNAnalyze(self, vals):
+    # analyze runs before 'gn gen' now, so we need to run gn gen
+    # in order to ensure that we have a build directory.
+    ret = self.RunGNGen(vals)
+    if ret:
+      return ret
+
     inp = self.ReadInputJSON(['files', 'targets'])
     if self.args.verbose:
       self.Print()
@@ -672,8 +686,9 @@ class MetaBuildWrapper(object):
 
     return inp
 
-  def WriteFailureAndRaise(self, msg, path):
-    self.WriteJSON({'error': msg}, path)
+  def WriteFailureAndRaise(self, msg, output_path):
+    if output_path:
+      self.WriteJSON({'error': msg}, output_path)
     raise MBErr(msg)
 
   def WriteJSON(self, obj, path):
@@ -738,6 +753,8 @@ class MetaBuildWrapper(object):
 
   def WriteFile(self, path, contents):
     # This function largely exists so it can be overriden for testing.
+    if self.args.dryrun or self.args.verbose:
+      self.Print('\nWriting """\\\n%s""" to %s.\n' % (contents, path))
     with open(path, 'w') as fp:
       return fp.write(contents)
 

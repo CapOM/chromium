@@ -46,6 +46,7 @@
 #include "components/variations/variations_associated_data.h"
 #include "content/public/browser/browser_thread.h"
 #include "content/public/browser/cookie_store_factory.h"
+#include "content/public/common/user_agent.h"
 #include "net/base/host_mapping_rules.h"
 #include "net/base/net_util.h"
 #include "net/base/network_quality_estimator.h"
@@ -86,7 +87,6 @@
 #include "net/url_request/url_request_context.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "net/url_request/url_request_job_factory_impl.h"
-#include "net/url_request/url_request_throttler_manager.h"
 #include "url/url_constants.h"
 
 #if defined(ENABLE_CONFIGURATION_POLICY)
@@ -138,9 +138,6 @@ const char kSpdyFieldTrialHoldbackGroupNamePrefix[] = "SpdyDisabled";
 const char kSpdyFieldTrialSpdy31GroupNamePrefix[] = "Spdy31Enabled";
 const char kSpdyFieldTrialSpdy4GroupNamePrefix[] = "Spdy4Enabled";
 const char kSpdyFieldTrialParametrizedPrefix[] = "Parametrized";
-
-// Field trial for Cache-Control: stale-while-revalidate directive.
-const char kStaleWhileRevalidateFieldTrialName[] = "StaleWhileRevalidate";
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
 void ObserveKeychainEvents() {
@@ -263,7 +260,6 @@ ConstructSystemRequestContext(IOThread::Globals* globals,
   context->set_cookie_store(globals->system_cookie_store.get());
   context->set_channel_id_service(
       globals->system_channel_id_service.get());
-  context->set_throttler_manager(globals->throttler_manager.get());
   context->set_network_delegate(globals->system_network_delegate.get());
   context->set_http_user_agent_settings(
       globals->http_user_agent_settings.get());
@@ -292,15 +288,6 @@ const std::string& GetVariationParam(
     return base::EmptyString();
 
   return it->second;
-}
-
-// Return true if stale-while-revalidate support should be enabled.
-bool IsStaleWhileRevalidateEnabled(const base::CommandLine& command_line) {
-  if (command_line.HasSwitch(switches::kEnableStaleWhileRevalidate))
-    return true;
-  const std::string group_name =
-      base::FieldTrialList::FindFullName(kStaleWhileRevalidateFieldTrialName);
-  return group_name == "Enabled";
 }
 
 // Parse kUseSpdy command line flag options, which may contain the following:
@@ -481,7 +468,6 @@ SystemRequestContextLeakChecker::~SystemRequestContextLeakChecker() {
 IOThread::Globals::Globals()
     : system_request_context_leak_checker(this),
       ignore_certificate_errors(false),
-      use_stale_while_revalidate(false),
       testing_fixed_http_port(0),
       testing_fixed_https_port(0),
       enable_user_alternate_protocol_ports(false) {
@@ -647,11 +633,6 @@ void IOThread::Init() {
       new ChromeNetworkDelegate(extension_event_router_forwarder(),
                                 &system_enable_referrers_));
 
-#if defined(ENABLE_EXTENSIONS)
-  if (command_line.HasSwitch(switches::kDisableExtensionsHttpThrottling))
-    chrome_network_delegate->NeverThrottleRequests();
-#endif
-
   // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/466432
   // is fixed.
   tracked_objects::ScopedTracker tracking_profile4(
@@ -799,8 +780,6 @@ void IOThread::Init() {
   }
   if (command_line.HasSwitch(switches::kIgnoreCertificateErrors))
     globals_->ignore_certificate_errors = true;
-  globals_->use_stale_while_revalidate =
-      IsStaleWhileRevalidateEnabled(command_line);
   if (command_line.HasSwitch(switches::kTestingFixedHttpPort)) {
     globals_->testing_fixed_http_port =
         GetSwitchValueAsInt(command_line, switches::kTestingFixedHttpPort);
@@ -874,11 +853,6 @@ void IOThread::Init() {
 #endif
   globals_->proxy_script_fetcher_url_request_job_factory = job_factory.Pass();
 
-  globals_->throttler_manager.reset(new net::URLRequestThrottlerManager());
-  globals_->throttler_manager->set_net_log(net_log_);
-  // Always done in production, disabled only for unit tests.
-  globals_->throttler_manager->set_enable_thread_checks(true);
-
   globals_->proxy_script_fetcher_context.reset(
       ConstructProxyScriptFetcherContext(globals_, net_log_));
 
@@ -949,7 +923,6 @@ void IOThread::InitializeNetworkOptions(const base::CommandLine& command_line) {
   }
 
   ConfigureTCPFastOpen(command_line);
-  ConfigureSdch();
 
   // TODO(rch): Make the client socket factory a per-network session
   // instance, constructed from a NetworkSession::Params, to allow us
@@ -967,26 +940,6 @@ void IOThread::ConfigureTCPFastOpen(const base::CommandLine& command_line) {
   // Check for OS support of TCP FastOpen, and turn it on for all connections
   // if indicated by user.
   net::CheckSupportAndMaybeEnableTCPFastOpen(always_enable_if_supported);
-}
-
-void IOThread::ConfigureSdch() {
-  // Check SDCH field trial.  Default is now that everything is enabled,
-  // so provide options for disabling HTTPS or all of SDCH.
-  const char kSdchFieldTrialName[] = "SDCH";
-  const char kEnabledHttpOnlyGroupName[] = "EnabledHttpOnly";
-  const char kDisabledAllGroupName[] = "DisabledAll";
-
-  // Store in a string on return to keep underlying storage for
-  // StringPiece stable.
-  std::string sdch_trial_group_string =
-      base::FieldTrialList::FindFullName(kSdchFieldTrialName);
-  base::StringPiece sdch_trial_group(sdch_trial_group_string);
-  if (sdch_trial_group.starts_with(kEnabledHttpOnlyGroupName)) {
-    net::SdchManager::EnableSdchSupport(true);
-    net::SdchManager::EnableSecureSchemeSupport(false);
-  } else if (sdch_trial_group.starts_with(kDisabledAllGroupName)) {
-    net::SdchManager::EnableSdchSupport(false);
-  }
 }
 
 // static
@@ -1068,8 +1021,7 @@ void IOThread::ConfigureSpdyGlobals(
 // static
 void IOThread::RegisterPrefs(PrefRegistrySimple* registry) {
   registry->RegisterStringPref(prefs::kAuthSchemes,
-                               "basic,digest,ntlm,negotiate,"
-                               "spdyproxy");
+                               "basic,digest,ntlm,negotiate");
   registry->RegisterBooleanPref(prefs::kDisableAuthNegotiateCnameLookup, false);
   registry->RegisterBooleanPref(prefs::kEnableAuthNegotiatePort, false);
   registry->RegisterStringPref(prefs::kAuthServerWhitelist, std::string());
@@ -1139,7 +1091,6 @@ void IOThread::InitializeNetworkSessionParamsFromGlobals(
   params->network_delegate = globals.system_network_delegate.get();
   params->host_mapping_rules = globals.host_mapping_rules.get();
   params->ignore_certificate_errors = globals.ignore_certificate_errors;
-  params->use_stale_while_revalidate = globals.use_stale_while_revalidate;
   params->testing_fixed_http_port = globals.testing_fixed_http_port;
   params->testing_fixed_https_port = globals.testing_fixed_https_port;
   globals.enable_tcp_fast_open_for_ssl.CopyToIfSet(
@@ -1351,6 +1302,8 @@ void IOThread::ConfigureQuicGlobals(
     quic_user_agent_id.push_back(' ');
   chrome::VersionInfo version_info;
   quic_user_agent_id.append(version_info.ProductNameAndVersionForUserAgent());
+  quic_user_agent_id.push_back(' ');
+  quic_user_agent_id.append(content::BuildOSCpuInfo());
   globals->quic_user_agent_id.set(quic_user_agent_id);
 
   net::QuicVersion version = GetQuicVersion(command_line, quic_trial_params);
@@ -1408,8 +1361,7 @@ bool IOThread::ShouldEnableQuicForDataReductionProxy() {
   if (command_line.HasSwitch(switches::kDisableQuic))
     return false;
 
-  return data_reduction_proxy::DataReductionProxyParams::
-      IsIncludedInQuicFieldTrial();
+  return data_reduction_proxy::params::IsIncludedInQuicFieldTrial();
 }
 
 // static

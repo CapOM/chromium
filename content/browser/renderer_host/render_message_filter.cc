@@ -332,7 +332,8 @@ RenderMessageFilter::~RenderMessageFilter() {
       BrowserGpuMemoryBufferManager::current();
   if (gpu_memory_buffer_manager)
     gpu_memory_buffer_manager->ProcessRemoved(PeerHandle(), render_process_id_);
-  HostDiscardableSharedMemoryManager::current()->ProcessRemoved(PeerHandle());
+  HostDiscardableSharedMemoryManager::current()->ProcessRemoved(
+      render_process_id_);
 }
 
 void RenderMessageFilter::OnChannelClosing() {
@@ -443,6 +444,12 @@ bool RenderMessageFilter::OnMessageReceived(const IPC::Message& message) {
 
 void RenderMessageFilter::OnDestruct() const {
   BrowserThread::DeleteOnIOThread::Destruct(this);
+}
+
+void RenderMessageFilter::OverrideThreadForMessage(const IPC::Message& message,
+                                                   BrowserThread::ID* thread) {
+  if (message.type() == ViewHostMsg_MediaLogEvents::ID)
+    *thread = BrowserThread::UI;
 }
 
 base::TaskRunner* RenderMessageFilter::OverrideTaskRunnerForMessage(
@@ -927,8 +934,8 @@ void RenderMessageFilter::AllocateLockedDiscardableSharedMemoryOnFileThread(
     IPC::Message* reply_msg) {
   base::SharedMemoryHandle handle;
   HostDiscardableSharedMemoryManager::current()
-      ->AllocateLockedDiscardableSharedMemoryForChild(PeerHandle(), size, id,
-                                                      &handle);
+      ->AllocateLockedDiscardableSharedMemoryForChild(
+          PeerHandle(), render_process_id_, size, id, &handle);
   ChildProcessHostMsg_SyncAllocateLockedDiscardableSharedMemory::
       WriteReplyParams(reply_msg, handle);
   Send(reply_msg);
@@ -948,7 +955,7 @@ void RenderMessageFilter::OnAllocateLockedDiscardableSharedMemory(
 void RenderMessageFilter::DeletedDiscardableSharedMemoryOnFileThread(
     DiscardableSharedMemoryId id) {
   HostDiscardableSharedMemoryManager::current()
-      ->ChildDeletedDiscardableSharedMemory(id, PeerHandle());
+      ->ChildDeletedDiscardableSharedMemory(id, render_process_id_);
 }
 
 void RenderMessageFilter::OnDeletedDiscardableSharedMemory(
@@ -1055,6 +1062,9 @@ void RenderMessageFilter::OnKeygenOnWorkerThread(
 
 void RenderMessageFilter::OnMediaLogEvents(
     const std::vector<media::MediaLogEvent>& events) {
+  // OnMediaLogEvents() is always dispatched to the UI thread for handling.
+  // See OverrideThreadForMessage().
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   if (media_internals_)
     media_internals_->OnMediaEvents(render_process_id_, events);
 }

@@ -13,7 +13,6 @@
 #include "cc/test/fake_picture_layer_tiling_client.h"
 #include "cc/test/fake_picture_pile_impl.h"
 #include "cc/test/fake_tile_manager.h"
-#include "cc/test/impl_side_painting_settings.h"
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "cc/test/test_task_graph_runner.h"
 #include "cc/test/test_tile_priorities.h"
@@ -28,7 +27,7 @@
 namespace cc {
 namespace {
 
-class LowResTilingsSettings : public ImplSidePaintingSettings {
+class LowResTilingsSettings : public LayerTreeSettings {
  public:
   LowResTilingsSettings() {
     tiling_interest_area_viewport_multiplier = 10000;
@@ -598,10 +597,7 @@ TEST_F(TileManagerTilePriorityQueueTest, RasterTilePriorityQueueInvalidation) {
 }
 
 TEST_F(TileManagerTilePriorityQueueTest, ActivationComesBeforeEventually) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size layer_bounds(1000, 1000);
   SetupDefaultTrees(layer_bounds);
@@ -619,9 +615,7 @@ TEST_F(TileManagerTilePriorityQueueTest, ActivationComesBeforeEventually) {
 
   // Set a small viewport, so we have soon and eventually tiles.
   host_impl_.SetViewportSize(gfx::Size(200, 200));
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
@@ -827,10 +821,7 @@ TEST_F(TileManagerTilePriorityQueueTest, EvictionTilePriorityQueue) {
 
 TEST_F(TileManagerTilePriorityQueueTest,
        EvictionTilePriorityQueueWithOcclusion) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -850,9 +841,7 @@ TEST_F(TileManagerTilePriorityQueueTest,
       static_cast<FakePictureLayerImpl*>(pending_layer_->children()[0]);
   pending_child_layer->SetDrawsContent(true);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
@@ -966,10 +955,7 @@ TEST_F(TileManagerTilePriorityQueueTest,
 
 TEST_F(TileManagerTilePriorityQueueTest,
        EvictionTilePriorityQueueWithTransparentLayer) {
-  base::TimeTicks time_ticks;
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
 
   gfx::Size tile_size(102, 102);
   gfx::Size layer_bounds(1000, 1000);
@@ -988,17 +974,13 @@ TEST_F(TileManagerTilePriorityQueueTest,
   // considered to be valid.
   pending_child_layer->SetDrawsContent(true);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   bool update_lcd_text = false;
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   pending_child_layer->SetOpacity(0.0);
 
-  time_ticks += base::TimeDelta::FromMilliseconds(1);
-  host_impl_.SetCurrentBeginFrameArgs(
-      CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE, time_ticks));
+  host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
   host_impl_.pending_tree()->UpdateDrawProperties(update_lcd_text);
 
   // Renew all of the tile priorities.
@@ -1422,6 +1404,64 @@ TEST_F(TileManagerTilePriorityQueueTest,
   EXPECT_FALSE(host_impl_.is_likely_to_require_a_draw());
 
   host_impl_.resource_pool()->ReleaseResource(resource.Pass(), 0);
+}
+
+TEST_F(TileManagerTilePriorityQueueTest, RasterQueueAllUsesCorrectTileBounds) {
+  // Verify that we use the real tile bounds when advancing phases during the
+  // tile iteration.
+  gfx::Size layer_bounds(1, 1);
+
+  scoped_refptr<FakePicturePileImpl> pile =
+      FakePicturePileImpl::CreateFilledPileWithDefaultTileSize(layer_bounds);
+
+  FakePictureLayerTilingClient pending_client;
+  pending_client.SetTileSize(gfx::Size(64, 64));
+
+  auto tiling_set = PictureLayerTilingSet::Create(
+      WhichTree::ACTIVE_TREE, &pending_client, 1.0f, 1.0f, 1000);
+  pending_client.set_twin_tiling_set(tiling_set.get());
+
+  auto tiling = tiling_set->AddTiling(1.0f, pile);
+
+  tiling->CreateAllTilesForTesting();
+  tiling->set_resolution(HIGH_RESOLUTION);
+
+  // The tile is (0, 0, 1, 1), create an intersecting and non-intersecting
+  // rectangle to test the advance phase with. The tile size is (64, 64), so
+  // both rectangles intersect the tile content size, but only one should
+  // intersect the actual size.
+  gfx::Rect non_intersecting_rect(2, 2, 10, 10);
+  gfx::Rect intersecting_rect(0, 0, 10, 10);
+  {
+    tiling->SetTilePriorityRectsForTesting(
+        non_intersecting_rect,  // Visible rect.
+        intersecting_rect,      // Skewport rect.
+        intersecting_rect,      // Soon rect.
+        intersecting_rect);     // Eventually rect.
+    scoped_ptr<TilingSetRasterQueueAll> queue(
+        new TilingSetRasterQueueAll(tiling_set.get(), false));
+    EXPECT_FALSE(queue->IsEmpty());
+  }
+  {
+    tiling->SetTilePriorityRectsForTesting(
+        non_intersecting_rect,  // Visible rect.
+        non_intersecting_rect,  // Skewport rect.
+        intersecting_rect,      // Soon rect.
+        intersecting_rect);     // Eventually rect.
+    scoped_ptr<TilingSetRasterQueueAll> queue(
+        new TilingSetRasterQueueAll(tiling_set.get(), false));
+    EXPECT_FALSE(queue->IsEmpty());
+  }
+  {
+    tiling->SetTilePriorityRectsForTesting(
+        non_intersecting_rect,  // Visible rect.
+        non_intersecting_rect,  // Skewport rect.
+        non_intersecting_rect,  // Soon rect.
+        intersecting_rect);     // Eventually rect.
+    scoped_ptr<TilingSetRasterQueueAll> queue(
+        new TilingSetRasterQueueAll(tiling_set.get(), false));
+    EXPECT_FALSE(queue->IsEmpty());
+  }
 }
 
 }  // namespace

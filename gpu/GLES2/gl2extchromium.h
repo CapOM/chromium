@@ -398,21 +398,29 @@ typedef void (GL_APIENTRYP PFNGLBLITFRAMEBUFFERCHROMIUMPROC) (GLint srcX0, GLint
 #define GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM 0x9241
 #endif
 #ifdef GL_GLEXT_PROTOTYPES
-GL_APICALL void GL_APIENTRY glCopyTextureCHROMIUM(GLenum target,
-                                                  GLenum source_id,
-                                                  GLenum dest_id,
-                                                  GLint internalformat,
-                                                  GLenum dest_type);
+GL_APICALL void GL_APIENTRY glCopyTextureCHROMIUM(
+    GLenum target,
+    GLenum source_id,
+    GLenum dest_id,
+    GLint internalformat,
+    GLenum dest_type,
+    GLboolean unpack_flip_y,
+    GLboolean unpack_premultiply_alpha,
+    GLboolean unpack_unmultiply_alpha);
 
-GL_APICALL void GL_APIENTRY glCopySubTextureCHROMIUM(GLenum target,
-                                                     GLenum source_id,
-                                                     GLenum dest_id,
-                                                     GLint xoffset,
-                                                     GLint yoffset,
-                                                     GLint x,
-                                                     GLint y,
-                                                     GLsizei width,
-                                                     GLsizei height);
+GL_APICALL void GL_APIENTRY glCopySubTextureCHROMIUM(
+    GLenum target,
+    GLenum source_id,
+    GLenum dest_id,
+    GLint xoffset,
+    GLint yoffset,
+    GLint x,
+    GLint y,
+    GLsizei width,
+    GLsizei height,
+    GLboolean unpack_flip_y,
+    GLboolean unpack_premultiply_alpha,
+    GLboolean unpack_unmultiply_alpha);
 #endif
 typedef void(GL_APIENTRYP PFNGLCOPYTEXTURECHROMIUMPROC)(GLenum target,
                                                         GLenum source_id,
@@ -430,6 +438,17 @@ typedef void(GL_APIENTRYP PFNGLCOPYSUBTEXTURECHROMIUMPROC)(GLenum target,
                                                            GLsizei width,
                                                            GLsizei height);
 #endif  /* GL_CHROMIUM_copy_texture */
+
+/* GL_CHROMIUM_compressed_copy_texture */
+#ifndef GL_CHROMIUM_compressed_copy_texture
+#define GL_CHROMIUM_compressed_copy_texture 1
+#ifdef GL_GLEXT_PROTOTYPES
+GL_APICALL void GL_APIENTRY glCompressedCopyTextureCHROMIUM(
+    GLenum target, GLenum source_id, GLenum dest_id);
+#endif
+typedef void(GL_APIENTRYP PFNGLCOMPRESSEDCOPYTEXTURECHROMIUMPROC)(
+    GLenum target, GLenum source_id, GLenum dest_id);
+#endif  /* GL_CHROMIUM_compressed_copy_texture */
 
 /* GL_CHROMIUM_lose_context */
 #ifndef GL_CHROMIUM_lose_context

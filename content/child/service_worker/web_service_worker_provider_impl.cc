@@ -57,13 +57,6 @@ void WebServiceWorkerProviderImpl::registerServiceWorker(
       context_->provider_id(), pattern, script_url, callbacks);
 }
 
-void WebServiceWorkerProviderImpl::unregisterServiceWorker(
-    const WebURL& pattern,
-    WebServiceWorkerUnregistrationCallbacks* callbacks) {
-  GetDispatcher()->UnregisterServiceWorker(
-      context_->provider_id(), pattern, callbacks);
-}
-
 void WebServiceWorkerProviderImpl::getRegistration(
     const blink::WebURL& document_url,
     WebServiceWorkerRegistrationCallbacks* callbacks) {
@@ -71,9 +64,19 @@ void WebServiceWorkerProviderImpl::getRegistration(
       context_->provider_id(), document_url, callbacks);
 }
 
+void WebServiceWorkerProviderImpl::getRegistrations(
+    WebServiceWorkerGetRegistrationsCallbacks* callbacks) {
+  GetDispatcher()->GetRegistrations(
+      context_->provider_id(), callbacks);
+}
+
 void WebServiceWorkerProviderImpl::getRegistrationForReady(
     WebServiceWorkerGetRegistrationForReadyCallbacks* callbacks) {
   GetDispatcher()->GetRegistrationForReady(context_->provider_id(), callbacks);
+}
+
+int WebServiceWorkerProviderImpl::provider_id() const {
+  return context_->provider_id();
 }
 
 void WebServiceWorkerProviderImpl::RemoveProviderClient() {

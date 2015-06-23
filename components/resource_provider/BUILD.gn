@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//mojo/mojo_application_package.gni")
 import("//mojo/public/mojo_application.gni")
 import("//testing/test.gni")
 
@@ -95,8 +94,7 @@ source_set("lib") {
   ]
 }
 
-test("tests") {
-  output_name = "resource_provider_unittests"
+test("resource_provider_unittests") {
   sources = [
     "file_utils_unittest.cc",
   ]
@@ -113,7 +111,7 @@ test("tests") {
   ]
 }
 
-mojo_application_package("apptests") {
+mojo_native_application("apptests") {
   output_name = "resource_provider_apptests"
   testonly = true
 

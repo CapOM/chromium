@@ -226,8 +226,9 @@ TEST_F(DataReductionProxyNetworkDelegateTest, LoFiTransitions) {
 
   for (size_t i = 0; i < arraysize(tests); ++i) {
     if (tests[i].lofi_switch_enabled) {
-      base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
+      base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+          switches::kDataReductionProxyLoFi,
+          switches::kDataReductionProxyLoFiValueAlwaysOn);
     }
     config()->SetIncludedInLoFiEnabledFieldTrial(tests[i].auto_lofi_enabled);
     config()->SetNetworkProhibitivelySlow(tests[i].auto_lofi_enabled);
@@ -449,8 +450,9 @@ TEST_F(DataReductionProxyNetworkDelegateTest, NetHistograms) {
     config()->SetNetworkProhibitivelySlow(tests[i].auto_lofi_enabled);
 
     if (tests[i].lofi_enabled_through_switch) {
-      base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
+      base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+          switches::kDataReductionProxyLoFi,
+          switches::kDataReductionProxyLoFiValueAlwaysOn);
     }
 
     config()->UpdateLoFiStatusOnMainFrameRequest(false, nullptr);
@@ -597,8 +599,7 @@ TEST_F(DataReductionProxyNetworkDelegateTest, OnResolveProxyHandler) {
   base::FieldTrialList field_trial_list(new base::MockEntropyProvider());
   base::FieldTrialList::CreateFieldTrial("DataCompressionProxyCriticalBypass",
                                          "Enabled");
-  EXPECT_TRUE(
-      DataReductionProxyParams::IsIncludedInCriticalPathBypassFieldTrial());
+  EXPECT_TRUE(params::IsIncludedInCriticalPathBypassFieldTrial());
 
   load_flags = net::LOAD_NORMAL;
 
@@ -625,6 +626,26 @@ TEST_F(DataReductionProxyNetworkDelegateTest, OnResolveProxyHandler) {
                         empty_proxy_retry_info, config(),
                         &other_proxy_info);
   EXPECT_FALSE(other_proxy_info.is_direct());
+}
+
+// Notify network delegate with a NULL request.
+TEST_F(DataReductionProxyNetworkDelegateTest, NullRequest) {
+  net::HttpRequestHeaders headers;
+  net::ProxyInfo data_reduction_proxy_info;
+  std::string data_reduction_proxy;
+  base::TrimString(params()->DefaultOrigin(), "/", &data_reduction_proxy);
+  data_reduction_proxy_info.UsePacString(
+      "PROXY " +
+      net::ProxyServer::FromURI(params()->DefaultOrigin(),
+                                net::ProxyServer::SCHEME_HTTP)
+          .host_port_pair()
+          .ToString() +
+      "; DIRECT");
+  EXPECT_FALSE(data_reduction_proxy_info.is_empty());
+
+  data_reduction_proxy_network_delegate_->NotifyBeforeSendProxyHeaders(
+      nullptr, data_reduction_proxy_info, &headers);
+  EXPECT_TRUE(headers.HasHeader(kChromeProxyHeader));
 }
 
 }  // namespace data_reduction_proxy

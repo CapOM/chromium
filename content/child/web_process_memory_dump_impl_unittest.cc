@@ -49,19 +49,23 @@ TEST(WebProcessMemoryDumpImplTest, IntegrationTest) {
   ASSERT_EQ(wmad, wpmd2->getMemoryAllocatorDump("2/new"));
 
   // Check that the attributes are propagated correctly.
-  const char* attr_type = nullptr;
-  const char* attr_units = nullptr;
-  const base::Value* attr_value = nullptr;
-  bool has_attr = mad->Get("attr_name", &attr_type, &attr_units, &attr_value);
-  ASSERT_TRUE(has_attr);
-  ASSERT_STREQ(base::trace_event::MemoryAllocatorDump::kTypeScalar, attr_type);
-  ASSERT_STREQ("bytes", attr_units);
-  ASSERT_NE(static_cast<base::Value*>(nullptr), attr_value);
-  has_attr = mad->Get("attr_name_2", &attr_type, &attr_units, &attr_value);
-  ASSERT_TRUE(has_attr);
-  ASSERT_STREQ(base::trace_event::MemoryAllocatorDump::kTypeScalar, attr_type);
-  ASSERT_STREQ("rate", attr_units);
-  ASSERT_NE(static_cast<base::Value*>(nullptr), attr_value);
+  auto raw_attrs = mad->attributes_for_testing()->ToBaseValue();
+  base::DictionaryValue* attrs = nullptr;
+  ASSERT_TRUE(raw_attrs->GetAsDictionary(&attrs));
+  base::DictionaryValue* attr = nullptr;
+  ASSERT_TRUE(attrs->GetDictionary("attr_name", &attr));
+  std::string attr_value;
+  ASSERT_TRUE(attr->GetString("type", &attr_value));
+  ASSERT_EQ(base::trace_event::MemoryAllocatorDump::kTypeScalar, attr_value);
+  ASSERT_TRUE(attr->GetString("units", &attr_value));
+  ASSERT_EQ("bytes", attr_value);
+
+  ASSERT_TRUE(attrs->GetDictionary("attr_name_2", &attr));
+  ASSERT_TRUE(attr->GetString("type", &attr_value));
+  ASSERT_EQ(base::trace_event::MemoryAllocatorDump::kTypeScalar, attr_value);
+  ASSERT_TRUE(attr->GetString("units", &attr_value));
+  ASSERT_EQ("rate", attr_value);
+  ASSERT_TRUE(attr->HasKey("value"));
 
   // Check that AsValueInto() doesn't cause a crash.
   wpmd2->process_memory_dump()->AsValueInto(traced_value.get());
@@ -97,6 +101,22 @@ TEST(WebProcessMemoryDumpImplTest, IntegrationTest) {
   // Check that AsValueInto() doesn't cause a crash.
   traced_value = new base::trace_event::TracedValue();
   wpmd1->process_memory_dump()->AsValueInto(traced_value.get());
+
+  // Check if a WebMemoryAllocatorDump created with guid, has correct guid.
+  blink::WebMemoryAllocatorDumpGuid guid =
+      base::trace_event::MemoryAllocatorDumpGuid("id_1").ToUint64();
+  auto wmad3 = wpmd1->createMemoryAllocatorDump("1/3", guid);
+  ASSERT_EQ(wmad3->guid(), guid);
+  ASSERT_EQ(wmad3, wpmd1->getMemoryAllocatorDump("1/3"));
+
+  // Check that AddOwnershipEdge is propagated correctly.
+  auto wmad4 = wpmd1->createMemoryAllocatorDump("1/4");
+  wpmd1->AddOwnershipEdge(wmad4->guid(), guid);
+  auto allocator_dumps_edges =
+      wpmd1->process_memory_dump()->allocator_dumps_edges();
+  ASSERT_EQ(1u, allocator_dumps_edges.size());
+  ASSERT_EQ(wmad4->guid(), allocator_dumps_edges[0].source.ToUint64());
+  ASSERT_EQ(guid, allocator_dumps_edges[0].target.ToUint64());
 
   wpmd1.reset();
 }

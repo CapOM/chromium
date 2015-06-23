@@ -46,12 +46,14 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
  public:
   typedef blink::WebServiceWorkerProvider::WebServiceWorkerRegistrationCallbacks
       WebServiceWorkerRegistrationCallbacks;
-  typedef
-      blink::WebServiceWorkerProvider::WebServiceWorkerUnregistrationCallbacks
+  typedef blink::WebCallbacks<bool, blink::WebServiceWorkerError>
       WebServiceWorkerUnregistrationCallbacks;
   typedef
       blink::WebServiceWorkerProvider::WebServiceWorkerGetRegistrationCallbacks
       WebServiceWorkerGetRegistrationCallbacks;
+  typedef
+      blink::WebServiceWorkerProvider::WebServiceWorkerGetRegistrationsCallbacks
+      WebServiceWorkerGetRegistrationsCallbacks;
   typedef blink::WebServiceWorkerProvider::
       WebServiceWorkerGetRegistrationForReadyCallbacks
           WebServiceWorkerGetRegistrationForReadyCallbacks;
@@ -62,22 +64,28 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
   void OnMessageReceived(const IPC::Message& msg);
   bool Send(IPC::Message* msg);
 
-  // Corresponds to navigator.serviceWorker.register()
+  // Corresponds to navigator.serviceWorker.register().
   void RegisterServiceWorker(
       int provider_id,
       const GURL& pattern,
       const GURL& script_url,
       WebServiceWorkerRegistrationCallbacks* callbacks);
-  // Corresponds to navigator.serviceWorker.unregister()
+  // Corresponds to ServiceWorkerRegistration.update().
+  void UpdateServiceWorker(int provider_id, int64 registration_id);
+  // Corresponds to ServiceWorkerRegistration.unregister().
   void UnregisterServiceWorker(
       int provider_id,
-      const GURL& pattern,
+      int64 registration_id,
       WebServiceWorkerUnregistrationCallbacks* callbacks);
-  // Corresponds to navigator.serviceWorker.getRegistration()
+  // Corresponds to navigator.serviceWorker.getRegistration().
   void GetRegistration(
       int provider_id,
       const GURL& document_url,
       WebServiceWorkerRegistrationCallbacks* callbacks);
+  // Corresponds to navigator.serviceWorker.getRegistrations().
+  void GetRegistrations(
+      int provider_id,
+      WebServiceWorkerGetRegistrationsCallbacks* callbacks);
 
   void GetRegistrationForReady(
       int provider_id,
@@ -137,6 +145,8 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
       IDMapOwnPointer> UnregistrationCallbackMap;
   typedef IDMap<WebServiceWorkerGetRegistrationCallbacks,
       IDMapOwnPointer> GetRegistrationCallbackMap;
+  typedef IDMap<WebServiceWorkerGetRegistrationsCallbacks,
+      IDMapOwnPointer> GetRegistrationsCallbackMap;
   typedef IDMap<WebServiceWorkerGetRegistrationForReadyCallbacks,
       IDMapOwnPointer> GetRegistrationForReadyCallbackMap;
 
@@ -177,6 +187,11 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
                             int request_id,
                             const ServiceWorkerRegistrationObjectInfo& info,
                             const ServiceWorkerVersionAttributes& attrs);
+  void OnDidGetRegistrations(
+      int thread_id,
+      int request_id,
+      const std::vector<ServiceWorkerRegistrationObjectInfo>& infos,
+      const std::vector<ServiceWorkerVersionAttributes>& attrs);
   void OnDidGetRegistrationForReady(
       int thread_id,
       int request_id,
@@ -191,6 +206,11 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
                              blink::WebServiceWorkerError::ErrorType error_type,
                              const base::string16& message);
   void OnGetRegistrationError(
+      int thread_id,
+      int request_id,
+      blink::WebServiceWorkerError::ErrorType error_type,
+      const base::string16& message);
+  void OnGetRegistrationsError(
       int thread_id,
       int request_id,
       blink::WebServiceWorkerError::ErrorType error_type,
@@ -239,6 +259,7 @@ class CONTENT_EXPORT ServiceWorkerDispatcher
   RegistrationCallbackMap pending_registration_callbacks_;
   UnregistrationCallbackMap pending_unregistration_callbacks_;
   GetRegistrationCallbackMap pending_get_registration_callbacks_;
+  GetRegistrationsCallbackMap pending_get_registrations_callbacks_;
   GetRegistrationForReadyCallbackMap get_for_ready_callbacks_;
 
   ProviderClientMap provider_clients_;

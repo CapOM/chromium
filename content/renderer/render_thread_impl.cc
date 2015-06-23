@@ -575,11 +575,6 @@ void RenderThreadImpl::Init() {
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();
 
-  is_impl_side_painting_enabled_ =
-      !command_line.HasSwitch(switches::kDisableImplSidePainting);
-  cc_blink::WebLayerImpl::SetImplSidePaintingEnabled(
-      is_impl_side_painting_enabled_);
-
   cc::LayerSettings layer_settings;
   if (command_line.HasSwitch(switches::kEnableCompositorAnimationTimelines))
     layer_settings.use_compositor_animation_timelines = true;
@@ -604,7 +599,7 @@ void RenderThreadImpl::Init() {
 #endif
 
   std::string image_texture_target_string =
-      command_line.GetSwitchValueASCII(switches::kUseImageTextureTarget);
+      command_line.GetSwitchValueASCII(switches::kContentImageTextureTarget);
   bool parsed_image_texture_target = base::StringToUint(
       image_texture_target_string, &use_image_texture_target_);
   DCHECK(parsed_image_texture_target);
@@ -656,49 +651,44 @@ void RenderThreadImpl::Init() {
 
   is_gather_pixel_refs_enabled_ = false;
 
-  if (is_impl_side_painting_enabled_) {
-    int num_raster_threads = 0;
-    std::string string_value =
-        command_line.GetSwitchValueASCII(switches::kNumRasterThreads);
-    bool parsed_num_raster_threads =
-        base::StringToInt(string_value, &num_raster_threads);
-    DCHECK(parsed_num_raster_threads) << string_value;
-    DCHECK_GT(num_raster_threads, 0);
+  int num_raster_threads = 0;
+  std::string string_value =
+      command_line.GetSwitchValueASCII(switches::kNumRasterThreads);
+  bool parsed_num_raster_threads =
+      base::StringToInt(string_value, &num_raster_threads);
+  DCHECK(parsed_num_raster_threads) << string_value;
+  DCHECK_GT(num_raster_threads, 0);
 
-    // Note: Currently, gathering of pixel refs when using a single
-    // raster thread doesn't provide any benefit. This might change
-    // in the future but we avoid it for now to reduce the cost of
-    // Picture::Create.
-    is_gather_pixel_refs_enabled_ = num_raster_threads > 1;
+  // Note: Currently, gathering of pixel refs when using a single
+  // raster thread doesn't provide any benefit. This might change
+  // in the future but we avoid it for now to reduce the cost of
+  // Picture::Create.
+  is_gather_pixel_refs_enabled_ = num_raster_threads > 1;
 
-    base::SimpleThread::Options thread_options;
+  base::SimpleThread::Options thread_options;
 #if defined(OS_ANDROID) || defined(OS_LINUX)
-    if (!command_line.HasSwitch(
-            switches::kUseNormalPriorityForTileTaskWorkerThreads)) {
-      thread_options.set_priority(base::ThreadPriority::BACKGROUND);
-    }
+  if (!command_line.HasSwitch(
+          switches::kUseNormalPriorityForTileTaskWorkerThreads)) {
+    thread_options.set_priority(base::ThreadPriority::BACKGROUND);
+  }
 #endif
-    while (compositor_raster_threads_.size() <
-           static_cast<size_t>(num_raster_threads)) {
-      scoped_ptr<CompositorRasterThread> raster_thread(
-          new CompositorRasterThread(
-              compositor_task_graph_runner_.get(),
-              base::StringPrintf(
-                  "CompositorTileWorker%u",
-                  static_cast<unsigned>(compositor_raster_threads_.size() + 1))
-                  .c_str(),
-              thread_options));
-      raster_thread->Start();
-      compositor_raster_threads_.push_back(raster_thread.Pass());
-    }
+  while (compositor_raster_threads_.size() <
+         static_cast<size_t>(num_raster_threads)) {
+    scoped_ptr<CompositorRasterThread> raster_thread(new CompositorRasterThread(
+        compositor_task_graph_runner_.get(),
+        base::StringPrintf("CompositorTileWorker%u",
+                           static_cast<unsigned>(
+                               compositor_raster_threads_.size() + 1)).c_str(),
+        thread_options));
+    raster_thread->Start();
+    compositor_raster_threads_.push_back(raster_thread.Pass());
   }
 
-  // In single process, browser main loop set up the discardable memory
-  // allocator.
-  if (!command_line.HasSwitch(switches::kSingleProcess)) {
-    base::DiscardableMemoryAllocator::SetInstance(
-        ChildThreadImpl::discardable_shared_memory_manager());
-  }
+  // TODO(boliu): In single process, browser main loop should set up the
+  // discardable memory manager, and should skip this if kSingleProcess.
+  // See crbug.com/503724.
+  base::DiscardableMemoryAllocator::SetInstance(
+      ChildThreadImpl::discardable_shared_memory_manager());
 
   service_registry()->AddService<RenderFrameSetup>(
       base::Bind(CreateRenderFrameSetup));
@@ -848,8 +838,6 @@ bool RenderThreadImpl::Send(IPC::Message* msg) {
 #endif
 
   if (pumping_events) {
-    // TODO(alexclarke): Remove the shared timer.
-    blink_platform_impl_->SuspendSharedTimer();
     renderer_scheduler_->SuspendTimerQueue();
 
     if (notify_webkit_of_modal_loop)
@@ -878,8 +866,6 @@ bool RenderThreadImpl::Send(IPC::Message* msg) {
     if (notify_webkit_of_modal_loop)
       WebView::didExitModalLoop();
 
-    // TODO(alexclarke): Remove the shared timer.
-    blink_platform_impl_->ResumeSharedTimer();
     renderer_scheduler_->ResumeTimerQueue();
   }
 
@@ -1050,10 +1036,11 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
 #endif
     if (!compositor_task_runner_.get()) {
       compositor_thread_.reset(new base::Thread("Compositor"));
-      compositor_thread_->Start();
+      base::Thread::Options compositor_thread_options;
 #if defined(OS_ANDROID)
-      compositor_thread_->SetPriority(base::ThreadPriority::DISPLAY);
+      compositor_thread_options.priority = base::ThreadPriority::DISPLAY;
 #endif
+      compositor_thread_->StartWithOptions(compositor_thread_options);
       compositor_task_runner_ = compositor_thread_->task_runner();
       compositor_task_runner_->PostTask(
           FROM_HERE,
@@ -1119,12 +1106,6 @@ void RenderThreadImpl::EnsureWebKitInitialized() {
     ScheduleIdleHandler(kLongIdleHandlerDelayMs);
 
   cc_blink::SetSharedBitmapAllocationFunction(AllocateSharedBitmapFunction);
-
-  // Limit use of the scaled image cache to when deferred image decoding is
-  // enabled.
-  if (!command_line.HasSwitch(switches::kEnableDeferredImageDecoding) &&
-      !is_impl_side_painting_enabled_)
-    SkGraphics::SetResourceCacheTotalByteLimit(0u);
 
   SkGraphics::SetResourceCacheSingleAllocationByteLimit(
       kImageCacheSingleAllocationByteLimit);
@@ -1279,34 +1260,40 @@ RenderThreadImpl::GetGpuFactories() {
   DCHECK(IsMainThread());
 
   scoped_refptr<GpuChannelHost> gpu_channel_host = GetGpuChannel();
-  const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
   scoped_refptr<media::GpuVideoAcceleratorFactories> gpu_factories;
   scoped_refptr<base::SingleThreadTaskRunner> media_task_runner =
       GetMediaThreadTaskRunner();
-  if (!cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode)) {
-    if (!gpu_va_context_provider_.get() ||
-        gpu_va_context_provider_->DestroyedOnMainThread()) {
-      if (!gpu_channel_host.get()) {
-        gpu_channel_host = EstablishGpuChannelSync(
-            CAUSE_FOR_GPU_LAUNCH_WEBGRAPHICSCONTEXT3DCOMMANDBUFFERIMPL_INITIALIZE);
-      }
-      blink::WebGraphicsContext3D::Attributes attributes;
-      bool lose_context_when_out_of_memory = false;
-      gpu_va_context_provider_ = ContextProviderCommandBuffer::Create(
-          make_scoped_ptr(
-              WebGraphicsContext3DCommandBufferImpl::CreateOffscreenContext(
-                  gpu_channel_host.get(),
-                  attributes,
-                  lose_context_when_out_of_memory,
-                  GURL("chrome://gpu/RenderThreadImpl::GetGpuVDAContext3D"),
-                  WebGraphicsContext3DCommandBufferImpl::SharedMemoryLimits(),
-                  NULL)),
-          GPU_VIDEO_ACCELERATOR_CONTEXT);
+  if (!gpu_va_context_provider_.get() ||
+      gpu_va_context_provider_->DestroyedOnMainThread()) {
+    if (!gpu_channel_host.get()) {
+      gpu_channel_host = EstablishGpuChannelSync(
+          CAUSE_FOR_GPU_LAUNCH_WEBGRAPHICSCONTEXT3DCOMMANDBUFFERIMPL_INITIALIZE);
     }
+    blink::WebGraphicsContext3D::Attributes attributes;
+    bool lose_context_when_out_of_memory = false;
+    gpu_va_context_provider_ = ContextProviderCommandBuffer::Create(
+        make_scoped_ptr(
+            WebGraphicsContext3DCommandBufferImpl::CreateOffscreenContext(
+                gpu_channel_host.get(), attributes,
+                lose_context_when_out_of_memory,
+                GURL("chrome://gpu/RenderThreadImpl::GetGpuVDAContext3D"),
+                WebGraphicsContext3DCommandBufferImpl::SharedMemoryLimits(),
+                NULL)),
+        GPU_VIDEO_ACCELERATOR_CONTEXT);
   }
   if (gpu_va_context_provider_.get()) {
+    const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
+    bool enable_video_accelerator =
+        !cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode);
+    std::string image_texture_target_string =
+        cmd_line->GetSwitchValueASCII(switches::kContentImageTextureTarget);
+    unsigned image_texture_target = 0;
+    bool parsed_image_texture_target =
+        base::StringToUint(image_texture_target_string, &image_texture_target);
+    DCHECK(parsed_image_texture_target);
     gpu_factories = RendererGpuVideoAcceleratorFactories::Create(
-        gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_);
+        gpu_channel_host.get(), media_task_runner, gpu_va_context_provider_,
+        image_texture_target, enable_video_accelerator);
   }
   return gpu_factories;
 }
@@ -1389,10 +1376,6 @@ void RenderThreadImpl::PreCacheFontCharacters(const LOGFONT& log_font,
 
 ServiceRegistry* RenderThreadImpl::GetServiceRegistry() {
   return service_registry();
-}
-
-bool RenderThreadImpl::IsImplSidePaintingEnabled() {
-  return is_impl_side_painting_enabled_;
 }
 
 bool RenderThreadImpl::IsGpuRasterizationForced() {
@@ -1539,7 +1522,6 @@ bool RenderThreadImpl::OnControlMessageReceived(const IPC::Message& msg) {
     // is there a new non-windows message I should add here?
     IPC_MESSAGE_HANDLER(ViewMsg_New, OnCreateNewView)
     IPC_MESSAGE_HANDLER(ViewMsg_NetworkTypeChanged, OnNetworkTypeChanged)
-    IPC_MESSAGE_HANDLER(ViewMsg_TempCrashWithData, OnTempCrashWithData)
     IPC_MESSAGE_HANDLER(WorkerProcessMsg_CreateWorker, OnCreateNewSharedWorker)
     IPC_MESSAGE_HANDLER(ViewMsg_TimezoneChange, OnUpdateTimezone)
 #if defined(OS_ANDROID)
@@ -1699,11 +1681,6 @@ void RenderThreadImpl::OnNetworkTypeChanged(
       NetConnectionTypeToWebConnectionType(type));
 }
 
-void RenderThreadImpl::OnTempCrashWithData(const GURL& data) {
-  GetContentClient()->SetActiveURL(data);
-  CHECK(false);
-}
-
 void RenderThreadImpl::OnUpdateTimezone(const std::string& zone_id) {
   if (!blink_platform_impl_)
     return;
@@ -1719,12 +1696,9 @@ void RenderThreadImpl::OnUpdateTimezone(const std::string& zone_id) {
 #if defined(OS_ANDROID)
 void RenderThreadImpl::OnSetWebKitSharedTimersSuspended(bool suspend) {
   EnsureWebKitInitialized();
-  // TODO(alexclarke): Remove the shared timer.
   if (suspend) {
-    blink_platform_impl_->SuspendSharedTimer();
     renderer_scheduler_->SuspendTimerQueue();
   } else {
-    blink_platform_impl_->ResumeSharedTimer();
     renderer_scheduler_->ResumeTimerQueue();
   }
   webkit_shared_timer_suspended_ = suspend;
@@ -1762,8 +1736,7 @@ void RenderThreadImpl::OnCreateNewSharedWorker(
 
 void RenderThreadImpl::OnMemoryPressure(
     base::MemoryPressureListener::MemoryPressureLevel memory_pressure_level) {
-  base::allocator::ReleaseFreeMemory();
-  discardable_shared_memory_manager()->ReleaseFreeMemory();
+  ReleaseFreeMemory();
 
   // Do not call into blink if it is not initialized.
   if (blink_platform_impl_) {

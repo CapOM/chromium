@@ -39,10 +39,12 @@ class MockBuffer : public VideoCaptureDevice::Client::Buffer {
   int id() const override { return id_; }
   size_t size() const override { return size_; }
   void* data() override { return data_; }
-  gfx::GpuMemoryBufferType GetType() override {
-    return gfx::SHARED_MEMORY_BUFFER;
-  }
   ClientBuffer AsClientBuffer() override { return nullptr; }
+#if defined(OS_POSIX)
+  base::FileDescriptor AsPlatformFile() override {
+    return base::FileDescriptor();
+  }
+#endif
 
  private:
   const int id_;
@@ -99,6 +101,8 @@ class MockClient : public VideoCaptureDevice::Client {
     VideoCaptureFormat format(frame->natural_size(), 30.0, PIXEL_FORMAT_I420);
     frame_cb_.Run(format);
   }
+
+  double GetBufferPoolUtilization() const override { return 0.0; }
 
  private:
   base::Callback<void(const VideoCaptureFormat&)> frame_cb_;

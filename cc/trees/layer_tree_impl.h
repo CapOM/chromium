@@ -180,6 +180,7 @@ class CC_EXPORT LayerTreeImpl {
     has_transparent_background_ = transparent;
   }
 
+  void UpdatePropertyTreeScrollingFromMainThread();
   void SetPageScaleOnActiveTree(float active_page_scale);
   void PushPageScaleFromMainThread(float page_scale_factor,
                                    float min_page_scale_factor,
@@ -257,10 +258,6 @@ class CC_EXPORT LayerTreeImpl {
   void PushPersistedState(LayerTreeImpl* pending_tree);
 
   void DidBecomeActive();
-
-  bool ContentsTexturesPurged() const;
-  void SetContentsTexturesPurged();
-  void ResetContentsTexturesPurged();
 
   // Set on the active tree when the viewport size recently changed
   // and the active tree's size is now out of date.
@@ -399,7 +396,6 @@ class CC_EXPORT LayerTreeImpl {
   // would not be fully covered by opaque content.
   Region unoccluded_screen_space_region_;
 
-  bool contents_textures_purged_;
   bool viewport_size_invalid_;
   bool needs_update_draw_properties_;
 

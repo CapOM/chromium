@@ -25,11 +25,10 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.SysUtils;
 import org.chromium.base.TraceEvent;
 import org.chromium.base.annotations.SuppressFBWarnings;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.EmptyTabObserver;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.TabObserver;
@@ -813,7 +812,16 @@ public class CompositorViewHolder extends FrameLayout
 
                 FrameLayout.LayoutParams layoutParams = new FrameLayout.LayoutParams(
                         LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+                if (mView.getLayoutParams() instanceof MarginLayoutParams) {
+                    MarginLayoutParams existingLayoutParams =
+                            (MarginLayoutParams) mView.getLayoutParams();
+                    layoutParams.leftMargin = existingLayoutParams.leftMargin;
+                    layoutParams.rightMargin = existingLayoutParams.rightMargin;
+                    layoutParams.topMargin = existingLayoutParams.topMargin;
+                    layoutParams.bottomMargin = existingLayoutParams.bottomMargin;
+                }
                 addView(mView, layoutParams);
+
                 setFocusable(false);
                 setFocusableInTouchMode(false);
 

@@ -79,6 +79,7 @@ Certaines fonctionnalités ne seront peut-être pas disponibles, et les modifica
 <translation id="8551886023433311834">Mise à jour presque terminée. Pour la finaliser, veuillez redémarrer votre appareil.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Notifications – Chrome</translation>
+<translation id="6368805772029492593">Pour plus de sécurité, vos données seront chiffrées dans Google Chrome.</translation>
 <translation id="7339898014177206373">Nouvelle fenêtre</translation>
 <translation id="3282568296779691940">Connectez-vous à Chrome</translation>
 <translation id="3089968997497233615">Une nouvelle version de Google Chrome encore plus sûre est disponible.</translation>
@@ -174,7 +175,6 @@ Si vous vous connectez quand même, toutes les informations Chrome, comme les fa
 <translation id="2290095356545025170">Voulez-vous vraiment désinstaller Google Chrome ?</translation>
 <translation id="4273752058983339720">Google Chrome est configuré de façon à être lancé automatiquement lorsque vous démarrez votre ordinateur.</translation>
 <translation id="2316129865977710310">Non merci</translation>
-<translation id="415994390253732730">Le fonctionnement de Chrome vous semble étrange ?</translation>
 <translation id="1104959162601287462">À propos de &amp;Chrome OS</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Bienvenue dans Chrome</translation>
@@ -227,6 +227,7 @@ Si vous vous connectez quand même, toutes les informations Chrome, comme les fa
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">Chrome s'est amélioré</translation>
 <translation id="2588322182880276190">Logo Google Chrome</translation>
+<translation id="4519152997629025674">Des <ph name="BEGIN_LINK"/>services Web<ph name="END_LINK"/> sont parfois utilisés dans Google Chrome pour améliorer votre confort de navigation. Vous pouvoir choisir de désactiver ces services à tout moment.</translation>
 <translation id="4367618624832907428">Cette page Web ne peut pas s'afficher dans Google Chrome, car votre ordinateur n'est pas connecté à Internet.</translation>
 <translation id="174539241580958092">Impossible de synchroniser vos données dans Google Chrome, car une erreur s'est produite lors de la connexion.</translation>
 <translation id="8255190535488645436">Votre webcam et votre micro sont en cours d'utilisation dans Google Chrome.</translation>
@@ -234,7 +235,6 @@ Si vous vous connectez quand même, toutes les informations Chrome, comme les fa
         de votre antivirus</translation>
 <translation id="9102715433345326100">Ce fichier est malveillant. Il a donc été bloqué dans Chrome.</translation>
 <translation id="8205111949707227942">Facultatif : Aidez-nous à améliorer Google Chrome OS en envoyant automatiquement des statistiques d'utilisation et des rapports d'erreur à Google.</translation>
-<translation id="487887346205285304">Le fonctionnement de Chrome vous semble étrange ?</translation>
 <translation id="3622797965165704966">Il est désormais plus facile d'utiliser Chrome avec votre compte Google et sur des ordinateurs partagés.</translation>
 <translation id="7196020411877309443">Pourquoi ce message s'affiche-t-il ?</translation>
 <translation id="2769762047821873045">Google Chrome n'est pas votre navigateur par défaut.</translation>

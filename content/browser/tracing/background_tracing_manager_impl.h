@@ -34,6 +34,7 @@ class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
   void SetTracingEnabledCallbackForTesting(
       const base::Closure& callback) override;
   void FireTimerForTesting() override;
+  bool HasActiveScenarioForTesting() override;
 
  private:
   BackgroundTracingManagerImpl();
@@ -44,6 +45,10 @@ class BackgroundTracingManagerImpl : public content::BackgroundTracingManager {
   void OnFinalizeStarted(scoped_refptr<base::RefCountedString>);
   void OnFinalizeComplete();
   void BeginFinalizing(StartedFinalizingCallback);
+  void ValidateStartupScenario();
+  void AbortScenario();
+
+  scoped_ptr<base::DictionaryValue> GenerateMetadataDict() const;
 
   std::string GetTriggerNameFromHandle(TriggerHandle handle) const;
   bool IsTriggerHandleValid(TriggerHandle handle) const;

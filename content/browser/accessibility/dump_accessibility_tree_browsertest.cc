@@ -401,6 +401,10 @@ IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest,
   RunAriaTest(FILE_PATH_LITERAL("aria-orientation.html"));
 }
 
+IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest, AccessibilityAriaOwns) {
+  RunAriaTest(FILE_PATH_LITERAL("aria-owns.html"));
+}
+
 IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest, AccessibilityAriaMath) {
   RunAriaTest(FILE_PATH_LITERAL("aria-math.html"));
 }
@@ -965,7 +969,7 @@ IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest, AccessibilityMain) {
   RunHtmlTest(FILE_PATH_LITERAL("main.html"));
 }
 
-IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest, DISABLED_AccessibilityMark) {
+IN_PROC_BROWSER_TEST_F(DumpAccessibilityTreeTest, AccessibilityMark) {
   RunHtmlTest(FILE_PATH_LITERAL("mark.html"));
 }
 

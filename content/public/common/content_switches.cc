@@ -39,12 +39,6 @@ const char kBlinkPlatformLogChannels[]      = "blink-platform-log-channels";
 // the enum value. Applied after other command line flags and prefs.
 const char kBlinkSettings[]                 = "blink-settings";
 
-// Block cross-site documents (i.e., HTML/XML/JSON) from being loaded in
-// subresources when a document is not supposed to read them.  This will later
-// allow us to block them from the entire renderer process when site isolation
-// is enabled.
-const char kBlockCrossSiteDocuments[]     = "block-cross-site-documents";
-
 // Causes the browser process to crash on startup.
 const char kBrowserCrashTest[]              = "crash-test";
 
@@ -161,9 +155,6 @@ const char kDisableHideInactiveStackedTabCloseButtons[] =
 // Disable the RenderThread's HistogramCustomizer.
 const char kDisableHistogramCustomizer[]    = "disable-histogram-customizer";
 
-// Paint content on the main thread instead of the compositor thread.
-const char kDisableImplSidePainting[]       = "disable-impl-side-painting";
-
 // Prevent Java from running.
 const char kDisableJava[]                   = "disable-java";
 
@@ -199,7 +190,6 @@ const char kDisableNamespaceSandbox[]       = "disable-namespace-sandbox";
 const char kDisableNotifications[]          = "disable-notifications";
 
 // Disable rasterizer that writes directly to GPU memory.
-// Overrides the kEnableOneCopy flag.
 const char kDisableOneCopy[]                = "disable-one-copy";
 
 // Disable Pepper3D.
@@ -237,6 +227,10 @@ const char kDisableSetuidSandbox[]          = "disable-setuid-sandbox";
 
 // Disable shared workers.
 const char kDisableSharedWorkers[]          = "disable-shared-workers";
+
+// Disables slimming paint: http://www.chromium.org/blink/slimming-paint
+// Can be overridden by kEnableSlimmingPaint.
+const char kDisableSlimmingPaint[]           = "disable-slimming-paint";
 
 // Disable smooth scrolling for testing.
 const char kDisableSmoothScrolling[]        = "disable-smooth-scrolling";
@@ -316,9 +310,6 @@ const char kEnableBlinkFeatures[]           = "enable-blink-features";
 // PlzNavigate: Use the experimental browser-side navigation path.
 const char kEnableBrowserSideNavigation[]   = "enable-browser-side-navigation";
 
-// Defer image decoding in WebKit until painting.
-const char kEnableDeferredImageDecoding[]   = "enable-deferred-image-decoding";
-
 // Enables Delay Agnostic AEC in WebRTC.
 const char kEnableDelayAgnosticAec[]        = "enable-delay-agnostic-aec";
 
@@ -375,9 +366,6 @@ const char kEnableMemoryBenchmarking[]      = "enable-memory-benchmarking";
 // Enables the network information API.
 const char kEnableNetworkInformation[]      = "enable-network-information";
 
-// Enable rasterizer that writes directly to GPU memory.
-const char kEnableOneCopy[]                 = "enable-one-copy";
-
 // Enables use of hardware overlay for fullscreen video playback. Android only.
 const char kEnableOverlayFullscreenVideo[]  = "enable-overlay-fullscreen-video";
 
@@ -421,6 +409,7 @@ const char kEnableSeccompFilterSandbox[] =
 const char kEnableSkiaBenchmarking[]        = "enable-skia-benchmarking";
 
 // Enables slimming paint: http://www.chromium.org/blink/slimming-paint
+// Overrides kDisableSlimmingPaint if both are present.
 const char kEnableSlimmingPaint[]           = "enable-slimming-paint";
 
 // On platforms that support it, enables smooth scroll animation.
@@ -488,6 +477,9 @@ const char kEnableWebGLDraftExtensions[] = "enable-webgl-draft-extensions";
 // Enables WebGL rendering into a scanout buffer for overlay support.
 const char kEnableWebGLImageChromium[] = "enable-webgl-image-chromium";
 
+// Enables interaction with virtual reality devices.
+const char kEnableWebVR[] = "enable-webvr";
+
 // Enable rasterizer that writes directly to GPU memory associated with tiles.
 const char kEnableZeroCopy[]                = "enable-zero-copy";
 
@@ -522,11 +514,6 @@ const char kGpuRasterizationMSAASampleCount[] =
 // a screen reader is detected. The disable-renderer-accessibility switch
 // overrides this if present.
 const char kForceRendererAccessibility[]    = "force-renderer-accessibility";
-
-// Always use text blob rendering, overriding kDisableTextBlobs and any
-// heuristics that may otherwise disable it.
-// TODO(fmalita): remove after --disable-impl-side-painting is phased out.
-const char kForceTextBlobs[]                = "force-text-blobs";
 
 // Passes gpu device_id from browser process to GPU process.
 const char kGpuDeviceID[]                   = "gpu-device-id";
@@ -841,8 +828,11 @@ const char kUseFakeUIForMediaStream[]     = "use-fake-ui-for-media-stream";
 // Enable native GPU memory buffer support when available.
 const char kEnableNativeGpuMemoryBuffers[] = "enable-native-gpu-memory-buffers";
 
-// Overrides the default texture target used with CHROMIUM_image extension.
-const char kUseImageTextureTarget[] = "use-image-texture-target";
+// Texture target for CHROMIUM_image backed content textures.
+const char kContentImageTextureTarget[] = "content-image-texture-target";
+
+// Texture target for CHROMIUM_image backed video frame textures.
+const char kVideoImageTextureTarget[] = "video-image-texture-target";
 
 // Set when Chromium should use a mobile user agent.
 const char kUseMobileUserAgent[] = "use-mobile-user-agent";
@@ -907,6 +897,11 @@ const char kEnableWebRtcHWH264Encoding[]    = "enable-webrtc-hw-h264-encoding";
 
 // Enables Origin header in Stun messages for WebRTC.
 const char kEnableWebRtcStunOrigin[]        = "enable-webrtc-stun-origin";
+
+// Renderer process parameter for WebRTC Stun probe trial to determine the
+// interval. Please see SetupStunProbeTrial in
+// chrome_browser_field_trials_desktop.cc for more detail.
+const char kWebRtcStunProbeTrialParameter[] = "webrtc-stun-probe-trial";
 
 // Override the maximum framerate as can be specified in calls to getUserMedia.
 // This flag expects a value.  Example: --max-gum-fps=17.5

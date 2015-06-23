@@ -113,7 +113,7 @@ DataReductionProxyIOData::DataReductionProxyIOData(
   event_creator_.reset(new DataReductionProxyEventCreator(this));
   configurator_.reset(
       new DataReductionProxyConfigurator(net_log, event_creator_.get()));
-  bool use_config_client = DataReductionProxyParams::IsConfigClientEnabled();
+  bool use_config_client = params::IsConfigClientEnabled();
   DataReductionProxyMutableConfigValues* raw_mutable_config = nullptr;
   if (use_config_client) {
     scoped_ptr<DataReductionProxyMutableConfigValues> mutable_config =
@@ -263,6 +263,10 @@ void DataReductionProxyIOData::SetDataReductionProxyConfiguration(
   DCHECK(io_task_runner_->BelongsToCurrentThread());
   if (config_client_)
     config_client_->ApplySerializedConfig(serialized_config);
+}
+
+void DataReductionProxyIOData::SetLoFiModeOff() {
+  config_->SetLoFiModeOff();
 }
 
 void DataReductionProxyIOData::UpdateContentLengths(

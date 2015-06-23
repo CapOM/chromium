@@ -5,8 +5,10 @@
 #include "net/socket/ssl_client_socket.h"
 
 #include "base/callback_helpers.h"
+#include "base/location.h"
 #include "base/memory/ref_counted.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/thread_task_runner_handle.h"
 #include "base/time/time.h"
 #include "net/base/address_list.h"
@@ -654,7 +656,7 @@ class AsyncFailingChannelIDStore : public ChannelIDStore {
   int GetChannelID(const std::string& server_identifier,
                    scoped_ptr<crypto::ECPrivateKey>* key_result,
                    const GetChannelIDCallback& callback) override {
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(callback, ERR_UNEXPECTED, server_identifier, nullptr));
     return ERR_IO_PENDING;
@@ -1483,7 +1485,7 @@ TEST_F(SSLClientSocketTest, Write_WithSynchronousErrorNoRead) {
   // TODO(davidben): Avoid the arbitrary timeout?
   int old_write_count = raw_counting_socket->write_count();
   base::RunLoop loop;
-  base::MessageLoop::current()->PostDelayedTask(
+  base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
       FROM_HERE, loop.QuitClosure(), base::TimeDelta::FromMilliseconds(100));
   loop.Run();
   EXPECT_EQ(old_write_count, raw_counting_socket->write_count());
@@ -2413,8 +2415,9 @@ TEST_F(SSLClientSocketTest, VerifyServerChainProperlyOrdered) {
                                     X509Certificate::FORMAT_AUTO);
 
   // Get the server certificate as received client side.
-  scoped_refptr<X509Certificate> server_certificate =
-      sock->GetUnverifiedServerCertificateChain();
+  SSLInfo ssl_info;
+  ASSERT_TRUE(sock->GetSSLInfo(&ssl_info));
+  scoped_refptr<X509Certificate> server_certificate = ssl_info.unverified_cert;
 
   // Get the intermediates as received  client side.
   const X509Certificate::OSCertHandles& server_intermediates =
@@ -2456,6 +2459,11 @@ TEST_F(SSLClientSocketTest, VerifyReturnChainProperlyOrdered) {
   // By default, cause the CertVerifier to treat all certificates as
   // expired.
   cert_verifier_->set_default_result(ERR_CERT_DATE_INVALID);
+
+  CertificateList unverified_certs = CreateCertificateListFromFile(
+      GetTestCertsDirectory(), "redundant-server-chain.pem",
+      X509Certificate::FORMAT_AUTO);
+  ASSERT_EQ(4u, unverified_certs.size());
 
   // We will expect SSLInfo to ultimately contain this chain.
   CertificateList certs =
@@ -2533,6 +2541,19 @@ TEST_F(SSLClientSocketTest, VerifyReturnChainProperlyOrdered) {
                                             certs[1]->os_cert_handle()));
   EXPECT_TRUE(X509Certificate::IsSameOSCert(intermediates[1],
                                             certs[2]->os_cert_handle()));
+
+  // Verify that SSLInfo also contains the chain as received from the server.
+  const X509Certificate::OSCertHandles& served_intermediates =
+      ssl_info.unverified_cert->GetIntermediateCertificates();
+  ASSERT_EQ(3U, served_intermediates.size());
+  EXPECT_TRUE(X509Certificate::IsSameOSCert(
+      ssl_info.cert->os_cert_handle(), unverified_certs[0]->os_cert_handle()));
+  EXPECT_TRUE(X509Certificate::IsSameOSCert(
+      served_intermediates[0], unverified_certs[1]->os_cert_handle()));
+  EXPECT_TRUE(X509Certificate::IsSameOSCert(
+      served_intermediates[1], unverified_certs[2]->os_cert_handle()));
+  EXPECT_TRUE(X509Certificate::IsSameOSCert(
+      served_intermediates[2], unverified_certs[3]->os_cert_handle()));
 
   sock->Disconnect();
   EXPECT_FALSE(sock->IsConnected());
@@ -2923,6 +2944,7 @@ TEST_F(SSLClientSocketTest, FallbackShardSessionCache) {
   SSLConfig ssl_config;
   SSLConfig fallback_ssl_config;
   fallback_ssl_config.version_max = SSL_PROTOCOL_VERSION_TLS1;
+  fallback_ssl_config.version_fallback_min = SSL_PROTOCOL_VERSION_TLS1;
   fallback_ssl_config.version_fallback = true;
 
   // Connect with a fallback config from the test server to add an entry to the
@@ -3081,6 +3103,37 @@ TEST_F(SSLClientSocketTest, DeprecatedShardSessionCache) {
   EXPECT_EQ(OK, callback.GetResult(sock->Connect(callback.callback())));
   EXPECT_TRUE(sock->GetSSLInfo(&ssl_info));
   EXPECT_EQ(SSLInfo::HANDSHAKE_FULL, ssl_info.handshake_type);
+}
+
+TEST_F(SSLClientSocketTest, RequireECDHE) {
+  // Run test server without ECDHE.
+  SpawnedTestServer::SSLOptions ssl_options;
+  ssl_options.key_exchanges = SpawnedTestServer::SSLOptions::KEY_EXCHANGE_RSA;
+  SpawnedTestServer test_server(SpawnedTestServer::TYPE_HTTPS, ssl_options,
+                                base::FilePath());
+  ASSERT_TRUE(test_server.Start());
+
+  AddressList addr;
+  ASSERT_TRUE(test_server.GetAddressList(&addr));
+
+  TestCompletionCallback callback;
+  TestNetLog log;
+  scoped_ptr<StreamSocket> transport(
+      new TCPClientSocket(addr, &log, NetLog::Source()));
+  int rv = transport->Connect(callback.callback());
+  rv = callback.GetResult(rv);
+  EXPECT_EQ(OK, rv);
+
+  SSLConfig config;
+  config.require_ecdhe = true;
+
+  scoped_ptr<SSLClientSocket> sock(CreateSSLClientSocket(
+      transport.Pass(), test_server.host_port_pair(), config));
+
+  rv = sock->Connect(callback.callback());
+  rv = callback.GetResult(rv);
+
+  EXPECT_EQ(ERR_SSL_VERSION_OR_CIPHER_MISMATCH, rv);
 }
 
 TEST_F(SSLClientSocketFalseStartTest, FalseStartEnabled) {

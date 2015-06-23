@@ -33,7 +33,6 @@
 #include "chrome/browser/chromeos/dbus/chrome_console_service_provider_delegate.h"
 #include "chrome/browser/chromeos/dbus/chrome_display_power_service_provider_delegate.h"
 #include "chrome/browser/chromeos/dbus/chrome_proxy_resolver_delegate.h"
-#include "chrome/browser/chromeos/dbus/printer_service_provider.h"
 #include "chrome/browser/chromeos/dbus/screen_lock_service_provider.h"
 #include "chrome/browser/chromeos/events/event_rewriter.h"
 #include "chrome/browser/chromeos/events/event_rewriter_controller.h"
@@ -51,7 +50,6 @@
 #include "chrome/browser/chromeos/login/users/chrome_user_manager.h"
 #include "chrome/browser/chromeos/login/users/wallpaper/wallpaper_manager.h"
 #include "chrome/browser/chromeos/login/wizard_controller.h"
-#include "chrome/browser/chromeos/memory/oom_priority_manager.h"
 #include "chrome/browser/chromeos/net/network_portal_detector_impl.h"
 #include "chrome/browser/chromeos/net/wake_on_wifi_manager.h"
 #include "chrome/browser/chromeos/options/cert_library.h"
@@ -73,6 +71,7 @@
 #include "chrome/browser/chromeos/upgrade_detector_chromeos.h"
 #include "chrome/browser/defaults.h"
 #include "chrome/browser/lifetime/application_lifetime.h"
+#include "chrome/browser/memory/oom_priority_manager.h"
 #include "chrome/browser/net/chrome_network_delegate.h"
 #include "chrome/browser/profiles/profile.h"
 #include "chrome/browser/profiles/profile_manager.h"
@@ -174,7 +173,6 @@ class DBusServices {
         make_scoped_ptr(new ChromeProxyResolverDelegate())));
     service_providers.push_back(new DisplayPowerServiceProvider(
         make_scoped_ptr(new ChromeDisplayPowerServiceProviderDelegate)));
-    service_providers.push_back(new PrinterServiceProvider);
     service_providers.push_back(new LivenessServiceProvider);
     service_providers.push_back(new ScreenLockServiceProvider);
     service_providers.push_back(new ConsoleServiceProvider(

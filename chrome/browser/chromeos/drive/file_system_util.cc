@@ -25,6 +25,7 @@
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chromeos/drive/drive.pb.h"
 #include "chrome/browser/chromeos/drive/drive_integration_service.h"
+#include "chrome/browser/chromeos/drive/drive_pref_names.h"
 #include "chrome/browser/chromeos/drive/file_system_interface.h"
 #include "chrome/browser/chromeos/drive/job_list.h"
 #include "chrome/browser/chromeos/drive/write_on_cache_file.h"
@@ -92,14 +93,16 @@ DriveIntegrationService* GetIntegrationServiceByProfile(Profile* profile) {
 }  // namespace
 
 const base::FilePath& GetDriveGrandRootPath() {
-  CR_DEFINE_STATIC_LOCAL(base::FilePath, grand_root_path,
-      (kDriveGrandRootDirName));
+  CR_DEFINE_STATIC_LOCAL(
+      base::FilePath, grand_root_path,
+      (base::FilePath::FromUTF8Unsafe(kDriveGrandRootDirName)));
   return grand_root_path;
 }
 
 const base::FilePath& GetDriveMyDriveRootPath() {
-  CR_DEFINE_STATIC_LOCAL(base::FilePath, drive_root_path,
-                         (FILE_PATH_LITERAL("drive/root")));
+  CR_DEFINE_STATIC_LOCAL(
+      base::FilePath, drive_root_path,
+      (GetDriveGrandRootPath().AppendASCII(kDriveMyDriveRootDirName)));
   return drive_root_path;
 }
 
@@ -182,7 +185,8 @@ base::FilePath ExtractDrivePath(const base::FilePath& path) {
     return base::FilePath();
   if (components[1] != FILE_PATH_LITERAL("special"))
     return base::FilePath();
-  if (!StartsWithASCII(components[2], "drive", true))
+  static const base::FilePath::CharType kPrefix[] = FILE_PATH_LITERAL("drive");
+  if (components[2].compare(0, arraysize(kPrefix) - 1, kPrefix) != 0)
     return base::FilePath();
 
   base::FilePath drive_path = GetDriveGrandRootPath();

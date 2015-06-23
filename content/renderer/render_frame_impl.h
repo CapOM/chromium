@@ -70,15 +70,17 @@ class Rect;
 namespace media {
 class CdmFactory;
 class MediaPermission;
-class MediaServiceProvider;
 class WebEncryptedMediaClientImpl;
+}
+
+namespace mojo {
+class ServiceProvider;
 }
 
 namespace content {
 
 class ChildFrameCompositingHelper;
 class CompositorDependencies;
-class ContentMediaServiceProvider;
 class DevToolsAgent;
 class DocumentState;
 class ExternalPopupMenu;
@@ -114,6 +116,7 @@ struct RequestNavigationParams;
 struct ResourceResponseHead;
 struct StartNavigationParams;
 struct StreamOverrideParameters;
+class VRDispatcher;
 
 class CONTENT_EXPORT RenderFrameImpl
     : public RenderFrame,
@@ -530,6 +533,10 @@ class CONTENT_EXPORT RenderFrameImpl
   virtual blink::WebPermissionClient* permissionClient();
   virtual blink::WebAppBannerClient* appBannerClient();
 
+#if defined(ENABLE_WEBVR)
+  blink::WebVRClient* webVRClient() override;
+#endif
+
   // WebMediaPlayerDelegate implementation:
   void DidPlay(blink::WebMediaPlayer* player) override;
   void DidPause(blink::WebMediaPlayer* player) override;
@@ -604,7 +611,8 @@ class CONTENT_EXPORT RenderFrameImpl
 
   // Builds and sends DidCommitProvisionalLoad to the host.
   void SendDidCommitProvisionalLoad(blink::WebFrame* frame,
-                                    blink::WebHistoryCommitType commit_type);
+                                    blink::WebHistoryCommitType commit_type,
+                                    const blink::WebHistoryItem& item);
 
   // IPC message handlers ------------------------------------------------------
   //
@@ -745,17 +753,14 @@ class CONTENT_EXPORT RenderFrameImpl
   void InitializeUserMediaClient();
 
   blink::WebMediaPlayer* CreateWebMediaPlayerForMediaStream(
-      const blink::WebURL& url,
       blink::WebMediaPlayerClient* client);
 
   // Creates a factory object used for creating audio and video renderers.
   scoped_ptr<MediaStreamRendererFactory> CreateRendererFactory();
 
-  // Checks that the RenderView is ready to display the navigation to |url|. If
-  // the return value is false, the navigation should be abandoned.
-  bool PrepareRenderViewForNavigation(
+  // Does preparation for the navigation to |url|.
+  void PrepareRenderViewForNavigation(
       const GURL& url,
-      bool is_history_navigation,
       const RequestNavigationParams& request_params,
       bool* is_reload,
       blink::WebURLRequest::CachePolicy* cache_policy);
@@ -791,7 +796,6 @@ class CONTENT_EXPORT RenderFrameImpl
 
 #if defined(OS_ANDROID)
   blink::WebMediaPlayer* CreateAndroidWebMediaPlayer(
-      const blink::WebURL& url,
       blink::WebMediaPlayerClient* client,
       media::MediaPermission* media_permission,
       blink::WebContentDecryptionModule* initial_cdm);
@@ -800,8 +804,16 @@ class CONTENT_EXPORT RenderFrameImpl
 #endif
 
   bool AreSecureCodecsSupported();
+
   media::MediaPermission* GetMediaPermission();
-  media::MediaServiceProvider* GetMediaServiceProvider();
+
+#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+  mojo::ServiceProvider* GetMediaServiceProvider();
+
+  // Called when a connection error happened on |media_service_provider_|.
+  void OnMediaServiceProviderConnectionError();
+#endif
+
   media::CdmFactory* GetCdmFactory();
 
   // Stores the WebLocalFrame we are associated with.  This is null from the
@@ -911,7 +923,7 @@ class CONTENT_EXPORT RenderFrameImpl
 
 #if defined(ENABLE_MEDIA_MOJO_RENDERER)
   // The media service provider attached to this frame, lazily initialized.
-  ContentMediaServiceProvider* content_media_service_provider_;
+  mojo::ServiceProviderPtr media_service_provider_;
 #endif
 
   // MidiClient attached to this frame; lazily initialized.
@@ -974,6 +986,11 @@ class CONTENT_EXPORT RenderFrameImpl
   scoped_ptr<PermissionDispatcher> permission_client_;
 
   scoped_ptr<blink::WebAppBannerClient> app_banner_client_;
+
+#if defined(ENABLE_WEBVR)
+  // The VR dispatcher attached to the frame, lazily initialized.
+  scoped_ptr<VRDispatcher> vr_dispatcher_;
+#endif
 
 #if defined(OS_MACOSX) || defined(OS_ANDROID)
   // The external popup for the currently showing select popup.

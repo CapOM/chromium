@@ -16,7 +16,6 @@
 #include "ui/aura/window_tree_host.h"
 #include "ui/base/hit_test.h"
 #include "ui/base/ime/input_method.h"
-#include "ui/base/ui_base_switches_util.h"
 #include "ui/compositor/layer.h"
 #include "ui/gfx/canvas.h"
 #include "ui/gfx/display.h"
@@ -105,6 +104,12 @@ class DesktopNativeWidgetTopLevelHandler : public aura::WindowObserver {
     // This widget instance will get deleted when the window is
     // destroyed.
     top_level_handler->top_level_widget_ = new Widget();
+    // Ensure that we always use the DesktopNativeWidgetAura instance as the
+    // native widget here. If we enter this code path in tests then it is
+    // possible that we may end up with a NativeWidgetAura instance as the
+    // native widget which breaks this code path.
+    init_params.native_widget =
+        new DesktopNativeWidgetAura(top_level_handler->top_level_widget_);
     top_level_handler->top_level_widget_->Init(init_params);
 
     top_level_handler->top_level_widget_->SetFullscreen(full_screen);
@@ -629,9 +634,6 @@ bool DesktopNativeWidgetAura::HasCapture() const {
 }
 
 InputMethod* DesktopNativeWidgetAura::CreateInputMethod() {
-  if (switches::IsTextInputFocusManagerEnabled())
-    return new NullInputMethod();
-
   return new InputMethodBridge(this, GetHostInputMethod(), false);
 }
 
@@ -726,7 +728,7 @@ void DesktopNativeWidgetAura::StackAtTop() {
 void DesktopNativeWidgetAura::StackBelow(gfx::NativeView native_view) {
 }
 
-void DesktopNativeWidgetAura::SetShape(gfx::NativeRegion shape) {
+void DesktopNativeWidgetAura::SetShape(SkRegion* shape) {
   if (content_window_)
     desktop_window_tree_host_->SetShape(shape);
 }

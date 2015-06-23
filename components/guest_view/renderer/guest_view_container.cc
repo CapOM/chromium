@@ -50,7 +50,8 @@ GuestViewContainer::GuestViewContainer(content::RenderFrame* render_frame)
     : element_instance_id_(guest_view::kInstanceIDNone),
       render_frame_(render_frame),
       ready_(false),
-      in_destruction_(false) {
+      in_destruction_(false),
+      weak_ptr_factory_(this) {
   render_frame_lifetime_observer_.reset(
       new RenderFrameLifetimeObserver(this, render_frame_));
 }
@@ -76,7 +77,7 @@ GuestViewContainer* GuestViewContainer::FromID(int element_instance_id) {
 //   <webview> element's GC will destroy it.
 // 3. If GuestViewContainer's embedder frame is destroyed, we'd also destroy
 //   GuestViewContainer.
-void GuestViewContainer::Destroy() {
+void GuestViewContainer::Destroy(bool embedder_frame_destroyed) {
   if (in_destruction_)
     return;
 
@@ -84,7 +85,11 @@ void GuestViewContainer::Destroy() {
 
   // Give our derived class an opportunity to perform some cleanup prior to
   // destruction.
-  OnDestroy();
+  OnDestroy(embedder_frame_destroyed);
+
+  // Invalidate weak references to us to avoid late arriving tasks from running
+  // during destruction
+  weak_ptr_factory_.InvalidateWeakPtrs();
 
   if (element_instance_id() != guest_view::kInstanceIDNone)
     g_guest_view_container_map.Get().erase(element_instance_id());
@@ -105,7 +110,7 @@ void GuestViewContainer::Destroy() {
 void GuestViewContainer::RenderFrameDestroyed() {
   OnRenderFrameDestroyed();
   render_frame_ = nullptr;
-  Destroy();
+  Destroy(true /* embedder_frame_destroyed */);
 }
 
 void GuestViewContainer::IssueRequest(linked_ptr<GuestViewRequest> request) {
@@ -173,7 +178,11 @@ void GuestViewContainer::SetElementInstanceID(int element_instance_id) {
 }
 
 void GuestViewContainer::DidDestroyElement() {
-  Destroy();
+  Destroy(false);
+}
+
+base::WeakPtr<content::BrowserPluginDelegate> GuestViewContainer::GetWeakPtr() {
+  return weak_ptr_factory_.GetWeakPtr();
 }
 
 }  // namespace guest_view

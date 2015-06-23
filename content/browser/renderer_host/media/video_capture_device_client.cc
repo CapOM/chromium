@@ -4,6 +4,8 @@
 
 #include "content/browser/renderer_host/media/video_capture_device_client.h"
 
+#include <algorithm>
+
 #include "base/bind.h"
 #include "base/strings/stringprintf.h"
 #include "base/trace_event/trace_event.h"
@@ -28,6 +30,7 @@
 
 using media::VideoCaptureFormat;
 using media::VideoFrame;
+using media::VideoFrameMetadata;
 
 namespace content {
 
@@ -117,12 +120,14 @@ class AutoReleaseBuffer : public media::VideoCaptureDevice::Client::Buffer {
   int id() const override { return id_; }
   size_t size() const override { return buffer_handle_->size(); }
   void* data() override { return buffer_handle_->data(); }
-  gfx::GpuMemoryBufferType GetType() override {
-    return buffer_handle_->GetType();
-  }
   ClientBuffer AsClientBuffer() override {
     return buffer_handle_->AsClientBuffer();
   }
+#if defined(OS_POSIX)
+  base::FileDescriptor AsPlatformFile() override {
+    return buffer_handle_->AsPlatformFile();
+  }
+#endif
 
  private:
   ~AutoReleaseBuffer() override { pool_->RelinquishProducerReservation(id_); }
@@ -230,10 +235,8 @@ void VideoCaptureDeviceClient::OnIncomingCapturedData(
 
   int destination_width = new_unrotated_width;
   int destination_height = new_unrotated_height;
-  if (rotation == 90 || rotation == 270) {
-    destination_width = new_unrotated_height;
-    destination_height = new_unrotated_width;
-  }
+  if (rotation == 90 || rotation == 270)
+    std::swap(destination_width, destination_height);
 
   DCHECK_EQ(rotation % 90, 0)
       << " Rotation must be a multiple of 90, now: " << rotation;
@@ -259,15 +262,16 @@ void VideoCaptureDeviceClient::OnIncomingCapturedData(
   if (!buffer.get())
     return;
 
+  const size_t y_plane_size = VideoFrame::PlaneSize(
+      VideoFrame::I420, VideoFrame::kYPlane, dimensions).GetArea();
+  const size_t u_plane_size = VideoFrame::PlaneSize(
+      VideoFrame::I420, VideoFrame::kUPlane, dimensions).GetArea();
   uint8* const yplane = reinterpret_cast<uint8*>(buffer->data());
-  uint8* const uplane =
-      yplane + VideoFrame::PlaneAllocationSize(VideoFrame::I420,
-                                               VideoFrame::kYPlane, dimensions);
-  uint8* const vplane =
-      uplane + VideoFrame::PlaneAllocationSize(VideoFrame::I420,
-                                               VideoFrame::kUPlane, dimensions);
-  int yplane_stride = dimensions.width();
-  int uv_plane_stride = yplane_stride / 2;
+  uint8* const uplane = yplane + y_plane_size;
+  uint8* const vplane = uplane + u_plane_size;
+
+  const int yplane_stride = dimensions.width();
+  const int uv_plane_stride = yplane_stride / 2;
   int crop_x = 0;
   int crop_y = 0;
   libyuv::FourCC origin_colorspace = libyuv::FOURCC_ANY;
@@ -380,10 +384,10 @@ VideoCaptureDeviceClient::OnIncomingCapturedYuvData(
 
   // Blit (copy) here from y,u,v into buffer.data()). Needed so we can return
   // the parameter buffer synchronously to the driver.
-  const size_t y_plane_size = VideoFrame::PlaneAllocationSize(VideoFrame::I420,
-      VideoFrame::kYPlane, frame_format.frame_size);
-  const size_t u_plane_size = VideoFrame::PlaneAllocationSize(
-      VideoFrame::I420, VideoFrame::kUPlane, frame_format.frame_size);
+  const size_t y_plane_size = VideoFrame::PlaneSize(
+      VideoFrame::I420, VideoFrame::kYPlane, frame_format.frame_size).GetArea();
+  const size_t u_plane_size = VideoFrame::PlaneSize(
+      VideoFrame::I420, VideoFrame::kUPlane, frame_format.frame_size).GetArea();
   uint8* const dst_y = reinterpret_cast<uint8*>(buffer->data());
   uint8* const dst_u = dst_y + y_plane_size;
   uint8* const dst_v = dst_u + u_plane_size;
@@ -513,6 +517,11 @@ void VideoCaptureDeviceClient::OnLog(
                                      controller_, message));
 }
 
+double VideoCaptureDeviceClient::GetBufferPoolUtilization() const {
+  // VideoCaptureBufferPool::GetBufferPoolUtilization() is thread-safe.
+  return buffer_pool_->GetBufferPoolUtilization();
+}
+
 VideoCaptureDeviceClient::TextureWrapHelper::TextureWrapHelper(
     const base::WeakPtr<VideoCaptureController>& controller,
     const scoped_refptr<base::SingleThreadTaskRunner>& capture_task_runner)
@@ -543,7 +552,7 @@ VideoCaptureDeviceClient::TextureWrapHelper::OnIncomingCapturedGpuMemoryBuffer(
                                             GL_BGRA_EXT);
   DCHECK(image_id);
 
-  GLuint texture_id = gl_helper_->CreateTexture();
+  const GLuint texture_id = gl_helper_->CreateTexture();
   DCHECK(texture_id);
   {
     content::ScopedTextureBinder<GL_TEXTURE_2D> texture_binder(gl, texture_id);
@@ -559,15 +568,29 @@ VideoCaptureDeviceClient::TextureWrapHelper::OnIncomingCapturedGpuMemoryBuffer(
 
   scoped_refptr<media::VideoFrame> video_frame =
       media::VideoFrame::WrapNativeTexture(
+          media::VideoFrame::ARGB,
           mailbox_holder,
           media::BindToCurrentLoop(base::Bind(
               &VideoCaptureDeviceClient::TextureWrapHelper::ReleaseCallback,
               this, image_id, texture_id)),
           frame_format.frame_size, gfx::Rect(frame_format.frame_size),
-          frame_format.frame_size, base::TimeDelta(), true /* allow_overlay */,
-          true /* has_alpha */);
-  video_frame->metadata()->SetDouble(media::VideoFrameMetadata::FRAME_RATE,
+          frame_format.frame_size, base::TimeDelta());
+  video_frame->metadata()->SetBoolean(VideoFrameMetadata::ALLOW_OVERLAY, true);
+  video_frame->metadata()->SetDouble(VideoFrameMetadata::FRAME_RATE,
                                      frame_format.frame_rate);
+#if defined(OS_LINUX)
+// TODO(mcasas): After http://crev.com/1179323002, use |frame_format| to query
+// the storage type of the buffer and use the appropriate |video_frame| method.
+#if defined(USE_OZONE)
+  DCHECK_EQ(media::VideoFrame::NumPlanes(video_frame->format()), 1u);
+  video_frame->DuplicateFileDescriptors(
+      std::vector<int>(1, buffer->AsPlatformFile().fd));
+#else
+   video_frame->AddSharedMemoryHandle(buffer->AsPlatformFile());
+#endif
+
+#endif
+  //TODO(mcasas): use AddSharedMemoryHandle() for gfx::SHARED_MEMORY_BUFFER.
 
   BrowserThread::PostTask(
       BrowserThread::IO, FROM_HERE,

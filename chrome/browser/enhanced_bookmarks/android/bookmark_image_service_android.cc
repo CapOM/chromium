@@ -8,8 +8,8 @@
 #include "chrome/browser/bitmap_fetcher/bitmap_fetcher.h"
 #include "chrome/browser/enhanced_bookmarks/android/bookmark_image_service_android.h"
 #include "chrome/browser/enhanced_bookmarks/enhanced_bookmark_model_factory.h"
+#include "chrome/common/chrome_isolated_world_ids.h"
 #include "chrome/grit/browser_resources.h"
-#include "chrome/renderer/chrome_isolated_world_ids.h"
 #include "components/bookmarks/browser/bookmark_model.h"
 #include "components/enhanced_bookmarks/enhanced_bookmark_model.h"
 #include "content/public/browser/browser_context.h"
@@ -274,8 +274,9 @@ void BookmarkImageServiceAndroid::BitmapFetcherHandler::Start(
   update_bookmark_ = update_bookmark;
   page_url_ = page_url;
 
-  bitmap_fetcher_.Start(browser_context->GetRequestContext(), referrer,
-                        referrer_policy, load_flags);
+  bitmap_fetcher_.Init(browser_context->GetRequestContext(), referrer,
+                       referrer_policy, load_flags);
+  bitmap_fetcher_.Start();
 }
 
 void BookmarkImageServiceAndroid::BitmapFetcherHandler::OnFetchComplete(

@@ -27,6 +27,8 @@ from pylib.base import test_run_factory
 from pylib.device import device_errors
 from pylib.device import device_utils
 from pylib.gtest import gtest_config
+# TODO(jbudorick): Remove this once we stop selectively enabling platform mode.
+from pylib.gtest import gtest_test_instance
 from pylib.gtest import setup as gtest_setup
 from pylib.gtest import test_options as gtest_test_options
 from pylib.linker import setup as linker_setup
@@ -221,6 +223,9 @@ def AddGTestOptions(parser):
   group.add_argument('--app-data-file-dir',
                      help='Host directory to which app data files will be'
                           ' saved. Used with --app-data-file.')
+  group.add_argument('--delete-stale-data', dest='delete_stale_data',
+                     action='store_true',
+                     help='Delete stale test data on the device.')
 
   filter_group = group.add_mutually_exclusive_group()
   filter_group.add_argument('-f', '--gtest_filter', '--gtest-filter',
@@ -341,6 +346,9 @@ def AddInstrumentationTestOptions(parser):
                      dest='isolate_file_path',
                      help='.isolate file path to override the default '
                           'path')
+  group.add_argument('--delete-stale-data', dest='delete_stale_data',
+                     action='store_true',
+                     help='Delete stale test data on the device.')
 
   AddCommonOptions(parser)
   AddDeviceOptions(parser)
@@ -394,7 +402,8 @@ def ProcessInstrumentationOptions(args):
       args.test_support_apk_path,
       args.device_flags,
       args.isolate_file_path,
-      args.set_asserts
+      args.set_asserts,
+      args.delete_stale_data
       )
 
 
@@ -648,7 +657,8 @@ def _RunGTests(args, devices):
         args.isolate_file_path,
         suite_name,
         args.app_data_files,
-        args.app_data_file_dir)
+        args.app_data_file_dir,
+        args.delete_stale_data)
     runner_factory, tests = gtest_setup.Setup(gtest_options, devices)
 
     results, test_exit_code = test_dispatcher.RunTests(
@@ -919,6 +929,8 @@ def RunTestsCommand(args, parser):
     raise Exception('Failed to reset test server port.')
 
   if command == 'gtest':
+    if args.suite_name[0] in gtest_test_instance.BROWSER_TEST_SUITES:
+      return RunTestsInPlatformMode(args, parser)
     return _RunGTests(args, devices)
   elif command == 'linker':
     return _RunLinkerTests(args, devices)

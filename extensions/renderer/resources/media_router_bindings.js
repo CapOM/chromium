@@ -37,21 +37,42 @@ define('media_router_bindings', [
    * Returns a Mojo MediaRoute object given a MediaRoute and a
    * media sink name.
    * @param {!MediaRoute} route
-   * @param {!string=} opt_sinkName
+   * @param {!string} sinkName
    * @return {!mojo.MediaRoute}
    */
-  function routeToMojo_(route, opt_sinkName) {
+  function routeToMojo_(route, sinkName) {
     return new mediaRouterMojom.MediaRoute({
       'media_route_id': route.id,
       'media_source': route.mediaSource,
       'media_sink': new mediaRouterMojom.MediaSink({
         'sink_id': route.sinkId,
-        'name': opt_sinkName,
+        'name': sinkName,
       }),
       'description': route.description,
       'icon_url': route.iconUrl,
       'is_local': route.isLocal
     });
+  }
+
+  /**
+   * Converts a route message to a RouteMessage Mojo object.
+   * @param {!RouteMessage} message
+   * @return {!mediaRouterMojom.RouteMessage} A Mojo RouteMessage object.
+   */
+  function messageToMojo_(message) {
+    if ("string" == typeof message.message) {
+      return new mediaRouterMojom.RouteMessage({
+        'route_id': message.routeId,
+        'type': RouteMessage.Type.TEXT,
+        'message': message.message,
+      });
+    } else {
+      return new mediaRouterMojom.RouteMessage({
+        'route_id': message.routeId,
+        'type': RouteMessage.Type.BINARY,
+        'data': message.message,
+      });
+    }
   }
 
   /**
@@ -138,8 +159,7 @@ define('media_router_bindings', [
    * @param {!Array<!MediaSink>} sinks
    */
   MediaRouterObserver.prototype.onSinksReceived = function(sourceUrn, sinks) {
-    this.service_.onSinksReceived(sourceUrn,
-                                   sinks.map(sinkToMojo_));
+    this.service_.onSinksReceived(sourceUrn, sinks.map(sinkToMojo_));
   };
 
   /**
@@ -159,17 +179,6 @@ define('media_router_bindings', [
           serviceProvider.connectToService(
               keepAliveMojom.KeepAlive.name));
     }
-  };
-
-  /**
-   * Sends a message to an active media route.
-   * @param {!string} routeId
-   * @param {!Object|string} message A message that can be converted to a JSON
-   * string.
-   */
-  MediaRouterObserver.prototype.onMessage = function(routeId, message) {
-    // TODO(mfoltz): Handle binary messages (ArrayBuffer, Blob).
-    this.service_.onMessage(routeId, JSON.stringify(message));
   };
 
   /**
@@ -238,13 +247,11 @@ define('media_router_bindings', [
 
     // Convert MediaRoutes to Mojo objects and add their sink names
     // via sinkNameMap.
-    var mojoRoutes = routes.map(function(route) {
-      return routeToMojo_(routes[j], sinkNameMap[routes[j].sinkId]);
+    var mojoRoutes = routes.map(function(nextRoute) {
+      return routeToMojo_(nextRoute, sinkNameMap[nextRoute.sinkId]);
     });
 
-    this.service_.onRoutesUpdated(
-        mojoRoutes,
-        sinks.map(MediaRouterObserver.sinkToMojo_));
+    this.service_.onRoutesUpdated(mojoRoutes, sinks.map(sinkToMojo_));
   };
 
   /**
@@ -279,7 +286,7 @@ define('media_router_bindings', [
    */
   function MediaRouterHandlers() {
     /**
-     * @type {function(!string, !string, !string=, !string=, !number=}
+     * @type {function(!string, !string, !string, !string, !number}
      */
     this.createRoute = null;
 
@@ -304,9 +311,14 @@ define('media_router_bindings', [
     this.stopObservingMediaSinks = null;
 
     /**
-     * @type {function(string, string, string)}
+     * @type {function(string, string): Promise}
      */
-    this.postMessage = null;
+    this.sendRouteMessage = null;
+
+    /**
+     * @type {function(Array.<string>): Promise.<Array.<RouteMessage>>}
+     */
+    this.listenForRouteMessages = null;
 
     /**
      * @type {function()}
@@ -327,6 +339,8 @@ define('media_router_bindings', [
    * @constructor
    */
   function MediaRouter(mediaRouterObserver) {
+    mediaRouterMojom.MediaRouter.stubClass.call(this);
+
     /**
      * Object containing JS callbacks into Provider Manager code.
      * @type {!MediaRouterHandlers}
@@ -353,7 +367,8 @@ define('media_router_bindings', [
     var requiredHandlers = [
       'stopObservingMediaRoutes',
       'startObservingMediaRoutes',
-      'postMessage',
+      'sendRouteMessage',
+      'listenForRouteMessages',
       'closeRoute',
       'joinRoute',
       'createRoute',
@@ -361,7 +376,7 @@ define('media_router_bindings', [
       'startObservingMediaRoutes'
     ];
     requiredHandlers.forEach(function(nextHandler) {
-      if (!handlers.hasOwnProperty(nextHandler)) {
+      if (handlers[nextHandler] === undefined) {
         console.error(nextHandler + ' handler not registered.');
       }
     });
@@ -389,47 +404,49 @@ define('media_router_bindings', [
 
   /**
    * Requests that |sinkId| render the media referenced by |sourceUrn|. If the
-   * request is from the Presentation API, then opt_origin and opt_tabId will
+   * request is from the Presentation API, then origin and tabId will
    * be populated.
-   * @param {!string} sourceUrn The media source to render.
-   * @param {!string} sinkId The media sink ID.
-   * @param {!string=} opt_presentationId Presentation ID from the site
+   * @param {!string} sourceUrn Media source to render.
+   * @param {!string} sinkId Media sink ID.
+   * @param {!string} presentationId Presentation ID from the site
    *     requesting presentation. TODO(mfoltz): Remove.
-   * @param {!string=} opt_origin The origin of the site requesting
-   *     presentation.
-   * @param {!number=} opt_tabId ID of the tab that requested presentation.
+   * @param {!string} origin Origin of site requesting presentation.
+   * @param {!number} tabId ID of tab requesting presentation.
    * @return {!Promise.<!Object>} A Promise resolving to an object describing
-   *     the newly created media route.
+   *     the newly created media route, or rejecting with an error message on
+   *     failure.
    */
   MediaRouter.prototype.createRoute =
-      function(sourceUrn, sinkId, opt_presentationId, opt_origin, opt_tabId) {
+      function(sourceUrn, sinkId, presentationId, origin, tabId) {
     return this.handlers_.createRoute(
-        sourceUrn, sinkId, opt_presentationId, opt_origin, opt_tabId)
+        sourceUrn, sinkId, presentationId, origin, tabId)
         .then(function(route) {
           // Sink name is not used, so it is omitted here.
           return {route: routeToMojo_(route, "")};
         }.bind(this))
         .catch(function(err) {
-          return {error_text: err.message};
+          return {error_text: 'Error creating route: ' + err.message};
         });
   };
 
   /**
    * Handles a request via the Presentation API to join an existing route given
-   * by |sourceUrn| and |presentationId|. |origin| and |tabId| are used so the
-   * media route provider can limit the scope by origin or tab.
-   * @param {!string} sourceUrn The media source to render.
-   * @param {!string} presentationId The presentation ID to join.
-   * @param {!string} origin The origin of the site requesting join.
-   * @param {!number} tabId The ID of the tab requesting join.
-   * @return {!Promise.<!Object>} Resolved with the route on success,
-   * or with an error message on failure.
+   * by |sourceUrn| and |presentationId|. |origin| and |tabId| are used for
+   * validating same-origin/tab scope.
+   * @param {!string} sourceUrn Media source to render.
+   * @param {!string} presentationId Presentation ID to join.
+   * @param {!string} origin Origin of site requesting join.
+   * @param {!number} tabId ID of tab requesting join.
+   * @return {!Promise.<!Object>} A Promise resolving to an object describing
+   *     the newly created media route, or rejecting with an error message on
+   *     failure.
    */
   MediaRouter.prototype.joinRoute =
       function(sourceUrn, presentationId, origin, tabId) {
     return this.handlers_.joinRoute(sourceUrn, presentationId, origin, tabId)
         .then(function(newRoute) {
-          return {route: routeToMojo_(newRoute)};
+          // Sink name is not used, so it is omitted here.
+          return {route: routeToMojo_(newRoute, "")};
         },
         function(err) {
           return {error_text: 'Error joining route: ' + err.message};
@@ -448,12 +465,32 @@ define('media_router_bindings', [
    * Posts a message to the route designated by |routeId|.
    * @param {!string} routeId
    * @param {!string} message
-   * @param {string} extraInfoJson
+   * @return {!Promise.<boolean>} Resolved with true if the message was sent,
+   *    or false on failure.
    */
-  MediaRouter.prototype.postMessage = function(
-      routeId, message, extraInfoJson) {
-    // TODO(mfoltz): Remove extraInfoJson if no longer needed.
-    this.handlers_.postMessage(routeId, message, JSON.parse(extraInfoJson));
+  MediaRouter.prototype.sendRouteMessage = function(
+      routeId, message) {
+    this.handlers_.sendRouteMessage(routeId, message)
+        .then(function() {
+          return true;
+        }, function() {
+          return false;
+        });
+  };
+
+  /**
+   * Listen for next batch of messages from one of the routeIds.
+   * @param {!Array.<string>} routeIds
+   * @return {!Promise.<Array.<RouteMessage>>} Resolved with a list of messages,
+   *    an empty list if an error occurred.
+   */
+  MediaRouter.prototype.listenForRouteMessages = function(routeIds) {
+    this.handlers_.listenForRouteMessages(routeIds)
+        .then(function(messages) {
+          return messages.map(messageToMojo_);
+        }, function() {
+          return [];
+        });
   };
 
   /**

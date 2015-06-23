@@ -185,12 +185,6 @@ InputDeviceFactoryEvdev::InputDeviceFactoryEvdev(
       gesture_property_provider_(new GesturePropertyProvider),
 #endif
       dispatcher_(dispatcher.Pass()),
-      pending_device_changes_(0),
-      touchscreen_list_dirty_(false),
-      keyboard_list_dirty_(false),
-      mouse_list_dirty_(false),
-      touchpad_list_dirty_(false),
-      caps_lock_led_enabled_(false),
       weak_ptr_factory_(this) {
 }
 
@@ -225,6 +219,11 @@ void InputDeviceFactoryEvdev::AddInputDevice(int id,
 
 void InputDeviceFactoryEvdev::RemoveInputDevice(const base::FilePath& path) {
   DetachInputDevice(path);
+}
+
+void InputDeviceFactoryEvdev::OnStartupScanComplete() {
+  startup_devices_enumerated_ = true;
+  NotifyDevicesUpdated();
 }
 
 void InputDeviceFactoryEvdev::AttachInputDevice(
@@ -263,6 +262,9 @@ void InputDeviceFactoryEvdev::DetachInputDevice(const base::FilePath& path) {
   converters_.erase(path);
 
   if (converter) {
+    // Disable the device (to release keys/buttons/etc).
+    converter->SetEnabled(false);
+
     // Cancel libevent notifications from this converter. This part must be
     // on UI since the polling happens on UI.
     converter->Stop();
@@ -274,49 +276,6 @@ void InputDeviceFactoryEvdev::DetachInputDevice(const base::FilePath& path) {
     base::WorkerPool::PostTask(
         FROM_HERE,
         base::Bind(&CloseInputDevice, path, base::Passed(&converter)), true);
-  }
-}
-
-void InputDeviceFactoryEvdev::DisableInternalTouchpad() {
-  for (const auto& it : converters_) {
-    EventConverterEvdev* converter = it.second;
-    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
-        converter->HasTouchpad()) {
-      DCHECK(!converter->HasKeyboard());
-      converter->set_ignore_events(true);
-    }
-  }
-}
-
-void InputDeviceFactoryEvdev::EnableInternalTouchpad() {
-  for (const auto& it : converters_) {
-    EventConverterEvdev* converter = it.second;
-    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
-        converter->HasTouchpad()) {
-      DCHECK(!converter->HasKeyboard());
-      converter->set_ignore_events(false);
-    }
-  }
-}
-
-void InputDeviceFactoryEvdev::DisableInternalKeyboardExceptKeys(
-    scoped_ptr<std::set<DomCode>> excepted_keys) {
-  for (const auto& it : converters_) {
-    EventConverterEvdev* converter = it.second;
-    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
-        converter->HasKeyboard()) {
-      converter->SetAllowedKeys(excepted_keys.Pass());
-    }
-  }
-}
-
-void InputDeviceFactoryEvdev::EnableInternalKeyboard() {
-  for (const auto& it : converters_) {
-    EventConverterEvdev* converter = it.second;
-    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
-        converter->HasKeyboard()) {
-      converter->AllowAllKeys();
-    }
   }
 }
 
@@ -358,6 +317,8 @@ base::WeakPtr<InputDeviceFactoryEvdev> InputDeviceFactoryEvdev::GetWeakPtr() {
 }
 
 void InputDeviceFactoryEvdev::ApplyInputDeviceSettings() {
+  TRACE_EVENT0("evdev", "ApplyInputDeviceSettings");
+
   SetIntPropertyForOneType(DT_TOUCHPAD, "Pointer Sensitivity",
                            input_device_settings_.touchpad_sensitivity);
   SetIntPropertyForOneType(DT_TOUCHPAD, "Scroll Sensitivity",
@@ -380,6 +341,18 @@ void InputDeviceFactoryEvdev::ApplyInputDeviceSettings() {
 
   SetBoolPropertyForOneType(DT_TOUCHPAD, "Tap Paused",
                             input_device_settings_.tap_to_click_paused);
+
+  for (const auto& it : converters_) {
+    EventConverterEvdev* converter = it.second;
+    converter->SetEnabled(IsDeviceEnabled(converter));
+
+    if (converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
+        converter->HasKeyboard()) {
+      converter->SetKeyFilter(
+          input_device_settings_.enable_internal_keyboard_filter,
+          input_device_settings_.internal_keyboard_allowed_keys);
+    }
+  }
 }
 
 void InputDeviceFactoryEvdev::ApplyCapsLockLed() {
@@ -387,6 +360,16 @@ void InputDeviceFactoryEvdev::ApplyCapsLockLed() {
     EventConverterEvdev* converter = it.second;
     converter->SetCapsLockLed(caps_lock_led_enabled_);
   }
+}
+
+bool InputDeviceFactoryEvdev::IsDeviceEnabled(
+    const EventConverterEvdev* converter) {
+  if (!input_device_settings_.enable_internal_touchpad &&
+      converter->type() == InputDeviceType::INPUT_DEVICE_INTERNAL &&
+      converter->HasTouchpad())
+    return false;
+
+  return input_device_settings_.enable_devices;
 }
 
 void InputDeviceFactoryEvdev::UpdateDirtyFlags(
@@ -405,8 +388,8 @@ void InputDeviceFactoryEvdev::UpdateDirtyFlags(
 }
 
 void InputDeviceFactoryEvdev::NotifyDevicesUpdated() {
-  if (pending_device_changes_)
-    return;  // No update until pending opens complete.
+  if (!startup_devices_enumerated_ || pending_device_changes_)
+    return;  // No update until full scan done and no pending operations.
   if (touchscreen_list_dirty_)
     NotifyTouchscreensUpdated();
   if (keyboard_list_dirty_)
@@ -415,6 +398,10 @@ void InputDeviceFactoryEvdev::NotifyDevicesUpdated() {
     NotifyMouseDevicesUpdated();
   if (touchpad_list_dirty_)
     NotifyTouchpadDevicesUpdated();
+  if (!startup_devices_opened_) {
+    dispatcher_->DispatchDeviceListsComplete();
+    startup_devices_opened_ = true;
+  }
   touchscreen_list_dirty_ = false;
   keyboard_list_dirty_ = false;
   mouse_list_dirty_ = false;

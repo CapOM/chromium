@@ -73,20 +73,20 @@ QuicPacketPublicHeader::QuicPacketPublicHeader(
 QuicPacketPublicHeader::~QuicPacketPublicHeader() {}
 
 QuicPacketHeader::QuicPacketHeader()
-    : fec_flag(false),
+    : packet_sequence_number(0),
+      fec_flag(false),
       entropy_flag(false),
       entropy_hash(0),
-      packet_sequence_number(0),
       is_in_fec_group(NOT_IN_FEC_GROUP),
       fec_group(0) {
 }
 
 QuicPacketHeader::QuicPacketHeader(const QuicPacketPublicHeader& header)
     : public_header(header),
+      packet_sequence_number(0),
       fec_flag(false),
       entropy_flag(false),
       entropy_hash(0),
-      packet_sequence_number(0),
       is_in_fec_group(NOT_IN_FEC_GROUP),
       fec_group(0) {
 }
@@ -547,7 +547,9 @@ StringPiece QuicPacket::Plaintext() const {
 }
 
 RetransmittableFrames::RetransmittableFrames(EncryptionLevel level)
-    : encryption_level_(level), has_crypto_handshake_(NOT_HANDSHAKE) {
+    : encryption_level_(level),
+      has_crypto_handshake_(NOT_HANDSHAKE),
+      needs_padding_(false) {
 }
 
 RetransmittableFrames::~RetransmittableFrames() {
@@ -627,11 +629,11 @@ SerializedPacket::SerializedPacket(
     QuicEncryptedPacket* packet,
     QuicPacketEntropyHash entropy_hash,
     RetransmittableFrames* retransmittable_frames)
-    : sequence_number(sequence_number),
-      sequence_number_length(sequence_number_length),
-      packet(packet),
-      entropy_hash(entropy_hash),
+    : packet(packet),
       retransmittable_frames(retransmittable_frames),
+      sequence_number(sequence_number),
+      sequence_number_length(sequence_number_length),
+      entropy_hash(entropy_hash),
       is_fec_packet(false) {
 }
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="fil">
 <translation id="2774256287122201187">Maaari ka nang magpatuloy. Kung magpapatuloy ka sa page, hindi na muling lalabas ang babalang ito sa loob ng limang minuto.</translation>
+<translation id="3963721102035795474">Reader Mode</translation>
 <translation id="7485870689360869515">Walang nahanap na data.</translation>
 <translation id="3884278016824448484">Sumasalungat na tagatukoy ng device</translation>
 <translation id="5172758083709347301">Computer</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">Nabigo ang pag-translate sa <ph name="TARGET_LANGUAGE"/>.</translation>
 <translation id="4103249731201008433">Di-wasto ang serial number ng device</translation>
 <translation id="3219579145727097045">Ilagay ang petsa ng pag-expire at ang CVC na may 4 na digit mula sa harap ng iyong card</translation>
-<translation id="3667681724235208644">Tingnan ang Orihinal</translation>
+<translation id="59107663811261420">Ang ganitong uri ng card ay hindi sinusuportahan ng Google Payments para sa merchant na ito. Mangyaring pumili ng ibang card.</translation>
 <translation id="4079302484614802869">Nakatakda ang configuration ng proxy upang gumamit ng isang .pac script URL, hindi ng mga hindi nababagong proxy server.</translation>
 <translation id="5540224163453853">Hindi mahanap ang hiniling na artikulo.</translation>
 <translation id="8437238597147034694">&amp;I-undo ang paglilipat</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;ilagay ang query&gt;</translation>
 <translation id="552553974213252141">Nakuha ba nang tama ang text?</translation>
 <translation id="5317780077021120954">I-save</translation>
+<translation id="8530504477309582336">Ang ganitong uri ng card ay hindi sinusuportahan ng Google Payments. Mangyaring pumili ng ibang card.</translation>
 <translation id="7610193165460212391">Wala sa sakop ang halaga <ph name="VALUE"/>.</translation>
 <translation id="3739623965217189342">Link na kinopya mo</translation>
 <translation id="8790007591277257123">&amp;Gawing muli ang pagtanggal</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">Di-wastong mode ng proxy.</translation>
 <translation id="3105172416063519923">Asset ID:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">Dapat naka-enable ang JavaScript upang magamit ang feature na ito.</translation>
 <translation id="2587841377698384444">Directory API ID:</translation>
 <translation id="7752995774971033316">Hindi pinamamahalaan</translation>
 <translation id="3712624925041724820">Naubos na ang mga lisensya</translation>

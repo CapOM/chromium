@@ -124,7 +124,8 @@ bool VideoLayerImpl::WillDraw(DrawMode draw_mode,
     unsigned resource_id = resource_provider->CreateResourceFromTextureMailbox(
         external_resources.mailboxes[i],
         SingleReleaseCallbackImpl::Create(
-            external_resources.release_callbacks[i]));
+            external_resources.release_callbacks[i]),
+        external_resources.read_lock_fences_enabled);
     frame_resources_.push_back(FrameResource(
         resource_id, external_resources.mailboxes[i].size_in_pixels(),
         external_resources.mailboxes[i].allow_overlay()));
@@ -138,7 +139,7 @@ void VideoLayerImpl::AppendQuads(RenderPass* render_pass,
   DCHECK(frame_.get());
 
   gfx::Transform transform = draw_transform();
-  gfx::Size rotated_size = content_bounds();
+  gfx::Size rotated_size = bounds();
 
   switch (video_rotation_) {
     case media::VIDEO_ROTATION_90:
@@ -160,7 +161,7 @@ void VideoLayerImpl::AppendQuads(RenderPass* render_pass,
 
   SharedQuadState* shared_quad_state =
       render_pass->CreateAndAppendSharedQuadState();
-  shared_quad_state->SetAll(transform, rotated_size, visible_content_rect(),
+  shared_quad_state->SetAll(transform, rotated_size, visible_layer_rect(),
                             clip_rect(), is_clipped(), draw_opacity(),
                             draw_blend_mode(), sorting_context_id());
 
@@ -235,7 +236,7 @@ void VideoLayerImpl::AppendQuads(RenderPass* render_pass,
       const gfx::Size ya_tex_size = coded_size;
       gfx::Size uv_tex_size;
 
-      if (frame_->storage_type() == media::VideoFrame::STORAGE_TEXTURE) {
+      if (frame_->HasTextures()) {
         DCHECK_EQ(media::VideoFrame::I420, frame_->format());
         DCHECK_EQ(3u, frame_resources_.size());  // Alpha is not supported yet.
         DCHECK(visible_rect.origin().IsOrigin());
@@ -388,11 +389,11 @@ void VideoLayerImpl::DidDraw(ResourceProvider* resource_provider) {
   provider_client_impl_->ReleaseLock();
 }
 
-SimpleEnclosedRegion VideoLayerImpl::VisibleContentOpaqueRegion() const {
+SimpleEnclosedRegion VideoLayerImpl::VisibleOpaqueRegion() const {
   // If we don't have a frame yet, then we don't have an opaque region.
   if (!provider_client_impl_->HasCurrentFrame())
     return SimpleEnclosedRegion();
-  return LayerImpl::VisibleContentOpaqueRegion();
+  return LayerImpl::VisibleOpaqueRegion();
 }
 
 void VideoLayerImpl::ReleaseResources() {

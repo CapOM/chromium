@@ -63,6 +63,12 @@ void ServiceWorkerMetrics::RecordDestroyDatabaseResult(
                             status, ServiceWorkerDatabase::STATUS_ERROR_MAX);
 }
 
+void ServiceWorkerMetrics::RecordDiskCacheMigrationResult(
+    DiskCacheMigrationResult result) {
+  UMA_HISTOGRAM_ENUMERATION("ServiceWorker.Storage.DiskCacheMigrationResult",
+                            result, NUM_MIGRATION_RESULT_TYPES);
+}
+
 void ServiceWorkerMetrics::RecordDeleteAndStartOverResult(
     DeleteAndStartOverResult result) {
   UMA_HISTOGRAM_ENUMERATION("ServiceWorker.Storage.DeleteAndStartOverResult",
@@ -114,6 +120,30 @@ void ServiceWorkerMetrics::RecordEventStatus(size_t fired_events,
   int unhandled_ratio = (fired_events - handled_events) * 100 / fired_events;
   UMA_HISTOGRAM_PERCENTAGE("ServiceWorker.UnhandledEventRatio",
                            unhandled_ratio);
+}
+
+void ServiceWorkerMetrics::RecordFetchEventStatus(
+    bool is_main_resource,
+    ServiceWorkerStatusCode status) {
+  if (is_main_resource) {
+    UMA_HISTOGRAM_ENUMERATION("ServiceWorker.FetchEvent.MainResource.Status",
+                              status, SERVICE_WORKER_ERROR_MAX_VALUE);
+  } else {
+    UMA_HISTOGRAM_ENUMERATION("ServiceWorker.FetchEvent.Subresource.Status",
+                              status, SERVICE_WORKER_ERROR_MAX_VALUE);
+  }
+}
+
+void ServiceWorkerMetrics::RecordURLRequestJobResult(
+    bool is_main_resource,
+    URLRequestJobResult result) {
+  if (is_main_resource) {
+    UMA_HISTOGRAM_ENUMERATION("ServiceWorker.URLRequestJob.MainResource.Result",
+                              result, NUM_REQUEST_JOB_RESULT_TYPES);
+  } else {
+    UMA_HISTOGRAM_ENUMERATION("ServiceWorker.URLRequestJob.Subresource.Result",
+                              result, NUM_REQUEST_JOB_RESULT_TYPES);
+  }
 }
 
 }  // namespace content

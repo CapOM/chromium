@@ -2,10 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <queue>
+
+#include "base/location.h"
 #include "base/path_service.h"
 #include "base/process/process.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "chrome/app/chrome_command_ids.h"
 #include "chrome/browser/apps/app_browsertest_util.h"
 #include "chrome/browser/chrome_content_browser_client.h"
@@ -30,6 +35,7 @@
 #include "content/public/browser/notification_service.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/web_contents_delegate.h"
+#include "content/public/common/child_process_host.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/test/browser_test_utils.h"
 #include "content/public/test/fake_speech_recognition_manager.h"
@@ -48,8 +54,14 @@
 #include "net/test/embedded_test_server/embedded_test_server.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
+#include "ui/aura/window.h"
+#include "ui/compositor/compositor.h"
+#include "ui/compositor/compositor_observer.h"
+#include "ui/events/event_switches.h"
 #include "ui/gfx/switches.h"
 #include "ui/gl/gl_switches.h"
+#include "ui/views/view.h"
+#include "ui/views/widget/widget.h"
 
 #if defined(ENABLE_PLUGINS)
 #include "content/public/browser/plugin_service.h"
@@ -147,7 +159,7 @@ class ContextMenuCallCountObserver {
                    const content::NotificationDetails& details) {
     ++num_times_shown_;
     auto context_menu = content::Source<RenderViewContextMenu>(source).ptr();
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE, base::Bind(&RenderViewContextMenuBase::Cancel,
                               base::Unretained(context_menu)));
     return true;
@@ -201,6 +213,25 @@ void ExecuteScriptWaitForTitle(content::WebContents* web_contents,
   EXPECT_TRUE(content::ExecuteScript(web_contents, script));
   EXPECT_EQ(expected_title, title_watcher.WaitAndGetTitle());
 }
+
+#if defined (USE_AURA)
+views::View* FindWebView(views::View* view) {
+  std::queue<views::View*> queue;
+  queue.push(view);
+  while (!queue.empty()) {
+    views::View* current = queue.front();
+    queue.pop();
+    if (std::string(current->GetClassName()).find("WebView") !=
+        std::string::npos) {
+      return current;
+    }
+
+    for (int i = 0; i < current->child_count(); ++i)
+      queue.push(current->child_at(i));
+  }
+  return nullptr;
+}
+#endif
 
 }  // namespace
 
@@ -322,6 +353,10 @@ class MockDownloadWebContentsDelegate : public content::WebContentsDelegate {
   DISALLOW_COPY_AND_ASSIGN(MockDownloadWebContentsDelegate);
 };
 
+// TODO(wjmaclean): Fix this test class at some point so it can be re-enabled on
+// the site isolation bots, and then look at re-enabling WebViewFocusTest when
+// that happens.
+// https://crbug.com/503751
 class WebViewTest : public extensions::PlatformAppBrowserTest {
  protected:
   void SetUp() override {
@@ -365,188 +400,19 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
     extensions::PlatformAppBrowserTest::SetUpCommandLine(command_line);
   }
 
-  // This method is responsible for initializing a packaged app, which contains
-  // multiple webview tags. The tags have different partition identifiers and
-  // their WebContent objects are returned as output. The method also verifies
-  // the expected process allocation and storage partition assignment.
-  // The |navigate_to_url| parameter is used to navigate the main browser
-  // window.
-  //
-  // TODO(ajwong): This function is getting to be too large. Either refactor it
-  // so the test can specify a configuration of WebView tags that we will
-  // dynamically inject JS to generate, or move this test wholesale into
-  // something that RunPlatformAppTest() can execute purely in Javascript. This
-  // won't let us do a white-box examination of the StoragePartition equivalence
-  // directly, but we will be able to view the black box effects which is good
-  // enough.  http://crbug.com/160361
-  void NavigateAndOpenAppForIsolation(
-      GURL navigate_to_url,
-      content::WebContents** default_tag_contents1,
-      content::WebContents** default_tag_contents2,
-      content::WebContents** named_partition_contents1,
-      content::WebContents** named_partition_contents2,
-      content::WebContents** persistent_partition_contents1,
-      content::WebContents** persistent_partition_contents2,
-      content::WebContents** persistent_partition_contents3) {
-    GURL::Replacements replace_host;
-    replace_host.SetHostStr("localhost");
-
-    navigate_to_url = navigate_to_url.ReplaceComponents(replace_host);
-
-    GURL tag_url1 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/cookie.html");
-    tag_url1 = tag_url1.ReplaceComponents(replace_host);
-    GURL tag_url2 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/cookie2.html");
-    tag_url2 = tag_url2.ReplaceComponents(replace_host);
-    GURL tag_url3 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/storage1.html");
-    tag_url3 = tag_url3.ReplaceComponents(replace_host);
-    GURL tag_url4 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/storage2.html");
-    tag_url4 = tag_url4.ReplaceComponents(replace_host);
-    GURL tag_url5 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/storage1.html#p1");
-    tag_url5 = tag_url5.ReplaceComponents(replace_host);
-    GURL tag_url6 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/storage1.html#p2");
-    tag_url6 = tag_url6.ReplaceComponents(replace_host);
-    GURL tag_url7 = embedded_test_server()->GetURL(
-        "/extensions/platform_apps/web_view/isolation/storage1.html#p3");
-    tag_url7 = tag_url7.ReplaceComponents(replace_host);
-
-    ui_test_utils::NavigateToURL(browser(), navigate_to_url);
-
-    ui_test_utils::UrlLoadObserver observer1(
-        tag_url1, content::NotificationService::AllSources());
-    ui_test_utils::UrlLoadObserver observer2(
-        tag_url2, content::NotificationService::AllSources());
-    ui_test_utils::UrlLoadObserver observer3(
-        tag_url3, content::NotificationService::AllSources());
-    ui_test_utils::UrlLoadObserver observer4(
-        tag_url4, content::NotificationService::AllSources());
-    ui_test_utils::UrlLoadObserver observer5(
-        tag_url5, content::NotificationService::AllSources());
-    ui_test_utils::UrlLoadObserver observer6(
-        tag_url6, content::NotificationService::AllSources());
-    ui_test_utils::UrlLoadObserver observer7(
-        tag_url7, content::NotificationService::AllSources());
-    LoadAndLaunchPlatformApp("web_view/isolation", "Launched");
-    observer1.Wait();
-    observer2.Wait();
-    observer3.Wait();
-    observer4.Wait();
-    observer5.Wait();
-    observer6.Wait();
-    observer7.Wait();
-
-    content::Source<content::NavigationController> source1 = observer1.source();
-    EXPECT_TRUE(source1->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-    content::Source<content::NavigationController> source2 = observer2.source();
-    EXPECT_TRUE(source2->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-    content::Source<content::NavigationController> source3 = observer3.source();
-    EXPECT_TRUE(source3->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-    content::Source<content::NavigationController> source4 = observer4.source();
-    EXPECT_TRUE(source4->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-    content::Source<content::NavigationController> source5 = observer5.source();
-    EXPECT_TRUE(source5->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-    content::Source<content::NavigationController> source6 = observer6.source();
-    EXPECT_TRUE(source6->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-    content::Source<content::NavigationController> source7 = observer7.source();
-    EXPECT_TRUE(source7->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
-
-    // Check that the first two tags use the same process and it is different
-    // than the process used by the other two.
-    EXPECT_EQ(source1->GetWebContents()->GetRenderProcessHost()->GetID(),
-              source2->GetWebContents()->GetRenderProcessHost()->GetID());
-    EXPECT_EQ(source3->GetWebContents()->GetRenderProcessHost()->GetID(),
-              source4->GetWebContents()->GetRenderProcessHost()->GetID());
-    EXPECT_NE(source1->GetWebContents()->GetRenderProcessHost()->GetID(),
-              source3->GetWebContents()->GetRenderProcessHost()->GetID());
-
-    // The two sets of tags should also be isolated from the main browser.
-    EXPECT_NE(source1->GetWebContents()->GetRenderProcessHost()->GetID(),
-              browser()->tab_strip_model()->GetWebContentsAt(0)->
-                  GetRenderProcessHost()->GetID());
-    EXPECT_NE(source3->GetWebContents()->GetRenderProcessHost()->GetID(),
-              browser()->tab_strip_model()->GetWebContentsAt(0)->
-                  GetRenderProcessHost()->GetID());
-
-    // Check that the storage partitions of the first two tags match and are
-    // different than the other two.
-    EXPECT_EQ(
-        source1->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source2->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-    EXPECT_EQ(
-        source3->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source4->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-    EXPECT_NE(
-        source1->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source3->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-
-    // Ensure the persistent storage partitions are different.
-    EXPECT_EQ(
-        source5->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source6->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-    EXPECT_NE(
-        source5->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source7->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-    EXPECT_NE(
-        source1->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source5->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-    EXPECT_NE(
-        source1->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition(),
-        source7->GetWebContents()->GetRenderProcessHost()->
-            GetStoragePartition());
-
-    *default_tag_contents1 = source1->GetWebContents();
-    *default_tag_contents2 = source2->GetWebContents();
-    *named_partition_contents1 = source3->GetWebContents();
-    *named_partition_contents2 = source4->GetWebContents();
-    if (persistent_partition_contents1) {
-      *persistent_partition_contents1 = source5->GetWebContents();
-    }
-    if (persistent_partition_contents2) {
-      *persistent_partition_contents2 = source6->GetWebContents();
-    }
-    if (persistent_partition_contents3) {
-      *persistent_partition_contents3 = source7->GetWebContents();
-    }
-  }
-
   // Handles |request| by serving a redirect response if the |User-Agent| is
   // foobar.
   static scoped_ptr<net::test_server::HttpResponse> UserAgentResponseHandler(
       const std::string& path,
       const GURL& redirect_target,
       const net::test_server::HttpRequest& request) {
-    if (!StartsWithASCII(path, request.relative_url, true))
+    if (!base::StartsWithASCII(path, request.relative_url, true))
       return scoped_ptr<net::test_server::HttpResponse>();
 
     std::map<std::string, std::string>::const_iterator it =
           request.headers.find("User-Agent");
     EXPECT_TRUE(it != request.headers.end());
-    if (!StartsWithASCII("foobar", it->second, true))
+    if (!base::StartsWithASCII("foobar", it->second, true))
       return scoped_ptr<net::test_server::HttpResponse>();
 
     scoped_ptr<net::test_server::BasicHttpResponse> http_response(
@@ -561,7 +427,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
       const std::string& path,
       const GURL& redirect_target,
       const net::test_server::HttpRequest& request) {
-    if (!StartsWithASCII(path, request.relative_url, true))
+    if (!base::StartsWithASCII(path, request.relative_url, true))
       return scoped_ptr<net::test_server::HttpResponse>();
 
     scoped_ptr<net::test_server::BasicHttpResponse> http_response(
@@ -575,7 +441,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
   static scoped_ptr<net::test_server::HttpResponse> EmptyResponseHandler(
       const std::string& path,
       const net::test_server::HttpRequest& request) {
-    if (StartsWithASCII(path, request.relative_url, true))
+    if (base::StartsWithASCII(path, request.relative_url, true))
       return scoped_ptr<net::test_server::HttpResponse>(new EmptyHttpResponse);
 
     return scoped_ptr<net::test_server::HttpResponse>();
@@ -585,7 +451,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
   static scoped_ptr<net::test_server::HttpResponse> CacheControlResponseHandler(
       const std::string& path,
       const net::test_server::HttpRequest& request) {
-    if (!StartsWithASCII(path, request.relative_url, true))
+    if (!base::StartsWithASCII(path, request.relative_url, true))
       return scoped_ptr<net::test_server::HttpResponse>();
 
     scoped_ptr<net::test_server::BasicHttpResponse> http_response(
@@ -687,7 +553,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
     content::Source<content::NavigationController> source =
         guest_observer.source();
     EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->
-        IsIsolatedGuest());
+        IsForGuestsOnly());
 
     content::WebContents* guest_web_contents = source->GetWebContents();
     return guest_web_contents;
@@ -721,7 +587,7 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
     // Wait for interstitial page to be shown in guest.
     content::WebContents* guest_web_contents =
         GetGuestViewManager()->WaitForSingleGuestCreated();
-    ASSERT_TRUE(guest_web_contents->GetRenderProcessHost()->IsIsolatedGuest());
+    ASSERT_TRUE(guest_web_contents->GetRenderProcessHost()->IsForGuestsOnly());
     content::WaitForInterstitialAttach(guest_web_contents);
   }
 
@@ -823,6 +689,9 @@ class WebViewTest : public extensions::PlatformAppBrowserTest {
                   embedder_web_contents_(NULL) {
     GuestViewManager::set_factory_for_testing(&factory_);
   }
+
+ protected:
+  scoped_refptr<content::FrameWatcher> frame_watcher_;
 
  private:
   bool UsesFakeSpeech() {
@@ -1370,7 +1239,7 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestRemoveWebviewOnExit) {
   content::Source<content::NavigationController> source =
       guest_observer.source();
   EXPECT_TRUE(source->GetWebContents()->GetRenderProcessHost()->
-      IsIsolatedGuest());
+      IsForGuestsOnly());
 
   ASSERT_TRUE(guest_loaded_listener.WaitUntilSatisfied());
 
@@ -1550,152 +1419,36 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, CookieIsolation) {
 // but persistent ones maintain state for cookies and HTML5 storage.
 IN_PROC_BROWSER_TEST_F(WebViewTest, PRE_StoragePersistence) {
   ASSERT_TRUE(StartEmbeddedTestServer());
-  const std::string kExpire =
-      "var expire = new Date(Date.now() + 24 * 60 * 60 * 1000);";
-  std::string cookie_script1(kExpire);
-  cookie_script1.append(
-      "document.cookie = 'inmemory=true; path=/; expires=' + expire + ';';");
-  std::string cookie_script2(kExpire);
-  cookie_script2.append(
-      "document.cookie = 'persist1=true; path=/; expires=' + expire + ';';");
-  std::string cookie_script3(kExpire);
-  cookie_script3.append(
-      "document.cookie = 'persist2=true; path=/; expires=' + expire + ';';");
-
   // We don't care where the main browser is on this test.
-  GURL blank_url("about:blank");
+  ui_test_utils::NavigateToURL(browser(), GURL("about:blank"));
+  // Start the app for the pre-test.
+  LoadAndLaunchPlatformApp("web_view/storage_persistence",
+                           "WebViewTest.LAUNCHED");
 
-  // The first two partitions will be used to set cookies and ensure they are
-  // shared. The named partition is used to ensure that cookies are isolated
-  // between partitions within the same app.
-  content::WebContents* cookie_contents1;
-  content::WebContents* cookie_contents2;
-  content::WebContents* named_partition_contents1;
-  content::WebContents* named_partition_contents2;
-  content::WebContents* persistent_partition_contents1;
-  content::WebContents* persistent_partition_contents2;
-  content::WebContents* persistent_partition_contents3;
-  NavigateAndOpenAppForIsolation(blank_url, &cookie_contents1,
-                                 &cookie_contents2, &named_partition_contents1,
-                                 &named_partition_contents2,
-                                 &persistent_partition_contents1,
-                                 &persistent_partition_contents2,
-                                 &persistent_partition_contents3);
+  // Send a message to run the PRE_StoragePersistence part of the test.
+  SendMessageToEmbedder("run-pre-test");
 
-  // Set the inmemory=true cookie for tags with inmemory partitions.
-  EXPECT_TRUE(content::ExecuteScript(cookie_contents1, cookie_script1));
-  EXPECT_TRUE(content::ExecuteScript(named_partition_contents1,
-                                     cookie_script1));
-
-  // For the two different persistent storage partitions, set the
-  // two different cookies so we can check that they aren't comingled below.
-  EXPECT_TRUE(content::ExecuteScript(persistent_partition_contents1,
-                                     cookie_script2));
-
-  EXPECT_TRUE(content::ExecuteScript(persistent_partition_contents3,
-                                     cookie_script3));
-
-  int cookie_size;
-  std::string cookie_value;
-
-  // Check that all in-memory partitions have a cookie set.
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            cookie_contents1,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("inmemory=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            cookie_contents2,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("inmemory=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            named_partition_contents1,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("inmemory=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            named_partition_contents2,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("inmemory=true", cookie_value);
-
-  // Check that all persistent partitions kept their state.
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            persistent_partition_contents1,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("persist1=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            persistent_partition_contents2,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("persist1=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            persistent_partition_contents3,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("persist2=true", cookie_value);
+  ExtensionTestMessageListener test_passed_listener("WebViewTest.PASSED",
+                                                    false);
+  EXPECT_TRUE(test_passed_listener.WaitUntilSatisfied());
 }
 
 // This is the post-reset portion of the StoragePersistence test.  See
 // PRE_StoragePersistence for main comment.
-#if defined(OS_CHROMEOS)
-// http://crbug.com/223888
-#define MAYBE_StoragePersistence DISABLED_StoragePersistence
-#else
-#define MAYBE_StoragePersistence StoragePersistence
-#endif
-IN_PROC_BROWSER_TEST_F(WebViewTest, MAYBE_StoragePersistence) {
+IN_PROC_BROWSER_TEST_F(WebViewTest, StoragePersistence) {
   ASSERT_TRUE(StartEmbeddedTestServer());
-
   // We don't care where the main browser is on this test.
-  GURL blank_url("about:blank");
+  ui_test_utils::NavigateToURL(browser(), GURL("about:blank"));
+  // Start the app for the pre-test.
+  LoadAndLaunchPlatformApp("web_view/storage_persistence",
+                           "WebViewTest.LAUNCHED");
 
-  // The first two partitions will be used to set cookies and ensure they are
-  // shared. The named partition is used to ensure that cookies are isolated
-  // between partitions within the same app.
-  content::WebContents* cookie_contents1;
-  content::WebContents* cookie_contents2;
-  content::WebContents* named_partition_contents1;
-  content::WebContents* named_partition_contents2;
-  content::WebContents* persistent_partition_contents1;
-  content::WebContents* persistent_partition_contents2;
-  content::WebContents* persistent_partition_contents3;
-  NavigateAndOpenAppForIsolation(blank_url, &cookie_contents1,
-                                 &cookie_contents2, &named_partition_contents1,
-                                 &named_partition_contents2,
-                                 &persistent_partition_contents1,
-                                 &persistent_partition_contents2,
-                                 &persistent_partition_contents3);
+  // Send a message to run the StoragePersistence part of the test.
+  SendMessageToEmbedder("run-test");
 
-  int cookie_size;
-  std::string cookie_value;
-
-  // Check that all in-memory partitions lost their state.
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            cookie_contents1,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            cookie_contents2,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            named_partition_contents1,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            named_partition_contents2,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("", cookie_value);
-
-  // Check that all persistent partitions kept their state.
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            persistent_partition_contents1,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("persist1=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            persistent_partition_contents2,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("persist1=true", cookie_value);
-  ui_test_utils::GetCookies(GURL("http://localhost"),
-                            persistent_partition_contents3,
-                            &cookie_size, &cookie_value);
-  EXPECT_EQ("persist2=true", cookie_value);
+  ExtensionTestMessageListener test_passed_listener("WebViewTest.PASSED",
+                                                    false);
+  EXPECT_TRUE(test_passed_listener.WaitUntilSatisfied());
 }
 
 // This tests DOM storage isolation for packaged apps with webview tags. It
@@ -1940,7 +1693,7 @@ static bool ContextMenuNotificationCallback(
     const content::NotificationSource& source,
     const content::NotificationDetails& details) {
   auto context_menu = content::Source<RenderViewContextMenu>(source).ptr();
-  base::MessageLoop::current()->PostTask(
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
       FROM_HERE, base::Bind(&RenderViewContextMenuBase::Cancel,
                             base::Unretained(context_menu)));
   return true;
@@ -2342,8 +2095,28 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, SendMessageToComponentExtensionFromGuest) {
 
   TestHelper("testComponentExtension", "web_view/component_extension",
              NEEDS_TEST_SERVER);
-}
 
+  content::WebContents* embedder_web_contents = GetFirstAppWindowWebContents();
+  ASSERT_TRUE(embedder_web_contents);
+
+  // Retrive the guestProcessId and guestRenderFrameRoutingId from the
+  // extension.
+  int guest_process_id = content::ChildProcessHost::kInvalidUniqueID;
+  content::ExecuteScriptAndGetValue(embedder_web_contents->GetMainFrame(),
+                                    "window.guestProcessId")
+      ->GetAsInteger(&guest_process_id);
+  int guest_render_frame_routing_id = MSG_ROUTING_NONE;
+  content::ExecuteScriptAndGetValue(embedder_web_contents->GetMainFrame(),
+                                    "window.guestRenderFrameRoutingId")
+      ->GetAsInteger(&guest_render_frame_routing_id);
+
+  auto* guest_rfh = content::RenderFrameHost::FromID(
+      guest_process_id, guest_render_frame_routing_id);
+  // Verify that the guest related info (guest_process_id and
+  // guest_render_frame_routing_id) actually points to a WebViewGuest.
+  ASSERT_TRUE(extensions::WebViewGuest::FromWebContents(
+      content::WebContents::FromRenderFrameHost(guest_rfh)));
+}
 
 IN_PROC_BROWSER_TEST_F(WebViewTest, SetPropertyOnDocumentReady) {
   ASSERT_TRUE(RunPlatformAppTest("platform_apps/web_view/document_ready"))
@@ -2633,3 +2406,135 @@ IN_PROC_BROWSER_TEST_F(WebViewTest, Shim_TestGarbageCollect) {
   TestHelper("testGarbageCollect", "web_view/shim", NO_TEST_SERVER);
   GetGuestViewManager()->WaitForSingleViewGarbageCollected();
 }
+
+#if defined(USE_AURA)
+// TODO(wjmaclean): when WebViewTest is re-enabled on the site-isolation
+// bots, then re-enable this test class as well.
+// https://crbug.com/503751
+class WebViewFocusTest : public WebViewTest {
+ public:
+  ~WebViewFocusTest() override {}
+
+  void SetUpCommandLine(base::CommandLine* command_line) override {
+    WebViewTest::SetUpCommandLine(command_line);
+
+    command_line->AppendSwitchASCII(switches::kTouchEvents,
+                                    switches::kTouchEventsEnabled);
+  }
+
+  void ForceCompositorFrame() {
+    if (!frame_watcher_) {
+      frame_watcher_ = new content::FrameWatcher();
+      frame_watcher_->AttachTo(GetEmbedderWebContents());
+    }
+
+    while (!RequestFrame(GetEmbedderWebContents())) {
+      // RequestFrame failed because we were waiting on an ack ... wait a short
+      // time and retry.
+      base::RunLoop run_loop;
+      base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
+          FROM_HERE, run_loop.QuitClosure(),
+          base::TimeDelta::FromMilliseconds(10));
+      run_loop.Run();
+    }
+    frame_watcher_->WaitFrames(1);
+  }
+
+ private:
+  scoped_refptr<content::FrameWatcher> frame_watcher_;
+};
+
+class FocusWaiter : public views::FocusChangeListener {
+ public:
+  explicit FocusWaiter(views::View* view_to_wait_for)
+      : view_to_wait_for_(view_to_wait_for) {
+    view_to_wait_for_->GetFocusManager()->AddFocusChangeListener(this);
+  }
+  ~FocusWaiter() override {
+    view_to_wait_for_->GetFocusManager()->RemoveFocusChangeListener(this);
+  }
+
+  void Wait() {
+    if (view_to_wait_for_->HasFocus())
+      return;
+
+    base::MessageLoop::current()->Run();
+  }
+
+  // FocusChangeListener implementation.
+  void OnWillChangeFocus(views::View* focused_before,
+                         views::View* focused_now) override {}
+  void OnDidChangeFocus(views::View* focused_before,
+                        views::View* focused_now) override {
+    if (view_to_wait_for_ == focused_now)
+      base::MessageLoop::current()->QuitWhenIdle();
+  }
+
+ private:
+  views::View* view_to_wait_for_;
+
+  DISALLOW_COPY_AND_ASSIGN(FocusWaiter);
+};
+
+// The following test verifies that a views::WebView hosting an embedder
+// gains focus on touchstart.
+IN_PROC_BROWSER_TEST_F(WebViewFocusTest, TouchFocusesEmbedder) {
+  LoadAppWithGuest("web_view/accept_touch_events");
+
+  content::WebContents* web_contents = GetEmbedderWebContents();
+  content::RenderViewHost* embedder_rvh = web_contents->GetRenderViewHost();
+
+  bool embedder_has_touch_handler =
+      content::RenderViewHostTester::HasTouchEventHandler(embedder_rvh);
+  EXPECT_FALSE(embedder_has_touch_handler);
+
+  SendMessageToGuestAndWait("install-touch-handler", "installed-touch-handler");
+
+  // Note that we need to wait for the installed/registered touch handler to
+  // appear in browser process before querying |embedder_rvh|.
+  // In practice, since we do a roundrtip from browser process to guest and
+  // back, this is sufficient.
+  embedder_has_touch_handler =
+      content::RenderViewHostTester::HasTouchEventHandler(embedder_rvh);
+  EXPECT_TRUE(embedder_has_touch_handler);
+
+  extensions::AppWindow* app_window = GetFirstAppWindowForBrowser(browser());
+  aura::Window* window = app_window->GetNativeWindow();
+  EXPECT_TRUE(app_window);
+  EXPECT_TRUE(window);
+  views::Widget* widget = views::Widget::GetWidgetForNativeView(window);
+  EXPECT_TRUE(widget->GetRootView());
+  // We only expect a single views::webview in the view hierarchy.
+  views::View* aura_webview = FindWebView(widget->GetRootView());
+  ASSERT_TRUE(aura_webview);
+  gfx::Rect bounds(aura_webview->bounds());
+  EXPECT_TRUE(aura_webview->IsFocusable());
+
+  views::View* other_focusable_view = new views::View();
+  other_focusable_view->SetBounds(bounds.x() + bounds.width(), bounds.y(), 100,
+                                  100);
+  other_focusable_view->SetFocusable(true);
+  aura_webview->parent()->AddChildView(other_focusable_view);
+  other_focusable_view->SetPosition(gfx::Point(bounds.x() + bounds.width(), 0));
+
+  // Sync changes to compositor.
+  ForceCompositorFrame();
+
+  aura_webview->RequestFocus();
+  // Verify that other_focusable_view can steal focus from aura_webview.
+  EXPECT_TRUE(aura_webview->HasFocus());
+  other_focusable_view->RequestFocus();
+  EXPECT_TRUE(other_focusable_view->HasFocus());
+  EXPECT_FALSE(aura_webview->HasFocus());
+
+  // Generate and send synthetic touch event.
+  // TODO(wjmaclean): This is fragile ... if anyone alters the location/size
+  // of the webview in accept_touch_events then this may miss its target.
+  FocusWaiter waiter(aura_webview);
+  content::SimulateTouchPressAt(GetEmbedderWebContents(), gfx::Point(10, 10));
+
+  // Wait for the TouchStart to propagate and restore focus. Test times out
+  // on failure.
+  waiter.Wait();
+}
+#endif

@@ -83,6 +83,7 @@ const char kOobeJSPath[] = "oobe.js";
 const char kKeyboardUtilsJSPath[] = "keyboard_utils.js";
 const char kCustomElementsHTMLPath[] = "custom_elements.html";
 const char kCustomElementsJSPath[] = "custom_elements.js";
+const char kPolymerConfigJSPath[] = "polymer_config.js";
 
 // Paths for deferred resource loading.
 const char kEnrollmentHTMLPath[] = "enrollment.html";
@@ -112,6 +113,7 @@ content::WebUIDataSource* CreateOobeUIDataSource(
     source->AddResourcePath(kCustomElementsJSPath,
                             IDR_CUSTOM_ELEMENTS_LOGIN_JS);
   }
+  source->AddResourcePath(kPolymerConfigJSPath, IDR_POLYMER_CONFIG_JS);
   source->AddResourcePath(kKeyboardUtilsJSPath, IDR_KEYBOARD_UTILS_JS);
   source->OverrideContentSecurityPolicyFrameSrc(
       base::StringPrintf(
@@ -200,7 +202,7 @@ OobeUI::OobeUI(content::WebUI* web_ui, const GURL& url)
     : WebUIController(web_ui),
       core_handler_(nullptr),
       network_dropdown_handler_(nullptr),
-      update_screen_handler_(nullptr),
+      update_view_(nullptr),
       network_view_(nullptr),
       debugging_screen_actor_(nullptr),
       eula_view_(nullptr),
@@ -236,9 +238,9 @@ OobeUI::OobeUI(content::WebUI* web_ui, const GURL& url)
   network_dropdown_handler_ = new NetworkDropdownHandler();
   AddScreenHandler(network_dropdown_handler_);
 
-  update_screen_handler_ = new UpdateScreenHandler();
-  AddScreenHandler(update_screen_handler_);
-  network_dropdown_handler_->AddObserver(update_screen_handler_);
+  UpdateScreenHandler* update_screen_handler = new UpdateScreenHandler();
+  update_view_ = update_screen_handler;
+  AddScreenHandler(update_screen_handler);
 
   if (display_type_ == kOobeDisplay) {
     NetworkScreenHandler* network_screen_handler =
@@ -293,6 +295,7 @@ OobeUI::OobeUI(content::WebUI* web_ui, const GURL& url)
 
   error_screen_handler_ = new ErrorScreenHandler();
   AddScreenHandler(error_screen_handler_);
+  network_dropdown_handler_->AddObserver(error_screen_handler_);
 
   error_screen_.reset(new ErrorScreen(nullptr, error_screen_handler_));
   NetworkErrorModel* network_error_model = error_screen_.get();
@@ -387,7 +390,7 @@ OobeUI::OobeUI(content::WebUI* web_ui, const GURL& url)
 
 OobeUI::~OobeUI() {
   core_handler_->SetDelegate(nullptr);
-  network_dropdown_handler_->RemoveObserver(update_screen_handler_);
+  network_dropdown_handler_->RemoveObserver(error_screen_handler_);
 }
 
 CoreOobeActor* OobeUI::GetCoreOobeActor() {
@@ -403,7 +406,7 @@ EulaView* OobeUI::GetEulaView() {
 }
 
 UpdateView* OobeUI::GetUpdateView() {
-  return update_screen_handler_;
+  return update_view_;
 }
 
 EnableDebuggingScreenActor* OobeUI::GetEnableDebuggingScreenActor() {

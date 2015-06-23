@@ -3,6 +3,53 @@
     "additional_compile_targets": [
       "chrome_shell_apk",
       "mandoline:all"
+    ],
+    "gtest_tests": [
+      {
+        "test": "html_viewer_unittests"
+      },
+      {
+        "test": "ipc_mojo_unittests"
+      },
+      {
+        "test": "mojo_common_unittests"
+      },
+      {
+        "test": "mojo_public_application_unittests"
+      },
+      {
+        "test": "mojo_public_bindings_unittests"
+      },
+      {
+        "test": "mojo_public_environment_unittests"
+      },
+      {
+        "test": "mojo_public_system_unittests"
+      },
+      {
+        "test": "mojo_public_utility_unittests"
+      },
+      {
+        "test": "mojo_runner_unittests"
+      },
+      {
+        "test": "mojo_shell_unittests"
+      },
+      {
+        "test": "mojo_surfaces_lib_unittests"
+      },
+      {
+        "test": "mojo_system_unittests"
+      },
+      {
+        "test": "mojo_view_manager_lib_unittests"
+      },
+      {
+        "test": "resource_provider_unittests"
+      },
+      {
+        "test": "view_manager_unittests"
+      }
     ]
   },
   "Android GN (dbg)": {
@@ -38,6 +85,9 @@
   "Cast Linux": {
     "gtest_tests": [
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "base_unittests"
       },
       {
@@ -53,9 +103,18 @@
         "test": "cast_shell_browser_test"
       },
       {
+        "test": "content_browsertests"
+      },
+      {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "content_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "crypto_unittests"
       },
       {
@@ -77,6 +136,9 @@
         "test": "net_unittests"
       },
       {
+        "test": "ppapi_unittests"
+      },
+      {
         "test": "sandbox_linux_unittests"
       },
       {
@@ -90,94 +152,6 @@
       },
       {
         "test": "url_unittests"
-      }
-    ]
-  },
-  "Linux Clang (dbg)": {
-    "gtest_tests": [
-      {
-        "swarming": {
-          "can_use_on_swarming_builders": true
-        },
-        "test": "accessibility_unittests"
-      },
-      {
-        "test": "app_shell_unittests"
-      },
-      {
-        "test": "base_unittests"
-      },
-      {
-        "test": "components_unittests"
-      },
-      {
-        "test": "content_unittests"
-      },
-      {
-        "test": "crypto_unittests"
-      },
-      {
-        "test": "device_unittests"
-      },
-      {
-        "test": "display_unittests"
-      },
-      {
-        "test": "extensions_unittests"
-      },
-      {
-        "test": "gn_unittests"
-      },
-      {
-        "test": "google_apis_unittests"
-      },
-      {
-        "test": "ipc_mojo_unittests"
-      },
-      {
-        "test": "ipc_tests"
-      },
-      {
-        "test": "mojo_common_unittests"
-      },
-      {
-        "test": "mojo_public_application_unittests"
-      },
-      {
-        "test": "mojo_public_bindings_unittests"
-      },
-      {
-        "test": "mojo_public_environment_unittests"
-      },
-      {
-        "test": "mojo_public_system_unittests"
-      },
-      {
-        "test": "mojo_public_utility_unittests"
-      },
-      {
-        "test": "mojo_system_unittests"
-      },
-      {
-        "test": "nacl_loader_unittests"
-      },
-      {
-        "test": "sandbox_linux_unittests"
-      },
-      {
-        "test": "skia_unittests"
-      },
-      {
-        "test": "sql_unittests"
-      },
-      {
-        "test": "sync_unit_tests"
-      },
-      {
-        "test": "ui_base_unittests"
-      },
-      {
-        "test": "unit_tests"
       }
     ]
   },
@@ -197,6 +171,9 @@
         "test": "aura_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "base_unittests"
       },
       {
@@ -376,10 +353,6 @@
         ],
         "name": "gyp_flag_compare",
         "script": "gyp_flag_compare.py"
-      },
-      {
-        "name": "mojo_apptest",
-        "script": "mojo_apptest.py"
       }
     ]
   },

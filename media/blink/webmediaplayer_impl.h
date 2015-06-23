@@ -25,6 +25,7 @@
 #include "media/blink/skcanvas_video_renderer.h"
 #include "media/blink/video_frame_compositor.h"
 #include "media/blink/webmediaplayer_params.h"
+#include "media/blink/webmediaplayer_util.h"
 #include "third_party/WebKit/public/platform/WebAudioSourceProvider.h"
 #include "third_party/WebKit/public/platform/WebContentDecryptionModuleResult.h"
 #include "third_party/WebKit/public/platform/WebMediaPlayer.h"
@@ -86,6 +87,8 @@ class MEDIA_EXPORT WebMediaPlayerImpl
   virtual void seek(double seconds);
   virtual void setRate(double rate);
   virtual void setVolume(double volume);
+  virtual void setSinkId(const blink::WebString& device_id,
+                         WebSetSinkIdCB* web_callbacks);
   virtual void setPreload(blink::WebMediaPlayer::Preload preload);
   virtual blink::WebTimeRanges buffered() const;
   virtual blink::WebTimeRanges seekable() const;
@@ -128,22 +131,13 @@ class MEDIA_EXPORT WebMediaPlayerImpl
   virtual unsigned audioDecodedByteCount() const;
   virtual unsigned videoDecodedByteCount() const;
 
-  // TODO(dshwang): remove |level|. crbug.com/443151
-  virtual bool copyVideoTextureToPlatformTexture(
-      blink::WebGraphicsContext3D* web_graphics_context,
-      unsigned int texture,
-      unsigned int level,
-      unsigned int internal_format,
-      unsigned int type,
-      bool premultiply_alpha,
-      bool flip_y);
-  virtual bool copyVideoTextureToPlatformTexture(
+  bool copyVideoTextureToPlatformTexture(
       blink::WebGraphicsContext3D* web_graphics_context,
       unsigned int texture,
       unsigned int internal_format,
       unsigned int type,
       bool premultiply_alpha,
-      bool flip_y);
+      bool flip_y) override;
 
   virtual blink::WebAudioSourceProvider* audioSourceProvider();
 

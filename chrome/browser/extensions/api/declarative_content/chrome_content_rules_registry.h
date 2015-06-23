@@ -16,8 +16,9 @@
 #include "base/time/time.h"
 #include "chrome/browser/extensions/api/declarative_content/content_action.h"
 #include "chrome/browser/extensions/api/declarative_content/content_condition.h"
+#include "chrome/browser/extensions/api/declarative_content/declarative_content_condition_tracker_delegate.h"
 #include "chrome/browser/extensions/api/declarative_content/declarative_content_css_condition_tracker.h"
-#include "components/url_matcher/url_matcher.h"
+#include "chrome/browser/extensions/api/declarative_content/declarative_content_page_url_condition_tracker.h"
 #include "content/public/browser/notification_observer.h"
 #include "content/public/browser/notification_registrar.h"
 #include "extensions/browser/api/declarative/declarative_rule.h"
@@ -70,7 +71,7 @@ typedef DeclarativeRule<ContentCondition, ContentAction> ContentRule;
 class ChromeContentRulesRegistry
     : public ContentRulesRegistry,
       public content::NotificationObserver,
-      public DeclarativeContentCssConditionTrackerDelegate {
+      public DeclarativeContentConditionTrackerDelegate {
  public:
   // For testing, |ui_part| can be NULL. In that case it constructs the
   // registry with storage functionality suspended.
@@ -99,7 +100,7 @@ class ChromeContentRulesRegistry
                const content::NotificationSource& source,
                const content::NotificationDetails& details) override;
 
-  // DeclarativeContentCssConditionTrackerDelegate:
+  // DeclarativeContentConditionTrackerDelegate:
   void RequestEvaluation(content::WebContents* contents) override;
   bool ShouldManageConditionsForBrowserContext(
       content::BrowserContext* context) override;
@@ -127,6 +128,19 @@ class ChromeContentRulesRegistry
       const std::string& extension_id) const;
 
  private:
+  // Specifies what to do with evaluation requests.
+  // TODO(wittman): Try to eliminate the need for IGNORE after refactoring to
+  // treat all condition evaluation consistently. Currently RemoveRulesImpl only
+  // updates the CSS selectors after the rules are removed, which is too late
+  // for evaluation.
+  enum EvaluationDisposition {
+    EVALUATE_REQUESTS,  // Evaluate immediately.
+    DEFER_REQUESTS,  // Defer for later evaluation.
+    IGNORE_REQUESTS  // Ignore.
+  };
+
+  class EvaluationScope;
+
   // True if this object is managing the rules for |context|.
   bool ManagingRulesForBrowserContext(content::BrowserContext* context);
 
@@ -161,11 +175,18 @@ class ChromeContentRulesRegistry
   // the value is the empty set.
   std::map<content::WebContents*, std::set<const ContentRule*>> active_rules_;
 
-  // Matches URLs for the page_url condition.
-  url_matcher::URLMatcher url_matcher_;
+  // Responsible for tracking declarative content page URL condition state.
+  DeclarativeContentPageUrlConditionTracker page_url_condition_tracker_;
 
-  // Responsible for evaluating the declarative content conditions.
+  // Responsible for tracking declarative content CSS condition state.
   DeclarativeContentCssConditionTracker css_condition_tracker_;
+
+  // Specifies what to do with evaluation requests.
+  EvaluationDisposition evaluation_disposition_;
+
+  // Contains WebContents which require rule evaluation. Only used while
+  // |evaluation_disposition_| is DEFER.
+  std::set<content::WebContents*> evaluation_pending_;
 
   // Manages our notification registrations.
   content::NotificationRegistrar registrar_;

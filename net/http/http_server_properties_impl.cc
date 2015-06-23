@@ -5,13 +5,14 @@
 #include "net/http/http_server_properties_impl.h"
 
 #include "base/bind.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/message_loop/message_loop.h"
-#include "base/metrics/histogram.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 
 namespace net {
@@ -87,7 +88,7 @@ void HttpServerPropertiesImpl::InitializeAlternativeServiceServers(
       for (AlternativeServiceMap::const_iterator it =
                alternative_service_map_.begin();
            it != alternative_service_map_.end(); ++it) {
-        if (EndsWith(it->first.host(), canonical_suffixes_[i], false)) {
+        if (base::EndsWith(it->first.host(), canonical_suffixes_[i], false)) {
           canonical_host_to_origin_map_[canonical_host] = it->first;
           break;
         }
@@ -224,7 +225,7 @@ std::string HttpServerPropertiesImpl::GetCanonicalSuffix(
   // suffix.
   for (size_t i = 0; i < canonical_suffixes_.size(); ++i) {
     std::string canonical_suffix = canonical_suffixes_[i];
-    if (EndsWith(host, canonical_suffixes_[i], false)) {
+    if (base::EndsWith(host, canonical_suffixes_[i], false)) {
       return canonical_suffix;
     }
   }
@@ -290,21 +291,12 @@ void HttpServerPropertiesImpl::SetAlternativeService(
       alternative_service, alternative_probability);
   AlternativeServiceMap::const_iterator it =
       GetAlternateProtocolIterator(origin);
-  if (it != alternative_service_map_.end()) {
-    const AlternativeServiceInfo existing_alternative_service_info = it->second;
-    if (existing_alternative_service_info != alternative_service_info) {
-      LOG(WARNING) << "Changing the alternative service for: "
-                   << origin.ToString() << " from "
-                   << existing_alternative_service_info.ToString() << " to "
-                   << alternative_service_info.ToString() << ".";
-    }
-  } else {
-    if (alternative_probability >= alternative_service_probability_threshold_) {
-      // TODO(rch): Consider the case where multiple requests are started
-      // before the first completes. In this case, only one of the jobs
-      // would reach this code, whereas all of them should should have.
-      HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_MAPPING_MISSING);
-    }
+  if (it == alternative_service_map_.end() &&
+      alternative_probability >= alternative_service_probability_threshold_) {
+    // TODO(rch): Consider the case where multiple requests are started
+    // before the first completes. In this case, only one of the jobs
+    // would reach this code, whereas all of them should should have.
+    HistogramAlternateProtocolUsage(ALTERNATE_PROTOCOL_USAGE_MAPPING_MISSING);
   }
 
   alternative_service_map_.Put(origin, alternative_service_info);
@@ -313,7 +305,7 @@ void HttpServerPropertiesImpl::SetAlternativeService(
   // canonical host.
   for (size_t i = 0; i < canonical_suffixes_.size(); ++i) {
     std::string canonical_suffix = canonical_suffixes_[i];
-    if (EndsWith(origin.host(), canonical_suffixes_[i], false)) {
+    if (base::EndsWith(origin.host(), canonical_suffixes_[i], false)) {
       HostPortPair canonical_host(canonical_suffix, origin.port());
       canonical_host_to_origin_map_[canonical_host] = origin;
       break;
@@ -555,7 +547,7 @@ HttpServerPropertiesImpl::CanonicalHostMap::const_iterator
 HttpServerPropertiesImpl::GetCanonicalHost(HostPortPair server) const {
   for (size_t i = 0; i < canonical_suffixes_.size(); ++i) {
     std::string canonical_suffix = canonical_suffixes_[i];
-    if (EndsWith(server.host(), canonical_suffixes_[i], false)) {
+    if (base::EndsWith(server.host(), canonical_suffixes_[i], false)) {
       HostPortPair canonical_host(canonical_suffix, server.port());
       return canonical_host_to_origin_map_.find(canonical_host);
     }
@@ -602,7 +594,7 @@ HttpServerPropertiesImpl::ScheduleBrokenAlternateProtocolMappingsExpiration() {
   base::TimeTicks now = base::TimeTicks::Now();
   base::TimeTicks when = broken_alternative_services_.front().second;
   base::TimeDelta delay = when > now ? when - now : base::TimeDelta();
-  base::MessageLoop::current()->PostDelayedTask(
+  base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
       FROM_HERE,
       base::Bind(
           &HttpServerPropertiesImpl::ExpireBrokenAlternateProtocolMappings,

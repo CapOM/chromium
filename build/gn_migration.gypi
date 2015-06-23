@@ -62,7 +62,6 @@
         '../cloud_print/cloud_print.gyp:cloud_print_unittests',
         '../components/components.gyp:network_hints_browser',
         '../components/components.gyp:policy_templates',
-        '../components/components.gyp:webui_generator',
         '../components/components_tests.gyp:components_browsertests',
         '../components/components_tests.gyp:components_perftests',
         '../components/components_tests.gyp:components_unittests',
@@ -606,7 +605,7 @@
           'dependencies': [
             # TODO(GYP): Figure out which of these run on android/mac/win/ios/etc.
             '../net/net.gyp:net_docs',
-            '../remoting/app_remoting_test.gyp:ar_sample_test_driver',
+            '../remoting/remoting.gyp:ar_sample_test_driver',
 
             # TODO(GYP): in progress - see tfarina.
             '../third_party/webrtc/tools/tools.gyp:frame_analyzer',
@@ -629,9 +628,9 @@
             '../chrome/tools/crash_service/caps/caps.gyp:caps',
             '../cloud_print/gcp20/prototype/gcp20_device.gyp:gcp20_device',
             '../cloud_print/gcp20/prototype/gcp20_device.gyp:gcp20_device_unittests',
-            '../cloud_print/service/service.gyp:cloud_print_service',
-            '../cloud_print/service/service.gyp:cloud_print_service_config',
-            '../cloud_print/service/service.gyp:cloud_print_service_setup',
+            '../cloud_print/service/win/service.gyp:cloud_print_service',
+            '../cloud_print/service/win/service.gyp:cloud_print_service_config',
+            '../cloud_print/service/win/service.gyp:cloud_print_service_setup',
             '../cloud_print/virtual_driver/win/install/virtual_driver_install.gyp:virtual_driver_setup',
             '../cloud_print/virtual_driver/win/virtual_driver.gyp:gcp_portmon',
             '../components/test_runner/test_runner.gyp:layout_test_helper',
@@ -640,7 +639,7 @@
             '../gpu/gpu.gyp:angle_perftests',
             '../net/net.gyp:net_docs',
             '../ppapi/ppapi_internal.gyp:ppapi_perftests',
-            '../remoting/app_remoting_test.gyp:ar_sample_test_driver',
+            '../remoting/remoting.gyp:ar_sample_test_driver',
             '../remoting/remoting.gyp:remoting_breakpad_tester',
             '../remoting/remoting.gyp:remoting_console',
             '../remoting/remoting.gyp:remoting_desktop',

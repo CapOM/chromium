@@ -17,7 +17,9 @@ class GoogleServiceAuthError;
 
 namespace sync_driver {
 
-class SyncService : public sync_driver::DataTypeEncryptionHandler {
+class OpenTabsUIDelegate;
+
+class SyncService : public DataTypeEncryptionHandler {
  public:
   // Used to specify the kind of passphrase with which sync data is encrypted.
   enum PassphraseType {
@@ -27,6 +29,14 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
                // during sync setup and provided a passphrase.
   };
 
+  // Passed as an argument to RequestStop to control whether or not the sync
+  // backend should clear its data directory when it shuts down. See
+  // RequestStop for more information.
+  enum SyncStopDataFate {
+    KEEP_DATA,
+    CLEAR_DATA,
+  };
+
   ~SyncService() override {}
 
   // Whether sync is enabled by user or not. This does not necessarily mean
@@ -34,6 +44,11 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
   // errors, or shutdown). See IsSyncActive below for checking whether sync
   // is actually running.
   virtual bool HasSyncSetupCompleted() const = 0;
+
+  // Whether sync is allowed to start. Command line flags, platform-level
+  // overrides, and account-level overrides are examples of reasons this
+  // might be false.
+  virtual bool IsSyncAllowed() const = 0;
 
   // Returns true if sync is fully initialized and active. This implies that
   // an initial configuration has successfully completed, although there may
@@ -62,21 +77,17 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
   // TODO(sync): The methods below were pulled from ProfileSyncService, and
   // should be evaluated to see if they should stay.
 
-  // Returns true if sync is enabled/not suppressed and the user is logged in.
+  // Returns true if sync is allowed, requested, and the user is logged in.
   // (being logged in does not mean that tokens are available - tokens may
   // be missing because they have not loaded yet, or because they were deleted
   // due to http://crbug.com/121755).
-  // Virtual to enable mocking in tests.
-  // TODO(tim): Remove this? Nothing in ProfileSyncService uses it, and outside
-  // callers use a seemingly arbitrary / redundant / bug prone combination of
-  // this method, IsSyncAccessible, and others.
-  virtual bool IsSyncEnabledAndLoggedIn() = 0;
+  virtual bool CanSyncStart() const = 0;
 
-  // Disables sync for user. Use ShowLoginDialog to enable.
-  virtual void DisableForUser() = 0;
-
-  // Stops sync at the user's request.
-  virtual void RequestStop() = 0;
+  // Stops sync at the user's request. |data_fate| controls whether the sync
+  // backend should clear its data directory when it shuts down. Generally
+  // KEEP_DATA is used when the user just stops sync, and CLEAR_DATA is used
+  // when they sign out of the profile entirely.
+  virtual void RequestStop(SyncStopDataFate data_fate) = 0;
 
   // The user requests that sync start. This only actually starts sync if
   // IsSyncAllowed is true and the user is signed in. Once sync starts,
@@ -129,6 +140,10 @@ class SyncService : public sync_driver::DataTypeEncryptionHandler {
   // changes. This should only be used for sync's internal configuration logic
   // (such as deciding when to prompt for an encryption passphrase).
   virtual bool backend_initialized() const = 0;
+
+  // Return the active OpenTabsUIDelegate. If sessions is not enabled or not
+  // currently syncing, returns nullptr.
+  virtual OpenTabsUIDelegate* GetOpenTabsUIDelegate() = 0;
 
   // Returns true if OnPassphraseRequired has been called for decryption and
   // we have an encrypted data type enabled.

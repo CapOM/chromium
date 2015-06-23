@@ -13,32 +13,36 @@ import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.VisibleForTesting;
-import org.chromium.chrome.browser.CompositorChromeActivity;
+import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.base.metrics.RecordUserAction;
+import org.chromium.chrome.R;
+import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.IntentHandler;
+import org.chromium.chrome.browser.IntentHandler.ExternalAppId;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.appmenu.AppMenuHandler;
 import org.chromium.chrome.browser.appmenu.AppMenuObserver;
 import org.chromium.chrome.browser.appmenu.AppMenuPropertiesDelegate;
+import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.StateChangeReason;
 import org.chromium.chrome.browser.compositor.layouts.LayoutManagerDocument;
 import org.chromium.chrome.browser.document.BrandColorUtils;
 import org.chromium.chrome.browser.tabmodel.SingleTabModelSelector;
+import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.toolbar.ToolbarControlContainer;
-import org.chromium.chrome.browser.toolbar.ToolbarHelper;
+import org.chromium.chrome.browser.toolbar.ToolbarManager;
 import org.chromium.chrome.browser.widget.findinpage.FindToolbarManager;
 import org.chromium.content_public.browser.LoadUrlParams;
 
 /**
  * The activity for custom tabs. It will be launched on top of a client's task.
  */
-public class CustomTabActivity extends CompositorChromeActivity {
+public class CustomTabActivity extends ChromeActivity {
     private static CustomTabContentHandler sActiveContentHandler;
 
     private CustomTab mTab;
-    private ToolbarHelper mToolbarHelper;
+    private ToolbarManager mToolbarManager;
     private CustomTabAppMenuPropertiesDelegate mAppMenuPropertiesDelegate;
     private AppMenuHandler mAppMenuHandler;
     private FindToolbarManager mFindToolbarManager;
@@ -51,6 +55,8 @@ public class CustomTabActivity extends CompositorChromeActivity {
     // TODO(ianwen, yusufo): Figure out a solution to extract external resources without having to
     // change the package name.
     private boolean mShouldOverridePackage;
+
+    private boolean mRecordedStartupUma;
 
     /**
      * Sets the currently active {@link CustomTabContentHandler} in focus.
@@ -76,7 +82,8 @@ public class CustomTabActivity extends CompositorChromeActivity {
         if (sActiveContentHandler.getSessionId() != intentSessionId) return false;
         String url = IntentHandler.getUrlFromIntent(intent);
         if (TextUtils.isEmpty(url)) return false;
-        sActiveContentHandler.loadUrl(new LoadUrlParams(url));
+        sActiveContentHandler.loadUrlAndTrackFromTimestamp(new LoadUrlParams(url),
+                IntentHandler.getTimestampFromIntent(intent));
         return true;
     }
 
@@ -98,7 +105,16 @@ public class CustomTabActivity extends CompositorChromeActivity {
     @Override
     public void preInflationStartup() {
         super.preInflationStartup();
-        setTabModelSelector(new SingleTabModelSelector(this, false, true));
+        setTabModelSelector(new SingleTabModelSelector(this, false, true) {
+            @Override
+            public Tab openNewTab(LoadUrlParams loadUrlParams, TabLaunchType type, Tab parent,
+                    boolean incognito) {
+                // A custom tab either loads a url or starts an external activity to handle the url.
+                // It never opens a new tab/chrome activity.
+                mTab.loadUrl(loadUrlParams);
+                return mTab;
+            }
+        });
         mIntentDataProvider = new CustomTabIntentDataProvider(getIntent(), this);
     }
 
@@ -111,18 +127,19 @@ public class CustomTabActivity extends CompositorChromeActivity {
                 mIntentDataProvider.getMenuTitles());
         mAppMenuHandler =
                 new AppMenuHandler(this, mAppMenuPropertiesDelegate, R.menu.custom_tabs_menu);
-        mToolbarHelper = new ToolbarHelper(this, controlContainer,
+        mToolbarManager = new ToolbarManager(this, controlContainer,
                 mAppMenuHandler, mAppMenuPropertiesDelegate,
                 getCompositorViewHolder().getInvalidator());
-        mToolbarHelper.setThemeColor(mIntentDataProvider.getToolbarColor());
+        mToolbarManager.updatePrimaryColor(mIntentDataProvider.getToolbarColor());
         setStatusBarColor(mIntentDataProvider.getToolbarColor());
         if (mIntentDataProvider.shouldShowActionButton()) {
-            mToolbarHelper.addCustomActionButton(mIntentDataProvider.getActionButtonIcon(),
+            mToolbarManager.addCustomActionButton(mIntentDataProvider.getActionButtonIcon(),
                     new OnClickListener() {
                         @Override
                         public void onClick(View v) {
                             mIntentDataProvider.sendButtonPendingIntentWithUrl(
                                     getApplicationContext(), mTab.getUrl());
+                            RecordUserAction.record("CustomTabsCustomActionButtonClick");
                         }
                     });
         }
@@ -149,9 +166,8 @@ public class CustomTabActivity extends CompositorChromeActivity {
         initializeCompositorContent(layoutDriver, findViewById(R.id.url_bar),
                 (ViewGroup) findViewById(android.R.id.content), controlContainer);
         mFindToolbarManager = new FindToolbarManager(this, getTabModelSelector(),
-                mToolbarHelper.getContextualMenuBar().getCustomSelectionActionModeCallback());
-        controlContainer.setFindToolbarManager(mFindToolbarManager);
-        mToolbarHelper.initializeControls(
+                mToolbarManager.getContextualMenuBar().getCustomSelectionActionModeCallback());
+        mToolbarManager.initializeWithNative(getTabModelSelector(), getFullscreenManager(),
                 mFindToolbarManager, null, layoutDriver, null, null, null,
                 new OnClickListener() {
                     @Override
@@ -161,11 +177,12 @@ public class CustomTabActivity extends CompositorChromeActivity {
                 });
 
         mTab.setFullscreenManager(getFullscreenManager());
-        mTab.loadUrl(new LoadUrlParams(url));
+        loadUrlInCurrentTab(new LoadUrlParams(url),
+                IntentHandler.getTimestampFromIntent(getIntent()));
         mCustomTabContentHandler = new CustomTabContentHandler() {
             @Override
-            public void loadUrl(LoadUrlParams params) {
-                mTab.loadUrl(params);
+            public void loadUrlAndTrackFromTimestamp(LoadUrlParams params, long timestamp) {
+                loadUrlInCurrentTab(params, timestamp);
             }
 
             @Override
@@ -180,6 +197,14 @@ public class CustomTabActivity extends CompositorChromeActivity {
     public void onStartWithNative() {
         super.onStartWithNative();
         setActiveContentHandler(mCustomTabContentHandler);
+
+        if (!mRecordedStartupUma) {
+            mRecordedStartupUma = true;
+            ExternalAppId externalId =
+                    IntentHandler.determineExternalIntentSource(getPackageName(), getIntent());
+            RecordHistogram.recordEnumeratedHistogram("CustomTabs.ClientAppId",
+                    externalId.ordinal(), ExternalAppId.INDEX_BOUNDARY.ordinal());
+        }
     }
 
     @Override
@@ -192,18 +217,29 @@ public class CustomTabActivity extends CompositorChromeActivity {
     @Override
     protected void onDeferredStartup() {
         super.onDeferredStartup();
-        mToolbarHelper.onDeferredStartup();
+        mToolbarManager.onDeferredStartup(getOnCreateTimestampMs(), getClass().getSimpleName());
     }
 
     @Override
     public boolean hasDoneFirstDraw() {
-        return mToolbarHelper.hasDoneFirstDraw();
+        return mToolbarManager.hasDoneFirstDraw();
     }
 
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         if (mAppMenuHandler != null) mAppMenuHandler.hideAppMenu();
         super.onConfigurationChanged(newConfig);
+    }
+
+    /**
+     * Loads the current tab with the given load params. Unlike
+     * {@link CustomTab#loadUrlAndTrackFromTimestamp(LoadUrlParams, long)}, this method takes client
+     * referrer and extra headers into account.
+     */
+    private void loadUrlInCurrentTab(LoadUrlParams params, long timeStamp) {
+        Intent intent = getIntent();
+        IntentHandler.addReferrerAndHeaders(params, intent, this);
+        mTab.loadUrlAndTrackFromTimestamp(params, timeStamp);
     }
 
     /**
@@ -262,7 +298,7 @@ public class CustomTabActivity extends CompositorChromeActivity {
 
     @Override
     public boolean shouldShowAppMenu() {
-        return mTab != null && mToolbarHelper.isInitialized();
+        return mTab != null && mToolbarManager.isInitialized();
     }
 
     @Override
@@ -271,6 +307,7 @@ public class CustomTabActivity extends CompositorChromeActivity {
         if (menuIndex >= 0) {
             mIntentDataProvider.clickMenuItemWithUrl(getApplicationContext(), menuIndex,
                     getTabModelSelector().getCurrentTab().getUrl());
+            RecordUserAction.record("CustomTabsMenuCustomMenuItem");
             return true;
         }
         return super.onOptionsItemSelected(item);
@@ -280,7 +317,7 @@ public class CustomTabActivity extends CompositorChromeActivity {
     public boolean onMenuOrKeyboardAction(int id, boolean fromMenu) {
         if (id == R.id.show_menu) {
             if (shouldShowAppMenu()) {
-                mAppMenuHandler.showAppMenu(mToolbarHelper.getMenuAnchor(), true, false);
+                mAppMenuHandler.showAppMenu(mToolbarManager.getMenuAnchor(), true, false);
                 return true;
             }
         } else if (id == R.id.open_in_chrome_id) {
@@ -289,9 +326,18 @@ public class CustomTabActivity extends CompositorChromeActivity {
             chromeIntent.setPackage(getApplicationContext().getPackageName());
             chromeIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(chromeIntent);
+            RecordUserAction.record("CustomTabsMenuOpenInChrome");
             return true;
         } else if (id == R.id.find_in_page_id) {
             mFindToolbarManager.showToolbar();
+            if (getContextualSearchManager() != null) {
+                getContextualSearchManager().hideContextualSearch(StateChangeReason.UNKNOWN);
+            }
+            if (fromMenu) {
+                RecordUserAction.record("MobileMenuFindInPage");
+            } else {
+                RecordUserAction.record("MobileShortcutFindInPage");
+            }
             return true;
         }
         return super.onMenuOrKeyboardAction(id, fromMenu);

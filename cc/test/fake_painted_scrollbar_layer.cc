@@ -5,7 +5,6 @@
 #include "cc/test/fake_painted_scrollbar_layer.h"
 
 #include "base/auto_reset.h"
-#include "cc/resources/resource_update_queue.h"
 #include "cc/test/fake_scrollbar.h"
 
 namespace cc {
@@ -37,10 +36,8 @@ FakePaintedScrollbarLayer::FakePaintedScrollbarLayer(
 
 FakePaintedScrollbarLayer::~FakePaintedScrollbarLayer() {}
 
-bool FakePaintedScrollbarLayer::Update(
-    ResourceUpdateQueue* queue,
-    const OcclusionTracker<Layer>* occlusion) {
-  bool updated = PaintedScrollbarLayer::Update(queue, occlusion);
+bool FakePaintedScrollbarLayer::Update() {
+  bool updated = PaintedScrollbarLayer::Update();
   ++update_count_;
   return updated;
 }

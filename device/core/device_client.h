@@ -6,7 +6,6 @@
 #define DEVICE_CORE_DEVICE_CLIENT_H_
 
 #include "base/macros.h"
-#include "third_party/mojo/src/mojo/public/cpp/bindings/interface_request.h"
 
 namespace device {
 
@@ -33,11 +32,6 @@ class DeviceClient {
 
   // Returns the UsbService instance for this embedder.
   virtual UsbService* GetUsbService();
-
-  // Connects a USB DeviceManager client to a concrete implementation. If
-  // no such implementation is available the request is dropped.
-  virtual void ConnectToUSBDeviceManager(
-      mojo::InterfaceRequest<usb::DeviceManager> request);
 
   // Returns the HidService instance for this embedder.
   virtual HidService* GetHidService();

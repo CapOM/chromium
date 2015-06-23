@@ -22,10 +22,9 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.SparseArray;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ImportantFileWriterAndroid;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ApplicationLifetime;
 import org.chromium.chrome.browser.ChromeMobileApplication;
 import org.chromium.chrome.browser.IntentHandler;
@@ -42,6 +41,7 @@ import org.chromium.chrome.browser.favicon.FaviconHelper.FaviconImageCallback;
 import org.chromium.chrome.browser.ntp.NativePageFactory;
 import org.chromium.chrome.browser.preferences.ChromePreferenceManager;
 import org.chromium.chrome.browser.profiles.Profile;
+import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabPersistentStore;
 import org.chromium.chrome.browser.tabmodel.TabPersistentStore.OnTabStateReadCallback;
 import org.chromium.chrome.browser.tabmodel.document.ActivityDelegate;
@@ -122,6 +122,16 @@ public class DocumentMigrationHelper {
         }
     }
 
+    private static class MigrationTabCreatorManager implements TabCreatorManager {
+        TabDelegateImpl mRegularTabCreator = new TabDelegateImpl(false);
+        TabDelegateImpl mIncognitoTabCreator = new TabDelegateImpl(true);
+
+        @Override
+        public TabDelegateImpl getTabCreator(boolean incognito) {
+            return incognito ? mIncognitoTabCreator : mRegularTabCreator;
+        }
+    }
+
     private static class MigrationTabModel extends DocumentTabModelImpl {
         private final SparseArray<String> mTitleList;
 
@@ -132,7 +142,7 @@ public class DocumentMigrationHelper {
          */
         MigrationTabModel(MigrationActivityDelegate activityDelegate,
                 StorageDelegate storageDelegate) {
-            super(activityDelegate, storageDelegate, new TabDelegateImpl(), false,
+            super(activityDelegate, storageDelegate, new MigrationTabCreatorManager(), false,
                     Tab.INVALID_TAB_ID, ApplicationStatus.getApplicationContext());
             startTabStateLoad();
             mTitleList = new SparseArray<String>();
@@ -424,6 +434,7 @@ public class DocumentMigrationHelper {
                 DocumentTabModelSelector.createDocumentDataString(tabId, currentUrl));
         intent.setClassName(activity, ChromeLauncherActivity.getDocumentClassName(false));
         intent.putExtra(IntentHandler.EXTRA_PRESERVE_TASK, true);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
         ActivityManager am =
                 (ActivityManager) activity.getSystemService(Activity.ACTIVITY_SERVICE);
 

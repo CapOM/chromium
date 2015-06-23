@@ -156,7 +156,7 @@ class GaiaAuthFetcherTest : public testing::Test {
   net::TestURLRequestContextGetter* GetRequestContext() {
     if (!request_context_getter_.get()) {
       request_context_getter_ = new net::TestURLRequestContextGetter(
-          message_loop_.message_loop_proxy());
+          message_loop_.task_runner());
     }
     return request_context_getter_.get();
   }
@@ -558,11 +558,12 @@ TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenSuccess) {
 
   net::TestURLFetcherFactory factory;
   GaiaAuthFetcher auth(&consumer, std::string(), GetRequestContext());
-  auth.StartLsoForOAuthLoginTokenExchange("lso_token");
+  auth.StartCookieForOAuthLoginTokenExchange("0");
   net::TestURLFetcher* fetcher = factory.GetFetcherByID(0);
   EXPECT_TRUE(NULL != fetcher);
-  EXPECT_EQ(net::LOAD_DO_NOT_SEND_COOKIES | net::LOAD_DO_NOT_SAVE_COOKIES,
-            fetcher->GetLoadFlags());
+  EXPECT_EQ(net::LOAD_NORMAL, fetcher->GetLoadFlags());
+  EXPECT_EQ(std::string::npos,
+            fetcher->GetOriginalURL().query().find("device_type=chrome"));
 
   net::ResponseCookies cookies;
   cookies.push_back(kGetAuthCodeValidCookie);
@@ -586,17 +587,6 @@ TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenSuccess) {
   EXPECT_FALSE(auth.HasPendingFetch());
 }
 
-TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenWithCookies) {
-  MockGaiaConsumer consumer;
-  net::TestURLFetcherFactory factory;
-  GaiaAuthFetcher auth(&consumer, std::string(), GetRequestContext());
-  auth.StartCookieForOAuthLoginTokenExchange("0");
-  net::TestURLFetcher* fetcher = factory.GetFetcherByID(0);
-  EXPECT_TRUE(NULL != fetcher);
-  EXPECT_EQ(net::LOAD_NORMAL, fetcher->GetLoadFlags());
-  EXPECT_FALSE(EndsWith(fetcher->upload_data(), "device_type=chrome", true));
-}
-
 TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenWithCookies_DeviceId) {
   MockGaiaConsumer consumer;
   net::TestURLFetcherFactory factory;
@@ -607,7 +597,8 @@ TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenWithCookies_DeviceId) {
   net::TestURLFetcher* fetcher = factory.GetFetcherByID(0);
   EXPECT_TRUE(NULL != fetcher);
   EXPECT_EQ(net::LOAD_NORMAL, fetcher->GetLoadFlags());
-  EXPECT_TRUE(EndsWith(fetcher->upload_data(), "device_type=chrome", true));
+  EXPECT_NE(std::string::npos,
+            fetcher->GetOriginalURL().query().find("device_type=chrome"));
   net::HttpRequestHeaders extra_request_headers;
   fetcher->GetExtraRequestHeaders(&extra_request_headers);
   std::string device_id;
@@ -622,7 +613,7 @@ TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenClientLoginToOAuth2Failure) {
 
   net::TestURLFetcherFactory factory;
   GaiaAuthFetcher auth(&consumer, std::string(), GetRequestContext());
-  auth.StartLsoForOAuthLoginTokenExchange("lso_token");
+  auth.StartCookieForOAuthLoginTokenExchange(std::string());
 
   net::ResponseCookies cookies;
   EXPECT_TRUE(auth.HasPendingFetch());
@@ -645,7 +636,7 @@ TEST_F(GaiaAuthFetcherTest, OAuthLoginTokenOAuth2TokenPairFailure) {
 
   net::TestURLFetcherFactory factory;
   GaiaAuthFetcher auth(&consumer, std::string(), GetRequestContext());
-  auth.StartLsoForOAuthLoginTokenExchange("lso_token");
+  auth.StartCookieForOAuthLoginTokenExchange(std::string());
 
   net::ResponseCookies cookies;
   cookies.push_back(kGetAuthCodeValidCookie);

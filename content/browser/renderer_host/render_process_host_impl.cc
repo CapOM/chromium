@@ -60,7 +60,7 @@
 #include "content/browser/fileapi/fileapi_message_filter.h"
 #include "content/browser/frame_host/render_frame_message_filter.h"
 #include "content/browser/geofencing/geofencing_dispatcher_host.h"
-#include "content/browser/gpu/browser_gpu_channel_host_factory.h"
+#include "content/browser/gpu/browser_gpu_memory_buffer_manager.h"
 #include "content/browser/gpu/compositor_util.h"
 #include "content/browser/gpu/gpu_data_manager_impl.h"
 #include "content/browser/gpu/gpu_process_host.h"
@@ -117,7 +117,6 @@
 #include "content/common/child_process_messages.h"
 #include "content/common/content_switches_internal.h"
 #include "content/common/frame_messages.h"
-#include "content/common/gpu/gpu_memory_buffer_factory.h"
 #include "content/common/gpu/gpu_messages.h"
 #include "content/common/in_process_child_thread_params.h"
 #include "content/common/mojo/channel_init.h"
@@ -137,6 +136,7 @@
 #include "content/public/browser/resource_context.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/worker_service.h"
+#include "content/public/common/child_process_host.h"
 #include "content/public/common/content_constants.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/mojo_channel_switches.h"
@@ -155,7 +155,6 @@
 #include "ipc/ipc_logging.h"
 #include "ipc/ipc_switches.h"
 #include "ipc/mojo/ipc_channel_mojo.h"
-#include "ipc/mojo/ipc_channel_mojo_host.h"
 #include "media/base/media_switches.h"
 #include "net/url_request/url_request_context_getter.h"
 #include "ppapi/shared_impl/ppapi_switches.h"
@@ -248,6 +247,10 @@ void GetContexts(
 }
 
 #if defined(ENABLE_WEBRTC)
+
+// Allow us to only run the trial in the first renderer.
+bool has_done_stun_trials = false;
+
 // Creates a file used for diagnostic echo canceller recordings for handing
 // over to the renderer.
 IPC::PlatformFileForTransit CreateAecDumpFileForProcess(
@@ -476,7 +479,7 @@ void RenderProcessHost::SetMaxRendererProcessCount(size_t count) {
 RenderProcessHostImpl::RenderProcessHostImpl(
     BrowserContext* browser_context,
     StoragePartitionImpl* storage_partition_impl,
-    bool is_isolated_guest)
+    bool is_for_guests_only)
     : fast_shutdown_started_(false),
       deleting_soon_(false),
 #ifndef NDEBUG
@@ -492,7 +495,7 @@ RenderProcessHostImpl::RenderProcessHostImpl(
       storage_partition_impl_(storage_partition_impl),
       sudden_termination_allowed_(true),
       ignore_input_events_(false),
-      is_isolated_guest_(is_isolated_guest),
+      is_for_guests_only_(is_for_guests_only),
       gpu_observer_registered_(false),
       delayed_cleanup_needed_(false),
       within_process_died_observer_(false),
@@ -713,18 +716,17 @@ scoped_ptr<IPC::ChannelProxy> RenderProcessHostImpl::CreateChannelProxy(
             ->task_runner();
   if (ShouldUseMojoChannel()) {
     VLOG(1) << "Mojo Channel is enabled on host";
-    if (!channel_mojo_host_) {
-      channel_mojo_host_.reset(new IPC::ChannelMojoHost(mojo_task_runner));
-    }
 
-    return IPC::ChannelProxy::Create(IPC::ChannelMojo::CreateServerFactory(
-                                         channel_mojo_host_->channel_delegate(),
-                                         mojo_task_runner, channel_id),
-                                     this, runner.get());
+    return IPC::ChannelProxy::Create(
+        IPC::ChannelMojo::CreateServerFactory(
+            mojo_task_runner, channel_id,
+            content::ChildProcessHost::GetAttachmentBroker()),
+        this, runner.get());
   }
 
   return IPC::ChannelProxy::Create(
-      channel_id, IPC::Channel::MODE_SERVER, this, runner.get());
+      channel_id, IPC::Channel::MODE_SERVER, this, runner.get(),
+      content::ChildProcessHost::GetAttachmentBroker());
 }
 
 void RenderProcessHostImpl::CreateMessageFilters() {
@@ -795,7 +797,8 @@ void RenderProcessHostImpl::CreateMessageFilters() {
       audio_manager,
       AudioMirroringManager::GetInstance(),
       media_internals,
-      media_stream_manager);
+      media_stream_manager,
+      browser_context->GetResourceContext()->GetMediaDeviceIDSalt());
   AddFilter(audio_renderer_host_.get());
   AddFilter(
       new MidiHost(GetID(), BrowserMainLoop::GetInstance()->midi_manager()));
@@ -1097,8 +1100,8 @@ int RenderProcessHostImpl::VisibleWidgetCount() const {
   return visible_widgets_;
 }
 
-bool RenderProcessHostImpl::IsIsolatedGuest() const {
-  return is_isolated_guest_;
+bool RenderProcessHostImpl::IsForGuestsOnly() const {
+  return is_for_guests_only_;
 }
 
 StoragePartition* RenderProcessHostImpl::GetStoragePartition() const {
@@ -1112,13 +1115,9 @@ static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
   if (IsDelegatedRendererEnabled())
     command_line->AppendSwitch(switches::kEnableDelegatedRenderer);
 
-  if (IsImplSidePaintingEnabled()) {
-    command_line->AppendSwitchASCII(
-        switches::kNumRasterThreads,
-        base::IntToString(NumberOfRendererRasterThreads()));
-  } else {
-    command_line->AppendSwitch(switches::kDisableImplSidePainting);
-  }
+  command_line->AppendSwitchASCII(
+      switches::kNumRasterThreads,
+      base::IntToString(NumberOfRendererRasterThreads()));
 
   if (IsGpuRasterizationEnabled())
     command_line->AppendSwitch(switches::kEnableGpuRasterization);
@@ -1140,22 +1139,26 @@ static void AppendCompositorCommandLineFlags(base::CommandLine* command_line) {
   if (IsForceGpuRasterizationEnabled())
     command_line->AppendSwitch(switches::kForceGpuRasterization);
 
-  // TODO(reveman): We currently assume that the compositor will use BGRA_8888
-  // if it's able to, and RGBA_8888 otherwise. Since we don't know what it will
-  // use we hardcode BGRA_8888 here for now. We should instead
-  // move decisions about GpuMemoryBuffer format to the browser embedder so we
-  // know it here, and pass that decision to the compositor for each usage.
-  // crbug.com/490362
-  gfx::GpuMemoryBuffer::Format format = gfx::GpuMemoryBuffer::BGRA_8888;
-
-  // TODO(danakj): When one-copy uploads support partial update, change this
-  // usage to PERSISTENT_MAP for one-copy.
-  gfx::GpuMemoryBuffer::Usage usage = gfx::GpuMemoryBuffer::MAP;
+  command_line->AppendSwitchASCII(
+      switches::kContentImageTextureTarget,
+      base::UintToString(
+          // TODO(reveman): We currently assume that the compositor will use
+          // BGRA_8888 if it's able to, and RGBA_8888 otherwise. Since we don't
+          // know what it will use we hardcode BGRA_8888 here for now. We should
+          // instead move decisions about GpuMemoryBuffer format to the browser
+          // embedder so we know it here, and pass that decision to the
+          // compositor for each usage.
+          // crbug.com/490362
+          BrowserGpuMemoryBufferManager::GetImageTextureTarget(
+              gfx::GpuMemoryBuffer::BGRA_8888,
+              // TODO(danakj): When one-copy supports partial update, change
+              // this usage to PERSISTENT_MAP for one-copy.
+              gfx::GpuMemoryBuffer::MAP)));
 
   command_line->AppendSwitchASCII(
-      switches::kUseImageTextureTarget,
-      base::UintToString(
-          BrowserGpuChannelHostFactory::GetImageTextureTarget(format, usage)));
+      switches::kVideoImageTextureTarget,
+      base::UintToString(BrowserGpuMemoryBufferManager::GetImageTextureTarget(
+          gfx::GpuMemoryBuffer::R_8, gfx::GpuMemoryBuffer::MAP)));
 
   // Appending disable-gpu-feature switches due to software rendering list.
   GpuDataManagerImpl* gpu_data_manager = GpuDataManagerImpl::GetInstance();
@@ -1213,7 +1216,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kAudioBufferSize,
     switches::kBlinkPlatformLogChannels,
     switches::kBlinkSettings,
-    switches::kBlockCrossSiteDocuments,
     switches::kDefaultTileWidth,
     switches::kDefaultTileHeight,
     switches::kDisable3DAPIs,
@@ -1247,6 +1249,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kDisablePrefixedEncryptedMedia,
     switches::kDisableSeccompFilterSandbox,
     switches::kDisableSharedWorkers,
+    switches::kDisableSlimmingPaint,
     switches::kDisableSpeechAPI,
     switches::kDisableSVG1DOM,
     switches::kDisableThreadedCompositing,
@@ -1261,7 +1264,6 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableBrowserSideNavigation,
     switches::kEnableCompositorAnimationTimelines,
     switches::kEnableCredentialManagerAPI,
-    switches::kEnableDeferredImageDecoding,
     switches::kEnableDelayAgnosticAec,
     switches::kEnableDisplayList2dCanvas,
     switches::kEnableDistanceFieldText,
@@ -1303,6 +1305,7 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
     switches::kEnableWebBluetooth,
     switches::kEnableWebGLDraftExtensions,
     switches::kEnableWebGLImageChromium,
+    switches::kEnableWebVR,
     switches::kExplicitlyAllowedPorts,
     switches::kForceDeviceScaleFactor,
     switches::kForceDisplayList2dCanvas,
@@ -1408,16 +1411,23 @@ void RenderProcessHostImpl::PropagateBrowserCommandLineToRenderer(
         browser_cmd.GetSwitchValueASCII(switches::kTraceStartup));
   }
 
+#if defined(ENABLE_WEBRTC)
+  // Only run the Stun trials in the first renderer.
+  if (!has_done_stun_trials &&
+      browser_cmd.HasSwitch(switches::kWebRtcStunProbeTrialParameter)) {
+    has_done_stun_trials = true;
+    renderer_cmd->AppendSwitchASCII(
+        switches::kWebRtcStunProbeTrialParameter,
+        browser_cmd.GetSwitchValueASCII(
+            switches::kWebRtcStunProbeTrialParameter));
+  }
+#endif
+
   // Disable databases in incognito mode.
   if (GetBrowserContext()->IsOffTheRecord() &&
       !browser_cmd.HasSwitch(switches::kDisableDatabases)) {
     renderer_cmd->AppendSwitch(switches::kDisableDatabases);
   }
-
-  // Enforce the extra command line flags for impl-side painting.
-  if (IsImplSidePaintingEnabled() &&
-      !browser_cmd.HasSwitch(switches::kEnableDeferredImageDecoding))
-    renderer_cmd->AppendSwitch(switches::kEnableDeferredImageDecoding);
 
   // Add kWaitForDebugger to let renderer process wait for a debugger.
   if (browser_cmd.HasSwitch(switches::kWaitForDebuggerChildren)) {
@@ -1854,7 +1864,7 @@ void RenderProcessHostImpl::FilterURL(RenderProcessHost* rph,
 
   // Do not allow browser plugin guests to navigate to non-web URLs, since they
   // cannot swap processes or grant bindings.
-  bool non_web_url_in_guest = rph->IsIsolatedGuest() &&
+  bool non_web_url_in_guest = rph->IsForGuestsOnly() &&
       !(url->is_valid() && policy->IsWebSafeScheme(url->scheme()));
 
   if (non_web_url_in_guest || !policy->CanRequestURL(rph->GetID(), *url)) {
@@ -1881,7 +1891,7 @@ bool RenderProcessHostImpl::IsSuitableHost(
   // and non-guest storage gets mixed. In the future, we might consider enabling
   // the sharing of guests, in this case this check should be removed and
   // InSameStoragePartition should handle the possible sharing.
-  if (host->IsIsolatedGuest())
+  if (host->IsForGuestsOnly())
     return false;
 
   // Check whether the given host and the intended site_url will be using the
@@ -2091,6 +2101,15 @@ void RenderProcessHostImpl::ProcessDied(bool already_dead,
   } else if (child_process_launcher_.get()) {
     status = child_process_launcher_->GetChildTerminationStatus(already_dead,
                                                                 &exit_code);
+    if (already_dead && status == base::TERMINATION_STATUS_STILL_RUNNING) {
+      // May be in case of IPC error, if it takes long time for renderer
+      // to exit. Child process will be killed in any case during
+      // child_process_launcher_.reset(). Make sure we will not broadcast
+      // FrameHostMsg_RenderProcessGone with status
+      // TERMINATION_STATUS_STILL_RUNNING, since this will break WebContentsImpl
+      // logic.
+      status = base::TERMINATION_STATUS_PROCESS_CRASHED;
+    }
   }
 
   RendererClosedDetails details(status, exit_code);
@@ -2260,7 +2279,8 @@ void RenderProcessHostImpl::SetBackgrounded(bool backgrounded) {
   // absence of field trials to get coverage on the perf waterfall.
   base::FieldTrial* trial =
       base::FieldTrialList::Find("BackgroundRendererProcesses");
-  if (!trial || !StartsWithASCII(trial->group_name(), "Disallow", true)) {
+  if (!trial || !base::StartsWith(trial->group_name(), "Disallow",
+                                  base::CompareCase::SENSITIVE)) {
     child_process_launcher_->SetProcessBackgrounded(backgrounded);
   }
 #else
@@ -2331,8 +2351,6 @@ void RenderProcessHostImpl::OnProcessLaunched() {
   tracked_objects::ScopedTracker tracking_profile5(
       FROM_HERE_WITH_EXPLICIT_FUNCTION(
           "465841 RenderProcessHostImpl::OnProcessLaunched::MojoClientLaunch"));
-  if (channel_mojo_host_)
-    channel_mojo_host_->OnClientLaunched(GetHandle());
 
   // TODO(erikchen): Remove ScopedTracker below once http://crbug.com/465841
   // is fixed.

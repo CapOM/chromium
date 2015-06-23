@@ -39,7 +39,7 @@ source_set("base_paths") {
     "base_paths_win.h",
   ]
 
-  if (is_android || is_mac) {
+  if (is_android || is_mac || is_ios) {
     sources -= [ "base_paths_posix.cc" ]
   }
 
@@ -177,6 +177,7 @@ component("base") {
     "containers/linked_list.h",
     "containers/mru_cache.h",
     "containers/scoped_ptr_hash_map.h",
+    "containers/scoped_ptr_map.h",
     "containers/small_map.h",
     "containers/stack_container.h",
     "cpu.cc",
@@ -320,10 +321,8 @@ component("base") {
     "message_loop/incoming_task_queue.h",
     "message_loop/message_loop.cc",
     "message_loop/message_loop.h",
-    "message_loop/message_loop_proxy.cc",
-    "message_loop/message_loop_proxy.h",
-    "message_loop/message_loop_proxy_impl.cc",
-    "message_loop/message_loop_proxy_impl.h",
+    "message_loop/message_loop_task_runner.cc",
+    "message_loop/message_loop_task_runner.h",
     "message_loop/message_pump.cc",
     "message_loop/message_pump.h",
     "message_loop/message_pump_android.cc",
@@ -366,7 +365,6 @@ component("base") {
     "pending_task.h",
     "pickle.cc",
     "pickle.h",
-    "port.h",
     "posix/eintr_wrapper.h",
     "posix/file_descriptor_shuffle.cc",
     "posix/global_descriptors.cc",
@@ -764,12 +762,20 @@ component("base") {
   }
 
   # Mac.
-  if (is_mac) {
+  if (is_mac || is_ios) {
+    # Common Desktop / iOS excludes
     sources -= [
       "native_library_posix.cc",
       "strings/sys_string_conversions_posix.cc",
       "threading/platform_thread_internal_posix.cc",
     ]
+
+    if (is_ios) {
+      sources -= [
+        "files/file_path_watcher_fsevents.cc",
+        "files/file_path_watcher_fsevents.h",
+      ]
+    }
   } else {
     # Non-Mac.
     sources -= [
@@ -814,6 +820,46 @@ component("base") {
     }
   }
 
+  # iOS
+  if (is_ios) {
+    set_sources_assignment_filter([])
+
+    sources += [
+      "atomicops_internals_mac.h",
+      "base_paths_mac.h",
+      "base_paths_mac.mm",
+      "file_version_info_mac.h",
+      "file_version_info_mac.mm",
+      "files/file_util_mac.mm",
+      "mac/bundle_locations.h",
+      "mac/bundle_locations.mm",
+      "mac/foundation_util.h",
+      "mac/foundation_util.mm",
+      "mac/mac_logging.cc",
+      "mac/mac_logging.h",
+      "mac/mach_logging.cc",
+      "mac/mach_logging.h",
+      "mac/objc_property_releaser.h",
+      "mac/objc_property_releaser.mm",
+      "mac/scoped_mach_port.cc",
+      "mac/scoped_mach_port.h",
+      "mac/scoped_mach_vm.cc",
+      "mac/scoped_mach_vm.h",
+      "mac/scoped_nsautorelease_pool.h",
+      "mac/scoped_nsautorelease_pool.mm",
+      "mac/scoped_nsobject.h",
+      "mac/scoped_objc_class_swizzler.h",
+      "mac/scoped_objc_class_swizzler.mm",
+      "message_loop/message_pump_mac.h",
+      "message_loop/message_pump_mac.mm",
+      "strings/sys_string_conversions_mac.mm",
+      "threading/platform_thread_mac.mm",
+      "time/time_mac.cc",
+    ]
+
+    set_sources_assignment_filter(sources_assignment_filter)
+  }
+
   if (!use_glib) {
     sources -= [
       "message_loop/message_pump_glib.cc",
@@ -822,7 +868,7 @@ component("base") {
   }
 
   configs += [ "//build/config/compiler:wexit_time_destructors" ]
-  if (is_android && !is_debug) {
+  if (!is_debug) {
     configs -= [ "//build/config/compiler:optimize" ]
     configs += [ "//build/config/compiler:optimize_max" ]
   }
@@ -841,7 +887,7 @@ source_set("base_static") {
     "win/pe_image.h",
   ]
 
-  if (is_android && !is_debug) {
+  if (!is_debug) {
     configs -= [ "//build/config/compiler:optimize" ]
     configs += [ "//build/config/compiler:optimize_max" ]
   }
@@ -894,7 +940,7 @@ component("i18n") {
     "//third_party/icu",
   ]
 
-  if (is_android && !is_debug) {
+  if (!is_debug) {
     configs -= [ "//build/config/compiler:optimize" ]
     configs += [ "//build/config/compiler:optimize_max" ]
   }
@@ -1006,7 +1052,7 @@ component("prefs") {
     ":base",
   ]
 
-  if (is_android && !is_debug) {
+  if (!is_debug) {
     configs -= [ "//build/config/compiler:optimize" ]
     configs += [ "//build/config/compiler:optimize_max" ]
   }
@@ -1067,6 +1113,15 @@ if (is_win) {
   }
 }
 
+# TODO(GYP): Delete this after we've converted everything to GN.
+# The _run targets exist only for compatibility w/ GYP.
+group("base_unittests_run") {
+  testonly = true
+  deps = [
+    ":base_unittests",
+  ]
+}
+
 test("base_unittests") {
   sources = [
     "android/application_status_listener_unittest.cc",
@@ -1100,6 +1155,7 @@ test("base_unittests") {
     "containers/linked_list_unittest.cc",
     "containers/mru_cache_unittest.cc",
     "containers/scoped_ptr_hash_map_unittest.cc",
+    "containers/scoped_ptr_map_unittest.cc",
     "containers/small_map_unittest.cc",
     "containers/stack_container_unittest.cc",
     "cpu_unittest.cc",
@@ -1170,8 +1226,7 @@ test("base_unittests") {
     "memory/singleton_unittest.cc",
     "memory/weak_ptr_unittest.cc",
     "memory/weak_ptr_unittest.nc",
-    "message_loop/message_loop_proxy_impl_unittest.cc",
-    "message_loop/message_loop_proxy_unittest.cc",
+    "message_loop/message_loop_task_runner_unittest.cc",
     "message_loop/message_loop_unittest.cc",
     "message_loop/message_pump_glib_unittest.cc",
     "message_loop/message_pump_io_ios_unittest.cc",
@@ -1340,8 +1395,6 @@ test("base_unittests") {
   if (is_ios) {
     sources -= [
       "process/memory_unittest.cc",
-      "process/memory_unittest_mac.h",
-      "process/memory_unittest_mac.mm",
       "process/process_unittest.cc",
       "process/process_util_unittest.cc",
     ]

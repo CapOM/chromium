@@ -283,10 +283,10 @@ bool MimeUtil::MatchesMimeType(const std::string& mime_type_pattern,
   const std::string left(base_pattern.substr(0, star));
   const std::string right(base_pattern.substr(star + 1));
 
-  if (!StartsWithASCII(base_type, left, false))
+  if (!base::StartsWithASCII(base_type, left, false))
     return false;
 
-  if (!right.empty() && !EndsWith(base_type, right, false))
+  if (!right.empty() && !base::EndsWith(base_type, right, false))
     return false;
 
   return MatchesMimeTypeParameters(mime_type_pattern, mime_type);
@@ -330,7 +330,8 @@ bool MimeUtil::IsValidTopLevelMimeType(const std::string& type_string) const {
       return true;
   }
 
-  return type_string.size() > 2 && StartsWithASCII(type_string, "x-", false);
+  return type_string.size() > 2 &&
+         base::StartsWithASCII(type_string, "x-", false);
 }
 
 //----------------------------------------------------------------------------
@@ -457,7 +458,8 @@ void GetExtensionsFromHardCodedMappings(
     const std::string& leading_mime_type,
     base::hash_set<base::FilePath::StringType>* extensions) {
   for (size_t i = 0; i < mappings_len; ++i) {
-    if (StartsWithASCII(mappings[i].mime_type, leading_mime_type, false)) {
+    if (base::StartsWithASCII(mappings[i].mime_type, leading_mime_type,
+                              false)) {
       std::vector<string> this_extensions;
       base::SplitString(mappings[i].extensions, ',', &this_extensions);
       for (size_t j = 0; j < this_extensions.size(); ++j) {
@@ -519,7 +521,7 @@ void GetExtensionsForMimeType(
   const std::string mime_type = base::StringToLowerASCII(unsafe_mime_type);
   base::hash_set<base::FilePath::StringType> unique_extensions;
 
-  if (EndsWith(mime_type, "/*", false)) {
+  if (base::EndsWith(mime_type, "/*", false)) {
     std::string leading_mime_type = mime_type.substr(0, mime_type.length() - 1);
 
     // Find the matching StandardType from within kStandardTypes, or fall

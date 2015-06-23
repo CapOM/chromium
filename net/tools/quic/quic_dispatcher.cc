@@ -470,8 +470,9 @@ QuicServerSession* QuicDispatcher::CreateQuicSession(
       /* owns_writer= */ true, Perspective::IS_SERVER,
       crypto_config_->HasProofSource(), supported_versions_);
 
-  QuicServerSession* session = new QuicServerSession(config_, connection, this);
-  session->InitializeSession(crypto_config_);
+  QuicServerSession* session =
+      new QuicServerSession(config_, connection, this, crypto_config_);
+  session->Initialize();
   if (FLAGS_quic_session_map_threshold_for_stateless_rejects != -1 &&
       session_map_.size() >=
           static_cast<size_t>(
@@ -482,8 +483,12 @@ QuicServerSession* QuicDispatcher::CreateQuicSession(
 }
 
 QuicTimeWaitListManager* QuicDispatcher::CreateQuicTimeWaitListManager() {
-  return new QuicTimeWaitListManager(
-      writer_.get(), this, helper_.get(), supported_versions());
+  // TODO(rjshade): The QuicTimeWaitListManager should take ownership of the
+  // per-connection packet writer.
+  time_wait_list_writer_.reset(
+      packet_writer_factory_->Create(writer_.get(), nullptr));
+  return new QuicTimeWaitListManager(time_wait_list_writer_.get(), this,
+                                     helper_.get(), supported_versions());
 }
 
 bool QuicDispatcher::HandlePacketForTimeWait(

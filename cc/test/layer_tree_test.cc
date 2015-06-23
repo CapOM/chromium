@@ -14,7 +14,6 @@
 #include "cc/animation/timing_function.h"
 #include "cc/base/switches.h"
 #include "cc/input/input_handler.h"
-#include "cc/layers/content_layer.h"
 #include "cc/layers/layer.h"
 #include "cc/layers/layer_impl.h"
 #include "cc/test/animation_test_common.h"
@@ -26,7 +25,6 @@
 #include "cc/test/test_gpu_memory_buffer_manager.h"
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "cc/test/test_task_graph_runner.h"
-#include "cc/test/tiled_layer_test_common.h"
 #include "cc/trees/layer_tree_host_client.h"
 #include "cc/trees/layer_tree_host_impl.h"
 #include "cc/trees/layer_tree_host_single_thread_client.h"
@@ -318,8 +316,12 @@ class LayerTreeHostImplForTesting : public LayerTreeHostImpl {
     test_hooks_->NotifyReadyToDrawOnThread(this);
   }
 
+  void NotifyAllTileTasksCompleted() override {
+    LayerTreeHostImpl::NotifyAllTileTasksCompleted();
+    test_hooks_->NotifyAllTileTasksCompleted(this);
+  }
+
   void BlockNotifyReadyToActivateForTesting(bool block) override {
-    CHECK(settings().impl_side_painting);
     CHECK(proxy()->ImplThreadTaskRunner())
         << "Not supported for single-threaded mode.";
     block_notify_ready_to_activate_for_testing_ = block;
@@ -786,9 +788,7 @@ void LayerTreeTest::DispatchCompositeImmediately() {
     layer_tree_host_->Composite(base::TimeTicks::Now());
 }
 
-void LayerTreeTest::RunTest(bool threaded,
-                            bool delegating_renderer,
-                            bool impl_side_painting) {
+void LayerTreeTest::RunTest(bool threaded, bool delegating_renderer) {
   if (threaded) {
     impl_thread_.reset(new base::Thread("Compositor"));
     ASSERT_TRUE(impl_thread_->Start());
@@ -806,7 +806,6 @@ void LayerTreeTest::RunTest(bool threaded,
   // mocked out.
   settings_.renderer_settings.refresh_rate = 200.0;
   settings_.background_animation_rate = 200.0;
-  settings_.impl_side_painting = impl_side_painting;
   settings_.verify_property_trees = verify_property_trees_;
   InitializeSettings(&settings_);
   InitializeLayerSettings(&layer_settings_);
@@ -835,10 +834,6 @@ void LayerTreeTest::RunTest(bool threaded,
     return;
   }
   AfterTest();
-}
-
-void LayerTreeTest::RunTestWithImplSidePainting() {
-  RunTest(true, false, true);
 }
 
 void LayerTreeTest::RequestNewOutputSurface() {

@@ -8,8 +8,8 @@
 #include "base/strings/utf_string_conversions.h"
 #include "components/omnibox/autocomplete_match.h"
 #include "components/omnibox/autocomplete_match_type.h"
-#include "components/omnibox/autocomplete_provider_client.h"
 #include "components/omnibox/autocomplete_scheme_classifier.h"
+#include "components/omnibox/mock_autocomplete_provider_client.h"
 #include "components/omnibox/search_suggestion_parser.h"
 #include "components/omnibox/suggestion_answer.h"
 #include "components/search_engines/search_terms_data.h"
@@ -22,45 +22,13 @@ using testing::NiceMock;
 using testing::Return;
 using testing::_;
 
-class MockAutocompleteProviderClient : public AutocompleteProviderClient {
- public:
-  MockAutocompleteProviderClient() {}
-  MOCK_METHOD0(RequestContext, net::URLRequestContextGetter*());
-  MOCK_METHOD0(IsOffTheRecord, bool());
-  MOCK_METHOD0(AcceptLanguages, std::string());
-  MOCK_METHOD0(SearchSuggestEnabled, bool());
-  MOCK_METHOD0(ShowBookmarkBar, bool());
-  MOCK_METHOD0(SchemeClassifier, const AutocompleteSchemeClassifier&());
-  MOCK_METHOD6(
-      Classify,
-      void(const base::string16& text,
-           bool prefer_keyword,
-           bool allow_exact_keyword_match,
-           metrics::OmniboxEventProto::PageClassification page_classification,
-           AutocompleteMatch* match,
-           GURL* alternate_nav_url));
-  MOCK_METHOD0(InMemoryDatabase, history::URLDatabase*());
-  MOCK_METHOD2(DeleteMatchingURLsForKeywordFromHistory,
-               void(history::KeywordID keyword_id, const base::string16& term));
-  MOCK_METHOD0(TabSyncEnabledAndUnencrypted, bool());
-  MOCK_METHOD1(PrefetchImage, void(const GURL& url));
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(MockAutocompleteProviderClient);
-};
-
 class TestBaseSearchProvider : public BaseSearchProvider {
  public:
   typedef BaseSearchProvider::MatchMap MatchMap;
 
-  // Note: Takes ownership of client. scoped_ptr<> would be the right way to
-  // express that, but NiceMock<> can't forward a scoped_ptr.
-  TestBaseSearchProvider(TemplateURLService* template_url_service,
-                         AutocompleteProviderClient* client,
-                         AutocompleteProvider::Type type)
-      : BaseSearchProvider(template_url_service,
-                           scoped_ptr<AutocompleteProviderClient>(client),
-                           type) {}
+  TestBaseSearchProvider(AutocompleteProvider::Type type,
+                         AutocompleteProviderClient* client)
+      : BaseSearchProvider(type, client) {}
   MOCK_METHOD1(DeleteMatch, void(const AutocompleteMatch& match));
   MOCK_CONST_METHOD1(AddProviderInfo, void(ProvidersInfo* provider_info));
   MOCK_CONST_METHOD1(GetTemplateURL, const TemplateURL*(bool is_keyword));
@@ -69,9 +37,8 @@ class TestBaseSearchProvider : public BaseSearchProvider {
                      bool(const SearchSuggestionParser::SuggestResult& result));
   MOCK_METHOD1(RecordDeletionResult, void(bool success));
 
-  MOCK_METHOD3(Start,
-               void(const AutocompleteInput& input, bool minimal_changes,
-                    bool called_due_to_focus));
+  MOCK_METHOD2(Start,
+               void(const AutocompleteInput& input, bool minimal_changes));
   void AddMatchToMap(const SearchSuggestionParser::SuggestResult& result,
                      const std::string& metadata,
                      int accepted_suggestion,
@@ -99,22 +66,18 @@ class BaseSearchProviderTest : public testing::Test {
 
  protected:
   void SetUp() override {
-    service_.reset(
-        new TemplateURLService(NULL,
-                               scoped_ptr<SearchTermsData>(new SearchTermsData),
-                               NULL,
-                               scoped_ptr<TemplateURLServiceClient>(),
-                               NULL,
-                               NULL,
-                               base::Closure()));
+    scoped_ptr<TemplateURLService> template_url_service(new TemplateURLService(
+        nullptr, scoped_ptr<SearchTermsData>(new SearchTermsData), nullptr,
+        scoped_ptr<TemplateURLServiceClient>(), nullptr, nullptr,
+        base::Closure()));
+    client_.reset(new NiceMock<MockAutocompleteProviderClient>());
+    client_->set_template_url_service(template_url_service.Pass());
     provider_ = new NiceMock<TestBaseSearchProvider>(
-        service_.get(),
-        new NiceMock<MockAutocompleteProviderClient>,
-        AutocompleteProvider::TYPE_SEARCH);
+        AutocompleteProvider::TYPE_SEARCH, client_.get());
   }
 
   scoped_refptr<NiceMock<TestBaseSearchProvider> > provider_;
-  scoped_ptr<TemplateURLService> service_;
+  scoped_ptr<NiceMock<MockAutocompleteProviderClient>> client_;
 };
 
 TEST_F(BaseSearchProviderTest, PreserveAnswersWhenDeduplicating) {

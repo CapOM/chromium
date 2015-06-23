@@ -240,15 +240,6 @@ bool Layer::IsPropertyChangeAllowed() const {
   return !layer_tree_host_->in_paint_layer_contents();
 }
 
-gfx::Rect Layer::LayerRectToContentRect(const gfx::Rect& layer_rect) const {
-  gfx::Rect content_rect = gfx::ScaleToEnclosingRect(
-      layer_rect, contents_scale_x(), contents_scale_y());
-  // Intersect with content rect to avoid the extra pixel because for some
-  // values x and y, ceil((x / y) * y) may be x + 1.
-  content_rect.Intersect(gfx::Rect(content_bounds()));
-  return content_rect;
-}
-
 skia::RefPtr<SkPicture> Layer::GetPicture() const {
   return skia::RefPtr<SkPicture>();
 }
@@ -468,17 +459,6 @@ SkColor Layer::SafeOpaqueBackgroundColor() const {
       color = SkColorSetA(color, 255);
   }
   return color;
-}
-
-void Layer::CalculateContentsScale(float ideal_contents_scale,
-                                   float* contents_scale_x,
-                                   float* contents_scale_y,
-                                   gfx::Size* content_bounds) {
-  DCHECK(layer_tree_host_);
-
-  *contents_scale_x = 1;
-  *contents_scale_y = 1;
-  *content_bounds = bounds();
 }
 
 void Layer::SetMasksToBounds(bool masks_to_bounds) {
@@ -1154,16 +1134,6 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
   layer->SetBounds(use_paint_properties ? paint_properties_.bounds
                                         : bounds_);
 
-  // TODO(enne): This is needed because CDP does this.  Once main thread CDP
-  // goes away, content scale / bounds can be removed.
-  if (layer_tree_host()->using_only_property_trees()) {
-    layer->SetContentsScale(1.f, 1.f);
-    layer->SetContentBounds(bounds());
-  } else {
-    layer->SetContentBounds(content_bounds());
-    layer->SetContentsScale(contents_scale_x(), contents_scale_y());
-  }
-
   if (frame_viewer_instrumentation::IsTracingLayerTreeSnapshots())
     layer->SetDebugInfo(TakeDebugInfo());
 
@@ -1176,7 +1146,7 @@ void Layer::PushPropertiesTo(LayerImpl* layer) {
       draw_checkerboard_for_missing_tiles_);
   layer->SetDrawsContent(DrawsContent());
   layer->SetHideLayerAndSubtree(hide_layer_and_subtree_);
-  layer->SetHasRenderSurface(has_render_surface_ || layer->HasCopyRequest());
+  layer->SetHasRenderSurface(has_render_surface_);
   if (!layer->FilterIsAnimatingOnImplOnly() && !FilterIsAnimating())
     layer->SetFilters(filters_);
   DCHECK(!(FilterIsAnimating() && layer->FilterIsAnimatingOnImplOnly()));
@@ -1377,8 +1347,7 @@ void Layer::SavePaintProperties() {
       layer_tree_host_->source_frame_number();
 }
 
-bool Layer::Update(ResourceUpdateQueue* queue,
-                   const OcclusionTracker<Layer>* occlusion) {
+bool Layer::Update() {
   DCHECK(layer_tree_host_);
   DCHECK_EQ(layer_tree_host_->source_frame_number(),
             paint_properties_.source_frame_number) <<
@@ -1549,12 +1518,6 @@ void Layer::RemoveLayerAnimationEventObserver(
     LayerAnimationEventObserver* animation_observer) {
   DCHECK(layer_animation_controller_);
   layer_animation_controller_->RemoveEventObserver(animation_observer);
-}
-
-SimpleEnclosedRegion Layer::VisibleContentOpaqueRegion() const {
-  if (contents_opaque())
-    return SimpleEnclosedRegion(visible_content_rect());
-  return SimpleEnclosedRegion();
 }
 
 ScrollbarLayerInterface* Layer::ToScrollbarLayer() {

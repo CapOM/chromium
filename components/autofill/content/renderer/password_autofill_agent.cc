@@ -9,7 +9,7 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/message_loop/message_loop.h"
 #include "base/metrics/field_trial.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/autofill/content/common/autofill_messages.h"
 #include "components/autofill/content/renderer/form_autofill_util.h"
@@ -225,7 +225,7 @@ bool DoUsernamesMatch(const base::string16& username1,
                       bool exact_match) {
   if (exact_match)
     return username1 == username2;
-  return StartsWith(username1, username2, true);
+  return base::StartsWith(username1, username2, true);
 }
 
 // Returns |true| if the given element is editable. Otherwise, returns |false|.
@@ -288,21 +288,21 @@ bool GetSuggestionsStats(const PasswordFormFillData& fill_data,
   for (const auto& usernames : fill_data.other_possible_usernames) {
     for (size_t i = 0; i < usernames.second.size(); ++i) {
       if (show_all ||
-          StartsWith(usernames.second[i], current_username, false)) {
+          base::StartsWith(usernames.second[i], current_username, false)) {
         *suggestions_present = true;
         return true;
       }
     }
   }
 
-  if (show_all ||
-      StartsWith(fill_data.username_field.value, current_username, false)) {
+  if (show_all || base::StartsWith(fill_data.username_field.value,
+                                   current_username, false)) {
     *suggestions_present = true;
     return false;
   }
 
   for (const auto& login : fill_data.additional_logins) {
-    if (show_all || StartsWith(login.first, current_username, false)) {
+    if (show_all || base::StartsWith(login.first, current_username, false)) {
       *suggestions_present = true;
       return false;
     }
@@ -722,6 +722,12 @@ void PasswordAutofillAgent::UpdateStateForTextChange(
   if (element.isTextField())
     nonscript_modified_values_[element] = element.value();
 
+  LoginToPasswordInfoMap::iterator password_info_iter =
+      login_to_password_info_.find(element);
+  if (password_info_iter != login_to_password_info_.end()) {
+    password_info_iter->second.username_was_edited = true;
+  }
+
   DCHECK_EQ(element.document().frame(), render_frame()->GetWebFrame());
 
   if (element.isPasswordField()) {
@@ -838,7 +844,8 @@ bool PasswordAutofillAgent::FindPasswordInfoForElement(
 
 bool PasswordAutofillAgent::ShowSuggestions(
     const blink::WebInputElement& element,
-    bool show_all) {
+    bool show_all,
+    bool generation_popup_showing) {
   const blink::WebInputElement* username_element;
   PasswordInfo* password_info;
   if (!FindPasswordInfoForElement(element, &username_element, &password_info))
@@ -858,8 +865,17 @@ bool PasswordAutofillAgent::ShowSuggestions(
   // is no username or the corresponding username element is not editable since
   // it is only in that case that the username element does not have a
   // suggestions popup.
-  if (element.isPasswordField() && username_is_available)
+  if (element.isPasswordField() && username_is_available &&
+      (!password_info->fill_data.is_possible_change_password_form ||
+       password_info->username_was_edited))
     return true;
+
+  UMA_HISTOGRAM_BOOLEAN(
+      "PasswordManager.AutocompletePopupSuppressedByGeneration",
+      generation_popup_showing);
+
+  if (generation_popup_showing)
+    return false;
 
   // Chrome should never show more than one account for a password element since
   // this implies that the username element cannot be modified. Thus even if
@@ -1287,7 +1303,9 @@ void PasswordAutofillAgent::OnFindFocusedPasswordForm() {
 // PasswordAutofillAgent, private:
 
 PasswordAutofillAgent::PasswordInfo::PasswordInfo()
-    : backspace_pressed_last(false), password_was_edited_last(false) {
+    : backspace_pressed_last(false),
+      password_was_edited_last(false),
+      username_was_edited(false) {
 }
 
 bool PasswordAutofillAgent::ShowSuggestionPopup(

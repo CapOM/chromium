@@ -233,7 +233,8 @@ void RenderWidgetCompositor::Initialize() {
       !compositor_deps_->IsElasticOverscrollEnabled();
   settings.accelerated_animation_enabled =
       !cmd->HasSwitch(cc::switches::kDisableThreadedAnimation);
-  settings.use_display_lists = cmd->HasSwitch(switches::kEnableSlimmingPaint);
+  settings.use_display_lists = cmd->HasSwitch(switches::kEnableSlimmingPaint) ||
+      !cmd->HasSwitch(switches::kDisableSlimmingPaint);
   if (cmd->HasSwitch(switches::kEnableCompositorAnimationTimelines)) {
     settings.use_compositor_animation_timelines = true;
     blink::WebRuntimeFeatures::enableCompositorAnimationTimelines(true);
@@ -277,7 +278,6 @@ void RenderWidgetCompositor::Initialize() {
 
   settings.gpu_rasterization_msaa_sample_count =
       compositor_deps_->GetGpuRasterizationMSAASampleCount();
-  settings.impl_side_painting = compositor_deps_->IsImplSidePaintingEnabled();
   settings.gpu_rasterization_forced =
       compositor_deps_->IsGpuRasterizationForced();
   settings.gpu_rasterization_enabled =
@@ -312,8 +312,7 @@ void RenderWidgetCompositor::Initialize() {
   }
 
   settings.verify_property_trees =
-      cmd->HasSwitch(cc::switches::kEnablePropertyTreeVerification) &&
-      settings.impl_side_painting;
+      cmd->HasSwitch(cc::switches::kEnablePropertyTreeVerification);
   settings.renderer_settings.allow_antialiasing &=
       !cmd->HasSwitch(cc::switches::kDisableCompositedAntialiasing);
   // The means the renderer compositor has 2 possible modes:
@@ -827,7 +826,7 @@ void RenderWidgetCompositor::setTopControlsShownRatio(float ratio) {
 }
 
 void RenderWidgetCompositor::WillBeginMainFrame() {
-  widget_->willBeginCompositorFrame();
+  widget_->WillBeginCompositorFrame();
 }
 
 void RenderWidgetCompositor::DidBeginMainFrame() {
@@ -929,16 +928,15 @@ void RenderWidgetCompositor::WillCommit() {
 void RenderWidgetCompositor::DidCommit() {
   DCHECK(!temporary_copy_output_request_);
   widget_->DidCommitCompositorFrame();
-  widget_->didBecomeReadyForAdditionalInput();
   compositor_deps_->GetRendererScheduler()->DidCommitFrameToCompositor();
 }
 
 void RenderWidgetCompositor::DidCommitAndDrawFrame() {
-  widget_->didCommitAndDrawCompositorFrame();
+  widget_->DidCommitAndDrawCompositorFrame();
 }
 
 void RenderWidgetCompositor::DidCompleteSwapBuffers() {
-  widget_->didCompleteSwapBuffers();
+  widget_->DidCompleteSwapBuffers();
   bool threaded = !!compositor_deps_->GetCompositorImplThreadTaskRunner().get();
   if (!threaded)
     widget_->OnSwapBuffersComplete();

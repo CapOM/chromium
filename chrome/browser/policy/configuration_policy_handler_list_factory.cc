@@ -42,6 +42,8 @@
 #endif
 
 #if defined(OS_CHROMEOS)
+#include "chrome/browser/chromeos/drive/drive_pref_names.h"
+#include "chrome/browser/chromeos/platform_keys/key_permissions_policy_handler.h"
 #include "chrome/browser/chromeos/policy/configuration_policy_handler_chromeos.h"
 #include "chromeos/chromeos_pref_names.h"
 #include "chromeos/dbus/power_policy_controller.h"
@@ -381,10 +383,10 @@ const PolicyToPreferenceMapEntry kSimplePolicyMap[] = {
     prefs::kChromeOsReleaseChannel,
     base::Value::TYPE_STRING },
   { key::kDriveDisabled,
-    prefs::kDisableDrive,
+    drive::prefs::kDisableDrive,
     base::Value::TYPE_BOOLEAN },
   { key::kDriveDisabledOverCellular,
-    prefs::kDisableDriveOverCellular,
+    drive::prefs::kDisableDriveOverCellular,
     base::Value::TYPE_BOOLEAN },
   { key::kExternalStorageDisabled,
     prefs::kExternalStorageDisabled,
@@ -775,6 +777,8 @@ scoped_ptr<ConfigurationPolicyHandlerList> BuildHandlerList(
       key::kSessionLocales, NULL, chrome_schema, SCHEMA_STRICT,
       SimpleSchemaValidatingPolicyHandler::RECOMMENDED_ALLOWED,
       SimpleSchemaValidatingPolicyHandler::MANDATORY_PROHIBITED)));
+  handlers->AddHandler(make_scoped_ptr(
+      new chromeos::KeyPermissionsPolicyHandler(chrome_schema)));
 #endif  // defined(OS_CHROMEOS)
 
   return handlers.Pass();

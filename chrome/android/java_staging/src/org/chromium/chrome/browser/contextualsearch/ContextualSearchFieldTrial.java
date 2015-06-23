@@ -12,7 +12,6 @@ import org.chromium.base.SysUtils;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ChromeVersionInfo;
 import org.chromium.components.variations.VariationsAssociatedData;
-import org.chromium.ui.base.DeviceFormFactor;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -77,7 +76,7 @@ public class ContextualSearchFieldTrial {
     }
 
     private static boolean detectEnabled(Context context) {
-        if (DeviceFormFactor.isTablet(context) || SysUtils.isLowEndDevice()) {
+        if (SysUtils.isLowEndDevice()) {
             return false;
         }
 
@@ -114,13 +113,6 @@ public class ContextualSearchFieldTrial {
         if (ChromeVersionInfo.isLocalBuild()) return true;
 
         return getBooleanParam(CONTEXTUAL_SEARCH_ENABLED_PARAM);
-    }
-
-    /**
-     * @return Whether the promo is configured for Opt-out.
-     */
-    static boolean isPromoOptOut() {
-        return true;
     }
 
     /**

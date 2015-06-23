@@ -15,7 +15,7 @@
 #include "chrome/browser/sync/glue/sync_start_util.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_switches.h"
 #include "components/keyed_service/content/browser_context_dependency_manager.h"
@@ -98,7 +98,7 @@ bool ShouldAffiliationBasedMatchingBeActive(Profile* profile) {
   ProfileSyncService* profile_sync_service =
       ProfileSyncServiceFactory::GetInstance()->GetForProfile(profile);
   return profile_sync_service &&
-         profile_sync_service->IsSyncEnabledAndLoggedIn() &&
+         profile_sync_service->CanSyncStart() &&
          profile_sync_service->IsSyncActive() &&
          profile_sync_service->GetPreferredDataTypes().Has(syncer::PASSWORDS) &&
          !profile_sync_service->IsUsingSecondaryPassphrase();

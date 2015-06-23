@@ -228,8 +228,19 @@ void LayerImpl::SetOpacityTreeIndex(int index) {
 }
 
 void LayerImpl::PassCopyRequests(ScopedPtrVector<CopyOutputRequest>* requests) {
+  // In the case that a layer still has a copy request, this means that there's
+  // a commit to the active tree without a draw.  This only happens in some
+  // edge cases during lost context or visibility changes, so don't try to
+  // handle preserving these output requests (and their surface).
+  if (!copy_requests_.empty()) {
+    layer_tree_impl()->RemoveLayerWithCopyOutputRequest(this);
+    // Destroying these will abort them.
+    copy_requests_.clear();
+  }
+
   if (requests->empty())
     return;
+
   DCHECK(render_surface());
   bool was_empty = copy_requests_.empty();
   copy_requests_.insert_and_take(copy_requests_.end(), requests);
@@ -256,10 +267,9 @@ void LayerImpl::TakeCopyRequestsAndTransformToTarget(
       continue;
 
     gfx::Rect request_in_layer_space = request->area();
-    gfx::Rect request_in_content_space =
-        LayerRectToContentRect(request_in_layer_space);
+    request_in_layer_space.Intersect(gfx::Rect(bounds()));
     request->set_area(MathUtil::MapEnclosingClippedRect(
-        draw_properties_.target_space_transform, request_in_content_space));
+        draw_properties_.target_space_transform, request_in_layer_space));
   }
 
   layer_tree_impl()->RemoveLayerWithCopyOutputRequest(this);
@@ -272,11 +282,10 @@ void LayerImpl::ClearRenderSurfaceLayerList() {
 }
 
 void LayerImpl::PopulateSharedQuadState(SharedQuadState* state) const {
-  state->SetAll(
-      draw_properties_.target_space_transform, draw_properties_.content_bounds,
-      draw_properties_.visible_content_rect, draw_properties_.clip_rect,
-      draw_properties_.is_clipped, draw_properties_.opacity,
-      draw_properties_.blend_mode, sorting_context_id_);
+  state->SetAll(draw_properties_.target_space_transform, bounds(),
+                draw_properties_.visible_layer_rect, draw_properties_.clip_rect,
+                draw_properties_.is_clipped, draw_properties_.opacity,
+                draw_properties_.blend_mode, sorting_context_id_);
 }
 
 void LayerImpl::PopulateScaledSharedQuadState(SharedQuadState* state,
@@ -284,16 +293,15 @@ void LayerImpl::PopulateScaledSharedQuadState(SharedQuadState* state,
   gfx::Transform scaled_draw_transform =
       draw_properties_.target_space_transform;
   scaled_draw_transform.Scale(SK_MScalar1 / scale, SK_MScalar1 / scale);
-  gfx::Size scaled_content_bounds =
-      gfx::ToCeiledSize(gfx::ScaleSize(bounds(), scale));
-  gfx::Rect scaled_visible_content_rect =
-      gfx::ScaleToEnclosingRect(visible_content_rect(), scale);
-  scaled_visible_content_rect.Intersect(gfx::Rect(scaled_content_bounds));
+  gfx::Size scaled_bounds = gfx::ToCeiledSize(gfx::ScaleSize(bounds(), scale));
+  gfx::Rect scaled_visible_layer_rect =
+      gfx::ScaleToEnclosingRect(visible_layer_rect(), scale);
+  scaled_visible_layer_rect.Intersect(gfx::Rect(scaled_bounds));
 
-  state->SetAll(scaled_draw_transform, scaled_content_bounds,
-                scaled_visible_content_rect, draw_properties().clip_rect,
-                draw_properties().is_clipped, draw_properties().opacity,
-                draw_properties().blend_mode, sorting_context_id_);
+  state->SetAll(scaled_draw_transform, scaled_bounds, scaled_visible_layer_rect,
+                draw_properties().clip_rect, draw_properties().is_clipped,
+                draw_properties().opacity, draw_properties().blend_mode,
+                sorting_context_id_);
 }
 
 bool LayerImpl::WillDraw(DrawMode draw_mode,
@@ -333,22 +341,18 @@ void LayerImpl::GetDebugBorderProperties(SkColor* color, float* width) const {
 
 void LayerImpl::AppendDebugBorderQuad(
     RenderPass* render_pass,
-    const gfx::Size& content_bounds,
+    const gfx::Size& bounds,
     const SharedQuadState* shared_quad_state,
     AppendQuadsData* append_quads_data) const {
   SkColor color;
   float width;
   GetDebugBorderProperties(&color, &width);
-  AppendDebugBorderQuad(render_pass,
-                        content_bounds,
-                        shared_quad_state,
-                        append_quads_data,
-                        color,
-                        width);
+  AppendDebugBorderQuad(render_pass, bounds, shared_quad_state,
+                        append_quads_data, color, width);
 }
 
 void LayerImpl::AppendDebugBorderQuad(RenderPass* render_pass,
-                                      const gfx::Size& content_bounds,
+                                      const gfx::Size& bounds,
                                       const SharedQuadState* shared_quad_state,
                                       AppendQuadsData* append_quads_data,
                                       SkColor color,
@@ -356,7 +360,7 @@ void LayerImpl::AppendDebugBorderQuad(RenderPass* render_pass,
   if (!ShowDebugBorders())
     return;
 
-  gfx::Rect quad_rect(content_bounds);
+  gfx::Rect quad_rect(bounds);
   gfx::Rect visible_quad_rect(quad_rect);
   DebugBorderDrawQuad* debug_border_quad =
       render_pass->CreateAndAppendDrawQuad<DebugBorderDrawQuad>();
@@ -459,14 +463,8 @@ InputHandler::ScrollStatus LayerImpl::TryScroll(
       // SCROLL_ON_MAIN_THREAD in this case?
     }
 
-    gfx::PointF hit_test_point_in_content_space =
-        MathUtil::ProjectPoint(inverse_screen_space_transform,
-                               screen_space_point,
-                               &clipped);
-    gfx::PointF hit_test_point_in_layer_space =
-        gfx::ScalePoint(hit_test_point_in_content_space,
-                        1.f / contents_scale_x(),
-                        1.f / contents_scale_y());
+    gfx::PointF hit_test_point_in_layer_space = MathUtil::ProjectPoint(
+        inverse_screen_space_transform, screen_space_point, &clipped);
     if (!clipped &&
         non_fast_scrollable_region().Contains(
             gfx::ToRoundedPoint(hit_test_point_in_layer_space))) {
@@ -504,16 +502,6 @@ InputHandler::ScrollStatus LayerImpl::TryScroll(
   return InputHandler::SCROLL_STARTED;
 }
 
-gfx::Rect LayerImpl::LayerRectToContentRect(
-    const gfx::RectF& layer_rect) const {
-  gfx::RectF content_rect =
-      gfx::ScaleRect(layer_rect, contents_scale_x(), contents_scale_y());
-  // Intersect with content rect to avoid the extra pixel because for some
-  // values x and y, ceil((x / y) * y) may be x + 1.
-  content_rect.Intersect(gfx::Rect(content_bounds()));
-  return gfx::ToEnclosingRect(content_rect);
-}
-
 skia::RefPtr<SkPicture> LayerImpl::GetPicture() {
   return skia::RefPtr<SkPicture>();
 }
@@ -526,14 +514,12 @@ void LayerImpl::PushPropertiesTo(LayerImpl* layer) {
   layer->SetTransformOrigin(transform_origin_);
   layer->SetBackgroundColor(background_color_);
   layer->SetBounds(bounds_);
-  layer->SetContentBounds(content_bounds());
-  layer->SetContentsScale(contents_scale_x(), contents_scale_y());
   layer->SetDoubleSided(double_sided_);
   layer->SetDrawCheckerboardForMissingTiles(
       draw_checkerboard_for_missing_tiles_);
   layer->SetDrawsContent(DrawsContent());
   layer->SetHideLayerAndSubtree(hide_layer_and_subtree_);
-  layer->SetHasRenderSurface(!!render_surface() || layer->HasCopyRequest());
+  layer->SetHasRenderSurface(!!render_surface());
   layer->SetFilters(filters());
   layer->SetBackgroundFilters(background_filters());
   layer->SetMasksToBounds(masks_to_bounds_);
@@ -876,10 +862,22 @@ void LayerImpl::SetBoundsDelta(const gfx::Vector2dF& bounds_delta) {
   bounds_delta_ = bounds_delta;
 
   ScrollbarParametersDidChange(true);
-  if (masks_to_bounds())
+
+  if (masks_to_bounds()) {
+    // If layer is clipping, then update the clip node using the new bounds.
+    ClipNode* clip_node =
+        layer_tree_impl()->property_trees()->clip_tree.Node(clip_tree_index());
+    if (clip_node) {
+      DCHECK(id() == clip_node->owner_id);
+      clip_node->data.clip =
+          gfx::RectF(gfx::PointF() + offset_to_transform_parent(), bounds());
+      layer_tree_impl()->property_trees()->clip_tree.set_needs_update(true);
+    }
+
     NoteLayerPropertyChangedForSubtree();
-  else
+  } else {
     NoteLayerPropertyChanged();
+  }
 }
 
 void LayerImpl::SetMaskLayer(scoped_ptr<LayerImpl> mask_layer) {
@@ -1132,25 +1130,6 @@ void LayerImpl::AddDamageRect(const gfx::RectF& damage_rect) {
   damage_rect_ = gfx::UnionRects(damage_rect_, damage_rect);
 }
 
-void LayerImpl::SetContentBounds(const gfx::Size& content_bounds) {
-  if (this->content_bounds() == content_bounds)
-    return;
-
-  draw_properties_.content_bounds = content_bounds;
-  NoteLayerPropertyChanged();
-}
-
-void LayerImpl::SetContentsScale(float contents_scale_x,
-                                 float contents_scale_y) {
-  if (this->contents_scale_x() == contents_scale_x &&
-      this->contents_scale_y() == contents_scale_y)
-    return;
-
-  draw_properties_.contents_scale_x = contents_scale_x;
-  draw_properties_.contents_scale_y = contents_scale_y;
-  NoteLayerPropertyChanged();
-}
-
 bool LayerImpl::IsExternalScrollActive() const {
   return layer_tree_impl_->IsExternalScrollActive();
 }
@@ -1237,6 +1216,22 @@ void LayerImpl::PushScrollOffset(const gfx::ScrollOffset* scroll_offset) {
     DidUpdateScrollOffset(false);
 }
 
+void LayerImpl::UpdatePropertyTreeForScrollingIfNeeded() {
+  // TODO(enne): in the future, scrolling should update the scroll tree
+  // directly instead of going through layers.
+  if (transform_tree_index_ != -1) {
+    TransformTree& transform_tree =
+        layer_tree_impl()->property_trees()->transform_tree;
+    TransformNode* node = transform_tree.Node(transform_tree_index_);
+    gfx::ScrollOffset current_offset = scroll_offset_->Current(IsActive());
+    if (node->data.scroll_offset != current_offset) {
+      node->data.scroll_offset = current_offset;
+      node->data.needs_local_transform_update = true;
+      transform_tree.set_needs_update(true);
+    }
+  }
+}
+
 void LayerImpl::DidUpdateScrollOffset(bool is_from_root_delegate) {
   DCHECK(scroll_offset_);
 
@@ -1245,16 +1240,7 @@ void LayerImpl::DidUpdateScrollOffset(bool is_from_root_delegate) {
   NoteLayerPropertyChangedForSubtree();
   ScrollbarParametersDidChange(false);
 
-  // TODO(enne): in the future, scrolling should update the scroll tree
-  // directly instead of going through layers.
-  if (transform_tree_index_ != -1) {
-    TransformTree& transform_tree =
-        layer_tree_impl()->property_trees()->transform_tree;
-    TransformNode* node = transform_tree.Node(transform_tree_index_);
-    node->data.scroll_offset = scroll_offset_->Current(IsActive());
-    node->data.needs_local_transform_update = true;
-    transform_tree.set_needs_update(true);
-  }
+  UpdatePropertyTreeForScrollingIfNeeded();
 
   // Inform the pending twin that a property changed.
   if (layer_tree_impl()->IsActiveTree()) {
@@ -1272,9 +1258,9 @@ void LayerImpl::SetDoubleSided(bool double_sided) {
   NoteLayerPropertyChangedForSubtree();
 }
 
-SimpleEnclosedRegion LayerImpl::VisibleContentOpaqueRegion() const {
+SimpleEnclosedRegion LayerImpl::VisibleOpaqueRegion() const {
   if (contents_opaque())
-    return SimpleEnclosedRegion(visible_content_rect());
+    return SimpleEnclosedRegion(visible_layer_rect());
   return SimpleEnclosedRegion();
 }
 
@@ -1528,9 +1514,7 @@ void LayerImpl::AsValueInto(base::trace_event::TracedValue* state) const {
 
   bool clipped;
   gfx::QuadF layer_quad = MathUtil::MapQuad(
-      screen_space_transform(),
-      gfx::QuadF(gfx::Rect(content_bounds())),
-      &clipped);
+      screen_space_transform(), gfx::QuadF(gfx::Rect(bounds())), &clipped);
   MathUtil::AddToTracedValue("layer_quad", layer_quad, state);
   if (!touch_event_handler_region_.IsEmpty()) {
     state->BeginArray("touch_event_handler_region");
@@ -1538,14 +1522,14 @@ void LayerImpl::AsValueInto(base::trace_event::TracedValue* state) const {
     state->EndArray();
   }
   if (have_wheel_event_handlers_) {
-    gfx::Rect wheel_rect(content_bounds());
+    gfx::Rect wheel_rect(bounds());
     Region wheel_region(wheel_rect);
     state->BeginArray("wheel_event_handler_region");
     wheel_region.AsValueInto(state);
     state->EndArray();
   }
   if (have_scroll_event_handlers_) {
-    gfx::Rect scroll_rect(content_bounds());
+    gfx::Rect scroll_rect(bounds());
     Region scroll_region(scroll_rect);
     state->BeginArray("scroll_event_handler_region");
     scroll_region.AsValueInto(state);
@@ -1669,18 +1653,16 @@ Region LayerImpl::GetInvalidationRegion() {
 
 gfx::Rect LayerImpl::GetEnclosingRectInTargetSpace() const {
   return MathUtil::MapEnclosingClippedRect(
-      draw_properties_.target_space_transform,
-      gfx::Rect(draw_properties_.content_bounds));
+      draw_properties_.target_space_transform, gfx::Rect(bounds()));
 }
 
 gfx::Rect LayerImpl::GetScaledEnclosingRectInTargetSpace(float scale) const {
   gfx::Transform scaled_draw_transform =
       draw_properties_.target_space_transform;
   scaled_draw_transform.Scale(SK_MScalar1 / scale, SK_MScalar1 / scale);
-  gfx::Size scaled_content_bounds =
-      gfx::ToCeiledSize(gfx::ScaleSize(content_bounds(), scale));
+  gfx::Size scaled_bounds = gfx::ToCeiledSize(gfx::ScaleSize(bounds(), scale));
   return MathUtil::MapEnclosingClippedRect(scaled_draw_transform,
-                                           gfx::Rect(scaled_content_bounds));
+                                           gfx::Rect(scaled_bounds));
 }
 
 }  // namespace cc

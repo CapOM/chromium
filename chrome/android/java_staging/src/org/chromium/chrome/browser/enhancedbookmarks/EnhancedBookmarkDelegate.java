@@ -4,9 +4,7 @@
 
 package org.chromium.chrome.browser.enhancedbookmarks;
 
-import android.support.annotation.Nullable;
 import android.support.v4.widget.DrawerLayout;
-import android.view.View;
 
 import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksModel;
 import org.chromium.chrome.browser.enhanced_bookmarks.LaunchLocation;
@@ -31,11 +29,6 @@ interface EnhancedBookmarkDelegate {
         public void onBookmarkUIStateChange(String url);
     }
 
-    static final int STATE_LOADING = 0;
-    static final int STATE_ALL_BOOKMARKS = 1;
-    static final int STATE_FOLDER = 2;
-    static final int STATE_FILTER = 3;
-
     /**
      * Corresponds to "All Items" list item in the side drawer. Shows all bookmarks.
      */
@@ -47,13 +40,6 @@ interface EnhancedBookmarkDelegate {
      * @param folder Parent folder that contains bookmarks to show as its children.
      */
     void openFolder(BookmarkId folder);
-
-    /**
-     * Corresponds to any filter list item in the side drawer. Shows bookmarks under the
-     * filter.
-     * @param filter Filter string to search
-     */
-    void openFilter(String filter);
 
     /**
      * Clear all selected items. After this call, {@link #isSelectionEnabled()} will return false.
@@ -81,17 +67,6 @@ interface EnhancedBookmarkDelegate {
      * @return The list of bookmarks that are currently selected by the user.
      */
     List<BookmarkId> getSelectedBookmarks();
-
-    /**
-     * Sets list mode. If the mode is toggles,
-     * {@link EnhancedBookmarkUIObserver#onListModeChange(boolean)} will be called.
-     */
-    void setListModeEnabled(boolean isListModeEnabled);
-
-    /**
-     * @return True is list mode is enabled. False otherwise.
-     */
-    boolean isListModeEnabled();
 
     /**
      * Notifies the current mode set event to the given observer. For example, if the current mode
@@ -123,26 +98,6 @@ interface EnhancedBookmarkDelegate {
     void openBookmark(BookmarkId bookmark, int launchLocation);
 
     /**
-     * Starts detail activity with shared element animation. On Lollipop and later devices, shows a
-     * shared image animation. On earlier devices, opens the activity using the standard Activity
-     * transition.
-     * @param bookmarkId The bookmark that the detail activity shows.
-     * @param view The view to share for activity transition animation. If null, no transition is
-     *            displayed.
-     */
-    void startDetailActivity(BookmarkId bookmarkId, @Nullable View view);
-
-    /**
-     * Shows the search UI.
-     */
-    void openSearchUI();
-
-    /**
-     * Dismisses the search UI.
-     */
-    void closeSearchUI();
-
-    /**
      * Closes the EnhancedBookmark Activity on Phone. Does nothing on tablet.
      */
     void finishActivityOnPhone();
@@ -164,7 +119,7 @@ interface EnhancedBookmarkDelegate {
 
     /**
      * @return Current UIState of Enhanced Bookmark main UI. If no mode is stored,
-     *         {@link EnhancedBookmarkDelegate#STATE_LOADING} is returned.
+     *         {@link UIState#STATE_LOADING} is returned.
      */
     int getCurrentState();
 }

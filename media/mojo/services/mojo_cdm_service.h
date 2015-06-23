@@ -15,15 +15,24 @@
 
 namespace media {
 
+class MojoCdmServiceContext;
+
 // A mojo::ContentDecryptionModule implementation backed by a media::MediaKeys.
 class MojoCdmService : public mojo::ContentDecryptionModule {
  public:
-  MojoCdmService(const mojo::String& key_system,
+  // Constructs a MojoCdmService and strongly binds it to the |request|.
+  MojoCdmService(MojoCdmServiceContext* context,
                  mojo::InterfaceRequest<mojo::ContentDecryptionModule> request);
+
   ~MojoCdmService() final;
 
   // mojo::ContentDecryptionModule implementation.
   void SetClient(mojo::ContentDecryptionModuleClientPtr client) final;
+  void Initialize(
+      const mojo::String& key_system,
+      const mojo::String& security_origin,
+      int32_t cdm_id,
+      const mojo::Callback<void(mojo::CdmPromiseResultPtr)>& callback) final;
   void SetServerCertificate(
       mojo::Array<uint8_t> certificate_data,
       const mojo::Callback<void(mojo::CdmPromiseResultPtr)>& callback) final;
@@ -47,8 +56,10 @@ class MojoCdmService : public mojo::ContentDecryptionModule {
   void RemoveSession(
       const mojo::String& session_id,
       const mojo::Callback<void(mojo::CdmPromiseResultPtr)>& callback) final;
-  void GetCdmContext(int32_t cdm_id,
-                     mojo::InterfaceRequest<mojo::Decryptor> decryptor) final;
+  void GetDecryptor(mojo::InterfaceRequest<mojo::Decryptor> decryptor) final;
+
+  // Get CdmContext to be used by the media pipeline.
+  CdmContext* GetCdmContext();
 
  private:
   // Callbacks for firing session events.
@@ -69,7 +80,11 @@ class MojoCdmService : public mojo::ContentDecryptionModule {
 
   mojo::StrongBinding<mojo::ContentDecryptionModule> binding_;
 
+  MojoCdmServiceContext* context_;
   scoped_ptr<MediaKeys> cdm_;
+
+  // Set to a valid CDM ID if the |cdm_| is successfully created.
+  int cdm_id_;
 
   mojo::ContentDecryptionModuleClientPtr client_;
 

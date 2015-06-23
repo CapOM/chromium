@@ -9,7 +9,6 @@
 #include "base/base_switches.h"
 #include "base/command_line.h"
 #include "base/files/scoped_file.h"
-#include "base/i18n/icu_util.h"
 #include "base/i18n/rtl.h"
 #include "base/path_service.h"
 #include "chromecast/base/cast_paths.h"
@@ -25,6 +24,7 @@
 #include "chromecast/browser/url_request_context_factory.h"
 #include "chromecast/common/global_descriptors.h"
 #include "chromecast/media/cma/backend/media_pipeline_device.h"
+#include "chromecast/media/cma/backend/media_pipeline_device_factory.h"
 #include "components/crash/app/breakpad_linux.h"
 #include "components/crash/browser/crash_handler_host_linux.h"
 #include "components/network_hints/browser/network_hints_message_filter.h"
@@ -38,7 +38,6 @@
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
 #include "content/public/common/web_preferences.h"
-#include "gin/v8_initializer.h"
 #include "media/audio/audio_manager_factory.h"
 #include "net/ssl/ssl_cert_request_info.h"
 #include "net/url_request/url_request_context_getter.h"
@@ -53,9 +52,7 @@ namespace chromecast {
 namespace shell {
 
 CastContentBrowserClient::CastContentBrowserClient()
-    : v8_natives_fd_(-1),
-      v8_snapshot_fd_(-1),
-      url_request_context_factory_(new URLRequestContextFactory()) {
+    : url_request_context_factory_(new URLRequestContextFactory()) {
 }
 
 CastContentBrowserClient::~CastContentBrowserClient() {
@@ -65,11 +62,37 @@ CastContentBrowserClient::~CastContentBrowserClient() {
       url_request_context_factory_.release());
 }
 
+void CastContentBrowserClient::AppendExtraCommandLineSwitches(
+    base::CommandLine* command_line) {
+}
+
+std::vector<scoped_refptr<content::BrowserMessageFilter>>
+CastContentBrowserClient::GetBrowserMessageFilters() {
+  return std::vector<scoped_refptr<content::BrowserMessageFilter>>();
+}
+
+scoped_ptr<::media::AudioManagerFactory>
+CastContentBrowserClient::CreateAudioManagerFactory() {
+  // Return nullptr. The factory will not be set, and the statically linked
+  // implementation of AudioManager will be used.
+  return scoped_ptr<::media::AudioManagerFactory>();
+}
+
+#if !defined(OS_ANDROID)
+scoped_ptr<media::MediaPipelineDevice>
+CastContentBrowserClient::CreateMediaPipelineDevice(
+    const media::MediaPipelineDeviceParams& params) {
+  scoped_ptr<media::MediaPipelineDeviceFactory> factory =
+      GetMediaPipelineDeviceFactory(params);
+  return make_scoped_ptr(new media::MediaPipelineDevice(factory.Pass()));
+}
+#endif
+
 content::BrowserMainParts* CastContentBrowserClient::CreateBrowserMainParts(
     const content::MainFunctionParams& parameters) {
   return new CastBrowserMainParts(parameters,
                                   url_request_context_factory_.get(),
-                                  PlatformCreateAudioManagerFactory());
+                                  CreateAudioManagerFactory());
 }
 
 void CastContentBrowserClient::RenderProcessWillLaunch(
@@ -79,7 +102,7 @@ void CastContentBrowserClient::RenderProcessWillLaunch(
       new media::CmaMessageFilterHost(
           host->GetID(),
           base::Bind(
-              &CastContentBrowserClient::PlatformCreateMediaPipelineDevice,
+              &CastContentBrowserClient::CreateMediaPipelineDevice,
               base::Unretained(this))));
   host->AddFilter(cma_message_filter.get());
 #endif  // !defined(OS_ANDROID)
@@ -94,7 +117,7 @@ void CastContentBrowserClient::RenderProcessWillLaunch(
       base::Bind(&CastContentBrowserClient::AddNetworkHintsMessageFilter,
                  base::Unretained(this), host->GetID()));
 
-  auto extra_filters = PlatformGetBrowserMessageFilters();
+  auto extra_filters = GetBrowserMessageFilters();
   for (auto const& filter : extra_filters) {
     host->AddFilter(filter.get());
   }
@@ -151,21 +174,6 @@ bool CastContentBrowserClient::IsHandledURL(const GURL& url) {
   return false;
 }
 
-void CastContentBrowserClient::AppendMappedFileCommandLineSwitches(
-    base::CommandLine* command_line) {
-  std::string process_type =
-      command_line->GetSwitchValueNative(switches::kProcessType);
-
-#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  if (process_type != switches::kZygoteProcess) {
-    DCHECK(natives_fd_exists());
-    command_line->AppendSwitch(::switches::kV8NativesPassedByFD);
-    if (snapshot_fd_exists())
-      command_line->AppendSwitch(::switches::kV8SnapshotPassedByFD);
-  }
-}
-
-#endif  // V8_USE_EXTERNAL_STARTUP_DATA
 void CastContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
     int child_process_id) {
@@ -199,7 +207,7 @@ void CastContentBrowserClient::AppendExtraCommandLineSwitches(
   }
 #endif
 
-  PlatformAppendExtraCommandLineSwitches(command_line);
+  AppendExtraCommandLineSwitches(command_line);
 }
 
 content::AccessTokenStore* CastContentBrowserClient::CreateAccessTokenStore() {
@@ -328,22 +336,6 @@ void CastContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
     const base::CommandLine& command_line,
     int child_process_id,
     content::FileDescriptorInfo* mappings) {
-#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  if (!natives_fd_exists()) {
-    int v8_natives_fd = -1;
-    int v8_snapshot_fd = -1;
-    if (gin::V8Initializer::OpenV8FilesForChildProcesses(&v8_natives_fd,
-                                                         &v8_snapshot_fd)) {
-      v8_natives_fd_.reset(v8_natives_fd);
-      v8_snapshot_fd_.reset(v8_snapshot_fd);
-    }
-  }
-  // V8 can't start up without the source of the natives, but it can
-  // start up (slower) without the snapshot.
-  DCHECK(natives_fd_exists());
-  mappings->Share(kV8NativesDataDescriptor, v8_natives_fd_.get());
-  mappings->Share(kV8SnapshotDataDescriptor, v8_snapshot_fd_.get());
-#endif  // V8_USE_EXTERNAL_STARTUP_DATA
 #if defined(OS_ANDROID)
   const int flags_open_read = base::File::FLAG_OPEN | base::File::FLAG_READ;
   base::FilePath pak_file_path;
@@ -368,16 +360,6 @@ void CastContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
                          base::ScopedFD(minidump_file.TakePlatformFile()));
     }
   }
-
-  base::FilePath app_data_path;
-  CHECK(PathService::Get(base::DIR_ANDROID_APP_DATA, &app_data_path));
-  base::FilePath icudata_path =
-      app_data_path.AppendASCII(base::i18n::kIcuDataFileName);
-  base::File icudata_file(icudata_path, flags_open_read);
-  if (!icudata_file.IsValid())
-    NOTREACHED() << "Failed to open ICU file when creating renderer process";
-  mappings->Transfer(kAndroidICUDataDescriptor,
-                     base::ScopedFD(icudata_file.TakePlatformFile()));
 #else
   int crash_signal_fd = GetCrashSignalFD(command_line);
   if (crash_signal_fd >= 0) {

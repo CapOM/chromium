@@ -6,7 +6,6 @@
 
 #include "base/bind.h"
 #include "base/callback.h"
-#include "base/command_line.h"
 #include "base/files/file_enumerator.h"
 #include "base/files/file_path.h"
 #include "base/files/file_util.h"
@@ -20,11 +19,9 @@
 #include "base/prefs/scoped_user_pref_update.h"
 #include "base/scoped_observer.h"
 #include "base/sequenced_task_runner.h"
-#include "base/strings/string_split.h"
 #include "base/strings/string_util.h"
 #include "chrome/browser/profiles/profile_info_cache.h"
 #include "chrome/browser/profiles/profile_info_cache_observer.h"
-#include "chrome/common/chrome_switches.h"
 #include "chrome/common/pref_names.h"
 #include "components/component_updater/component_updater_paths.h"
 #include "components/component_updater/component_updater_service.h"
@@ -35,21 +32,20 @@ namespace component_updater {
 
 namespace {
 
-// See the corresponding entries in extensions::manifest_keys.
-const char kContentPack[] = "content_pack";
-const char kContentPackSites[] = "sites";
+const char kWhitelist[] = "whitelist";
+const char kFile[] = "file";
 
 const char kClients[] = "clients";
 const char kName[] = "name";
 
 base::FilePath GetWhitelistPath(const base::DictionaryValue& manifest,
                                 const base::FilePath& install_dir) {
-  const base::DictionaryValue* content_pack_dict = nullptr;
-  if (!manifest.GetDictionary(kContentPack, &content_pack_dict))
+  const base::DictionaryValue* whitelist_dict = nullptr;
+  if (!manifest.GetDictionary(kWhitelist, &whitelist_dict))
     return base::FilePath();
 
   base::FilePath::StringType whitelist_file;
-  if (!content_pack_dict->GetString(kContentPackSites, &whitelist_file))
+  if (!whitelist_dict->GetString(kFile, &whitelist_file))
     return base::FilePath();
 
   return install_dir.Append(whitelist_file);
@@ -284,28 +280,6 @@ void SupervisedUserWhitelistInstallerImpl::RegisterComponents() {
     DCHECK(result);
     const std::string& id = it.key();
     RegisterComponent(id, name, base::Closure());
-
-    registered_whitelists.insert(id);
-  }
-
-  // Register whitelists specified on the command line.
-  const base::CommandLine* command_line =
-      base::CommandLine::ForCurrentProcess();
-  std::string command_line_whitelists = command_line->GetSwitchValueASCII(
-      switches::kInstallSupervisedUserWhitelists);
-  std::vector<std::string> split_whitelists;
-  base::SplitString(command_line_whitelists, ',', &split_whitelists);
-  for (const std::string& whitelist : split_whitelists) {
-    std::string id;
-    std::string name;
-    size_t separator = whitelist.find(':');
-    if (separator != std::string::npos) {
-      id = whitelist.substr(0, separator);
-      name = whitelist.substr(separator + 1);
-    } else {
-      id = whitelist;
-    }
-    RegisterNewComponent(id, name);
 
     registered_whitelists.insert(id);
   }

@@ -20,7 +20,6 @@
 #include "chrome/browser/autocomplete/autocomplete_controller.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
-#include "chrome/browser/autocomplete/history_url_provider.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/search_engines/template_url_service_factory.h"
 #include "chrome/browser/signin/account_tracker_service_factory.h"
@@ -38,6 +37,7 @@
 #include "components/omnibox/autocomplete_match.h"
 #include "components/omnibox/autocomplete_provider.h"
 #include "components/omnibox/autocomplete_provider_listener.h"
+#include "components/omnibox/history_url_provider.h"
 #include "components/omnibox/omnibox_field_trial.h"
 #include "components/omnibox/omnibox_switches.h"
 #include "components/omnibox/suggestion_answer.h"
@@ -72,8 +72,8 @@ ACMatches::const_iterator FindDefaultMatch(const ACMatches& matches) {
 class SuggestionDeletionHandler;
 class SearchProviderForTest : public SearchProvider {
  public:
-  SearchProviderForTest(AutocompleteProviderListener* listener,
-                        TemplateURLService* template_url_service,
+  SearchProviderForTest(ChromeAutocompleteProviderClient* client,
+                        AutocompleteProviderListener* listener,
                         Profile* profile);
   bool is_success() { return is_success_; }
 
@@ -87,13 +87,10 @@ class SearchProviderForTest : public SearchProvider {
 };
 
 SearchProviderForTest::SearchProviderForTest(
+    ChromeAutocompleteProviderClient* client,
     AutocompleteProviderListener* listener,
-    TemplateURLService* template_url_service,
     Profile* profile)
-    : SearchProvider(listener, template_url_service,
-                     scoped_ptr<AutocompleteProviderClient>(
-                         new ChromeAutocompleteProviderClient(profile))),
-      is_success_(false) {
+    : SearchProvider(client, listener), is_success_(false) {
 }
 
 SearchProviderForTest::~SearchProviderForTest() {
@@ -255,13 +252,9 @@ class SearchProviderTest : public testing::Test,
 
   content::TestBrowserThreadBundle thread_bundle_;
 
-  // URLFetcherFactory implementation registered.
   net::TestURLFetcherFactory test_factory_;
-
-  // Profile we use.
   TestingProfile profile_;
-
-  // The provider.
+  scoped_ptr<ChromeAutocompleteProviderClient> client_;
   scoped_refptr<SearchProviderForTest> provider_;
 
   // If non-NULL, OnProviderUpdate quits the current |run_loop_|.
@@ -283,6 +276,8 @@ void SearchProviderTest::SetUp() {
   ASSERT_TRUE(profile_.CreateHistoryService(true, false));
   TemplateURLServiceFactory::GetInstance()->SetTestingFactoryAndUse(
       &profile_, &TemplateURLServiceFactory::BuildInstanceFor);
+
+  client_.reset(new ChromeAutocompleteProviderClient(&profile_));
 
   TemplateURLService* turl_model =
       TemplateURLServiceFactory::GetForProfile(&profile_);
@@ -325,7 +320,7 @@ void SearchProviderTest::SetUp() {
   AutocompleteClassifierFactory::GetInstance()->SetTestingFactoryAndUse(
       &profile_, &AutocompleteClassifierFactory::BuildInstanceFor);
 
-  provider_ = new SearchProviderForTest(this, turl_model, &profile_);
+  provider_ = new SearchProviderForTest(client_.get(), this, &profile_);
   OmniboxFieldTrial::kDefaultMinimumTimeBetweenSuggestQueriesMs = 0;
 }
 
@@ -341,12 +336,11 @@ void SearchProviderTest::RunTest(TestData* cases,
                                  bool prefer_keyword) {
   ACMatches matches;
   for (int i = 0; i < num_cases; ++i) {
-    AutocompleteInput input(cases[i].input, base::string16::npos,
-                            std::string(), GURL(),
-                            metrics::OmniboxEventProto::INVALID_SPEC, false,
-                            prefer_keyword, true, true,
+    AutocompleteInput input(cases[i].input, base::string16::npos, std::string(),
+                            GURL(), metrics::OmniboxEventProto::INVALID_SPEC,
+                            false, prefer_keyword, true, true, false,
                             ChromeAutocompleteSchemeClassifier(&profile_));
-    provider_->Start(input, false, false);
+    provider_->Start(input, false);
     matches = provider_->matches();
     SCOPED_TRACE(
         ASCIIToUTF16("Input was: ") +
@@ -390,8 +384,9 @@ void SearchProviderTest::QueryForInput(const base::string16& text,
   AutocompleteInput input(text, base::string16::npos, std::string(), GURL(),
                           metrics::OmniboxEventProto::INVALID_SPEC,
                           prevent_inline_autocomplete, prefer_keyword, true,
-                          true, ChromeAutocompleteSchemeClassifier(&profile_));
-  provider_->Start(input, false, false);
+                          true, false,
+                          ChromeAutocompleteSchemeClassifier(&profile_));
+  provider_->Start(input, false);
 
   // RunUntilIdle so that the task scheduled by SearchProvider to create the
   // URLFetchers runs.
@@ -1129,12 +1124,12 @@ TEST_F(SearchProviderTest, KeywordOrderingAndDescriptions) {
   AddSearchToHistory(keyword_t_url_, ASCIIToUTF16("term2"), 1);
   profile_.BlockUntilHistoryProcessesPendingRequests();
 
-  AutocompleteController controller(&profile_,
-      TemplateURLServiceFactory::GetForProfile(&profile_),
-      NULL, AutocompleteProvider::TYPE_SEARCH);
+  AutocompleteController controller(
+      make_scoped_ptr(new ChromeAutocompleteProviderClient(&profile_)), nullptr,
+      AutocompleteProvider::TYPE_SEARCH);
   controller.Start(AutocompleteInput(
       ASCIIToUTF16("k t"), base::string16::npos, std::string(), GURL(),
-      metrics::OmniboxEventProto::INVALID_SPEC, false, false, true, true,
+      metrics::OmniboxEventProto::INVALID_SPEC, false, false, true, true, false,
       ChromeAutocompleteSchemeClassifier(&profile_)));
   const AutocompleteResult& result = controller.result();
 
@@ -3601,11 +3596,10 @@ TEST_F(SearchProviderTest, RemoveExtraAnswers) {
 }
 
 TEST_F(SearchProviderTest, DoesNotProvideOnFocus) {
-  AutocompleteInput input(base::ASCIIToUTF16("f"), base::string16::npos,
-                          std::string(), GURL(),
-                          metrics::OmniboxEventProto::INVALID_SPEC, false,
-                          true, true, true,
-                          ChromeAutocompleteSchemeClassifier(&profile_));
-  provider_->Start(input, false, true);
+  AutocompleteInput input(
+      base::ASCIIToUTF16("f"), base::string16::npos, std::string(), GURL(),
+      metrics::OmniboxEventProto::INVALID_SPEC, false, true, true, true, true,
+      ChromeAutocompleteSchemeClassifier(&profile_));
+  provider_->Start(input, false);
   EXPECT_TRUE(provider_->matches().empty());
 }

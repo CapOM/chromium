@@ -7,7 +7,6 @@
 #include "base/bind.h"
 #include "base/callback_helpers.h"
 #include "base/json/json_reader.h"
-#include "base/json/json_writer.h"
 #include "base/logging.h"
 #include "base/message_loop/message_loop.h"
 #include "base/strings/stringprintf.h"
@@ -58,6 +57,12 @@ bool RemoteHostInfoFetcher::RetrieveRemoteHostInfo(
                                        application_id.c_str());
       break;
 
+    case kStagingEnvironment:
+      DVLOG(1) << "Configuring service request for staging environment";
+      service_url = base::StringPrintf(kStagingServiceEnvironmentUrlFormat,
+                                       application_id.c_str());
+      break;
+
     default:
       LOG(ERROR) << "Unrecognized service type: " << service_environment;
       return false;
@@ -101,7 +106,7 @@ void RemoteHostInfoFetcher::OnURLFetchComplete(const net::URLFetcher* source) {
   }
 
   scoped_ptr<base::Value> response_value(
-      base::JSONReader::DeprecatedRead(response_string));
+      base::JSONReader::Read(response_string));
   if (!response_value ||
       !response_value->IsType(base::Value::TYPE_DICTIONARY)) {
     LOG(ERROR) << "Failed to parse response string to JSON";

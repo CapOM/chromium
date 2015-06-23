@@ -143,6 +143,11 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['win', 'opengl'], bug=1007) # angle bug ID
     self.Fail('conformance/renderbuffers/framebuffer-object-attachment.html',
         ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/rendering/point-size.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
+    self.Fail('conformance/rendering/' +
+        'point-with-gl-pointcoord-in-fragment-shader.html',
+        ['win', 'opengl'], bug=1007) # angle bug ID
     self.Fail('conformance/textures/gl-pixelstorei.html',
         ['win', 'opengl'], bug=1007) # angle bug ID
     self.Fail('conformance/textures/tex-image-canvas-corruption.html',
@@ -316,31 +321,124 @@ class WebGLConformanceExpectations(GpuTestExpectations):
         ['android'], bug=478572)
     self.Fail('deqp/data/gles2/shaders/linkage.html',
         ['android'], bug=478572)
-    self.Fail('conformance/textures/tex-image-and-sub-image-2d-with-video.html',
+    # The following WebView crashes are causing problems with further
+    # tests in the suite, so skip them for now.
+    self.Skip('conformance/textures/tex-image-and-sub-image-2d-with-video.html',
         ['android', 'android-webview-shell'], bug=352645)
-    self.Fail('conformance/textures/' +
+    self.Skip('conformance/textures/' +
         'tex-image-and-sub-image-2d-with-video-rgb565.html',
         ['android', 'android-webview-shell'], bug=352645)
-    self.Fail('conformance/textures/' +
+    self.Skip('conformance/textures/' +
         'tex-image-and-sub-image-2d-with-video-rgba4444.html',
         ['android', 'android-webview-shell'], bug=352645)
-    self.Fail('conformance/textures/' +
+    self.Skip('conformance/textures/' +
         'tex-image-and-sub-image-2d-with-video-rgba5551.html',
         ['android', 'android-webview-shell'], bug=352645)
-    self.Fail('conformance/textures/texture-npot-video.html',
+    self.Skip('conformance/textures/texture-npot-video.html',
         ['android', 'android-webview-shell'], bug=352645)
-
+    # Recent regressions have caused these to fail on multiple devices
+    self.Fail('conformance/textures/tex-image-and-sub-image-2d-with-video.html',
+        ['android', 'android-content-shell'], bug=499555)
+    # These are failing on the Nexus 5 and 6
+    self.Fail('conformance/extensions/oes-texture-float-with-canvas.html',
+              ['android', 'qualcomm'], bug=499555)
+    # This crashes in Android WebView on the Nexus 6, preventing the
+    # suite from running further. Rather than add multiple
+    # suppressions, skip it until it's passing at least in content
+    # shell.
+    self.Skip('conformance/extensions/oes-texture-float-with-video.html',
+              ['android', 'qualcomm'], bug=499555)
+    # Nexus 6 failures only
+    self.Fail('conformance/context/' +
+              'context-attributes-alpha-depth-stencil-antialias.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/context/premultiplyalpha-test.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/extensions/oes-texture-float-with-image-data.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/extensions/oes-texture-float-with-image.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-video-rgb565.html',
+              ['android', 'android-content-shell',
+               ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-video-rgba4444.html',
+              ['android', 'android-content-shell',
+               ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-video-rgba5551.html',
+              ['android', 'android-content-shell',
+               ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    # bindBufferBadArgs is causing the GPU thread to crash, taking
+    # down the WebView shell, causing the next test to fail and
+    # subsequent tests to be aborted.
+    self.Skip('conformance/more/functions/bindBufferBadArgs.html',
+              ['android', 'android-webview-shell',
+               ('qualcomm', 'Adreno (TM) 420')], bug=499874)
+    self.Fail('conformance/rendering/gl-scissor-test.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'copy-tex-image-and-sub-image-2d.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-array-buffer-view.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-canvas.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-canvas-rgb565.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-canvas-rgba4444.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-canvas-rgba5551.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-data.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-data-rgb565.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-data-rgba4444.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-data-rgba5551.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-rgb565.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-rgba4444.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-image-rgba5551.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-webgl-canvas.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-webgl-canvas-rgb565.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-webgl-canvas-rgba4444.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    self.Fail('conformance/textures/' +
+              'tex-image-and-sub-image-2d-with-webgl-canvas-rgba5551.html',
+              ['android', ('qualcomm', 'Adreno (TM) 420')], bug=499555)
+    # Nexus 9 failures
+    self.Fail('conformance/extensions/oes-texture-float-with-video.html',
+              ['android', 'nvidia'], bug=499555) # flaky
 
     # The following test is very slow and therefore times out on Android bot.
     self.Skip('conformance/rendering/multisample-corruption.html',
         ['android'])
-    # The following test times out on Android bot.
-    self.Fail('conformance/uniforms/gl-uniform-arrays.html',
-        ['android'], bug=369300)
-    self.Fail('conformance/glsl/misc/empty_main.vert.html',
-        ['android'], bug=315976)
-    self.Fail('conformance/glsl/misc/gl_position_unset.vert.html',
-        ['android'], bug=315976)
 
     # ChromeOS: affecting all devices.
     self.Fail('conformance/extensions/webgl-depth-texture.html',
@@ -447,7 +545,31 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     # WEBGL 2 TESTS FAILURES
     ##############################################################
 
+    # Skip all WebGL 2 tests on Win AMD.
+    self.Skip('deqp/data/gles3/shaders/*', ['win', 'amd'], bug=483282)
+    self.Skip('framework/opengl/simplereference/*', ['win', 'amd'], bug=483282)
+    self.Skip('deqp/functional/gles3/*', ['win', 'amd'], bug=483282)
+    self.Skip('conformance2/*', ['win', 'amd'], bug=483282)
+
+    # Skip all WebGL 2 tests on Win Intel.
+    self.Skip('deqp/data/gles3/shaders/*', ['win', 'intel'], bug=483282)
+    self.Skip('framework/opengl/simplereference/*',
+        ['win', 'intel'], bug=483282)
+    self.Skip('deqp/functional/gles3/*', ['win', 'intel'], bug=483282)
+    self.Skip('conformance2/*', ['win', 'intel'], bug=483282)
+
+    # Skip all WebGL 2 tests on Win NVIDIA debug.
+    self.Skip('deqp/data/gles3/shaders/*',
+        ['win', 'nvidia', 'debug'], bug=483282)
+    self.Skip('framework/opengl/simplereference/*',
+        ['win', 'nvidia', 'debug'], bug=483282)
+    self.Skip('deqp/functional/gles3/*',
+        ['win', 'nvidia', 'debug'], bug=483282)
+    self.Skip('conformance2/*',
+        ['win', 'nvidia', 'debug'], bug=483282)
+
     self.Fail('deqp/data/gles3/shaders/arrays.html', bug=483282)
+    self.Fail('deqp/data/gles3/shaders/constant_expressions.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/constants.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/conversions.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/functions.html', bug=483282)
@@ -456,9 +578,23 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Fail('deqp/data/gles3/shaders/qualification_order.html', bug=483282)
     self.Fail('deqp/data/gles3/shaders/scoping.html', bug=483282)
 
+    self.Fail('deqp/functional/gles3/attriblocation.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fbocompleteness.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fbomultisample.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fbostencilbuffer.html', bug=483282)
+    self.Fail('deqp/functional/gles3/fragmentoutput.html', bug=483282)
+    self.Fail('deqp/functional/gles3/framebufferblit.html', bug=483282)
+    self.Fail('deqp/functional/gles3/instancedrendering.html', bug=483282)
+    self.Fail('deqp/functional/gles3/lifetime.html', bug=483282)
+    self.Fail('deqp/functional/gles3/pixelbufferobject.html', bug=483282)
+    self.Fail('deqp/functional/gles3/primitiverestart.html', bug=483282)
+    self.Fail('deqp/functional/gles3/samplerobject.html', bug=483282)
     self.Fail('deqp/functional/gles3/textureformat.html', bug=483282)
+    self.Fail('deqp/functional/gles3/texturewrap.html', bug=483282)
     self.Fail('deqp/functional/gles3/transformfeedback.html', bug=483282)
+    self.Fail('deqp/functional/gles3/uniformapi.html', bug=483282)
     self.Fail('deqp/functional/gles3/uniformbuffers.html', bug=483282)
+    self.Fail('deqp/functional/gles3/vertexarrays.html', bug=483282)
 
     self.Fail('conformance2/attribs/gl-vertex-attrib.html', bug=483282)
     self.Fail('conformance2/attribs/gl-vertex-attrib-i-render.html', bug=483282)
@@ -490,19 +626,23 @@ class WebGLConformanceExpectations(GpuTestExpectations):
     self.Fail('conformance2/textures/tex-mipmap-levels.html', bug=483282)
     self.Fail('conformance2/textures/tex-new-formats.html', bug=483282)
     self.Fail('conformance2/textures/tex-storage-2d.html', bug=483282)
+    self.Fail('conformance2/textures/tex-storage-and-subimage-3d.html',
+        bug=483282)
     self.Fail('conformance2/textures/texture-npot.html', bug=483282)
     self.Fail('conformance2/transform_feedback/transform_feedback.html',
         bug=483282)
 
     # Mac only.
+    self.Fail('conformance2/glsl3/array-as-return-value.html',
+        ['mac'], bug=483282)
+    self.Fail('conformance2/glsl3/array-assign.html',
+        ['mac'], bug=483282)
+    self.Fail('conformance2/glsl3/array-equality.html',
+        ['mac'], bug=483282)
+    self.Fail('conformance2/glsl3/array-in-complex-expression.html',
+        ['mac'], bug=483282)
     self.Fail('conformance2/renderbuffers/' +
         'multisampled-renderbuffer-initialization.html',
         ['mac'], bug=483282)
     self.Fail('conformance2/rendering/instanced-arrays.html',
         ['mac'], bug=483282)
-    self.Fail('conformance2/textures/tex-storage-and-subimage-3d.html',
-        ['mac'], bug=483282)
-
-    # Win only (using OpenGL).
-    self.Fail('conformance2/textures/tex-storage-and-subimage-3d.html',
-        ['win'], bug=483282)

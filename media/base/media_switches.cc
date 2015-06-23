@@ -16,10 +16,6 @@ const char kDisableNewVideoRenderer[] = "disable-new-video-renderer";
 const char kVideoThreads[] = "video-threads";
 
 #if defined(OS_ANDROID)
-// Disables the infobar popup for accessing protected media identifier.
-const char kDisableInfobarForProtectedMediaIdentifier[] =
-    "disable-infobar-for-protected-media-identifier";
-
 // Sets the MediaSource player that uses the separate media thread
 const char kEnableMediaThreadForMediaPlayback[] =
     "enable-media-thread-for-media-playback";
@@ -30,6 +26,13 @@ const char kEnableMediaThreadForMediaPlayback[] =
 const char kAlsaInputDevice[] = "alsa-input-device";
 // The Alsa device to use when opening an audio stream.
 const char kAlsaOutputDevice[] = "alsa-output-device";
+#endif
+
+#if defined(OS_LINUX)
+// Try to use Native GpuMemoryBuffers for Video Capture. The actual use depends
+// on the actual hardware capabilities of the capture device and encoder(s).
+const char kUseNativeGpuMemoryBuffersForCapture[] =
+    "use-native-gpu-memory-buffers-for-capture";
 #endif
 
 #if defined(OS_MACOSX)

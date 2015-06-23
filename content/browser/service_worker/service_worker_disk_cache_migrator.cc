@@ -4,8 +4,14 @@
 
 #include "content/browser/service_worker/service_worker_disk_cache_migrator.h"
 
+#include "base/barrier_closure.h"
+#include "base/files/file_util.h"
+#include "base/location.h"
 #include "base/memory/ref_counted.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/task_runner_util.h"
+#include "base/time/time.h"
 #include "content/common/service_worker/service_worker_types.h"
 #include "net/base/io_buffer.h"
 #include "net/base/net_errors.h"
@@ -17,6 +23,41 @@ namespace {
 
 // Disk cache entry data indices (Copied from appcache_diskcache.cc).
 enum { kResponseInfoIndex, kResponseContentIndex, kResponseMetadataIndex };
+
+#if defined(OS_ANDROID)
+ServiceWorkerStatusCode MigrateForAndroid(const base::FilePath& src_path,
+                                          const base::FilePath& dest_path) {
+  // Continue the migration regardless of the deletion result. If the migrator
+  // cannot proceed or the diskcache gets corrupted due to the failure, the
+  // storage detects it and recovers by DeleteAndStartOver.
+  base::DeleteFile(dest_path, true);
+
+  if (!base::DirectoryExists(src_path))
+    return SERVICE_WORKER_OK;
+
+  // Android has alredy used the Simple backend. Just move the existing
+  // diskcache files to a new location.
+  if (base::Move(src_path, dest_path))
+    return SERVICE_WORKER_OK;
+  return SERVICE_WORKER_ERROR_FAILED;
+}
+#endif  // defined(OS_ANDROID)
+
+void RecordMigrationResult(ServiceWorkerStatusCode status) {
+  UMA_HISTOGRAM_ENUMERATION("ServiceWorker.DiskCacheMigrator.MigrationResult",
+                            status, SERVICE_WORKER_ERROR_MAX_VALUE);
+}
+
+void RecordNumberOfMigratedResources(size_t migrated_resources) {
+  UMA_HISTOGRAM_COUNTS_1000(
+      "ServiceWorker.DiskCacheMigrator.NumberOfMigratedResources",
+      migrated_resources);
+}
+
+void RecordMigrationTime(const base::TimeDelta& time) {
+  UMA_HISTOGRAM_MEDIUM_TIMES("ServiceWorker.DiskCacheMigrator.MigrationTime",
+                             time);
+}
 
 }  // namespace
 
@@ -225,11 +266,15 @@ void ServiceWorkerDiskCacheMigrator::Task::Finish(
 }
 
 ServiceWorkerDiskCacheMigrator::ServiceWorkerDiskCacheMigrator(
-    ServiceWorkerDiskCache* src,
-    ServiceWorkerDiskCache* dest)
-    : src_(src), dest_(dest), weak_factory_(this) {
-  DCHECK(!src_->is_disabled());
-  DCHECK(!dest_->is_disabled());
+    const base::FilePath& src_path,
+    const base::FilePath& dest_path,
+    int max_disk_cache_size,
+    const scoped_refptr<base::SingleThreadTaskRunner>& disk_cache_thread)
+    : src_path_(src_path),
+      dest_path_(dest_path),
+      max_disk_cache_size_(max_disk_cache_size),
+      disk_cache_thread_(disk_cache_thread),
+      weak_factory_(this) {
 }
 
 ServiceWorkerDiskCacheMigrator::~ServiceWorkerDiskCacheMigrator() {
@@ -237,6 +282,76 @@ ServiceWorkerDiskCacheMigrator::~ServiceWorkerDiskCacheMigrator() {
 
 void ServiceWorkerDiskCacheMigrator::Start(const StatusCallback& callback) {
   callback_ = callback;
+  start_time_ = base::TimeTicks::Now();
+
+#if defined(OS_ANDROID)
+  PostTaskAndReplyWithResult(
+      disk_cache_thread_.get(), FROM_HERE,
+      base::Bind(&MigrateForAndroid, src_path_, dest_path_),
+      base::Bind(&ServiceWorkerDiskCacheMigrator::Complete,
+                 weak_factory_.GetWeakPtr()));
+#else
+  PostTaskAndReplyWithResult(
+      disk_cache_thread_.get(), FROM_HERE,
+      base::Bind(&base::DeleteFile, dest_path_, true),
+      base::Bind(&ServiceWorkerDiskCacheMigrator::DidDeleteDestDirectory,
+                 weak_factory_.GetWeakPtr()));
+#endif  // defined(OS_ANDROID)
+}
+
+void ServiceWorkerDiskCacheMigrator::DidDeleteDestDirectory(bool deleted) {
+  // Continue the migration regardless of the deletion result. If the migrator
+  // cannot proceed or the diskcache gets corrupted due to the failure, the
+  // storage detects it and recovers by DeleteAndStartOver.
+
+  src_ = ServiceWorkerDiskCache::CreateWithBlockFileBackend();
+  dest_ = ServiceWorkerDiskCache::CreateWithSimpleBackend();
+  bool* is_failed = new bool(false);
+
+  // This closure is called when both diskcaches are initialized.
+  base::Closure barrier_closure = base::BarrierClosure(
+      2, base::Bind(&ServiceWorkerDiskCacheMigrator::DidInitializeAllDiskCaches,
+                    weak_factory_.GetWeakPtr(), base::Owned(is_failed)));
+
+  // Initialize the src DiskCache.
+  net::CompletionCallback src_callback =
+      base::Bind(&ServiceWorkerDiskCacheMigrator::DidInitializeDiskCache,
+                 weak_factory_.GetWeakPtr(), is_failed, barrier_closure);
+  int result = src_->InitWithDiskBackend(src_path_, max_disk_cache_size_,
+                                         false /* force */, disk_cache_thread_,
+                                         src_callback);
+  if (result != net::ERR_IO_PENDING)
+    src_callback.Run(result);
+
+  // Initialize the dest DiskCache.
+  net::CompletionCallback dest_callback =
+      base::Bind(&ServiceWorkerDiskCacheMigrator::DidInitializeDiskCache,
+                 weak_factory_.GetWeakPtr(), is_failed, barrier_closure);
+  result = dest_->InitWithDiskBackend(dest_path_, max_disk_cache_size_,
+                                      false /* force */, disk_cache_thread_,
+                                      dest_callback);
+  if (result != net::ERR_IO_PENDING)
+    dest_callback.Run(result);
+}
+
+void ServiceWorkerDiskCacheMigrator::DidInitializeDiskCache(
+    bool* is_failed,
+    const base::Closure& barrier_closure,
+    int result) {
+  if (result != net::OK)
+    *is_failed = true;
+  barrier_closure.Run();
+}
+
+void ServiceWorkerDiskCacheMigrator::DidInitializeAllDiskCaches(
+    bool* is_failed) {
+  if (*is_failed) {
+    LOG(ERROR) << "Failed to initialize the diskcache";
+    Complete(SERVICE_WORKER_ERROR_FAILED);
+    return;
+  }
+
+  // Iterate through existing entries in the src DiskCache.
   iterator_ = src_->disk_cache()->CreateIterator();
   OpenNextEntry();
 }
@@ -290,9 +405,9 @@ void ServiceWorkerDiskCacheMigrator::OnNextEntryOpened(
   }
 
   InflightTaskMap::KeyType task_id = next_task_id_++;
-  pending_task_.reset(new Task(task_id, resource_id,
-                               scoped_entry->GetDataSize(kResponseContentIndex),
-                               src_, dest_, weak_factory_.GetWeakPtr()));
+  pending_task_.reset(new Task(
+      task_id, resource_id, scoped_entry->GetDataSize(kResponseContentIndex),
+      src_.get(), dest_.get(), weak_factory_.GetWeakPtr()));
   if (inflight_tasks_.size() < max_number_of_inflight_tasks_) {
     RunPendingTask();
     OpenNextEntry();
@@ -321,6 +436,8 @@ void ServiceWorkerDiskCacheMigrator::OnEntryMigrated(
     return;
   }
 
+  ++number_of_migrated_resources_;
+
   if (pending_task_) {
     RunPendingTask();
     OpenNextEntry();
@@ -336,7 +453,14 @@ void ServiceWorkerDiskCacheMigrator::OnEntryMigrated(
 
 void ServiceWorkerDiskCacheMigrator::Complete(ServiceWorkerStatusCode status) {
   DCHECK(inflight_tasks_.IsEmpty());
-  // TODO(nhiroki): Add UMA for the result of migration.
+  if (status == SERVICE_WORKER_OK) {
+    RecordMigrationTime(base::TimeTicks().Now() - start_time_);
+    RecordNumberOfMigratedResources(number_of_migrated_resources_);
+  }
+  RecordMigrationResult(status);
+
+  src_.reset();
+  dest_.reset();
   callback_.Run(status);
 }
 

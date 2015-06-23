@@ -133,7 +133,7 @@ ReliableQuicStream::ReliableQuicStream(QuicStreamId id, QuicSession* session)
                        perspective_,
                        GetReceivedFlowControlWindow(session),
                        GetInitialStreamFlowControlWindowToSend(session),
-                       GetInitialStreamFlowControlWindowToSend(session)),
+                       session_->flow_controller()->auto_tune_receive_window()),
       connection_flow_controller_(session_->flow_controller()),
       stream_contributes_to_connection_flow_control_(true) {
 }
@@ -371,13 +371,9 @@ QuicConsumedData ReliableQuicStream::WritevData(
     write_length = static_cast<size_t>(send_window);
   }
 
-  // Fill an IOVector with bytes from the iovec.
-  IOVector data;
-  data.AppendIovecAtMostBytes(iov, iov_count, write_length);
-
   QuicConsumedData consumed_data = session()->WritevData(
-      id(), data, stream_bytes_written_, fin, GetFecProtection(),
-      ack_notifier_delegate);
+      id(), QuicIOVector(iov, iov_count, write_length), stream_bytes_written_,
+      fin, GetFecProtection(), ack_notifier_delegate);
   stream_bytes_written_ += consumed_data.bytes_consumed;
 
   AddBytesSent(consumed_data.bytes_consumed);

@@ -12,8 +12,10 @@ import android.graphics.drawable.Drawable;
 import android.test.mock.MockResources;
 import android.util.DisplayMetrics;
 import android.util.SparseArray;
+import android.util.SparseBooleanArray;
+import android.util.SparseIntArray;
 
-import com.google.android.apps.chrome.R;
+import org.chromium.chrome.R;
 
 /**
  * This is the minimal {@link Resources} needed by the {@link LayoutManager} to be working properly.
@@ -25,8 +27,8 @@ import com.google.android.apps.chrome.R;
 public class MockResourcesForLayout extends MockResources {
     private final Resources mValidResources;
     private final SparseArray<Float> mFloats = new SparseArray<Float>();
-    private final SparseArray<Integer> mIntegers = new SparseArray<Integer>();
-    private final SparseArray<Boolean> mBooleans = new SparseArray<Boolean>();
+    private final SparseIntArray mIntegers = new SparseIntArray();
+    private final SparseBooleanArray mBooleans = new SparseBooleanArray();
     private final SparseArray<String> mStrings = new SparseArray<String>();
     private final Drawable mDrawable = new ColorDrawable(Color.RED);
 
@@ -71,6 +73,7 @@ public class MockResourcesForLayout extends MockResources {
         mBooleans.put(org.chromium.chrome.R.bool.compositor_tab_title_fake_bold_text, true);
         mStrings.put(R.string.tab_loading_default_title, "Loading...");
         mFloats.put(org.chromium.chrome.R.dimen.contextual_search_bar_height, 80.f);
+        mFloats.put(org.chromium.chrome.R.dimen.control_container_height, 56.0f);
     }
 
     @Override
@@ -101,14 +104,14 @@ public class MockResourcesForLayout extends MockResources {
 
     @Override
     public int getInteger(int id) {
-        final Integer value = mIntegers.get(id);
-        return value != null ? value.intValue() : mValidResources.getInteger(id);
+        if (mIntegers.indexOfKey(id) < 0) mValidResources.getInteger(id);
+        return mIntegers.get(id);
     }
 
     @Override
     public boolean getBoolean(int id) {
-        final Boolean value = mBooleans.get(id);
-        return value != null ? value.booleanValue() : mValidResources.getBoolean(id);
+        if (mBooleans.indexOfKey(id) < 0) mValidResources.getBoolean(id);
+        return mBooleans.get(id);
     }
 
     @Override

@@ -66,6 +66,36 @@ should be able to be added at any place in this file.
   <description>Please enter the description of this user action.</description>
 </action>
 
+<action name="AboutFlags_data-reduction-proxy-lo-fi@1">
+  <owner>bengr@chromium.org</owner>
+  <owner>megjablon@chromium.org</owner>
+  <description>
+    User enabled flag that Forces Data Saver Lo-Fi mode to be always enabled via
+    chrome://flags. The action is emitted once per startup when the flag is
+    active.
+  </description>
+</action>
+
+<action name="AboutFlags_data-reduction-proxy-lo-fi@2">
+  <owner>bengr@chromium.org</owner>
+  <owner>megjablon@chromium.org</owner>
+  <description>
+    User enabled flag that Forces Data Saver Lo-Fi mode to be enabled only on
+    cellular connection via chrome://flags. The action is emitted once per
+    startup when the flag is active.
+  </description>
+</action>
+
+<action name="AboutFlags_data-reduction-proxy-lo-fi@3">
+  <owner>bengr@chromium.org</owner>
+  <owner>megjablon@chromium.org</owner>
+  <description>
+    User enabled flag that Forces Data Saver Lo-Fi mode to be disabled via
+    chrome://flags. The action is emitted once per startup when the flag is
+    active.
+  </description>
+</action>
+
 <action name="AboutFlags_disable-chrome-to-mobile">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
@@ -2400,6 +2430,26 @@ should be able to be added at any place in this file.
 <action name="Cryptohome.PKCS11InitFail">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
+</action>
+
+<action name="CustomTabsCustomActionButtonClick">
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <description>Please enter the description of the metric.</description>
+</action>
+
+<action name="CustomTabsMenuCustomMenuItem">
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <description>Please enter the description of the metric.</description>
+</action>
+
+<action name="CustomTabsMenuFindInPage">
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <description>Please enter the description of the metric.</description>
+</action>
+
+<action name="CustomTabsMenuOpenInChrome">
+  <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
+  <description>Please enter the description of the metric.</description>
 </action>
 
 <action name="Cut">
@@ -9742,6 +9792,11 @@ should be able to be added at any place in this file.
   <description>Please enter the description of this user action.</description>
 </action>
 
+<action name="Options_ShowPowerSettings">
+  <owner>michaelpg@chromium.org</owner>
+  <description>Settings: Manage power</description>
+</action>
+
 <action name="Options_ShowProxySettings">
   <owner>Please list the metric's owners. Add more owner tags as needed.</owner>
   <description>Please enter the description of this user action.</description>
@@ -11349,6 +11404,23 @@ should be able to be added at any place in this file.
     Counts the number of times the user has clicked on the &quot;Cast desktop
     to&quot; status tray item and is now in the detail view to select a cast
     receiver.
+  </description>
+</action>
+
+<action name="StatusArea_Cast_Detailed_Launch_Cast">
+  <owner>jdufault@chromium.org</owner>
+  <description>
+    Counts the number of times the user has initiated a cast from the system
+    tray. This does not mean the cast has actually begun, as the user still has
+    to select what to cast (ie, the desktop or a tab) and they may cancel the
+    process.
+  </description>
+</action>
+
+<action name="StatusArea_Cast_StopCast">
+  <owner>jdufault@chromium.org</owner>
+  <description>
+    Counts the number of times the user has stopped a cast from the system tray.
   </description>
 </action>
 

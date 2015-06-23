@@ -12,9 +12,13 @@ import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Process;
+import android.provider.Settings;
 import android.support.v7.widget.AppCompatTextView;
 import android.text.Layout;
 import android.text.Spannable;
@@ -47,8 +51,8 @@ import org.chromium.chrome.browser.preferences.Preferences;
 import org.chromium.chrome.browser.preferences.PreferencesLauncher;
 import org.chromium.chrome.browser.preferences.website.SingleWebsitePreferences;
 import org.chromium.chrome.browser.profiles.Profile;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelper;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelperSecurityLevel;
+import org.chromium.chrome.browser.ssl.ConnectionSecurity;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.toolbar.ToolbarModel;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -250,7 +254,7 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
     // chrome://settings page).
     private boolean mIsInternalPage;
 
-    // The security level of the page (a valid ConnectionSecurityHelperSecurityLevel).
+    // The security level of the page (a valid ConnectionSecurityLevel).
     private int mSecurityLevel;
 
     // Whether the security level of the page was deprecated due to SHA-1.
@@ -376,6 +380,12 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
                 // is stale so dismiss the dialog.
                 mDialog.dismiss();
             }
+
+            @Override
+            public void destroy() {
+                super.destroy();
+                mDialog.dismiss();
+            }
         };
         mDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
             @Override
@@ -395,7 +405,7 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
             mParsedUrl = null;
             mIsInternalPage = false;
         }
-        mSecurityLevel = ConnectionSecurityHelper.getSecurityLevelForWebContents(mWebContents);
+        mSecurityLevel = ConnectionSecurity.getSecurityLevelForWebContents(mWebContents);
         mDeprecatedSHA1Present = ToolbarModel.isDeprecatedSHA1Present(mWebContents);
 
         SpannableStringBuilder urlBuilder = new SpannableStringBuilder(mFullUrl);
@@ -464,7 +474,7 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
      * Gets the message to display in the connection message box for the given security level. Does
      * not apply to SECURITY_ERROR pages, since these have their own coloured/formatted message.
      *
-     * @param securityLevel A valid ConnectionSecurityHelperSecurityLevel, which is the security
+     * @param securityLevel A valid ConnectionSecurityLevel, which is the security
      *                      level of the page.
      * @param isInternalPage Whether or not this page is an internal chrome page (e.g. the
      *                       chrome://settings page).
@@ -474,13 +484,13 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
         if (isInternalPage) return R.string.page_info_connection_internal_page;
 
         switch (securityLevel) {
-            case ConnectionSecurityHelperSecurityLevel.NONE:
+            case ConnectionSecurityLevel.NONE:
                 return R.string.page_info_connection_http;
-            case ConnectionSecurityHelperSecurityLevel.SECURE:
-            case ConnectionSecurityHelperSecurityLevel.EV_SECURE:
+            case ConnectionSecurityLevel.SECURE:
+            case ConnectionSecurityLevel.EV_SECURE:
                 return R.string.page_info_connection_https;
-            case ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING:
-            case ConnectionSecurityHelperSecurityLevel.SECURITY_POLICY_WARNING:
+            case ConnectionSecurityLevel.SECURITY_WARNING:
+            case ConnectionSecurityLevel.SECURITY_POLICY_WARNING:
                 return R.string.page_info_connection_mixed;
             default:
                 assert false : "Invalid security level specified: " + securityLevel;
@@ -493,7 +503,7 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
      * HTTPS connections.
      */
     private boolean isConnectionDetailsLinkVisible() {
-        return !mIsInternalPage && mSecurityLevel != ConnectionSecurityHelperSecurityLevel.NONE;
+        return !mIsInternalPage && mSecurityLevel != ConnectionSecurityLevel.NONE;
     }
 
     /**
@@ -505,7 +515,7 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
         if (mDeprecatedSHA1Present) {
             messageBuilder.append(
                     mContext.getResources().getString(R.string.page_info_connection_sha1));
-        } else if (mSecurityLevel != ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR) {
+        } else if (mSecurityLevel != ConnectionSecurityLevel.SECURITY_ERROR) {
             messageBuilder.append(mContext.getResources().getString(
                     getConnectionMessageId(mSecurityLevel, mIsInternalPage)));
         } else {
@@ -544,6 +554,26 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
         }
 
         return messageBuilder;
+    }
+
+    private String getAndroidPermissionForContentSetting(int contentSettingType) {
+        switch(contentSettingType) {
+            case ContentSettingsType.CONTENT_SETTINGS_TYPE_GEOLOCATION:
+                return android.Manifest.permission.ACCESS_FINE_LOCATION;
+            case ContentSettingsType.CONTENT_SETTINGS_TYPE_MEDIASTREAM_MIC:
+                return android.Manifest.permission.RECORD_AUDIO;
+            case ContentSettingsType.CONTENT_SETTINGS_TYPE_MEDIASTREAM_CAMERA:
+                return android.Manifest.permission.CAMERA;
+            default:
+                return null;
+        }
+    }
+
+    private boolean hasAndroidPermission(int contentSettingType) {
+        String androidPermission = getAndroidPermissionForContentSetting(contentSettingType);
+        return androidPermission == null
+                || (mContext.checkPermission(androidPermission, Process.myPid(), Process.myUid())
+                           == PackageManager.PERMISSION_GRANTED);
     }
 
     /**
@@ -612,6 +642,18 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
         ImageView permissionIcon = (ImageView) permissionRow.findViewById(
                 R.id.website_settings_permission_icon);
         permissionIcon.setImageResource(getImageResourceForPermission(type));
+
+        if (!hasAndroidPermission(type) && currentSetting == ContentSetting.ALLOW) {
+            View permissionUnavailable = permissionRow.findViewById(
+                    R.id.website_settings_permission_unavailable_message);
+            permissionUnavailable.setVisibility(View.VISIBLE);
+
+            permissionIcon.setImageResource(R.drawable.deprecation_warning);
+            permissionIcon.setColorFilter(
+                    mContext.getResources().getColor(R.color.website_settings_popup_text_link));
+
+            permissionRow.setOnClickListener(this);
+        }
 
         TextView permissionStatus = (TextView) permissionRow.findViewById(
                 R.id.website_settings_permission_status);
@@ -730,7 +772,19 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
             runAfterDismiss(new Runnable() {
                 @Override
                 public void run() {
-                    ConnectionInfoPopup.show(mContext, mWebContents);
+                    if (!mWebContents.isDestroyed()) {
+                        ConnectionInfoPopup.show(mContext, mWebContents);
+                    }
+                }
+            });
+        } else if (view.getId() == R.id.website_settings_permission_row) {
+            runAfterDismiss(new Runnable() {
+                @Override
+                public void run() {
+                    Intent settingsIntent =
+                            new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                    settingsIntent.setData(Uri.parse("package:" + mContext.getPackageName()));
+                    mContext.startActivity(settingsIntent);
                 }
             });
         }
@@ -834,8 +888,8 @@ public class WebsiteSettingsPopup implements OnClickListener, OnItemSelectedList
     }
 
     private static boolean enableReadOnlyPopup() {
-        return CommandLine.getInstance().hasSwitch(
-                ChromeSwitches.ENABLE_READ_ONLY_WEBSITE_SETTINGS_POPUP);
+        return !CommandLine.getInstance().hasSwitch(
+                ChromeSwitches.DISABLE_READ_ONLY_WEBSITE_SETTINGS_POPUP);
     }
 
     /**

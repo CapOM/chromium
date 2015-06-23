@@ -207,7 +207,8 @@ SafeBrowsingService* SafeBrowsingService::CreateSafeBrowsingService() {
 SafeBrowsingService::SafeBrowsingService()
     : protocol_manager_(NULL),
       ping_manager_(NULL),
-      enabled_(false) {
+      enabled_(false),
+      enabled_by_prefs_(false) {
 }
 
 SafeBrowsingService::~SafeBrowsingService() {
@@ -591,6 +592,11 @@ void SafeBrowsingService::AddPrefService(PrefService* pref_service) {
   registrar->Add(prefs::kSafeBrowsingEnabled,
                  base::Bind(&SafeBrowsingService::RefreshState,
                             base::Unretained(this)));
+  // ClientSideDetectionService will need to be refresh the models
+  // renderers have if extended-reporting changes.
+  registrar->Add(prefs::kSafeBrowsingExtendedReportingEnabled,
+                 base::Bind(&SafeBrowsingService::RefreshState,
+                            base::Unretained(this)));
   prefs_map_[pref_service] = registrar;
   RefreshState();
 }
@@ -605,7 +611,15 @@ void SafeBrowsingService::RemovePrefService(PrefService* pref_service) {
   }
 }
 
+scoped_ptr<SafeBrowsingService::StateSubscription>
+SafeBrowsingService::RegisterStateCallback(
+      const base::Callback<void(void)>& callback) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return state_callback_list_.Add(callback);
+}
+
 void SafeBrowsingService::RefreshState() {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
   // Check if any profile requires the service to be active.
   bool enable = false;
   std::map<PrefService*, PrefChangeRegistrar*>::iterator iter;
@@ -616,10 +630,14 @@ void SafeBrowsingService::RefreshState() {
     }
   }
 
+  enabled_by_prefs_ = enable;
+
   if (enable)
     Start();
   else
     Stop(false);
+
+  state_callback_list_.Notify();
 
 #if defined(FULL_SAFE_BROWSING)
   if (csd_service_)

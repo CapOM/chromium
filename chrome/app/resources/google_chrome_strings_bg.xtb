@@ -76,6 +76,7 @@
 <translation id="8551886023433311834">Почти актуално! Рестартирайте устройството си, за да завършите актуализирането.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome – Известия</translation>
+<translation id="6368805772029492593">За повишаване на сигурността Google Chrome ще шифрова данните ви.</translation>
 <translation id="7339898014177206373">Нов прозорец</translation>
 <translation id="3282568296779691940">Вход в Chrome</translation>
 <translation id="3089968997497233615">Налице е нова, по-сигурна версия на Google Chrome.</translation>
@@ -168,7 +169,6 @@
 <translation id="2290095356545025170">Наистина ли искате да деинсталирате Google Chrome?</translation>
 <translation id="4273752058983339720">Google Chrome е конфигуриран да стартира автоматично, когато включите компютъра си.</translation>
 <translation id="2316129865977710310">Не, благодаря</translation>
-<translation id="415994390253732730">Chrome се държи странно?</translation>
 <translation id="1104959162601287462">Всичко за &amp;Chrome OS</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Добре дошли в Chrome</translation>
@@ -221,6 +221,7 @@
 <translation id="5566025111015594046">Google Chrome (входящ трафик за mDNS)</translation>
 <translation id="6113794647360055231">Chrome се подобри</translation>
 <translation id="2588322182880276190">Лого на Chrome</translation>
+<translation id="4519152997629025674">Google Chrome може да използва <ph name="BEGIN_LINK"/>уеб услуги<ph name="END_LINK"/>, за да подобри сърфирането ви. В състояние сте да ги деактивирате по всяко време.</translation>
 <translation id="4367618624832907428">Google Chrome не може да покаже уеб страницата, защото компютърът ви не е свързан с интернет.</translation>
 <translation id="174539241580958092">Google Chrome не можа да синхронизира данните ви поради грешка при влизането.</translation>
 <translation id="8255190535488645436">Google Chrome използва камерата и микрофона ви.</translation>
@@ -228,7 +229,6 @@
 или антивирусния си софтуер.</translation>
 <translation id="9102715433345326100">Този файл е злонамерен и е блокиран от Chrome.</translation>
 <translation id="8205111949707227942">По избор: Помогнете ни да подобрим Chrome OS, като автоматично изпращате на Google статистически данни за използването му и сигнали за сривове.</translation>
-<translation id="487887346205285304">Chrome се държи странно?</translation>
 <translation id="3622797965165704966">Вече е по-лесно да използвате Chrome с профила си в Google и на споделени компютри.</translation>
 <translation id="7196020411877309443">Защо се показва това?</translation>
 <translation id="2769762047821873045">Google Chrome не е браузърът ви по подразбиране.</translation>

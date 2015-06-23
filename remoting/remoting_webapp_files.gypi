@@ -15,6 +15,11 @@
 {
   'variables': {
 
+    # JSCompiler externs.
+    'remoting_webapp_js_externs_files': [
+      'webapp/externs/qunit.js',
+    ],
+
     # Jscompile proto files.
     # These provide type information for jscompile.
     'remoting_webapp_js_proto_files': [
@@ -94,6 +99,8 @@
       'webapp/base/js/typecheck_unittest.js',
       'webapp/base/js/viewport_unittest.js',
       'webapp/base/js/window_shape_unittest.js',
+      'webapp/base/js/window_message_dispatcher_unittest.js',
+      'webapp/base/js/xhr_event_writer_unittest.js',
       'webapp/base/js/xhr_unittest.js',
       'webapp/base/js/xmpp_connection_unittest.js',
       'webapp/base/js/xmpp_login_handler_unittest.js',
@@ -124,7 +131,6 @@
       'webapp/js_proto/chrome_proto.js',
       'webapp/js_proto/dom_proto.js',
       'webapp/js_proto/remoting_proto.js',
-      'webapp/js_proto/qunit_proto.js',
       'webapp/js_proto/sinon_proto.js',
     ],
     'remoting_webapp_unittests_all_js_files': [
@@ -181,6 +187,8 @@
       'webapp/base/js/plugin_settings.js',
       'webapp/base/js/suspend_detector.js',
       'webapp/base/js/typecheck.js',
+      'webapp/base/js/window_message_dispatcher.js',
+      'webapp/base/js/xhr_event_writer.js',
       'webapp/base/js/xhr.js',
     ],
     # Host JavaScript files.
@@ -444,6 +452,14 @@
     ],
 
     #
+    # All the JavaScript files required by credits.html
+    #
+    
+    'remoting_webapp_credits_html_all_js_files': [
+      'webapp/base/js/credits_js.js',
+    ],
+
+    #
     # Complete webapp JS and resource files.
     #
 
@@ -461,6 +477,7 @@
     'remoting_webapp_crd_js_files': [
       '<@(remoting_webapp_shared_js_files)',
       '<@(remoting_webapp_crd_main_html_all_js_files)',
+      '<@(remoting_webapp_credits_html_all_js_files)',
     ],
 
     'remoting_webapp_info_files': [
@@ -492,6 +509,7 @@
       'resources/reload.webp',
       'resources/tick.webp',
       'webapp/base/html/connection_stats.css',
+      'webapp/base/html/credits_css.css',
       'webapp/base/html/main.css',
       'webapp/base/html/message_window.css',
       'webapp/base/resources/open_sans.css',

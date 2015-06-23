@@ -7,14 +7,18 @@ package org.chromium.ui.base;
 import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender.SendIntentException;
+import android.content.pm.PackageManager;
 import android.os.Handler;
+import android.os.Process;
 import android.util.SparseArray;
 import android.view.View;
 
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
+import org.chromium.base.BuildInfo;
 import org.chromium.ui.UiUtils;
 
 import java.lang.ref.WeakReference;
@@ -159,20 +163,53 @@ public class ActivityWindowAndroid
         return false;
     }
 
+    private static boolean hasPermission(Context context, String permission) {
+        return context.checkPermission(permission, Process.myPid(), Process.myUid())
+                != PackageManager.PERMISSION_DENIED;
+    }
+
     @Override
-    public void requestPermissions(String[] permissions, PermissionCallback callback) {
+    public void requestPermissions(
+            final String[] permissions, final PermissionCallback callback) {
+        // If the permission request was not sent successfully, just post a response to the
+        // callback with whatever the current permission state is for all the requested
+        // permissions.  The response is posted to keep the async behavior of this method
+        // consistent.
+        if (!requestPermissionsInternal(permissions, callback)) {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    int[] results = new int[permissions.length];
+                    for (int i = 0; i < permissions.length; i++) {
+                        results[i] = hasPermission(mApplicationContext, permissions[i])
+                                ? PackageManager.PERMISSION_GRANTED
+                                : PackageManager.PERMISSION_DENIED;
+                    }
+                    callback.onRequestPermissionsResult(permissions, results);
+                }
+            });
+        }
+    }
+
+    /**
+     * Issues the permission request and returns whether it was sent successfully.
+     */
+    private boolean requestPermissionsInternal(String[] permissions, PermissionCallback callback) {
         mHandler.removeCallbacks(mClearPermissionRequestsTask);
+
+        // TODO(tedchoc): Remove the MNC check once the SDK version is bumped.
+        if (!BuildInfo.isMncOrLater()) return false;
 
         // TODO(tedchoc): Remove the reflection aspect of this once a public M SDK is available.
         Activity activity = mActivityRef.get();
-        if (activity == null) return;
+        if (activity == null) return false;
 
         if (mRequestPermissionsMethod == null) {
             try {
                 mRequestPermissionsMethod = Activity.class.getMethod(
                         "requestPermissions", String[].class, int.class);
             } catch (NoSuchMethodException e) {
-                return;
+                return false;
             }
         }
 
@@ -181,6 +218,7 @@ public class ActivityWindowAndroid
 
         try {
             mRequestPermissionsMethod.invoke(activity, permissions, requestCode);
+            return true;
         } catch (IllegalAccessException e) {
             mOutstandingPermissionRequests.delete(requestCode);
         } catch (IllegalArgumentException e) {
@@ -188,6 +226,8 @@ public class ActivityWindowAndroid
         } catch (InvocationTargetException e) {
             mOutstandingPermissionRequests.delete(requestCode);
         }
+
+        return false;
     }
 
     /**

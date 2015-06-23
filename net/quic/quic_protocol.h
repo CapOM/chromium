@@ -21,11 +21,12 @@
 #include "base/logging.h"
 #include "base/strings/string_piece.h"
 #include "net/base/int128.h"
+#include "net/base/iovec.h"
 #include "net/base/ip_endpoint.h"
 #include "net/base/net_export.h"
-#include "net/quic/iovector.h"
 #include "net/quic/quic_bandwidth.h"
 #include "net/quic/quic_time.h"
+#include "net/quic/quic_types.h"
 
 namespace net {
 
@@ -625,10 +626,10 @@ struct NET_EXPORT_PRIVATE QuicPacketHeader {
       std::ostream& os, const QuicPacketHeader& s);
 
   QuicPacketPublicHeader public_header;
+  QuicPacketSequenceNumber packet_sequence_number;
   bool fec_flag;
   bool entropy_flag;
   QuicPacketEntropyHash entropy_hash;
-  QuicPacketSequenceNumber packet_sequence_number;
   InFecGroup is_in_fec_group;
   QuicFecGroupNumber fec_group;
 };
@@ -1005,11 +1006,16 @@ class NET_EXPORT_PRIVATE RetransmittableFrames {
     return encryption_level_;
   }
 
+  bool needs_padding() const { return needs_padding_; }
+
+  void set_needs_padding(bool needs_padding) { needs_padding_ = needs_padding; }
+
  private:
   QuicFrames frames_;
   const EncryptionLevel encryption_level_;
   IsHandshake has_crypto_handshake_;
-  // Data referenced by the IOVector of a QuicStreamFrame.
+  bool needs_padding_;
+  // Data referenced by the StringPiece of a QuicStreamFrame.
   std::vector<const char*> stream_data_;
 
   DISALLOW_COPY_AND_ASSIGN(RetransmittableFrames);
@@ -1023,11 +1029,11 @@ struct NET_EXPORT_PRIVATE SerializedPacket {
                    RetransmittableFrames* retransmittable_frames);
   ~SerializedPacket();
 
+  QuicEncryptedPacket* packet;
+  RetransmittableFrames* retransmittable_frames;
   QuicPacketSequenceNumber sequence_number;
   QuicSequenceNumberLength sequence_number_length;
-  QuicEncryptedPacket* packet;
   QuicPacketEntropyHash entropy_hash;
-  RetransmittableFrames* retransmittable_frames;
   bool is_fec_packet;
 
   // Optional notifiers which will be informed when this packet has been ACKed.
@@ -1063,6 +1069,17 @@ struct NET_EXPORT_PRIVATE TransmissionInfo {
   bool is_unackable;
   // True if the packet is an FEC packet.
   bool is_fec_packet;
+};
+
+// Convenience wrapper to wrap an iovec array and the total length, which must
+// be less than or equal to the actual total length of the iovecs.
+struct NET_EXPORT_PRIVATE QuicIOVector {
+  QuicIOVector(const struct iovec* iov, int iov_count, size_t total_length)
+      : iov(iov), iov_count(iov_count), total_length(total_length) {}
+
+  const struct iovec* iov;
+  const int iov_count;
+  const size_t total_length;
 };
 
 }  // namespace net

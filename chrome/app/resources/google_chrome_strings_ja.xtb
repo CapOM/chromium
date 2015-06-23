@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">更新を完了するには、端末を再起動してください。</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome - お知らせ</translation>
+<translation id="6368805772029492593">セキュリティ強化のため、Google Chrome ではデータが暗号化されます。</translation>
 <translation id="7339898014177206373">新しいウィンドウ</translation>
 <translation id="3282568296779691940">Chrome にログイン</translation>
 <translation id="3089968997497233615">Google クロームブラウザがより速く、さらに便利に。いますぐトライ！</translation>
@@ -164,7 +165,6 @@
 <translation id="2290095356545025170">Google Chrome をアンインストールしてもよろしいですか？</translation>
 <translation id="4273752058983339720">Google Chrome は、パソコン起動時に自動的に起動されるよう設定されています。</translation>
 <translation id="2316129865977710310">いいえ</translation>
-<translation id="415994390253732730">Chrome の動作がおかしい場合</translation>
 <translation id="1104959162601287462">Chrome OS について(&amp;C)</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Chrome にようこそ</translation>
@@ -217,6 +217,7 @@
 <translation id="5566025111015594046">Google Chrome（mDNS インバウンド）</translation>
 <translation id="6113794647360055231">進化する Chrome</translation>
 <translation id="2588322182880276190">Chrome ロゴ</translation>
+<translation id="4519152997629025674">Google Chrome では、より快適なブラウジングを提供する目的で<ph name="BEGIN_LINK"/>ウェブサービス<ph name="END_LINK"/>が使用されることがあります。これらのサービスはいつでも無効にできます。</translation>
 <translation id="4367618624832907428">パソコンがインターネットに接続されていないため、Google Chrome ではウェブページを表示できません。</translation>
 <translation id="174539241580958092">ログイン時にエラーが発生したため、Google Chrome はデータを同期できませんでした。</translation>
 <translation id="8255190535488645436">Google Chrome がカメラとマイクを使用しています。</translation>
@@ -224,7 +225,6 @@
         許可します。</translation>
 <translation id="9102715433345326100">不正なファイルです。Chrome はこのファイルをブロックしました。</translation>
 <translation id="8205111949707227942">オプション: 使用状況データと障害レポートを Google に自動送信して Chrome OS の機能向上に役立てる。</translation>
-<translation id="487887346205285304">Chrome の動作がおかしい場合</translation>
 <translation id="3622797965165704966">共有パソコンの Chrome で Google アカウントが簡単に使用できるようになりました。</translation>
 <translation id="7196020411877309443">このウィンドウが表示される理由</translation>
 <translation id="2769762047821873045">Google Chromeはデフォルトのブラウザとして設定されていません。</translation>

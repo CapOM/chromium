@@ -20,8 +20,8 @@
 #include "content/public/child/v8_value_converter.h"
 #include "content/public/common/content_switches.h"
 #include "content/public/common/url_constants.h"
+#include "content/public/renderer/render_frame.h"
 #include "content/public/renderer/render_thread.h"
-#include "content/public/renderer/render_view.h"
 #include "extensions/common/api/messaging/message.h"
 #include "extensions/common/constants.h"
 #include "extensions/common/extension_api.h"
@@ -54,6 +54,7 @@
 #include "extensions/renderer/document_custom_bindings.h"
 #include "extensions/renderer/dom_activity_logger.h"
 #include "extensions/renderer/event_bindings.h"
+#include "extensions/renderer/extension_frame_helper.h"
 #include "extensions/renderer/extension_helper.h"
 #include "extensions/renderer/extensions_renderer_client.h"
 #include "extensions/renderer/file_system_natives.h"
@@ -106,7 +107,6 @@ using blink::WebString;
 using blink::WebVector;
 using blink::WebView;
 using content::RenderThread;
-using content::RenderView;
 
 namespace extensions {
 
@@ -392,7 +392,7 @@ void Dispatcher::DispatchEvent(const std::string& extension_id,
                                kEventDispatchFunction, &args));
 }
 
-void Dispatcher::InvokeModuleSystemMethod(content::RenderView* render_view,
+void Dispatcher::InvokeModuleSystemMethod(content::RenderFrame* render_frame,
                                           const std::string& extension_id,
                                           const std::string& module_name,
                                           const std::string& function_name,
@@ -403,7 +403,7 @@ void Dispatcher::InvokeModuleSystemMethod(content::RenderView* render_view,
     web_user_gesture.reset(new WebScopedUserGesture);
 
   script_context_set_->ForEach(
-      extension_id, render_view,
+      extension_id, render_frame,
       base::Bind(&CallModuleMethod, module_name, function_name, &args));
 
   // Reset the idle handler each time there's any activity like event or message
@@ -419,13 +419,13 @@ void Dispatcher::InvokeModuleSystemMethod(content::RenderView* render_view,
   if (extension && BackgroundInfo::HasLazyBackgroundPage(extension) &&
       module_name == kEventBindings &&
       function_name == kEventDispatchFunction) {
-    RenderView* background_view =
-        ExtensionHelper::GetBackgroundPage(extension_id);
-    if (background_view) {
+    content::RenderFrame* background_frame =
+        ExtensionFrameHelper::GetBackgroundPageFrame(extension_id);
+    if (background_frame) {
       int message_id;
       args.GetInteger(3, &message_id);
-      background_view->Send(new ExtensionHostMsg_EventAck(
-          background_view->GetRoutingID(), message_id));
+      background_frame->Send(new ExtensionHostMsg_EventAck(
+          background_frame->GetRoutingID(), message_id));
     }
   }
 }
@@ -788,6 +788,7 @@ void Dispatcher::IdleNotification() {
 void Dispatcher::OnRenderProcessShutdown() {
   v8_schema_registry_.reset();
   forced_idle_timer_.reset();
+  content_watcher_.reset();
 }
 
 void Dispatcher::OnActivateExtension(const std::string& extension_id) {

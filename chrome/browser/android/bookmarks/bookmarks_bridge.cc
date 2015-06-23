@@ -170,7 +170,8 @@ ScopedJavaLocalRef<jobject> BookmarksBridge::GetBookmarkByID(JNIEnv* env,
                                                              jlong id,
                                                              jint type) {
   DCHECK(IsLoaded());
-  return CreateJavaBookmark(GetNodeByID(id, type));
+  const BookmarkNode* node = GetNodeByID(id, type);
+  return node ? CreateJavaBookmark(node) : ScopedJavaLocalRef<jobject>();
 }
 
 bool BookmarksBridge::IsDoingExtensiveChanges(JNIEnv* env, jobject obj) {
@@ -654,45 +655,6 @@ void BookmarksBridge::MoveBookmark(JNIEnv* env,
   type = JavaBookmarkIdGetType(env, j_parent_id_obj);
   const BookmarkNode* new_parent_node = GetNodeByID(bookmark_id, type);
   bookmark_model_->Move(node, new_parent_node, index);
-}
-
-void BookmarksBridge::SearchBookmarks(JNIEnv* env,
-                                      jobject obj,
-                                      jobject j_list,
-                                      jstring j_query,
-                                      jint max_results) {
-  DCHECK(bookmark_model_->loaded());
-
-  std::vector<bookmarks::BookmarkMatch> results;
-  bookmark_model_->GetBookmarksMatching(
-      base::android::ConvertJavaStringToUTF16(env, j_query),
-      max_results,
-      query_parser::MatchingAlgorithm::ALWAYS_PREFIX_SEARCH,
-      &results);
-  for (const bookmarks::BookmarkMatch& match : results) {
-    const BookmarkNode* node = match.node;
-
-    std::vector<int> title_match_start_positions;
-    std::vector<int> title_match_end_positions;
-    for (auto position : match.title_match_positions) {
-      title_match_start_positions.push_back(position.first);
-      title_match_end_positions.push_back(position.second);
-    }
-
-    std::vector<int> url_match_start_positions;
-    std::vector<int> url_match_end_positions;
-    for (auto position : match.url_match_positions) {
-      url_match_start_positions.push_back(position.first);
-      url_match_end_positions.push_back(position.second);
-    }
-
-    Java_BookmarksBridge_addToBookmarkMatchList(
-        env, j_list, node->id(), node->type(),
-        ToJavaIntArray(env, title_match_start_positions).obj(),
-        ToJavaIntArray(env, title_match_end_positions).obj(),
-        ToJavaIntArray(env, url_match_start_positions).obj(),
-        ToJavaIntArray(env, url_match_end_positions).obj());
-  }
 }
 
 ScopedJavaLocalRef<jobject> BookmarksBridge::AddBookmark(

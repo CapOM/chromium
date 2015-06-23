@@ -16,6 +16,17 @@ namespace aria_strings {
   extern const char kAriaLiveAssertive[];
 }
 
+// A Java counterpart will be generated for this enum.
+// GENERATED_JAVA_ENUM_PACKAGE: org.chromium.content.browser.accessibility
+enum ScrollDirection {
+  FORWARD,
+  BACKWARD,
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT
+};
+
 // From android.view.accessibility.AccessibilityNodeInfo in Java:
 enum AndroidMovementGranularity {
   ANDROID_ACCESSIBILITY_NODE_INFO_MOVEMENT_GRANULARITY_CHARACTER = 1,
@@ -47,6 +58,18 @@ class CONTENT_EXPORT BrowserAccessibilityManagerAndroid
 
   void SetContentViewCore(
       base::android::ScopedJavaLocalRef<jobject> content_view_core);
+
+  // By default, the tree is pruned for a better screen reading experience,
+  // including:
+  //   * If the node has only static text children
+  //   * If the node is focusable and has no focusable children
+  //   * If the node is a heading
+  // This can be turned off to generate a tree that more accurately reflects
+  // the DOM and includes style changes within these nodes.
+  void set_prune_tree_for_screen_reader(bool prune) {
+    prune_tree_for_screen_reader_ = prune;
+  }
+  bool prune_tree_for_screen_reader() { return prune_tree_for_screen_reader_; }
 
   // Implementation of BrowserAccessibilityManager.
   void NotifyAccessibilityEvent(ui::AXEvent event_type,
@@ -121,6 +144,13 @@ class CONTENT_EXPORT BrowserAccessibilityManagerAndroid
   // accurate movement by granularities on this node.
   void SetAccessibilityFocus(JNIEnv* env, jobject obj, jint id);
 
+  // Returns true if the object is a slider.
+  bool IsSlider(JNIEnv* env, jobject obj, jint id);
+
+  // Scrolls any scrollable container by about 80% of one page in the
+  // given direction.
+  bool Scroll(JNIEnv* env, jobject obj, jint id, int direction);
+
  protected:
   // AXTreeDelegate overrides.
   void OnAtomicUpdateFinished(
@@ -144,6 +174,9 @@ class CONTENT_EXPORT BrowserAccessibilityManagerAndroid
 
   // Handle a hover event from the renderer process.
   void HandleHoverEvent(BrowserAccessibility* node);
+
+  // See docs for set_prune_tree_for_screen_reader, above.
+  bool prune_tree_for_screen_reader_;
 
   DISALLOW_COPY_AND_ASSIGN(BrowserAccessibilityManagerAndroid);
 };

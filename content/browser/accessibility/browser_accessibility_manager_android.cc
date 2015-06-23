@@ -70,7 +70,8 @@ BrowserAccessibilityManagerAndroid::BrowserAccessibilityManagerAndroid(
     const ui::AXTreeUpdate& initial_tree,
     BrowserAccessibilityDelegate* delegate,
     BrowserAccessibilityFactory* factory)
-    : BrowserAccessibilityManager(delegate, factory) {
+    : BrowserAccessibilityManager(delegate, factory),
+      prune_tree_for_screen_reader_(true) {
   Initialize(initial_tree);
   SetContentViewCore(content_view_core);
 }
@@ -268,6 +269,10 @@ jboolean BrowserAccessibilityManagerAndroid::PopulateAccessibilityNodeInfo(
       id,
       node->CanScrollForward(),
       node->CanScrollBackward(),
+      node->CanScrollUp(),
+      node->CanScrollDown(),
+      node->CanScrollLeft(),
+      node->CanScrollRight(),
       node->IsClickable(),
       node->IsEditableText(),
       node->IsEnabled(),
@@ -282,6 +287,12 @@ jboolean BrowserAccessibilityManagerAndroid::PopulateAccessibilityNodeInfo(
         env, obj, info,
         base::android::ConvertUTF16ToJavaString(env, node->GetText()).obj(),
         node->IsLink());
+  }
+  base::string16 element_id;
+  if (node->GetHtmlAttribute("id", &element_id)) {
+    Java_BrowserAccessibilityManager_setAccessibilityNodeInfoViewIdResourceName(
+        env, obj, info,
+        base::android::ConvertUTF16ToJavaString(env, element_id).obj());
   }
 
   gfx::Rect absolute_rect = node->GetLocalBoundsRect();
@@ -726,6 +737,26 @@ void BrowserAccessibilityManagerAndroid::SetAccessibilityFocus(
     JNIEnv* env, jobject obj, jint id) {
   if (delegate_)
     delegate_->AccessibilitySetAccessibilityFocus(id);
+}
+
+bool BrowserAccessibilityManagerAndroid::IsSlider(
+    JNIEnv* env, jobject obj, jint id) {
+  BrowserAccessibilityAndroid* node = static_cast<BrowserAccessibilityAndroid*>(
+      GetFromID(id));
+  if (!node)
+    return false;
+
+  return node->GetRole() == ui::AX_ROLE_SLIDER;
+}
+
+bool BrowserAccessibilityManagerAndroid::Scroll(
+    JNIEnv* env, jobject obj, jint id, int direction) {
+  BrowserAccessibilityAndroid* node = static_cast<BrowserAccessibilityAndroid*>(
+      GetFromID(id));
+  if (!node)
+    return false;
+
+  return node->Scroll(direction);
 }
 
 void BrowserAccessibilityManagerAndroid::OnAtomicUpdateFinished(

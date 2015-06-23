@@ -1201,7 +1201,8 @@ WRAPPED_INSTANTIATE_TEST_CASE_P(
 #if defined(DISABLE_SLOW_FILESAPP_TESTS)
 #define MAYBE_CopyBetweenWindows DISABLED_CopyBetweenWindows
 #else
-#define MAYBE_CopyBetweenWindows CopyBetweenWindows
+// flaky: http://crbug.com/500966
+#define MAYBE_CopyBetweenWindows DISABLED_CopyBetweenWindows
 #endif
 WRAPPED_INSTANTIATE_TEST_CASE_P(
     MAYBE_CopyBetweenWindows,
@@ -1572,8 +1573,58 @@ IN_PROC_BROWSER_TEST_F(VideoPlayerBrowserTest, OpenSingleVideoOnDownloads) {
   StartTest();
 }
 
+IN_PROC_BROWSER_TEST_F(
+    VideoPlayerBrowserTestInGuestMode, OpenSingleVideoOnDownloads) {
+  set_test_case_name("openSingleVideoOnDownloads");
+  StartTest();
+}
+
 IN_PROC_BROWSER_TEST_F(VideoPlayerBrowserTest, OpenSingleVideoOnDrive) {
   set_test_case_name("openSingleVideoOnDrive");
+  StartTest();
+}
+
+template <GuestMode M>
+class AudioPlayerBrowserTestBase : public FileManagerBrowserTestBase {
+ public:
+  GuestMode GetGuestModeParam() const override { return M; }
+  const char* GetTestCaseNameParam() const override {
+    return test_case_name_.c_str();
+  }
+
+ protected:
+  const char* GetTestManifestName() const override {
+    return "audio_player_test_manifest.json";
+  }
+
+  void set_test_case_name(const std::string& name) { test_case_name_ = name; }
+
+ private:
+  std::string test_case_name_;
+};
+
+typedef AudioPlayerBrowserTestBase<NOT_IN_GUEST_MODE> AudioPlayerBrowserTest;
+typedef AudioPlayerBrowserTestBase<IN_GUEST_MODE>
+    AudioPlayerBrowserTestInGuestMode;
+
+IN_PROC_BROWSER_TEST_F(AudioPlayerBrowserTest, OpenAudioOnDownloads) {
+  set_test_case_name("openAudioOnDownloads");
+  StartTest();
+}
+
+IN_PROC_BROWSER_TEST_F(AudioPlayerBrowserTestInGuestMode,
+                       OpenAudioOnDownloads) {
+  set_test_case_name("openAudioOnDownloads");
+  StartTest();
+}
+
+IN_PROC_BROWSER_TEST_F(AudioPlayerBrowserTest, OpenAudioOnDrive) {
+  set_test_case_name("openAudioOnDrive");
+  StartTest();
+}
+
+IN_PROC_BROWSER_TEST_F(VideoPlayerBrowserTest, CheckInitialElements) {
+  set_test_case_name("checkInitialElements");
   StartTest();
 }
 

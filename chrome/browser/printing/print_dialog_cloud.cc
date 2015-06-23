@@ -11,8 +11,11 @@
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/json/json_reader.h"
+#include "base/location.h"
 #include "base/prefs/pref_service.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/devtools/devtools_window.h"
@@ -126,7 +129,7 @@ const int kDefaultHeight = 633;
 
 bool IsSimilarUrl(const GURL& url, const GURL& cloud_print_url) {
   return url.host() == cloud_print_url.host() &&
-         StartsWithASCII(url.path(), cloud_print_url.path(), false) &&
+         base::StartsWithASCII(url.path(), cloud_print_url.path(), false) &&
          url.scheme() == cloud_print_url.scheme();
 }
 
@@ -147,10 +150,9 @@ class SignInObserver : public content::WebContentsObserver {
       const content::LoadCommittedDetails& details,
       const content::FrameNavigateParams& params) override {
     if (IsSimilarUrl(params.url, cloud_print_url_)) {
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&SignInObserver::OnSignIn,
-                     weak_ptr_factory_.GetWeakPtr()));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&SignInObserver::OnSignIn,
+                                weak_ptr_factory_.GetWeakPtr()));
     }
   }
 
@@ -594,7 +596,7 @@ void CloudPrintWebDialogDelegate::OnDialogClosed(
   // End the keep-alive so that Chrome can exit.
   if (!modal_parent_ && keep_alive_when_non_modal_) {
     // Post to prevent recursive call tho this function.
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE, base::Bind(&chrome::DecrementKeepAliveCount));
   }
   delete this;

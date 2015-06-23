@@ -29,6 +29,7 @@
 #include "content/renderer/render_frame_impl.h"
 #include "content/renderer/render_thread_impl.h"
 #include "content/renderer/render_view_impl.h"
+#include "gpu/blink/webgraphicscontext3d_impl.h"
 #include "gpu/GLES2/gl2extchromium.h"
 #include "gpu/command_buffer/client/gles2_interface.h"
 #include "gpu/command_buffer/common/mailbox_holder.h"
@@ -268,7 +269,9 @@ void WebMediaPlayerAndroid::load(LoadType load_type,
                                  const blink::WebURL& url,
                                  CORSMode cors_mode) {
   DCHECK(main_thread_checker_.CalledOnValidThread());
-  media::ReportMediaSchemeUma(GURL(url));
+
+  media::ReportMetrics(load_type, GURL(url),
+                       GURL(frame_->document().securityOrigin().toString()));
 
   switch (load_type) {
     case LoadTypeURL:
@@ -325,8 +328,6 @@ void WebMediaPlayerAndroid::load(LoadType load_type,
 
   UpdateNetworkState(WebMediaPlayer::NetworkStateLoading);
   UpdateReadyState(WebMediaPlayer::ReadyStateHaveNothing);
-  UMA_HISTOGRAM_BOOLEAN(
-      "Media.MSE.Playback", player_type_ == MEDIA_PLAYER_TYPE_MEDIA_SOURCE);
 }
 
 void WebMediaPlayerAndroid::DidLoadMediaInfo(
@@ -456,6 +457,15 @@ void WebMediaPlayerAndroid::setRate(double rate) {
 void WebMediaPlayerAndroid::setVolume(double volume) {
   DCHECK(main_thread_checker_.CalledOnValidThread());
   player_manager_->SetVolume(player_id_, volume);
+}
+
+void WebMediaPlayerAndroid::setSinkId(
+    const blink::WebString& device_id,
+    media::WebSetSinkIdCB* raw_web_callbacks) {
+  DCHECK(main_thread_checker_.CalledOnValidThread());
+  scoped_ptr<media::WebSetSinkIdCB> web_callbacks(raw_web_callbacks);
+  web_callbacks->onError(new blink::WebSetSinkIdError(
+      blink::WebSetSinkIdError::ErrorTypeNotSupported, "Not Supported"));
 }
 
 bool WebMediaPlayerAndroid::hasVideo() const {
@@ -610,7 +620,7 @@ void WebMediaPlayerAndroid::paint(blink::WebCanvas* canvas,
 
   unsigned textureId = static_cast<unsigned>(
     (bitmap_.getTexture())->getTextureHandle());
-  if (!copyVideoTextureToPlatformTexture(context3D, textureId, 0,
+  if (!copyVideoTextureToPlatformTexture(context3D, textureId,
       GL_RGBA, GL_UNSIGNED_BYTE, true, false)) {
     return;
   }
@@ -632,19 +642,6 @@ void WebMediaPlayerAndroid::paint(blink::WebCanvas* canvas,
 bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
     blink::WebGraphicsContext3D* web_graphics_context,
     unsigned int texture,
-    unsigned int level,
-    unsigned int internal_format,
-    unsigned int type,
-    bool premultiply_alpha,
-    bool flip_y) {
-  return copyVideoTextureToPlatformTexture(web_graphics_context, texture,
-                                           internal_format, type,
-                                           premultiply_alpha, flip_y);
-}
-
-bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
-    blink::WebGraphicsContext3D* web_graphics_context,
-    unsigned int texture,
     unsigned int internal_format,
     unsigned int type,
     bool premultiply_alpha,
@@ -654,14 +651,19 @@ bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
   if (needs_external_surface_)
     return false;
 
+  // TODO(zmo): Remove the casting once Copy{Sub}TextureCHROMIUM API
+  // signatures are switched over in blink.
+  gpu_blink::WebGraphicsContext3DImpl* web_graphics_context_impl =
+      reinterpret_cast<gpu_blink::WebGraphicsContext3DImpl*>(
+          web_graphics_context);
+
   scoped_refptr<VideoFrame> video_frame;
   {
     base::AutoLock auto_lock(current_frame_lock_);
     video_frame = current_frame_;
   }
 
-  if (!video_frame.get() ||
-      video_frame->storage_type() != media::VideoFrame::STORAGE_TEXTURE)
+  if (!video_frame.get() || !video_frame->HasTextures())
     return false;
   DCHECK_EQ(1u, media::VideoFrame::NumPlanes(video_frame->format()));
   const gpu::MailboxHolder& mailbox_holder = video_frame->mailbox_holder(0);
@@ -669,31 +671,33 @@ bool WebMediaPlayerAndroid::copyVideoTextureToPlatformTexture(
           mailbox_holder.texture_target == GL_TEXTURE_EXTERNAL_OES) ||
          (is_remote_ && mailbox_holder.texture_target == GL_TEXTURE_2D));
 
-  web_graphics_context->waitSyncPoint(mailbox_holder.sync_point);
+  web_graphics_context_impl->waitSyncPoint(mailbox_holder.sync_point);
 
   // Ensure the target of texture is set before copyTextureCHROMIUM, otherwise
   // an invalid texture target may be used for copy texture.
-  uint32 src_texture = web_graphics_context->createAndConsumeTextureCHROMIUM(
-      mailbox_holder.texture_target, mailbox_holder.mailbox.name);
+  uint32 src_texture =
+      web_graphics_context_impl->createAndConsumeTextureCHROMIUM(
+          mailbox_holder.texture_target, mailbox_holder.mailbox.name);
 
   // The video is stored in an unmultiplied format, so premultiply if
   // necessary.
-  web_graphics_context->pixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM,
-                                    premultiply_alpha);
+  web_graphics_context_impl->pixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM,
+                                         premultiply_alpha);
 
   // Application itself needs to take care of setting the right flip_y
   // value down to get the expected result.
   // flip_y==true means to reverse the video orientation while
   // flip_y==false means to keep the intrinsic orientation.
-  web_graphics_context->pixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, flip_y);
-  web_graphics_context->copyTextureCHROMIUM(GL_TEXTURE_2D, src_texture, texture,
-                                            internal_format, type);
-  web_graphics_context->pixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, false);
-  web_graphics_context->pixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM,
-                                    false);
+  web_graphics_context_impl->pixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, flip_y);
+  web_graphics_context_impl->copyTextureCHROMIUM(
+      GL_TEXTURE_2D, src_texture, texture, internal_format, type,
+      flip_y, premultiply_alpha, false);
+  web_graphics_context_impl->pixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, false);
+  web_graphics_context_impl->pixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM,
+                                         false);
 
-  web_graphics_context->deleteTexture(src_texture);
-  web_graphics_context->flush();
+  web_graphics_context_impl->deleteTexture(src_texture);
+  web_graphics_context_impl->flush();
 
   SyncPointClientImpl client(web_graphics_context);
   video_frame->UpdateReleaseSyncPoint(&client);
@@ -981,10 +985,6 @@ void WebMediaPlayerAndroid::OnMediaPlayerPause() {
   client_->playbackStateChanged();
 }
 
-void WebMediaPlayerAndroid::OnRequestFullscreen() {
-  client_->requestFullscreen();
-}
-
 void WebMediaPlayerAndroid::OnRemoteRouteAvailabilityChanged(
     bool routes_available) {
   client_->remoteRouteAvailabilityChanged(routes_available);
@@ -1205,14 +1205,14 @@ void WebMediaPlayerAndroid::DrawRemotePlaybackText(
   GLuint texture_mailbox_sync_point = gl->InsertSyncPointCHROMIUM();
 
   scoped_refptr<VideoFrame> new_frame = VideoFrame::WrapNativeTexture(
+      VideoFrame::ARGB,
       gpu::MailboxHolder(texture_mailbox, texture_target,
                          texture_mailbox_sync_point),
       media::BindToCurrentLoop(base::Bind(&OnReleaseTexture,
                                           stream_texture_factory_,
                                           remote_playback_texture_id)),
       canvas_size /* coded_size */, gfx::Rect(canvas_size) /* visible_rect */,
-      canvas_size /* natural_size */, base::TimeDelta() /* timestamp */,
-      false /* allow overlay */, true /* has_alpha */);
+      canvas_size /* natural_size */, base::TimeDelta() /* timestamp */);
   SetCurrentFrameInternal(new_frame);
 }
 
@@ -1243,12 +1243,13 @@ void WebMediaPlayerAndroid::ReallocateVideoFrame() {
     GLuint texture_mailbox_sync_point = gl->InsertSyncPointCHROMIUM();
 
     scoped_refptr<VideoFrame> new_frame = VideoFrame::WrapNativeTexture(
+        media::VideoFrame::ARGB,
         gpu::MailboxHolder(texture_mailbox_, texture_target,
                            texture_mailbox_sync_point),
         media::BindToCurrentLoop(base::Bind(
             &OnReleaseTexture, stream_texture_factory_, texture_id_ref)),
         natural_size_, gfx::Rect(natural_size_), natural_size_,
-        base::TimeDelta(), false /* allow_overlay */, true /* has_alpha */);
+        base::TimeDelta());
     SetCurrentFrameInternal(new_frame);
   }
 }

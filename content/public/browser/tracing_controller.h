@@ -38,6 +38,7 @@ class TracingController {
    public:
     virtual void AddTraceChunk(const std::string& chunk) {}
     virtual void SetSystemTrace(const std::string& data) {}
+    virtual void SetMetadata(const std::string& data) {}
     virtual void Close() {}
 
    protected:
@@ -73,6 +74,11 @@ class TracingController {
   CONTENT_EXPORT static scoped_refptr<TraceDataSink> CreateFileSink(
       const base::FilePath& file_path,
       const base::Closure& callback);
+
+  // Create an endpoint that may be supplied to any TraceDataSink to
+  // dump the trace data to a callback.
+  CONTENT_EXPORT static scoped_refptr<TraceDataEndpoint> CreateCallbackEndpoint(
+      const base::Callback<void(base::RefCountedString*)>& callback);
 
   // Create an endpoint that may be supplied to any TraceDataSink to
   // dump the trace data to a file.

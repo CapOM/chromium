@@ -5,6 +5,7 @@
 #ifndef CONTENT_CHILD_SHARED_MEMORY_DATA_CONSUMER_HANDLE_H_
 #define CONTENT_CHILD_SHARED_MEMORY_DATA_CONSUMER_HANDLE_H_
 
+#include "base/callback.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "content/common/content_export.h"
@@ -29,8 +30,12 @@ class CONTENT_EXPORT SharedMemoryDataConsumerHandle final
    public:
     Writer(const scoped_refptr<Context>& context, BackpressureMode mode);
     ~Writer();
+    // Note: Writer assumes |AddData| is not called in a client's didGetReadable
+    // callback. There isn't such assumption for |Close| and |Fail|.
     void AddData(scoped_ptr<RequestPeer::ReceivedData> data);
     void Close();
+    // TODO(yhirano): Consider providing error code.
+    void Fail();
 
    private:
     scoped_refptr<Context> context_;
@@ -39,17 +44,42 @@ class CONTENT_EXPORT SharedMemoryDataConsumerHandle final
     DISALLOW_COPY_AND_ASSIGN(Writer);
   };
 
+  class ReaderImpl final : public Reader {
+   public:
+    ReaderImpl(scoped_refptr<Context> context, Client* client);
+    virtual ~ReaderImpl();
+    virtual Result read(void* data, size_t size, Flags flags, size_t* readSize);
+    virtual Result beginRead(const void** buffer,
+                             Flags flags,
+                             size_t* available);
+    virtual Result endRead(size_t readSize);
+
+   private:
+    scoped_refptr<Context> context_;
+
+    DISALLOW_COPY_AND_ASSIGN(ReaderImpl);
+  };
+
+  // Creates a handle and a writer associated with the handle. The created
+  // writer should be used on the calling thread.
   SharedMemoryDataConsumerHandle(BackpressureMode mode,
+                                 scoped_ptr<Writer>* writer);
+  // |on_reader_detached| will be called aynchronously on the calling thread
+  // when the reader (including the handle) is detached (i.e. both the handle
+  // and the reader are destructed). The callback will be reset in the internal
+  // context when the writer is detached, i.e. |Close| or |Fail| is called,
+  // and the callback will never be called.
+  SharedMemoryDataConsumerHandle(BackpressureMode mode,
+                                 const base::Closure& on_reader_detached,
                                  scoped_ptr<Writer>* writer);
   virtual ~SharedMemoryDataConsumerHandle();
 
-  virtual Result read(void* data, size_t size, Flags flags, size_t* readSize);
-  virtual Result beginRead(const void** buffer, Flags flags, size_t* available);
-  virtual Result endRead(size_t readSize);
-  virtual void registerClient(Client* client);
-  virtual void unregisterClient();
+  scoped_ptr<Reader> ObtainReader(Client* client);
 
  private:
+  virtual ReaderImpl* obtainReaderInternal(Client* client);
+  const char* debugName() const override;
+
   scoped_refptr<Context> context_;
 
   DISALLOW_COPY_AND_ASSIGN(SharedMemoryDataConsumerHandle);

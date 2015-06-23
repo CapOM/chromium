@@ -65,10 +65,12 @@ bool HardwareDisplayPlaneManagerAtomic::Commit(
   }
   plane_list->plane_list.clear();
   if (!drm_->CommitProperties(plane_list->atomic_property_set.get(), 0, is_sync,
-                              test_only, base::Bind(&AtomicPageFlipCallback))) {
+                              test_only,
+                              base::Bind(&AtomicPageFlipCallback, crtcs))) {
     PLOG(ERROR) << "Failed to commit properties";
     return false;
   }
+  plane_list->atomic_property_set.reset(drmModePropertySetAlloc());
   return true;
 }
 

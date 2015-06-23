@@ -17,6 +17,9 @@
         "test": "aura_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "base_unittests"
       },
       {
@@ -30,15 +33,24 @@
         "test": "cacheinvalidation_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "cast_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "cc_unittests"
       },
       {
         "test": "chromedriver_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "components_unittests"
       },
       {
@@ -48,9 +60,15 @@
         "test": "content_browsertests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "content_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "crypto_unittests"
       },
       {
@@ -185,6 +203,9 @@
         "test": "aura_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "base_unittests"
       },
       {
@@ -198,15 +219,24 @@
         "test": "cacheinvalidation_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "cast_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "cc_unittests"
       },
       {
         "test": "chromedriver_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "components_unittests"
       },
       {
@@ -216,9 +246,15 @@
         "test": "content_browsertests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "content_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "crypto_unittests"
       },
       {
@@ -373,12 +409,18 @@
         "test": "cacheinvalidation_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "cast_unittests"
       },
       {
         "test": "chromedriver_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "components_unittests"
       },
       {
@@ -394,6 +436,9 @@
         "test": "content_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "crypto_unittests"
       },
       {

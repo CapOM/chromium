@@ -4,6 +4,7 @@
 
 #include "chrome/browser/chrome_content_browser_client.h"
 
+#include <map>
 #include <set>
 #include <utility>
 #include <vector>
@@ -12,13 +13,15 @@
 #include "base/bind_helpers.h"
 #include "base/command_line.h"
 #include "base/files/scoped_file.h"
-#include "base/i18n/icu_util.h"
 #include "base/lazy_instance.h"
 #include "base/path_service.h"
 #include "base/prefs/pref_service.h"
 #include "base/prefs/scoped_user_pref_update.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/strings/string_util.h"
+#include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/sequenced_worker_pool.h"
 #include "chrome/browser/after_startup_task_utils.h"
 #include "chrome/browser/browser_about_handler.h"
@@ -104,6 +107,7 @@
 #include "components/signin/core/common/profile_management_switches.h"
 #include "components/translate/core/common/translate_switches.h"
 #include "components/url_fixer/url_fixer.h"
+#include "components/variations/variations_associated_data.h"
 #include "content/public/browser/browser_child_process_host.h"
 #include "content/public/browser/browser_main_parts.h"
 #include "content/public/browser/browser_ppapi_host.h"
@@ -123,6 +127,7 @@
 #include "content/public/common/service_registry.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/web_preferences.h"
+#include "device/devices_app/devices_app.h"
 #include "gin/v8_initializer.h"
 #include "net/base/mime_util.h"
 #include "net/cookies/canonical_cookie.h"
@@ -608,10 +613,6 @@ namespace chrome {
 
 ChromeContentBrowserClient::ChromeContentBrowserClient()
     :
-#if defined(OS_POSIX) && !defined(OS_MACOSX)
-      v8_natives_fd_(-1),
-      v8_snapshot_fd_(-1),
-#endif  // OS_POSIX && !OS_MACOSX
       weak_factory_(this) {
 #if defined(ENABLE_PLUGINS)
   for (size_t i = 0; i < arraysize(kPredefinedAllowedDevChannelOrigins); ++i)
@@ -870,7 +871,7 @@ void ChromeContentBrowserClient::RenderProcessWillLaunch(
     extra_parts_[i]->RenderProcessWillLaunch(host);
 
   RendererContentSettingRules rules;
-  if (host->IsIsolatedGuest()) {
+  if (host->IsForGuestsOnly()) {
 #if defined(ENABLE_EXTENSIONS)
     GetGuestViewDefaultContentSettingRules(profile->IsOffTheRecord(), &rules);
 #else
@@ -1171,33 +1172,60 @@ bool IsAutoReloadVisibleOnlyEnabled() {
   return true;
 }
 
-}  // namespace
-
-// When Chrome is updated on non-Windows platforms, the new files (like
-// V8 natives and snapshot) can have the same names as the previous
-// versions. Since the renderers for an existing Chrome browser process
-// are likely not compatible with the new files, the browser keeps hold
-// of the old files using an open fd. This fd is passed to subprocesses
-// like renderers.  Here we add the flag to tell the subprocesses where
-// to find these file descriptors.
-void ChromeContentBrowserClient::AppendMappedFileCommandLineSwitches(
+void MaybeAppendBlinkSettingsSwitchForFieldTrial(
+    const base::CommandLine& browser_command_line,
     base::CommandLine* command_line) {
-#if defined(OS_POSIX) && !defined(OS_MACOSX)
-#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  std::string process_type =
-      command_line->GetSwitchValueASCII(switches::kProcessType);
-  if (process_type != switches::kZygoteProcess) {
-    // We want to pass the natives by fd because after an update the file may
-    // be updated, but we want the newly launched renderers to get the old one,
-    // opened by the browser when it started.
-    DCHECK(natives_fd_exists());
-    command_line->AppendSwitch(::switches::kV8NativesPassedByFD);
-    if (snapshot_fd_exists())
-      command_line->AppendSwitch(::switches::kV8SnapshotPassedByFD);
+  // List of field trials that modify the blink-settings command line flag. No
+  // two field trials in the list should specify the same keys, otherwise one
+  // field trial may overwrite another. See Source/core/frame/Settings.in in
+  // Blink for the list of valid keys.
+  static const char* const kBlinkSettingsFieldTrials[] = {
+    // Keys: backgroundHtmlParserOutstandingTokenLimit
+    //       backgroundHtmlParserPendingTokenLimit
+    "BackgroundHtmlParserTokenLimits",
+
+    // Keys: lowPriorityIframes
+    "LowPriorityIFrames",
+  };
+
+  std::vector<std::string> blink_settings;
+  for (const char* field_trial_name : kBlinkSettingsFieldTrials) {
+    // Each blink-settings field trial should include a forcing_flag group,
+    // to make sure that clients that specify the blink-settings flag on the
+    // command line are excluded from the experiment groups. To make
+    // sure we assign clients that specify this flag to the forcing_flag
+    // group, we must call GetVariationParams for each field trial first
+    // (for example, before checking HasSwitch() and returning), since
+    // GetVariationParams has the side-effect of assigning the client to
+    // a field trial group.
+    std::map<std::string, std::string> params;
+    if (variations::GetVariationParams(field_trial_name, &params)) {
+      for (const auto& param : params) {
+        blink_settings.push_back(base::StringPrintf(
+            "%s=%s", param.first.c_str(), param.second.c_str()));
+      }
+    }
   }
-#endif  // V8_USE_EXTERNAL_STARTUP_DATA
-#endif  // OS_POSIX && !OS_MACOSX
+  if (blink_settings.empty()) {
+    return;
+  }
+
+  if (browser_command_line.HasSwitch(switches::kBlinkSettings) ||
+      command_line->HasSwitch(switches::kBlinkSettings)) {
+    // The field trial is configured to force users that specify the
+    // blink-settings flag into a group with no params, and we return
+    // above if no params were specified, so it's an error if we reach
+    // this point.
+    LOG(WARNING) << "Received field trial params, "
+                    "but blink-settings switch already specified.";
+    return;
+  }
+
+  command_line->AppendSwitchASCII(switches::kBlinkSettings,
+                                  JoinString(blink_settings, ','));
 }
+
+}  // namespace
 
 void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
     base::CommandLine* command_line,
@@ -1359,6 +1387,9 @@ void ChromeContentBrowserClient::AppendExtraCommandLineSwitches(
         }
       }
     }
+
+    MaybeAppendBlinkSettingsSwitchForFieldTrial(
+        browser_command_line, command_line);
 
     // Please keep this in alphabetical order.
     static const char* const kSwitchNames[] = {
@@ -2244,24 +2275,6 @@ void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
     const base::CommandLine& command_line,
     int child_process_id,
     FileDescriptorInfo* mappings) {
-#if defined(V8_USE_EXTERNAL_STARTUP_DATA)
-  if (!natives_fd_exists()) {
-    int v8_natives_fd = -1;
-    int v8_snapshot_fd = -1;
-    if (gin::V8Initializer::OpenV8FilesForChildProcesses(&v8_natives_fd,
-                                                         &v8_snapshot_fd)) {
-      v8_natives_fd_.reset(v8_natives_fd);
-      v8_snapshot_fd_.reset(v8_snapshot_fd);
-    }
-  }
-  // V8 can't start up without the source of the natives, but it can
-  // start up (slower) without the snapshot.
-  DCHECK(natives_fd_exists());
-  mappings->Share(kV8NativesDataDescriptor, v8_natives_fd_.get());
-  if (snapshot_fd_exists())
-    mappings->Share(kV8SnapshotDataDescriptor, v8_snapshot_fd_.get());
-#endif  // V8_USE_EXTERNAL_STARTUP_DATA
-
 #if defined(OS_ANDROID)
   base::FilePath data_path;
   PathService::Get(ui::DIR_RESOURCE_PAKS_ANDROID, &data_path);
@@ -2305,14 +2318,6 @@ void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
   base::FilePath app_data_path;
   PathService::Get(base::DIR_ANDROID_APP_DATA, &app_data_path);
   DCHECK(!app_data_path.empty());
-
-  flags = base::File::FLAG_OPEN | base::File::FLAG_READ;
-  base::FilePath icudata_path =
-      app_data_path.AppendASCII(base::i18n::kIcuDataFileName);
-  base::File icudata_file(icudata_path, flags);
-  DCHECK(icudata_file.IsValid());
-  mappings->Transfer(kAndroidICUDataDescriptor,
-                     base::ScopedFD(icudata_file.TakePlatformFile()));
 #else
   int crash_signal_fd = GetCrashSignalFD(command_line);
   if (crash_signal_fd >= 0) {
@@ -2362,6 +2367,15 @@ void ChromeContentBrowserClient::OverrideRenderFrameMojoServices(
   registry->AddService(
       base::Bind(&chromeos::attestation::PlatformVerificationImpl::Create,
                  render_frame_host));
+#endif
+}
+
+void ChromeContentBrowserClient::RegisterMojoApplications(
+    StaticMojoApplicationMap* apps) {
+#if !defined(OS_ANDROID) && !defined(OS_IOS)
+  apps->insert(std::make_pair(GURL(device::kDevicesMojoAppUrl),
+                              base::Bind(&device::DevicesApp::CreateDelegate,
+                                         base::ThreadTaskRunnerHandle::Get())));
 #endif
 }
 

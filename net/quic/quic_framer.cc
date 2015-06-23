@@ -135,15 +135,6 @@ QuicSequenceNumberLength ReadSequenceNumberLength(uint8 flags) {
 
 }  // namespace
 
-bool QuicFramerVisitorInterface::OnWindowUpdateFrame(
-    const QuicWindowUpdateFrame& frame) {
-  return true;
-}
-
-bool QuicFramerVisitorInterface::OnBlockedFrame(const QuicBlockedFrame& frame) {
-  return true;
-}
-
 QuicFramer::QuicFramer(const QuicVersionVector& supported_versions,
                        QuicTime creation_time,
                        Perspective perspective)
@@ -182,7 +173,6 @@ size_t QuicFramer::GetMinStreamFrameSize(QuicStreamId stream_id,
 
 // static
 size_t QuicFramer::GetMinAckFrameSize(
-    QuicSequenceNumberLength sequence_number_length,
     QuicSequenceNumberLength largest_observed_length) {
   return kQuicFrameTypeSize + kQuicEntropyHashSize +
       largest_observed_length + kQuicDeltaTimeLargestObservedSize;
@@ -310,9 +300,9 @@ size_t QuicFramer::GetSerializedFrameLength(
   if (!first_frame) {
     return 0;
   }
-  bool can_truncate = frame.type == ACK_FRAME &&
-      free_bytes >= GetMinAckFrameSize(PACKET_6BYTE_SEQUENCE_NUMBER,
-                                       PACKET_6BYTE_SEQUENCE_NUMBER);
+  bool can_truncate =
+      frame.type == ACK_FRAME &&
+      free_bytes >= GetMinAckFrameSize(PACKET_6BYTE_SEQUENCE_NUMBER);
   if (can_truncate) {
     // Truncate the frame so the packet will not exceed kMaxPacketSize.
     // Note that we may not use every byte of the writer in this case.
@@ -1592,16 +1582,15 @@ StringPiece QuicFramer::GetAssociatedDataFromEncryptedPacket(
       - kStartOfHashData);
 }
 
-void QuicFramer::SetDecrypter(QuicDecrypter* decrypter,
-                              EncryptionLevel level) {
+void QuicFramer::SetDecrypter(EncryptionLevel level, QuicDecrypter* decrypter) {
   DCHECK(alternative_decrypter_.get() == nullptr);
   DCHECK_GE(level, decrypter_level_);
   decrypter_.reset(decrypter);
   decrypter_level_ = level;
 }
 
-void QuicFramer::SetAlternativeDecrypter(QuicDecrypter* decrypter,
-                                         EncryptionLevel level,
+void QuicFramer::SetAlternativeDecrypter(EncryptionLevel level,
+                                         QuicDecrypter* decrypter,
                                          bool latch_once_used) {
   alternative_decrypter_.reset(decrypter);
   alternative_decrypter_level_ = level;
@@ -1623,7 +1612,7 @@ void QuicFramer::SetEncrypter(EncryptionLevel level,
   encrypter_[level].reset(encrypter);
 }
 
-QuicEncryptedPacket* QuicFramer::EncryptPacket(
+QuicEncryptedPacket* QuicFramer::EncryptPayload(
     EncryptionLevel level,
     QuicPacketSequenceNumber packet_sequence_number,
     const QuicPacket& packet,
@@ -1738,8 +1727,7 @@ size_t QuicFramer::GetAckFrameSize(
   QuicSequenceNumberLength missing_sequence_number_length =
       GetMinSequenceNumberLength(ack_info.max_delta);
 
-  size_t ack_size = GetMinAckFrameSize(sequence_number_length,
-                                       largest_observed_length);
+  size_t ack_size = GetMinAckFrameSize(largest_observed_length);
   if (!ack_info.nack_ranges.empty()) {
     ack_size += kNumberOfNackRangesSize  + kNumberOfRevivedPacketsSize;
     ack_size += min(ack_info.nack_ranges.size(), kMaxNackRanges) *
@@ -1929,10 +1917,9 @@ bool QuicFramer::AppendAckFrameAndTypeByte(
   QuicSequenceNumberLength missing_sequence_number_length =
       GetMinSequenceNumberLength(ack_info.max_delta);
   // Determine whether we need to truncate ranges.
-  size_t available_range_bytes = writer->capacity() - writer->length() -
-      kNumberOfRevivedPacketsSize - kNumberOfNackRangesSize -
-      GetMinAckFrameSize(header.public_header.sequence_number_length,
-                         largest_observed_length);
+  size_t available_range_bytes =
+      writer->capacity() - writer->length() - kNumberOfRevivedPacketsSize -
+      kNumberOfNackRangesSize - GetMinAckFrameSize(largest_observed_length);
   size_t max_num_ranges = available_range_bytes /
       (missing_sequence_number_length + PACKET_1BYTE_SEQUENCE_NUMBER);
   max_num_ranges = min(kMaxNackRanges, max_num_ranges);

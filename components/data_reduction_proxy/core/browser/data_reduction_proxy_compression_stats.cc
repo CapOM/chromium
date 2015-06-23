@@ -11,7 +11,7 @@
 #include "base/command_line.h"
 #include "base/location.h"
 #include "base/logging.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_change_registrar.h"
 #include "base/prefs/pref_service.h"
 #include "base/prefs/scoped_user_pref_update.h"
@@ -737,10 +737,10 @@ void DataReductionProxyCompressionStats::RecordUserVisibleDataSavings() {
   int user_visible_savings_percent =
       user_visible_savings_bytes * 100 / original_content_length;
   UMA_HISTOGRAM_PERCENTAGE(
-      "Net.DailyUserVisibleSavingsPercent_DataRedictionProxyEnabled",
+      "Net.DailyUserVisibleSavingsPercent_DataReductionProxyEnabled",
       user_visible_savings_percent);
   UMA_HISTOGRAM_COUNTS(
-      "Net.DailyUserVisibleSavingsSize_DataRedictionProxyEnabled",
+      "Net.DailyUserVisibleSavingsSize_DataReductionProxyEnabled",
       user_visible_savings_bytes >> 10);
 }
 

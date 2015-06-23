@@ -46,17 +46,30 @@ tests = [
 if config.target_os != config.OS_ANDROID:
   tests += [
     {
-      "test": "mojo:html_viewer_apptests",
+      "test": "mojo:filesystem_apptests",
       "type": "gtest_isolated",
-      "args": ["--is-headless"]
     },
     {
-      "test": "mojo:resource_provider_apptests",
+      "test": "mojo:html_viewer_apptests",
       "type": "gtest_isolated",
+      "args": ["--use-test-config"]
     },
     {
       "test": "mojo:mandoline_frame_apptests",
       "type": "gtest_isolated",
       "args": ["--use-headless-config"]
     },
+    {
+      "test": "mojo:resource_provider_apptests",
+      "type": "gtest_isolated",
+    },
+    {
+      "test": "mojo:sql_apptests",
+      "type": "gtest_isolated",
+    },
+    # TODO(xhwang): Fix and enable the media_apptests. http://crbug.com/501417
+    #{
+    #  "test": "mojo:media_apptests",
+    #  "type": "gtest_isolated",
+    #},
   ]

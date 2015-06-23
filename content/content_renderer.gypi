@@ -262,8 +262,6 @@
       'renderer/media/audio_message_filter.h',
       'renderer/media/audio_renderer_mixer_manager.cc',
       'renderer/media/audio_renderer_mixer_manager.h',
-      'renderer/media/crypto/cdm_initialized_promise.cc',
-      'renderer/media/crypto/cdm_initialized_promise.h',
       'renderer/media/crypto/pepper_cdm_wrapper.h',
       'renderer/media/crypto/pepper_cdm_wrapper_impl.cc',
       'renderer/media/crypto/pepper_cdm_wrapper_impl.h',
@@ -641,6 +639,8 @@
       'renderer/media/webrtc/media_stream_track_metrics.h',
       'renderer/media/webrtc/peer_connection_dependency_factory.cc',
       'renderer/media/webrtc/peer_connection_dependency_factory.h',
+      'renderer/media/webrtc/stun_field_trial.cc',
+      'renderer/media/webrtc/stun_field_trial.h',
       'renderer/media/webrtc/track_observer.cc',
       'renderer/media/webrtc/track_observer.h',
       'renderer/media/webrtc/video_destination_handler.cc',
@@ -653,10 +653,10 @@
       'renderer/media/webrtc/webrtc_media_stream_adapter.h',
       'renderer/media/webrtc/webrtc_video_capturer_adapter.cc',
       'renderer/media/webrtc/webrtc_video_capturer_adapter.h',
-      'renderer/media/webrtc/webrtc_video_track_adapter.cc',
-      'renderer/media/webrtc/webrtc_video_track_adapter.h',
       'renderer/media/webrtc/webrtc_video_frame_adapter.cc',
       'renderer/media/webrtc/webrtc_video_frame_adapter.h',
+      'renderer/media/webrtc/webrtc_video_track_adapter.cc',
+      'renderer/media/webrtc/webrtc_video_track_adapter.h',
       'renderer/media/webrtc_audio_capturer.cc',
       'renderer/media/webrtc_audio_capturer.h',
       'renderer/media/webrtc_audio_device_impl.cc',
@@ -773,6 +773,7 @@
         '../third_party/libyuv/libyuv.gyp:libyuv',
         '../third_party/webrtc/modules/modules.gyp:audio_device',
         '../third_party/webrtc/modules/modules.gyp:audio_processing',
+        '../third_party/webrtc/p2p/p2p.gyp:libstunprober',
         '<(DEPTH)/crypto/crypto.gyp:crypto',
       ],
       'sources': [
@@ -838,6 +839,14 @@
     }],
     ['use_seccomp_bpf==1', {
       'defines': ['USE_SECCOMP_BPF'],
+    }],
+    ['enable_webvr==1', {
+      'sources': [
+        'renderer/vr/vr_dispatcher.cc',
+        'renderer/vr/vr_dispatcher.h',
+        'renderer/vr/vr_type_converters.cc',
+        'renderer/vr/vr_type_converters.h',
+      ]
     }],
   ],
   'target_conditions': [

@@ -54,9 +54,8 @@ class SearchProvider : public BaseSearchProvider,
                        public TemplateURLServiceObserver,
                        public net::URLFetcherDelegate {
  public:
-  SearchProvider(AutocompleteProviderListener* listener,
-                 TemplateURLService* template_url_service,
-                 scoped_ptr<AutocompleteProviderClient> client);
+  SearchProvider(AutocompleteProviderClient* client,
+                 AutocompleteProviderListener* listener);
 
   // Extracts the suggest response metadata which SearchProvider previously
   // stored for |match|.
@@ -68,11 +67,6 @@ class SearchProvider : public BaseSearchProvider,
 
   // AutocompleteProvider:
   void ResetSession() override;
-
-  // This URL may be sent with suggest requests; see comments on CanSendURL().
-  void set_current_page_url(const GURL& current_page_url) {
-    current_page_url_ = current_page_url;
-  }
 
  protected:
   ~SearchProvider() override;
@@ -161,9 +155,7 @@ class SearchProvider : public BaseSearchProvider,
   static ACMatches::iterator FindTopMatch(ACMatches* matches);
 
   // AutocompleteProvider:
-  void Start(const AutocompleteInput& input,
-             bool minimal_changes,
-             bool called_due_to_focus) override;
+  void Start(const AutocompleteInput& input, bool minimal_changes) override;
   void Stop(bool clear_cached_results,
             bool due_to_user_inactivity) override;
 
@@ -405,8 +397,6 @@ class SearchProvider : public BaseSearchProvider,
   base::string16 top_query_suggestion_match_contents_;
   // The top navigation suggestion, left blank/invalid if none.
   GURL top_navigation_suggestion_;
-
-  GURL current_page_url_;
 
   // Session token management.
   std::string current_token_;

@@ -544,6 +544,69 @@ template("jinja_template_resources") {
   }
 }
 
+# Creates a resources.zip with locale.pak files placed into appropriate
+# resource configs (e.g. en-GB.pak -> res/raw-en/en_gb.pak). Also generates
+# a locale_paks TypedArray so that resource files can be enumerated at runtime.
+#
+# If this target is included in the deps of an android resources/library/apk,
+# the resources will be included with that target.
+#
+# Variables:
+#   sources: List of .pak files. Names must be of the form "en.pak" or
+#       "en-US.pak".
+#   deps: (optional) List of dependencies that might be needed to generate
+#       the .pak files.
+#
+# Example
+#   locale_pak_resources("locale_paks") {
+#     sources = [ "path/en-US.pak", "path/fr.pak", ... ]
+#   }
+template("locale_pak_resources") {
+  set_sources_assignment_filter([])
+  assert(defined(invoker.sources))
+
+  _base_path = "$target_gen_dir/$target_name"
+  _resources_zip = _base_path + ".resources.zip"
+  _build_config = _base_path + ".build_config"
+
+  write_build_config("${target_name}__build_config") {
+    build_config = _build_config
+    resources_zip = _resources_zip
+    type = "android_resources"
+  }
+
+  action("${target_name}__create_resources_zip") {
+    sources = invoker.sources
+    script = "//build/android/gyp/locale_pak_resources.py"
+    depfile = "$target_gen_dir/$target_name.d"
+
+    outputs = [
+      depfile,
+      _resources_zip,
+    ]
+
+    _rebased_sources = rebase_path(invoker.sources, root_build_dir)
+    args = [
+      "--locale-paks=${_rebased_sources}",
+      "--resources-zip",
+      rebase_path(_resources_zip, root_build_dir),
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
+    ]
+
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+    }
+  }
+
+  group(target_name) {
+    deps = [
+      ":${target_name}__build_config",
+      ":${target_name}__create_resources_zip",
+    ]
+  }
+}
+
 # Declare an Android resources target
 #
 # This creates a resources zip file that will be used when building an Android
@@ -798,6 +861,7 @@ template("java_strings_grd_prebuilt") {
 #     android_library target, for example.
 #
 #   chromium_code: If true, extra analysis warning/errors will be enabled.
+#   enable_errorprone: If true, enables the errorprone compiler.
 #
 #   data_deps, testonly
 #
@@ -824,6 +888,9 @@ template("java_binary") {
     }
     if (defined(invoker.deps)) {
       deps = invoker.deps
+    }
+    if (defined(invoker.enable_errorprone)) {
+      enable_errorprone = invoker.enable_errorprone
     }
     if (defined(invoker.java_files)) {
       java_files = invoker.java_files
@@ -919,6 +986,8 @@ template("junit_binary") {
 #     ease the gyp->gn conversion and will be removed in the future.
 #
 #   chromium_code: If true, extra analysis warning/errors will be enabled.
+#   enable_errorprone: If true, enables the errorprone compiler.
+#
 #   jar_excluded_patterns: List of patterns of .class files to exclude from the
 #     final jar.
 #
@@ -966,6 +1035,9 @@ template("java_library") {
     }
     if (defined(invoker.deps)) {
       deps = invoker.deps
+    }
+    if (defined(invoker.enable_errorprone)) {
+      enable_errorprone = invoker.enable_errorprone
     }
     if (defined(invoker.jar_excluded_patterns)) {
       jar_excluded_patterns = invoker.jar_excluded_patterns
@@ -1058,6 +1130,8 @@ template("java_prebuilt") {
 #     ease the gyp->gn conversion and will be removed in the future.
 #
 #   chromium_code: If true, extra analysis warning/errors will be enabled.
+#   enable_errorprone: If true, enables the errorprone compiler.
+#
 #   jar_excluded_patterns: List of patterns of .class files to exclude from the
 #     final jar.
 #
@@ -1102,6 +1176,9 @@ template("android_library") {
     }
     if (defined(invoker.deps)) {
       deps = invoker.deps
+    }
+    if (defined(invoker.enable_errorprone)) {
+      enable_errorprone = invoker.enable_errorprone
     }
     if (defined(invoker.jar_excluded_patterns)) {
       jar_excluded_patterns = invoker.jar_excluded_patterns
@@ -1609,6 +1686,12 @@ template("android_apk") {
     dex_path = final_dex_path
     load_library_from_apk = _load_library_from_apk
     create_density_splits = _create_density_splits
+    if (defined(invoker.extensions_to_not_compress)) {
+      extensions_to_not_compress = invoker.extensions_to_not_compress
+    } else {
+      # Allow icu data and v8 snapshots to be loaded directly from the .apk.
+      extensions_to_not_compress = "dat,bin"
+    }
 
     version_code = _version_code
     version_name = _version_name
@@ -1856,6 +1939,7 @@ template("unittest_apk") {
       "//base:base_java",
       "//build/android/pylib/remote/device/dummy:remote_device_dummy_apk",
       "//testing/android/appurify_support:appurify_support_java",
+      "//testing/android/reporter:reporter_java",
     ]
     if (defined(invoker.deps)) {
       deps += invoker.deps

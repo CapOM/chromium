@@ -53,7 +53,7 @@ class AwWebContentsDelegateAdapter extends AwWebContentsDelegate {
 
     @Override
     public void onLoadProgressChanged(int progress) {
-        mContentsClient.onProgressChanged(progress);
+        mContentsClient.getCallbackHelper().postOnProgressChanged(progress);
     }
 
     @Override
@@ -83,6 +83,7 @@ class AwWebContentsDelegateAdapter extends AwWebContentsDelegate {
         mContentsClient.onUnhandledKeyEvent(event);
     }
 
+    @SuppressLint("NewApi") // AudioManager#dispatchMediaKeyEvent requires API level 19.
     /**
      * Redispatches unhandled media keys. This allows bluetooth headphones with play/pause or
      * other buttons to function correctly.
@@ -207,7 +208,7 @@ class AwWebContentsDelegateAdapter extends AwWebContentsDelegate {
 
         Message resend = handler.obtainMessage(msgContinuePendingReload);
         Message dontResend = handler.obtainMessage(msgCancelPendingReload);
-        mContentsClient.onFormResubmission(dontResend, resend);
+        mContentsClient.getCallbackHelper().postOnFormResubmission(dontResend, resend);
     }
 
     @Override
@@ -255,10 +256,7 @@ class AwWebContentsDelegateAdapter extends AwWebContentsDelegate {
             // the pending entry.
             String url = mAwContents.getLastCommittedUrl();
             url = TextUtils.isEmpty(url) ? "about:blank" : url;
-            mContentsClient.onPageStarted(url);
-            mContentsClient.onLoadResource(url);
-            mContentsClient.onProgressChanged(100);
-            mContentsClient.onPageFinished(url);
+            mContentsClient.getCallbackHelper().postSynthesizedPageLoadingForUrlBarUpdate(url);
         }
     }
 

@@ -1158,8 +1158,9 @@ TEST_F(DataReductionProxyConfigTest, LoFiOn) {
   for (size_t i = 0; i < arraysize(tests); ++i) {
     config()->ResetLoFiStatusForTest();
     if (tests[i].lofi_switch_enabled) {
-      base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
+      base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+          switches::kDataReductionProxyLoFi,
+          switches::kDataReductionProxyLoFiValueAlwaysOn);
     }
 
     EXPECT_CALL(*config(), IsIncludedInLoFiEnabledFieldTrial())
@@ -1192,8 +1193,9 @@ TEST_F(DataReductionProxyConfigTest, LoFiStatusTransition) {
   for (size_t i = 0; i < arraysize(tests); ++i) {
     config()->ResetLoFiStatusForTest();
     if (tests[i].lofi_switch_enabled) {
-      base::CommandLine::ForCurrentProcess()->AppendSwitch(
-          data_reduction_proxy::switches::kEnableDataReductionProxyLoFi);
+      base::CommandLine::ForCurrentProcess()->AppendSwitchASCII(
+          switches::kDataReductionProxyLoFi,
+          switches::kDataReductionProxyLoFiValueAlwaysOn);
     } else {
       EXPECT_CALL(*config(), IsIncludedInLoFiEnabledFieldTrial())
           .WillRepeatedly(testing::Return(true));
@@ -1216,15 +1218,16 @@ TEST_F(DataReductionProxyConfigTest, LoFiStatusTransition) {
   }
 }
 
-// Overrides net::NetworkQualityEstimator::GetEstimate() for testing purposes.
+// Overrides net::NetworkQualityEstimator::GetPeakEstimate() for testing
+// purposes.
 class TestNetworkQualityEstimator : public net::NetworkQualityEstimator {
  public:
   TestNetworkQualityEstimator() : rtt_(base::TimeDelta()), kbps_(0) {}
 
   ~TestNetworkQualityEstimator() override {}
 
-  net::NetworkQuality GetEstimate() const override {
-    return net::NetworkQuality(rtt_, 0.0, kbps_, 0.0);
+  net::NetworkQuality GetPeakEstimate() const override {
+    return net::NetworkQuality(rtt_, kbps_);
   }
 
   void SetRtt(base::TimeDelta rtt) { rtt_ = rtt; }
@@ -1257,18 +1260,17 @@ TEST_F(DataReductionProxyConfigTest, AutoLoFiParams) {
   variation_params["spurious_field"] = "480";
 
   ASSERT_TRUE(variations::AssociateVariationParams(
-      DataReductionProxyParams::GetLoFiFieldTrialName(), "Enabled",
-      variation_params));
+      params::GetLoFiFieldTrialName(), "Enabled", variation_params));
 
   base::FieldTrialList field_trial_list(nullptr);
-  base::FieldTrialList::CreateFieldTrial(
-      DataReductionProxyParams::GetLoFiFieldTrialName(), "Enabled");
+  base::FieldTrialList::CreateFieldTrial(params::GetLoFiFieldTrialName(),
+                                         "Enabled");
 
   config.PopulateAutoLoFiParams();
 
   EXPECT_EQ(base::TimeDelta::FromMilliseconds(rtt_msec),
             config.auto_lofi_minimum_rtt_);
-  EXPECT_EQ(240U, config.auto_lofi_maximum_kbps_);
+  EXPECT_EQ(240, config.auto_lofi_maximum_kbps_);
   EXPECT_EQ(base::TimeDelta::FromSeconds(hysteresis_sec),
             config.auto_lofi_hysteresis_);
 

@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="et">
 <translation id="2774256287122201187">Võite jätkata. Kui liigute edasi lehele, ei ilmu see hoiatus järgmise viie minuti jooksul uuesti.</translation>
+<translation id="3963721102035795474">Lugejarežiim</translation>
 <translation id="7485870689360869515">Andmeid ei leitud.</translation>
 <translation id="3884278016824448484">Seadme identifikaator on konfliktne</translation>
 <translation id="5172758083709347301">Masin</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">Tõlkimine <ph name="TARGET_LANGUAGE"/> keelde ebaõnnestus.</translation>
 <translation id="4103249731201008433">Seadme seerianumber on kehtetu</translation>
 <translation id="3219579145727097045">Sisestage aegumiskuupäev ja 4-kohaline CVC kaardi tagaküljelt</translation>
-<translation id="3667681724235208644">Originaali kuvamine</translation>
+<translation id="59107663811261420">Google Payments ei toeta selle kaupmehe puhul seda tüüpi kaarti. Valige teine kaart.</translation>
 <translation id="4079302484614802869">Puhverserveri konfigureerimine on määratud kasutama pac-skripti URL-i, mitte fikseeritud puhverservereid.</translation>
 <translation id="5540224163453853">Taotletud artiklit ei õnnestunud leida.</translation>
 <translation id="8437238597147034694">&amp;Võta teisaldamine tagasi</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;sisesta päring&gt;</translation>
 <translation id="552553974213252141">Kas tekst ekstraktiti õigesti?</translation>
 <translation id="5317780077021120954">Salvesta</translation>
+<translation id="8530504477309582336">Google Payments ei toeta seda tüüpi kaarti. Valige teine kaart.</translation>
 <translation id="7610193165460212391">Väärtus on vahemikust (<ph name="VALUE"/>) väljaspool.</translation>
 <translation id="3739623965217189342">Teie kopeeritud link</translation>
 <translation id="8790007591277257123">&amp;Kustuta uuesti</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">Kehtetu puhverserveri režiim.</translation>
 <translation id="3105172416063519923">Vara ID:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">Selle funktsiooni kasutamiseks peab JavaScript olema lubatud.</translation>
 <translation id="2587841377698384444">Kataloogi API ID:</translation>
 <translation id="7752995774971033316">Haldamata</translation>
 <translation id="3712624925041724820">Litsentsid on ammendunud</translation>

@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="lt">
 <translation id="2774256287122201187">Galite tęsti. Jei tęsite veiksmus puslapyje, šis įspėjimas nebus vėl rodomas penkias minutes.</translation>
+<translation id="3963721102035795474">Skaitytojo režimas</translation>
 <translation id="7485870689360869515">Nerasta jokių duomenų.</translation>
 <translation id="3884278016824448484">Nesuderinamas įrenginio identifikatorius</translation>
 <translation id="5172758083709347301">Įrenginys</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">Verčiant į <ph name="TARGET_LANGUAGE"/> įvyko klaida.</translation>
 <translation id="4103249731201008433">Netinkamas įrenginio serijos numeris</translation>
 <translation id="3219579145727097045">Įveskite galiojimo pabaigos datą ir 4 skaitmenų kortelės saugos kodą (CVC), nurodytą kortelės priekyje</translation>
-<translation id="3667681724235208644">Peržiūrėti pradinį puslapį</translation>
+<translation id="59107663811261420">„Google Payments“ nepalaiko šio tipo kortelės naudojantis šio prekybininko paslaugomis. Pasirinkite kitą kortelę.</translation>
 <translation id="4079302484614802869">Įgaliotojo serverio konfigūracijoje nustatyta naudoti .pac scenarijaus URL, o ne fiksuotus įgaliotuosius serverius.</translation>
 <translation id="5540224163453853">Nepavyko rasti straipsnio, dėl kurio pateikta užklausa.</translation>
 <translation id="8437238597147034694">&amp;Anuliuoti perkėlimą</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;enter query&gt;</translation>
 <translation id="552553974213252141">Ar tekstas tinkamai ištrauktas?</translation>
 <translation id="5317780077021120954">Išsaugoti</translation>
+<translation id="8530504477309582336">„Google Payments“ nepalaiko šio tipo kortelės. Pasirinkite kitą kortelę.</translation>
 <translation id="7610193165460212391">Vertė nepatenka į diapazoną <ph name="VALUE"/>.</translation>
 <translation id="3739623965217189342">Nukopijuota nuoroda</translation>
 <translation id="8790007591277257123">&amp;Ištrinti dar kartą</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">Netinkamas įgaliotojo serverio režimas.</translation>
 <translation id="3105172416063519923">Ištekliaus ID:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">Norint naudoti šią funkciją, reikia įgalinti „JavaScript“.</translation>
 <translation id="2587841377698384444">Katalogo API ID:</translation>
 <translation id="7752995774971033316">Netvarkoma</translation>
 <translation id="3712624925041724820">Licencijos baigėsi</translation>

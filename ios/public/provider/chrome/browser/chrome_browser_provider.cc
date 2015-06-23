@@ -9,7 +9,7 @@
 namespace ios {
 
 namespace {
-ChromeBrowserProvider* g_chrome_browser_provider;
+ChromeBrowserProvider* g_chrome_browser_provider = nullptr;
 }  // namespace
 
 void SetChromeBrowserProvider(ChromeBrowserProvider* provider) {
@@ -86,10 +86,6 @@ std::string ChromeBrowserProvider::GetProductVersionWithPrefix(
     const std::string& prefix) {
   NOTREACHED();
   return std::string();
-}
-
-KeyedServiceProvider* ChromeBrowserProvider::GetKeyedServiceProvider() {
-  return nullptr;
 }
 
 }  // namespace ios

@@ -27,7 +27,6 @@ class GURL;
 class SearchTermsData;
 class SuggestionDeletionHandler;
 class TemplateURL;
-class TemplateURLService;
 
 namespace base {
 class DictionaryValue;
@@ -49,9 +48,8 @@ class BaseSearchProvider : public AutocompleteProvider {
   // ID used in creating URLFetcher for deleting suggestion results.
   static const int kDeletionURLFetcherID;
 
-  BaseSearchProvider(TemplateURLService* template_url_service,
-                     scoped_ptr<AutocompleteProviderClient> client,
-                     AutocompleteProvider::Type type);
+  BaseSearchProvider(AutocompleteProvider::Type type,
+                     AutocompleteProviderClient* client);
 
   // Returns whether |match| is flagged as a query that should be prefetched.
   static bool ShouldPrefetch(const AutocompleteMatch& match);
@@ -141,11 +139,11 @@ class BaseSearchProvider : public AutocompleteProvider {
   //   providers to see this data someday, but for now this has only been
   //   implemented for Google.
   static bool ZeroSuggestEnabled(
-     const GURL& suggest_url,
-     const TemplateURL* template_url,
-     metrics::OmniboxEventProto::PageClassification page_classification,
-     const SearchTermsData& search_terms_data,
-     AutocompleteProviderClient* client);
+      const GURL& suggest_url,
+      const TemplateURL* template_url,
+      metrics::OmniboxEventProto::PageClassification page_classification,
+      const SearchTermsData& search_terms_data,
+      const AutocompleteProviderClient* client);
 
   // Returns whether we can send the URL of the current page in any suggest
   // requests.  Doing this requires that all the following hold:
@@ -220,18 +218,17 @@ class BaseSearchProvider : public AutocompleteProvider {
   // Records in UMA whether the deletion request resulted in success.
   virtual void RecordDeletionResult(bool success) = 0;
 
-  TemplateURLService* template_url_service_;
-  scoped_ptr<AutocompleteProviderClient> client_;
+  AutocompleteProviderClient* client() { return client_; }
+  const AutocompleteProviderClient* client() const { return client_; }
 
-  // Whether a field trial, if any, has triggered in the most recent
-  // autocomplete query. This field is set to true only if the suggestion
-  // provider has completed and the response contained
-  // '"google:fieldtrialtriggered":true'.
-  bool field_trial_triggered_;
+  bool field_trial_triggered() const { return field_trial_triggered_; }
 
-  // Same as above except that it is maintained across the current Omnibox
-  // session.
-  bool field_trial_triggered_in_session_;
+  void set_field_trial_triggered(bool triggered) {
+    field_trial_triggered_ = triggered;
+  }
+  void set_field_trial_triggered_in_session(bool triggered) {
+    field_trial_triggered_in_session_ = triggered;
+  }
 
  private:
   friend class SearchProviderTest;
@@ -245,6 +242,18 @@ class BaseSearchProvider : public AutocompleteProvider {
   // deletion request completes.
   void OnDeletionComplete(bool success,
                           SuggestionDeletionHandler* handler);
+
+  AutocompleteProviderClient* client_;
+
+  // Whether a field trial, if any, has triggered in the most recent
+  // autocomplete query. This field is set to true only if the suggestion
+  // provider has completed and the response contained
+  // '"google:fieldtrialtriggered":true'.
+  bool field_trial_triggered_;
+
+  // Same as above except that it is maintained across the current Omnibox
+  // session.
+  bool field_trial_triggered_in_session_;
 
   // Each deletion handler in this vector corresponds to an outstanding request
   // that a server delete a personalized suggestion. Making this a ScopedVector

@@ -64,7 +64,6 @@ class TransportSecurityState;
 class URLRequestContext;
 class URLRequestContextGetter;
 class URLRequestJobFactory;
-class URLRequestThrottlerManager;
 class URLSecurityManager;
 }  // namespace net
 
@@ -139,7 +138,6 @@ class IOThread : public content::BrowserThreadDelegate {
         proxy_script_fetcher_ftp_transaction_factory;
     scoped_ptr<net::URLRequestJobFactory>
         proxy_script_fetcher_url_request_job_factory;
-    scoped_ptr<net::URLRequestThrottlerManager> throttler_manager;
     scoped_ptr<net::URLSecurityManager> url_security_manager;
     // TODO(willchan): Remove proxy script fetcher context since it's not
     // necessary now that I got rid of refcounting URLRequestContexts.
@@ -164,7 +162,6 @@ class IOThread : public content::BrowserThreadDelegate {
     scoped_ptr<net::HttpUserAgentSettings> http_user_agent_settings;
     scoped_ptr<net::NetworkQualityEstimator> network_quality_estimator;
     bool ignore_certificate_errors;
-    bool use_stale_while_revalidate;
     uint16 testing_fixed_http_port;
     uint16 testing_fixed_https_port;
     Optional<bool> enable_tcp_fast_open_for_ssl;
@@ -269,9 +266,6 @@ class IOThread : public content::BrowserThreadDelegate {
 
   // Sets up TCP FastOpen if enabled via field trials or via the command line.
   void ConfigureTCPFastOpen(const base::CommandLine& command_line);
-
-  // Sets up SDCH based on field trials.
-  void ConfigureSdch();
 
   // Configures available SPDY protocol versions in |globals| based on the flags
   // in |command_lin| as well as SPDY field trial group and parameters.  Must be

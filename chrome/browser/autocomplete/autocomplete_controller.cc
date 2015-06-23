@@ -14,27 +14,19 @@
 #include "base/strings/stringprintf.h"
 #include "base/time/time.h"
 #include "chrome/browser/autocomplete/autocomplete_controller_delegate.h"
-#include "chrome/browser/autocomplete/bookmark_provider.h"
 #include "chrome/browser/autocomplete/builtin_provider.h"
-#include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
-#include "chrome/browser/autocomplete/history_quick_provider.h"
-#include "chrome/browser/autocomplete/history_url_provider.h"
-#include "chrome/browser/autocomplete/in_memory_url_index_factory.h"
-#include "chrome/browser/autocomplete/shortcuts_provider.h"
 #include "chrome/browser/autocomplete/zero_suggest_provider.h"
-#include "chrome/browser/chrome_notification_types.h"
+#include "components/omnibox/bookmark_provider.h"
+#include "components/omnibox/history_quick_provider.h"
+#include "components/omnibox/history_url_provider.h"
 #include "components/omnibox/keyword_provider.h"
 #include "components/omnibox/omnibox_field_trial.h"
 #include "components/omnibox/search_provider.h"
+#include "components/omnibox/shortcuts_provider.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
-#include "content/public/browser/notification_service.h"
 #include "grit/components_strings.h"
 #include "ui/base/l10n/l10n_util.h"
-
-#if defined(ENABLE_EXTENSIONS)
-#include "chrome/browser/autocomplete/keyword_extensions_delegate_impl.h"
-#endif
 
 namespace {
 
@@ -169,11 +161,11 @@ bool AutocompleteMatchHasCustomDescription(const AutocompleteMatch& match) {
 }  // namespace
 
 AutocompleteController::AutocompleteController(
-    Profile* profile,
-    TemplateURLService* template_url_service,
+    scoped_ptr<AutocompleteProviderClient> provider_client,
     AutocompleteControllerDelegate* delegate,
     int provider_types)
     : delegate_(delegate),
+      provider_client_(provider_client.Pass()),
       history_url_provider_(NULL),
       keyword_provider_(NULL),
       search_provider_(NULL),
@@ -181,43 +173,35 @@ AutocompleteController::AutocompleteController(
       stop_timer_duration_(OmniboxFieldTrial::StopTimerFieldTrialDuration()),
       done_(true),
       in_start_(false),
-      template_url_service_(template_url_service) {
+      template_url_service_(provider_client_->GetTemplateURLService()) {
   provider_types &= ~OmniboxFieldTrial::GetDisabledProviderTypes();
   if (provider_types & AutocompleteProvider::TYPE_BOOKMARK)
-    providers_.push_back(new BookmarkProvider(profile));
+    providers_.push_back(new BookmarkProvider(provider_client_.get()));
   if (provider_types & AutocompleteProvider::TYPE_BUILTIN)
-    providers_.push_back(new BuiltinProvider());
-  if (provider_types & AutocompleteProvider::TYPE_HISTORY_QUICK) {
-    providers_.push_back(new HistoryQuickProvider(
-        profile, InMemoryURLIndexFactory::GetForProfile(profile)));
-  }
+    providers_.push_back(new BuiltinProvider(provider_client_.get()));
+  if (provider_types & AutocompleteProvider::TYPE_HISTORY_QUICK)
+    providers_.push_back(new HistoryQuickProvider(provider_client_.get()));
   if (provider_types & AutocompleteProvider::TYPE_HISTORY_URL) {
-    history_url_provider_ = new HistoryURLProvider(this, profile);
+    history_url_provider_ =
+        new HistoryURLProvider(provider_client_.get(), this);
     providers_.push_back(history_url_provider_);
   }
   // "Tab to search" can be used on all platforms other than Android.
 #if !defined(OS_ANDROID)
   if (provider_types & AutocompleteProvider::TYPE_KEYWORD) {
-    keyword_provider_ = new KeywordProvider(this, template_url_service);
-#if defined(ENABLE_EXTENSIONS)
-    keyword_provider_->set_extensions_delegate(
-        scoped_ptr<KeywordExtensionsDelegate>(
-            new KeywordExtensionsDelegateImpl(profile, keyword_provider_)));
-#endif
+    keyword_provider_ = new KeywordProvider(provider_client_.get(), this);
     providers_.push_back(keyword_provider_);
   }
 #endif
   if (provider_types & AutocompleteProvider::TYPE_SEARCH) {
-    search_provider_ = new SearchProvider(
-        this, template_url_service, scoped_ptr<AutocompleteProviderClient>(
-            new ChromeAutocompleteProviderClient(profile)));
+    search_provider_ = new SearchProvider(provider_client_.get(), this);
     providers_.push_back(search_provider_);
   }
   if (provider_types & AutocompleteProvider::TYPE_SHORTCUTS)
-    providers_.push_back(new ShortcutsProvider(profile));
+    providers_.push_back(new ShortcutsProvider(provider_client_.get()));
   if (provider_types & AutocompleteProvider::TYPE_ZERO_SUGGEST) {
-    zero_suggest_provider_ = ZeroSuggestProvider::Create(
-        this, template_url_service, profile);
+    zero_suggest_provider_ =
+        ZeroSuggestProvider::Create(provider_client_.get(), this);
     if (zero_suggest_provider_)
       providers_.push_back(zero_suggest_provider_);
   }
@@ -237,6 +221,7 @@ AutocompleteController::~AutocompleteController() {
 void AutocompleteController::Start(const AutocompleteInput& input) {
   const base::string16 old_input_text(input_.text());
   const bool old_want_asynchronous_matches = input_.want_asynchronous_matches();
+  const bool old_from_omnibox_focus = input_.from_omnibox_focus();
   input_ = input;
 
   // See if we can avoid rerunning autocomplete when the query hasn't changed
@@ -248,8 +233,10 @@ void AutocompleteController::Start(const AutocompleteInput& input) {
   //
   // NOTE: This comes after constructing |input_| above since that construction
   // can change the text string (e.g. by stripping off a leading '?').
-  const bool minimal_changes = (input_.text() == old_input_text) &&
-      (input_.want_asynchronous_matches() == old_want_asynchronous_matches);
+  const bool minimal_changes =
+      (input_.text() == old_input_text) &&
+      (input_.want_asynchronous_matches() == old_want_asynchronous_matches) &&
+      (input.from_omnibox_focus() == old_from_omnibox_focus);
 
   expire_timer_.Stop();
   stop_timer_.Stop();
@@ -260,11 +247,11 @@ void AutocompleteController::Start(const AutocompleteInput& input) {
   for (Providers::iterator i(providers_.begin()); i != providers_.end(); ++i) {
     // TODO(mpearson): Remove timing code once bug 178705 is resolved.
     base::TimeTicks provider_start_time = base::TimeTicks::Now();
-    (*i)->Start(input_, minimal_changes, false);
+    (*i)->Start(input_, minimal_changes);
     if (!input.want_asynchronous_matches())
       DCHECK((*i)->done());
     base::TimeTicks provider_end_time = base::TimeTicks::Now();
-    std::string name = std::string("Omnibox.ProviderTime.") + (*i)->GetName();
+    std::string name = std::string("Omnibox.ProviderTime2.") + (*i)->GetName();
     base::HistogramBase* counter = base::Histogram::FactoryGet(
         name, 1, 5000, 20, base::Histogram::kUmaTargetedHistogramFlag);
     counter->Add(static_cast<int>(
@@ -272,8 +259,8 @@ void AutocompleteController::Start(const AutocompleteInput& input) {
   }
   if (input.want_asynchronous_matches() && (input.text().length() < 6)) {
     base::TimeTicks end_time = base::TimeTicks::Now();
-    std::string name = "Omnibox.QueryTime." + base::IntToString(
-        input.text().length());
+    std::string name =
+        "Omnibox.QueryTime2." + base::IntToString(input.text().length());
     base::HistogramBase* counter = base::Histogram::FactoryGet(
         name, 1, 1000, 50, base::Histogram::kUmaTargetedHistogramFlag);
     counter->Add(static_cast<int>((end_time - start_time).InMilliseconds()));
@@ -303,18 +290,6 @@ void AutocompleteController::Start(const AutocompleteInput& input) {
 
 void AutocompleteController::Stop(bool clear_result) {
   StopHelper(clear_result, false);
-}
-
-void AutocompleteController::OnOmniboxFocused(const AutocompleteInput& input) {
-  DCHECK(!in_start_);  // We should not be already running a query.
-
-  // Call Start() on all prefix-based providers with an INVALID
-  // AutocompleteInput to clear out cached |matches_|, which ensures that
-  // they aren't used with zero suggest.
-  for (Providers::iterator i(providers_.begin()); i != providers_.end(); ++i)
-    (*i)->Start(input, false, true);
-
-  UpdateResult(false, false);
 }
 
 void AutocompleteController::DeleteMatch(const AutocompleteMatch& match) {
@@ -617,12 +592,8 @@ void AutocompleteController::UpdateAssistedQueryStats(
 void AutocompleteController::NotifyChanged(bool notify_default_match) {
   if (delegate_)
     delegate_->OnResultChanged(notify_default_match);
-  if (done_) {
-    content::NotificationService::current()->Notify(
-        chrome::NOTIFICATION_AUTOCOMPLETE_CONTROLLER_RESULT_READY,
-        content::Source<AutocompleteController>(this),
-        content::NotificationService::NoDetails());
-  }
+  if (done_)
+    provider_client_->OnAutocompleteControllerResultReady(this);
 }
 
 void AutocompleteController::CheckIfDone() {

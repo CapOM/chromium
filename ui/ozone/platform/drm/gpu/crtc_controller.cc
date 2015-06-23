@@ -15,11 +15,7 @@ namespace ui {
 CrtcController::CrtcController(const scoped_refptr<DrmDevice>& drm,
                                uint32_t crtc,
                                uint32_t connector)
-    : drm_(drm),
-      crtc_(crtc),
-      connector_(connector),
-      is_disabled_(true),
-      time_of_last_flip_(0) {
+    : drm_(drm), crtc_(crtc), connector_(connector) {
 }
 
 CrtcController::~CrtcController() {
@@ -71,7 +67,7 @@ bool CrtcController::SchedulePageFlip(
     const OverlayPlaneList& overlays,
     bool test_only,
     scoped_refptr<PageFlipRequest> page_flip_request) {
-  DCHECK(!page_flip_request_.get());
+  DCHECK(!page_flip_request_.get() || test_only);
   DCHECK(!is_disabled_);
   const OverlayPlane* primary = OverlayPlane::GetPrimaryPlane(overlays);
   if (!primary) {

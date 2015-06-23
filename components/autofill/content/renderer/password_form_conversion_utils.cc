@@ -143,13 +143,17 @@ bool LocateSpecificPasswords(std::vector<WebInputElement> passwords,
       *current_password = passwords[0];
       break;
     case 2:
-      if (passwords[0].value() == passwords[1].value()) {
-        // Two identical passwords: assume we are seeing a new password with a
-        // confirmation. This can be either a sign-up form or a password change
-        // form that does not ask for the old password.
+      if (!passwords[0].value().isEmpty() &&
+          passwords[0].value() == passwords[1].value()) {
+        // Two identical non-empty passwords: assume we are seeing a new
+        // password with a confirmation. This can be either a sign-up form or a
+        // password change form that does not ask for the old password.
         *new_password = passwords[0];
       } else {
         // Assume first is old password, second is new (no choice but to guess).
+        // This case also includes empty passwords in order to allow filling of
+        // password change forms (that also could autofill for sign up form, but
+        // we can't do anything with this using only client side information).
         *current_password = passwords[0];
         *new_password = passwords[1];
       }
@@ -376,7 +380,7 @@ void GetPasswordForm(
         nonscript_modified_values->find(username_element);
       if (username_iterator != nonscript_modified_values->end()) {
         base::string16 typed_username_value = username_iterator->second;
-        if (!StartsWith(username_value, typed_username_value, false)) {
+        if (!base::StartsWith(username_value, typed_username_value, false)) {
           // We check that |username_value| was not obtained by autofilling
           // |typed_username_value|. In case when it was, |typed_username_value|
           // is incomplete, so we should leave autofilled value.
@@ -412,7 +416,6 @@ void GetPasswordForm(
         password_value = password_iterator->second;
     }
     password_form->password_value = password_value;
-    password_form->password_autocomplete_set = password.autoComplete();
   }
   if (!new_password.isNull()) {
     password_form->new_password_element = new_password.nameForAutofill();

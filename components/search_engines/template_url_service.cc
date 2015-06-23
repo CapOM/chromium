@@ -13,7 +13,7 @@
 #include "base/guid.h"
 #include "base/i18n/case_conversion.h"
 #include "base/memory/scoped_vector.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/prefs/pref_service.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/stl_util.h"
@@ -549,13 +549,18 @@ void TemplateURLService::SetUserSelectedDefaultSearchProvider(
 }
 
 TemplateURL* TemplateURLService::GetDefaultSearchProvider() {
-  return loaded_ ?
-    default_search_provider_ : initial_default_search_provider_.get();
+  return const_cast<TemplateURL*>(
+      static_cast<const TemplateURLService*>(this)->GetDefaultSearchProvider());
+}
+
+const TemplateURL* TemplateURLService::GetDefaultSearchProvider() const {
+  return loaded_ ? default_search_provider_
+                 : initial_default_search_provider_.get();
 }
 
 bool TemplateURLService::IsSearchResultsPageFromDefaultSearchProvider(
-    const GURL& url) {
-  TemplateURL* default_provider = GetDefaultSearchProvider();
+    const GURL& url) const {
+  const TemplateURL* default_provider = GetDefaultSearchProvider();
   return default_provider &&
       default_provider->IsSearchURL(url, search_terms_data());
 }

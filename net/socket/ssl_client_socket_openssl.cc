@@ -18,7 +18,7 @@
 #include "base/callback_helpers.h"
 #include "base/environment.h"
 #include "base/memory/singleton.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/profiler/scoped_tracker.h"
 #include "base/strings/string_piece.h"
 #include "base/synchronization/lock.h"
@@ -27,6 +27,7 @@
 #include "crypto/ec_private_key.h"
 #include "crypto/openssl_util.h"
 #include "crypto/scoped_openssl_types.h"
+#include "net/base/ip_address_number.h"
 #include "net/base/net_errors.h"
 #include "net/cert/cert_policy_enforcer.h"
 #include "net/cert/cert_verifier.h"
@@ -595,6 +596,7 @@ bool SSLClientSocketOpenSSL::GetSSLInfo(SSLInfo* ssl_info) {
     return false;
 
   ssl_info->cert = server_cert_verify_result_.verified_cert;
+  ssl_info->unverified_cert = server_cert_;
   ssl_info->cert_status = server_cert_verify_result_.cert_status;
   ssl_info->is_issued_by_known_root =
       server_cert_verify_result_.is_issued_by_known_root;
@@ -695,8 +697,16 @@ int SSLClientSocketOpenSSL::Init() {
   if (!ssl_ || !context->SetClientSocketForSSL(ssl_, this))
     return ERR_UNEXPECTED;
 
-  if (!SSL_set_tlsext_host_name(ssl_, host_and_port_.host().c_str()))
+  // SNI should only contain valid DNS hostnames, not IP addresses (see RFC
+  // 6066, Section 3).
+  //
+  // TODO(rsleevi): Should this code allow hostnames that violate the LDH rule?
+  // See https://crbug.com/496472 and https://crbug.com/496468 for discussion.
+  IPAddressNumber unused;
+  if (!ParseIPLiteralToNumber(host_and_port_.host(), &unused) &&
+      !SSL_set_tlsext_host_name(ssl_, host_and_port_.host().c_str())) {
     return ERR_UNEXPECTED;
+  }
 
   SSL_SESSION* session = context->session_cache()->Lookup(GetSessionCacheKey());
   if (session != nullptr)
@@ -764,18 +774,17 @@ int SSLClientSocketOpenSSL::Init() {
   // disabled by default. Note that !SHA256 and !SHA384 only remove HMAC-SHA256
   // and HMAC-SHA384 cipher suites, not GCM cipher suites with SHA256 or SHA384
   // as the handshake hash.
-  std::string command(
-      "DEFAULT:!NULL:!aNULL:!SHA256:!SHA384:!aECDH:!AESGCM+AES256:!aPSK");
+  std::string command("DEFAULT:!SHA256:!SHA384:!AESGCM+AES256:!aPSK");
   // Walk through all the installed ciphers, seeing if any need to be
   // appended to the cipher removal |command|.
   for (size_t i = 0; i < sk_SSL_CIPHER_num(ciphers); ++i) {
     const SSL_CIPHER* cipher = sk_SSL_CIPHER_value(ciphers, i);
     const uint16 id = static_cast<uint16>(SSL_CIPHER_get_id(cipher));
-    // Remove any ciphers with a strength of less than 80 bits. Note the NSS
-    // implementation uses "effective" bits here but OpenSSL does not provide
-    // this detail. This only impacts Triple DES: reports 112 vs. 168 bits,
-    // both of which are greater than 80 anyway.
-    bool disable = SSL_CIPHER_get_bits(cipher, NULL) < 80;
+    bool disable = false;
+    if (ssl_config_.require_ecdhe) {
+      base::StringPiece kx_name(SSL_CIPHER_get_kx_name(cipher));
+      disable = kx_name != "ECDHE_RSA" && kx_name != "ECDHE_ECDSA";
+    }
     if (!disable) {
       disable = std::find(ssl_config_.disabled_cipher_suites.begin(),
                           ssl_config_.disabled_cipher_suites.end(), id) !=
@@ -1920,11 +1929,6 @@ bool SSLClientSocketOpenSSL::IsRenegotiationAllowed() const {
       return true;
   }
   return false;
-}
-
-scoped_refptr<X509Certificate>
-SSLClientSocketOpenSSL::GetUnverifiedServerCertificateChain() const {
-  return server_cert_;
 }
 
 }  // namespace net

@@ -15,11 +15,11 @@ TEST(ProcessUtilsTest, SimpleProcess) {
   args.push_back("Hello World");
 
   // Execute the command and collect the output.
-  std::string stdout;
-  ASSERT_TRUE(GetAppOutput(args, &stdout));
+  std::string stdout_result;
+  ASSERT_TRUE(GetAppOutput(args, &stdout_result));
 
   // Echo will append a newline to the stdout.
-  EXPECT_EQ("Hello World\n", stdout);
+  EXPECT_EQ("Hello World\n", stdout_result);
 }
 
 // Verify that false is returned for an invalid command.
@@ -29,9 +29,9 @@ TEST(ProcessUtilsTest, InvalidCommand) {
   args.push_back("invalid_command");
 
   // The command should not run.
-  std::string stdout;
-  ASSERT_FALSE(GetAppOutput(args, &stdout));
-  ASSERT_TRUE(stdout.empty());
+  std::string stdout_result;
+  ASSERT_FALSE(GetAppOutput(args, &stdout_result));
+  ASSERT_TRUE(stdout_result.empty());
 }
 
 // Verify that false is returned when a command an error code.
@@ -44,9 +44,9 @@ TEST(ProcessUtilsTest, ProcessReturnsError) {
 
   // Execute the command and collect the output. Verify that the output of the
   // process is collected, even when the process returns an error code.
-  std::string stderr;
-  ASSERT_FALSE(GetAppOutput(args, &stderr));
-  ASSERT_FALSE(stderr.empty());
+  std::string stderr_result;
+  ASSERT_FALSE(GetAppOutput(args, &stderr_result));
+  ASSERT_FALSE(stderr_result.empty());
 }
 
 }  // namespace chromecast

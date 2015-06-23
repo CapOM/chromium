@@ -16,15 +16,17 @@
 #include "base/json/json_file_value_serializer.h"
 #include "base/json/json_reader.h"
 #include "base/json/json_string_value_serializer.h"
+#include "base/location.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/message_loop/message_loop.h"
 #include "base/prefs/scoped_user_pref_update.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string16.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/version.h"
 #include "chrome/browser/browser_process.h"
 #include "chrome/browser/chrome_notification_types.h"
@@ -60,6 +62,8 @@
 #include "chrome/browser/extensions/test_extension_system.h"
 #include "chrome/browser/extensions/unpacked_installer.h"
 #include "chrome/browser/extensions/updater/extension_updater.h"
+#include "chrome/browser/policy/profile_policy_connector.h"
+#include "chrome/browser/policy/profile_policy_connector_factory.h"
 #include "chrome/browser/prefs/pref_service_syncable.h"
 #include "chrome/browser/sync/profile_sync_service.h"
 #include "chrome/browser/sync/profile_sync_service_factory.h"
@@ -342,6 +346,7 @@ class MockProviderVisitor
       : ids_found_(0),
         fake_base_path_(fake_base_path),
         expected_creation_flags_(expected_creation_flags) {
+    profile_.reset(new TestingProfile);
   }
 
   int Visit(const std::string& json_data) {
@@ -4677,13 +4682,15 @@ class ExtensionCookieCallback {
       weak_factory_(base::MessageLoop::current()) {}
 
   void SetCookieCallback(bool result) {
-    base::MessageLoop::current()->PostTask(FROM_HERE,
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE,
         base::Bind(&base::MessageLoop::Quit, weak_factory_.GetWeakPtr()));
     result_ = result;
   }
 
   void GetAllCookiesCallback(const net::CookieList& list) {
-    base::MessageLoop::current()->PostTask(FROM_HERE,
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE,
         base::Bind(&base::MessageLoop::Quit, weak_factory_.GetWeakPtr()));
     list_ = list;
   }
@@ -4757,7 +4764,7 @@ TEST_F(ExtensionServiceTest, ClearExtensionData) {
   IndexedDBContext* idb_context = BrowserContext::GetDefaultStoragePartition(
                                       profile())->GetIndexedDBContext();
   idb_context->SetTaskRunnerForTesting(
-      base::MessageLoop::current()->message_loop_proxy().get());
+      base::MessageLoop::current()->task_runner().get());
   base::FilePath idb_path = idb_context->GetFilePathForTesting(origin_id);
   EXPECT_TRUE(base::CreateDirectory(idb_path));
   EXPECT_TRUE(base::DirectoryExists(idb_path));
@@ -4880,7 +4887,7 @@ TEST_F(ExtensionServiceTest, ClearAppData) {
   IndexedDBContext* idb_context = BrowserContext::GetDefaultStoragePartition(
                                       profile())->GetIndexedDBContext();
   idb_context->SetTaskRunnerForTesting(
-      base::MessageLoop::current()->message_loop_proxy().get());
+      base::MessageLoop::current()->task_runner().get());
   base::FilePath idb_path = idb_context->GetFilePathForTesting(origin_id);
   EXPECT_TRUE(base::CreateDirectory(idb_path));
   EXPECT_TRUE(base::DirectoryExists(idb_path));
@@ -5528,6 +5535,33 @@ TEST_F(ExtensionServiceTest, ExternalPrefProvider) {
   min_profile_created_by_version_visitor.profile()->GetPrefs()->SetString(
       prefs::kProfileCreatedByVersion, "45.0.0.1");
   EXPECT_EQ(3, min_profile_created_by_version_visitor.Visit(json_data));
+}
+
+TEST_F(ExtensionServiceTest, DoNotInstallForEnterprise) {
+  InitializeEmptyExtensionService();
+
+  const base::FilePath base_path(FILE_PATH_LITERAL("//base/path"));
+  ASSERT_TRUE(base_path.IsAbsolute());
+  MockProviderVisitor visitor(base_path);
+  policy::ProfilePolicyConnector* const connector =
+      policy::ProfilePolicyConnectorFactory::GetForBrowserContext(
+          visitor.profile());
+  connector->OverrideIsManagedForTesting(true);
+  EXPECT_TRUE(connector->IsManaged());
+
+  std::string json_data =
+      "{"
+      "  \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\": {"
+      "    \"external_crx\": \"RandomExtension.crx\","
+      "    \"external_version\": \"1.0\","
+      "    \"do_not_install_for_enterprise\": true"
+      "  },"
+      "  \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\": {"
+      "    \"external_crx\": \"RandomExtension2.crx\","
+      "    \"external_version\": \"1.0\""
+      "  }"
+      "}";
+  EXPECT_EQ(1, visitor.Visit(json_data));
 }
 
 // Test loading good extensions from the profile directory.

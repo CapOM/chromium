@@ -53,14 +53,13 @@ import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ListView;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.CollectionUtil;
 import org.chromium.base.CommandLine;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.metrics.RecordHistogram;
 import org.chromium.base.metrics.RecordUserAction;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ContextualMenuBar;
 import org.chromium.chrome.browser.ContextualMenuBar.ActionBarDelegate;
@@ -85,10 +84,11 @@ import org.chromium.chrome.browser.omnibox.geo.GeolocationHeader;
 import org.chromium.chrome.browser.preferences.privacy.PrivacyPreferencesManager;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.chrome.browser.search_engines.TemplateUrlService;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelperSecurityLevel;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.tab.BackgroundContentViewHelper;
 import org.chromium.chrome.browser.tab.ChromeTab;
 import org.chromium.chrome.browser.toolbar.ToolbarDataProvider;
+import org.chromium.chrome.browser.toolbar.ToolbarPhone;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.chrome.browser.util.KeyNavigationUtil;
 import org.chromium.chrome.browser.util.ViewUtils;
@@ -243,6 +243,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
 
     private CustomSelectionActionModeCallback mDefaultActionModeCallbackForTextEdit;
 
+    private Runnable mShowSuggestions;
+
     /**
      * Listener for receiving the messages related with interacting with the omnibox during startup.
      */
@@ -287,10 +289,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
                 mSuggestionList.setSelection(0);
             }
 
-            final String textWithoutAutocomplete = mUrlBar.getTextWithoutAutocomplete();
-
             stopAutocomplete(false);
-            if (TextUtils.isEmpty(textWithoutAutocomplete)) {
+            if (TextUtils.isEmpty(mUrlBar.getTextWithoutAutocomplete())) {
                 hideSuggestions();
                 startZeroSuggest();
             } else {
@@ -298,6 +298,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
                 mRequestSuggestions = new Runnable() {
                     @Override
                     public void run() {
+                        String textWithoutAutocomplete = mUrlBar.getTextWithoutAutocomplete();
+
                         boolean preventAutocomplete = !shouldAutocomplete()
                                 || (editableText != null && Selection.getSelectionEnd(editableText)
                                         != editableText.length());
@@ -675,7 +677,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
                 ? NavigationButtonType.PAGE : NavigationButtonType.EMPTY;
 
         mSecurityButton = (ImageButton) findViewById(R.id.security_button);
-        mSecurityIconType = ConnectionSecurityHelperSecurityLevel.NONE;
+        mSecurityIconType = ConnectionSecurityLevel.NONE;
 
         mDeleteButton = (TintedImageButton) findViewById(R.id.delete_button);
 
@@ -931,6 +933,14 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     }
 
     /**
+     * @return Whether the URL focus change is taking place, e.g. a focus animation is running on
+     *         a phone device.
+     */
+    protected boolean isUrlFocusChangeInProgress() {
+        return false;
+    }
+
+    /**
      * Triggered when the URL input field has gained or lost focus.
      * @param hasFocus Whether the URL field has gained focus.
      */
@@ -1157,7 +1167,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     }
 
     private int getSecurityLevel() {
-        if (getCurrentTab() == null) return ConnectionSecurityHelperSecurityLevel.NONE;
+        if (getCurrentTab() == null) return ConnectionSecurityLevel.NONE;
         return getCurrentTab().getSecurityLevel();
     }
 
@@ -1169,14 +1179,14 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
      */
     public static int getSecurityIconResource(int securityLevel, boolean usingLightTheme) {
         switch (securityLevel) {
-            case ConnectionSecurityHelperSecurityLevel.NONE:
+            case ConnectionSecurityLevel.NONE:
                 return 0;
-            case ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING:
+            case ConnectionSecurityLevel.SECURITY_WARNING:
                 return R.drawable.omnibox_https_warning;
-            case ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR:
+            case ConnectionSecurityLevel.SECURITY_ERROR:
                 return R.drawable.omnibox_https_invalid;
-            case ConnectionSecurityHelperSecurityLevel.SECURE:
-            case ConnectionSecurityHelperSecurityLevel.EV_SECURE:
+            case ConnectionSecurityLevel.SECURE:
+            case ConnectionSecurityLevel.EV_SECURE:
                 return usingLightTheme
                         ? R.drawable.omnibox_https_valid_light : R.drawable.omnibox_https_valid;
             default:
@@ -1191,14 +1201,14 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     @Override
     public void updateSecurityIcon(int securityLevel) {
         if (showingOriginalUrlForPreview()) {
-            securityLevel = ConnectionSecurityHelperSecurityLevel.NONE;
+            securityLevel = ConnectionSecurityLevel.NONE;
         }
         if (mQueryInTheOmnibox) {
-            if (securityLevel == ConnectionSecurityHelperSecurityLevel.SECURE
-                    || securityLevel == ConnectionSecurityHelperSecurityLevel.EV_SECURE) {
-                securityLevel = ConnectionSecurityHelperSecurityLevel.NONE;
-            } else if (securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING
-                    || securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR) {
+            if (securityLevel == ConnectionSecurityLevel.SECURE
+                    || securityLevel == ConnectionSecurityLevel.EV_SECURE) {
+                securityLevel = ConnectionSecurityLevel.NONE;
+            } else if (securityLevel == ConnectionSecurityLevel.SECURITY_WARNING
+                    || securityLevel == ConnectionSecurityLevel.SECURITY_ERROR) {
                 setUrlToPageUrl();
             }
         }
@@ -1210,7 +1220,7 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         if (mSecurityIconType == securityLevel) return;
         mSecurityIconType = securityLevel;
 
-        if (securityLevel == ConnectionSecurityHelperSecurityLevel.NONE) {
+        if (securityLevel == ConnectionSecurityLevel.NONE) {
             updateSecurityButton(false);
         } else {
             updateSecurityButton(true);
@@ -1228,9 +1238,9 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     @Override
     public boolean shouldEmphasizeHttpsScheme() {
         int securityLevel = getSecurityLevel();
-        if (securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR
-                || securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING
-                || securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_POLICY_WARNING) {
+        if (securityLevel == ConnectionSecurityLevel.SECURITY_ERROR
+                || securityLevel == ConnectionSecurityLevel.SECURITY_WARNING
+                || securityLevel == ConnectionSecurityLevel.SECURITY_POLICY_WARNING) {
             return true;
         }
         if (getToolbarDataProvider().isUsingBrandColor()) return false;
@@ -1583,6 +1593,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
     public void hideSuggestions() {
         if (mAutocomplete == null) return;
 
+        if (mShowSuggestions != null) removeCallbacks(mShowSuggestions);
+
         recordSuggestionsDismissed();
 
         stopAutocomplete(true);
@@ -1818,10 +1830,23 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         mSuggestionList.resetMaxTextWidths();
 
         if (itemsChanged) mSuggestionListAdapter.notifySuggestionsChanged();
+
         if (mUrlBar.hasFocus()) {
-            setSuggestionsListVisibility(true);
-            if (itemCountChanged) {
-                mSuggestionList.updateLayoutParams();
+            final boolean updateLayoutParams = itemCountChanged;
+            mShowSuggestions = new Runnable() {
+                @Override
+                public void run() {
+                    setSuggestionsListVisibility(true);
+                    if (updateLayoutParams) {
+                        mSuggestionList.updateLayoutParams();
+                    }
+                    mShowSuggestions = null;
+                }
+            };
+            if (!isUrlFocusChangeInProgress()) {
+                mShowSuggestions.run();
+            } else {
+                postDelayed(mShowSuggestions, ToolbarPhone.URL_FOCUS_CHANGE_ANIMATION_DURATION_MS);
             }
         }
 
@@ -1943,9 +1968,8 @@ public class LocationBarLayout extends FrameLayout implements OnClickListener,
         boolean showingQuery = false;
         String displayText = mToolbarDataProvider.getText();
         int securityLevel = getSecurityLevel();
-        if (securityLevel != ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR
-                && !TextUtils.isEmpty(displayText)
-                && mToolbarDataProvider.wouldReplaceURL()) {
+        if (securityLevel != ConnectionSecurityLevel.SECURITY_ERROR
+                && !TextUtils.isEmpty(displayText) && mToolbarDataProvider.wouldReplaceURL()) {
             url = displayText.trim();
             showingQuery = true;
             mQueryInTheOmnibox = true;

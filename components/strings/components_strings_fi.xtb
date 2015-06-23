@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="fi">
 <translation id="2774256287122201187">Voit jatkaa. Jos jatkat sivulle, tätä varoitusta ei näytetä uudelleen viiteen minuuttiin.</translation>
+<translation id="3963721102035795474">Lukijatila</translation>
 <translation id="7485870689360869515">Tietoja ei löydy.</translation>
 <translation id="3884278016824448484">Ristiriitainen laitteen tunnus</translation>
 <translation id="5172758083709347301">Kaikki tietokoneen käyttäjät</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">Käännös kielelle <ph name="TARGET_LANGUAGE"/> epäonnistui.</translation>
 <translation id="4103249731201008433">Laitteen sarjanumero on virheellinen</translation>
 <translation id="3219579145727097045">Anna vanhenemispäivä ja nelinumeroinen CVC luottokortin etupuolelta.</translation>
-<translation id="3667681724235208644">Näytä alkuperäinen</translation>
+<translation id="59107663811261420">Google Payments ei tue tämän tyyppisen kortin käyttämistä ostoksien tekemiseen tältä myyjältä. Valitse eri kortti.</translation>
 <translation id="4079302484614802869">Välityspalvelinmääritykset on asetettu käyttämään .pac-URL-osoitteita, ei kiinteitä välityspalvelimia.</translation>
 <translation id="5540224163453853">Pyydettyä artikkelia ei löydy.</translation>
 <translation id="8437238597147034694">K&amp;umoa siirto</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;anna hakulauseke&gt;</translation>
 <translation id="552553974213252141">Noudettiinko teksti oikein?</translation>
 <translation id="5317780077021120954">Tallenna</translation>
+<translation id="8530504477309582336">Google Payments ei tue tämän tyyppistä korttia. Valitse eri kortti.</translation>
 <translation id="7610193165460212391">Arvo on alueen ulkopuolella (<ph name="VALUE"/>).</translation>
 <translation id="3739623965217189342">Kopioimasi linkki</translation>
 <translation id="8790007591277257123">&amp;Toista poisto</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">Virheellinen välityspalvelimen tila.</translation>
 <translation id="3105172416063519923">Laitteen tunnus:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">Tämän ominaisuuden käyttö edellyttää JavaScriptiä.</translation>
 <translation id="2587841377698384444">Hakemistosovellusliittymän tunnus:</translation>
 <translation id="7752995774971033316">Ei hallinnoida</translation>
 <translation id="3712624925041724820">Käyttöluvat ovat lopussa</translation>

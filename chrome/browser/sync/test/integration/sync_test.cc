@@ -579,15 +579,19 @@ bool SyncTest::SetupSync() {
 
 void SyncTest::TearDownOnMainThread() {
   for (size_t i = 0; i < clients_.size(); ++i) {
-    clients_[i]->service()->DisableForUser();
+    clients_[i]->service()->RequestStop(ProfileSyncService::CLEAR_DATA);
   }
 
-  // Some of the pending messages might rely on browser windows still being
-  // around, so run messages both before and after closing all browsers.
-  content::RunAllPendingInMessageLoop();
-  // Close all browser windows.
+  content::WindowedNotificationObserver observer(
+      chrome::NOTIFICATION_BROWSER_CLOSED,
+      content::NotificationService::AllSources());
   chrome::CloseAllBrowsers();
-  content::RunAllPendingInMessageLoop();
+
+  // Waiting for a single notification mitigates flakiness (related to not all
+  // browsers being closed). If further flakiness is seen
+  // (GetTotalBrowserCount() > 0 after this call), GetTotalBrowserCount()
+  // notifications should be waited on.
+  observer.Wait();
 
   if (fake_server_.get()) {
     std::vector<fake_server::FakeServerInvalidationService*>::const_iterator it;
@@ -612,6 +616,10 @@ void SyncTest::SetUpInProcessBrowserTestFixture() {
   net::RuleBasedHostResolverProc* resolver =
       new net::RuleBasedHostResolverProc(host_resolver());
   resolver->AllowDirectLookup("*.google.com");
+
+  // Allow connection to googleapis.com for oauth token requests in E2E tests.
+  resolver->AllowDirectLookup("*.googleapis.com");
+
   // On Linux, we use Chromium's NSS implementation which uses the following
   // hosts for certificate verification. Without these overrides, running the
   // integration tests on Linux causes error as we make external DNS lookups.

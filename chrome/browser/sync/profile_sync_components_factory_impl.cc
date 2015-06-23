@@ -39,12 +39,13 @@
 #include "chrome/browser/themes/theme_service.h"
 #include "chrome/browser/themes/theme_service_factory.h"
 #include "chrome/browser/themes/theme_syncable_service.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/chrome_switches.h"
 #include "chrome/common/chrome_version_info.h"
 #include "chrome/common/pref_names.h"
 #include "components/autofill/core/browser/webdata/autocomplete_syncable_service.h"
 #include "components/autofill/core/browser/webdata/autofill_profile_syncable_service.h"
+#include "components/autofill/core/browser/webdata/autofill_wallet_metadata_syncable_service.h"
 #include "components/autofill/core/browser/webdata/autofill_wallet_syncable_service.h"
 #include "components/autofill/core/browser/webdata/autofill_webdata_service.h"
 #include "components/autofill/core/common/autofill_pref_names.h"
@@ -519,7 +520,8 @@ base::WeakPtr<syncer::SyncableService> ProfileSyncComponentsFactoryImpl::
         return autofill::AutofillProfileSyncableService::FromWebDataService(
             web_data_service_.get())->AsWeakPtr();
       } else if (type == syncer::AUTOFILL_WALLET_METADATA) {
-        return base::WeakPtr<syncer::SyncableService>();
+        return autofill::AutofillWalletMetadataSyncableService::
+            FromWebDataService(web_data_service_.get())->AsWeakPtr();
       }
       return autofill::AutofillWalletSyncableService::FromWebDataService(
           web_data_service_.get())->AsWeakPtr();

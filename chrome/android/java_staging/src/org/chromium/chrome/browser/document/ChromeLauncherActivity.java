@@ -142,6 +142,9 @@ public class ChromeLauncherActivity extends Activity
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // Needs to be called as early as possible, to accurately capture the
+        // time at which the intent was received.
+        IntentHandler.addTimestampToIntent(getIntent());
         // Initialize the command line in case we've disabled document mode from there.
         ((ChromeMobileApplication) getApplication()).initCommandLine();
 
@@ -361,8 +364,7 @@ public class ChromeLauncherActivity extends Activity
 
                 int mode = mIsInMultiInstanceMode ? LAUNCH_MODE_FOREGROUND : LAUNCH_MODE_RETARGET;
                 launchDocumentInstance(ChromeLauncherActivity.this, false, mode, url,
-                        DocumentMetricIds.STARTED_BY_LAUNCHER, PageTransition.AUTO_TOPLEVEL, false,
-                        null);
+                        DocumentMetricIds.STARTED_BY_LAUNCHER, PageTransition.AUTO_TOPLEVEL, null);
 
                 if (mIsFinishNeeded) finish();
             }
@@ -427,7 +429,8 @@ public class ChromeLauncherActivity extends Activity
     }
 
     /**
-     * Starts a Document for the given URL.
+     * Starts a Document for the given URL. Generally, you should be using the TabCreator attached
+     * to the DocumentTabModelSelector.
      *
      * NOTE: this method adds trusted intent extra to authenticate that Chrome set the
      * EXTRA_PAGE_TRANSITION_TYPE extra which we only want Chrome to do.
@@ -439,14 +442,13 @@ public class ChromeLauncherActivity extends Activity
      * @param intentSource What is causing the Intent to be fired.
      *         See DocumentUma.DOCUMENT_ACTIVITY_STARTED_BY_
      * @param pageTransitionType The page transition we will do on loading the given URL.
-     * @param useDesktopUserAgent Whether to use a desktop user agent.
      * @param pendingUrlParams PendingUrlParams to store internally and use later once an intent is
      *                         received to launch the URL. May be null.
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public static void launchDocumentInstance(Activity activity, boolean incognito, int launchMode,
             String url, int intentSource, int pageTransitionType,
-            boolean useDesktopUserAgent, PendingDocumentData pendingUrlParams) {
+            PendingDocumentData pendingUrlParams) {
         // If we weren't given an initial URL, check the pending parameters.
         if (url == null && pendingUrlParams != null) {
             if (pendingUrlParams.url != null) {
@@ -477,7 +479,6 @@ public class ChromeLauncherActivity extends Activity
         intent.putExtra(IntentHandler.EXTRA_OPEN_NEW_INCOGNITO_TAB, incognito);
         intent.putExtra(IntentHandler.EXTRA_PAGE_TRANSITION_TYPE, pageTransitionType);
         intent.putExtra(IntentHandler.EXTRA_STARTED_BY, intentSource);
-        intent.putExtra(IntentHandler.EXTRA_USE_DESKTOP_USER_AGENT, useDesktopUserAgent);
         intent.putExtra(EXTRA_LAUNCH_MODE, launchMode);
         IntentHandler.addTrustedIntentExtras(intent, context);
 
@@ -798,8 +799,10 @@ public class ChromeLauncherActivity extends Activity
      * @return Whether or not the First Run Experience needed to be shown.
      */
     private boolean launchFirstRunExperience() {
+        final boolean isIntentActionMain = getIntent() != null
+                && TextUtils.equals(getIntent().getAction(), Intent.ACTION_MAIN);
         final Intent freIntent = FirstRunFlowSequencer.checkIfFirstRunIsNecessary(
-                this, getIntent());
+                this, getIntent(), isIntentActionMain);
         if (freIntent == null) return false;
 
         if ((getIntent().getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0) {

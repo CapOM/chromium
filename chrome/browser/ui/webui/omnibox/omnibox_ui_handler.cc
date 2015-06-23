@@ -15,6 +15,7 @@
 #include "base/values.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
 #include "chrome/browser/autocomplete/autocomplete_controller.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
@@ -196,14 +197,13 @@ void OmniboxUIHandler::StartOmniboxQuery(const mojo::String& input_string,
       input_string.To<base::string16>(), cursor_position, std::string(), GURL(),
       static_cast<metrics::OmniboxEventProto::PageClassification>(
           page_classification),
-      prevent_inline_autocomplete, prefer_keyword, true, true,
+      prevent_inline_autocomplete, prefer_keyword, true, true, false,
       ChromeAutocompleteSchemeClassifier(profile_));
   controller_->Start(input_);
 }
 
 void OmniboxUIHandler::ResetController() {
-  controller_.reset(new AutocompleteController(profile_,
-          TemplateURLServiceFactory::GetForProfile(profile_),
-          this,
-          AutocompleteClassifier::kDefaultOmniboxProviders));
+  controller_.reset(new AutocompleteController(
+      make_scoped_ptr(new ChromeAutocompleteProviderClient(profile_)), this,
+      AutocompleteClassifier::kDefaultOmniboxProviders));
 }

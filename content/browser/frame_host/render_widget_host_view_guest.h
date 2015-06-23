@@ -100,7 +100,6 @@ class CONTENT_EXPORT RenderWidgetHostViewGuest
   bool LockMouse() override;
   void UnlockMouse() override;
   void GetScreenInfo(blink::WebScreenInfo* results) override;
-  uint32_t GetSurfaceIdNamespace() override;
 
 #if defined(OS_MACOSX)
   // RenderWidgetHostView implementation.
@@ -118,11 +117,11 @@ class CONTENT_EXPORT RenderWidgetHostViewGuest
       const NativeWebKeyboardEvent& event) override;
 #endif  // defined(OS_MACOSX)
 
-#if defined(OS_ANDROID) || defined(TOOLKIT_VIEWS)
+#if defined(OS_ANDROID) || defined(USE_AURA)
   // RenderWidgetHostViewBase implementation.
   void ShowDisambiguationPopup(const gfx::Rect& rect_pixels,
                                const SkBitmap& zoomed_bitmap) override;
-#endif  // defined(OS_ANDROID) || defined(TOOLKIT_VIEWS)
+#endif  // defined(OS_ANDROID) || defined(USE_AURA)
 
 #if defined(OS_ANDROID)
   void LockCompositingSurface() override;

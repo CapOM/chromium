@@ -18,14 +18,18 @@ from mopy.config import Config
 
 def main():
   parser = argparse.ArgumentParser(description="An application test runner.")
-  parser.add_argument("test_list_file", type=file,
-                      help="a file listing apptests to run")
-  parser.add_argument("build_dir", type=str, help="the build output directory")
-  parser.add_argument("--verbose", default=False, action='store_true')
-  parser.add_argument('--repeat_count', default=1, metavar='INT',
-                      action='store', type=int)
+  parser.add_argument("build_dir", type=str, help="The build output directory.")
+  parser.add_argument("--verbose", default=False, action='store_true',
+                      help="Print additional logging information.")
+  parser.add_argument('--repeat-count', default=1, metavar='INT',
+                      action='store', type=int,
+                      help="The number of times to repeat the set of tests.")
   parser.add_argument('--write-full-results-to', metavar='FILENAME',
-                      help='Path to write the JSON list of full results.')
+                      help='The path to write the JSON list of full results.')
+  parser.add_argument("--test-list-file", metavar='FILENAME', type=file,
+                      default=os.path.abspath(os.path.join(__file__, os.pardir,
+                                                           "data", "apptests")),
+                      help="The file listing apptests to run.")
   args = parser.parse_args()
 
   gtest.set_color()
@@ -50,8 +54,8 @@ def main():
       return result
 
   tests = []
-  passed = []
   failed = []
+  failed_suites = 0
   for _ in range(args.repeat_count):
     for test_dict in test_list:
       test = test_dict["test"]
@@ -62,22 +66,31 @@ def main():
       print "Running %s...%s" % (test_name, ("\n" if args.verbose else "")),
       sys.stdout.flush()
 
-      tests.append(test_name)
       assert test_type in ("gtest", "gtest_isolated")
       isolate = test_type == "gtest_isolated"
-      result = gtest.run_apptest(config, shell, test_args, test, isolate)
-      passed.extend([test_name] if result else [])
-      failed.extend([] if result else [test_name])
+      (test, fail) = gtest.run_apptest(config, shell, test_args, test, isolate)
+      tests.extend(test)
+      failed.extend(fail)
+      result = test and not fail
       print "[  PASSED  ]" if result else "[  FAILED  ]",
       print test_name if args.verbose or not result else ""
+      # Abort when 3 apptest suites, or a tenth of all, have failed.
+      # base::TestLauncher does this for timeouts and unknown results.
+      failed_suites += 0 if result else 1
+      if failed_suites >= max(3, len(test_list) / 10):
+        print "Too many failing suites (%d), exiting now." % failed_suites
+        failed.append("Test runner aborted for excessive failures.")
+        break;
 
     if failed:
       break;
 
-  print "[  PASSED  ] %d apptests" % len(passed),
-  print ": %s" % ", ".join(passed) if passed else ""
-  print "[  FAILED  ] %d apptests" % len(failed),
-  print ": %s" % ", ".join(failed) if failed else ""
+  print "[==========] %d tests ran." % len(tests)
+  print "[  PASSED  ] %d tests." % (len(tests) - len(failed))
+  if failed:
+    print "[  FAILED  ] %d tests, listed below:" % len(failed)
+    for failure in failed:
+      print "[  FAILED  ] %s" % failure
 
   if args.write_full_results_to:
     _WriteJSONResults(tests, failed, args.write_full_results_to)

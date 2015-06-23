@@ -353,8 +353,8 @@ const char* const kForbiddenHeaderFields[] = {
 // static
 bool HttpUtil::IsSafeHeader(const std::string& name) {
   std::string lower_name(base::StringToLowerASCII(name));
-  if (StartsWithASCII(lower_name, "proxy-", true) ||
-      StartsWithASCII(lower_name, "sec-", true))
+  if (base::StartsWithASCII(lower_name, "proxy-", true) ||
+      base::StartsWithASCII(lower_name, "sec-", true))
     return false;
   for (size_t i = 0; i < arraysize(kForbiddenHeaderFields); ++i) {
     if (lower_name == kForbiddenHeaderFields[i])
@@ -544,9 +544,19 @@ int HttpUtil::LocateStartOfStatusLine(const char* buf, int buf_len) {
   return -1;  // Not found
 }
 
-int HttpUtil::LocateEndOfHeaders(const char* buf, int buf_len, int i) {
-  bool was_lf = false;
+static int LocateEndOfHeadersHelper(const char* buf,
+                                    int buf_len,
+                                    int i,
+                                    bool accept_empty_header_list) {
   char last_c = '\0';
+  bool was_lf = false;
+  if (accept_empty_header_list) {
+    // Normally two line breaks signal the end of a header list. An empty header
+    // list ends with a single line break at the start of the buffer.
+    last_c = '\n';
+    was_lf = true;
+  }
+
   for (; i < buf_len; ++i) {
     char c = buf[i];
     if (c == '\n') {
@@ -559,6 +569,16 @@ int HttpUtil::LocateEndOfHeaders(const char* buf, int buf_len, int i) {
     last_c = c;
   }
   return -1;
+}
+
+int HttpUtil::LocateEndOfAdditionalHeaders(const char* buf,
+                                           int buf_len,
+                                           int i) {
+  return LocateEndOfHeadersHelper(buf, buf_len, i, true);
+}
+
+int HttpUtil::LocateEndOfHeaders(const char* buf, int buf_len, int i) {
+  return LocateEndOfHeadersHelper(buf, buf_len, i, false);
 }
 
 // In order for a line to be continuable, it must specify a

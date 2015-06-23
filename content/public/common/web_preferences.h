@@ -36,18 +36,10 @@ enum EditingBehavior {
 // Cache options for V8. See V8CacheOptions.h for information on the options.
 enum V8CacheOptions {
   V8_CACHE_OPTIONS_DEFAULT,
+  V8_CACHE_OPTIONS_NONE,
   V8_CACHE_OPTIONS_PARSE,
   V8_CACHE_OPTIONS_CODE,
-  V8_CACHE_OPTIONS_CODE_COMPRESSED,
-  V8_CACHE_OPTIONS_NONE,
-  V8_CACHE_OPTIONS_PARSE_MEMORY,
-  V8_CACHE_OPTIONS_HEURISTICS,
-  V8_CACHE_OPTIONS_HEURISTICS_MOBILE,
-  V8_CACHE_OPTIONS_HEURISTICS_DEFAULT,
-  V8_CACHE_OPTIONS_HEURISTICS_DEFAULT_MOBILE,
-  V8_CACHE_OPTIONS_RECENT,
-  V8_CACHE_OPTIONS_RECENT_SMALL,
-  V8_CACHE_OPTIONS_LAST = V8_CACHE_OPTIONS_RECENT_SMALL
+  V8_CACHE_OPTIONS_LAST = V8_CACHE_OPTIONS_CODE
 };
 
 // ImageAnimationPolicy is used for controlling image animation
@@ -164,7 +156,6 @@ struct CONTENT_EXPORT WebPreferences {
   int available_hover_types;
   ui::HoverType primary_hover_type;
   bool sync_xhr_in_documents_enabled;
-  bool deferred_image_decoding_enabled;
   bool image_color_profiles_enabled;
   bool should_respect_image_orientation;
   int number_of_cpu_cores;
