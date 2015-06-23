@@ -14,7 +14,6 @@
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/history/chrome_history_client.h"
-#include "chrome/browser/history/chrome_history_client_factory.h"
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/common/chrome_constants.h"
 #include "chrome/test/base/testing_browser_process.h"
@@ -24,6 +23,7 @@
 #include "components/bookmarks/test/bookmark_test_helpers.h"
 #include "components/history/core/browser/android/android_time.h"
 #include "components/history/core/browser/history_backend.h"
+#include "components/history/core/browser/history_backend_client.h"
 #include "components/history/core/browser/history_constants.h"
 #include "components/history/core/browser/history_database_params.h"
 #include "components/history/core/browser/keyword_search_term.h"
@@ -181,8 +181,8 @@ class AndroidProviderBackendTest : public testing::Test {
         chrome::kInitialProfile);
     testing_profile->CreateBookmarkModel(true);
     bookmark_model_ = BookmarkModelFactory::GetForProfile(testing_profile);
-    history_client_ =
-        ChromeHistoryClientFactory::GetForProfile(testing_profile);
+    history_client_.reset(new ChromeHistoryClient(bookmark_model_));
+    history_backend_client_ = history_client_->CreateBackendClient();
     bookmarks::test::WaitForBookmarkModelToLoad(bookmark_model_);
     ASSERT_TRUE(bookmark_model_);
 
@@ -253,7 +253,8 @@ class AndroidProviderBackendTest : public testing::Test {
   base::MessageLoopForUI message_loop_;
   content::TestBrowserThread ui_thread_;
   content::TestBrowserThread file_thread_;
-  history::HistoryClient* history_client_;
+  scoped_ptr<history::HistoryClient> history_client_;
+  scoped_ptr<history::HistoryBackendClient> history_backend_client_;
 
   DISALLOW_COPY_AND_ASSIGN(AndroidProviderBackendTest);
 };
@@ -288,9 +289,9 @@ TEST_F(AndroidProviderBackendTest, UpdateTables) {
   // HistoryBackend will shutdown after that.
   {
   scoped_refptr<HistoryBackend> history_backend;
-  history_backend =
-      new HistoryBackend(new AndroidProviderBackendDelegate(), history_client_,
-                         message_loop_.task_runner());
+  history_backend = new HistoryBackend(new AndroidProviderBackendDelegate(),
+                                       history_client_->CreateBackendClient(),
+                                       message_loop_.task_runner());
   history_backend->Init(std::string(), false,
                         TestHistoryDatabaseParamsForPath(temp_dir_.path()));
   history_backend->AddVisits(url1, visits1, history::SOURCE_SYNCED);
@@ -321,7 +322,7 @@ TEST_F(AndroidProviderBackendTest, UpdateTables) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   ASSERT_TRUE(backend->EnsureInitializedAndUpdated());
@@ -427,9 +428,9 @@ TEST_F(AndroidProviderBackendTest, QueryHistoryAndBookmarks) {
   // HistoryBackend will shutdown after that.
   {
   scoped_refptr<HistoryBackend> history_backend;
-  history_backend =
-      new HistoryBackend(new AndroidProviderBackendDelegate(), history_client_,
-                         message_loop_.task_runner());
+  history_backend = new HistoryBackend(new AndroidProviderBackendDelegate(),
+                                       history_client_->CreateBackendClient(),
+                                       message_loop_.task_runner());
   history_backend->Init(std::string(), false,
                         TestHistoryDatabaseParamsForPath(temp_dir_.path()));
   history_backend->AddVisits(url1, visits1, history::SOURCE_SYNCED);
@@ -462,7 +463,7 @@ TEST_F(AndroidProviderBackendTest, QueryHistoryAndBookmarks) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   std::vector<HistoryAndBookmarkRow::ColumnID> projections;
@@ -551,7 +552,7 @@ TEST_F(AndroidProviderBackendTest, InsertHistoryAndBookmark) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   ASSERT_TRUE(backend->InsertHistoryAndBookmark(row1));
@@ -663,7 +664,7 @@ TEST_F(AndroidProviderBackendTest, DeleteHistoryAndBookmarks) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   ASSERT_TRUE(backend->InsertHistoryAndBookmark(row1));
@@ -762,7 +763,7 @@ TEST_F(AndroidProviderBackendTest, IsValidHistoryAndBookmarkRow) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   // The created time and last visit time are too close to have required visit
@@ -855,7 +856,7 @@ TEST_F(AndroidProviderBackendTest, UpdateURL) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   AndroidURLID id1 = backend->InsertHistoryAndBookmark(row1);
@@ -1037,7 +1038,7 @@ TEST_F(AndroidProviderBackendTest, UpdateVisitCount) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   AndroidURLID id1 = backend->InsertHistoryAndBookmark(row1);
@@ -1120,7 +1121,7 @@ TEST_F(AndroidProviderBackendTest, UpdateLastVisitTime) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   AndroidURLID id1 = backend->InsertHistoryAndBookmark(row1);
@@ -1184,7 +1185,7 @@ TEST_F(AndroidProviderBackendTest, UpdateFavicon) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   AndroidURLID id1 = backend->InsertHistoryAndBookmark(row1);
@@ -1252,7 +1253,7 @@ TEST_F(AndroidProviderBackendTest, UpdateSearchTermTable) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   // Insert a keyword search item to verify if the update succeeds.
   HistoryAndBookmarkRow row1;
@@ -1333,7 +1334,7 @@ TEST_F(AndroidProviderBackendTest, QuerySearchTerms) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   // Insert a keyword search item to verify if we can find it.
   HistoryAndBookmarkRow row1;
@@ -1370,7 +1371,7 @@ TEST_F(AndroidProviderBackendTest, UpdateSearchTerms) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   // Insert a keyword.
   HistoryAndBookmarkRow row1;
@@ -1477,7 +1478,7 @@ TEST_F(AndroidProviderBackendTest, DeleteSearchTerms) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   // Insert a keyword.
   HistoryAndBookmarkRow row1;
@@ -1586,7 +1587,7 @@ TEST_F(AndroidProviderBackendTest, InsertSearchTerm) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   SearchRow search_row;
   search_row.set_search_term(UTF8ToUTF16("google"));
@@ -1643,7 +1644,7 @@ TEST_F(AndroidProviderBackendTest, DeleteHistory) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   AndroidURLID id1 = backend->InsertHistoryAndBookmark(row1);
@@ -1699,7 +1700,7 @@ TEST_F(AndroidProviderBackendTest, TestMultipleNestingTransaction) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   // Create the nested transactions.
@@ -1752,7 +1753,7 @@ TEST_F(AndroidProviderBackendTest, TestAndroidCTSComplianceForZeroVisitCount) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   URLRow url_row(GURL("http://www.google.com"));
   url_row.set_last_visit(Time::Now());
@@ -1792,7 +1793,7 @@ TEST_F(AndroidProviderBackendTest, AndroidCTSComplianceFolderColumnExists) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  &thumbnail_db_,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
   HistoryAndBookmarkRow row1;
   row1.set_raw_url("cnn.com");
@@ -1865,9 +1866,9 @@ TEST_F(AndroidProviderBackendTest, QueryWithoutThumbnailDB) {
   // HistoryBackend will shutdown after that.
   {
   scoped_refptr<HistoryBackend> history_backend;
-  history_backend =
-      new HistoryBackend(new AndroidProviderBackendDelegate(), history_client_,
-                         message_loop_.task_runner());
+  history_backend = new HistoryBackend(new AndroidProviderBackendDelegate(),
+                                       history_client_->CreateBackendClient(),
+                                       message_loop_.task_runner());
   history_backend->Init(std::string(), false,
                         TestHistoryDatabaseParamsForPath(temp_dir_.path()));
   history_backend->AddVisits(url1, visits1, history::SOURCE_SYNCED);
@@ -1902,7 +1903,7 @@ TEST_F(AndroidProviderBackendTest, QueryWithoutThumbnailDB) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  NULL,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   std::vector<HistoryAndBookmarkRow::ColumnID> projections;
@@ -1975,7 +1976,7 @@ TEST_F(AndroidProviderBackendTest, InsertWithoutThumbnailDB) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  NULL,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   ASSERT_TRUE(backend->InsertHistoryAndBookmark(row1));
@@ -2042,7 +2043,7 @@ TEST_F(AndroidProviderBackendTest, DeleteWithoutThumbnailDB) {
         new AndroidProviderBackend(android_cache_db_name_,
                                    &history_db,
                                    &thumbnail_db,
-                                   history_client_,
+                                   history_backend_client_.get(),
                                    &notifier_));
 
     ASSERT_TRUE(backend->InsertHistoryAndBookmark(row1));
@@ -2060,7 +2061,7 @@ TEST_F(AndroidProviderBackendTest, DeleteWithoutThumbnailDB) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  NULL,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   // Delete all rows.
@@ -2118,7 +2119,7 @@ TEST_F(AndroidProviderBackendTest, UpdateFaviconWithoutThumbnail) {
         new AndroidProviderBackend(android_cache_db_name_,
                                    &history_db,
                                    &thumbnail_db,
-                                   history_client_,
+                                   history_backend_client_.get(),
                                    &notifier_));
 
     AndroidURLID id1 = backend->InsertHistoryAndBookmark(row1);
@@ -2130,7 +2131,7 @@ TEST_F(AndroidProviderBackendTest, UpdateFaviconWithoutThumbnail) {
       new AndroidProviderBackend(android_cache_db_name_,
                                  &history_db_,
                                  NULL,
-                                 history_client_,
+                                 history_backend_client_.get(),
                                  &notifier_));
 
   int update_count;

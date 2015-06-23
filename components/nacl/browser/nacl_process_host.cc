@@ -13,7 +13,7 @@
 #include "base/command_line.h"
 #include "base/files/file_util.h"
 #include "base/location.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/path_service.h"
 #include "base/process/launch.h"
 #include "base/process/process_iterator.h"
@@ -464,7 +464,8 @@ void NaClProcessHost::Launch(
 #if defined(OS_LINUX)
     nonsfi_mode_forced_by_command_line =
         cmd->HasSwitch(switches::kEnableNaClNonSfiMode);
-#if defined(OS_CHROMEOS) && defined(ARCH_CPU_ARMEL)
+#if defined(OS_CHROMEOS) && \
+    (defined(ARCH_CPU_X86_FAMILY) || defined(ARCH_CPU_ARMEL))
     nonsfi_mode_allowed = NaClBrowser::GetDelegate()->IsNonSfiModeAllowed(
         nacl_host_message_filter->profile_directory(), manifest_url_);
 #endif

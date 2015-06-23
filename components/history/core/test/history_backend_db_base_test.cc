@@ -12,6 +12,7 @@
 #include "components/history/core/browser/download_constants.h"
 #include "components/history/core/browser/download_row.h"
 #include "components/history/core/browser/history_backend.h"
+#include "components/history/core/browser/history_backend_client.h"
 #include "components/history/core/browser/history_constants.h"
 #include "components/history/core/browser/history_database_params.h"
 #include "components/history/core/browser/in_memory_history_backend.h"
@@ -28,7 +29,9 @@ class BackendDelegate : public HistoryBackend::Delegate {
       : history_test_(history_test) {}
 
   // HistoryBackend::Delegate implementation.
-  void NotifyProfileError(sql::InitStatus init_status) override {}
+  void NotifyProfileError(sql::InitStatus init_status) override {
+    history_test_->last_profile_error_ = init_status;
+  }
   void SetInMemoryBackend(scoped_ptr<InMemoryHistoryBackend> backend) override {
     // Save the in-memory backend to the history test object, this happens
     // synchronously, so we don't have to do anything fancy.
@@ -54,7 +57,9 @@ class BackendDelegate : public HistoryBackend::Delegate {
   HistoryBackendDBBaseTest* history_test_;
 };
 
-HistoryBackendDBBaseTest::HistoryBackendDBBaseTest() : db_(nullptr) {
+HistoryBackendDBBaseTest::HistoryBackendDBBaseTest()
+    : db_(nullptr),
+      last_profile_error_ (sql::INIT_OK) {
 }
 
 HistoryBackendDBBaseTest::~HistoryBackendDBBaseTest() {
@@ -83,7 +88,15 @@ void HistoryBackendDBBaseTest::CreateBackendAndDatabase() {
                  TestHistoryDatabaseParamsForPath(history_dir_));
   db_ = backend_->db_.get();
   DCHECK(in_mem_backend_) << "Mem backend should have been set by "
-                             "HistoryBackend::Init";
+      "HistoryBackend::Init";
+}
+
+void HistoryBackendDBBaseTest::CreateBackendAndDatabaseAllowFail() {
+  backend_ = new HistoryBackend(new BackendDelegate(this), nullptr,
+                                base::ThreadTaskRunnerHandle::Get());
+  backend_->Init(std::string(), false,
+                 TestHistoryDatabaseParamsForPath(history_dir_));
+  db_ = backend_->db_.get();
 }
 
 void HistoryBackendDBBaseTest::CreateDBVersion(int version) {

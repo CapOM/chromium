@@ -32,6 +32,7 @@
 #include "base/trace_event/trace_event.h"
 #include "components/history/core/browser/download_row.h"
 #include "components/history/core/browser/history_backend.h"
+#include "components/history/core/browser/history_backend_client.h"
 #include "components/history/core/browser/history_client.h"
 #include "components/history/core/browser/history_database_params.h"
 #include "components/history/core/browser/history_db_task.h"
@@ -185,11 +186,11 @@ HistoryService::HistoryService()
       weak_ptr_factory_(this) {
 }
 
-HistoryService::HistoryService(HistoryClient* history_client,
+HistoryService::HistoryService(scoped_ptr<HistoryClient> history_client,
                                scoped_ptr<VisitDelegate> visit_delegate)
     : thread_(new base::Thread(kHistoryThreadName)),
+      history_client_(history_client.Pass()),
       visit_delegate_(visit_delegate.Pass()),
-      history_client_(history_client),
       backend_loaded_(false),
       weak_ptr_factory_(this) {
 }
@@ -360,7 +361,7 @@ void HistoryService::TopHosts(int num_hosts,
   DCHECK(thread_) << "History service being called after cleanup";
   DCHECK(thread_checker_.CalledOnValidThread());
   PostTaskAndReplyWithResult(
-      thread_->message_loop_proxy().get(), FROM_HERE,
+      thread_->task_runner().get(), FROM_HERE,
       base::Bind(&HistoryBackend::TopHosts, history_backend_.get(), num_hosts),
       callback);
 }
@@ -810,6 +811,10 @@ void HistoryService::Cleanup() {
 
   weak_ptr_factory_.InvalidateWeakPtrs();
 
+  // Inform the HistoryClient that we are shuting down.
+  if (history_client_)
+    history_client_->Shutdown();
+
   // Unload the backend.
   if (history_backend_.get()) {
     // Get rid of the in-memory backend.
@@ -873,7 +878,7 @@ bool HistoryService::Init(
   scoped_refptr<HistoryBackend> backend(new HistoryBackend(
       new BackendDelegate(weak_ptr_factory_.GetWeakPtr(),
                           base::ThreadTaskRunnerHandle::Get()),
-      history_client_,
+      history_client_ ? history_client_->CreateBackendClient() : nullptr,
       thread_->task_runner()));
   history_backend_.swap(backend);
 

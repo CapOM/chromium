@@ -96,12 +96,7 @@ TouchEventConverterEvdev::TouchEventConverterEvdev(
                           devinfo.name(),
                           devinfo.vendor_id(),
                           devinfo.product_id()),
-      dispatcher_(dispatcher),
-      syn_dropped_(false),
-      has_mt_(false),
-      touch_points_(0),
-      next_tracking_id_(0),
-      current_slot_(0) {
+      dispatcher_(dispatcher) {
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
           switches::kExtraTouchNoiseFiltering)) {
     touch_noise_finder_.reset(new TouchNoiseFinder);
@@ -109,8 +104,6 @@ TouchEventConverterEvdev::TouchEventConverterEvdev(
 }
 
 TouchEventConverterEvdev::~TouchEventConverterEvdev() {
-  Stop();
-  close(fd_);
 }
 
 void TouchEventConverterEvdev::Initialize(const EventDeviceInfo& info) {
@@ -136,6 +129,9 @@ void TouchEventConverterEvdev::Initialize(const EventDeviceInfo& info) {
     touch_points_ = 1;
     current_slot_ = 0;
   }
+
+  quirk_left_mouse_button_ =
+      !has_mt_ && !info.HasKeyEvent(BTN_TOUCH) && info.HasKeyEvent(BTN_LEFT);
 
   // Apply --touch-calibration.
   if (type() == INPUT_DEVICE_INTERNAL) {
@@ -178,6 +174,7 @@ void TouchEventConverterEvdev::Initialize(const EventDeviceInfo& info) {
     }
   } else {
     // TODO(spang): Add key state to EventDeviceInfo to allow initial contact.
+    // (and make sure to take into account quirk_left_mouse_button_)
     events_[0].x = 0;
     events_[0].y = 0;
     events_[0].tracking_id = kTrackingIdForUnusedSlot;
@@ -189,13 +186,16 @@ void TouchEventConverterEvdev::Initialize(const EventDeviceInfo& info) {
   }
 }
 
-bool TouchEventConverterEvdev::Reinitialize() {
+void TouchEventConverterEvdev::Reinitialize() {
   EventDeviceInfo info;
-  if (info.Initialize(fd_)) {
-    Initialize(info);
-    return true;
+  if (!info.Initialize(fd_)) {
+    LOG(ERROR) << "Failed to synchronize state for touch device: "
+               << path_.value();
+    Stop();
+    return;
   }
-  return false;
+
+  Initialize(info);
 }
 
 bool TouchEventConverterEvdev::HasTouchscreen() const {
@@ -210,7 +210,11 @@ int TouchEventConverterEvdev::GetTouchPoints() const {
   return touch_points_;
 }
 
-void TouchEventConverterEvdev::OnStopped() {
+void TouchEventConverterEvdev::OnEnabled() {
+  ReportEvents(EventTimeForNow());
+}
+
+void TouchEventConverterEvdev::OnDisabled() {
   ReleaseTouches();
 }
 
@@ -230,8 +234,10 @@ void TouchEventConverterEvdev::OnFileCanReadWithoutBlocking(int fd) {
     return;
   }
 
-  if (ignore_events_)
+  if (!enabled_) {
+    dropped_events_ = true;
     return;
+  }
 
   for (unsigned i = 0; i < read_size / sizeof(*inputs); i++) {
     if (!has_mt_) {
@@ -248,7 +254,7 @@ void TouchEventConverterEvdev::ProcessMultitouchEvent(
     const input_event& input) {
   if (input.type == EV_SYN) {
     ProcessSyn(input);
-  } else if (syn_dropped_) {
+  } else if (dropped_events_) {
     // Do nothing. This branch indicates we have lost sync with the driver.
   } else if (input.type == EV_ABS) {
     if (events_.size() <= current_slot_) {
@@ -259,6 +265,8 @@ void TouchEventConverterEvdev::ProcessMultitouchEvent(
     }
   } else if (input.type == EV_KEY) {
     ProcessKey(input);
+  } else if (input.type == EV_MSC) {
+    // Ignored.
   } else {
     NOTIMPLEMENTED() << "invalid type: " << input.type;
   }
@@ -272,18 +280,22 @@ void TouchEventConverterEvdev::EmulateMultitouchEvent(
     emulated_event.code = AbsCodeToMtCode(event.code);
     if (emulated_event.code >= 0)
       ProcessMultitouchEvent(emulated_event);
-  } else if (event.type == EV_KEY && event.code == BTN_TOUCH) {
-    emulated_event.type = EV_ABS;
-    emulated_event.code = ABS_MT_TRACKING_ID;
-    emulated_event.value =
-        event.value ? NextTrackingId() : kTrackingIdForUnusedSlot;
-    ProcessMultitouchEvent(emulated_event);
+  } else if (event.type == EV_KEY) {
+    if (event.code == BTN_TOUCH ||
+        (quirk_left_mouse_button_ && event.code == BTN_LEFT)) {
+      emulated_event.type = EV_ABS;
+      emulated_event.code = ABS_MT_TRACKING_ID;
+      emulated_event.value =
+          event.value ? NextTrackingId() : kTrackingIdForUnusedSlot;
+      ProcessMultitouchEvent(emulated_event);
+    }
   }
 }
 
 void TouchEventConverterEvdev::ProcessKey(const input_event& input) {
   switch (input.code) {
     case BTN_TOUCH:
+    case BTN_LEFT:
       break;
     default:
       NOTIMPLEMENTED() << "invalid code for EV_KEY: " << input.code;
@@ -332,21 +344,12 @@ void TouchEventConverterEvdev::ProcessAbs(const input_event& input) {
 void TouchEventConverterEvdev::ProcessSyn(const input_event& input) {
   switch (input.code) {
     case SYN_REPORT:
-      if (syn_dropped_) {
-        // Have to re-initialize.
-        if (Reinitialize()) {
-          syn_dropped_ = false;
-        } else {
-          LOG(ERROR) << "failed to re-initialize device info";
-        }
-      } else {
-        ReportEvents(EventConverterEvdev::TimeDeltaFromInputEvent(input));
-      }
+      ReportEvents(EventConverterEvdev::TimeDeltaFromInputEvent(input));
       break;
     case SYN_DROPPED:
       // Some buffer has overrun. We ignore all events up to and
       // including the next SYN_REPORT.
-      syn_dropped_ = true;
+      dropped_events_ = true;
       break;
     default:
       NOTIMPLEMENTED() << "invalid code for EV_SYN: " << input.code;
@@ -379,6 +382,11 @@ void TouchEventConverterEvdev::ReportEvent(const InProgressTouchEvdev& event,
 }
 
 void TouchEventConverterEvdev::ReportEvents(base::TimeDelta delta) {
+  if (dropped_events_) {
+    Reinitialize();
+    dropped_events_ = false;
+  }
+
   if (touch_noise_finder_)
     touch_noise_finder_->HandleTouches(events_, delta);
 

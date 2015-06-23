@@ -182,9 +182,6 @@ extern const char kMouseSensitivity[];
 extern const char kTouchpadSensitivity[];
 extern const char kUse24HourClock[];
 extern const char kResolveTimezoneByGeolocation[];
-extern const char kDisableDrive[];
-extern const char kDisableDriveOverCellular[];
-extern const char kDisableDriveHostedFiles[];
 // TODO(yusukes): Change "kLanguageABC" to "kABC". The current form is too long
 // to remember and confusing. The prefs are actually for input methods and i18n
 // keyboards, not UI languages.
@@ -275,6 +272,7 @@ extern const char kTouchVirtualKeyboardEnabled[];
 extern const char kWakeOnWifiSsid[];
 extern const char kCaptivePortalAuthenticationIgnoresProxy[];
 extern const char kForceMaximizeOnFirstRun[];
+extern const char kPlatformKeys[];
 #endif  // defined(OS_CHROMEOS)
 extern const char kShowHomeButton[];
 extern const char kRecentlySelectedEncoding[];
@@ -413,8 +411,6 @@ extern const char kEasyUnlockEnabled[];
 extern const char kEasyUnlockPairing[];
 extern const char kEasyUnlockProximityRequired[];
 
-extern const char kZeroSuggestCachedResults[];
-
 #if defined(ENABLE_EXTENSIONS) && !defined(OS_ANDROID) && !defined(OS_IOS)
 extern const char kCopresenceAuthenticatedDeviceId[];
 extern const char kCopresenceAnonymousDeviceId[];
@@ -551,7 +547,6 @@ extern const char kNtpCollapsedRecentlyClosedTabs[];
 extern const char kNtpCollapsedSnapshotDocument[];
 extern const char kNtpCollapsedSyncPromo[];
 #endif
-extern const char kNtpMostVisitedURLsBlacklist[];
 extern const char kNtpShownPage[];
 
 extern const char kDevToolsAdbKey[];
@@ -673,7 +668,6 @@ extern const char kServerBackedDeviceState[];
 extern const char kCustomizationDefaultWallpaperURL[];
 extern const char kLogoutStartedLast[];
 extern const char kConsumerManagementStage[];
-extern const char kNewOobe[];
 extern const char kWebviewSigninDisabled[];
 extern const char kNewLoginUIPopup[];
 #endif  // defined(OS_CHROMEOS)

@@ -15,8 +15,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
 
-import com.google.android.apps.chrome.R;
-
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkModelObserver;
 import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksModel;
@@ -84,12 +83,6 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
         if (menuItem.getItemId() == R.id.edit_menu_id) {
             EnhancedBookmarkAddEditFolderActivity.startEditFolderActivity(getContext(),
                     mCurrentFolder.getId());
-        } else if (menuItem.getItemId() == R.id.list_toggle_menu_id) {
-            mDelegate.setListModeEnabled(!mDelegate.isListModeEnabled());
-            return true;
-        } else if (menuItem.getItemId() == R.id.search_menu_id) {
-            mDelegate.openSearchUI();
-            return true;
         } else if (menuItem.getItemId() == R.id.close_menu_id) {
             mDelegate.finishActivityOnPhone();
             return true;
@@ -101,7 +94,7 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
                 EnhancedBookmarkAddEditFolderActivity.startEditFolderActivity(getContext(),
                         item.getId());
             } else {
-                mDelegate.startDetailActivity(item.getId(), null);
+                EnhancedBookmarkUtils.startEditActivity(getContext(), item.getId());
             }
             return true;
         } else if (menuItem.getItemId() == R.id.selection_mode_move_menu_id) {
@@ -188,9 +181,7 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
     void showLoadingUi() {
         setTitle(null);
         setNavigationButton(NAVIGATION_BUTTON_NONE);
-        getMenu().findItem(R.id.search_menu_id).setVisible(false);
         getMenu().findItem(R.id.edit_menu_id).setVisible(false);
-        getMenu().findItem(R.id.list_toggle_menu_id).setVisible(false);
     }
 
     // EnhancedBookmarkUIObserver implementations.
@@ -200,7 +191,6 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
         mDelegate = delegate;
         mDelegate.addUIObserver(this);
         delegate.getModel().addModelObserver(mBookmarkModelObserver);
-        getMenu().findItem(R.id.list_toggle_menu_id).setVisible(true);
     }
 
     @Override
@@ -213,7 +203,6 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
     public void onAllBookmarksStateSet() {
         setTitle(R.string.enhanced_bookmark_title_bar_all_items);
         setNavigationButton(NAVIGATION_BUTTON_MENU);
-        getMenu().findItem(R.id.search_menu_id).setVisible(true);
         getMenu().findItem(R.id.edit_menu_id).setVisible(false);
     }
 
@@ -221,7 +210,6 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
     public void onFolderStateSet(BookmarkId folder) {
         mCurrentFolder = mDelegate.getModel().getBookmarkById(folder);
 
-        getMenu().findItem(R.id.search_menu_id).setVisible(false);
         getMenu().findItem(R.id.edit_menu_id).setVisible(mCurrentFolder.isEditable());
 
         // If the parent folder is a top level node, we don't go up anymore.
@@ -278,19 +266,5 @@ public class EnhancedBookmarkActionBar extends Toolbar implements EnhancedBookma
 
             mDelegate.notifyStateChange(this);
         }
-    }
-
-    @Override
-    public void onFilterStateSet(String filter) {
-        setTitle(filter);
-        setNavigationButton(NAVIGATION_BUTTON_MENU);
-        getMenu().findItem(R.id.search_menu_id).setVisible(false);
-        getMenu().findItem(R.id.edit_menu_id).setVisible(false);
-    }
-
-    @Override
-    public void onListModeChange(boolean isListModeEnabled) {
-        MenuItem menuItem = getMenu().findItem(R.id.list_toggle_menu_id);
-        menuItem.getIcon().setLevel(isListModeEnabled ? 1 : 0);
     }
 }

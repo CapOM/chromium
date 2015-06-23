@@ -13,6 +13,7 @@
 #include "chrome/browser/media/router/media_route.h"
 #include "chrome/browser/media/router/media_sink.h"
 #include "chrome/browser/media/router/media_source.h"
+#include "content/public/browser/presentation_session_message.h"
 
 namespace media_router {
 
@@ -29,19 +30,48 @@ class MediaSinksObserver;
 using MediaRouteResponseCallback =
     base::Callback<void(scoped_ptr<MediaRoute>, const std::string&)>;
 
+// Used in cases where a tab ID is not applicable in CreateRoute/JoinRoute.
+const int kInvalidTabId = -1;
+
 // An interface for handling resources related to media routing.
 // Responsible for registering observers for receiving sink availability
 // updates, handling route requests/responses, and operating on routes (e.g.
 // posting messages or closing).
 class MediaRouter {
  public:
+  using PresentationSessionMessageCallback = base::Callback<void(
+      scoped_ptr<ScopedVector<content::PresentationSessionMessage>>)>;
+  using SendRouteMessageCallback = base::Callback<void(bool sent)>;
+
   virtual ~MediaRouter() {}
 
   // Creates a media route from |source_id| to |sink_id|.
+  // |origin| is the URL of requestor's page.
+  // |tab_id| is the ID of the tab in which the request was made.
+  // |origin| and |tab_id| are used for enforcing same-origin and/or same-tab
+  // scope for JoinRoute() requests. (e.g., if enforced, the page
+  // requesting JoinRoute() must have the same origin as the page that requested
+  // CreateRoute()).
+  // The caller may pass in|kInvalidTabId| if tab is not applicable.
   // |callback| is invoked with a response indicating success or failure.
   virtual void CreateRoute(const MediaSource::Id& source_id,
                            const MediaSink::Id& sink_id,
+                           const GURL& origin,
+                           int tab_id,
                            const MediaRouteResponseCallback& callback) = 0;
+
+  // Joins an existing route identified by |presentation_id|.
+  // |source|: The source to route to the existing route.
+  // |presentation_id|: Presentation ID of the existing route.
+  // |origin|, |tab_id|: Origin and tab of the join route request. Used for
+  // validation when enforcing same-origin and/or same-tab scope.
+  // (See CreateRoute documentation).
+  // |callback| is invoked with a response indicating success or failure.
+  virtual void JoinRoute(const MediaSource::Id& source,
+                         const std::string& presentation_id,
+                         const GURL& origin,
+                         int tab_id,
+                         const MediaRouteResponseCallback& callback) = 0;
 
   // Closes the media route specified by |route_id|.
   virtual void CloseRoute(const MediaRoute::Id& route_id) = 0;
@@ -49,21 +79,20 @@ class MediaRouter {
   // Posts |message| to a MediaSink connected via MediaRoute with |route_id|.
   // TODO(imcheng): Support additional data types: Blob, ArrayBuffer,
   // ArrayBufferView.
-  virtual void PostMessage(const MediaRoute::Id& route_id,
-                           const std::string& message) = 0;
+  virtual void SendRouteMessage(const MediaRoute::Id& route_id,
+                                const std::string& message,
+                                const SendRouteMessageCallback& callback) = 0;
+
+  // Gets the next batch of messages from one of the routes in |route_ids|.
+  // |message_cb|: Invoked with a non-empty list of messages when there are
+  //      messages, an empty list when messaging channel had error.
+  //      It is not invoked until there are messages available or error.
+  virtual void ListenForRouteMessages(
+      const std::vector<MediaRoute::Id>& route_ids,
+      const PresentationSessionMessageCallback& message_cb) = 0;
 
   // Clears the issue with the id |issue_id|.
   virtual void ClearIssue(const Issue::Id& issue_id) = 0;
-
-  // Receives updates from a MediaRouter instance.
-  class Delegate {
-   public:
-    // Called when there is a message from a route.
-    // |route_id|: The route ID.
-    // |message|: The message.
-    virtual void OnMessage(const MediaRoute::Id& route_id,
-                           const std::string& message) = 0;
-  };
 
  private:
   friend class IssuesObserver;
@@ -104,10 +133,10 @@ class MediaRouter {
   // Adds the IssuesObserver |observer|.
   // It is invalid to register the same observer more than once and will result
   // in undefined behavior.
-  virtual void AddIssuesObserver(IssuesObserver* observer) = 0;
+  virtual void RegisterIssuesObserver(IssuesObserver* observer) = 0;
 
   // Removes the IssuesObserver |observer|.
-  virtual void RemoveIssuesObserver(IssuesObserver* observer) = 0;
+  virtual void UnregisterIssuesObserver(IssuesObserver* observer) = 0;
 };
 
 }  // namespace media_router

@@ -183,8 +183,6 @@ enable_chromevox_next = false
 # Use brlapi from brltty for braille display support.
 use_brlapi = is_chromeos
 
-enable_media_router = !is_ios && !is_android
-
 # Option controlling the use of GConf (the classic GNOME configuration
 # system).
 # TODO(GYP) also require !embedded to enable.
@@ -197,3 +195,6 @@ enable_hangout_services_extension = false
 
 # Whether to back up data before sync.
 enable_pre_sync_backup = is_win || is_mac || (is_linux && !is_chromeos)
+
+# WebVR support disabled until platform implementations have been added
+enable_webvr = false

@@ -51,14 +51,8 @@ void ViewManagerApp::Initialize(ApplicationImpl* app) {
 
   if (!gpu_state_.get())
     gpu_state_ = new gles2::GpuState;
-  scoped_ptr<DefaultDisplayManager> display_manager(new DefaultDisplayManager(
-      is_headless_,
-      app_impl_,
-      gpu_state_,
-      base::Bind(&ViewManagerApp::OnLostConnectionToWindowManager,
-                 base::Unretained(this))));
   connection_manager_.reset(
-      new ConnectionManager(this, display_manager.Pass()));
+      new ConnectionManager(this, is_headless_, app_impl_, gpu_state_));
 }
 
 bool ViewManagerApp::ConfigureIncomingConnection(
@@ -113,7 +107,7 @@ void ViewManagerApp::Create(ApplicationConnection* connection,
   }
 
   scoped_ptr<ViewManagerServiceImpl> service(new ViewManagerServiceImpl(
-      connection_manager_.get(), kInvalidConnectionId, RootViewId()));
+      connection_manager_.get(), kInvalidConnectionId, RootViewId(0)));
   mojo::ViewManagerClientPtr client;
   connection->ConnectToService(&client);
   scoped_ptr<ClientConnection> client_connection(
@@ -133,7 +127,7 @@ void ViewManagerApp::Create(ApplicationConnection* connection,
   // ConfigureIncomingConnection() must have been called before getting here.
   DCHECK(connection_manager_.get());
   view_manager_root_binding_.reset(new mojo::Binding<ViewManagerRoot>(
-      connection_manager_.get(), request.Pass()));
+      connection_manager_->view_manager_root(), request.Pass()));
   view_manager_root_binding_->set_error_handler(this);
 }
 

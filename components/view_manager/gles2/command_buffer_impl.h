@@ -6,11 +6,10 @@
 #define COMPONENTS_VIEW_MANAGER_GLES2_COMMAND_BUFFER_IMPL_H_
 
 #include "base/memory/scoped_ptr.h"
-#include "base/memory/weak_ptr.h"
 #include "base/single_thread_task_runner.h"
 #include "components/view_manager/public/interfaces/command_buffer.mojom.h"
 #include "components/view_manager/public/interfaces/viewport_parameter_listener.mojom.h"
-#include "third_party/mojo/src/mojo/public/cpp/bindings/strong_binding.h"
+#include "third_party/mojo/src/mojo/public/cpp/bindings/binding.h"
 
 namespace gpu {
 class SyncPointManager;
@@ -24,7 +23,8 @@ class CommandBufferImplObserver;
 // so that we can insert sync points without blocking on the GL driver. It
 // forwards most method calls to the CommandBufferDriver, which runs on the
 // same thread as the native viewport.
-class CommandBufferImpl : public mojo::CommandBuffer {
+class CommandBufferImpl : public mojo::CommandBuffer,
+                          public mojo::ErrorHandler {
  public:
   CommandBufferImpl(
       mojo::InterfaceRequest<CommandBuffer> request,
@@ -32,8 +32,8 @@ class CommandBufferImpl : public mojo::CommandBuffer {
       scoped_refptr<base::SingleThreadTaskRunner> control_task_runner,
       gpu::SyncPointManager* sync_point_manager,
       scoped_ptr<CommandBufferDriver> driver);
-  ~CommandBufferImpl() override;
 
+  // mojo::CommandBuffer:
   void Initialize(mojo::CommandBufferSyncClientPtr sync_client,
                   mojo::CommandBufferSyncPointClientPtr sync_point_client,
                   mojo::CommandBufferLostContextObserverPtr loss_observer,
@@ -48,27 +48,43 @@ class CommandBufferImpl : public mojo::CommandBuffer {
   void InsertSyncPoint(bool retire) override;
   void RetireSyncPoint(uint32_t sync_point) override;
   void Echo(const mojo::Callback<void()>& callback) override;
+  void CreateImage(int32_t id,
+                   mojo::ScopedHandle memory_handle,
+                   int32_t type,
+                   mojo::SizePtr size,
+                   int32_t format,
+                   int32_t internal_format) override;
+  void DestroyImage(int32_t id) override;
 
   void DidLoseContext();
-  void UpdateVSyncParameters(base::TimeTicks timebase,
-                             base::TimeDelta interval);
 
   void set_observer(CommandBufferImplObserver* observer) {
     observer_ = observer;
   }
 
  private:
+  class CommandBufferDriverClientImpl;
+
+  friend class base::DeleteHelper<CommandBufferImpl>;
+
+  ~CommandBufferImpl() override;
+
   void BindToRequest(mojo::InterfaceRequest<CommandBuffer> request);
+
+  void UpdateVSyncParameters(base::TimeTicks timebase,
+                             base::TimeDelta interval);
+
+  // mojo::ErrorHandler:
+  void OnConnectionError() override;
 
   scoped_refptr<gpu::SyncPointManager> sync_point_manager_;
   scoped_refptr<base::SingleThreadTaskRunner> driver_task_runner_;
   scoped_ptr<CommandBufferDriver> driver_;
   mojo::CommandBufferSyncPointClientPtr sync_point_client_;
   mojo::ViewportParameterListenerPtr viewport_parameter_listener_;
-  mojo::StrongBinding<CommandBuffer> binding_;
+  mojo::Binding<CommandBuffer> binding_;
   CommandBufferImplObserver* observer_;
 
-  base::WeakPtrFactory<CommandBufferImpl> weak_factory_;
   DISALLOW_COPY_AND_ASSIGN(CommandBufferImpl);
 };
 

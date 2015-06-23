@@ -113,7 +113,8 @@ static const char* const kSwitchNames[] = {
   switches::kVModule,
 #if defined(OS_MACOSX)
   switches::kDisableRemoteCoreAnimation,
-  switches::kEnableNSGLSurfaces,
+  switches::kDisableNSCGLSurfaceApi,
+  switches::kForceNSCGLSurfaceApi,
   switches::kEnableSandboxLogging,
 #endif
 #if defined(USE_AURA)
@@ -429,6 +430,13 @@ GpuProcessHost::~GpuProcessHost() {
     queued_messages_.pop();
   }
 
+#if defined(OS_MACOSX) && !defined(OS_IOS)
+  if (!io_surface_manager_token_.IsZero()) {
+    BrowserIOSurfaceManager::GetInstance()->InvalidateGpuProcessToken();
+    io_surface_manager_token_.SetZero();
+  }
+#endif
+
   // This is only called on the IO thread so no race against the constructor
   // for another GpuProcessHost.
   if (g_gpu_process_hosts[kind_] == this)
@@ -605,8 +613,9 @@ void GpuProcessHost::OnChannelConnected(int32 peer_pid) {
   TRACE_EVENT0("gpu", "GpuProcessHost::OnChannelConnected");
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
-  Send(new ChildProcessMsg_SetIOSurfaceManagerToken(
-      BrowserIOSurfaceManager::GetInstance()->GetGpuProcessToken()));
+  io_surface_manager_token_ =
+      BrowserIOSurfaceManager::GetInstance()->GenerateGpuProcessToken();
+  Send(new ChildProcessMsg_SetIOSurfaceManagerToken(io_surface_manager_token_));
 #endif
 
   while (!queued_messages_.empty()) {

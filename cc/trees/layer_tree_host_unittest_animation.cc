@@ -775,8 +775,7 @@ class LayerTreeHostAnimationTestScrollOffsetAnimationRemoval
   }
 
   void BeginCommitOnThread(LayerTreeHostImpl* host_impl) override {
-    if (host_impl->settings().impl_side_painting)
-      host_impl->BlockNotifyReadyToActivateForTesting(true);
+    host_impl->BlockNotifyReadyToActivateForTesting(true);
   }
 
   void WillBeginImplFrameOnThread(LayerTreeHostImpl* host_impl,
@@ -810,8 +809,6 @@ class LayerTreeHostAnimationTestScrollOffsetAnimationRemoval
   }
 
   void WillActivateTreeOnThread(LayerTreeHostImpl* host_impl) override {
-    if (!host_impl->settings().impl_side_painting)
-      return;
     if (host_impl->pending_tree()->source_frame_number() != 1)
       return;
     LayerImpl* scroll_layer_impl =
@@ -867,8 +864,7 @@ class LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers
   }
 
   void BeginCommitOnThread(LayerTreeHostImpl* host_impl) override {
-    if (host_impl->settings().impl_side_painting)
-      host_impl->BlockNotifyReadyToActivateForTesting(true);
+    host_impl->BlockNotifyReadyToActivateForTesting(true);
   }
 
   void CommitCompleteOnThread(LayerTreeHostImpl* host_impl) override {
@@ -876,8 +872,7 @@ class LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers
     // blocking activation. We want to verify that even with activation blocked,
     // the animation on the layer that's already in the active tree won't get a
     // head start.
-    if (host_impl->settings().impl_side_painting &&
-        host_impl->pending_tree()->source_frame_number() != 2) {
+    if (host_impl->pending_tree()->source_frame_number() != 2) {
       host_impl->BlockNotifyReadyToActivateForTesting(false);
     }
   }
@@ -889,8 +884,7 @@ class LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers
       return;
 
     frame_count_with_pending_tree_++;
-    if (frame_count_with_pending_tree_ == 2 &&
-        host_impl->settings().impl_side_painting) {
+    if (frame_count_with_pending_tree_ == 2) {
       host_impl->BlockNotifyReadyToActivateForTesting(false);
     }
   }
@@ -923,7 +917,8 @@ class LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers
   int frame_count_with_pending_tree_;
 };
 
-SINGLE_AND_MULTI_THREAD_BLOCKNOTIFY_TEST_F(
+// This test blocks activation which is not supported for single thread mode.
+MULTI_THREAD_BLOCKNOTIFY_TEST_F(
     LayerTreeHostAnimationTestAnimationsAddedToNewAndExistingLayers);
 
 // When a layer with an animation is removed from the tree and later re-added,
@@ -1039,6 +1034,56 @@ class LayerTreeHostAnimationTestAddAnimationAfterAnimating
 
 SINGLE_AND_MULTI_THREAD_TEST_F(
     LayerTreeHostAnimationTestAddAnimationAfterAnimating);
+
+class LayerTreeHostAnimationTestNotifyAnimationFinished
+    : public LayerTreeHostAnimationTest {
+ public:
+  LayerTreeHostAnimationTestNotifyAnimationFinished()
+      : called_animation_started_(false), called_animation_finished_(false) {}
+
+  void SetupTree() override {
+    LayerTreeHostAnimationTest::SetupTree();
+    picture_ = FakePictureLayer::Create(layer_settings(), &client_);
+    picture_->SetBounds(gfx::Size(4, 4));
+    picture_->set_layer_animation_delegate(this);
+    layer_tree_host()->root_layer()->AddChild(picture_);
+  }
+
+  void BeginTest() override {
+    layer_tree_host()->SetViewportSize(gfx::Size());
+    PostAddLongAnimationToMainThread(picture_.get());
+  }
+
+  void NotifyAnimationStarted(base::TimeTicks monotonic_time,
+                              Animation::TargetProperty target_property,
+                              int group) override {
+    called_animation_started_ = true;
+    layer_tree_host()->AnimateLayers(
+        base::TimeTicks::FromInternalValue(std::numeric_limits<int64>::max()));
+    PostSetNeedsCommitToMainThread();
+  }
+
+  void NotifyAnimationFinished(base::TimeTicks monotonic_time,
+                               Animation::TargetProperty target_property,
+                               int group) override {
+    called_animation_finished_ = true;
+    EndTest();
+  }
+
+  void AfterTest() override {
+    EXPECT_TRUE(called_animation_started_);
+    EXPECT_TRUE(called_animation_finished_);
+  }
+
+ private:
+  bool called_animation_started_;
+  bool called_animation_finished_;
+  FakeContentLayerClient client_;
+  scoped_refptr<FakePictureLayer> picture_;
+};
+
+SINGLE_AND_MULTI_THREAD_TEST_F(
+    LayerTreeHostAnimationTestNotifyAnimationFinished);
 
 }  // namespace
 }  // namespace cc

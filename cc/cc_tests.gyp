@@ -29,7 +29,6 @@
       'debug/micro_benchmark_controller_unittest.cc',
       'debug/rendering_stats_unittest.cc',
       'input/top_controls_manager_unittest.cc',
-      'layers/contents_scaling_layer_unittest.cc',
       'layers/delegated_frame_provider_unittest.cc',
       'layers/delegated_frame_resource_collection_unittest.cc',
       'layers/delegated_renderer_layer_impl_unittest.cc',
@@ -58,8 +57,6 @@
       'layers/surface_layer_unittest.cc',
       'layers/texture_layer_impl_unittest.cc',
       'layers/texture_layer_unittest.cc',
-      'layers/tiled_layer_impl_unittest.cc',
-      'layers/tiled_layer_unittest.cc',
       'layers/ui_resource_layer_impl_unittest.cc',
       'layers/ui_resource_layer_unittest.cc',
       'layers/video_frame_provider_client_impl_unittest.cc',
@@ -93,11 +90,8 @@
       'raster/texture_compressor_etc1_unittest.cc',
       'raster/tile_task_worker_pool_unittest.cc',
       'resources/platform_color_unittest.cc',
-      'resources/prioritized_resource_unittest.cc',
       'resources/resource_provider_unittest.cc',
-      'resources/resource_update_controller_unittest.cc',
       'resources/scoped_resource_unittest.cc',
-      'resources/texture_uploader_unittest.cc',
       'resources/video_resource_updater_unittest.cc',
       'scheduler/begin_frame_source_unittest.cc',
       'scheduler/delay_based_time_source_unittest.cc',
@@ -126,7 +120,6 @@
       'trees/layer_tree_host_unittest_copyrequest.cc',
       'trees/layer_tree_host_unittest_damage.cc',
       'trees/layer_tree_host_unittest_delegated.cc',
-      'trees/layer_tree_host_unittest_no_message_loop.cc',
       'trees/layer_tree_host_unittest_occlusion.cc',
       'trees/layer_tree_host_unittest_picture.cc',
       'trees/layer_tree_host_unittest_proxy.cc',
@@ -210,7 +203,6 @@
       'test/fake_video_frame_provider.h',
       'test/geometry_test_utils.cc',
       'test/geometry_test_utils.h',
-      'test/impl_side_painting_settings.h',
       'test/layer_test_common.cc',
       'test/layer_test_common.h',
       'test/layer_tree_host_common_test.cc',
@@ -262,8 +254,6 @@
       'test/test_image_factory.h',
       'test/test_in_process_context_provider.cc',
       'test/test_in_process_context_provider.h',
-      'test/test_now_source.cc',
-      'test/test_now_source.h',
       'test/test_occlusion_tracker.h',
       'test/test_shared_bitmap_manager.cc',
       'test/test_shared_bitmap_manager.h',
@@ -275,8 +265,6 @@
       'test/test_tile_priorities.h',
       'test/test_web_graphics_context_3d.cc',
       'test/test_web_graphics_context_3d.h',
-      'test/tiled_layer_test_common.cc',
-      'test/tiled_layer_test_common.h',
     ],
   },
   'targets': [
@@ -331,8 +319,6 @@
           }
         ],
       ],
-      # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-      'msvs_disabled_warnings': [ 4267, ],
     },
     {
       # GN version: //cc/cc_perftests
@@ -393,8 +379,6 @@
           }
         ],
       ],
-      # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-      'msvs_disabled_warnings': [ 4267, ],
     },
     {
       'target_name': 'cc_test_support',
@@ -426,8 +410,6 @@
       'sources': [
         '<@(cc_tests_support_files)',
       ],
-      # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
-      'msvs_disabled_warnings': [ 4267, ],
     },
   ],
   'conditions': [

@@ -20,12 +20,13 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/format_macros.h"
+#include "base/location.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
 #include "base/message_loop/message_loop.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/path_service.h"
 #include "base/run_loop.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/string_split.h"
@@ -33,6 +34,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "base/test/histogram_tester.h"
+#include "base/thread_task_runner_handle.h"
 #include "net/base/chunked_upload_data_stream.h"
 #include "net/base/elements_upload_data_stream.h"
 #include "net/base/load_flags.h"
@@ -550,7 +552,7 @@ NetworkDelegate::AuthRequiredResponse BlockingNetworkDelegate::OnAuthRequired(
       return auth_retval_;
 
     case AUTO_CALLBACK:
-      base::MessageLoop::current()->PostTask(
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
           FROM_HERE,
           base::Bind(&BlockingNetworkDelegate::RunAuthCallback,
                      weak_factory_.GetWeakPtr(), auth_retval_, callback));
@@ -559,8 +561,8 @@ NetworkDelegate::AuthRequiredResponse BlockingNetworkDelegate::OnAuthRequired(
     case USER_CALLBACK:
       auth_callback_ = callback;
       stage_blocked_for_callback_ = ON_AUTH_REQUIRED;
-      base::MessageLoop::current()->PostTask(FROM_HERE,
-                                             base::MessageLoop::QuitClosure());
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::MessageLoop::QuitClosure());
       return AUTH_REQUIRED_RESPONSE_IO_PENDING;
   }
   NOTREACHED();
@@ -590,17 +592,16 @@ int BlockingNetworkDelegate::MaybeBlockStage(
       return retval_;
 
     case AUTO_CALLBACK:
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&BlockingNetworkDelegate::RunCallback,
-                     weak_factory_.GetWeakPtr(), retval_, callback));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&BlockingNetworkDelegate::RunCallback,
+                                weak_factory_.GetWeakPtr(), retval_, callback));
       return ERR_IO_PENDING;
 
     case USER_CALLBACK:
       callback_ = callback;
       stage_blocked_for_callback_ = stage;
-      base::MessageLoop::current()->PostTask(FROM_HERE,
-                                             base::MessageLoop::QuitClosure());
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::MessageLoop::QuitClosure());
       return ERR_IO_PENDING;
   }
   NOTREACHED();
@@ -648,7 +649,7 @@ class URLRequestTest : public PlatformTest {
     job_factory_impl_->SetProtocolHandler("data", new DataProtocolHandler);
 #if !defined(DISABLE_FILE_SUPPORT)
     job_factory_impl_->SetProtocolHandler(
-        "file", new FileProtocolHandler(base::MessageLoopProxy::current()));
+        "file", new FileProtocolHandler(base::ThreadTaskRunnerHandle::Get()));
 #endif
   }
 
@@ -4076,7 +4077,7 @@ TEST_F(URLRequestTestHTTP, GetZippedTest) {
 TEST_F(URLRequestTestHTTP, NetworkQualityEstimator) {
   ASSERT_TRUE(test_server_.Start());
   // Enable requests to local host to be used for network quality estimation.
-  NetworkQualityEstimator estimator(true);
+  NetworkQualityEstimator estimator(true, true);
 
   TestDelegate d;
   TestNetworkDelegate network_delegate;  // Must outlive URLRequest.
@@ -4085,29 +4086,19 @@ TEST_F(URLRequestTestHTTP, NetworkQualityEstimator) {
   context.set_network_delegate(&network_delegate);
   context.Init();
 
-  uint64_t min_transfer_size_in_bytes =
-      NetworkQualityEstimator::kMinTransferSizeInBytes;
-  // Create a long enough URL such that response size exceeds network quality
-  // estimator's minimum transfer size.
-  std::string url = "echo.html?";
-  url.append(min_transfer_size_in_bytes, 'x');
+  std::string url = "echo.html";
 
   scoped_ptr<URLRequest> r(
       context.CreateRequest(test_server_.GetURL(url), DEFAULT_PRIORITY, &d));
-  int sleep_duration_milliseconds = 1;
-  base::PlatformThread::Sleep(
-      base::TimeDelta::FromMilliseconds(sleep_duration_milliseconds));
   r->Start();
 
   base::RunLoop().Run();
 
   NetworkQuality network_quality =
-      context.network_quality_estimator()->GetEstimate();
-  EXPECT_GE(network_quality.fastest_rtt,
-            base::TimeDelta::FromMilliseconds(sleep_duration_milliseconds));
-  EXPECT_GT(network_quality.fastest_rtt_confidence, 0);
-  EXPECT_GT(network_quality.peak_throughput_kbps, uint64_t(0));
-  EXPECT_GT(network_quality.peak_throughput_kbps_confidence, 0);
+      context.network_quality_estimator()->GetPeakEstimate();
+  EXPECT_GE(network_quality.rtt(), base::TimeDelta());
+  EXPECT_LT(network_quality.rtt(), base::TimeDelta::Max());
+  EXPECT_GT(network_quality.downstream_throughput_kbps(), 0);
 
   // Verify that histograms are not populated. They should populate only when
   // there is a change in ConnectionType.
@@ -4288,9 +4279,8 @@ class AsyncDelegateLogger : public base::RefCounted<AsyncDelegateLogger> {
     LoadStateWithParam load_state = url_request_->GetLoadState();
     EXPECT_EQ(expected_first_load_state_, load_state.state);
     EXPECT_NE(ASCIIToUTF16(kFirstDelegateInfo), load_state.param);
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(&AsyncDelegateLogger::LogSecondDelegate, this));
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(&AsyncDelegateLogger::LogSecondDelegate, this));
   }
 
   void LogSecondDelegate() {
@@ -4302,9 +4292,8 @@ class AsyncDelegateLogger : public base::RefCounted<AsyncDelegateLogger> {
     } else {
       EXPECT_NE(ASCIIToUTF16(kSecondDelegateInfo), load_state.param);
     }
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(&AsyncDelegateLogger::LogComplete, this));
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(&AsyncDelegateLogger::LogComplete, this));
   }
 
   void LogComplete() {
@@ -5162,11 +5151,8 @@ TEST_F(URLRequestTestHTTP, PostFileTest) {
     path = path.Append(kTestFilePath);
     path = path.Append(FILE_PATH_LITERAL("with-headers.html"));
     element_readers.push_back(
-        new UploadFileElementReader(base::MessageLoopProxy::current().get(),
-                                    path,
-                                    0,
-                                    kuint64max,
-                                    base::Time()));
+        new UploadFileElementReader(base::ThreadTaskRunnerHandle::Get().get(),
+                                    path, 0, kuint64max, base::Time()));
     r->set_upload(make_scoped_ptr<UploadDataStream>(
         new ElementsUploadDataStream(element_readers.Pass(), 0)));
 
@@ -5206,12 +5192,10 @@ TEST_F(URLRequestTestHTTP, PostUnreadableFileTest) {
     ScopedVector<UploadElementReader> element_readers;
 
     element_readers.push_back(new UploadFileElementReader(
-        base::MessageLoopProxy::current().get(),
+        base::ThreadTaskRunnerHandle::Get().get(),
         base::FilePath(FILE_PATH_LITERAL(
             "c:\\path\\to\\non\\existant\\file.randomness.12345")),
-        0,
-        kuint64max,
-        base::Time()));
+        0, kuint64max, base::Time()));
     r->set_upload(make_scoped_ptr<UploadDataStream>(
         new ElementsUploadDataStream(element_readers.Pass(), 0)));
 
@@ -5575,7 +5559,8 @@ TEST_F(URLRequestTestHTTP, ProtocolHandlerAndFactoryRestrictDataRedirects) {
 TEST_F(URLRequestTestHTTP, ProtocolHandlerAndFactoryRestrictFileRedirects) {
   // Test URLRequestJobFactory::ProtocolHandler::IsSafeRedirectTarget().
   GURL file_url("file:///foo.txt");
-  FileProtocolHandler file_protocol_handler(base::MessageLoopProxy::current());
+  FileProtocolHandler file_protocol_handler(
+      base::ThreadTaskRunnerHandle::Get());
   EXPECT_FALSE(file_protocol_handler.IsSafeRedirectTarget(file_url));
 
   // Test URLRequestJobFactoryImpl::IsSafeRedirectTarget().
@@ -8044,32 +8029,70 @@ class HTTPSFallbackTest : public testing::Test {
   scoped_ptr<URLRequest> request_;
 };
 
-// Tests TLSv1.1 -> TLSv1 fallback. Verifies that we don't fall back more
-// than necessary.
-TEST_F(HTTPSFallbackTest, TLSv1Fallback) {
+// Tests the TLS 1.0 fallback doesn't happen.
+TEST_F(HTTPSFallbackTest, TLSv1NoFallback) {
   SpawnedTestServer::SSLOptions ssl_options(
       SpawnedTestServer::SSLOptions::CERT_OK);
   ssl_options.tls_intolerant =
       SpawnedTestServer::SSLOptions::TLS_INTOLERANT_TLS1_1;
 
   ASSERT_NO_FATAL_FAILURE(DoFallbackTest(ssl_options));
-  ExpectConnection(SSL_CONNECTION_VERSION_TLS1);
+  ExpectFailure(ERR_SSL_FALLBACK_BEYOND_MINIMUM_VERSION);
+}
+
+// Tests the TLS 1.1 fallback.
+TEST_F(HTTPSFallbackTest, TLSv1_1Fallback) {
+  if (SSLClientSocket::GetMaxSupportedSSLVersion() <
+      SSL_PROTOCOL_VERSION_TLS1_2) {
+    return;
+  }
+
+  SpawnedTestServer::SSLOptions ssl_options(
+      SpawnedTestServer::SSLOptions::CERT_OK);
+  ssl_options.tls_intolerant =
+      SpawnedTestServer::SSLOptions::TLS_INTOLERANT_TLS1_2;
+
+  ASSERT_NO_FATAL_FAILURE(DoFallbackTest(ssl_options));
+  ExpectConnection(SSL_CONNECTION_VERSION_TLS1_1);
+}
+
+// Tests that the TLS 1.1 fallback triggers on closed connections.
+TEST_F(HTTPSFallbackTest, TLSv1_1FallbackClosed) {
+  if (SSLClientSocket::GetMaxSupportedSSLVersion() <
+      SSL_PROTOCOL_VERSION_TLS1_2) {
+    return;
+  }
+
+  SpawnedTestServer::SSLOptions ssl_options(
+      SpawnedTestServer::SSLOptions::CERT_OK);
+  ssl_options.tls_intolerant =
+      SpawnedTestServer::SSLOptions::TLS_INTOLERANT_TLS1_2;
+  ssl_options.tls_intolerance_type =
+      SpawnedTestServer::SSLOptions::TLS_INTOLERANCE_CLOSE;
+
+  ASSERT_NO_FATAL_FAILURE(DoFallbackTest(ssl_options));
+  ExpectConnection(SSL_CONNECTION_VERSION_TLS1_1);
 }
 
 // This test is disabled on Android because the remote test server doesn't cause
 // a TCP reset.
 #if !defined(OS_ANDROID)
-// Tests fallback to TLS 1.0 on connection reset.
-TEST_F(HTTPSFallbackTest, TLSv1FallbackReset) {
+// Tests fallback to TLS 1.1 on connection reset.
+TEST_F(HTTPSFallbackTest, TLSv1_1FallbackReset) {
+  if (SSLClientSocket::GetMaxSupportedSSLVersion() <
+      SSL_PROTOCOL_VERSION_TLS1_2) {
+    return;
+  }
+
   SpawnedTestServer::SSLOptions ssl_options(
       SpawnedTestServer::SSLOptions::CERT_OK);
   ssl_options.tls_intolerant =
-      SpawnedTestServer::SSLOptions::TLS_INTOLERANT_TLS1_1;
+      SpawnedTestServer::SSLOptions::TLS_INTOLERANT_TLS1_2;
   ssl_options.tls_intolerance_type =
       SpawnedTestServer::SSLOptions::TLS_INTOLERANCE_RESET;
 
   ASSERT_NO_FATAL_FAILURE(DoFallbackTest(ssl_options));
-  ExpectConnection(SSL_CONNECTION_VERSION_TLS1);
+  ExpectConnection(SSL_CONNECTION_VERSION_TLS1_1);
 }
 #endif  // !OS_ANDROID
 
@@ -8114,30 +8137,6 @@ TEST_F(HTTPSFallbackTest, FallbackSCSVClosed) {
 
   // The original error should be replayed on rejected fallback.
   ExpectFailure(ERR_CONNECTION_CLOSED);
-}
-
-// Tests that the SSLv3 fallback doesn't happen.
-TEST_F(HTTPSFallbackTest, SSLv3Fallback) {
-  SpawnedTestServer::SSLOptions ssl_options(
-      SpawnedTestServer::SSLOptions::CERT_OK);
-  ssl_options.tls_intolerant =
-      SpawnedTestServer::SSLOptions::TLS_INTOLERANT_ALL;
-
-  ASSERT_NO_FATAL_FAILURE(DoFallbackTest(ssl_options));
-  ExpectFailure(ERR_SSL_VERSION_OR_CIPHER_MISMATCH);
-}
-
-// Tests that the TLSv1 fallback triggers on closed connections.
-TEST_F(HTTPSFallbackTest, SSLv3FallbackClosed) {
-  SpawnedTestServer::SSLOptions ssl_options(
-      SpawnedTestServer::SSLOptions::CERT_OK);
-  ssl_options.tls_intolerant =
-      SpawnedTestServer::SSLOptions::TLS_INTOLERANT_TLS1_1;
-  ssl_options.tls_intolerance_type =
-      SpawnedTestServer::SSLOptions::TLS_INTOLERANCE_CLOSE;
-
-  ASSERT_NO_FATAL_FAILURE(DoFallbackTest(ssl_options));
-  ExpectConnection(SSL_CONNECTION_VERSION_TLS1);
 }
 
 // Test that fallback probe connections don't cause sessions to be cached.

@@ -85,7 +85,9 @@ void VideoResourceUpdater::SetPlaneResourceUniqueId(
   plane_resource->timestamp = video_frame->timestamp();
 }
 
-VideoFrameExternalResources::VideoFrameExternalResources() : type(NONE) {}
+VideoFrameExternalResources::VideoFrameExternalResources()
+    : type(NONE), read_lock_fences_enabled(false) {
+}
 
 VideoFrameExternalResources::~VideoFrameExternalResources() {}
 
@@ -139,8 +141,8 @@ VideoFrameExternalResources VideoResourceUpdater::
         const scoped_refptr<media::VideoFrame>& video_frame) {
   if (video_frame->format() == media::VideoFrame::UNKNOWN)
     return VideoFrameExternalResources();
-
-  if (video_frame->storage_type() == media::VideoFrame::STORAGE_TEXTURE)
+  DCHECK(video_frame->HasTextures() || video_frame->IsMappable());
+  if (video_frame->HasTextures())
     return CreateForHardwarePlanes(video_frame);
   else
     return CreateForSoftwarePlanes(video_frame);
@@ -366,13 +368,14 @@ void VideoResourceUpdater::ReturnTexture(
 VideoFrameExternalResources VideoResourceUpdater::CreateForHardwarePlanes(
     const scoped_refptr<media::VideoFrame>& video_frame) {
   TRACE_EVENT0("cc", "VideoResourceUpdater::CreateForHardwarePlanes");
-  DCHECK_EQ(video_frame->storage_type(), media::VideoFrame::STORAGE_TEXTURE);
+  DCHECK(video_frame->HasTextures());
   if (!context_provider_)
     return VideoFrameExternalResources();
 
   const size_t textures = media::VideoFrame::NumPlanes(video_frame->format());
   DCHECK_GE(textures, 1u);
   VideoFrameExternalResources external_resources;
+  external_resources.read_lock_fences_enabled = true;
   switch (video_frame->format()) {
     case media::VideoFrame::ARGB:
     case media::VideoFrame::XRGB:
@@ -418,7 +421,8 @@ VideoFrameExternalResources VideoResourceUpdater::CreateForHardwarePlanes(
     external_resources.mailboxes.push_back(
         TextureMailbox(mailbox_holder.mailbox, mailbox_holder.texture_target,
                        mailbox_holder.sync_point, video_frame->coded_size(),
-                       video_frame->allow_overlay()));
+                       video_frame->metadata()->IsTrue(
+                           media::VideoFrameMetadata::ALLOW_OVERLAY)));
     external_resources.release_callbacks.push_back(
         base::Bind(&ReturnTexture, AsWeakPtr(), video_frame));
   }

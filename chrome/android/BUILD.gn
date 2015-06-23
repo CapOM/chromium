@@ -24,17 +24,41 @@ jinja_variables = [
   "configuration_policy=$configuration_policy",
 ]
 
+chrome_android_paks_gypi =
+    exec_script("//build/gypi_to_gn.py",
+                [
+                  rebase_path("//chrome/chrome_android_paks.gypi"),
+                  "--replace=<(PRODUCT_DIR)=$root_out_dir",
+                ],
+                "scope",
+                [ "//chrome/chrome_android_paks.gypi" ])
+
+locale_pak_resources("chrome_locale_paks") {
+  sources = chrome_android_paks_gypi.chrome_android_pak_locale_resources
+
+  deps = [
+    "//chrome:packed_resources",
+  ]
+}
+
 # GYP: //chrome/chrome.gyp:chrome_java (resources part)
 android_resources("chrome_java_resources") {
-  resource_dirs = [ "java/res" ]
+  resource_dirs = [
+    "java/res",
+    "java/res_default",
+  ]
   deps = [
+    ":chrome_locale_paks",
     ":chrome_strings_grd",
+    "//components/policy:app_restrictions_resources",
     "//content/public/android:content_java_resources",
     "//chrome/app:java_strings_grd",
     "//third_party/android_data_chart:android_data_chart_java_resources",
     "//third_party/android_media:android_media_resources",
-    "//third_party/android_tools:android_support_v7_appcompat_resources",
   ]
+  if (!enable_configuration_policy) {
+    deps -= [ "//components/policy:app_restrictions_resources" ]
+  }
   custom_package = "org.chromium.chrome"
 }
 
@@ -142,21 +166,21 @@ android_library("chrome_java") {
 # GYP: //chrome/chrome_browser.gypi:activity_type_ids_java
 # GYP: //chrome/chrome_browser.gypi:profile_account_management_metrics_java
 # GYP: //chrome/chrome_browser.gypi:profile_sync_service_model_type_selection_java
-# GYP: //chrome/chrome_browser.gypi:connection_security_helper_security_levels_java
+# GYP: //chrome/chrome_browser.gypi:connection_security_security_levels_java
 # GYP: //chrome/chrome_browser.gypi:tab_load_status_java
 java_cpp_enum("chrome_android_java_enums_srcjar") {
   sources = [
     "//chrome/browser/android/activity_type_ids.h",
     "//chrome/browser/android/tab_android.h",
     "//chrome/browser/profiles/profile_metrics.h",
-    "//chrome/browser/ssl/connection_security_helper.h",
+    "//chrome/browser/ssl/connection_security.h",
     "//chrome/browser/sync/profile_sync_service_android.cc",
   ]
   outputs = [
     "org/chromium/chrome/browser/ActivityTypeIds.java",
     "org/chromium/chrome/browser/TabLoadStatus.java",
     "org/chromium/chrome/browser/profiles/ProfileAccountManagementMetrics.java",
-    "org/chromium/chrome/browser/ssl/ConnectionSecurityHelperSecurityLevel.java",
+    "org/chromium/chrome/browser/ssl/ConnectionSecurityLevel.java",
     "org/chromium/chrome/browser/sync/ModelTypeSelection.java",
   ]
 }
@@ -239,6 +263,7 @@ android_library("chrome_shell_java") {
   deps = [
     ":chrome_shell_resources",
     ":chrome_java",
+    ":chrome_java_resources",
     "//base:base_java",
     "//content/public/android:content_java",
     "//components/dom_distiller/android:dom_distiller_content_java",
@@ -477,6 +502,7 @@ instrumentation_test_apk("chrome_shell_test_apk") {
 # GYP: //chrome/chrome_tests.gypi:chrome_junit_tests
 junit_binary("chrome_junit_tests") {
   java_files = [
+    "junit/src/org/chromium/chrome/browser/child_accounts/ChildAccountServiceTest.java",
     "junit/src/org/chromium/chrome/browser/externalauth/ExternalAuthUtilsTest.java",
     "junit/src/org/chromium/chrome/browser/omaha/ResponseParserTest.java",
     "junit/src/org/chromium/chrome/browser/media/remote/AbstractMediaRouteControllerTest.java",
@@ -488,6 +514,7 @@ junit_binary("chrome_junit_tests") {
     ":chrome_java",
     "//base:base_java",
     "//base:base_java_test_support",
+    "//sync:sync_java_test_support",
     "//third_party/junit:hamcrest",
     "//third_party/android_tools:android_support_v7_mediarouter_java",
   ]
@@ -578,7 +605,6 @@ android_library("chrome_staging_java") {
   DEPRECATED_java_in_dir = "java_staging/src"
 
   deps = [
-    ":chrome_staging_java_resources",
     "//base:base_java",
     "//net/android:net_java",
     "//chrome/android:chrome_java",
@@ -613,24 +639,6 @@ android_library("chrome_staging_java") {
   srcjar_deps = [ ":custom_tabs_service_aidl" ]
 }
 
-#GYP: //chrome/android/chrome_apk.gyp:chrome_staging_java
-android_resources("chrome_staging_java_resources") {
-  resource_dirs = [
-    "java_staging/res",
-    "java_staging/res_default",
-  ]
-  custom_package = "com.google.android.apps.chrome"
-  deps = [
-    "//chrome/android:chrome_java_resources",
-    "//components/policy:app_restrictions_resources",
-    "//third_party/android_tools:android_support_v7_appcompat_resources",
-    "//third_party/android_tools:android_support_v7_mediarouter_resources",
-  ]
-  if (!enable_configuration_policy) {
-    deps -= [ "//components/policy:app_restrictions_resources" ]
-  }
-}
-
 # GYP: //chrome/android/chrome_apk.gyp:chrome_staging_test_java
 android_library("chrome_staging_test_java") {
   testonly = true
@@ -638,7 +646,6 @@ android_library("chrome_staging_test_java") {
 
   deps = [
     "//chrome/android:chrome_staging_java",
-    "//chrome/android:chrome_staging_java_resources",
     "//chrome/test/android:chrome_staging_test_support_java",
     "//base:base_java",
     "//base:base_java_test_support",
@@ -647,6 +654,7 @@ android_library("chrome_staging_test_java") {
     "//chrome/test/android:chrome_java_test_support",
     "//components/bookmarks/common/android:bookmarks_java",
     "//components/dom_distiller/android:dom_distiller_core_java",
+    "//components/invalidation:java",
     "//components/web_contents_delegate_android:web_contents_delegate_android_java",
     "//content/public/android:content_java",
     "//content/public/test/android:content_java_test_support",
@@ -663,69 +671,16 @@ android_library("chrome_staging_test_java") {
   ]
 }
 
-# GYP: //chrome/android/chrome_apk.gyp:staging_jni_headers
-generate_jni("staging_jni_headers") {
-  jni_package = "staging/android"
-  gypi_values = exec_script("//build/gypi_to_gn.py",
-                            [
-                              rebase_path("chrome_apk.gyp"),
-                              "--replace=<(chrome_java_dir)=java_staging",
-                            ],
-                            "scope",
-                            [ "chrome_apk.gyp" ])
-  sources = gypi_values.chrome_staging_jni_files
-}
-
-# GYP: //chrome/android/chrome_apk.gyp:libchrome_staging
-static_library("chrome_staging") {
-  deps = [
-    ":staging_jni_headers",
-    "//chrome/browser",
-    "//chrome:strings",
-    "//components/enhanced_bookmarks",
-    "//components/metrics/proto",
-    "//third_party/leveldatabase",
-  ]
-
-  gypi_values = exec_script(
-          "//build/gypi_to_gn.py",
-          [
-            rebase_path("chrome_apk.gyp"),
-            "--replace=<(chrome_native_sources_dir)=../browser/android/",
-          ],
-          "scope",
-          [ "chrome_apk.gyp" ])
-  sources = gypi_values.chrome_staging_native_sources
-
-  if (safe_browsing_mode != 0) {
-    sources += [
-      "../browser/android/spdy_proxy_resource_throttle.cc",
-      "../browser/android/spdy_proxy_resource_throttle.h",
-    ]
-  }
-
-  libs = [
-    "android",
-    "jnigraphics",
-  ]
-
-  defines = []
+# TODO(newt): delete this once all references are gone.
+group("chrome_staging") {
 }
 
 chrome_public_apk_assets_dir = "$root_build_dir/chrome_public_apk_assets"
 
-chrome_android_paks_gypi =
-    exec_script("//build/gypi_to_gn.py",
-                [ rebase_path("//chrome/chrome_android_paks.gypi") ],
-                "scope",
-                [ "//chrome/chrome_android_paks.gypi" ])
-
 copy_ex("chrome_public_apk_assets") {
   clear_dir = true
   dest = chrome_public_apk_assets_dir
-  gypi_sources = chrome_android_paks_gypi.chrome_android_pak_input_resources
-  cleaned_sources = rebase_path(gypi_sources, "<(PRODUCT_DIR)")
-  sources = rebase_path(cleaned_sources, ".", root_out_dir)
+  sources = chrome_android_paks_gypi.chrome_android_pak_input_resources
   if (icu_use_data_file) {
     sources += [ "$root_build_dir/icudtl.dat" ]
   }
@@ -748,7 +703,7 @@ copy_ex("chrome_public_apk_assets") {
 
 # GYP: //chrome/android/chrome_apk.gyp:chrome_apk_manifest
 jinja_template("chrome_public_apk_manifest") {
-  input = "java_staging/AndroidManifest.xml"
+  input = "java/AndroidManifest.xml"
   output = "$root_gen_dir/chrome_public_apk_manifest/AndroidManifest.xml"
   variables = jinja_variables
   variables += [
@@ -760,17 +715,16 @@ jinja_template("chrome_public_apk_manifest") {
 # GYP: //chrome/android/chrome_apk.gyp:chrome_public_template_resources
 jinja_template_resources("chrome_public_template_resources") {
   resources = [
-    "java_staging/res_template/xml/searchable.xml",
-    "java_staging/res_template/xml/syncadapter.xml",
+    "java/res_template/xml/searchable.xml",
+    "java/res_template/xml/syncadapter.xml",
   ]
-  res_dir = "java_staging/res_template"
+  res_dir = "java/res_template"
   variables = jinja_variables
 }
 
 # GYP: //chrome/android/chrome_apk.gyp:libchrome_public
 shared_library("chrome_public") {
   deps = [
-    "//chrome/android:chrome_staging",
     "//chrome:chrome_android_core",
   ]
   gypi_values = exec_script(
@@ -802,8 +756,8 @@ android_apk("chrome_public_apk") {
   asset_location = chrome_public_apk_assets_dir
 
   deps = [
+    ":chrome_java_resources",
     ":chrome_staging_java",
-    ":chrome_staging_java_resources",
     ":chrome_public",
     ":chrome_public_apk_assets",
     ":chrome_public_apk_manifest",

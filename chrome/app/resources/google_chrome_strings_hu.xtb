@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">Majdnem naprakész! Indítsa újra a készüléket a frissítés befejezéséhez.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome – Értesítések</translation>
+<translation id="6368805772029492593">A nagyobb biztonság érdekében a Google Chrome titkosítja az Ön adatait.</translation>
 <translation id="7339898014177206373">Új ablak</translation>
 <translation id="3282568296779691940">Bejelentkezés a Chrome-ba</translation>
 <translation id="3089968997497233615">Elérhető a Google Chrome új, biztonságosabb verziója.</translation>
@@ -165,7 +166,6 @@ Ha mindenképp bejelentkezik, akkor egyesíti a(z) <ph name="ACCOUNT_EMAIL_NEW"/
 <translation id="2290095356545025170">Biztos benne, hogy eltávolítja a Google Chrome-ot?</translation>
 <translation id="4273752058983339720">A Google Chrome úgy van beállítva, hogy automatikusan elinduljon a számítógép indításakor.</translation>
 <translation id="2316129865977710310">Köszönöm, nem</translation>
-<translation id="415994390253732730">Furcsán viselkedik a Chrome?</translation>
 <translation id="1104959162601287462">A &amp;Chrome OS névjegye</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">A Chrome üdvözli Önt!</translation>
@@ -216,6 +216,7 @@ Ha mindenképp bejelentkezik, akkor egyesíti a(z) <ph name="ACCOUNT_EMAIL_NEW"/
 <translation id="5566025111015594046">Google Chrome (mDNS-In)</translation>
 <translation id="6113794647360055231">A Chrome még jobb lett</translation>
 <translation id="2588322182880276190">Chrome embléma</translation>
+<translation id="4519152997629025674">A Google Chrome <ph name="BEGIN_LINK"/>internetes szolgáltatásokat<ph name="END_LINK"/> is használhat a böngészés javításának érdekében. Ezek a szolgáltatások bármikor letilthatók.</translation>
 <translation id="4367618624832907428">A Google Chrome nem tudja megjeleníteni a weboldalt, mert számítógépe nem csatlakozik az internethez.</translation>
 <translation id="174539241580958092">A Google Chrome egy bejelentkezési hiba miatt nem tudta szinkronizálni az adatokat.</translation>
 <translation id="8255190535488645436">A Google Chrome használja a kamerát és a mikrofont.</translation>
@@ -223,7 +224,6 @@ Ha mindenképp bejelentkezik, akkor egyesíti a(z) <ph name="ACCOUNT_EMAIL_NEW"/
         beállításokban.</translation>
 <translation id="9102715433345326100">Ez a fájl rosszindulatú, ezért a Chrome letiltotta.</translation>
 <translation id="8205111949707227942">Opcionális: Segítse a Chrome OS fejlesztését azzal, hogy automatikusan elküldi a használati statisztikákat és hibajelentéseket a Google részére</translation>
-<translation id="487887346205285304">Furcsán viselkedik a Chrome?</translation>
 <translation id="3622797965165704966">Google-fiókjával most még egyszerűbben használhatja a Chrome-ot közösen használt számítógépeken.</translation>
 <translation id="7196020411877309443">Miért jelenik meg ez az üzenet?</translation>
 <translation id="2769762047821873045">Nem a Google Chrome az alapértelmezett böngésző.</translation>

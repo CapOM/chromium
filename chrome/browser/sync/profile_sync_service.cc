@@ -17,9 +17,9 @@
 #include "base/files/file_util.h"
 #include "base/logging.h"
 #include "base/memory/ref_counted.h"
-#include "base/message_loop/message_loop.h"
 #include "base/metrics/histogram.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string16.h"
 #include "base/strings/stringprintf.h"
 #include "base/thread_task_runner_handle.h"
@@ -289,12 +289,8 @@ ProfileSyncService::~ProfileSyncService() {
   CHECK(!backend_initialized_);
 }
 
-bool ProfileSyncService::IsSyncEnabledAndLoggedIn() {
-  // Exit if sync is disabled.
-  if (IsManaged() || !IsSyncRequested())
-    return false;
-
-  return IsSignedIn();
+bool ProfileSyncService::CanSyncStart() const {
+  return IsSyncAllowed() && IsSyncRequested() && IsSignedIn();
 }
 
 bool ProfileSyncService::IsOAuthRefreshTokenAvailable() {
@@ -313,9 +309,9 @@ void ProfileSyncService::Initialize() {
 
   sync_prefs_.AddSyncPrefObserver(this);
 
-  // For now, the only thing we can do through policy is to turn sync off.
-  if (IsManaged()) {
-    DisableForUser();
+  // If sync isn't allowed, the only thing to do is to turn it off.
+  if (!IsSyncAllowed()) {
+    RequestStop(CLEAR_DATA);
     return;
   }
 
@@ -323,7 +319,7 @@ void ProfileSyncService::Initialize() {
 
   if (!HasSyncSetupCompleted() || !IsSignedIn()) {
     // Clean up in case of previous crash / setup abort / signout.
-    DisableForUser();
+    StopImpl(CLEAR_DATA);
   }
 
   TrySyncDatatypePrefRecovery();
@@ -456,7 +452,7 @@ bool ProfileSyncService::IsDataTypeControllerRunning(
   return iter->second->state() == DataTypeController::RUNNING;
 }
 
-browser_sync::OpenTabsUIDelegate* ProfileSyncService::GetOpenTabsUIDelegate() {
+sync_driver::OpenTabsUIDelegate* ProfileSyncService::GetOpenTabsUIDelegate() {
   if (!IsDataTypeControllerRunning(syncer::SESSIONS))
     return NULL;
   return sessions_sync_manager_.get();
@@ -540,14 +536,14 @@ void ProfileSyncService::InitializeBackend(bool delete_stale_data) {
           new browser_sync::BackendUnrecoverableErrorHandler(
               MakeWeakHandle(weak_factory_.GetWeakPtr())));
 
-  backend_->Initialize(
-      this, sync_thread_.Pass(), GetJsEventHandler(), sync_service_url_,
-      credentials, delete_stale_data,
-      scoped_ptr<syncer::SyncManagerFactory>(
-          new syncer::SyncManagerFactory(GetManagerType())).Pass(),
-      backend_unrecoverable_error_handler.Pass(),
-      base::Bind(browser_sync::ChromeReportUnrecoverableError),
-      network_resources_.get());
+  backend_->Initialize(this, sync_thread_.Pass(), GetJsEventHandler(),
+                       sync_service_url_, credentials, delete_stale_data,
+                       scoped_ptr<syncer::SyncManagerFactory>(
+                           new syncer::SyncManagerFactory(GetManagerType()))
+                           .Pass(),
+                       backend_unrecoverable_error_handler.Pass(),
+                       base::Bind(browser_sync::ChromeReportUnrecoverableError),
+                       network_resources_.get(), saved_nigori_state_.Pass());
 }
 
 bool ProfileSyncService::IsEncryptedDatatypeEnabled() const {
@@ -827,8 +823,8 @@ void ProfileSyncService::ShutdownImpl(syncer::ShutdownReason reason) {
     if (reason == syncer::ShutdownReason::DISABLE_SYNC && sync_thread_) {
       // If the backend is already shut down when a DISABLE_SYNC happens,
       // the data directory needs to be cleaned up here.
-      sync_thread_->message_loop()->PostTask(FROM_HERE,
-          base::Bind(&DeleteSyncDataFolder, directory_path_));
+      sync_thread_->task_runner()->PostTask(
+          FROM_HERE, base::Bind(&DeleteSyncDataFolder, directory_path_));
     }
     return;
   }
@@ -889,7 +885,7 @@ void ProfileSyncService::ShutdownImpl(syncer::ShutdownReason reason) {
   if ((backend_mode_ == ROLLBACK || backend_mode_ == BACKUP) &&
       reason != syncer::SWITCH_MODE_SYNC &&
       reason != syncer::BROWSER_SHUTDOWN) {
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE, base::Bind(&ProfileSyncService::TryStartSyncAfterBackup,
                               startup_controller_weak_factory_.GetWeakPtr()));
   }
@@ -915,12 +911,24 @@ void ProfileSyncService::ShutdownImpl(syncer::ShutdownReason reason) {
   sync_prefs_.SetCleanShutdown(true);
 }
 
-void ProfileSyncService::DisableForUser() {
-  // Clear prefs (including SyncSetupHasCompleted) before shutting down so
-  // PSS clients don't think we're set up while we're shutting down.
-  sync_prefs_.ClearPreferences();
-  ClearUnrecoverableError();
-  ShutdownImpl(syncer::DISABLE_SYNC);
+void ProfileSyncService::StopImpl(SyncStopDataFate data_fate) {
+  switch (data_fate) {
+    case KEEP_DATA:
+      // TODO(maxbogue): Investigate whether this logic can/should be moved
+      // into ShutdownImpl or SyncBackendHost itself.
+      if (HasSyncingBackend()) {
+        backend_->UnregisterInvalidationIds();
+      }
+      ShutdownImpl(syncer::STOP_SYNC);
+      break;
+    case CLEAR_DATA:
+      // Clear prefs (including SyncSetupHasCompleted) before shutting down so
+      // PSS clients don't think we're set up while we're shutting down.
+      sync_prefs_.ClearPreferences();
+      ClearUnrecoverableError();
+      ShutdownImpl(syncer::DISABLE_SYNC);
+      break;
+  }
 }
 
 bool ProfileSyncService::HasSyncSetupCompleted() const {
@@ -989,11 +997,11 @@ void ProfileSyncService::OnUnrecoverableErrorImpl(
       << " -- ProfileSyncService unusable: " << message;
 
   // Shut all data types down.
-  base::MessageLoop::current()->PostTask(FROM_HERE,
-      base::Bind(&ProfileSyncService::ShutdownImpl,
-                 weak_factory_.GetWeakPtr(),
-                 delete_sync_database ?
-                     syncer::DISABLE_SYNC : syncer::STOP_SYNC));
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
+      FROM_HERE,
+      base::Bind(
+          &ProfileSyncService::ShutdownImpl, weak_factory_.GetWeakPtr(),
+          delete_sync_database ? syncer::DISABLE_SYNC : syncer::STOP_SYNC));
 }
 
 void ProfileSyncService::ReenableDatatype(syncer::ModelType type) {
@@ -1139,9 +1147,9 @@ void ProfileSyncService::OnSyncCycleCompleted() {
   if (IsDataTypeControllerRunning(syncer::SESSIONS)) {
     // Trigger garbage collection of old sessions now that we've downloaded
     // any new session data.
-    base::MessageLoop::current()->PostTask(FROM_HERE, base::Bind(
-        &SessionsSyncManager::DoGarbageCollection,
-            base::AsWeakPtr(sessions_sync_manager_.get())));
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(&SessionsSyncManager::DoGarbageCollection,
+                              base::AsWeakPtr(sessions_sync_manager_.get())));
   }
   DVLOG(2) << "Notifying observers sync cycle completed";
   NotifySyncCycleCompleted();
@@ -1251,11 +1259,6 @@ void ProfileSyncService::OnConnectionStatusChange(
   }
 }
 
-void ProfileSyncService::StopSyncingPermanently() {
-  sync_prefs_.SetSyncRequested(false);
-  DisableForUser();
-}
-
 void ProfileSyncService::OnPassphraseRequired(
     syncer::PassphraseRequiredReason reason,
     const sync_pb::EncryptedData& pending_keys) {
@@ -1363,7 +1366,7 @@ void ProfileSyncService::OnActionableError(const SyncProtocolError& error) {
       // actions in the popup. The current experience might not be optimal for
       // the user. We just dismiss the dialog.
       if (startup_controller_->setup_in_progress()) {
-        StopSyncingPermanently();
+        RequestStop(CLEAR_DATA);
         expect_sync_configuration_aborted_ = true;
       }
       // Trigger an unrecoverable error to stop syncing.
@@ -1376,7 +1379,7 @@ void ProfileSyncService::OnActionableError(const SyncProtocolError& error) {
       backup_rollback_controller_->OnRollbackReceived();
       // Fall through to shutdown backend and sign user out.
     case syncer::DISABLE_SYNC_ON_CLIENT:
-      StopSyncingPermanently();
+      RequestStop(CLEAR_DATA);
 #if !defined(OS_CHROMEOS)
       // On desktop Chrome, sign out the user after a dashboard clear.
       // Skip sign out on ChromeOS/Android.
@@ -1412,6 +1415,25 @@ void ProfileSyncService::OnActionableError(const SyncProtocolError& error) {
   }
 }
 
+void ProfileSyncService::OnLocalSetPassphraseEncryption(
+    const syncer::SyncEncryptionHandler::NigoriState& nigori_state) {
+  DCHECK_CURRENTLY_ON(content::BrowserThread::UI);
+  if (!base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kSyncEnableClearDataOnPassphraseEncryption))
+    return;
+
+  // At this point the user has set a custom passphrase and we
+  // have received the updated nigori state. Time to cache the nigori state,
+  // shutdown sync, then restart it and restore the cached nigori state.
+  ShutdownImpl(syncer::DISABLE_SYNC);
+  saved_nigori_state_.reset(
+      new syncer::SyncEncryptionHandler::NigoriState(nigori_state));
+  // TODO(maniscalco): We should also clear the bootstrap keystore key from the
+  // pref before restarting sync to ensure we obtain a new, valid one when we
+  // perform the configuration sync cycle (crbug.com/490836).
+  startup_controller_->TryStart();
+}
+
 void ProfileSyncService::OnConfigureDone(
     const DataTypeManager::ConfigureResult& result) {
   configure_status_ = result.status;
@@ -1426,7 +1448,7 @@ void ProfileSyncService::OnConfigureDone(
         backup_finished_ = true;
 
       // Asynchronously check whether sync needs to start.
-      base::MessageLoop::current()->PostTask(
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
           FROM_HERE, base::Bind(&ProfileSyncService::TryStartSyncAfterBackup,
                                 startup_controller_weak_factory_.GetWeakPtr()));
     } else if (!expect_sync_configuration_aborted_) {
@@ -1618,6 +1640,10 @@ void ProfileSyncService::SetSetupInProgress(bool setup_in_progress) {
   if (!setup_in_progress && backend_initialized())
     ReconfigureDatatypeManager();
   NotifyObservers();
+}
+
+bool ProfileSyncService::IsSyncAllowed() const {
+  return IsSyncAllowedByFlag() && !IsManaged();
 }
 
 bool ProfileSyncService::IsSyncActive() const {
@@ -2206,7 +2232,7 @@ syncer::ModelTypeSet ProfileSyncService::GetEncryptedDataTypes() const {
 
 void ProfileSyncService::OnSyncManagedPrefChange(bool is_sync_managed) {
   if (is_sync_managed) {
-    DisableForUser();
+    StopImpl(CLEAR_DATA);
   } else {
     // Sync is no longer disabled by policy. Try starting it up if appropriate.
     startup_controller_->TryStart();
@@ -2235,7 +2261,7 @@ void ProfileSyncService::GoogleSigninSucceeded(const std::string& account_id,
 void ProfileSyncService::GoogleSignedOut(const std::string& account_id,
                                          const std::string& username) {
   sync_disabled_by_admin_ = false;
-  DisableForUser();
+  RequestStop(CLEAR_DATA);
 
   if (browser_sync::BackupRollbackController::IsBackupEnabled()) {
     need_backup_ = true;
@@ -2428,12 +2454,9 @@ bool ProfileSyncService::IsManaged() const {
   return sync_prefs_.IsManaged() || sync_disabled_by_admin_;
 }
 
-void ProfileSyncService::RequestStop() {
+void ProfileSyncService::RequestStop(SyncStopDataFate data_fate) {
   sync_prefs_.SetSyncRequested(false);
-  if (HasSyncingBackend()) {
-    backend_->UnregisterInvalidationIds();
-  }
-  ShutdownImpl(syncer::STOP_SYNC);
+  StopImpl(data_fate);
 }
 
 bool ProfileSyncService::IsSyncRequested() const {
@@ -2641,7 +2664,7 @@ void ProfileSyncService::CheckSyncBackupIfNeeded() {
     // If sync thread is set, need to serialize check on sync thread after
     // closing backup DB.
     if (sync_thread_) {
-      sync_thread_->message_loop_proxy()->PostTask(
+      sync_thread_->task_runner()->PostTask(
           FROM_HERE,
           base::Bind(syncer::CheckSyncDbLastModifiedTime,
                      profile_->GetPath().Append(kSyncBackupDataFolderName),

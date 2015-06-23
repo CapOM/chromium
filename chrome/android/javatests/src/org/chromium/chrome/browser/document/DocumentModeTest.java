@@ -4,40 +4,25 @@
 
 package org.chromium.chrome.browser.document;
 
-import static org.chromium.base.test.util.Restriction.RESTRICTION_TYPE_LOW_END_DEVICE;
-
 import android.app.Activity;
-import android.app.ActivityManager;
-import android.app.ActivityManager.RunningServiceInfo;
 import android.app.Instrumentation;
 import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
-import android.provider.Browser;
-import android.test.MoreAsserts;
 import android.test.suitebuilder.annotation.MediumTest;
-import android.view.ContextMenu;
 import android.view.View;
-
-import com.google.android.apps.chrome.R;
 
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.MinAndroidSdkLevel;
-import org.chromium.base.test.util.Restriction;
-import org.chromium.base.test.util.UrlUtils;
 import org.chromium.chrome.browser.BookmarkUtils;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeMobileApplication;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.EmptyTabObserver;
 import org.chromium.chrome.browser.IntentHandler;
 import org.chromium.chrome.browser.Tab;
-import org.chromium.chrome.browser.tabmodel.EmptyTabModelSelectorObserver;
 import org.chromium.chrome.browser.tabmodel.TabModel;
-import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelUtils;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModel;
 import org.chromium.chrome.browser.tabmodel.document.DocumentTabModel.InitializationObserver;
@@ -47,104 +32,22 @@ import org.chromium.chrome.browser.tabmodel.document.OffTheRecordDocumentTabMode
 import org.chromium.chrome.test.MultiActivityTestBase;
 import org.chromium.chrome.test.util.ActivityUtils;
 import org.chromium.chrome.test.util.DisableInTabbedMode;
-import org.chromium.content.app.SandboxedProcessService;
-import org.chromium.content.browser.test.util.CallbackHelper;
 import org.chromium.content.browser.test.util.Criteria;
 import org.chromium.content.browser.test.util.CriteriaHelper;
+import org.chromium.content.browser.test.util.DOMUtils;
 import org.chromium.content.browser.test.util.TouchCommon;
 import org.chromium.content_public.browser.LoadUrlParams;
-import org.chromium.ui.base.PageTransition;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
-import java.util.concurrent.Callable;
 
 /**
- * Tests the interactions of the DocumentTabModel with Android's ActivityManager.  This test suite
- * actually fires Intents to start different DocumentActivities.
- *
- * Note that this is different instrumenting one DocumentActivity in particular, which should be
- * tested using the DocumentActivityTestBase class.
+ * General tests for how Document mode Activities interact with each other.
  */
 @MinAndroidSdkLevel(Build.VERSION_CODES.LOLLIPOP)
 @DisableInTabbedMode
-public class DocumentModeTest extends MultiActivityTestBase {
-
-    private static final int ACTIVITY_START_TIMEOUT = 1000;
-    private static final String URL_1 = "data:text/html;charset=utf-8,Page%201";
-    private static final String URL_2 = "data:text/html;charset=utf-8,Page%202";
-    private static final String URL_3 = "data:text/html;charset=utf-8,Page%203";
-    private static final String URL_4 = "data:text/html;charset=utf-8,Page%204";
-
-    private static final String HTML_LINK = "<html><head><meta "
-            + "name='viewport' content='width=device-width initial-scale=0.5, maximum-scale=0.5'>"
-            + "<style>body {margin: 0em;} div {width: 100%; height: 100%; background: #011684;}"
-            + "</style></head><body><a href='data:text/html;charset=utf-8,white' target='_blank'>"
-            + "<div></div></a></body></html>";
-    private static final float HTML_SCALE = 0.5f;
-
+public class DocumentModeTest extends DocumentModeTestBase {
     private boolean mInitializationCompleted;
-
-    private Context mContext;
-    private String mUrl;
-    private String mReferrer;
-    private TabModelSelectorTabObserver mObserver;
-
-    private static class TestTabObserver extends EmptyTabObserver {
-        private ContextMenu mContextMenu;
-
-        @Override
-        public void onContextMenuShown(Tab tab, ContextMenu menu) {
-            mContextMenu = menu;
-        }
-    }
-
-    private static void launchMainIntent(Context context) throws Exception {
-        Intent intent = new Intent(Intent.ACTION_MAIN);
-        intent.setPackage(context.getPackageName());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
-        MultiActivityTestBase.waitUntilChromeInForeground();
-    }
-
-    private static void fireViewIntent(Context context, Uri data) throws Exception {
-        Intent intent = new Intent(Intent.ACTION_VIEW, data);
-        intent.setClassName(context.getPackageName(), ChromeLauncherActivity.class.getName());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        context.startActivity(intent);
-        MultiActivityTestBase.waitUntilChromeInForeground();
-    }
-
-    /**
-     * Launches three tabs via Intents with ACTION_VIEW.
-     */
-    private int[] launchThreeTabs() throws Exception {
-        int[] tabIds = new int[3];
-        tabIds[0] = launchViaViewIntent(false, URL_1);
-        tabIds[1] = launchViaViewIntent(false, URL_2);
-        tabIds[2] = launchViaViewIntent(false, URL_3);
-        assertFalse(tabIds[0] == tabIds[1]);
-        assertFalse(tabIds[0] == tabIds[2]);
-        assertFalse(tabIds[1] == tabIds[2]);
-        assertEquals(3,
-                ChromeMobileApplication.getDocumentTabModelSelector().getModel(false).getCount());
-        return tabIds;
-    }
-
-    @Override
-    public void setUp() throws Exception {
-        super.setUp();
-        mContext = getInstrumentation().getTargetContext();
-    }
-
-    @Override
-    public void tearDown() throws Exception {
-        super.tearDown();
-        if (mObserver != null) {
-            mObserver.destroy();
-            mObserver = null;
-        }
-    }
 
     /**
      * Confirm that you can't start ChromeTabbedActivity while the user is running in Document mode.
@@ -324,217 +227,6 @@ public class DocumentModeTest extends MultiActivityTestBase {
         assertEquals(3, selector.getTotalTabCount());
     }
 
-    @MediumTest
-    public void testReferrerExtra() throws Exception {
-        Instrumentation.ActivityMonitor monitor = getInstrumentation().addMonitor(
-                DocumentActivity.class.getName(), null, false);
-        launchMainIntent(mContext);
-
-        // Wait for tab model to become initialized.
-        assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests();
-            }
-        }));
-
-        DocumentTabModelSelector selector = ChromeMobileApplication.getDocumentTabModelSelector();
-        mObserver = new TabModelSelectorTabObserver(selector) {
-            @Override
-            public void onLoadUrl(Tab tab, LoadUrlParams params, int loadType) {
-                mUrl = params.getUrl();
-                if (params.getReferrer() != null) {
-                    mReferrer = params.getReferrer().getUrl();
-                }
-            }
-        };
-
-        // Wait for document activity from the main intent to launch before firing the next
-        // intent.
-        DocumentActivity doc = (DocumentActivity) monitor.waitForActivityWithTimeout(
-                ACTIVITY_START_TIMEOUT);
-        assertNotNull("DocumentActivity did not start", doc);
-
-        mUrl = null;
-        mReferrer = null;
-
-        // Fire the Intent with EXTRA_REFERRER.
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL_1));
-        intent.setClassName(mContext.getPackageName(), ChromeLauncherActivity.class.getName());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.putExtra(Intent.EXTRA_REFERRER, Uri.parse(URL_2));
-        IntentHandler.addTrustedIntentExtras(intent, mContext);
-        mContext.startActivity(intent);
-
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return URL_1.equals(mUrl);
-            }
-        }));
-
-        assertEquals(URL_2, mReferrer);
-    }
-
-    @MediumTest
-    public void testReferrerExtraAndroidApp() throws Exception {
-        Instrumentation.ActivityMonitor monitor = getInstrumentation().addMonitor(
-                DocumentActivity.class.getName(), null, false);
-        launchMainIntent(mContext);
-
-        // Wait for tab model to become initialized.
-        assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests();
-            }
-        }));
-
-        DocumentTabModelSelector selector = ChromeMobileApplication.getDocumentTabModelSelector();
-        mObserver = new TabModelSelectorTabObserver(selector) {
-            @Override
-            public void onLoadUrl(Tab tab, LoadUrlParams params, int loadType) {
-                mUrl = params.getUrl();
-                if (params.getReferrer() != null) {
-                    mReferrer = params.getReferrer().getUrl();
-                }
-            }
-        };
-
-        // Wait for document activity from the main intent to launch before firing the next
-        // intent.
-        DocumentActivity doc = (DocumentActivity) monitor.waitForActivityWithTimeout(
-                ACTIVITY_START_TIMEOUT);
-        assertNotNull("DocumentActivity did not start", doc);
-
-        mUrl = null;
-        mReferrer = null;
-
-        // Fire the Intent with EXTRA_REFERRER using android-app scheme.
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL_1));
-        intent.setClassName(mContext.getPackageName(), ChromeLauncherActivity.class.getName());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        final String androidAppReferrer = "android-app://com.imdb.mobile/http/www.imdb.com";
-        intent.putExtra(Intent.EXTRA_REFERRER, Uri.parse(androidAppReferrer));
-        mContext.startActivity(intent);
-
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return URL_1.equals(mUrl);
-            }
-        }));
-
-        assertEquals(androidAppReferrer, mReferrer);
-    }
-
-    @MediumTest
-    public void testReferrerExtraNotAndroidApp() throws Exception {
-        Instrumentation.ActivityMonitor monitor = getInstrumentation().addMonitor(
-                DocumentActivity.class.getName(), null, false);
-        launchMainIntent(mContext);
-
-        // Wait for tab model to become initialized.
-        assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests();
-            }
-        }));
-
-        DocumentTabModelSelector selector = ChromeMobileApplication.getDocumentTabModelSelector();
-        mObserver = new TabModelSelectorTabObserver(selector) {
-            @Override
-            public void onLoadUrl(Tab tab, LoadUrlParams params, int loadType) {
-                mUrl = params.getUrl();
-                if (params.getReferrer() != null) {
-                    mReferrer = params.getReferrer().getUrl();
-                }
-            }
-        };
-
-        // Wait for document activity from the main intent to launch before firing the next
-        // intent.
-        DocumentActivity doc = (DocumentActivity) monitor.waitForActivityWithTimeout(
-                ACTIVITY_START_TIMEOUT);
-        assertNotNull("DocumentActivity did not start", doc);
-
-        mUrl = null;
-        mReferrer = null;
-
-        // Fire the third-party Intent with EXTRA_REFERRER using a regular URL.
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL_1));
-        intent.setClassName(mContext.getPackageName(), ChromeLauncherActivity.class.getName());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        final String nonAppExtra = "http://www.imdb.com";
-        intent.putExtra(Intent.EXTRA_REFERRER, Uri.parse(nonAppExtra));
-        mContext.startActivity(intent);
-
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return URL_1.equals(mUrl);
-            }
-        }));
-
-        // Check that referrer is not carried over
-        assertNull(mReferrer);
-    }
-
-    @MediumTest
-    public void testReferrerExtraFromExternalIntent() throws Exception {
-        Instrumentation.ActivityMonitor monitor = getInstrumentation().addMonitor(
-                DocumentActivity.class.getName(), null, false);
-        launchMainIntent(mContext);
-
-        // Wait for tab model to become initialized.
-        assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests();
-            }
-        }));
-
-        DocumentTabModelSelector selector = ChromeMobileApplication.getDocumentTabModelSelector();
-        mObserver = new TabModelSelectorTabObserver(selector) {
-            @Override
-            public void onLoadUrl(Tab tab, LoadUrlParams params, int loadType) {
-                mUrl = params.getUrl();
-                if (params.getReferrer() != null) {
-                    mReferrer = params.getReferrer().getUrl();
-                }
-            }
-        };
-
-        // Wait for document activity from the main intent to launch before firing the next
-        // intent.
-        DocumentActivity doc = (DocumentActivity) monitor.waitForActivityWithTimeout(
-                ACTIVITY_START_TIMEOUT);
-        assertNotNull("DocumentActivity did not start", doc);
-
-        mUrl = null;
-        mReferrer = null;
-
-        // Simulate a link click inside the application that goes through external navigation
-        // handler and then goes back to Chrome.
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL_1));
-        intent.setClassName(mContext.getPackageName(), ChromeLauncherActivity.class.getName());
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.putExtra(Browser.EXTRA_APPLICATION_ID, mContext.getPackageName());
-        IntentHandler.setPendingReferrer(intent, "http://www.google.com");
-        mContext.startActivity(intent);
-
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return URL_1.equals(mUrl);
-            }
-        }));
-
-        // Check that referrer is not carried over
-        assertEquals("http://www.google.com", mReferrer);
-    }
-
     /**
      * Confirm that setting the index brings the correct tab forward.
      */
@@ -567,7 +259,7 @@ public class DocumentModeTest extends MultiActivityTestBase {
     @MediumTest
     public void testReuseIntent() throws Exception {
         // Create a tab, then send the user back to the Home screen.
-        int tabId = launchViaViewIntent(false, URL_1);
+        int tabId = launchViaViewIntent(false, URL_1, "Page 1");
         assertTrue(ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests());
         final DocumentTabModelSelector selector =
                 ChromeMobileApplication.getDocumentTabModelSelector();
@@ -598,7 +290,7 @@ public class DocumentModeTest extends MultiActivityTestBase {
         assertFalse(selector.isIncognitoSelected());
 
         // Create another tab.
-        final int secondTabId = launchViaViewIntent(false, URL_2);
+        final int secondTabId = launchViaViewIntent(false, URL_2, "Page 2");
         assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
             @Override
             public boolean isSatisfied() {
@@ -636,7 +328,7 @@ public class DocumentModeTest extends MultiActivityTestBase {
         assertNull(doc);
 
         // Create an Incognito tab via an Intent extra.
-        final int firstId = launchViaViewIntent(true, URL_2);
+        final int firstId = launchViaViewIntent(true, URL_2, "Page 2");
         assertTrue(ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests());
         final DocumentTabModelSelector selector =
                 ChromeMobileApplication.getDocumentTabModelSelector();
@@ -650,7 +342,7 @@ public class DocumentModeTest extends MultiActivityTestBase {
         assertEquals(incognitoModel, selector.getCurrentModel());
 
         // Launch via ChromeLauncherActivity.launchInstance().
-        final int secondId = launchViaLaunchDocumentInstance(true, URL_3);
+        final int secondId = launchViaLaunchDocumentInstance(true, URL_3, "Page 3");
         assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
             @Override
             public boolean isSatisfied() {
@@ -668,12 +360,12 @@ public class DocumentModeTest extends MultiActivityTestBase {
      */
     @MediumTest
     public void testIncognitoNotificationClosesTabs() throws Exception {
-        final int regularId = launchViaLaunchDocumentInstance(false, URL_1);
+        final int regularId = launchViaLaunchDocumentInstance(false, URL_1, "Page 1");
         final DocumentTabModelSelector selector =
                 ChromeMobileApplication.getDocumentTabModelSelector();
         assertFalse(selector.isIncognitoSelected());
 
-        final int incognitoId = launchViaLaunchDocumentInstance(true, URL_2);
+        final int incognitoId = launchViaLaunchDocumentInstance(true, URL_2, "Page 2");
         assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
             @Override
             public boolean isSatisfied() {
@@ -704,7 +396,7 @@ public class DocumentModeTest extends MultiActivityTestBase {
      */
     @MediumTest
     public void testCoveredByChildActivity() throws Exception {
-        final int tabId = launchViaLaunchDocumentInstance(false, URL_1);
+        final int tabId = launchViaLaunchDocumentInstance(false, URL_1, "Page 1");
         final DocumentTabModel model =
                 ChromeMobileApplication.getDocumentTabModelSelector().getModelForTabId(tabId);
         final Tab tab = model.getTabAt(0);
@@ -764,30 +456,32 @@ public class DocumentModeTest extends MultiActivityTestBase {
      */
     @MediumTest
     public void testIncognitoOpensInForegroundViaLinkContextMenu() throws Exception {
-        launchLinkDocument();
+        launchViaLaunchDocumentInstance(false, HREF_LINK, "href link page");
 
         // Save the current tab info.
-        final DocumentActivity regularActivity =
-                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
+        Activity regularActivity = ApplicationStatus.getLastTrackedFocusedActivity();
+        assertTrue(regularActivity instanceof DocumentActivity);
+        assertFalse(regularActivity instanceof IncognitoDocumentActivity);
+
         final DocumentTabModelSelector selector =
                 ChromeMobileApplication.getDocumentTabModelSelector();
         final TabModel regularTabModel = selector.getModel(false);
+        final TabModel incognitoTabModel = selector.getModel(true);
         final int regularTabId = selector.getCurrentTabId();
 
         // Open a link in incognito via the context menu.
         openLinkInNewTabViaContextMenu(true);
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                if (1 != regularTabModel.getCount()) return false;
-                if (regularTabId == selector.getCurrentTabId()) return false;
-                if (!selector.isIncognitoSelected()) return false;
-                return true;
-            }
-        }));
-        assertEquals(0, selector.getCurrentModel().index());
-        MoreAsserts.assertNotEqual(
-                regularActivity, ApplicationStatus.getLastTrackedFocusedActivity());
+        final DocumentActivity secondActivity =
+                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
+        final int secondTabId = selector.getCurrentTabId();
+        assertEquals("Wrong regular tab count", 1, regularTabModel.getCount());
+        assertEquals("Wrong incognito tab count", 1, incognitoTabModel.getCount());
+        assertNotSame("Wrong tab selected", regularTabId, selector.getCurrentTabId());
+        assertTrue("Wrong model selected", selector.isIncognitoSelected());
+        assertEquals("Wrong tab index selected", 0, selector.getCurrentModel().index());
+        assertNotSame("Wrong Activity in foreground", regularActivity, secondActivity);
+        assertTrue("Foreground Activity isn't Incognito",
+                secondActivity instanceof IncognitoDocumentActivity);
 
         // Re-open the other tab.
         TabModelUtils.setIndex(regularTabModel, 0);
@@ -801,20 +495,74 @@ public class DocumentModeTest extends MultiActivityTestBase {
 
         // Try to open a new Incognito Tab in the background using the TabModelSelector directly.
         // Should open it in the foreground, instead.
-        final DocumentActivity currentActivity =
-                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
         Runnable runnable = new Runnable() {
             @Override
             public void run() {
                 LoadUrlParams params = new LoadUrlParams(URL_1);
-                currentActivity.getTabModelSelector().openNewTab(
+                secondActivity.getTabModelSelector().openNewTab(
                         params, TabModel.TabLaunchType.FROM_LONGPRESS_BACKGROUND, null, true);
             }
         };
-        ActivityUtils.waitForActivity(
-                getInstrumentation(), IncognitoDocumentActivity.class, runnable);
-        MoreAsserts.assertNotEqual(
-                currentActivity, ApplicationStatus.getLastTrackedFocusedActivity());
+        DocumentActivity thirdActivity = ActivityUtils.waitForActivity(getInstrumentation(),
+                IncognitoDocumentActivity.class, runnable);
+        waitForFullLoad(thirdActivity, "Page 1");
+        assertEquals("Wrong regular tab count", 1, regularTabModel.getCount());
+        assertEquals("Wrong incognito tab count", 2, incognitoTabModel.getCount());
+        assertNotSame("Wrong tab selected", regularTabId, selector.getCurrentTabId());
+        assertNotSame("Wrong tab selected", secondTabId, selector.getCurrentTabId());
+        assertTrue("Wrong model selected", selector.isIncognitoSelected());
+        assertEquals("Wrong tab index selected", 1, selector.getCurrentModel().index());
+        assertNotSame("Wrong Activity in foreground", regularActivity, thirdActivity);
+        assertNotSame("Wrong Activity in foreground", secondActivity, thirdActivity);
+        assertTrue("Foreground Activity isn't Incognito",
+                thirdActivity instanceof IncognitoDocumentActivity);
+    }
+
+    /**
+     * Tests that tabs opened via window.open() load properly.
+     * Tabs opened this way have their WebContents paused while the new Activity that will host
+     * the WebContents starts asynchronously.
+     */
+    @MediumTest
+    public void testWindowOpen() throws Exception {
+        launchViaLaunchDocumentInstance(false, ONCLICK_LINK, "window.open page");
+
+        final DocumentActivity firstActivity =
+                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
+
+        // Save the current tab ID.
+        final DocumentTabModelSelector selector =
+                ChromeMobileApplication.getDocumentTabModelSelector();
+        final TabModel tabModel = selector.getModel(false);
+        final int firstTabId = selector.getCurrentTabId();
+        final int firstTabIndex = tabModel.index();
+
+        // Do a plain click to make the link open in a new foreground Document via a window.open().
+        // If the window is opened successfully, javascript on the first page triggers and changes
+        // its URL as a signal for this test.
+        Runnable fgTrigger = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    DOMUtils.clickNode(null, firstActivity.getCurrentContentViewCore(), "body");
+                } catch (Exception e) {
+
+                }
+            }
+        };
+
+        // Wait for the new Activity to finish loading and make sure the Activities are in the
+        // correct state.
+        DocumentActivity secondActivity = (DocumentActivity) ActivityUtils.waitForActivity(
+                getInstrumentation(), DocumentActivity.class, fgTrigger);
+        waitForFullLoad(secondActivity, "Page 4");
+        assertEquals("New WebContents was not created",
+                SUCCESS_URL, firstActivity.getActivityTab().getUrl());
+        assertEquals("Wrong number of tabs", 2, tabModel.getCount());
+        assertNotSame("Wrong tab selected", firstTabIndex, tabModel.index());
+        assertNotSame("Wrong tab ID in foreground", firstTabId, selector.getCurrentTabId());
+        assertNotSame("Wrong Activity in foreground",
+                firstActivity, ApplicationStatus.getLastTrackedFocusedActivity());
     }
 
     /**
@@ -822,7 +570,7 @@ public class DocumentModeTest extends MultiActivityTestBase {
      */
     @MediumTest
     public void testLastTabIdUpdates() throws Exception {
-        launchLinkDocument();
+        launchViaLaunchDocumentInstance(false, HREF_LINK, "href link page");
 
         final DocumentActivity firstActivity =
                 (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
@@ -849,273 +597,14 @@ public class DocumentModeTest extends MultiActivityTestBase {
                 });
             }
         };
-        ActivityUtils.waitForActivity(getInstrumentation(), DocumentActivity.class, fgTrigger);
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                if (3 != tabModel.getCount()) return false;
-                if (firstTabIndex == tabModel.index()) return false;
-                if (firstTabId == selector.getCurrentTabId()) return false;
-                return true;
-            }
-        }));
-        MoreAsserts.assertNotEqual(
+
+        final DocumentActivity thirdActivity = (DocumentActivity) ActivityUtils.waitForActivity(
+                    getInstrumentation(), DocumentActivity.class, fgTrigger);
+        waitForFullLoad(thirdActivity, "Page 4");
+        assertEquals("Wrong number of tabs", 3, tabModel.getCount());
+        assertNotSame("Wrong tab selected", firstTabIndex, tabModel.index());
+        assertNotSame("Wrong tab ID in foreground", firstTabId, selector.getCurrentTabId());
+        assertNotSame("Wrong Activity in foreground",
                 firstActivity, ApplicationStatus.getLastTrackedFocusedActivity());
-    }
-
-    @Restriction(RESTRICTION_TYPE_LOW_END_DEVICE)
-    @MediumTest
-    public void testNewTabLoadLowEnd() throws Exception {
-        launchLinkDocument();
-
-        final CallbackHelper tabCreatedCallback = new CallbackHelper();
-        final CallbackHelper tabLoadStartedCallback = new CallbackHelper();
-
-        final DocumentTabModelSelector selector =
-                ChromeMobileApplication.getDocumentTabModelSelector();
-        selector.addObserver(new EmptyTabModelSelectorObserver() {
-            @Override
-            public void onNewTabCreated(final Tab newTab) {
-                selector.removeObserver(this);
-                tabCreatedCallback.notifyCalled();
-
-                assertFalse(newTab.getWebContents().isLoadingToDifferentDocument());
-
-                newTab.addObserver(new EmptyTabObserver() {
-                    @Override
-                    public void onPageLoadStarted(Tab tab, String url) {
-                        newTab.removeObserver(this);
-                        tabLoadStartedCallback.notifyCalled();
-                    }
-                });
-            }
-        });
-
-        openLinkInBackgroundTab();
-
-        // Tab should be created, but shouldn't start loading until we switch to it.
-        assertEquals(1, tabCreatedCallback.getCallCount());
-        assertEquals(0, tabLoadStartedCallback.getCallCount());
-
-        TabModelUtils.setIndex(selector.getCurrentModel(), 1);
-        tabLoadStartedCallback.waitForCallback(0);
-    }
-
-    /**
-     * Tests that "Open in new tab" command doesn't create renderer per tab
-     * on low end devices.
-     */
-    @Restriction(RESTRICTION_TYPE_LOW_END_DEVICE)
-    @MediumTest
-    public void testNewTabRenderersLowEnd() throws Exception {
-        launchLinkDocument();
-
-        // Ignore any side effects that the first background tab might produce.
-        openLinkInBackgroundTab();
-
-        int rendererCountBefore = countRenderers();
-
-        final int newTabCount = 5;
-        for (int i = 0; i != newTabCount; ++i) {
-            openLinkInBackgroundTab();
-        }
-
-        int rendererCountAfter = countRenderers();
-
-        assertEquals(rendererCountBefore, rendererCountAfter);
-    }
-
-    /** Starts a DocumentActivity by using firing a VIEW Intent. */
-    private int launchViaViewIntent(final boolean incognito, final String url) throws Exception {
-        // Fire the Intent and wait until Chrome is in the foreground.
-        Runnable runnable = new Runnable() {
-            @Override
-            public void run() {
-                Runnable runnable = new Runnable() {
-                    @Override
-                    public void run() {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(URL_1));
-                        intent.setClass(mContext, ChromeLauncherActivity.class);
-                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        if (incognito) {
-                            intent.putExtra(IntentHandler.EXTRA_OPEN_NEW_INCOGNITO_TAB, true);
-                            IntentHandler.startActivityForTrustedIntent(intent, mContext);
-                        } else {
-                            mContext.startActivity(intent);
-                        }
-                    }
-                };
-                ActivityUtils.waitForActivity(getInstrumentation(),
-                        (incognito ? IncognitoDocumentActivity.class : DocumentActivity.class),
-                        runnable);
-            }
-        };
-        return launchUrlViaRunnable(incognito, runnable);
-    }
-
-    /** Starts a DocumentActivity using {@ref ChromeLauncherActivity.launchDocumentInstance().} */
-    private int launchViaLaunchDocumentInstance(
-            final boolean incognito, final String url) throws Exception {
-        Runnable runnable = new Runnable() {
-            @Override
-            public void run() {
-                ChromeLauncherActivity.launchDocumentInstance(null, incognito,
-                        ChromeLauncherActivity.LAUNCH_MODE_FOREGROUND, url,
-                        DocumentMetricIds.STARTED_BY_UNKNOWN, PageTransition.LINK, false, null);
-            }
-        };
-        return launchUrlViaRunnable(incognito, runnable);
-    }
-
-    /**
-     * Launches a DocumentActivity via the given Runnable.
-     * Ideally this would use Observers, but we can't know that the DocumentTabModelSelector has
-     * been created, and don't want to influence the test by accidentally creating it during the
-     * test suite runs.
-     * @return ID of the Tab that was launched.
-     */
-    private int launchUrlViaRunnable(final boolean incognito, final Runnable runnable)
-            throws Exception {
-        final int tabCount =
-                ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests()
-                ? ChromeMobileApplication.getDocumentTabModelSelector().getModel(incognito)
-                        .getCount() : 0;
-        final int tabId =
-                ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests()
-                ? ChromeMobileApplication.getDocumentTabModelSelector().getCurrentTabId()
-                : Tab.INVALID_TAB_ID;
-
-        runnable.run();
-        assertTrue(ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests());
-        MultiActivityTestBase.waitUntilChromeInForeground();
-
-        // Wait until the selector is ready and the Tabs have been added to the DocumentTabModel.
-        assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                if (!ChromeMobileApplication.isDocumentTabModelSelectorInitializedForTests()) {
-                    return false;
-                }
-
-                DocumentTabModelSelector selector =
-                        ChromeMobileApplication.getDocumentTabModelSelector();
-                if (selector.isIncognitoSelected() != incognito) return false;
-                if (selector.getModel(incognito).getCount() != (tabCount + 1)) return false;
-                if (selector.getCurrentTabId() == tabId) return false;
-                return true;
-            }
-        }));
-
-        return ChromeMobileApplication.getDocumentTabModelSelector().getCurrentTabId();
-    }
-
-    /**
-     * Launches DocumentActivity with the special URL suitable for openLinkInBackgroundTab()
-     * invocations.
-     */
-    private void launchLinkDocument() throws Exception {
-        // Load HTML that defines one gigantic link spanning the whole page.
-        launchViaLaunchDocumentInstance(false, UrlUtils.encodeHtmlDataUri(HTML_LINK));
-        final DocumentActivity activity =
-                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
-        assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return Float.compare(
-                        activity.getCurrentContentViewCore().getScale(), HTML_SCALE) == 0;
-            }
-        }));
-    }
-
-    /**
-     * Long presses at the center of the page, selects "Open In New Tab" option
-     * from the menu.
-     */
-    private void openLinkInBackgroundTab() throws Exception {
-        // We expect tab to open in the background, i.e. tab index / id should
-        // stay the same.
-        final DocumentTabModelSelector selector =
-                ChromeMobileApplication.getDocumentTabModelSelector();
-        final TabModel tabModel = selector.getModel(false);
-        final int expectedTabCount = tabModel.getCount() + 1;
-        final int expectedTabIndex = tabModel.index();
-        final int expectedTabId = selector.getCurrentTabId();
-        final DocumentActivity expectedActivity =
-                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
-
-        openLinkInNewTabViaContextMenu(false);
-
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                if (expectedTabCount != tabModel.getCount()) return false;
-                if (expectedTabIndex != tabModel.index()) return false;
-                if (expectedTabId != selector.getCurrentTabId()) return false;
-                return true;
-            }
-        }));
-
-        assertEquals(expectedActivity, ApplicationStatus.getLastTrackedFocusedActivity());
-    }
-
-
-    private void openLinkInNewTabViaContextMenu(final boolean incognito) throws Exception {
-        // Long press the center of the page, which should bring up the context menu.
-        final TestTabObserver observer = new TestTabObserver();
-        final DocumentActivity activity =
-                (DocumentActivity) ApplicationStatus.getLastTrackedFocusedActivity();
-        activity.getActivityTab().addObserver(observer);
-        assertNull(observer.mContextMenu);
-        final View view = ThreadUtils.runOnUiThreadBlocking(new Callable<View>() {
-            @Override
-            public View call() throws Exception {
-                return activity.findViewById(android.R.id.content).getRootView();
-            }
-        });
-        TouchCommon.longPressView(view, view.getWidth() / 2, view.getHeight() / 2);
-        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
-            @Override
-            public boolean isSatisfied() {
-                return observer.mContextMenu != null;
-            }
-        }));
-        activity.getActivityTab().removeObserver(observer);
-
-        // Select the "open in new tab" option to open a tab in the background.
-        ActivityUtils.waitForActivity(getInstrumentation(),
-                incognito ? IncognitoDocumentActivity.class : DocumentActivity.class,
-                new Runnable() {
-                    @Override
-                    public void run() {
-                        if (incognito) {
-                            assertTrue(observer.mContextMenu.performIdentifierAction(
-                                    R.id.contextmenu_open_in_incognito_tab, 0));
-                        } else {
-                            assertTrue(observer.mContextMenu.performIdentifierAction(
-                                    R.id.contextmenu_open_in_new_tab, 0));
-                        }
-                    }
-                }
-        );
-    }
-
-    /**
-     * Returns the number of currently running renderer services.
-     */
-    private int countRenderers() {
-        ActivityManager activityManager = (ActivityManager) mContext.getSystemService(
-                Context.ACTIVITY_SERVICE);
-
-        int rendererCount = 0;
-        List<RunningServiceInfo> serviceInfos = activityManager.getRunningServices(
-                Integer.MAX_VALUE);
-        for (RunningServiceInfo serviceInfo : serviceInfos) {
-            if (serviceInfo.service.getClassName().startsWith(
-                    SandboxedProcessService.class.getName())) {
-                rendererCount++;
-            }
-        }
-
-        return rendererCount;
     }
 }

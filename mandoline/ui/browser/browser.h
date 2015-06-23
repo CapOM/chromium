@@ -7,11 +7,12 @@
 
 #include "components/view_manager/public/cpp/view_manager.h"
 #include "components/view_manager/public/cpp/view_manager_delegate.h"
+#include "components/view_manager/public/cpp/view_manager_init.h"
 #include "components/view_manager/public/interfaces/view_manager_root.mojom.h"
 #include "mandoline/services/navigation/public/interfaces/navigation.mojom.h"
 #include "mandoline/ui/browser/navigator_host_impl.h"
-#include "mandoline/ui/browser/omnibox.mojom.h"
-#include "mandoline/ui/browser/view_embedder.mojom.h"
+#include "mandoline/ui/browser/public/interfaces/omnibox.mojom.h"
+#include "mandoline/ui/browser/public/interfaces/view_embedder.mojom.h"
 #include "mojo/application/public/cpp/application_delegate.h"
 #include "mojo/application/public/cpp/application_impl.h"
 #include "mojo/application/public/cpp/connect.h"
@@ -25,18 +26,18 @@ class ViewManagerInit;
 
 namespace mandoline {
 
+class BrowserManager;
 class BrowserUI;
 class FrameTree;
 
-class Browser : public mojo::ApplicationDelegate,
-                public mojo::ViewManagerDelegate,
+class Browser : public mojo::ViewManagerDelegate,
                 public mojo::ViewManagerRootClient,
                 public OmniboxClient,
                 public ViewEmbedder,
                 public mojo::InterfaceFactory<mojo::NavigatorHost>,
                 public mojo::InterfaceFactory<ViewEmbedder> {
  public:
-  Browser();
+  Browser(mojo::ApplicationImpl* app, BrowserManager* browser_manager);
   ~Browser() override;
 
   void ReplaceContentWithRequest(mojo::URLRequestPtr request);
@@ -46,14 +47,13 @@ class Browser : public mojo::ApplicationDelegate,
 
   const GURL& current_url() const { return current_url_; }
 
- private:
-  // Overridden from mojo::ApplicationDelegate:
-  void Initialize(mojo::ApplicationImpl* app) override;
-  bool ConfigureIncomingConnection(
-      mojo::ApplicationConnection* connection) override;
-  bool ConfigureOutgoingConnection(
-      mojo::ApplicationConnection* connection) override;
+  // Called once a valid device_pixel_ratio is determined. We gate construction
+  // of the UI until the device_pixel_ratio is available as it's necessary to
+  // properly setup the ui.
+  // TODO(sky): remove this. Only here until we move to viewmanager.
+  void OnDevicePixelRatioAvailable();
 
+ private:
   // Overridden from mojo::ViewManagerDelegate:
   void OnEmbed(mojo::View* root) override;
   void OnEmbedForDescendant(mojo::View* view,
@@ -80,7 +80,7 @@ class Browser : public mojo::ApplicationDelegate,
 
   void ShowOmnibox(mojo::URLRequestPtr request);
 
-  scoped_ptr<mojo::ViewManagerInit> view_manager_init_;
+  mojo::ViewManagerInit view_manager_init_;
 
   // Only support being embedded once, so both application-level
   // and embedding-level state are shared on the same object.
@@ -98,6 +98,7 @@ class Browser : public mojo::ApplicationDelegate,
 
   scoped_ptr<BrowserUI> ui_;
   mojo::ApplicationImpl* app_;
+  BrowserManager* browser_manager_;
 
   scoped_ptr<FrameTree> frame_tree_;
 

@@ -259,7 +259,7 @@ void SurfaceAggregator::HandleSurfaceQuad(
     // transform of the surface quad into account to update their transform to
     // the root surface.
     copy_pass->transform_to_root_target.ConcatTransform(
-        surface_quad->shared_quad_state->content_to_target_transform);
+        surface_quad->shared_quad_state->quad_to_target_transform);
     copy_pass->transform_to_root_target.ConcatTransform(target_transform);
     copy_pass->transform_to_root_target.ConcatTransform(
         dest_pass->transform_to_root_target);
@@ -274,20 +274,20 @@ void SurfaceAggregator::HandleSurfaceQuad(
     dest_pass_list_->push_back(copy_pass.Pass());
   }
 
+  gfx::Transform surface_transform =
+      surface_quad->shared_quad_state->quad_to_target_transform;
+  surface_transform.ConcatTransform(target_transform);
+
   const RenderPass& last_pass = *render_pass_list.back();
   if (merge_pass) {
     // TODO(jamesr): Clean up last pass special casing.
     const QuadList& quads = last_pass.quad_list;
 
-    gfx::Transform surface_transform =
-        surface_quad->shared_quad_state->content_to_target_transform;
-    surface_transform.ConcatTransform(target_transform);
-
     // Intersect the transformed visible rect and the clip rect to create a
     // smaller cliprect for the quad.
     ClipData surface_quad_clip_rect(
         true, MathUtil::MapEnclosingClippedRect(
-                  surface_quad->shared_quad_state->content_to_target_transform,
+                  surface_quad->shared_quad_state->quad_to_target_transform,
                   surface_quad->visible_rect));
     if (surface_quad->shared_quad_state->is_clipped) {
       surface_quad_clip_rect.rect.Intersect(
@@ -321,11 +321,10 @@ void SurfaceAggregator::HandleSurfaceQuad(
                  gfx::Vector2dF(),
                  FilterOperations());
   }
+
   dest_pass->damage_rect = gfx::UnionRects(
       dest_pass->damage_rect,
-      MathUtil::MapEnclosingClippedRect(
-          surface_quad->shared_quad_state->content_to_target_transform,
-          surface_damage));
+      MathUtil::MapEnclosingClippedRect(surface_transform, surface_damage));
 
   referenced_surfaces_.erase(it);
 }
@@ -344,7 +343,7 @@ void SurfaceAggregator::CopySharedQuadState(
   // target space of the pass. This will be identity except when copying the
   // root draw pass from a surface into a pass when the surface draw quad's
   // transform is not identity.
-  copy_shared_quad_state->content_to_target_transform.ConcatTransform(
+  copy_shared_quad_state->quad_to_target_transform.ConcatTransform(
       target_transform);
 
   ClipData new_clip_rect = CalculateClipRect(
@@ -404,7 +403,7 @@ void SurfaceAggregator::CopyQuadsToPass(
         dest_pass->damage_rect = gfx::UnionRects(
             dest_pass->damage_rect,
             MathUtil::MapEnclosingClippedRect(
-                dest_quad->shared_quad_state->content_to_target_transform,
+                dest_quad->shared_quad_state->quad_to_target_transform,
                 pass_damage));
       } else {
         dest_quad = dest_pass->CopyFromAndAppendDrawQuad(

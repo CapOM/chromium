@@ -110,10 +110,6 @@ class LayerTreeHostImplClient {
   virtual void SetVideoNeedsBeginFrames(bool needs_begin_frames) = 0;
   virtual void PostAnimationEventsToMainThreadOnImplThread(
       scoped_ptr<AnimationEventsVector> events) = 0;
-  // Returns true if resources were deleted by this call.
-  virtual bool ReduceContentsTextureMemoryOnImplThread(
-      size_t limit_bytes,
-      int priority_cutoff) = 0;
   virtual bool IsInsideDraw() = 0;
   virtual void RenewTreePriority() = 0;
   virtual void PostDelayedAnimationTaskOnImplThread(const base::Closure& task,
@@ -162,6 +158,8 @@ class CC_EXPORT LayerTreeHostImpl
   void BindToClient(InputHandlerClient* client) override;
   InputHandler::ScrollStatus ScrollBegin(
       const gfx::Point& viewport_point,
+      InputHandler::ScrollInputType type) override;
+  InputHandler::ScrollStatus RootScrollBegin(
       InputHandler::ScrollInputType type) override;
   InputHandler::ScrollStatus ScrollAnimated(
       const gfx::Point& viewport_point,
@@ -272,6 +270,7 @@ class CC_EXPORT LayerTreeHostImpl
   // TileManagerClient implementation.
   void NotifyReadyToActivate() override;
   void NotifyReadyToDraw() override;
+  void NotifyAllTileTasksCompleted() override;
   void NotifyTileStateChanged(const Tile* tile) override;
   scoped_ptr<RasterTilePriorityQueue> BuildRasterQueue(
       TreePriority tree_priority,
@@ -600,6 +599,10 @@ class CC_EXPORT LayerTreeHostImpl
   // outer if the inner is at its scroll extents.
   void ScrollViewportInnerFirst(gfx::Vector2dF scroll_delta);
 
+  InputHandler::ScrollStatus ScrollBeginImpl(
+      LayerImpl* scrolling_layer_impl,
+      InputHandler::ScrollInputType type);
+
   void AnimateInput(base::TimeTicks monotonic_time);
   void AnimatePageScale(base::TimeTicks monotonic_time);
   void AnimateScrollbars(base::TimeTicks monotonic_time);
@@ -631,7 +634,6 @@ class CC_EXPORT LayerTreeHostImpl
                                    LayerImpl* layer_impl);
   void StartScrollbarFadeRecursive(LayerImpl* layer);
   void SetManagedMemoryPolicy(const ManagedMemoryPolicy& policy);
-  void EnforceManagedMemoryPolicy(const ManagedMemoryPolicy& policy);
 
   void MarkUIResourceNotEvicted(UIResourceId uid);
 
@@ -655,9 +657,6 @@ class CC_EXPORT LayerTreeHostImpl
 
   scoped_ptr<OutputSurface> output_surface_;
 
-  // |resource_provider_| and |tile_manager_| can be NULL, e.g. when using tile-
-  // free rendering - see OutputSurface::ForcedDrawToSoftwareDevice().
-  // |tile_manager_| can also be NULL when raster_enabled is false.
   scoped_ptr<ResourceProvider> resource_provider_;
   scoped_ptr<TileManager> tile_manager_;
   bool content_is_suitable_for_gpu_rasterization_;

@@ -1,5 +1,6 @@
 <?xml version="1.0" ?><!DOCTYPE translationbundle><translationbundle lang="ro">
 <translation id="2774256287122201187">Poți continua. Dacă accesezi pagina, acest avertisment nu se va mai afișa în următoarele 5 minute.</translation>
+<translation id="3963721102035795474">Modul Cititor</translation>
 <translation id="7485870689360869515">Nu s-au găsit date.</translation>
 <translation id="3884278016824448484">Identificator de gadget în conflict</translation>
 <translation id="5172758083709347301">Computer</translation>
@@ -63,7 +64,7 @@
 <translation id="7108649287766967076">Traducerea în <ph name="TARGET_LANGUAGE"/> nu a reușit.</translation>
 <translation id="4103249731201008433">Numărul de serie al gadgetului este nevalid</translation>
 <translation id="3219579145727097045">Introdu data de expirare și codul CVC alcătuit din 4 cifre înscris pe fața cardului</translation>
-<translation id="3667681724235208644">Vedeți pagina originală</translation>
+<translation id="59107663811261420">Acest tip de card nu este acceptat de Google Payments pentru acest comerciant. Selectează alt card.</translation>
 <translation id="4079302484614802869">Configurația pentru proxy este setată să utilizeze o adresă URL pentru scripturi .pac, și nu servere proxy fixe.</translation>
 <translation id="5540224163453853">Articolul solicitat nu poate fi găsit.</translation>
 <translation id="8437238597147034694">&amp;Anulați mutarea</translation>
@@ -90,6 +91,7 @@
 <translation id="7977590112176369853">&lt;introdu interogarea&gt;</translation>
 <translation id="552553974213252141">Textul a fost extras corect?</translation>
 <translation id="5317780077021120954">Salvează</translation>
+<translation id="8530504477309582336">Acest tip de card nu este acceptat de Google Payments. Selectează alt card.</translation>
 <translation id="7610193165460212391">Valoarea este în afara intervalului <ph name="VALUE"/>.</translation>
 <translation id="3739623965217189342">Linkul copiat de tine</translation>
 <translation id="8790007591277257123">&amp;Repetați ștergerea</translation>
@@ -163,6 +165,7 @@
 <translation id="8891727572606052622">Mod proxy nevalid.</translation>
 <translation id="3105172416063519923">ID articol:</translation>
 <translation id="6008256403891681546">JCB</translation>
+<translation id="1549470594296187301">Trebuie să activezi JavaScript pentru a folosi această funcție.</translation>
 <translation id="2587841377698384444">ID-ul API-ului Directory:</translation>
 <translation id="7752995774971033316">Negestionat</translation>
 <translation id="3712624925041724820">Licențe epuizate</translation>

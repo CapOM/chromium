@@ -24,7 +24,7 @@
             'crnet_consumer_app_delegate.mm',
             'crnet_consumer_view_controller.h',
             'crnet_consumer_view_controller.m',
-            'main.m',
+            'main.mm',
           ],
           'mac_bundle_resources': [
             '../../../third_party/icu/source/data/in/icudtl.dat',
@@ -46,10 +46,14 @@
               '$(SDKROOT)/System/Library/Frameworks/UIKit.framework',
               '$(SDKROOT)/System/Library/Frameworks/Security.framework',
               '$(SDKROOT)/System/Library/Frameworks/SystemConfiguration.framework',
-              '$(SDKROOT)/usr/lib/libresolv.dylib',
-              '$(SDKROOT)/usr/lib/libsqlite3.dylib',
-              '$(SDKROOT)/usr/lib/libxml2.dylib',
             ],
+            'xcode_settings': {
+              'OTHER_LDFLAGS': [
+                '-lresolv',
+                '-lsqlite3',
+                '-lxml2',
+              ],
+            },
           },
           'xcode_settings': {
             'CLANG_ENABLE_OBJC_ARC': 'YES',

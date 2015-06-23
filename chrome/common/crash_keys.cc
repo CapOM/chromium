@@ -128,6 +128,10 @@ const char kKaskoGuid[] = "kasko-guid";
 const char kKaskoEquivalentGuid[] = "kasko-equivalent-guid";
 #endif
 
+// Used to help investigate bug 464926.  NOTE: This value is defined multiple
+// places in the codebase due to layering issues. DO NOT change the value here
+// without changing it in all other places that it is defined in the codebase
+// (search for |kBug464926CrashKey|).
 const char kBug464926CrashKey[] = "bug-464926-info";
 
 const char kViewCount[] = "view-count";
@@ -195,19 +199,6 @@ size_t RegisterChromeCrashKeys() {
 #endif
     { kBug464926CrashKey, kSmallSize },
     { kViewCount, kSmallSize },
-    // Temporary for http://crbug.com/369661.
-    { "369661-navurl", kLargeSize },
-    { "369661-oldtype", kSmallSize },
-    { "369661-newtype", kSmallSize },
-    { "369661-naventryid", kSmallSize },
-    { "369661-oldignore", kSmallSize },
-    { "369661-newignore", kSmallSize },
-    { "369661-didcreatenew", kSmallSize },
-    { "369661-pageid", kSmallSize },
-    { "369661-maxpageid", kSmallSize },
-    { "369661-earlyreturn", kSmallSize },
-    { "369661-doubleignore", kSmallSize },
-    // End http://crbug.com/369661.
   };
 
   // This dynamic set of keys is used for sets of key value pairs when gathering
@@ -352,11 +343,11 @@ static bool IsBoringSwitch(const std::string& flag) {
 
 #if defined(OS_WIN)
   // Just about everything has this, don't bother.
-  if (StartsWithASCII(flag, "/prefetch:", true))
+  if (base::StartsWithASCII(flag, "/prefetch:", true))
     return true;
 #endif
 
-  if (!StartsWithASCII(flag, "--", true))
+  if (!base::StartsWithASCII(flag, "--", true))
     return false;
   size_t end = flag.find("=");
   size_t len = (end == std::string::npos) ? flag.length() - 2 : end - 2;

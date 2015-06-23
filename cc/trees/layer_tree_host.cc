@@ -43,7 +43,6 @@
 #include "cc/trees/layer_tree_host_common.h"
 #include "cc/trees/layer_tree_host_impl.h"
 #include "cc/trees/layer_tree_impl.h"
-#include "cc/trees/occlusion_tracker.h"
 #include "cc/trees/single_thread_proxy.h"
 #include "cc/trees/thread_proxy.h"
 #include "cc/trees/tree_synchronizer.h"
@@ -112,7 +111,6 @@ LayerTreeHost::LayerTreeHost(InitParams* params)
       gpu_rasterization_histogram_recorded_(false),
       background_color_(SK_ColorWHITE),
       has_transparent_background_(false),
-      partial_texture_update_requests_(0),
       did_complete_scale_animation_(false),
       in_paint_layer_contents_(false),
       id_(s_layer_tree_host_sequence_number.GetNext() + 1),
@@ -122,6 +120,7 @@ LayerTreeHost::LayerTreeHost(InitParams* params)
       task_graph_runner_(params->task_graph_runner),
       surface_id_namespace_(0u),
       next_surface_sequence_(1u) {
+  DCHECK(task_graph_runner_);
   if (settings_.accelerated_animation_enabled)
     animation_registrar_ = AnimationRegistrar::Create();
   rendering_stats_instrumentation_->set_record_rendering_stats(
@@ -194,13 +193,6 @@ void LayerTreeHost::SetLayerTreeHostClientReady() {
   proxy_->SetLayerTreeHostClientReady();
 }
 
-void LayerTreeHost::DeleteContentsTexturesOnImplThread(
-    ResourceProvider* resource_provider) {
-  DCHECK(proxy_->IsImplThread());
-  if (contents_texture_manager_)
-    contents_texture_manager_->ClearAllMemory(resource_provider);
-}
-
 void LayerTreeHost::WillBeginMainFrame() {
   devtools_instrumentation::WillBeginMainThreadFrame(id(),
                                                      source_frame_number());
@@ -241,32 +233,6 @@ void LayerTreeHost::BeginCommitOnImplThread(LayerTreeHostImpl* host_impl) {
 // after the commit, but on the main thread.
 void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
   DCHECK(proxy_->IsImplThread());
-
-  // If there are linked evicted backings, these backings' resources may be put
-  // into the impl tree, so we can't draw yet. Determine this before clearing
-  // all evicted backings.
-  bool new_impl_tree_has_no_evicted_resources = false;
-  if (contents_texture_manager_) {
-    new_impl_tree_has_no_evicted_resources =
-        !contents_texture_manager_->LinkedEvictedBackingsExist();
-
-    // If the memory limit has been increased since this now-finishing
-    // commit began, and the extra now-available memory would have been used,
-    // then request another commit.
-    if (contents_texture_manager_->MaxMemoryLimitBytes() <
-            host_impl->memory_allocation_limit_bytes() &&
-        contents_texture_manager_->MaxMemoryLimitBytes() <
-            contents_texture_manager_->MaxMemoryNeededBytes()) {
-      host_impl->SetNeedsCommit();
-    }
-
-    host_impl->set_max_memory_needed_bytes(
-        contents_texture_manager_->MaxMemoryNeededBytes());
-
-    contents_texture_manager_->UpdateBackingsState(
-        host_impl->resource_provider());
-    contents_texture_manager_->ReduceMemory(host_impl->resource_provider());
-  }
 
   bool is_new_trace;
   TRACE_EVENT_IS_NEW_TRACE(&is_new_trace);
@@ -318,6 +284,8 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
 
   sync_tree->RegisterSelection(selection_);
 
+  // Setting property trees must happen before pushing the page scale.
+  sync_tree->SetPropertyTrees(property_trees_);
   sync_tree->PushPageScaleFromMainThread(
       page_scale_factor_, min_page_scale_factor_, max_page_scale_factor_);
   sync_tree->elastic_overscroll()->PushFromMainThread(elastic_overscroll_);
@@ -351,23 +319,22 @@ void LayerTreeHost::FinishCommitOnImplThread(LayerTreeHostImpl* host_impl) {
 
   DCHECK(!sync_tree->ViewportSizeInvalid());
 
-  if (new_impl_tree_has_no_evicted_resources) {
-    if (sync_tree->ContentsTexturesPurged())
-      sync_tree->ResetContentsTexturesPurged();
-  }
-
   sync_tree->set_has_ever_been_drawn(false);
-  sync_tree->SetPropertyTrees(property_trees_);
 
   {
     TRACE_EVENT0("cc", "LayerTreeHost::PushProperties");
     TreeSynchronizer::PushProperties(root_layer(), sync_tree->root_layer());
   }
 
+  // This must happen after synchronizing property trees and after push
+  // properties, which updates property tree indices.
+  sync_tree->UpdatePropertyTreeScrollingFromMainThread();
+
   micro_benchmark_controller_.ScheduleImplBenchmarks(host_impl);
 }
 
 void LayerTreeHost::WillCommit() {
+  OnCommitForSwapPromises();
   client_->WillCommit();
 }
 
@@ -411,19 +378,10 @@ void LayerTreeHost::RequestNewOutputSurface() {
 
 void LayerTreeHost::DidInitializeOutputSurface() {
   output_surface_lost_ = false;
-
-  if (!contents_texture_manager_ && !settings_.impl_side_painting) {
-    contents_texture_manager_ =
-        PrioritizedResourceManager::Create(proxy_.get());
-    surface_memory_placeholder_ =
-        contents_texture_manager_->CreateTexture(gfx::Size(), RGBA_8888);
-  }
-
   if (root_layer()) {
     LayerTreeHostCommon::CallFunctionForSubtree(
         root_layer(), [](Layer* layer) { layer->OnOutputSurfaceCreated(); });
   }
-
   client_->DidInitializeOutputSurface();
 }
 
@@ -498,12 +456,6 @@ void LayerTreeHost::SetNeedsUpdateLayers() {
 }
 
 void LayerTreeHost::SetNeedsCommit() {
-  if (!prepaint_callback_.IsCancelled()) {
-    TRACE_EVENT_INSTANT0("cc",
-                         "LayerTreeHost::SetNeedsCommit::cancel prepaint",
-                         TRACE_EVENT_SCOPE_THREAD);
-    prepaint_callback_.Cancel();
-  }
   proxy_->SetNeedsCommit();
   NotifySwapPromiseMonitorsOfSetNeedsCommit();
 }
@@ -694,18 +646,13 @@ void LayerTreeHost::Composite(base::TimeTicks frame_begin_time) {
   proxy->CompositeImmediately(frame_begin_time);
 }
 
-bool LayerTreeHost::UpdateLayers(ResourceUpdateQueue* queue) {
+bool LayerTreeHost::UpdateLayers() {
   DCHECK(!output_surface_lost_);
-
   if (!root_layer())
     return false;
-
   DCHECK(!root_layer()->parent());
-
-  bool result = UpdateLayers(root_layer(), queue);
-
+  bool result = DoUpdateLayers(root_layer());
   micro_benchmark_controller_.DidUpdateLayers();
-
   return result || next_commit_forces_redraw_;
 }
 
@@ -730,8 +677,7 @@ static Layer* FindFirstScrollableLayer(Layer* layer) {
 }
 
 void LayerTreeHost::RecordGpuRasterizationHistogram() {
-  // Gpu rasterization is only supported when impl-side painting is enabled.
-  if (gpu_rasterization_histogram_recorded_ || !settings_.impl_side_painting)
+  if (gpu_rasterization_histogram_recorded_)
     return;
 
   // Record how widely gpu rasterization is enabled.
@@ -758,10 +704,9 @@ bool LayerTreeHost::UsingSharedMemoryResources() {
   return GetRendererCapabilities().using_shared_memory_resources;
 }
 
-bool LayerTreeHost::UpdateLayers(Layer* root_layer,
-                                 ResourceUpdateQueue* queue) {
-  TRACE_EVENT1("cc", "LayerTreeHost::UpdateLayers",
-               "source_frame_number", source_frame_number());
+bool LayerTreeHost::DoUpdateLayers(Layer* root_layer) {
+  TRACE_EVENT1("cc", "LayerTreeHost::DoUpdateLayers", "source_frame_number",
+               source_frame_number());
 
   RenderSurfaceLayerList render_surface_layer_list;
 
@@ -793,77 +738,40 @@ bool LayerTreeHost::UpdateLayers(Layer* root_layer,
       settings_.verify_property_trees, &render_surface_layer_list,
       render_surface_layer_list_id, &property_trees_);
 
-  // This is a temporary state of affairs until impl-side painting is shipped
-  // everywhere and main thread property trees can be used in all cases.
-  // This code here implies that even if verify property trees is on,
-  // no verification will occur and only property trees will be used on the
-  // main thread.
-  if (using_only_property_trees()) {
-    TRACE_EVENT0("cc", "LayerTreeHost::UpdateLayers::CalcDrawProps");
+  TRACE_EVENT0("cc", "LayerTreeHost::UpdateLayers::CalcDrawProps");
 
-    LayerTreeHostCommon::PreCalculateMetaInformation(root_layer);
+  LayerTreeHostCommon::PreCalculateMetaInformation(root_layer);
 
-    bool preserves_2d_axis_alignment = false;
-    gfx::Transform identity_transform;
-    LayerList update_layer_list;
+  bool preserves_2d_axis_alignment = false;
+  gfx::Transform identity_transform;
+  LayerList update_layer_list;
 
-    LayerTreeHostCommon::UpdateRenderSurfaces(
-        root_layer, can_render_to_separate_surface, identity_transform,
-        preserves_2d_axis_alignment);
-    {
-      TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("cc.debug.cdp-perf"),
-                   "LayerTreeHostCommon::ComputeVisibleRectsWithPropertyTrees");
-      BuildPropertyTreesAndComputeVisibleRects(
-          root_layer, page_scale_layer, page_scale_factor_,
-          device_scale_factor_, gfx::Rect(device_viewport_size_),
-          identity_transform, &property_trees_, &update_layer_list);
-    }
-
-    for (const auto& layer : update_layer_list)
-      layer->SavePaintProperties();
-
-    base::AutoReset<bool> painting(&in_paint_layer_contents_, true);
-    bool did_paint_content = false;
-    for (const auto& layer : update_layer_list) {
-      // TODO(enne): temporarily clobber draw properties visible rect.
-      layer->draw_properties().visible_content_rect =
-          layer->visible_rect_from_property_trees();
-      did_paint_content |= layer->Update(queue, nullptr);
-      content_is_suitable_for_gpu_rasterization_ &=
-          layer->IsSuitableForGpuRasterization();
-    }
-    return did_paint_content;
-  }
-
+  LayerTreeHostCommon::UpdateRenderSurfaces(
+      root_layer, can_render_to_separate_surface, identity_transform,
+      preserves_2d_axis_alignment);
   {
-    TRACE_EVENT0("cc", "LayerTreeHost::UpdateLayers::CalcDrawProps");
-    LayerTreeHostCommon::CalculateDrawProperties(&inputs);
+    TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("cc.debug.cdp-perf"),
+                 "LayerTreeHostCommon::ComputeVisibleRectsWithPropertyTrees");
+    BuildPropertyTreesAndComputeVisibleRects(
+        root_layer, page_scale_layer, page_scale_factor_, device_scale_factor_,
+        gfx::Rect(device_viewport_size_), identity_transform, &property_trees_,
+        &update_layer_list);
   }
 
-  // Reset partial texture update requests.
-  partial_texture_update_requests_ = 0;
+  for (const auto& layer : update_layer_list)
+    layer->SavePaintProperties();
 
+  base::AutoReset<bool> painting(&in_paint_layer_contents_, true);
   bool did_paint_content = false;
-  bool need_more_updates = false;
-  PaintLayerContents(render_surface_layer_list, queue, &did_paint_content,
-                     &need_more_updates);
-  if (need_more_updates) {
-    TRACE_EVENT0("cc", "LayerTreeHost::UpdateLayers::posting prepaint task");
-    prepaint_callback_.Reset(base::Bind(&LayerTreeHost::TriggerPrepaint,
-                                        base::Unretained(this)));
-    static base::TimeDelta prepaint_delay =
-        base::TimeDelta::FromMilliseconds(100);
-    base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
-        FROM_HERE, prepaint_callback_.callback(), prepaint_delay);
+  for (const auto& layer : update_layer_list) {
+    // TODO(enne): temporarily clobber draw properties visible rect.
+    layer->draw_properties().visible_layer_rect =
+        layer->visible_rect_from_property_trees();
+    did_paint_content |= layer->Update();
+    content_is_suitable_for_gpu_rasterization_ &=
+        layer->IsSuitableForGpuRasterization();
   }
-
   return did_paint_content;
-}
-
-void LayerTreeHost::TriggerPrepaint() {
-  prepaint_callback_.Cancel();
-  TRACE_EVENT0("cc", "LayerTreeHost::TriggerPrepaint");
-  SetNeedsCommit();
 }
 
 void LayerTreeHost::ReduceMemoryUsage() {
@@ -872,157 +780,6 @@ void LayerTreeHost::ReduceMemoryUsage() {
 
   LayerTreeHostCommon::CallFunctionForSubtree(
       root_layer(), [](Layer* layer) { layer->ReduceMemoryUsage(); });
-}
-
-void LayerTreeHost::SetPrioritiesForSurfaces(size_t surface_memory_bytes) {
-  DCHECK(surface_memory_placeholder_);
-
-  // Surfaces have a place holder for their memory since they are managed
-  // independantly but should still be tracked and reduce other memory usage.
-  surface_memory_placeholder_->SetTextureManager(
-      contents_texture_manager_.get());
-  surface_memory_placeholder_->set_request_priority(
-      PriorityCalculator::RenderSurfacePriority());
-  surface_memory_placeholder_->SetToSelfManagedMemoryPlaceholder(
-      surface_memory_bytes);
-}
-
-void LayerTreeHost::SetPrioritiesForLayers(
-    const RenderSurfaceLayerList& update_list) {
-  PriorityCalculator calculator;
-  typedef LayerIterator<Layer> LayerIteratorType;
-  LayerIteratorType end = LayerIteratorType::End(&update_list);
-  for (LayerIteratorType it = LayerIteratorType::Begin(&update_list);
-       it != end;
-       ++it) {
-    if (it.represents_itself()) {
-      it->SetTexturePriorities(calculator);
-    } else if (it.represents_target_render_surface()) {
-      if (it->mask_layer())
-        it->mask_layer()->SetTexturePriorities(calculator);
-      if (it->replica_layer() && it->replica_layer()->mask_layer())
-        it->replica_layer()->mask_layer()->SetTexturePriorities(calculator);
-    }
-  }
-}
-
-void LayerTreeHost::PrioritizeTextures(
-    const RenderSurfaceLayerList& render_surface_layer_list) {
-  if (!contents_texture_manager_)
-    return;
-
-  contents_texture_manager_->ClearPriorities();
-
-  size_t memory_for_render_surfaces_metric =
-      CalculateMemoryForRenderSurfaces(render_surface_layer_list);
-
-  SetPrioritiesForLayers(render_surface_layer_list);
-  SetPrioritiesForSurfaces(memory_for_render_surfaces_metric);
-
-  contents_texture_manager_->PrioritizeTextures();
-}
-
-size_t LayerTreeHost::CalculateMemoryForRenderSurfaces(
-    const RenderSurfaceLayerList& update_list) {
-  size_t readback_bytes = 0;
-  size_t contents_texture_bytes = 0;
-
-  // Start iteration at 1 to skip the root surface as it does not have a texture
-  // cost.
-  for (size_t i = 1; i < update_list.size(); ++i) {
-    Layer* render_surface_layer = update_list.at(i);
-    RenderSurface* render_surface = render_surface_layer->render_surface();
-
-    // We can use UncheckedMemorySizeBytes, since render surface content rect is
-    // limited by max texture size.
-    size_t bytes = Resource::UncheckedMemorySizeBytes(
-        render_surface->content_rect().size(), RGBA_8888);
-    contents_texture_bytes += bytes;
-
-    if (render_surface_layer->background_filters().IsEmpty() &&
-        render_surface_layer->uses_default_blend_mode())
-      continue;
-
-    if (!readback_bytes) {
-      // We need to use a checked size calucation here, since we don't control
-      // the size of the device viewport.
-      readback_bytes =
-          Resource::CheckedMemorySizeBytes(device_viewport_size_, RGBA_8888);
-    }
-  }
-  return readback_bytes + contents_texture_bytes;
-}
-
-void LayerTreeHost::PaintMasksForRenderSurface(Layer* render_surface_layer,
-                                               ResourceUpdateQueue* queue,
-                                               bool* did_paint_content,
-                                               bool* need_more_updates) {
-  // Note: Masks and replicas only exist for layers that own render surfaces. If
-  // we reach this point in code, we already know that at least something will
-  // be drawn into this render surface, so the mask and replica should be
-  // painted.
-
-  Layer* mask_layer = render_surface_layer->mask_layer();
-  if (mask_layer) {
-    *did_paint_content |= mask_layer->Update(queue, NULL);
-    *need_more_updates |= mask_layer->NeedMoreUpdates();
-  }
-
-  Layer* replica_mask_layer =
-      render_surface_layer->replica_layer() ?
-      render_surface_layer->replica_layer()->mask_layer() : NULL;
-  if (replica_mask_layer) {
-    *did_paint_content |= replica_mask_layer->Update(queue, NULL);
-    *need_more_updates |= replica_mask_layer->NeedMoreUpdates();
-  }
-}
-
-void LayerTreeHost::PaintLayerContents(
-    const RenderSurfaceLayerList& render_surface_layer_list,
-    ResourceUpdateQueue* queue,
-    bool* did_paint_content,
-    bool* need_more_updates) {
-  OcclusionTracker<Layer> occlusion_tracker(
-      root_layer_->render_surface()->content_rect());
-  occlusion_tracker.set_minimum_tracking_size(
-      settings_.minimum_occlusion_tracking_size);
-
-  PrioritizeTextures(render_surface_layer_list);
-
-  in_paint_layer_contents_ = true;
-
-  // Iterates front-to-back to allow for testing occlusion and performing
-  // culling during the tree walk.
-  typedef LayerIterator<Layer> LayerIteratorType;
-  LayerIteratorType end = LayerIteratorType::End(&render_surface_layer_list);
-  for (LayerIteratorType it =
-           LayerIteratorType::Begin(&render_surface_layer_list);
-       it != end;
-       ++it) {
-    occlusion_tracker.EnterLayer(it);
-
-    if (it.represents_target_render_surface()) {
-      PaintMasksForRenderSurface(
-          *it, queue, did_paint_content, need_more_updates);
-    } else if (it.represents_itself()) {
-      DCHECK(!it->paint_properties().bounds.IsEmpty());
-      *did_paint_content |= it->Update(queue, &occlusion_tracker);
-      *need_more_updates |= it->NeedMoreUpdates();
-      // Note the '&&' with previous is-suitable state.
-      // This means that once the layer-tree becomes unsuitable for gpu
-      // rasterization due to some content, it will continue to be unsuitable
-      // even if that content is replaced by gpu-friendly content.
-      // This is to avoid switching back-and-forth between gpu and sw
-      // rasterization which may be both bad for performance and visually
-      // jarring.
-      content_is_suitable_for_gpu_rasterization_ &=
-          it->IsSuitableForGpuRasterization();
-    }
-
-    occlusion_tracker.LeaveLayer(it);
-  }
-
-  in_paint_layer_contents_ = false;
 }
 
 void LayerTreeHost::ApplyScrollAndScale(ScrollAndScaleSet* info) {
@@ -1110,31 +867,6 @@ void LayerTreeHost::RateLimit() {
   // SwapBuffers.
   proxy_->ForceSerializeOnSwapBuffers();
   client_->RateLimitSharedMainThreadContext();
-}
-
-bool LayerTreeHost::AlwaysUsePartialTextureUpdates() {
-  if (!proxy_->GetRendererCapabilities().allow_partial_texture_updates)
-    return false;
-  return !proxy_->HasImplThread();
-}
-
-size_t LayerTreeHost::MaxPartialTextureUpdates() const {
-  size_t max_partial_texture_updates = 0;
-  if (proxy_->GetRendererCapabilities().allow_partial_texture_updates &&
-      !settings_.impl_side_painting) {
-    max_partial_texture_updates =
-        std::min(settings_.max_partial_texture_updates,
-                 proxy_->MaxPartialTextureUpdates());
-  }
-  return max_partial_texture_updates;
-}
-
-bool LayerTreeHost::RequestPartialTextureUpdate() {
-  if (partial_texture_update_requests_ >= MaxPartialTextureUpdates())
-    return false;
-
-  partial_texture_update_requests_++;
-  return true;
 }
 
 void LayerTreeHost::SetDeviceScaleFactor(float device_scale_factor) {
@@ -1280,6 +1012,11 @@ void LayerTreeHost::BreakSwapPromises(SwapPromise::DidNotSwapReason reason) {
   for (auto* swap_promise : swap_promise_list_)
     swap_promise->DidNotSwap(reason);
   swap_promise_list_.clear();
+}
+
+void LayerTreeHost::OnCommitForSwapPromises() {
+  for (auto* swap_promise : swap_promise_list_)
+    swap_promise->OnCommit();
 }
 
 void LayerTreeHost::set_surface_id_namespace(uint32_t id_namespace) {

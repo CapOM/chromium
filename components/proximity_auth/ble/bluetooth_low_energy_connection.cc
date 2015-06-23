@@ -29,7 +29,14 @@ using device::BluetoothUUID;
 
 namespace proximity_auth {
 namespace {
+
+// Deprecated signal send as the first byte in send byte operations.
 const int kFirstByteZero = 0;
+
+// The maximum number of bytes written in a remote characteristic with a single
+// request.
+const int kMaxChunkSize = 100;
+
 }  // namespace
 
 BluetoothLowEnergyConnection::BluetoothLowEnergyConnection(
@@ -50,6 +57,7 @@ BluetoothLowEnergyConnection::BluetoothLowEnergyConnection(
       receiving_bytes_(false),
       write_remote_characteristic_pending_(false),
       max_number_of_write_attempts_(max_number_of_write_attempts),
+      max_chunk_size_(kMaxChunkSize),
       weak_ptr_factory_(this) {
   DCHECK(adapter_);
   DCHECK(adapter_->IsInitialized());
@@ -83,9 +91,6 @@ void BluetoothLowEnergyConnection::Connect() {
   }
 }
 
-// This actually forgets the remote BLE device. This is safe as long as we only
-// connect to BLE devices advertising the SmartLock service (assuming this
-// device has no other connection).
 void BluetoothLowEnergyConnection::Disconnect() {
   if (sub_status_ != SubStatus::DISCONNECTED) {
     ClearWriteRequestsQueue();
@@ -95,11 +100,23 @@ void BluetoothLowEnergyConnection::Disconnect() {
       connection_.reset();
       BluetoothDevice* device = GetRemoteDevice();
       if (device) {
-        VLOG(1) << "Forget device " << device->GetAddress();
-        device->Forget(base::Bind(&base::DoNothing));
+        VLOG(1) << "Disconnect from device " << device->GetAddress();
+        device->Disconnect(
+            base::Bind(&BluetoothLowEnergyConnection::OnDisconnected,
+                       weak_ptr_factory_.GetWeakPtr()),
+            base::Bind(&BluetoothLowEnergyConnection::OnDisconnectError,
+                       weak_ptr_factory_.GetWeakPtr()));
       }
     }
   }
+}
+
+void BluetoothLowEnergyConnection::OnDisconnected() {
+  VLOG(1) << "Disconnected.";
+}
+
+void BluetoothLowEnergyConnection::OnDisconnectError() {
+  VLOG(1) << "Disconnection failed.";
 }
 
 void BluetoothLowEnergyConnection::SetSubStatus(SubStatus new_sub_status) {
@@ -115,8 +132,6 @@ void BluetoothLowEnergyConnection::SetSubStatus(SubStatus new_sub_status) {
   }
 }
 
-// TODO(sacomoto): Implement a sender with full support for messages larger than
-// a single characteristic value.
 void BluetoothLowEnergyConnection::SendMessageImpl(
     scoped_ptr<WireMessage> message) {
   VLOG(1) << "Sending message " << message->Serialize();
@@ -128,10 +143,27 @@ void BluetoothLowEnergyConnection::SendMessageImpl(
       ToByteVector(static_cast<uint32>(serialized_msg.size())), false);
   WriteRemoteCharacteristic(write_request);
 
-  write_request = BuildWriteRequest(
-      std::vector<uint8>{static_cast<uint8>(kFirstByteZero)},
-      std::vector<uint8>(serialized_msg.begin(), serialized_msg.end()), true);
-  WriteRemoteCharacteristic(write_request);
+  // Each chunk has to include a deprecated signal: |kFirstByteZero| as the
+  // first byte.
+  int chunk_size = max_chunk_size_ - 1;
+  std::vector<uint8> kFirstByteZeroVector;
+  kFirstByteZeroVector.push_back(static_cast<uint8>(kFirstByteZero));
+
+  int message_size = static_cast<int>(serialized_msg.size());
+  int start_index = 0;
+  while (start_index < message_size) {
+    int end_index = (start_index + chunk_size) <= message_size
+                        ? (start_index + chunk_size)
+                        : message_size;
+    bool is_last_write_request = (end_index == message_size);
+    write_request = BuildWriteRequest(
+        kFirstByteZeroVector,
+        std::vector<uint8>(serialized_msg.begin() + start_index,
+                           serialized_msg.begin() + end_index),
+        is_last_write_request);
+    WriteRemoteCharacteristic(write_request);
+    start_index = end_index;
+  }
 }
 
 void BluetoothLowEnergyConnection::DeviceRemoved(BluetoothAdapter* adapter,
@@ -142,8 +174,6 @@ void BluetoothLowEnergyConnection::DeviceRemoved(BluetoothAdapter* adapter,
   }
 }
 
-// TODO(sacomoto): Implement a receiver with full support for messages larger
-// than a single characteristic value.
 void BluetoothLowEnergyConnection::GattCharacteristicValueChanged(
     BluetoothAdapter* adapter,
     BluetoothGattCharacteristic* characteristic,
@@ -157,8 +187,11 @@ void BluetoothLowEnergyConnection::GattCharacteristicValueChanged(
     if (receiving_bytes_) {
       // Ignoring the first byte, as it contains a deprecated signal.
       const std::string bytes(value.begin() + 1, value.end());
-      OnBytesReceived(bytes);
-      receiving_bytes_ = false;
+      incoming_bytes_buffer_.append(bytes);
+      if (incoming_bytes_buffer_.size() >= expected_number_of_incoming_bytes_) {
+        OnBytesReceived(incoming_bytes_buffer_);
+        receiving_bytes_ = false;
+      }
       return;
     }
 
@@ -175,9 +208,19 @@ void BluetoothLowEnergyConnection::GattCharacteristicValueChanged(
         break;
       case ControlSignal::kInviteToConnectSignal:
         break;
-      case ControlSignal::kSendSignal:
+      case ControlSignal::kSendSignal: {
+        if (value.size() < 8) {
+          VLOG(1)
+              << "Incoming data corrupted, expected message size not found.";
+          return;
+        }
+        std::vector<uint8> size(value.begin() + 4, value.end());
+        expected_number_of_incoming_bytes_ =
+            static_cast<size_t>(ToUint32(size));
         receiving_bytes_ = true;
+        incoming_bytes_buffer_.clear();
         break;
+      }
       case ControlSignal::kDisconnectSignal:
         Disconnect();
         break;
@@ -394,11 +437,20 @@ const std::string& BluetoothLowEnergyConnection::GetRemoteDeviceAddress() {
 }
 
 BluetoothDevice* BluetoothLowEnergyConnection::GetRemoteDevice() {
-  if (!adapter_ || !adapter_->IsInitialized()) {
-    VLOG(1) << "adapter not ready";
-    return NULL;
+  // It's not possible to simply use
+  // |adapter_->GetDevice(GetRemoteDeviceAddress())| to find the device with MAC
+  // address |GetRemoteDeviceAddress()|. For paired devices,
+  // BluetoothAdapter::GetDevice(XXX) searches for the temporary MAC address
+  // XXX, whereas |GetRemoteDeviceAddress()| is the real MAC address. This is a
+  // bug in the way device::BluetoothAdapter is storing the devices (see
+  // crbug.com/497841).
+  std::vector<BluetoothDevice*> devices = adapter_->GetDevices();
+  for (const auto& device : devices) {
+    if (device->GetAddress() == GetRemoteDeviceAddress())
+      return device;
   }
-  return adapter_->GetDevice(GetRemoteDeviceAddress());
+
+  return nullptr;
 }
 
 BluetoothGattService* BluetoothLowEnergyConnection::GetRemoteService() {

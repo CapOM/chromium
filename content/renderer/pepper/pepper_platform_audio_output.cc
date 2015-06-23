@@ -70,7 +70,7 @@ void PepperPlatformAudioOutput::ShutDown() {
 }
 
 void PepperPlatformAudioOutput::OnStateChanged(
-    media::AudioOutputIPCDelegate::State state) {}
+    media::AudioOutputIPCDelegateState state) {}
 
 void PepperPlatformAudioOutput::OnStreamCreated(
     base::SharedMemoryHandle handle,
@@ -96,6 +96,10 @@ void PepperPlatformAudioOutput::OnStreamCreated(
                               handle, socket_handle, length));
   }
 }
+
+void PepperPlatformAudioOutput::OnOutputDeviceSwitched(
+    int request_id,
+    media::SwitchOutputDeviceResult result) {}
 
 void PepperPlatformAudioOutput::OnIPCClosed() { ipc_.reset(); }
 

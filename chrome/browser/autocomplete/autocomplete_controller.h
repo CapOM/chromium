@@ -14,13 +14,13 @@
 #include "base/timer/timer.h"
 #include "components/omnibox/autocomplete_input.h"
 #include "components/omnibox/autocomplete_provider.h"
+#include "components/omnibox/autocomplete_provider_client.h"
 #include "components/omnibox/autocomplete_provider_listener.h"
 #include "components/omnibox/autocomplete_result.h"
 
 class AutocompleteControllerDelegate;
 class HistoryURLProvider;
 class KeywordProvider;
-class Profile;
 class SearchProvider;
 class TemplateURLService;
 class ZeroSuggestProvider;
@@ -53,8 +53,7 @@ class AutocompleteController : public AutocompleteProviderListener {
   // that will (potentially, depending on platform, flags, etc.) be
   // instantiated. |template_url_service| is used to create URLs from the
   // autocomplete results.
-  AutocompleteController(Profile* profile,
-                         TemplateURLService* template_url_service,
+  AutocompleteController(scoped_ptr<AutocompleteProviderClient> provider_client,
                          AutocompleteControllerDelegate* delegate,
                          int provider_types);
   ~AutocompleteController() override;
@@ -79,12 +78,6 @@ class AutocompleteController : public AutocompleteProviderListener {
   //
   // If |clear_result| is true, the controller will also erase the result set.
   void Stop(bool clear_result);
-
-  // Called when the omnibox is focused while no existing user input is in
-  // progress.  This is used to call Start() on all providers with
-  // |called_due_to_focus| parameter set to check if they want to provide
-  // on focus matches.
-  void OnOmniboxFocused(const AutocompleteInput& input);
 
   // Asks the relevant provider to delete |match|, and ensures observers are
   // notified of resulting changes immediately.  This should only be called when
@@ -204,6 +197,9 @@ class AutocompleteController : public AutocompleteProviderListener {
                   bool due_to_user_inactivity);
 
   AutocompleteControllerDelegate* delegate_;
+
+  // The client passed to the providers.
+  scoped_ptr<AutocompleteProviderClient> provider_client_;
 
   // A list of all providers.
   Providers providers_;

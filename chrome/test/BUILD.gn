@@ -242,7 +242,6 @@ if (!is_android) {
       "//third_party/hunspell",
       "//third_party/icu",
       "//third_party/libpng",
-      "//third_party/npapi",
       "//third_party/zlib",
       "//ui/base:test_support",
       "//ui/resources:ui_test_pak",
@@ -636,7 +635,8 @@ if (!is_android) {
       "//chrome/common/extensions/api",
       "//chrome/renderer",
       "//components/autofill/content/browser:risk_proto",
-      "//components/autofill/content/browser:test_support",
+      "//components/autofill/content/browser/wallet:test_support",
+      "//components/autofill/content/renderer:test_support",
       "//components/captive_portal:test_support",
       "//components/dom_distiller/content",
       "//components/dom_distiller/core:test_support",
@@ -669,6 +669,7 @@ if (!is_android) {
       "//third_party/libaddressinput",
       "//third_party/libjingle",
       "//third_party/safe_browsing:test_support",
+      "//third_party/webrtc/modules/desktop_capture",
       "//third_party/widevine/cdm:version_h",
       "//ui/accessibility:test_support",
       "//ui/base:test_support",
@@ -970,12 +971,6 @@ if (!is_android) {
           [ "../browser/copresence/chrome_whispernet_client_browsertest.cc" ]
       deps += [ "//components/copresence" ]
     }
-    if (!is_android && !is_ios && !is_linux) {
-      # NPAPI test plugin only works on some platforms.
-      data_deps += [
-        #'../content/content_shell_and_tests.gyp:copy_npapi_test_plugin',  TODO(GYP)
-      ]
-    }
     if (enable_app_list) {
       sources += rebase_path(
               chrome_tests_gypi_values.chrome_browser_tests_app_list_sources,
@@ -1066,7 +1061,6 @@ if (!is_android) {
       "//testing/gtest",
       "//third_party/icu",
       "//third_party/leveldatabase",
-      "//third_party/npapi",
       "//third_party/WebKit/public:blink",
     ]
 
@@ -1276,7 +1270,8 @@ if (!is_android) {
       deps += [
         ":unit_tests_js",
         "//components/audio_modem:audio_modem_test_support",
-        "//components/autofill/content/browser:test_support",
+        "//components/autofill/content/browser/wallet:test_support",
+        "//components/autofill/content/renderer:test_support",
         "//components/metrics/proto",
         "//components/data_reduction_proxy/core/browser:test_support",
         "//components/webdata_services:test_support",
@@ -1291,6 +1286,7 @@ if (!is_android) {
         "//third_party/libaddressinput",
         "//third_party/libjingle",
         "//third_party/libphonenumber",
+        "//third_party/webrtc/modules/desktop_capture",
         "//tools/json_schema_compiler/test",
         "//ui/gl",
         "//v8",
@@ -1368,12 +1364,14 @@ if (!is_android) {
         "//ui/views",
         "//ui/views:test_support",
       ]
+      sources += rebase_path(unit_gypi_values.chrome_unit_tests_views_sources,
+                             ".",
+                             "//chrome")
       if (!is_mac) {
-        # TODO(tapted): Enable toolkit-views unit_tests on Mac when their
-        # respective implementations are linked in. http://crbug.com/412234.
-        sources += rebase_path(unit_gypi_values.chrome_unit_tests_views_sources,
-                               ".",
-                               "//chrome")
+        sources += rebase_path(
+                unit_gypi_values.chrome_unit_tests_views_non_mac_sources,
+                ".",
+                "//chrome")
       }
     }
     if (use_ash) {
@@ -1548,10 +1546,6 @@ if (!is_android) {
         "../browser/ui/views/frame/opaque_browser_frame_view_layout_unittest.cc",
         "../browser/ui/views/sync/one_click_signin_bubble_view_unittest.cc",
       ]
-      if (use_ozone) {
-        # crbug.com/354036
-        sources -= [ "../browser/chromeos/events/event_rewriter_unittest.cc" ]
-      }
     }
     if (use_x11) {
       deps += [ "//ui/events/devices" ]
@@ -1775,6 +1769,8 @@ if (!is_android) {
         "//base/test:test_support",
         "//chrome/browser",
         "//chrome/renderer",
+        "//components/autofill/content/browser/wallet:test_support",
+        "//components/autofill/content/renderer:test_support",
         "//media/cast:test_support",
         "//testing/gmock",
         "//testing/gtest",

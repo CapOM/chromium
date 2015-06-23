@@ -351,22 +351,16 @@ void DelegatedRendererLayerImpl::AppendRainbowDebugBorder(
   for (int i = 0;; ++i) {
     // For horizontal lines.
     int x =  kStripeWidth * i;
-    int width = std::min(kStripeWidth, content_bounds().width() - x - 1);
+    int width = std::min(kStripeWidth, bounds().width() - x - 1);
 
     // For vertical lines.
     int y = kStripeHeight * i;
-    int height = std::min(kStripeHeight, content_bounds().height() - y - 1);
+    int height = std::min(kStripeHeight, bounds().height() - y - 1);
 
     gfx::Rect top(x, 0, width, border_width);
-    gfx::Rect bottom(x,
-                     content_bounds().height() - border_width,
-                     width,
-                     border_width);
+    gfx::Rect bottom(x, bounds().height() - border_width, width, border_width);
     gfx::Rect left(0, y, border_width, height);
-    gfx::Rect right(content_bounds().width() - border_width,
-                    y,
-                    border_width,
-                    height);
+    gfx::Rect right(bounds().width() - border_width, y, border_width, height);
 
     if (top.IsEmpty() && left.IsEmpty())
       break;
@@ -395,7 +389,7 @@ void DelegatedRendererLayerImpl::AppendRainbowDebugBorder(
             colors[i % kNumColors],
             static_cast<uint8_t>(SkColorGetA(colors[i % kNumColors]) *
                                  kFillOpacity));
-        gfx::Rect fill_rect(x, 0, width, content_bounds().height());
+        gfx::Rect fill_rect(x, 0, width, bounds().height());
         solid_quad->SetNew(shared_quad_state, fill_rect, fill_rect, fill_color,
                            force_anti_aliasing_off);
       }
@@ -435,7 +429,7 @@ void DelegatedRendererLayerImpl::AppendRenderPassQuads(
       output_shared_quad_state->CopyFrom(delegated_shared_quad_state);
 
       if (is_root_delegated_render_pass) {
-        output_shared_quad_state->content_to_target_transform.ConcatTransform(
+        output_shared_quad_state->quad_to_target_transform.ConcatTransform(
             delegated_frame_to_target_transform);
 
         if (render_target() == this) {
@@ -463,7 +457,7 @@ void DelegatedRendererLayerImpl::AppendRenderPassQuads(
     DCHECK(output_shared_quad_state);
 
     gfx::Transform quad_content_to_delegated_target_space =
-        output_shared_quad_state->content_to_target_transform;
+        output_shared_quad_state->quad_to_target_transform;
     if (!is_root_delegated_render_pass) {
       quad_content_to_delegated_target_space.ConcatTransform(
           delegated_render_pass->transform_to_root_target);

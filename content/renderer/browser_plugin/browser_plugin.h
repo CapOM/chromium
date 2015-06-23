@@ -20,6 +20,11 @@
 struct BrowserPluginHostMsg_ResizeGuest_Params;
 struct FrameMsg_BuffersSwapped_Params;
 
+namespace cc {
+struct SurfaceId;
+struct SurfaceSequence;
+}
+
 namespace content {
 
 class BrowserPluginDelegate;
@@ -54,6 +59,9 @@ class CONTENT_EXPORT BrowserPlugin :
 
   // A request to enable hardware compositing.
   void EnableCompositing(bool enable);
+
+  // Called by CompositingHelper to send current SurfaceSequence to browser.
+  void SendSatisfySequence(const cc::SurfaceSequence& sequence);
 
   // Provided that a guest instance ID has been allocated, this method attaches
   // this BrowserPlugin instance to that guest.
@@ -144,7 +152,7 @@ class CONTENT_EXPORT BrowserPlugin :
   // uniquely identifies a guest WebContents that's hosted by this
   // BrowserPlugin.
   BrowserPlugin(RenderFrame* render_frame,
-                BrowserPluginDelegate* delegate);
+                const base::WeakPtr<BrowserPluginDelegate>& delegate);
 
   ~BrowserPlugin() override;
 
@@ -158,6 +166,11 @@ class CONTENT_EXPORT BrowserPlugin :
   void OnAdvanceFocus(int instance_id, bool reverse);
   void OnCompositorFrameSwapped(const IPC::Message& message);
   void OnGuestGone(int instance_id);
+  void OnSetChildFrameSurface(int instance_id,
+                              const cc::SurfaceId& surface_id,
+                              const gfx::Size& frame_size,
+                              float scale_factor,
+                              const cc::SurfaceSequence& sequence);
   void OnSetContentsOpaque(int instance_id, bool opaque);
   void OnSetCursor(int instance_id, const WebCursor& cursor);
   void OnSetMouseLock(int instance_id, bool enable);
@@ -202,7 +215,7 @@ class CONTENT_EXPORT BrowserPlugin :
 
   // We call lifetime managing methods on |delegate_|, but we do not directly
   // own this. The delegate destroys itself.
-  BrowserPluginDelegate* delegate_;
+  base::WeakPtr<BrowserPluginDelegate> delegate_;
 
   // Weak factory used in v8 |MakeWeak| callback, since the v8 callback might
   // get called after BrowserPlugin has been destroyed.

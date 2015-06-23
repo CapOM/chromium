@@ -28,14 +28,13 @@ import android.util.LongSparseArray;
 import android.util.SparseArray;
 import android.view.WindowManager;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.Log;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.base.annotations.SuppressFBWarnings;
 import org.chromium.base.library_loader.ProcessInitException;
 import org.chromium.base.metrics.RecordHistogram;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromiumApplication;
 import org.chromium.chrome.browser.WarmupManager;
 import org.chromium.chrome.browser.prerender.ExternalPrerenderHandler;
@@ -54,7 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Implementation of the ICustomTabsConnectionService interface.
  */
 class CustomTabsConnection extends ICustomTabsConnectionService.Stub {
-    private static final String TAG = Log.makeTag("ChromeConnection");
+    private static final String TAG = "cr.ChromeConnection";
     private static final long RESULT_OK = 0;
     private static final long RESULT_ERROR = -1;
     private static final String KEY_CUSTOM_TABS_REFERRER = "android.support.CUSTOM_TABS:referrer";
@@ -184,8 +183,7 @@ class CustomTabsConnection extends ICustomTabsConnectionService.Stub {
                 try {
                     // TODO(lizeb): Warm up more of the browser.
                     ChromiumApplication app = (ChromiumApplication) mApplication;
-                    app.startBrowserProcessesAndLoadLibrariesSync(
-                            app.getApplicationContext(), true);
+                    app.startBrowserProcessesAndLoadLibrariesSync(true);
                     final Context context = app.getApplicationContext();
                     new AsyncTask<Void, Void, Void>() {
                         @Override

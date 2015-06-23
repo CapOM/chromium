@@ -18,11 +18,11 @@
         }],
       ],
     },
-    'asset_location': '<(PRODUCT_DIR)/../assets/<(package_name)',
+    'asset_location': '<(PRODUCT_DIR)/assets/<(package_name)',
     'java_in_dir_suffix': '/src_dummy',
     'native_lib_version_name': '<(version_full)',
     'proguard_enabled': 'true',
-    'proguard_flags_paths': ['<(DEPTH)/chrome/android/java_staging/proguard.flags'],
+    'proguard_flags_paths': ['<(DEPTH)/chrome/android/java/proguard.flags'],
     'additional_input_paths' : ['<@(chrome_android_pak_output_resources)'],
     'conditions': [
       ['component != "shared_library"', {

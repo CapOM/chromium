@@ -5,18 +5,23 @@
 package org.chromium.sync.signin;
 
 
+import android.Manifest;
 import android.accounts.Account;
 import android.accounts.AccountManager;
+import android.accounts.AccountManagerCallback;
 import android.accounts.AccountManagerFuture;
 import android.accounts.AuthenticatorDescription;
 import android.accounts.AuthenticatorException;
 import android.accounts.OperationCanceledException;
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Process;
 import android.util.Log;
 
+import org.chromium.base.BuildInfo;
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.VisibleForTesting;
 import org.chromium.net.NetworkChangeNotifier;
@@ -47,6 +52,12 @@ public class AccountManagerHelper {
     private static final String GOOGLEMAIL_COM = "googlemail.com";
 
     public static final String GOOGLE_ACCOUNT_TYPE = "com.google";
+
+    /**
+     * An account feature (corresponding to a Gaia service flag) that specifies whether the account
+     * is a child account.
+     */
+    @VisibleForTesting public static final String FEATURE_IS_CHILD_ACCOUNT_KEY = "service_uca";
 
     private static final Object sLock = new Object();
 
@@ -125,6 +136,18 @@ public class AccountManagerHelper {
 
     public Account[] getGoogleAccounts() {
         return mAccountManager.getAccountsByType(GOOGLE_ACCOUNT_TYPE);
+    }
+
+    /**
+     * Convenience method to get the single Google account on the device. Should only be
+     * called if it has been determined that there is exactly one account.
+     *
+     * @return The single account to sign into.
+     */
+    public Account getSingleGoogleAccount() {
+        Account[] googleAccounts = getGoogleAccounts();
+        assert googleAccounts.length == 1;
+        return googleAccounts[0];
     }
 
     public boolean hasGoogleAccounts() {
@@ -236,6 +259,12 @@ public class AccountManagerHelper {
         }
     }
 
+    private boolean hasUseCredentialsPermission() {
+        return BuildInfo.isMncOrLater()
+                || mApplicationContext.checkPermission(Manifest.permission.USE_CREDENTIALS,
+                        Process.myPid(), Process.myUid()) == PackageManager.PERMISSION_GRANTED;
+    }
+
     // Gets the auth token synchronously
     private String getAuthTokenInner(AccountManagerFuture<Bundle> future,
             AtomicBoolean errorEncountered) {
@@ -261,6 +290,11 @@ public class AccountManagerHelper {
             final String authTokenType, final GetAuthTokenCallback callback,
             final AtomicInteger numTries, final AtomicBoolean errorEncountered,
             final ConnectionRetry retry) {
+        // Return null token for no USE_CREDENTIALS permission.
+        if (!hasUseCredentialsPermission()) {
+            callback.tokenAvailable(null);
+            return;
+        }
         final AccountManagerFuture<Bundle> future = mAccountManager.getAuthToken(
                 account, authTokenType, true, null, null);
         errorEncountered.set(false);
@@ -349,8 +383,18 @@ public class AccountManagerHelper {
      * Removes an auth token from the AccountManager's cache.
      */
     public void invalidateAuthToken(String authToken) {
+        // Cancel operation for no USE_CREDENTIALS permission.
+        if (!hasUseCredentialsPermission()) {
+            return;
+        }
         if (authToken != null && !authToken.isEmpty()) {
             mAccountManager.invalidateAuthToken(GOOGLE_ACCOUNT_TYPE, authToken);
         }
+    }
+
+    public AccountManagerFuture<Boolean> checkChildAccount(
+            Account account, AccountManagerCallback<Boolean> callback) {
+        String[] features = {FEATURE_IS_CHILD_ACCOUNT_KEY};
+        return mAccountManager.hasFeatures(account, features, callback, null /* handler */);
     }
 }

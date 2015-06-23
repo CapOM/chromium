@@ -9,8 +9,9 @@
 #include "base/files/file_util.h"
 #include "base/files/scoped_temp_dir.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
+#include "base/test/test_mock_time_task_runner.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/time/clock.h"
 #include "base/timer/timer.h"
 #include "google_apis/gcm/base/fake_encryptor.h"
@@ -350,19 +351,26 @@ class GCMClientImplTest : public testing::Test,
     return temp_directory_.path();
   }
 
+  base::FilePath gcm_store_path() const {
+    // Pass an non-existent directory as store path to match the exact
+    // behavior in the production code. Currently GCMStoreImpl checks if
+    // the directory exist or not to determine the store existence.
+    return temp_directory_.path().Append(FILE_PATH_LITERAL("GCM Store"));
+  }
+
   int64 CurrentTime();
 
   // Tooling.
-  void PumpLoop();
   void PumpLoopUntilIdle();
-  void QuitLoop();
-  void InitializeLoop();
   bool CreateUniqueTempDir();
   AutoAdvancingTestClock* clock() const {
     return reinterpret_cast<AutoAdvancingTestClock*>(gcm_client_->clock_.get());
   }
   net::TestURLFetcherFactory* url_fetcher_factory() {
     return &url_fetcher_factory_;
+  }
+  base::TestMockTimeTaskRunner* task_runner() {
+    return task_runner_.get();
   }
 
  private:
@@ -379,9 +387,10 @@ class GCMClientImplTest : public testing::Test,
 
   scoped_ptr<GCMClientImpl> gcm_client_;
 
-  base::MessageLoop message_loop_;
-  scoped_ptr<base::RunLoop> run_loop_;
   net::TestURLFetcherFactory url_fetcher_factory_;
+
+  scoped_refptr<base::TestMockTimeTaskRunner> task_runner_;
+  base::ThreadTaskRunnerHandle task_runner_handle_;
 
   // Injected to GCM client:
   base::ScopedTempDir temp_directory_;
@@ -391,8 +400,10 @@ class GCMClientImplTest : public testing::Test,
 GCMClientImplTest::GCMClientImplTest()
     : last_event_(NONE),
       last_result_(GCMClient::UNKNOWN_ERROR),
+      task_runner_(new base::TestMockTimeTaskRunner),
+      task_runner_handle_(task_runner_),
       url_request_context_getter_(
-          new net::TestURLRequestContextGetter(message_loop_.task_runner())) {
+          new net::TestURLRequestContextGetter(task_runner_)) {
 }
 
 GCMClientImplTest::~GCMClientImplTest() {}
@@ -400,7 +411,6 @@ GCMClientImplTest::~GCMClientImplTest() {}
 void GCMClientImplTest::SetUp() {
   testing::Test::SetUp();
   ASSERT_TRUE(CreateUniqueTempDir());
-  InitializeLoop();
   BuildGCMClient(base::TimeDelta());
   InitializeGCMClient();
   StartGCMClient();
@@ -415,23 +425,8 @@ void GCMClientImplTest::SetUpUrlFetcherFactory() {
   url_fetcher_factory_.set_remove_fetcher_on_delete(true);
 }
 
-void GCMClientImplTest::PumpLoop() {
-  run_loop_->Run();
-  run_loop_.reset(new base::RunLoop());
-}
-
 void GCMClientImplTest::PumpLoopUntilIdle() {
-  run_loop_->RunUntilIdle();
-  run_loop_.reset(new base::RunLoop());
-}
-
-void GCMClientImplTest::QuitLoop() {
-  if (run_loop_ && run_loop_->running())
-    run_loop_->Quit();
-}
-
-void GCMClientImplTest::InitializeLoop() {
-  run_loop_.reset(new base::RunLoop);
+  task_runner_->RunUntilIdle();
 }
 
 bool GCMClientImplTest::CreateUniqueTempDir() {
@@ -475,6 +470,8 @@ void GCMClientImplTest::CompleteCheckin(
   fetcher->set_response_code(net::HTTP_OK);
   fetcher->SetResponseString(response_string);
   fetcher->delegate()->OnURLFetchComplete(fetcher);
+  // Give a chance for GCMStoreImpl::Backend to finish persisting data.
+  PumpLoopUntilIdle();
 }
 
 void GCMClientImplTest::CompleteRegistration(
@@ -486,6 +483,8 @@ void GCMClientImplTest::CompleteRegistration(
   fetcher->set_response_code(net::HTTP_OK);
   fetcher->SetResponseString(response);
   fetcher->delegate()->OnURLFetchComplete(fetcher);
+  // Give a chance for GCMStoreImpl::Backend to finish persisting data.
+  PumpLoopUntilIdle();
 }
 
 void GCMClientImplTest::CompleteUnregistration(
@@ -497,6 +496,8 @@ void GCMClientImplTest::CompleteUnregistration(
   fetcher->set_response_code(net::HTTP_OK);
   fetcher->SetResponseString(response);
   fetcher->delegate()->OnURLFetchComplete(fetcher);
+  // Give a chance for GCMStoreImpl::Backend to finish persisting data.
+  PumpLoopUntilIdle();
 }
 
 void GCMClientImplTest::VerifyPendingRequestFetcherDeleted() {
@@ -524,10 +525,13 @@ void GCMClientImplTest::InitializeGCMClient() {
   // Actual initialization.
   GCMClient::ChromeBuildInfo chrome_build_info;
   chrome_build_info.version = kChromeVersion;
-  gcm_client_->Initialize(chrome_build_info, temp_directory_.path(),
-                          message_loop_.task_runner(),
-                          url_request_context_getter_,
-                          make_scoped_ptr<Encryptor>(new FakeEncryptor), this);
+  gcm_client_->Initialize(
+      chrome_build_info,
+      gcm_store_path(),
+      task_runner_,
+      url_request_context_getter_,
+      make_scoped_ptr<Encryptor>(new FakeEncryptor),
+      this);
 }
 
 void GCMClientImplTest::StartGCMClient() {
@@ -571,7 +575,6 @@ void GCMClientImplTest::OnGCMReady(
   last_event_ = LOADING_COMPLETED;
   last_account_mappings_ = account_mappings;
   last_token_fetch_time_ = last_token_fetch_time;
-  QuitLoop();
 }
 
 void GCMClientImplTest::OnMessageReceived(
@@ -580,7 +583,6 @@ void GCMClientImplTest::OnMessageReceived(
   last_event_ = MESSAGE_RECEIVED;
   last_app_id_ = registration_id;
   last_message_ = message;
-  QuitLoop();
 }
 
 void GCMClientImplTest::OnRegisterFinished(
@@ -645,7 +647,7 @@ TEST_F(GCMClientImplTest, LoadingBusted) {
 
   // Mess up the store.
   base::FilePath store_file_path =
-      temp_directory_path().Append(FILE_PATH_LITERAL("CURRENT"));
+      gcm_store_path().Append(FILE_PATH_LITERAL("CURRENT"));
   ASSERT_TRUE(base::AppendToFile(store_file_path, "A", 1));
 
   // Restart GCM client. The store should be reset and the loading should
@@ -662,6 +664,31 @@ TEST_F(GCMClientImplTest, LoadingBusted) {
   EXPECT_EQ(LOADING_COMPLETED, last_event());
   EXPECT_EQ(kDeviceAndroidId2, mcs_client()->last_android_id());
   EXPECT_EQ(kDeviceSecurityToken2, mcs_client()->last_security_token());
+}
+
+TEST_F(GCMClientImplTest, DestroyStoreWhenNotNeeded) {
+  // Close the GCM store.
+  gcm_client()->Stop();
+  PumpLoopUntilIdle();
+
+  // Restart GCM client. The store is loaded successfully.
+  reset_last_event();
+  BuildGCMClient(base::TimeDelta());
+  InitializeGCMClient();
+  gcm_client()->Start(GCMClient::DELAYED_START);
+  PumpLoopUntilIdle();
+
+  EXPECT_EQ(GCMClientImpl::LOADED, gcm_client_state());
+  EXPECT_TRUE(device_checkin_info().android_id);
+  EXPECT_TRUE(device_checkin_info().secret);
+
+  // Fast forward the clock to trigger the store destroying logic.
+  task_runner()->FastForwardBy(base::TimeDelta::FromMilliseconds(300000));
+  PumpLoopUntilIdle();
+
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+  EXPECT_FALSE(device_checkin_info().android_id);
+  EXPECT_FALSE(device_checkin_info().secret);
 }
 
 TEST_F(GCMClientImplTest, RegisterApp) {
@@ -728,6 +755,7 @@ TEST_F(GCMClientImplTest, DeletePendingRequestsWhenStopping) {
   Register(kAppId, senders);
 
   gcm_client()->Stop();
+  PumpLoopUntilIdle();
   VerifyPendingRequestFetcherDeleted();
 }
 
@@ -857,7 +885,6 @@ void GCMClientImplCheckinTest::SetUp() {
   // Creating unique temp directory that will be used by GCMStore shared between
   // GCM Client and G-services settings.
   ASSERT_TRUE(CreateUniqueTempDir());
-  InitializeLoop();
   // Time will be advancing one hour every time it is checked.
   BuildGCMClient(base::TimeDelta::FromSeconds(kSettingsCheckinInterval));
   InitializeGCMClient();
@@ -1068,7 +1095,7 @@ TEST_F(GCMClientImplCheckinTest, CheckinWhenAccountReplaced) {
 }
 
 class GCMClientImplStartAndStopTest : public GCMClientImplTest {
-public:
+ public:
   GCMClientImplStartAndStopTest();
   ~GCMClientImplStartAndStopTest() override;
 
@@ -1086,7 +1113,6 @@ GCMClientImplStartAndStopTest::~GCMClientImplStartAndStopTest() {
 void GCMClientImplStartAndStopTest::SetUp() {
   testing::Test::SetUp();
   ASSERT_TRUE(CreateUniqueTempDir());
-  InitializeLoop();
   BuildGCMClient(base::TimeDelta());
   InitializeGCMClient();
 }
@@ -1107,7 +1133,7 @@ TEST_F(GCMClientImplStartAndStopTest, StartStopAndRestart) {
   // Delay start the GCM.
   gcm_client()->Start(GCMClient::DELAYED_START);
   PumpLoopUntilIdle();
-  EXPECT_EQ(GCMClientImpl::LOADED, gcm_client_state());
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
   // Stop the GCM.
   gcm_client()->Stop();
@@ -1120,7 +1146,7 @@ TEST_F(GCMClientImplStartAndStopTest, StartStopAndRestart) {
   EXPECT_EQ(GCMClientImpl::INITIAL_DEVICE_CHECKIN, gcm_client_state());
 }
 
-TEST_F(GCMClientImplStartAndStopTest, StartAndStopImmediately) {
+TEST_F(GCMClientImplStartAndStopTest, DelayedStartAndStopImmediately) {
   // GCMClientImpl should be in INITIALIZED state at first.
   EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
@@ -1128,6 +1154,11 @@ TEST_F(GCMClientImplStartAndStopTest, StartAndStopImmediately) {
   gcm_client()->Start(GCMClient::DELAYED_START);
   gcm_client()->Stop();
   PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+}
+
+TEST_F(GCMClientImplStartAndStopTest, ImmediateStartAndStopImmediately) {
+  // GCMClientImpl should be in INITIALIZED state at first.
   EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
   // Start the GCM and then stop it immediately.
@@ -1137,7 +1168,7 @@ TEST_F(GCMClientImplStartAndStopTest, StartAndStopImmediately) {
   EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 }
 
-TEST_F(GCMClientImplStartAndStopTest, StartStopAndRestartImmediately) {
+TEST_F(GCMClientImplStartAndStopTest, DelayedStartStopAndRestart) {
   // GCMClientImpl should be in INITIALIZED state at first.
   EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
@@ -1146,7 +1177,12 @@ TEST_F(GCMClientImplStartAndStopTest, StartStopAndRestartImmediately) {
   gcm_client()->Stop();
   gcm_client()->Start(GCMClient::DELAYED_START);
   PumpLoopUntilIdle();
-  EXPECT_EQ(GCMClientImpl::LOADED, gcm_client_state());
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+}
+
+TEST_F(GCMClientImplStartAndStopTest, ImmediateStartStopAndRestart) {
+  // GCMClientImpl should be in INITIALIZED state at first.
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
   // Start the GCM and then stop and restart it immediately.
   gcm_client()->Start(GCMClient::IMMEDIATE_START);
@@ -1156,14 +1192,63 @@ TEST_F(GCMClientImplStartAndStopTest, StartStopAndRestartImmediately) {
   EXPECT_EQ(GCMClientImpl::INITIAL_DEVICE_CHECKIN, gcm_client_state());
 }
 
-TEST_F(GCMClientImplStartAndStopTest, DelayStart) {
+TEST_F(GCMClientImplStartAndStopTest, ImmediateStartAndThenImmediateStart) {
   // GCMClientImpl should be in INITIALIZED state at first.
   EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
-  // Delay start the GCM.
+  // Start the GCM immediately and complete the checkin.
+  gcm_client()->Start(GCMClient::IMMEDIATE_START);
+  PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::INITIAL_DEVICE_CHECKIN, gcm_client_state());
+  DefaultCompleteCheckin();
+  EXPECT_EQ(GCMClientImpl::READY, gcm_client_state());
+
+  // Stop the GCM.
+  gcm_client()->Stop();
+  PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+
+  // Start the GCM immediately. GCMClientImpl should be in READY state.
+  BuildGCMClient(base::TimeDelta());
+  InitializeGCMClient();
+  gcm_client()->Start(GCMClient::IMMEDIATE_START);
+  PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::READY, gcm_client_state());
+}
+
+TEST_F(GCMClientImplStartAndStopTest, ImmediateStartAndThenDelayStart) {
+  // GCMClientImpl should be in INITIALIZED state at first.
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+
+  // Start the GCM immediately and complete the checkin.
+  gcm_client()->Start(GCMClient::IMMEDIATE_START);
+  PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::INITIAL_DEVICE_CHECKIN, gcm_client_state());
+  DefaultCompleteCheckin();
+  EXPECT_EQ(GCMClientImpl::READY, gcm_client_state());
+
+  // Stop the GCM.
+  gcm_client()->Stop();
+  PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+
+  // Delay start the GCM. GCMClientImpl should be in LOADED state.
+  BuildGCMClient(base::TimeDelta());
+  InitializeGCMClient();
   gcm_client()->Start(GCMClient::DELAYED_START);
   PumpLoopUntilIdle();
   EXPECT_EQ(GCMClientImpl::LOADED, gcm_client_state());
+}
+
+TEST_F(GCMClientImplStartAndStopTest, DelayedStart) {
+  // GCMClientImpl should be in INITIALIZED state at first.
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
+
+  // Delay start the GCM. The store will not be loaded and GCMClientImpl should
+  // still be in INITIALIZED state.
+  gcm_client()->Start(GCMClient::DELAYED_START);
+  PumpLoopUntilIdle();
+  EXPECT_EQ(GCMClientImpl::INITIALIZED, gcm_client_state());
 
   // Start the GCM immediately and complete the checkin.
   gcm_client()->Start(GCMClient::IMMEDIATE_START);
@@ -1175,7 +1260,7 @@ TEST_F(GCMClientImplStartAndStopTest, DelayStart) {
   // Registration.
   std::vector<std::string> senders;
   senders.push_back("sender");
- Register(kAppId, senders);
+  Register(kAppId, senders);
   CompleteRegistration("reg_id");
   EXPECT_EQ(GCMClientImpl::READY, gcm_client_state());
 
@@ -1186,6 +1271,8 @@ TEST_F(GCMClientImplStartAndStopTest, DelayStart) {
 
   // Delay start the GCM. GCM is indeed started without delay because the
   // registration record has been found.
+  BuildGCMClient(base::TimeDelta());
+  InitializeGCMClient();
   gcm_client()->Start(GCMClient::DELAYED_START);
   PumpLoopUntilIdle();
   EXPECT_EQ(GCMClientImpl::READY, gcm_client_state());
@@ -1293,6 +1380,8 @@ void GCMClientInstanceIDTest::CompleteDeleteToken() {
   fetcher->set_response_code(net::HTTP_OK);
   fetcher->SetResponseString(response);
   fetcher->delegate()->OnURLFetchComplete(fetcher);
+  // Give a chance for GCMStoreImpl::Backend to finish persisting data.
+  PumpLoopUntilIdle();
 }
 
 bool GCMClientInstanceIDTest::ExistsToken(const std::string& app_id,
@@ -1334,6 +1423,28 @@ TEST_F(GCMClientInstanceIDTest, GetToken) {
   EXPECT_TRUE(ExistsToken(kAppId, kSender, kScope));
 }
 
+TEST_F(GCMClientInstanceIDTest, DeleteInvalidToken) {
+  AddInstanceID(kAppId, kInstanceID);
+
+  // Delete an invalid token.
+  DeleteToken(kAppId, "Foo@#$", kScope);
+  PumpLoopUntilIdle();
+
+  EXPECT_EQ(UNREGISTRATION_COMPLETED, last_event());
+  EXPECT_EQ(kAppId, last_app_id());
+  EXPECT_EQ(GCMClient::INVALID_PARAMETER, last_result());
+
+  reset_last_event();
+
+  // Delete a non-existing token.
+  DeleteToken(kAppId, kSender, kScope);
+  PumpLoopUntilIdle();
+
+  EXPECT_EQ(UNREGISTRATION_COMPLETED, last_event());
+  EXPECT_EQ(kAppId, last_app_id());
+  EXPECT_EQ(GCMClient::INVALID_PARAMETER, last_result());
+}
+
 TEST_F(GCMClientInstanceIDTest, DeleteSingleToken) {
   AddInstanceID(kAppId, kInstanceID);
 
@@ -1348,6 +1459,8 @@ TEST_F(GCMClientInstanceIDTest, DeleteSingleToken) {
   EXPECT_EQ(GCMClient::SUCCESS, last_result());
   EXPECT_TRUE(ExistsToken(kAppId, kSender, kScope));
 
+  reset_last_event();
+
   // Get another token.
   EXPECT_FALSE(ExistsToken(kAppId, kSender2, kScope));
   GetToken(kAppId, kSender2, kScope);
@@ -1361,6 +1474,8 @@ TEST_F(GCMClientInstanceIDTest, DeleteSingleToken) {
   // The 1st token still exists.
   EXPECT_TRUE(ExistsToken(kAppId, kSender, kScope));
 
+  reset_last_event();
+
   // Delete the 2nd token.
   DeleteToken(kAppId, kSender2, kScope);
   CompleteDeleteToken();
@@ -1372,6 +1487,8 @@ TEST_F(GCMClientInstanceIDTest, DeleteSingleToken) {
   EXPECT_TRUE(ExistsToken(kAppId, kSender, kScope));
   EXPECT_FALSE(ExistsToken(kAppId, kSender2, kScope));
 
+  reset_last_event();
+
   // Delete the 1st token.
   DeleteToken(kAppId, kSender, kScope);
   CompleteDeleteToken();
@@ -1382,9 +1499,19 @@ TEST_F(GCMClientInstanceIDTest, DeleteSingleToken) {
   // Both tokens are gone now.
   EXPECT_FALSE(ExistsToken(kAppId, kSender, kScope));
   EXPECT_FALSE(ExistsToken(kAppId, kSender, kScope));
+
+  reset_last_event();
+
+  // Trying to delete the token again will get an error.
+  DeleteToken(kAppId, kSender, kScope);
+  PumpLoopUntilIdle();
+
+  EXPECT_EQ(UNREGISTRATION_COMPLETED, last_event());
+  EXPECT_EQ(kAppId, last_app_id());
+  EXPECT_EQ(GCMClient::INVALID_PARAMETER, last_result());
 }
 
-TEST_F(GCMClientInstanceIDTest, DeleteMultiTokens) {
+TEST_F(GCMClientInstanceIDTest, DeleteAllTokens) {
   AddInstanceID(kAppId, kInstanceID);
 
   // Get a token.
@@ -1398,6 +1525,8 @@ TEST_F(GCMClientInstanceIDTest, DeleteMultiTokens) {
   EXPECT_EQ(GCMClient::SUCCESS, last_result());
   EXPECT_TRUE(ExistsToken(kAppId, kSender, kScope));
 
+  reset_last_event();
+
   // Get another token.
   EXPECT_FALSE(ExistsToken(kAppId, kSender2, kScope));
   GetToken(kAppId, kSender2, kScope);
@@ -1411,6 +1540,8 @@ TEST_F(GCMClientInstanceIDTest, DeleteMultiTokens) {
   // The 1st token still exists.
   EXPECT_TRUE(ExistsToken(kAppId, kSender, kScope));
 
+  reset_last_event();
+
   // Delete all tokens.
   DeleteToken(kAppId, "*", "*");
   CompleteDeleteToken();
@@ -1421,6 +1552,20 @@ TEST_F(GCMClientInstanceIDTest, DeleteMultiTokens) {
   // All tokens are gone now.
   EXPECT_FALSE(ExistsToken(kAppId, kSender, kScope));
   EXPECT_FALSE(ExistsToken(kAppId, kSender, kScope));
+}
+
+TEST_F(GCMClientInstanceIDTest, DeleteAllTokensBeforeGetAnyToken) {
+  AddInstanceID(kAppId, kInstanceID);
+
+  // Delete all tokens without getting a token first.
+  DeleteToken(kAppId, "*", "*");
+  // No need to call CompleteDeleteToken since unregistration request should
+  // not be triggered.
+  PumpLoopUntilIdle();
+
+  EXPECT_EQ(UNREGISTRATION_COMPLETED, last_event());
+  EXPECT_EQ(kAppId, last_app_id());
+  EXPECT_EQ(GCMClient::SUCCESS, last_result());
 }
 
 }  // namespace gcm

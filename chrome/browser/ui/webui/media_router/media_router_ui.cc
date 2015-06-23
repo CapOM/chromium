@@ -36,8 +36,10 @@ namespace media_router {
 namespace {
 
 std::string GetHostFromURL(const GURL& gurl) {
+  if (gurl.is_empty())
+    return std::string();
   std::string host = gurl.host();
-  if (StartsWithASCII(host, "www.", false))
+  if (base::StartsWithASCII(host, "www.", false))
     host = host.substr(4);
   return host;
 }
@@ -48,7 +50,10 @@ std::string GetHostFromURL(const GURL& gurl) {
 // updated.
 class MediaRouterUI::UIIssuesObserver : public IssuesObserver {
  public:
-  explicit UIIssuesObserver(MediaRouterUI* ui) : ui_(ui) { DCHECK(ui); }
+  UIIssuesObserver(MediaRouter* router, MediaRouterUI* ui)
+      : IssuesObserver(router), ui_(ui) {
+    DCHECK(ui);
+  }
 
   ~UIIssuesObserver() override {}
 
@@ -149,7 +154,7 @@ void MediaRouterUI::InitCommon(const content::WebContents* initiator,
   DCHECK(initiator);
 
   // Register for Issue and MediaRoute updates.
-  issues_observer_.reset(new UIIssuesObserver(this));
+  issues_observer_.reset(new UIIssuesObserver(router_, this));
   routes_observer_.reset(new UIMediaRoutesObserver(router_, this));
 
   query_result_manager_.reset(new QueryResultManager(router_));
@@ -190,7 +195,8 @@ void MediaRouterUI::HandleRouteResponseForPresentation(
   } else {
     // TODO(imcheng): Presentation ID should come from the response
     // as the IDs might not be the same.
-    presentation_session_request_->MaybeInvokeSuccessCallback();
+    presentation_session_request_->MaybeInvokeSuccessCallback(
+        route->media_route_id());
   }
 }
 
@@ -295,6 +301,7 @@ void MediaRouterUI::OnRouteResponseReceived(scoped_ptr<MediaRoute> route,
 bool MediaRouterUI::DoCreateRoute(const MediaSink::Id& sink_id,
                                   MediaCastMode cast_mode) {
   DCHECK(query_result_manager_.get());
+  DCHECK(initiator_);
 
   // Note that there is a rarely-encountered bug, where the MediaCastMode to
   // MediaSource mapping could have been updated, between when the user
@@ -310,10 +317,27 @@ bool MediaRouterUI::DoCreateRoute(const MediaSink::Id& sink_id,
 
   has_pending_route_request_ = true;
   requesting_route_for_default_source_ = cast_mode == MediaCastMode::DEFAULT;
-  router_->CreateRoute(source.id(), sink_id,
+  GURL origin;
+  // TODO(imcheng): What is the origin if not creating route in DEFAULT mode?
+  if (requesting_route_for_default_source_) {
+    origin = frame_url_.GetOrigin();
+  } else {
+    // Requesting route for mirroring. Use a placeholder URL as origin.
+    origin = GURL(chrome::kChromeUIMediaRouterURL);
+  }
+  DCHECK(origin.is_valid());
+
+  DVLOG(1) << "DoCreateRoute: origin: " << origin;
+
+  router_->CreateRoute(source.id(), sink_id, origin,
+                       SessionTabHelper::IdForTab(initiator_),
                        base::Bind(&MediaRouterUI::OnRouteResponseReceived,
                                   weak_factory_.GetWeakPtr()));
   return true;
+}
+
+std::string MediaRouterUI::GetFrameURLHost() const {
+  return GetHostFromURL(frame_url_);
 }
 
 }  // namespace media_router

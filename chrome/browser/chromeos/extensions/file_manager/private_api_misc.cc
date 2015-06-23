@@ -13,6 +13,7 @@
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
 #include "chrome/browser/browser_process.h"
+#include "chrome/browser/chromeos/drive/drive_pref_names.h"
 #include "chrome/browser/chromeos/drive/file_system_util.h"
 #include "chrome/browser/chromeos/extensions/file_manager/private_api_util.h"
 #include "chrome/browser/chromeos/file_manager/fileapi_util.h"
@@ -55,14 +56,10 @@ const char kCWSScope[] = "https://www.googleapis.com/auth/chromewebstore";
 
 // Obtains the current app window.
 AppWindow* GetCurrentAppWindow(ChromeSyncExtensionFunction* function) {
-  AppWindowRegistry* const app_window_registry =
-      AppWindowRegistry::Get(function->GetProfile());
-  content::WebContents* const contents = function->GetAssociatedWebContents();
-  content::RenderViewHost* const render_view_host =
-      contents ? contents->GetRenderViewHost() : NULL;
-  return render_view_host ? app_window_registry->GetAppWindowForRenderViewHost(
-                                render_view_host)
-                          : NULL;
+  content::WebContents* const contents = function->GetSenderWebContents();
+  return contents ?
+      AppWindowRegistry::Get(function->GetProfile())->
+          GetAppWindowForWebContents(contents) : nullptr;
 }
 
 std::vector<linked_ptr<api::file_manager_private::ProfileInfo> >
@@ -118,9 +115,11 @@ bool FileManagerPrivateGetPreferencesFunction::RunSync() {
 
   result.drive_enabled = drive::util::IsDriveEnabledForProfile(GetProfile());
   result.cellular_disabled =
-      service->GetBoolean(prefs::kDisableDriveOverCellular);
+      service->GetBoolean(drive::prefs::kDisableDriveOverCellular);
   result.hosted_files_disabled =
-      service->GetBoolean(prefs::kDisableDriveHostedFiles);
+      service->GetBoolean(drive::prefs::kDisableDriveHostedFiles);
+  result.search_suggest_enabled =
+      service->GetBoolean(prefs::kSearchSuggestEnabled);
   result.use24hour_clock = service->GetBoolean(prefs::kUse24HourClock);
   result.allow_redeem_offers = true;
   if (!chromeos::CrosSettings::Get()->GetBoolean(
@@ -145,11 +144,11 @@ bool FileManagerPrivateSetPreferencesFunction::RunSync() {
   PrefService* const service = GetProfile()->GetPrefs();
 
   if (params->change_info.cellular_disabled)
-    service->SetBoolean(prefs::kDisableDriveOverCellular,
+    service->SetBoolean(drive::prefs::kDisableDriveOverCellular,
                         *params->change_info.cellular_disabled);
 
   if (params->change_info.hosted_files_disabled)
-    service->SetBoolean(prefs::kDisableDriveHostedFiles,
+    service->SetBoolean(drive::prefs::kDisableDriveHostedFiles,
                         *params->change_info.hosted_files_disabled);
 
   drive::EventLogger* logger = file_manager::util::GetLogger(GetProfile());
@@ -174,7 +173,7 @@ bool FileManagerPrivateZipSelectionFunction::RunAsync() {
     return false;
 
   base::FilePath src_dir = file_manager::util::GetLocalPathFromURL(
-      render_view_host(), GetProfile(), GURL(params->dir_url));
+      render_frame_host(), GetProfile(), GURL(params->dir_url));
   if (src_dir.empty())
     return false;
 
@@ -185,7 +184,7 @@ bool FileManagerPrivateZipSelectionFunction::RunAsync() {
   std::vector<base::FilePath> files;
   for (size_t i = 0; i < params->selection_urls.size(); ++i) {
     base::FilePath path = file_manager::util::GetLocalPathFromURL(
-        render_view_host(), GetProfile(), GURL(params->selection_urls[i]));
+        render_frame_host(), GetProfile(), GURL(params->selection_urls[i]));
     if (path.empty())
       return false;
     files.push_back(path);
@@ -245,7 +244,7 @@ bool FileManagerPrivateZoomFunction::RunSync() {
       NOTREACHED();
       return false;
   }
-  render_view_host()->Zoom(zoom_type);
+  render_view_host_do_not_use()->Zoom(zoom_type);
   return true;
 }
 
@@ -345,20 +344,17 @@ bool FileManagerPrivateOpenInspectorFunction::RunSync() {
   switch (params->type) {
     case extensions::api::file_manager_private::INSPECTION_TYPE_NORMAL:
       // Open inspector for foreground page.
-      DevToolsWindow::OpenDevToolsWindow(
-          content::WebContents::FromRenderViewHost(render_view_host()));
+      DevToolsWindow::OpenDevToolsWindow(GetSenderWebContents());
       break;
     case extensions::api::file_manager_private::INSPECTION_TYPE_CONSOLE:
       // Open inspector for foreground page and bring focus to the console.
-      DevToolsWindow::OpenDevToolsWindow(
-          content::WebContents::FromRenderViewHost(render_view_host()),
-          DevToolsToggleAction::ShowConsole());
+      DevToolsWindow::OpenDevToolsWindow(GetSenderWebContents(),
+                                         DevToolsToggleAction::ShowConsole());
       break;
     case extensions::api::file_manager_private::INSPECTION_TYPE_ELEMENT:
       // Open inspector for foreground page in inspect element mode.
-      DevToolsWindow::OpenDevToolsWindow(
-          content::WebContents::FromRenderViewHost(render_view_host()),
-          DevToolsToggleAction::Inspect());
+      DevToolsWindow::OpenDevToolsWindow(GetSenderWebContents(),
+                                         DevToolsToggleAction::Inspect());
       break;
     case extensions::api::file_manager_private::INSPECTION_TYPE_BACKGROUND:
       // Open inspector for background page.
@@ -389,8 +385,8 @@ bool FileManagerPrivateGetMimeTypeFunction::RunAsync() {
 
   // Convert file url to local path.
   const scoped_refptr<storage::FileSystemContext> file_system_context =
-      file_manager::util::GetFileSystemContextForRenderViewHost(
-          GetProfile(), render_view_host());
+      file_manager::util::GetFileSystemContextForRenderFrameHost(
+          GetProfile(), render_frame_host());
 
   const GURL file_url(params->file_url);
   storage::FileSystemURL file_system_url(

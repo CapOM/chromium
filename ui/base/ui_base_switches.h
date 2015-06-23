@@ -14,19 +14,18 @@ namespace switches {
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
 UI_BASE_EXPORT extern const char kDisableRemoteCoreAnimation[];
-UI_BASE_EXPORT extern const char kEnableNSGLSurfaces[];
+UI_BASE_EXPORT extern const char kDisableNSCGLSurfaceApi[];
+UI_BASE_EXPORT extern const char kForceNSCGLSurfaceApi[];
 #endif
 
 UI_BASE_EXPORT extern const char kDisableDwmComposition[];
 UI_BASE_EXPORT extern const char kDisableIconNtp[];
-UI_BASE_EXPORT extern const char kDisableTextInputFocusManager[];
 UI_BASE_EXPORT extern const char kDisableTouchAdjustment[];
 UI_BASE_EXPORT extern const char kDisableTouchDragDrop[];
 UI_BASE_EXPORT extern const char kDisableTouchEditing[];
 UI_BASE_EXPORT extern const char kDisableTouchFeedback[];
 UI_BASE_EXPORT extern const char kEnableIconNtp[];
 UI_BASE_EXPORT extern const char kEnableLinkDisambiguationPopup[];
-UI_BASE_EXPORT extern const char kEnableTextInputFocusManager[];
 UI_BASE_EXPORT extern const char kEnableTouchDragDrop[];
 UI_BASE_EXPORT extern const char kEnableTouchEditing[];
 UI_BASE_EXPORT extern const char kLang[];

@@ -138,6 +138,7 @@
           'containers/linked_list.h',
           'containers/mru_cache.h',
           'containers/scoped_ptr_hash_map.h',
+          'containers/scoped_ptr_map.h',
           'containers/small_map.h',
           'containers/stack_container.h',
           'cpu.cc',
@@ -357,6 +358,9 @@
           'memory/scoped_vector.h',
           'memory/shared_memory.h',
           'memory/shared_memory_android.cc',
+          'memory/shared_memory_handle.h',
+          'memory/shared_memory_handle_mac.cc',
+          'memory/shared_memory_mac.cc',
           'memory/shared_memory_nacl.cc',
           'memory/shared_memory_posix.cc',
           'memory/shared_memory_win.cc',
@@ -368,10 +372,8 @@
           'message_loop/incoming_task_queue.h',
           'message_loop/message_loop.cc',
           'message_loop/message_loop.h',
-          'message_loop/message_loop_proxy.cc',
-          'message_loop/message_loop_proxy.h',
-          'message_loop/message_loop_proxy_impl.cc',
-          'message_loop/message_loop_proxy_impl.h',
+          'message_loop/message_loop_task_runner.cc',
+          'message_loop/message_loop_task_runner.h',
           'message_loop/message_pump.cc',
           'message_loop/message_pump.h',
           'message_loop/message_pump_android.cc',
@@ -432,7 +434,6 @@
           'pending_task.h',
           'pickle.cc',
           'pickle.h',
-          'port.h',
           'posix/eintr_wrapper.h',
           'posix/global_descriptors.cc',
           'posix/global_descriptors.h',
@@ -762,6 +763,11 @@
           4018,
         ],
         'target_conditions': [
+          ['OS == "mac"', {
+            'sources!': [
+              'memory/shared_memory_posix.cc',
+            ],
+          }],
           ['(<(desktop_linux) == 0 and <(chromeos) == 0) or >(nacl_untrusted_build)==1', {
               'sources/': [
                 ['exclude', '^nix/'],

@@ -15,8 +15,8 @@
 #include "base/memory/ref_counted.h"
 #include "base/memory/scoped_ptr.h"
 #include "base/memory/weak_ptr.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/observer_list.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/thread_checker.h"
 #include "chrome/browser/media/router/issue.h"
 #include "chrome/browser/media/router/media_router.h"
@@ -61,17 +61,28 @@ class MediaRouterMojoImpl : public MediaRouter,
   // enqueued for later use if the extension is temporarily suspended.
   void CreateRoute(const MediaSource::Id& source_id,
                    const MediaSink::Id& sink_id,
+                   const GURL& origin,
+                   int tab_id,
                    const MediaRouteResponseCallback& callback) override;
+  void JoinRoute(const MediaSource::Id& source_id,
+                 const std::string& presentation_id,
+                 const GURL& origin,
+                 int tab_id,
+                 const MediaRouteResponseCallback& callback) override;
   void CloseRoute(const MediaRoute::Id& route_id) override;
-  void PostMessage(const MediaRoute::Id& route_id,
-                   const std::string& message) override;
+  void SendRouteMessage(const MediaRoute::Id& route_id,
+                        const std::string& message,
+                        const SendRouteMessageCallback& callback) override;
+  void ListenForRouteMessages(
+      const std::vector<MediaRoute::Id>& route_ids,
+      const PresentationSessionMessageCallback& message_cb) override;
   void ClearIssue(const Issue::Id& issue_id) override;
   void RegisterMediaSinksObserver(MediaSinksObserver* observer) override;
   void UnregisterMediaSinksObserver(MediaSinksObserver* observer) override;
   void RegisterMediaRoutesObserver(MediaRoutesObserver* observer) override;
   void UnregisterMediaRoutesObserver(MediaRoutesObserver* observer) override;
-  void AddIssuesObserver(IssuesObserver* observer) override;
-  void RemoveIssuesObserver(IssuesObserver* observer) override;
+  void RegisterIssuesObserver(IssuesObserver* observer) override;
+  void UnregisterIssuesObserver(IssuesObserver* observer) override;
 
   void set_instance_id_for_test(const std::string& instance_id) {
     instance_id_ = instance_id;
@@ -109,17 +120,35 @@ class MediaRouterMojoImpl : public MediaRouter,
   // These calls invoke methods in the component extension via Mojo.
   void DoCreateRoute(const MediaSource::Id& source_id,
                      const MediaSink::Id& sink_id,
+                     const std::string& origin,
+                     int tab_id,
                      const MediaRouteResponseCallback& callback);
+  void DoJoinRoute(const MediaSource::Id& source_id,
+                   const std::string& presentation_id,
+                   const std::string& origin,
+                   int tab_id,
+                   const MediaRouteResponseCallback& callback);
   void DoCloseRoute(const MediaRoute::Id& route_id);
-  void DoPostMessage(const MediaRoute::Id& route_id,
-                     const std::string& message);
+  void DoSendSessionMessage(const MediaRoute::Id& route_id,
+                            const std::string& message,
+                            const SendRouteMessageCallback& callback);
+  void DoListenForRouteMessages(
+      const std::vector<MediaRoute::Id>& route_ids,
+      const PresentationSessionMessageCallback& message_cb);
   void DoClearIssue(const Issue::Id& issue_id);
-  void DoStartObservingMediaSinks(const std::string& source_id);
-  void DoStopObservingMediaSinks(const std::string& source_id);
+  void DoStartObservingMediaSinks(const MediaSource::Id& source_id);
+  void DoStopObservingMediaSinks(const MediaSource::Id& source_id);
   void DoStartObservingMediaRoutes();
   void DoStopObservingMediaRoutes();
   void DoStartObservingIssues();
   void DoStopObservingIssues();
+
+  // Invoked when the next batch of messages arrives.
+  // |messages|: A list of messages received.
+  // |message_cb|: The callback to invoke to pass on the messages received.
+  void OnRouteMessageReceived(
+      const PresentationSessionMessageCallback& message_cb,
+      mojo::Array<interfaces::RouteMessagePtr> messages);
 
   // mojo::ErrorHandler implementation.
   void OnConnectionError() override;
@@ -129,8 +158,6 @@ class MediaRouterMojoImpl : public MediaRouter,
       interfaces::MediaRouterPtr media_router_ptr,
       const interfaces::MediaRouterObserver::ProvideMediaRouterCallback&
           callback) override;
-  void OnMessage(const mojo::String& route_id,
-                 const mojo::String& message) override;
   void OnIssue(interfaces::IssuePtr issue) override;
   void OnSinksReceived(const mojo::String& media_source,
                        mojo::Array<interfaces::MediaSinkPtr> sinks) override;

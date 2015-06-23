@@ -6,6 +6,7 @@
 
 #include <vector>
 
+#include "base/thread_task_runner_handle.h"
 #include "net/base/chunked_upload_data_stream.h"
 #include "net/base/elements_upload_data_stream.h"
 #include "net/base/net_errors.h"
@@ -207,14 +208,15 @@ class QuicHttpStreamTest : public ::testing::TestWithParam<QuicVersion> {
     connection_->set_visitor(&visitor_);
     connection_->SetSendAlgorithm(send_algorithm_);
     session_.reset(new QuicClientSession(
-        connection_, scoped_ptr<DatagramClientSocket>(socket), nullptr,
+        connection_, scoped_ptr<DatagramClientSocket>(socket),
+        /*stream_factory=*/nullptr, &crypto_client_stream_factory_,
         &transport_security_state_, make_scoped_ptr((QuicServerInfo*)nullptr),
-        DefaultQuicConfig(), "CONNECTION_UNKNOWN", base::TimeTicks::Now(),
-        base::MessageLoop::current()->message_loop_proxy().get(), nullptr));
-    session_->InitializeSession(
         QuicServerId(kDefaultServerHostName, kDefaultServerPort,
                      /*is_secure=*/false, PRIVACY_MODE_DISABLED),
-        &crypto_config_, &crypto_client_stream_factory_);
+        /*cert_verify_flags=*/0, DefaultQuicConfig(), &crypto_config_,
+        "CONNECTION_UNKNOWN", base::TimeTicks::Now(),
+        base::ThreadTaskRunnerHandle::Get().get(), nullptr));
+    session_->Initialize();
     session_->GetCryptoStream()->CryptoConnect();
     EXPECT_TRUE(session_->IsCryptoHandshakeConfirmed());
     stream_.reset(use_closing_stream_ ?

@@ -459,8 +459,6 @@ TEST_F(WebContentsImplTest, NavigateToExcessivelyLongURL) {
 // Test that navigating across a site boundary creates a new RenderViewHost
 // with a new SiteInstance.  Going back should do the same.
 TEST_F(WebContentsImplTest, CrossSiteBoundaries) {
-  bool is_site_per_process = base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kSitePerProcess);
   TestRenderFrameHost* orig_rfh = contents()->GetMainFrame();
   int orig_rvh_delete_count = 0;
   orig_rfh->GetRenderViewHost()->set_delete_counter(&orig_rvh_delete_count);
@@ -540,8 +538,10 @@ TEST_F(WebContentsImplTest, CrossSiteBoundaries) {
     contents()->GetMainFrame()->PrepareForCommit();
   }
   TestRenderFrameHost* goback_rfh = contents()->GetPendingMainFrame();
-  if (!is_site_per_process)
+  if (!RenderFrameHostManager::IsSwappedOutStateForbidden()) {
+    // Recycling the rfh is a behavior specific to swappedout://
     EXPECT_EQ(orig_rfh, goback_rfh);
+  }
   EXPECT_TRUE(contents()->CrossProcessNavigationPending());
 
   // Navigations should be suspended in goback_rfh until BeforeUnloadACK.
@@ -804,20 +804,22 @@ TEST_F(WebContentsImplTest, NavigateFromRestoredSitelessUrl) {
   // SiteInstance.
   browser_client.set_assign_site_for_url(false);
   const GURL native_url("non-site-url://stuffandthings");
-  std::vector<NavigationEntry*> entries;
-  NavigationEntry* entry = NavigationControllerImpl::CreateNavigationEntry(
-      native_url, Referrer(), ui::PAGE_TRANSITION_LINK, false, std::string(),
-      browser_context());
-  entry->SetPageID(0);
-  entries.push_back(entry);
+  ScopedVector<NavigationEntry> entries;
+  scoped_ptr<NavigationEntry> new_entry =
+      NavigationControllerImpl::CreateNavigationEntry(
+          native_url, Referrer(), ui::PAGE_TRANSITION_LINK, false,
+          std::string(), browser_context());
+  new_entry->SetPageID(0);
+  entries.push_back(new_entry.Pass());
   controller().Restore(
       0,
       NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY,
       &entries);
   ASSERT_EQ(0u, entries.size());
   ASSERT_EQ(1, controller().GetEntryCount());
+
   controller().GoToIndex(0);
-  entry = controller().GetPendingEntry();
+  NavigationEntry* entry = controller().GetPendingEntry();
   orig_rfh->PrepareForCommit();
   contents()->TestDidNavigate(orig_rfh, 0, entry->GetUniqueID(), false,
                               native_url, ui::PAGE_TRANSITION_RELOAD);
@@ -852,20 +854,22 @@ TEST_F(WebContentsImplTest, NavigateFromRestoredRegularUrl) {
   // ShouldAssignSiteForUrl override is disabled (i.e. returns true).
   browser_client.set_assign_site_for_url(true);
   const GURL regular_url("http://www.yahoo.com");
-  std::vector<NavigationEntry*> entries;
-  NavigationEntry* entry = NavigationControllerImpl::CreateNavigationEntry(
-      regular_url, Referrer(), ui::PAGE_TRANSITION_LINK, false, std::string(),
-      browser_context());
-  entry->SetPageID(0);
-  entries.push_back(entry);
+  ScopedVector<NavigationEntry> entries;
+  scoped_ptr<NavigationEntry> new_entry =
+      NavigationControllerImpl::CreateNavigationEntry(
+          regular_url, Referrer(), ui::PAGE_TRANSITION_LINK, false,
+          std::string(), browser_context());
+  new_entry->SetPageID(0);
+  entries.push_back(new_entry.Pass());
   controller().Restore(
       0,
       NavigationController::RESTORE_LAST_SESSION_EXITED_CLEANLY,
       &entries);
   ASSERT_EQ(0u, entries.size());
+
   ASSERT_EQ(1, controller().GetEntryCount());
   controller().GoToIndex(0);
-  entry = controller().GetPendingEntry();
+  NavigationEntry* entry = controller().GetPendingEntry();
   orig_rfh->PrepareForCommit();
   contents()->TestDidNavigate(orig_rfh, 0, entry->GetUniqueID(), false,
                               regular_url, ui::PAGE_TRANSITION_RELOAD);
@@ -909,10 +913,10 @@ TEST_F(WebContentsImplTest, FindOpenerRVHWhenPending) {
   TestRenderFrameHost* pending_rfh = contents()->GetPendingMainFrame();
 
   // While it is still pending, simulate opening a new tab with the first tab
-  // as its opener.  This will call WebContentsImpl::CreateOpenerRenderViews
-  // on the opener to ensure that an RVH exists.
-  int opener_routing_id =
-      contents()->CreateOpenerRenderViews(pending_rfh->GetSiteInstance());
+  // as its opener.  This will call CreateOpenerProxies on the opener to ensure
+  // that an RVH exists.
+  int opener_routing_id = contents()->GetRenderManager()->CreateOpenerProxies(
+      pending_rfh->GetSiteInstance());
 
   // We should find the pending RVH and not create a new one.
   EXPECT_EQ(pending_rfh->GetRenderViewHost()->GetRoutingID(),
@@ -1213,6 +1217,12 @@ TEST_F(WebContentsImplTest, CrossSiteNavigationNotPreemptedByFrame) {
   EXPECT_TRUE(contents()->CrossProcessNavigationPending());
 }
 
+namespace {
+void SetAsNonUserGesture(FrameHostMsg_DidCommitProvisionalLoad_Params* params) {
+  params->gesture = NavigationGestureAuto;
+}
+}
+
 // Test that a cross-site navigation is not preempted if the previous
 // renderer sends a FrameNavigate message just before being told to stop.
 // We should only preempt the cross-site navigation if the previous renderer
@@ -1234,20 +1244,26 @@ TEST_F(WebContentsImplTest, CrossSiteNotPreemptedDuringBeforeUnload) {
   TestRenderFrameHost* pending_rfh = contents()->GetPendingMainFrame();
   EXPECT_TRUE(contents()->CrossProcessNavigationPending());
   EXPECT_TRUE(orig_rfh->IsWaitingForBeforeUnloadACK());
+  EXPECT_NE(orig_rfh, pending_rfh);
 
   // Suppose the first navigation tries to commit now, with a
   // FrameMsg_Stop in flight.  This should not cancel the pending navigation,
   // but it should act as if the beforeunload ack arrived.
-  orig_rfh->SendNavigate(1, entry1_id, true, GURL("chrome://gpu"));
+  orig_rfh->SendNavigateWithModificationCallback(
+      1, entry1_id, true, url, base::Bind(SetAsNonUserGesture));
   EXPECT_TRUE(contents()->CrossProcessNavigationPending());
   EXPECT_EQ(orig_rfh, contents()->GetMainFrame());
   EXPECT_FALSE(orig_rfh->IsWaitingForBeforeUnloadACK());
+  // It should commit.
+  ASSERT_EQ(1, controller().GetEntryCount());
+  EXPECT_EQ(url, controller().GetLastCommittedEntry()->GetURL());
 
   // The pending navigation should be able to commit successfully.
   contents()->TestDidNavigate(pending_rfh, 1, entry2_id, true, url2,
                               ui::PAGE_TRANSITION_TYPED);
   EXPECT_FALSE(contents()->CrossProcessNavigationPending());
   EXPECT_EQ(pending_rfh, contents()->GetMainFrame());
+  EXPECT_EQ(2, controller().GetEntryCount());
 }
 
 // Test that NavigationEntries have the correct page state after going
@@ -2992,11 +3008,15 @@ TEST_F(WebContentsImplTest, NoEarlyStop) {
   // Simulate the commit and DidStopLoading from the renderer-initiated
   // navigation in the current RenderFrameHost. There should still be a pending
   // RenderFrameHost and the WebContents should still be loading.
-  current_rfh->SendNavigate(1, 0, true, kUrl3);
+  current_rfh->SendNavigateWithModificationCallback(
+      1, 0, true, kUrl3, base::Bind(SetAsNonUserGesture));
   current_rfh->OnMessageReceived(
       FrameHostMsg_DidStopLoading(current_rfh->GetRoutingID()));
   EXPECT_EQ(contents()->GetPendingMainFrame(), pending_rfh);
   EXPECT_TRUE(contents()->IsLoading());
+  // It should commit.
+  ASSERT_EQ(2, controller().GetEntryCount());
+  EXPECT_EQ(kUrl3, controller().GetLastCommittedEntry()->GetURL());
 
   // Commit the navigation. The formerly pending RenderFrameHost should now be
   // the current RenderFrameHost and the WebContents should still be loading.
@@ -3006,6 +3026,7 @@ TEST_F(WebContentsImplTest, NoEarlyStop) {
   TestRenderFrameHost* new_current_rfh = contents()->GetMainFrame();
   EXPECT_EQ(new_current_rfh, pending_rfh);
   EXPECT_TRUE(contents()->IsLoading());
+  EXPECT_EQ(3, controller().GetEntryCount());
 
   // Simulate the new current RenderFrameHost DidStopLoading. The WebContents
   // should now have stopped loading.

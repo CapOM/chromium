@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "chrome/browser/autocomplete/history_quick_provider.h"
+#include "components/omnibox/history_quick_provider.h"
 
 #include <algorithm>
 #include <functional>
@@ -16,11 +16,9 @@
 #include "base/prefs/pref_service.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/autocomplete/chrome_autocomplete_provider_client.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
-#include "chrome/browser/autocomplete/history_url_provider.h"
-#include "chrome/browser/autocomplete/in_memory_url_index.h"
 #include "chrome/browser/autocomplete/in_memory_url_index_factory.h"
-#include "chrome/browser/autocomplete/url_index_private_data.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/history/history_service_factory.h"
 #include "chrome/browser/search_engines/chrome_template_url_service_client.h"
@@ -36,6 +34,9 @@
 #include "components/metrics/proto/omnibox_event.pb.h"
 #include "components/omnibox/autocomplete_match.h"
 #include "components/omnibox/autocomplete_result.h"
+#include "components/omnibox/history_url_provider.h"
+#include "components/omnibox/in_memory_url_index.h"
+#include "components/omnibox/url_index_private_data.h"
 #include "components/search_engines/search_terms_data.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
@@ -216,6 +217,7 @@ class HistoryQuickProviderTest : public testing::Test {
   content::TestBrowserThread file_thread_;
 
   scoped_ptr<TestingProfile> profile_;
+  scoped_ptr<ChromeAutocompleteProviderClient> client_;
   history::HistoryService* history_service_;
 
   ACMatches ac_matches_;  // The resulting matches after running RunTest.
@@ -225,6 +227,7 @@ class HistoryQuickProviderTest : public testing::Test {
 
 void HistoryQuickProviderTest::SetUp() {
   profile_.reset(new TestingProfile());
+  client_.reset(new ChromeAutocompleteProviderClient(profile_.get()));
   ASSERT_TRUE(profile_->CreateHistoryService(true, false));
   profile_->CreateBookmarkModel(true);
   bookmarks::test::WaitForBookmarkModelToLoad(
@@ -233,13 +236,13 @@ void HistoryQuickProviderTest::SetUp() {
   history_service_ = HistoryServiceFactory::GetForProfile(
       profile_.get(), ServiceAccessType::EXPLICIT_ACCESS);
   EXPECT_TRUE(history_service_);
-  InMemoryURLIndex* index =
-      InMemoryURLIndexFactory::GetForProfile(profile_.get());
-  EXPECT_TRUE(index);
-  provider_ = new HistoryQuickProvider(profile_.get(), index);
+  provider_ = new HistoryQuickProvider(client_.get());
   TemplateURLServiceFactory::GetInstance()->SetTestingFactoryAndUse(
       profile_.get(), &HistoryQuickProviderTest::CreateTemplateURLService);
   FillData();
+  InMemoryURLIndex* index =
+      InMemoryURLIndexFactory::GetForProfile(profile_.get());
+  EXPECT_TRUE(index);
   index->RebuildFromHistory(history_backend()->db());
 }
 
@@ -336,9 +339,9 @@ void HistoryQuickProviderTest::RunTestWithCursor(
   base::MessageLoop::current()->RunUntilIdle();
   AutocompleteInput input(text, cursor_position, std::string(), GURL(),
                           metrics::OmniboxEventProto::INVALID_SPEC,
-                          prevent_inline_autocomplete, false, true, true,
+                          prevent_inline_autocomplete, false, true, true, false,
                           ChromeAutocompleteSchemeClassifier(profile_.get()));
-  provider_->Start(input, false, false);
+  provider_->Start(input, false);
   EXPECT_TRUE(provider_->done());
 
   ac_matches_ = provider_->matches();
@@ -759,12 +762,11 @@ TEST_F(HistoryQuickProviderTest, CullSearchResults) {
 }
 
 TEST_F(HistoryQuickProviderTest, DoesNotProvideMatchesOnFocus) {
-  AutocompleteInput input(ASCIIToUTF16("popularsite"), base::string16::npos,
-                          std::string(), GURL(),
-                          metrics::OmniboxEventProto::INVALID_SPEC,
-                          false, false, true, true,
-                          ChromeAutocompleteSchemeClassifier(profile_.get()));
-  provider_->Start(input, false, true);
+  AutocompleteInput input(
+      ASCIIToUTF16("popularsite"), base::string16::npos, std::string(), GURL(),
+      metrics::OmniboxEventProto::INVALID_SPEC, false, false, true, true, true,
+      ChromeAutocompleteSchemeClassifier(profile_.get()));
+  provider_->Start(input, false);
   EXPECT_TRUE(provider_->matches().empty());
 }
 

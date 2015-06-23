@@ -154,7 +154,7 @@ __gCrWeb.autofill.lastActiveElement = null;
 
 /**
  * Extracts fields from |controlElements| with |requirements| and |extractMask|
- * to |formFields|. The extracted fields are also placed in |nameMap|.
+ * to |formFields|. The extracted fields are also placed in |elementArray|.
  *
  * It is based on the logic in
  *     bool ExtractFieldsFromControlElements(
@@ -163,10 +163,12 @@ __gCrWeb.autofill.lastActiveElement = null;
  *         ExtractMask extract_mask,
  *         ScopedVector<FormFieldData>* form_fields,
  *         std::vector<bool>* fields_extracted,
- *         std::map<base::string16, FormFieldData*>* name_map)
+ *         std::map<WebFormControlElement, FormFieldData*>* element_map)
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc
  *
  * TODO(thestig): Get rid of |requirements| to match the C++ version.
+ * TODO(thestig): Make |element_map| a Map when Chrome makes iOS 8 and Safari 8
+ *                part of the minimal requirements.
  *
  * @param {Array<FormControlElement>} controlElements The control elements that
  *     will be processed.
@@ -177,16 +179,18 @@ __gCrWeb.autofill.lastActiveElement = null;
  * @param {Array<AutofillFormFieldData>} formFields The extracted form fields.
  * @param {Array<boolean>} fieldsExtracted Indicates whether the fields were
  *     extracted.
- * @param {Object<AutofillFormFieldData>} nameMap Map of field names to
- *     fields.
+ * @param {Array<?AutofillFormFieldData>} elementArray The extracted form
+ *     fields or null if a particular control has no corresponding field.
  * @return {boolean} Whether there are fields and not too many fields in the
  *     form.
  */
 function extractFieldsFromControlElements_(controlElements, requirements,
-    extractMask, formFields, fieldsExtracted, nameMap) {
+    extractMask, formFields, fieldsExtracted, elementArray) {
   for (var i = 0; i < controlElements.length; ++i) {
     fieldsExtracted[i] = false;
+    elementArray[i] = null;
 
+    /** @type {FormControlElement} */
     var controlElement = controlElements[i];
     if (!__gCrWeb.autofill.isAutofillableElement(controlElement)) {
       continue;
@@ -206,7 +210,7 @@ function extractFieldsFromControlElements_(controlElements, requirements,
     __gCrWeb.autofill.webFormControlElementToFormField(
         controlElement, extractMask, formField);
     formFields.push(formField);
-    nameMap[formField['name']] = formField;
+    elementArray[i] = formField;
     fieldsExtracted[i] = true;
 
     // To avoid overly expensive computation, we impose a maximum number of
@@ -221,9 +225,10 @@ function extractFieldsFromControlElements_(controlElements, requirements,
 
 /**
  * For each label element, get the corresponding form control element, use the
- * form control element's name as a key into the |nameMap| to find the
- * previously created AutofillFormFieldData and set the AutofillFormFieldData's
- * label to the label.firstChild().nodeValue() of the label element.
+ * form control element along with |controlElements| and |elementArray| to find
+ * the previously created AutofillFormFieldData and set the
+ * AutofillFormFieldData's label to the label.firstChild().nodeValue() of the
+ * label element.
  *
  * It is based on the logic in
  *     void MatchLabelsAndFields(
@@ -234,45 +239,69 @@ function extractFieldsFromControlElements_(controlElements, requirements,
  * This differs in that it takes a formElement field, instead of calling
  * field_element.isFormControlElement().
  *
+ * This also uses (|controlElements|, |elementArray|) because there is no
+ * guaranteeded Map support on iOS yet.
+ *
  * @param {NodeList} labels The labels to match.
  * @param {HTMLFormElement} formElement The form element being processed.
- * @param {Object<AutofillFormFieldData>} nameMap Map of field names to
- *     fields.
+ * @param {Array<FormControlElement>} controlElements The control elements that
+ *     were processed.
+ * @param {Array<?AutofillFormFieldData>} elementArray The extracted fields.
  */
-function matchLabelsAndFields_(labels, formElement, nameMap) {
+function matchLabelsAndFields_(labels, formElement, controlElements,
+    elementArray) {
   for (var index = 0; index < labels.length; ++index) {
     var label = labels[index];
     var fieldElement = label.control;
-    var elementName;
+    var fieldData = null;
     if (!fieldElement) {
       // Sometimes site authors will incorrectly specify the corresponding
       // field element's name rather than its id, so we compensate here.
-      elementName = label.htmlFor;
+      var elementName = label.htmlFor;
+      if (!elementName)
+        continue;
+      // Look through the list for elements with this name. There can actually
+      // be more than one. In this case, the label may not be particularly
+      // useful, so just discard it.
+      for (var elementIndex = 0; elementIndex < elementArray.length;
+           ++elementIndex) {
+        var currentFieldData = elementArray[elementIndex];
+        if (currentFieldData && currentFieldData['name'] === elementName) {
+          if (fieldData !== null) {
+            fieldData = null;
+            break;
+          } else {
+            fieldData = currentFieldData;
+          }
+        }
+      }
     } else if (fieldElement.form != formElement ||
                    fieldElement.type === 'hidden') {
       continue;
     } else {
-      elementName = __gCrWeb['common'].nameForAutofill(fieldElement);
+      // Typical case: look up |fieldData| in |elementArray|.
+      for (var elementIndex = 0; elementIndex < elementArray.length;
+           ++elementIndex) {
+        if (controlElements[elementIndex] === fieldElement) {
+          fieldData = elementArray[elementIndex];
+          break;
+        }
+      }
     }
 
-    if (!elementName)
+    if (!fieldData)
       continue;
 
-    var fieldElementData = nameMap[elementName];
-    if (!fieldElementData)
-      continue;
-
-    if (!('label' in fieldElementData)) {
-      fieldElementData['label'] = '';
+    if (!('label' in fieldData)) {
+      fieldData['label'] = '';
     }
     var labelText = __gCrWeb.autofill.findChildText(label);
     // Concatenate labels because some sites might have multiple label
     // candidates.
-    if (fieldElementData['label'].length > 0 &&
-        labelText.length > 0) {
-      fieldElementData['label'] += ' ';
+    if (fieldData['label'].length > 0 && labelText.length > 0) {
+      fieldData['label'] += ' ';
     }
-    fieldElementData['label'] += labelText;
+    fieldData['label'] += labelText;
   }
 }
 
@@ -314,9 +343,9 @@ function matchLabelsAndFields_(labels, formElement, nameMap) {
  */
 function formOrFieldsetsToFormData_(formElement, formControlElement,
     fieldsets, controlElements, requirements, extractMask, form, field) {
-  // A map from a AutofillFormFieldData's name to the AutofillFormFieldData
-  // itself.
-  var nameMap = {};
+  // This should be a map from a control element to the AutofillFormFieldData.
+  // However, without Map support, it's just an Array of AutofillFormFieldData.
+  var elementArray = [];
 
   // The extracted FormFields.
   var formFields = [];
@@ -327,23 +356,23 @@ function formOrFieldsetsToFormData_(formElement, formControlElement,
 
   if (!extractFieldsFromControlElements_(controlElements, requirements,
                                          extractMask, formFields,
-                                         fieldsExtracted, nameMap)) {
+                                         fieldsExtracted, elementArray)) {
     return false;
   }
 
   if (formElement) {
     // Loop through the label elements inside the form element. For each label
     // element, get the corresponding form control element, use the form control
-    // element's name as a key into the <name, AutofillFormFieldData> |nameMap|
-    // to find the previously created AutofillFormFieldData and set the
+    // element along with |controlElements| and |elementArray| to find the
+    // previously created AutofillFormFieldData and set the
     // AutofillFormFieldData's label.
     var labels = formElement.getElementsByTagName('label');
-    matchLabelsAndFields_(labels, formElement, nameMap);
+    matchLabelsAndFields_(labels, formElement, controlElements, elementArray);
   } else {
     // Same as the if block, but for all the labels in fieldset
     for (var i = 0; i < fieldsets.length; ++i) {
       var labels = fieldsets[i].getElementsByTagName('label');
-      matchLabelsAndFields_(labels, formElement, nameMap);
+      matchLabelsAndFields_(labels, formElement, controlElements, elementArray);
     }
   }
 
@@ -386,8 +415,7 @@ function formOrFieldsetsToFormData_(formElement, formControlElement,
  * @param {number} requirements The requirements mask for forms, e.g.
  *      autocomplete attribute state.
  * @return {string} A JSON encoded object with object['forms'] containing the
- *     forms data and object['has_more_forms'] indicating if there are more
- *     forms to extract.
+ *     forms data.
  */
 __gCrWeb.autofill['extractForms'] = function(requiredFields, requirements) {
   var forms = [];
@@ -402,10 +430,6 @@ __gCrWeb.autofill['extractForms'] = function(requiredFields, requirements) {
       requirements,
       forms);
   var results = new __gCrWeb.common.JSONSafeObject;
-  // TODO(thestig): This is no longer used, but removing it will require changes
-  // internal to iOS, where some unit tests check this value and expects it to
-  // be false. Once those are removed, this can be removed.
-  results['has_more_forms'] = false;
   results['forms'] = forms;
   return __gCrWeb.stringify(results);
 };
@@ -1200,6 +1224,34 @@ __gCrWeb.autofill.inferLabelFromDefinitionList = function(element) {
 };
 
 /**
+ * Checks if the element's closest ancestor is a TD or DIV.
+ *
+ * It is based on the logic in
+ *    bool ClosestAncestorIsDivAndNotTD(const WebFormControlElement& element)
+ * in chromium/src/components/autofill/content/renderer/form_autofill_util.cc.
+ *
+ * @param {Element} element An element to examine.
+ * @return {boolean} true if the closest ancestor is a <div> and not a <td>.
+ *     false if the closest ancestor is a <td> tag, or if there is no <div> or
+ *     <td> ancestor.
+ */
+__gCrWeb.autofill.closestAncestorIsDivAndNotTD = function(element) {
+  var parentNode = element.parentNode;
+  while (parentNode) {
+    if (parentNode.nodeType === Node.ELEMENT_NODE) {
+      if (__gCrWeb.autofill.hasTagName(parentNode, 'div')) {
+        return true;
+      }
+      if (__gCrWeb.autofill.hasTagName(parentNode, 'td')) {
+        return false;
+      }
+    }
+    parentNode = parentNode.parentNode;
+  }
+  return false;
+}
+
+/**
  * Infers corresponding label for |element| from surrounding context in the DOM,
  * e.g. the contents of the preceding <p> tag or text element.
  *
@@ -1228,6 +1280,22 @@ __gCrWeb.autofill.inferLabelForElement = function(element) {
     return inferredLabel;
   }
 
+  // If we didn't find a label, check for definition list case.
+  inferredLabel = __gCrWeb.autofill.inferLabelFromDefinitionList(element);
+  if (inferredLabel.length > 0) {
+    return inferredLabel;
+  }
+
+  var checkDivFirst = __gCrWeb.autofill.closestAncestorIsDivAndNotTD(element);
+  if (checkDivFirst) {
+    // If we didn't find a label, check for div table case first since it's the
+    // closest ancestor.
+    inferredLabel = __gCrWeb.autofill.inferLabelFromDivTable(element);
+    if (inferredLabel.length > 0) {
+      return inferredLabel;
+    }
+  }
+
   // If we didn't find a label, check for table cell case.
   inferredLabel = __gCrWeb.autofill.inferLabelFromTableColumn(element);
   if (inferredLabel.length > 0) {
@@ -1240,14 +1308,13 @@ __gCrWeb.autofill.inferLabelForElement = function(element) {
     return inferredLabel;
   }
 
-  // If we didn't find a label, check for definition list case.
-  inferredLabel = __gCrWeb.autofill.inferLabelFromDefinitionList(element);
-  if (inferredLabel.length > 0) {
-    return inferredLabel;
+  if (!checkDivFirst) {
+    // If we didn't find a label from the table, check for div table case if we
+    // haven't already.
+    inferredLabel = __gCrWeb.autofill.inferLabelFromDivTable(element);
   }
 
-  // If we didn't find a label, check for div table case.
-  return __gCrWeb.autofill.inferLabelFromDivTable(element);
+  return inferredLabel;
 };
 
 /**
@@ -1442,26 +1509,20 @@ __gCrWeb.autofill.value = function(element) {
 /**
  * Returns the auto-fillable form control elements in |formElement|.
  *
- * It is based on the logic in
- *     std::vector<blink::WebFormControlElement> ExtractAutofillableElements(
- *         const blink::WebFormElement& form_element,
- *         RequirementsMask requirements,
- *         std::vector<blink::WebFormControlElement>* autofillable_elements);
+ * It is based on the logic in:
+ *     std::vector<blink::WebFormControlElement>
+ *     ExtractAutofillableElementsFromSet(
+ *         const WebVector<WebFormControlElement>& control_elements,
+ *         RequirementsMask requirements);
  * in chromium/src/components/autofill/content/renderer/form_autofill_util.h.
  *
- * TODO(thestig): This should match ExtractAutofillableElementsFromSet() from
- *                r306470 once all internal callers have switched over to
- *                extractAutofillableElementsInForm().
- *
- * @param {HTMLFormElement} formElement A form element to be processed.
+ * @param {Array<FormControlElement>} controlElements Set of control elements.
  * @param {number} requirementsMask A mask on the requirement.
- * @param {Array<FormControlElement>} autofillableElements The array of
- *     autofillable elements.
+ * @return {Array<FormControlElement>} The array of autofillable elements.
  */
-__gCrWeb.autofill.extractAutofillableElements = function(
-    formElement, requirementsMask, autofillableElements) {
-  var controlElements = __gCrWeb.common.getFormControlElements(formElement);
-
+__gCrWeb.autofill.extractAutofillableElementsFromSet = function(
+    controlElements, requirementsMask) {
+  var autofillableElements = [];
   for (var i = 0; i < controlElements.length; ++i) {
     var element = controlElements[i];
     if (!__gCrWeb.autofill.isAutofillableElement(element)) {
@@ -1482,6 +1543,7 @@ __gCrWeb.autofill.extractAutofillableElements = function(
     }
     autofillableElements.push(element);
   }
+  return autofillableElements;
 };
 
 /**
@@ -1499,11 +1561,9 @@ __gCrWeb.autofill.extractAutofillableElements = function(
  */
 __gCrWeb.autofill.extractAutofillableElementsInForm = function(
     formElement, requirementsMask) {
-  var autofillableElements = [];
-
-  __gCrWeb.autofill.extractAutofillableElements(
-      formElement, requirementsMask, autofillableElements);
-  return autofillableElements;
+  var controlElements = __gCrWeb.common.getFormControlElements(formElement);
+  return __gCrWeb.autofill.extractAutofillableElementsFromSet(
+      controlElements, requirementsMask);
 };
 
 /**

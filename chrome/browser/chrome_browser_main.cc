@@ -85,6 +85,7 @@
 #include "chrome/browser/profiles/profile_manager.h"
 #include "chrome/browser/profiles/profiles_state.h"
 #include "chrome/browser/shell_integration.h"
+#include "chrome/browser/tracing/navigation_tracing.h"
 #include "chrome/browser/translate/translate_service.h"
 #include "chrome/browser/ui/app_list/app_list_service.h"
 #include "chrome/browser/ui/browser.h"
@@ -469,7 +470,9 @@ void RegisterComponentsForUpdate() {
   }
 
 #if defined(OS_WIN)
+#if defined(GOOGLE_CHROME_BUILD)
   RegisterSwReporterComponent(cus, g_browser_process->local_state());
+#endif  // defined(GOOGLE_CHROME_BUILD)
   RegisterCAPSComponent(cus);
 #endif  // defined(OS_WIN)
 }
@@ -646,6 +649,12 @@ void ChromeBrowserMainParts::SetupMetricsAndFieldTrials() {
 
   // This must be called after |local_state_| is initialized.
   browser_field_trials_.SetupFieldTrials();
+
+  // Enable Navigation Tracing only if a trace upload url is specified.
+  if (command_line->HasSwitch(switches::kEnableNavigationTracing) &&
+      command_line->HasSwitch(switches::kTraceUploadURL)) {
+    tracing::SetupNavigationTracing();
+  }
 
   // Initialize FieldTrialSynchronizer system. This is a singleton and is used
   // for posting tasks via base::Bind. Its deleted when it goes out of scope.

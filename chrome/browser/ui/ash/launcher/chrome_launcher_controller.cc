@@ -68,8 +68,6 @@
 #include "chrome/grit/generated_resources.h"
 #include "components/favicon/content/content_favicon_driver.h"
 #include "content/public/browser/navigation_entry.h"
-#include "content/public/browser/notification_registrar.h"
-#include "content/public/browser/notification_service.h"
 #include "content/public/browser/web_contents.h"
 #include "extensions/browser/extension_prefs.h"
 #include "extensions/browser/extension_registry.h"
@@ -273,34 +271,24 @@ std::string GetSourceFromAppListSource(ash::LaunchSource source) {
 
 #if defined(OS_CHROMEOS)
 // A class to get events from ChromeOS when a user gets changed or added.
-class ChromeLauncherControllerUserSwitchObserverChromeOS
-    : public ChromeLauncherControllerUserSwitchObserver,
-      public user_manager::UserManager::UserSessionStateObserver,
-      content::NotificationObserver {
+class ChromeLauncherControllerUserSwitchObserver
+    : public user_manager::UserManager::UserSessionStateObserver {
  public:
-  ChromeLauncherControllerUserSwitchObserverChromeOS(
+  ChromeLauncherControllerUserSwitchObserver(
       ChromeLauncherController* controller)
       : controller_(controller) {
     DCHECK(user_manager::UserManager::IsInitialized());
     user_manager::UserManager::Get()->AddSessionStateObserver(this);
-    // A UserAddedToSession notification can be sent before a profile is loaded.
-    // Since our observers require that we have already a profile, we might have
-    // to postpone the notification until the ProfileManager lets us know that
-    // the profile for that newly added user was added to the ProfileManager.
-    registrar_.Add(this, chrome::NOTIFICATION_PROFILE_ADDED,
-                   content::NotificationService::AllSources());
   }
-  ~ChromeLauncherControllerUserSwitchObserverChromeOS() override {
+  ~ChromeLauncherControllerUserSwitchObserver() override {
     user_manager::UserManager::Get()->RemoveSessionStateObserver(this);
   }
 
   // user_manager::UserManager::UserSessionStateObserver overrides:
   void UserAddedToSession(const user_manager::User* added_user) override;
 
-  // content::NotificationObserver overrides:
-  void Observe(int type,
-               const content::NotificationSource& source,
-               const content::NotificationDetails& details) override;
+  // ChromeLauncherControllerUserSwitchObserver:
+  void OnUserProfileReadyToSwitch(Profile* profile);
 
  private:
   // Add a user to the session.
@@ -309,18 +297,14 @@ class ChromeLauncherControllerUserSwitchObserverChromeOS
   // The owning ChromeLauncherController.
   ChromeLauncherController* controller_;
 
-  // The notification registrar to track the Profile creations after a user got
-  // added to the session (if required).
-  content::NotificationRegistrar registrar_;
-
   // Users which were just added to the system, but which profiles were not yet
   // (fully) loaded.
   std::set<std::string> added_user_ids_waiting_for_profiles_;
 
-  DISALLOW_COPY_AND_ASSIGN(ChromeLauncherControllerUserSwitchObserverChromeOS);
+  DISALLOW_COPY_AND_ASSIGN(ChromeLauncherControllerUserSwitchObserver);
 };
 
-void ChromeLauncherControllerUserSwitchObserverChromeOS::UserAddedToSession(
+void ChromeLauncherControllerUserSwitchObserver::UserAddedToSession(
     const user_manager::User* active_user) {
   Profile* profile = multi_user_util::GetProfileFromUserID(
       active_user->email());
@@ -332,14 +316,10 @@ void ChromeLauncherControllerUserSwitchObserverChromeOS::UserAddedToSession(
     AddUser(profile);
 }
 
-void ChromeLauncherControllerUserSwitchObserverChromeOS::Observe(
-    int type,
-    const content::NotificationSource& source,
-    const content::NotificationDetails& details) {
-  if (type == chrome::NOTIFICATION_PROFILE_ADDED &&
-      !added_user_ids_waiting_for_profiles_.empty()) {
+void ChromeLauncherControllerUserSwitchObserver::OnUserProfileReadyToSwitch(
+    Profile* profile) {
+  if (!added_user_ids_waiting_for_profiles_.empty()) {
     // Check if the profile is from a user which was on the waiting list.
-    Profile* profile = content::Source<Profile>(source).ptr();
     std::string user_id = multi_user_util::GetUserIDFromProfile(profile);
     std::set<std::string>::iterator it = std::find(
         added_user_ids_waiting_for_profiles_.begin(),
@@ -352,8 +332,7 @@ void ChromeLauncherControllerUserSwitchObserverChromeOS::Observe(
   }
 }
 
-void ChromeLauncherControllerUserSwitchObserverChromeOS::AddUser(
-    Profile* profile) {
+void ChromeLauncherControllerUserSwitchObserver::AddUser(Profile* profile) {
   if (chrome::MultiUserWindowManager::GetMultiProfileMode() ==
           chrome::MultiUserWindowManager::MULTI_PROFILE_MODE_SEPARATED)
     chrome::MultiUserWindowManager::GetInstance()->AddUser(profile);
@@ -397,7 +376,7 @@ ChromeLauncherController::ChromeLauncherController(Profile* profile,
   if (chrome::MultiUserWindowManager::GetMultiProfileMode() !=
           chrome::MultiUserWindowManager::MULTI_PROFILE_MODE_OFF) {
     user_switch_observer_.reset(
-        new ChromeLauncherControllerUserSwitchObserverChromeOS(this));
+        new ChromeLauncherControllerUserSwitchObserver(this));
   }
 
   // Create our v1/v2 application / browser monitors which will inform the
@@ -1521,6 +1500,13 @@ bool ChromeLauncherController::ShelfBoundsChangesProbablyWithUser(
   return currently_shown != other_shown ||
          GetShelfAlignmentFromPrefs(profile_, root_window) !=
              GetShelfAlignmentFromPrefs(other_profile, root_window);
+}
+
+void ChromeLauncherController::OnUserProfileReadyToSwitch(Profile* profile) {
+#if defined(OS_CHROMEOS)
+  if (user_switch_observer_.get())
+    user_switch_observer_->OnUserProfileReadyToSwitch(profile);
+#endif
 }
 
 void ChromeLauncherController::LauncherItemClosed(ash::ShelfID id) {

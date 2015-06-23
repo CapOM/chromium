@@ -8,10 +8,10 @@
 # Do NOT CHANGE this if you don't know what you're doing -- see
 # https://code.google.com/p/chromium/wiki/UpdatingClang
 # Reverting problematic clang rolls is safe, though.
-CLANG_REVISION=238013
+CLANG_REVISION=239765
 
 # This is incremented when pushing a new build of Clang at the same revision.
-CLANG_SUB_REVISION=3
+CLANG_SUB_REVISION=1
 
 PACKAGE_VERSION="${CLANG_REVISION}-${CLANG_SUB_REVISION}"
 
@@ -369,8 +369,8 @@ if [[ -n "$with_patches" ]]; then
   # Apply patch for tests failing with --disable-pthreads (llvm.org/PR11974)
   pushd "${CLANG_DIR}"
   cat << 'EOF' |
---- third_party/llvm/tools/clang/test/Index/crash-recovery-modules.m	(revision 202554)
-+++ third_party/llvm/tools/clang/test/Index/crash-recovery-modules.m	(working copy)
+--- test/Index/crash-recovery-modules.m	(revision 202554)
++++ test/Index/crash-recovery-modules.m	(working copy)
 @@ -12,6 +12,8 @@
  
  // REQUIRES: crash-recovery
@@ -380,7 +380,7 @@ if [[ -n "$with_patches" ]]; then
  
  @import Crash;
 EOF
-patch -p4
+patch -p0
 popd
 
 pushd "${CLANG_DIR}"
@@ -403,8 +403,6 @@ EOF
   # This Go bindings test doesn't work after the bootstrap build on Linux. (PR21552)
   pushd "${LLVM_DIR}"
   cat << 'EOF' |
-Index: test/Bindings/Go/go.test
-===================================================================
 --- test/Bindings/Go/go.test    (revision 223109)
 +++ test/Bindings/Go/go.test    (working copy)
 @@ -1,3 +1,3 @@
@@ -420,8 +418,8 @@ EOF
   # on Mac OS X 10.8 (PR23539).
   pushd "${COMPILER_RT_DIR}"
   cat << 'EOF' |
---- a/cmake/config-ix.cmake
-+++ b/cmake/config-ix.cmake
+--- cmake/config-ix.cmake
++++ cmake/config-ix.cmake
 @@ -319,7 +319,7 @@ else()
  endif()
  
@@ -433,8 +431,8 @@ EOF
    set(COMPILER_RT_HAS_UBSAN FALSE)
 diff --git a/lib/ubsan/ubsan_platform.h b/lib/ubsan/ubsan_platform.h
 index 8ba253b..d5dce8d 100644
---- a/lib/ubsan/ubsan_platform.h
-+++ b/lib/ubsan/ubsan_platform.h
+--- lib/ubsan/ubsan_platform.h
++++ lib/ubsan/ubsan_platform.h
 @@ -14,7 +14,7 @@
  #define UBSAN_PLATFORM_H
  
@@ -445,7 +443,7 @@ index 8ba253b..d5dce8d 100644
       defined(__aarch64__) || defined(__mips__) || defined(__powerpc64__))
  # define CAN_SANITIZE_UB 1
 EOF
-  patch -p1
+  patch -p0
   popd
 
 fi
@@ -474,16 +472,15 @@ LDFLAGS=""
 # needed, on OS X it requires libc++. clang only automatically links to libc++
 # when targeting OS X 10.9+, so add stdlib=libc++ explicitly so clang can run on
 # OS X versions as old as 10.7.
-# TODO(thakis): Some bots are still on 10.6, so for now bundle libc++.dylib.
-# Remove this once all bots are on 10.7+, then use --enable-libcpp=yes and
-# change deployment_target to 10.7.
+# TODO(thakis): Some bots are still on 10.6 (nacl...), so for now bundle
+# libc++.dylib.  Remove this once all bots are on 10.7+, then use
+# -DLLVM_ENABLE_LIBCXX=ON and change deployment_target to 10.7.
 deployment_target=""
 
 if [ "${OS}" = "Darwin" ]; then
   # When building on 10.9, /usr/include usually doesn't exist, and while
   # Xcode's clang automatically sets a sysroot, self-built clangs don't.
   CFLAGS="-isysroot $(xcrun --show-sdk-path)"
-  CPPFLAGS="${CFLAGS}"
   CXXFLAGS="-stdlib=libc++ -nostdinc++ -I${ABS_LIBCXX_DIR}/include ${CFLAGS}"
 
   if [[ -n "${bootstrap}" ]]; then

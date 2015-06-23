@@ -8,8 +8,10 @@
 #include "base/memory/scoped_ptr.h"
 #include "base/metrics/histogram.h"
 #include "base/strings/utf_string_conversions.h"
+#include "components/dom_distiller/content/distiller_javascript_utils.h"
 #include "components/dom_distiller/content/web_contents_main_frame_observer.h"
 #include "components/dom_distiller/core/distiller_page.h"
+#include "components/dom_distiller/core/dom_distiller_constants.h"
 #include "components/dom_distiller/core/dom_distiller_service.h"
 #include "content/public/browser/browser_context.h"
 #include "content/public/browser/navigation_controller.h"
@@ -60,7 +62,8 @@ DistillerPageWebContents::DistillerPageWebContents(
     : state_(IDLE),
       source_page_handle_(nullptr),
       browser_context_(browser_context),
-      render_view_size_(render_view_size) {
+      render_view_size_(render_view_size),
+      weak_factory_(this) {
   if (optional_web_contents_handle) {
     source_page_handle_ = optional_web_contents_handle.Pass();
     if (render_view_size.IsEmpty())
@@ -180,10 +183,10 @@ void DistillerPageWebContents::ExecuteJavaScript() {
   // page.
   source_page_handle_->web_contents()->Stop();
   DVLOG(1) << "Beginning distillation";
-  frame->ExecuteJavaScript(
-      base::UTF8ToUTF16(script_),
+  RunIsolatedJavaScript(
+      frame, script_,
       base::Bind(&DistillerPageWebContents::OnWebContentsDistillationDone,
-                 base::Unretained(this),
+                 weak_factory_.GetWeakPtr(),
                  source_page_handle_->web_contents()->GetLastCommittedURL(),
                  base::TimeTicks::Now()));
 }

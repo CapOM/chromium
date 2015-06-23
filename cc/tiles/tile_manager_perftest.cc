@@ -16,7 +16,6 @@
 #include "cc/test/fake_picture_pile_impl.h"
 #include "cc/test/fake_tile_manager.h"
 #include "cc/test/fake_tile_manager_client.h"
-#include "cc/test/impl_side_painting_settings.h"
 #include "cc/test/test_shared_bitmap_manager.h"
 #include "cc/test/test_task_graph_runner.h"
 #include "cc/test/test_tile_priorities.h"
@@ -65,8 +64,9 @@ class FakeTileTaskRunnerImpl : public TileTaskRunner, public TileTaskClient {
     }
     completed_tasks_.clear();
   }
-  ResourceFormat GetResourceFormat() override {
-    return RGBA_8888;
+  ResourceFormat GetResourceFormat() const override { return RGBA_8888; }
+  bool GetResourceRequiresSwizzle() const override {
+    return !PlatformColor::SameComponentOrder(GetResourceFormat());
   }
 
   // Overridden from TileTaskClient:
@@ -84,6 +84,13 @@ class FakeTileTaskRunnerImpl : public TileTaskRunner, public TileTaskClient {
 base::LazyInstance<FakeTileTaskRunnerImpl> g_fake_tile_task_runner =
     LAZY_INSTANCE_INITIALIZER;
 
+class LayerTreeSettingsWithLargeInterestArea : public LayerTreeSettings {
+ public:
+  LayerTreeSettingsWithLargeInterestArea() {
+    tiling_interest_area_viewport_multiplier = 10000;
+  }
+};
+
 class TileManagerPerfTest : public testing::Test {
  public:
   TileManagerPerfTest()
@@ -91,7 +98,7 @@ class TileManagerPerfTest : public testing::Test {
         max_tiles_(10000),
         id_(7),
         proxy_(base::ThreadTaskRunnerHandle::Get()),
-        host_impl_(ImplSidePaintingSettings(10000),
+        host_impl_(LayerTreeSettingsWithLargeInterestArea(),
                    &proxy_,
                    &shared_bitmap_manager_,
                    &task_graph_runner_),
@@ -385,12 +392,11 @@ class TileManagerPerfTest : public testing::Test {
                            int approximate_tile_count_per_layer) {
     std::vector<FakePictureLayerImpl*> layers =
         CreateLayers(layer_count, approximate_tile_count_per_layer);
+
     timer_.Reset();
     bool resourceless_software_draw = false;
     do {
-      BeginFrameArgs args =
-          CreateBeginFrameArgsForTesting(BEGINFRAME_FROM_HERE);
-      host_impl_.WillBeginImplFrame(args);
+      host_impl_.AdvanceToNextFrame(base::TimeDelta::FromMilliseconds(1));
       for (const auto& layer : layers)
         layer->UpdateTiles(resourceless_software_draw);
 
@@ -398,7 +404,6 @@ class TileManagerPerfTest : public testing::Test {
       tile_manager()->PrepareTiles(global_state);
       tile_manager()->UpdateVisibleTiles(global_state);
       timer_.NextLap();
-      host_impl_.DidFinishImplFrame();
     } while (!timer_.HasTimeLimitExpired());
 
     perf_test::PrintResult("prepare_tiles", "", test_name,

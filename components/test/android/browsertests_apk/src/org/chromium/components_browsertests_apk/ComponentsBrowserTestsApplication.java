@@ -15,9 +15,9 @@ import org.chromium.base.ResourceExtractor;
  */
 public class ComponentsBrowserTestsApplication extends BaseChromiumApplication {
     private static final String[] MANDATORY_PAK_FILES =
-            new String[] {"components_tests_resources.pak", "content_shell.pak", "icudtl.dat",
-                    "natives_blob.bin", "snapshot_blob.bin"};
-    private static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "components_shell";
+            new String[] {"components_tests_resources.pak", "content_shell.pak", "natives_blob.bin",
+                    "snapshot_blob.bin"};
+    static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "components_shell";
 
     @Override
     public void onCreate() {
@@ -26,7 +26,7 @@ public class ComponentsBrowserTestsApplication extends BaseChromiumApplication {
     }
 
     public static void initializeApplicationParameters(Context context) {
-        ResourceExtractor.setMandatoryPaksToExtract(MANDATORY_PAK_FILES);
+        ResourceExtractor.setMandatoryPaksToExtract(0, MANDATORY_PAK_FILES);
         PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, context);
     }
 }

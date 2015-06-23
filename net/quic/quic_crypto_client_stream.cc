@@ -4,7 +4,7 @@
 
 #include "net/quic/quic_crypto_client_stream.h"
 
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/profiler/scoped_tracker.h"
 #include "net/quic/crypto/crypto_protocol.h"
 #include "net/quic/crypto/crypto_utils.h"
@@ -340,8 +340,8 @@ void QuicCryptoClientStream::DoSendCHLO(
   SendHandshakeMessage(out);
   // Be prepared to decrypt with the new server write key.
   session()->connection()->SetAlternativeDecrypter(
-      crypto_negotiated_params_.initial_crypters.decrypter.release(),
       ENCRYPTION_INITIAL,
+      crypto_negotiated_params_.initial_crypters.decrypter.release(),
       true /* latch once used */);
   // Send subsequent packets under encryption on the assumption that the
   // server will accept the handshake.
@@ -419,14 +419,9 @@ QuicAsyncStatus QuicCryptoClientStream::DoVerifyProof(
   verify_ok_ = false;
 
   QuicAsyncStatus status = verifier->VerifyProof(
-      server_id_.host(),
-      cached->server_config(),
-      cached->certs(),
-      cached->signature(),
-      verify_context_.get(),
-      &verify_error_details_,
-      &verify_details_,
-      proof_verify_callback);
+      server_id_.host(), cached->server_config(), cached->certs(),
+      cached->signature(), verify_context_.get(), &verify_error_details_,
+      &verify_details_, proof_verify_callback);
 
   switch (status) {
     case QUIC_PENDING:
@@ -578,7 +573,7 @@ void QuicCryptoClientStream::DoReceiveSHLO(
   // with the FORWARD_SECURE key until it receives a FORWARD_SECURE
   // packet from the client.
   session()->connection()->SetAlternativeDecrypter(
-      crypters->decrypter.release(), ENCRYPTION_FORWARD_SECURE,
+      ENCRYPTION_FORWARD_SECURE, crypters->decrypter.release(),
       false /* don't latch */);
   session()->connection()->SetEncrypter(
       ENCRYPTION_FORWARD_SECURE, crypters->encrypter.release());

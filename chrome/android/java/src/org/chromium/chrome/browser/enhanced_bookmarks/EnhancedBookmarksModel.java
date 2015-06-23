@@ -9,12 +9,9 @@ import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.browser.BookmarksBridge;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkItem;
 import org.chromium.chrome.browser.BookmarksBridge.BookmarkModelObserver;
-import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksBridge.FiltersObserver;
 import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksBridge.SalientImageCallback;
-import org.chromium.chrome.browser.enhanced_bookmarks.EnhancedBookmarksBridge.SearchServiceObserver;
 import org.chromium.chrome.browser.profiles.Profile;
 import org.chromium.components.bookmarks.BookmarkId;
-import org.chromium.components.bookmarks.BookmarkMatch;
 import org.chromium.components.bookmarks.BookmarkType;
 import org.chromium.components.dom_distiller.core.DomDistillerUrlUtils;
 import org.chromium.content_public.browser.WebContents;
@@ -286,20 +283,6 @@ public class EnhancedBookmarksModel {
     }
 
     /**
-     * @see EnhancedBookmarksBridge#getBookmarkDescription(BookmarkId)
-     */
-    public String getBookmarkDescription(BookmarkId id) {
-        return mEnhancedBookmarksBridge.getBookmarkDescription(id);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#setBookmarkDescription(BookmarkId, String)
-     */
-    public void setBookmarkDescription(BookmarkId id, String description) {
-        mEnhancedBookmarksBridge.setBookmarkDescription(id, description);
-    }
-
-    /**
      * @see EnhancedBookmarksBridge#salientImageForUrl(String, SalientImageCallback)
      */
     public boolean salientImageForUrl(String url, SalientImageCallback callback) {
@@ -318,76 +301,6 @@ public class EnhancedBookmarksModel {
      */
     public void undo() {
         mBookmarksBridge.undo();
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#getFiltersForBookmark(BookmarkId)
-     */
-    public String[] getFiltersForBookmark(BookmarkId bookmark) {
-        return mEnhancedBookmarksBridge.getFiltersForBookmark(bookmark);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#getFilters()
-     */
-    public List<String> getFilters() {
-        return mEnhancedBookmarksBridge.getFilters();
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#getBookmarksForFilter(String)
-     */
-    public List<BookmarkId> getBookmarksForFilter(String filter) {
-        return mEnhancedBookmarksBridge.getBookmarksForFilter(filter);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#addFiltersObserver(FiltersObserver)
-     */
-    public void addFiltersObserver(FiltersObserver observer) {
-        mEnhancedBookmarksBridge.addFiltersObserver(observer);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#removeFiltersObserver(FiltersObserver)
-     */
-    public void removeFiltersObserver(FiltersObserver observer) {
-        mEnhancedBookmarksBridge.removeFiltersObserver(observer);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#sendSearchRequest(String)
-     */
-    public void sendSearchRequest(String query) {
-        mEnhancedBookmarksBridge.sendSearchRequest(query);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#sendSearchRequest(String)
-     */
-    public List<BookmarkId> getSearchResultsForQuery(String query) {
-        return mEnhancedBookmarksBridge.getSearchResultsForQuery(query);
-    }
-
-    /**
-     * @see BookmarksBridge#searchBookmarks(String, int)
-     */
-    public List<BookmarkMatch> getLocalSearchForQuery(String query, int maxNumberOfQuery) {
-        return mBookmarksBridge.searchBookmarks(query, maxNumberOfQuery);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#addSearchObserver(SearchServiceObserver)
-     */
-    public void addSearchObserver(SearchServiceObserver observer) {
-        mEnhancedBookmarksBridge.addSearchObserver(observer);
-    }
-
-    /**
-     * @see EnhancedBookmarksBridge#removeSearchObserver(SearchServiceObserver)
-     */
-    public void removeSearchObserver(SearchServiceObserver observer) {
-        mEnhancedBookmarksBridge.removeSearchObserver(observer);
     }
 
     /**

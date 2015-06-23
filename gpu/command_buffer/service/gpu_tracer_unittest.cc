@@ -170,6 +170,15 @@ class BaseGpuTest : public GpuServiceTest {
     }
   }
 
+  void ExpectDisjointOutputMocks(MockOutputter* outputter,
+                                 int64 expect_start_time,
+                                 int64 expect_end_time) {
+    EXPECT_CALL(*outputter,
+                TraceDevice(kTraceDisjoint, "DisjointEvent", _,
+                            expect_start_time, expect_end_time))
+          .Times(Exactly(1));
+  }
+
   void ExpectOutputterMocks(MockOutputter* outputter,
                             bool tracing_service,
                             bool tracing_device,
@@ -180,8 +189,7 @@ class BaseGpuTest : public GpuServiceTest {
     if (tracing_service)
       ExpectOutputterBeginMocks(outputter, source, category, name);
     const bool valid_timer = tracing_device &&
-                             gpu_timing_client_->IsAvailable() &&
-                             GetTimerType() != gfx::GPUTiming::kTimerTypeEXT;
+                             gpu_timing_client_->IsAvailable();
     ExpectOutputterEndMocks(outputter, source, category, name,
                             expect_start_time, expect_end_time,
                             tracing_service, valid_timer);
@@ -393,8 +401,7 @@ class BaseGpuTracerTest : public BaseGpuTest {
       std::string source_category = category_name + num_char;
       std::string source_trace_name = trace_name + num_char;
 
-      const bool valid_timer = gpu_timing_client_->IsAvailable() &&
-                               GetTimerType() != gfx::GPUTiming::kTimerTypeEXT;
+      const bool valid_timer = gpu_timing_client_->IsAvailable();
 
       const GpuTracerSource source = static_cast<GpuTracerSource>(i);
       ExpectOutputterEndMocks(outputter_ref_.get(), source, source_category,
@@ -459,6 +466,9 @@ class BaseGpuTracerTest : public BaseGpuTest {
     ASSERT_FALSE(disjoint_client->CheckAndResetTimerErrors());
     gl_fake_queries_.SetDisjoint();
     ASSERT_TRUE(disjoint_client->CheckAndResetTimerErrors());
+
+    ExpectDisjointOutputMocks(outputter_ref_.get(),
+                              expect_start_time, expect_end_time);
 
     ExpectOutputterEndMocks(outputter_ref_.get(), tracer_source,
                             category_name, trace_name,

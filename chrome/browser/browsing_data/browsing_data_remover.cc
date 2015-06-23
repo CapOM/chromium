@@ -35,7 +35,7 @@
 #include "chrome/browser/sessions/session_service_factory.h"
 #include "chrome/browser/sessions/tab_restore_service.h"
 #include "chrome/browser/sessions/tab_restore_service_factory.h"
-#include "chrome/browser/webdata/web_data_service_factory.h"
+#include "chrome/browser/web_data_service_factory.h"
 #include "chrome/common/pref_names.h"
 #include "chrome/common/url_constants.h"
 #include "components/autofill/core/browser/personal_data_manager.h"
@@ -46,6 +46,7 @@
 #include "components/history/core/browser/history_service.h"
 #include "components/nacl/browser/nacl_browser.h"
 #include "components/nacl/browser/pnacl_host.h"
+#include "components/omnibox/omnibox_pref_names.h"
 #include "components/password_manager/core/browser/password_store.h"
 #include "components/power/origin_power_map.h"
 #include "components/power/origin_power_map_factory.h"
@@ -263,7 +264,7 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
 
   // All the UI entry points into the BrowsingDataRemover should be disabled,
   // but this will fire if something was missed or added.
-  DCHECK(may_delete_history ||
+  DCHECK(may_delete_history || (remove_mask & REMOVE_NOCHECKS) ||
       (!(remove_mask & REMOVE_HISTORY) && !(remove_mask & REMOVE_DOWNLOADS)));
 
   if (origin_set_mask_ & BrowsingDataHelper::UNPROTECTED_WEB) {
@@ -549,12 +550,10 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
   }
 #endif
 
-#if defined(OS_ANDROID)
   if (remove_mask & REMOVE_APP_BANNER_DATA || remove_mask & REMOVE_HISTORY) {
     profile_->GetHostContentSettingsMap()->ClearSettingsForOneType(
         CONTENT_SETTINGS_TYPE_APP_BANNER);
   }
-#endif
 
   if (remove_mask & REMOVE_PASSWORDS) {
     content::RecordAction(UserMetricsAction("ClearBrowsingData_Passwords"));
@@ -715,7 +714,7 @@ void BrowsingDataRemover::RemoveImpl(int remove_mask,
 
   // Remove omnibox zero-suggest cache results.
   if ((remove_mask & (REMOVE_CACHE | REMOVE_COOKIES)))
-    prefs->SetString(prefs::kZeroSuggestCachedResults, std::string());
+    prefs->SetString(omnibox::kZeroSuggestCachedResults, std::string());
 
   // Always wipe accumulated network related data (TransportSecurityState and
   // HttpServerPropertiesManager data).

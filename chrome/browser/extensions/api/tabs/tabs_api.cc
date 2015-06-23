@@ -10,15 +10,17 @@
 
 #include "base/bind.h"
 #include "base/command_line.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/memory/ref_counted_memory.h"
-#include "base/message_loop/message_loop.h"
 #include "base/prefs/pref_service.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string16.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "chrome/browser/apps/scoped_keep_alive.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/extensions/api/tabs/tabs_constants.h"
@@ -60,7 +62,6 @@
 #include "content/public/browser/notification_details.h"
 #include "content/public/browser/notification_source.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_view.h"
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/url_constants.h"
@@ -573,7 +574,7 @@ bool WindowsCreateFunction::RunSync() {
           extension());
       AshPanelContents* ash_panel_contents = new AshPanelContents(app_window);
       app_window->Init(urls[0], ash_panel_contents, create_params);
-      SetResult(ash_panel_contents->GetExtensionWindowController()
+      SetResult(ash_panel_contents->GetWindowController()
                     ->CreateWindowValueWithTabs(extension()));
       return true;
     }
@@ -1070,8 +1071,7 @@ bool TabsGetCurrentFunction::RunSync() {
 
   // Return the caller, if it's a tab. If not the result isn't an error but an
   // empty tab (hence returning true).
-  WebContents* caller_contents =
-      WebContents::FromRenderViewHost(render_view_host());
+  WebContents* caller_contents = GetSenderWebContents();
   if (caller_contents && ExtensionTabUtil::GetTabId(caller_contents) >= 0)
     SetResult(ExtensionTabUtil::CreateTabValue(caller_contents, extension()));
 
@@ -1677,11 +1677,10 @@ bool TabsDetectLanguageFunction::RunAsync() {
            .empty()) {
     // Delay the callback invocation until after the current JS call has
     // returned.
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(
-            &TabsDetectLanguageFunction::GotLanguage,
-            this,
+            &TabsDetectLanguageFunction::GotLanguage, this,
             chrome_translate_client->GetLanguageState().original_language()));
     return true;
   }

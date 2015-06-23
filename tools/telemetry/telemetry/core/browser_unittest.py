@@ -16,9 +16,9 @@ from telemetry.core.platform import tracing_options
 from telemetry.core import system_info
 from telemetry.core import util
 from telemetry import decorators
+from telemetry.internal.util import path
 from telemetry.unittest_util import browser_test_case
 from telemetry.unittest_util import options_for_unittests
-from telemetry.util import path
 
 
 class BrowserTest(browser_test_case.BrowserTestCase):
@@ -107,6 +107,7 @@ class BrowserTest(browser_test_case.BrowserTestCase):
   def testGetSystemTotalMemory(self):
     self.assertTrue(self._browser.memory_stats['SystemTotalPhysicalMemory'] > 0)
 
+  @decorators.Disabled('mac')  # crbug.com/499208.
   def testIsTracingRunning(self):
     tracing_controller = self._browser.platform.tracing_controller
     if not tracing_controller.IsChromeTracingSupported():

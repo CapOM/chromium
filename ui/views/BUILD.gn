@@ -11,7 +11,12 @@ gypi_values = exec_script("//build/gypi_to_gn.py",
                           "scope",
                           [ "views.gyp" ])
 
+config("flags") {
+  defines = [ "TOOLKIT_VIEWS=1" ]
+}
+
 component("views") {
+  all_dependent_configs = [ ":flags" ]
   sources = gypi_values.views_sources
 
   # TODO(jschuh): crbug.com/167187 fix size_t to int truncations.
@@ -260,13 +265,9 @@ test("views_unittests") {
     # views_unittests not yet compiling on Mac. http://crbug.com/378134
     sources -= [
       "bubble/bubble_window_targeter_unittest.cc",
-      "controls/button/custom_button_unittest.cc",
-      "controls/button/menu_button_unittest.cc",
-      "controls/menu/menu_controller_unittest.cc",
       "controls/native/native_view_host_unittest.cc",
       "focus/focus_manager_unittest.cc",
       "ime/input_method_bridge_unittest.cc",
-      "widget/widget_unittest.cc",
       "widget/window_reorderer_unittest.cc",
     ]
   }

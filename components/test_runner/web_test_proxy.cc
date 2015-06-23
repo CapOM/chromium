@@ -12,6 +12,7 @@
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/trace_event/trace_event.h"
 #include "components/test_runner/accessibility_controller.h"
 #include "components/test_runner/event_sender.h"
@@ -198,7 +199,7 @@ bool IsLocalHost(const std::string& host) {
 }
 
 bool IsTestHost(const std::string& host) {
-  return EndsWith(host, ".test", false);
+  return base::EndsWith(host, ".test", false);
 }
 
 bool HostIsUsedBySomeTestsToGenerateError(const std::string& host) {
@@ -456,7 +457,9 @@ void WebTestProxyBase::ShowValidationMessage(
                           base::UTF16ToUTF8(sub_message) + "\n");
 }
 
-std::string WebTestProxyBase::CaptureTree(bool debug_render_tree) {
+std::string WebTestProxyBase::CaptureTree(
+    bool debug_render_tree,
+    bool dump_line_box_trees) {
   bool should_dump_custom_text =
       test_interfaces_->GetTestRunner()->shouldDumpAsCustomText();
   bool should_dump_as_text =
@@ -489,6 +492,8 @@ std::string WebTestProxyBase::CaptureTree(bool debug_render_tree) {
       layout_text_behavior |= blink::WebFrame::LayoutAsTextPrinting;
     if (debug_render_tree)
       layout_text_behavior |= blink::WebFrame::LayoutAsTextDebug;
+    if (dump_line_box_trees)
+      layout_text_behavior |= blink::WebFrame::LayoutAsTextWithLineTrees;
     data_utf8 = frame->layoutTreeAsText(layout_text_behavior).utf8();
     data_utf8 += DumpFrameScrollPosition(frame, recursive);
   }
@@ -629,11 +634,9 @@ void WebTestProxyBase::CapturePixelsAsync(
   }
 
   if (test_interfaces_->GetTestRunner()->isPrinting()) {
-    base::MessageLoopProxy::current()->PostTask(
-        FROM_HERE,
-        base::Bind(&WebTestProxyBase::CapturePixelsForPrinting,
-                   base::Unretained(this),
-                   callback));
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(&WebTestProxyBase::CapturePixelsForPrinting,
+                              base::Unretained(this), callback));
     return;
   }
 

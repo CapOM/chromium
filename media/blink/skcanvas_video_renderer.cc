@@ -12,9 +12,13 @@
 #include "skia/ext/refptr.h"
 #include "third_party/libyuv/include/libyuv.h"
 #include "third_party/skia/include/core/SkCanvas.h"
+#include "third_party/skia/include/core/SkImage.h"
 #include "third_party/skia/include/core/SkImageGenerator.h"
 #include "third_party/skia/include/gpu/GrContext.h"
+#include "third_party/skia/include/gpu/GrPaint.h"
+#include "third_party/skia/include/gpu/GrTexture.h"
 #include "third_party/skia/include/gpu/GrTextureProvider.h"
+#include "third_party/skia/include/gpu/SkGr.h"
 #include "third_party/skia/include/gpu/SkGrPixelRef.h"
 #include "ui/gfx/skbitmap_operations.h"
 
@@ -46,7 +50,7 @@ bool CheckColorSpace(const scoped_refptr<VideoFrame>& video_frame,
                      VideoFrame::ColorSpace color_space) {
   int result;
   return video_frame->metadata()->GetInteger(
-             media::VideoFrameMetadata::COLOR_SPACE, &result) &&
+             VideoFrameMetadata::COLOR_SPACE, &result) &&
          result == color_space;
 }
 
@@ -84,32 +88,6 @@ bool AllocateSkBitmapTexture(GrContext* gr,
   return true;
 }
 
-bool CopyVideoFrameTextureToSkBitmapTexture(VideoFrame* video_frame,
-                                            SkBitmap* bitmap,
-                                            const Context3D& context_3d) {
-  // Check if we could reuse existing texture based bitmap.
-  // Otherwise, release existing texture based bitmap and allocate
-  // a new one based on video size.
-  if (!IsSkBitmapProperlySizedTexture(bitmap,
-                                      video_frame->visible_rect().size())) {
-    if (!AllocateSkBitmapTexture(context_3d.gr_context, bitmap,
-                                 video_frame->visible_rect().size())) {
-      return false;
-    }
-  }
-
-  unsigned texture_id =
-      static_cast<unsigned>((bitmap->getTexture())->getTextureHandle());
-  // If CopyVideoFrameTextureToGLTexture() changes the state of the
-  // |texture_id|, it's needed to invalidate the state cached in skia,
-  // but currently the state isn't changed.
-  SkCanvasVideoRenderer::CopyVideoFrameTextureToGLTexture(
-      context_3d.gl, video_frame, texture_id, GL_RGBA, GL_UNSIGNED_BYTE, true,
-      false);
-  bitmap->notifyPixelsChanged();
-  return true;
-}
-
 class SyncPointClientImpl : public VideoFrame::SyncPointClient {
  public:
   explicit SyncPointClientImpl(gpu::gles2::GLES2Interface* gl) : gl_(gl) {}
@@ -124,6 +102,84 @@ class SyncPointClientImpl : public VideoFrame::SyncPointClient {
 
   DISALLOW_IMPLICIT_CONSTRUCTORS(SyncPointClientImpl);
 };
+
+scoped_ptr<SkImage> CreateSkImageFromVideoFrameYUVTextures(
+    VideoFrame* video_frame,
+    const Context3D& context_3d) {
+  // Support only TEXTURE_YUV_420.
+  DCHECK(video_frame->HasTextures());
+  DCHECK_EQ(media::VideoFrame::I420, video_frame->format());
+  DCHECK_EQ(3u, media::VideoFrame::NumPlanes(video_frame->format()));
+
+  gpu::gles2::GLES2Interface* gl = context_3d.gl;
+  DCHECK(gl);
+  gfx::Size ya_tex_size = video_frame->coded_size();
+  gfx::Size uv_tex_size((ya_tex_size.width() + 1) / 2,
+                        (ya_tex_size.height() + 1) / 2);
+
+  unsigned source_textures[3] = {0};
+  for (size_t i = 0; i < media::VideoFrame::NumPlanes(video_frame->format());
+       ++i) {
+    // Get the texture from the mailbox and wrap it in a GrTexture.
+    const gpu::MailboxHolder& mailbox_holder = video_frame->mailbox_holder(i);
+    DCHECK(mailbox_holder.texture_target == GL_TEXTURE_2D ||
+           mailbox_holder.texture_target == GL_TEXTURE_EXTERNAL_OES ||
+           mailbox_holder.texture_target == GL_TEXTURE_RECTANGLE_ARB);
+    gl->WaitSyncPointCHROMIUM(mailbox_holder.sync_point);
+    source_textures[i] = gl->CreateAndConsumeTextureCHROMIUM(
+        mailbox_holder.texture_target, mailbox_holder.mailbox.name);
+  }
+  GrBackendObject handles[3] = {
+      source_textures[0], source_textures[1], source_textures[2]};
+
+  SkISize yuvSizes[] = {
+      {ya_tex_size.width(), ya_tex_size.height()},
+      {uv_tex_size.width(), uv_tex_size.height()},
+      {uv_tex_size.width(), uv_tex_size.height()},
+  };
+
+  // TODO(dcastagna): Skia currently doesn't support Rec709 YUV conversion.
+  DCHECK(!CheckColorSpace(video_frame, VideoFrame::COLOR_SPACE_HD_REC709));
+  SkYUVColorSpace color_space = kRec601_SkYUVColorSpace;
+  if (CheckColorSpace(video_frame, VideoFrame::COLOR_SPACE_JPEG))
+    color_space = kJPEG_SkYUVColorSpace;
+
+  SkImage* img = SkImage::NewFromYUVTexturesCopy(context_3d.gr_context,
+                                                 color_space, handles, yuvSizes,
+                                                 kTopLeft_GrSurfaceOrigin);
+  DCHECK(img);
+  gl->DeleteTextures(3, source_textures);
+  SyncPointClientImpl client(gl);
+  video_frame->UpdateReleaseSyncPoint(&client);
+  return make_scoped_ptr(img);
+}
+
+bool CopyVideoFrameSingleTextureToSkBitmap(VideoFrame* video_frame,
+                                           SkBitmap* bitmap,
+                                           const Context3D& context_3d) {
+  // Check if we could reuse existing texture based bitmap.
+  // Otherwise, release existing texture based bitmap and allocate
+  // a new one based on video size.
+  if (!IsSkBitmapProperlySizedTexture(bitmap,
+                                      video_frame->visible_rect().size())) {
+    if (!AllocateSkBitmapTexture(context_3d.gr_context, bitmap,
+                                 video_frame->visible_rect().size())) {
+      return false;
+    }
+  }
+
+  unsigned texture_id =
+      static_cast<unsigned>((bitmap->getTexture())->getTextureHandle());
+  // If CopyVideoFrameSingleTextureToGLTexture() changes the state of the
+  // |texture_id|, it's needed to invalidate the state cached in skia,
+  // but currently the state isn't changed.
+
+  SkCanvasVideoRenderer::CopyVideoFrameSingleTextureToGLTexture(
+      context_3d.gl, video_frame, texture_id, GL_RGBA, GL_UNSIGNED_BYTE, true,
+      false);
+  bitmap->notifyPixelsChanged();
+  return true;
+}
 
 }  // anonymous namespace
 
@@ -145,6 +201,7 @@ class VideoImageGenerator : public SkImageGenerator {
   Result onGetPixels(const SkImageInfo& info,
                      void* pixels,
                      size_t row_bytes,
+                     const Options&,
                      SkPMColor ctable[],
                      int* ctable_count) override {
     if (!frame_.get())
@@ -159,7 +216,7 @@ class VideoImageGenerator : public SkImageGenerator {
                        void* planes[3],
                        size_t row_bytes[3],
                        SkYUVColorSpace* color_space) override {
-    if (!frame_.get() || !media::VideoFrame::IsYuvPlanar(frame_->format()) ||
+    if (!frame_.get() || !VideoFrame::IsYuvPlanar(frame_->format()) ||
         // TODO(rileya): Skia currently doesn't support Rec709 YUV conversion,
         // or YUVA conversion. Remove this case once it does. As-is we will
         // fall back on the pure-software path in this case.
@@ -178,23 +235,21 @@ class VideoImageGenerator : public SkImageGenerator {
     for (int plane = VideoFrame::kYPlane; plane <= VideoFrame::kVPlane;
          ++plane) {
       if (sizes) {
-        gfx::Size size;
-        size =
-            VideoFrame::PlaneSize(frame_->format(),
-                                  plane,
+        const gfx::Size size =
+            VideoFrame::PlaneSize(frame_->format(), plane,
                                   gfx::Size(frame_->visible_rect().width(),
                                             frame_->visible_rect().height()));
         sizes[plane].set(size.width(), size.height());
       }
       if (row_bytes && planes) {
         size_t offset;
-        int y_shift = (frame_->format() == media::VideoFrame::YV16) ? 0 : 1;
-        if (plane == media::VideoFrame::kYPlane) {
-          offset = (frame_->stride(media::VideoFrame::kYPlane) *
+        const int y_shift = (frame_->format() == VideoFrame::YV16) ? 0 : 1;
+        if (plane == VideoFrame::kYPlane) {
+          offset = (frame_->stride(VideoFrame::kYPlane) *
                     frame_->visible_rect().y()) +
                    frame_->visible_rect().x();
         } else {
-          offset = (frame_->stride(media::VideoFrame::kUPlane) *
+          offset = (frame_->stride(VideoFrame::kUPlane) *
                     (frame_->visible_rect().y() >> y_shift)) +
                    (frame_->visible_rect().x() >> 1);
         }
@@ -269,8 +324,8 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
   // Paint black rectangle if there isn't a frame available or the
   // frame has an unexpected format.
   if (!video_frame.get() || video_frame->natural_size().IsEmpty() ||
-      !(media::VideoFrame::IsYuvPlanar(video_frame->format()) ||
-        (video_frame->storage_type() == media::VideoFrame::STORAGE_TEXTURE))) {
+      !(VideoFrame::IsYuvPlanar(video_frame->format()) ||
+        video_frame->HasTextures())) {
     canvas->drawRect(dest, paint);
     canvas->flush();
     return;
@@ -278,7 +333,7 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
 
   SkBitmap* target_frame = nullptr;
 
-  if (video_frame->storage_type() == VideoFrame::STORAGE_TEXTURE) {
+  if (video_frame->HasTextures()) {
     // Draw HW Video on both SW and HW Canvas.
     // In SW Canvas case, rely on skia drawing Ganesh SkBitmap on SW SkCanvas.
     if (accelerated_last_frame_.isNull() ||
@@ -290,16 +345,23 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
         accelerated_last_frame_.reset();
         accelerated_generator_ = nullptr;
       }
-      if (!CopyVideoFrameTextureToSkBitmapTexture(
-              video_frame.get(), &accelerated_last_frame_, context_3d)) {
-        NOTREACHED();
-        return;
-      }
-      DCHECK(video_frame->visible_rect().width() ==
-                 accelerated_last_frame_.width() &&
-             video_frame->visible_rect().height() ==
-                 accelerated_last_frame_.height());
 
+      if (media::VideoFrame::NumPlanes(video_frame->format()) == 1) {
+        accelerated_last_image_.reset();
+        if (!CopyVideoFrameSingleTextureToSkBitmap(
+                video_frame.get(), &accelerated_last_frame_, context_3d)) {
+          NOTREACHED();
+          return;
+        }
+        DCHECK(video_frame->visible_rect().width() ==
+                   accelerated_last_frame_.width() &&
+               video_frame->visible_rect().height() ==
+                   accelerated_last_frame_.height());
+      } else {
+        accelerated_last_image_ = CreateSkImageFromVideoFrameYUVTextures(
+            video_frame.get(), context_3d);
+        DCHECK(accelerated_last_image_);
+      }
       accelerated_last_frame_timestamp_ = video_frame->timestamp();
     }
     target_frame = &accelerated_last_frame_;
@@ -333,7 +395,7 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
     accelerated_frame_deleting_timer_.Reset();
   } else {
     // Draw SW Video on SW Canvas.
-    DCHECK(VideoFrame::IsMappable(video_frame->storage_type()));
+    DCHECK(video_frame->IsMappable());
     if (last_frame_.isNull() ||
         video_frame->timestamp() != last_frame_timestamp_) {
       // Check if |bitmap| needs to be (re)allocated.
@@ -358,7 +420,7 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
   paint.setXfermodeMode(mode);
   paint.setFilterQuality(kLow_SkFilterQuality);
 
-  bool need_transform =
+  const bool need_transform =
       video_rotation != VIDEO_ROTATION_0 ||
       dest_rect.size() != video_frame->visible_rect().size() ||
       !dest_rect.origin().IsOrigin();
@@ -395,7 +457,11 @@ void SkCanvasVideoRenderer::Paint(const scoped_refptr<VideoFrame>& video_frame,
     canvas->translate(-SkFloatToScalar(target_frame->width() * 0.5f),
                       -SkFloatToScalar(target_frame->height() * 0.5f));
   }
-  canvas->drawBitmap(*target_frame, 0, 0, &paint);
+  if (accelerated_last_image_) {
+    canvas->drawImage(accelerated_last_image_.get(), 0, 0, &paint);
+  } else {
+    canvas->drawBitmap(*target_frame, 0, 0, &paint);
+  }
   if (need_transform)
     canvas->restore();
   canvas->flush();
@@ -414,31 +480,31 @@ void SkCanvasVideoRenderer::Copy(const scoped_refptr<VideoFrame>& video_frame,
 
 // static
 void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
-    const scoped_refptr<media::VideoFrame>& video_frame,
+    const scoped_refptr<VideoFrame>& video_frame,
     void* rgb_pixels,
     size_t row_bytes) {
-  if (!VideoFrame::IsMappable(video_frame->storage_type())) {
+  if (!video_frame->IsMappable()) {
     NOTREACHED() << "Cannot extract pixels from non-CPU frame formats.";
     return;
   }
-  if (!media::VideoFrame::IsYuvPlanar(video_frame->format())) {
+  if (!VideoFrame::IsYuvPlanar(video_frame->format())) {
     NOTREACHED() << "Non YUV formats are not supported";
     return;
   }
 
-  DCHECK_EQ(video_frame->stride(media::VideoFrame::kUPlane),
-            video_frame->stride(media::VideoFrame::kVPlane));
+  DCHECK_EQ(video_frame->stride(VideoFrame::kUPlane),
+            video_frame->stride(VideoFrame::kVPlane));
 
   const int y_shift =
-      (video_frame->format() == media::VideoFrame::YV16) ? 0 : 1;
+      (video_frame->format() == VideoFrame::YV16) ? 0 : 1;
   // Use the "left" and "top" of the destination rect to locate the offset
   // in Y, U and V planes.
-  const size_t y_offset = (video_frame->stride(media::VideoFrame::kYPlane) *
+  const size_t y_offset = (video_frame->stride(VideoFrame::kYPlane) *
                            video_frame->visible_rect().y()) +
                           video_frame->visible_rect().x();
   // For format YV12, there is one U, V value per 2x2 block.
   // For format YV16, there is one U, V value per 2x1 block.
-  const size_t uv_offset = (video_frame->stride(media::VideoFrame::kUPlane) *
+  const size_t uv_offset = (video_frame->stride(VideoFrame::kUPlane) *
                             (video_frame->visible_rect().y() >> y_shift)) +
                            (video_frame->visible_rect().x() >> 1);
 
@@ -548,7 +614,7 @@ void SkCanvasVideoRenderer::ConvertVideoFrameToRGBPixels(
 }
 
 // static
-void SkCanvasVideoRenderer::CopyVideoFrameTextureToGLTexture(
+void SkCanvasVideoRenderer::CopyVideoFrameSingleTextureToGLTexture(
     gpu::gles2::GLES2Interface* gl,
     VideoFrame* video_frame,
     unsigned int texture,
@@ -557,7 +623,7 @@ void SkCanvasVideoRenderer::CopyVideoFrameTextureToGLTexture(
     bool premultiply_alpha,
     bool flip_y) {
   DCHECK(video_frame);
-  DCHECK_EQ(video_frame->storage_type(), VideoFrame::STORAGE_TEXTURE);
+  DCHECK(video_frame->HasTextures());
   DCHECK_EQ(1u, VideoFrame::NumPlanes(video_frame->format()));
 
   const gpu::MailboxHolder& mailbox_holder = video_frame->mailbox_holder(0);
@@ -578,7 +644,8 @@ void SkCanvasVideoRenderer::CopyVideoFrameTextureToGLTexture(
   // "flip_y == false" means to keep the intrinsic orientation.
   gl->PixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, flip_y);
   gl->CopyTextureCHROMIUM(GL_TEXTURE_2D, source_texture, texture,
-                          internal_format, type);
+                          internal_format, type,
+                          flip_y, premultiply_alpha, false);
   gl->PixelStorei(GL_UNPACK_FLIP_Y_CHROMIUM, false);
   gl->PixelStorei(GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM, false);
 
@@ -595,6 +662,7 @@ void SkCanvasVideoRenderer::ResetLastFrame() {
 }
 
 void SkCanvasVideoRenderer::ResetAcceleratedLastFrame() {
+  accelerated_last_image_.reset();
   accelerated_last_frame_.reset();
   accelerated_generator_ = nullptr;
   accelerated_last_frame_timestamp_ = media::kNoTimestamp();

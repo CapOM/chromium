@@ -6,8 +6,10 @@
 
 #include "chrome/browser/extensions/error_console/error_console.h"
 #include "chrome/browser/extensions/extension_service.h"
+#include "chrome/browser/extensions/window_controller.h"
 #include "chrome/common/extensions/chrome_extension_messages.h"
 #include "content/public/browser/browser_context.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "extensions/browser/extension_registry.h"
@@ -37,6 +39,11 @@ void ChromeExtensionWebContentsObserver::RenderViewCreated(
 bool ChromeExtensionWebContentsObserver::OnMessageReceived(
     const IPC::Message& message,
     content::RenderFrameHost* render_frame_host) {
+  if (ExtensionWebContentsObserver::OnMessageReceived(message,
+                                                      render_frame_host)) {
+    return true;
+  }
+
   bool handled = true;
   IPC_BEGIN_MESSAGE_MAP(ChromeExtensionWebContentsObserver, message)
     IPC_MESSAGE_HANDLER(ExtensionHostMsg_DetailedConsoleMessageAdded,
@@ -71,6 +78,16 @@ void ChromeExtensionWebContentsObserver::OnDetailedConsoleMessageAdded(
                            static_cast<logging::LogSeverity>(severity_level),
                            render_view_host->GetRoutingID(),
                            render_view_host->GetProcess()->GetID())));
+}
+
+void ChromeExtensionWebContentsObserver::InitializeRenderFrame(
+    content::RenderFrameHost* render_frame_host) {
+  ExtensionWebContentsObserver::InitializeRenderFrame(render_frame_host);
+  WindowController* controller = dispatcher()->GetExtensionWindowController();
+  if (controller) {
+    render_frame_host->Send(new ExtensionMsg_UpdateBrowserWindowId(
+        render_frame_host->GetRoutingID(), controller->GetWindowId()));
+  }
 }
 
 void ChromeExtensionWebContentsObserver::ReloadIfTerminated(

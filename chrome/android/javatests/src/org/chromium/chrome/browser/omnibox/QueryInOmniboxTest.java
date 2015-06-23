@@ -15,10 +15,9 @@ import android.view.KeyEvent;
 import android.view.View;
 import android.widget.ImageButton;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.Feature;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.ntp.NewTabPage;
@@ -36,6 +35,7 @@ import org.chromium.chrome.test.util.TestHttpServerClient;
 import org.chromium.content.browser.test.util.KeyUtils;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -203,7 +203,7 @@ public class QueryInOmniboxTest extends ChromeActivityTestCaseBase<ChromeActivit
      * @throws InterruptedException
      */
     private void setupAutocompleteSuggestions(final String term) throws InterruptedException {
-        final String suggestionFor = term.toLowerCase();
+        final String suggestionFor = term.toLowerCase(Locale.US);
         Map<String, List<SuggestionsResult>> suggestionsMap = buildSuggestionMap(
                 new TestSuggestionResultsBuilder()
                         .setTextShownFor(suggestionFor)

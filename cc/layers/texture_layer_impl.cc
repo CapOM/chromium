@@ -126,10 +126,8 @@ bool TextureLayerImpl::WillDraw(DrawMode draw_mode,
         pixels = &swizzled[0];
       }
 
-      resource_provider->SetPixels(texture_copy_->id(), pixels,
-                                   gfx::Rect(texture_mailbox_.size_in_pixels()),
-                                   gfx::Rect(texture_mailbox_.size_in_pixels()),
-                                   gfx::Vector2d());
+      resource_provider->CopyToResource(texture_copy_->id(), pixels,
+                                        texture_mailbox_.size_in_pixels());
 
       valid_texture_copy_ = true;
     }
@@ -146,14 +144,14 @@ void TextureLayerImpl::AppendQuads(RenderPass* render_pass,
       render_pass->CreateAndAppendSharedQuadState();
   PopulateSharedQuadState(shared_quad_state);
 
-  AppendDebugBorderQuad(
-      render_pass, content_bounds(), shared_quad_state, append_quads_data);
+  AppendDebugBorderQuad(render_pass, bounds(), shared_quad_state,
+                        append_quads_data);
 
   SkColor bg_color = blend_background_color_ ?
       background_color() : SK_ColorTRANSPARENT;
   bool opaque = contents_opaque() || (SkColorGetA(bg_color) == 0xFF);
 
-  gfx::Rect quad_rect(content_bounds());
+  gfx::Rect quad_rect(bounds());
   gfx::Rect opaque_rect = opaque ? quad_rect : gfx::Rect();
   gfx::Rect visible_quad_rect =
       draw_properties().occlusion_in_content_space.GetUnoccludedContentRect(
@@ -184,12 +182,12 @@ void TextureLayerImpl::AppendQuads(RenderPass* render_pass,
   ValidateQuadResources(quad);
 }
 
-SimpleEnclosedRegion TextureLayerImpl::VisibleContentOpaqueRegion() const {
+SimpleEnclosedRegion TextureLayerImpl::VisibleOpaqueRegion() const {
   if (contents_opaque())
-    return SimpleEnclosedRegion(visible_content_rect());
+    return SimpleEnclosedRegion(visible_layer_rect());
 
   if (blend_background_color_ && (SkColorGetA(background_color()) == 0xFF))
-    return SimpleEnclosedRegion(visible_content_rect());
+    return SimpleEnclosedRegion(visible_layer_rect());
 
   return SimpleEnclosedRegion();
 }

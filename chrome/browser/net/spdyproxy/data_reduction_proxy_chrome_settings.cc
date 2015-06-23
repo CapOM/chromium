@@ -42,8 +42,8 @@ bool ContainsDataReductionProxyDefaultHostSuffix(
     const net::ProxyList& proxy_list) {
   for (const net::ProxyServer& proxy : proxy_list.GetAll()) {
     if (proxy.is_valid() && !proxy.is_direct() &&
-        EndsWith(proxy.host_port_pair().host(),
-                 kDataReductionProxyDefaultHostSuffix, true)) {
+        base::EndsWith(proxy.host_port_pair().host(),
+                       kDataReductionProxyDefaultHostSuffix, true)) {
       return true;
     }
   }
@@ -67,7 +67,7 @@ bool GetEmbeddedPacScript(const std::string& pac_url, std::string* pac_script) {
   DCHECK(pac_script);
   const std::string kPacURLPrefix =
       "data:application/x-ns-proxy-autoconfig;base64,";
-  return StartsWithASCII(pac_url, kPacURLPrefix, true) &&
+  return base::StartsWithASCII(pac_url, kPacURLPrefix, true) &&
          base::Base64Decode(pac_url.substr(kPacURLPrefix.size()), pac_script);
 }
 
@@ -205,8 +205,7 @@ void DataReductionProxyChromeSettings::InitDataReductionProxySettings(
           base::Bind(
               &ChromeMetricsServiceAccessor::RegisterSyntheticFieldTrial));
   SetDataReductionProxyAlternativeEnabled(
-      data_reduction_proxy::DataReductionProxyParams::
-          IsIncludedInAlternativeFieldTrial());
+      data_reduction_proxy::params::IsIncludedInAlternativeFieldTrial());
   // TODO(bengr): Remove after M46. See http://crbug.com/445599.
   MigrateDataReductionProxyOffProxyPrefs(profile_prefs);
 }

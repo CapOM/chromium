@@ -163,7 +163,7 @@ void ProfileSyncServiceAndroid::DisableSync(JNIEnv* env, jobject) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   // Don't need to do anything if we're already disabled.
   if (sync_service_->IsSyncRequested()) {
-    sync_service_->RequestStop();
+    sync_service_->RequestStop(ProfileSyncService::KEEP_DATA);
   } else {
     DVLOG(2)
         << "Ignoring call to DisableSync() because sync is already disabled";
@@ -176,7 +176,7 @@ void ProfileSyncServiceAndroid::SignInSync(JNIEnv* env, jobject) {
   // should start up automatically as long as it has credentials). This can
   // happen normally if (for example) the user closes and reopens the sync
   // settings window quickly during initial startup.
-  if (sync_service_->IsSyncEnabledAndLoggedIn() &&
+  if (sync_service_->CanSyncStart() &&
       sync_service_->IsOAuthRefreshTokenAvailable() &&
       sync_service_->HasSyncSetupCompleted()) {
     return;
@@ -190,10 +190,7 @@ void ProfileSyncServiceAndroid::SignInSync(JNIEnv* env, jobject) {
 void ProfileSyncServiceAndroid::SignOutSync(JNIEnv* env, jobject) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   DCHECK(profile_);
-  sync_service_->DisableForUser();
-
-  // Need to reset sync requested flag manually
-  sync_prefs_->SetSyncRequested(true);
+  sync_service_->RequestStop(ProfileSyncService::CLEAR_DATA);
 }
 
 void ProfileSyncServiceAndroid::FlushDirectory(JNIEnv* env, jobject) {
@@ -446,6 +443,11 @@ jboolean ProfileSyncServiceAndroid::IsSyncRequested(
     JNIEnv* env, jobject obj) {
   DCHECK_CURRENTLY_ON(BrowserThread::UI);
   return sync_service_->IsSyncRequested();
+}
+
+jboolean ProfileSyncServiceAndroid::IsSyncActive(JNIEnv* env, jobject obj) {
+  DCHECK_CURRENTLY_ON(BrowserThread::UI);
+  return sync_service_->IsSyncActive();
 }
 
 void ProfileSyncServiceAndroid::EnableEncryptEverything(

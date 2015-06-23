@@ -121,8 +121,7 @@ class CC_EXPORT LayerTreeHost {
   bool output_surface_lost() const { return output_surface_lost_; }
   void DidCommitAndDrawFrame() { client_->DidCommitAndDrawFrame(); }
   void DidCompleteSwapBuffers() { client_->DidCompleteSwapBuffers(); }
-  void DeleteContentsTexturesOnImplThread(ResourceProvider* resource_provider);
-  bool UpdateLayers(ResourceUpdateQueue* queue);
+  bool UpdateLayers();
 
   // Called when the compositor completed page scale animation.
   void DidCompletePageScaleAnimation();
@@ -227,10 +226,6 @@ class CC_EXPORT LayerTreeHost {
     has_transparent_background_ = transparent;
   }
 
-  PrioritizedResourceManager* contents_texture_manager() const {
-    return contents_texture_manager_.get();
-  }
-
   void SetVisible(bool visible);
   bool visible() const { return visible_; }
 
@@ -249,10 +244,6 @@ class CC_EXPORT LayerTreeHost {
   virtual void StopRateLimiter();
 
   void RateLimit();
-
-  bool AlwaysUsePartialTextureUpdates();
-  size_t MaxPartialTextureUpdates() const;
-  bool RequestPartialTextureUpdate();
 
   void SetDeviceScaleFactor(float device_scale_factor);
   float device_scale_factor() const { return device_scale_factor_; }
@@ -324,12 +315,6 @@ class CC_EXPORT LayerTreeHost {
     return needs_meta_info_recomputation_;
   }
 
-  // If this is true, only property trees will be used for main thread CDP.
-  // CDP will not be run, and verify_property_trees will be ignored.
-  bool using_only_property_trees() const {
-    return settings().impl_side_painting;
-  }
-
   void RecordFrameTimingEvents(
       scoped_ptr<FrameTimingTracker::CompositeTimingSet> composite_events,
       scoped_ptr<FrameTimingTracker::MainFrameTimingSet> main_frame_events);
@@ -362,30 +347,15 @@ class CC_EXPORT LayerTreeHost {
 
   MicroBenchmarkController micro_benchmark_controller_;
 
+  void OnCommitForSwapPromises();
+
  private:
   void InitializeProxy(scoped_ptr<Proxy> proxy);
 
-  void PaintLayerContents(
-      const RenderSurfaceLayerList& render_surface_layer_list,
-      ResourceUpdateQueue* queue,
-      bool* did_paint_content,
-      bool* need_more_updates);
-  void PaintMasksForRenderSurface(Layer* render_surface_layer,
-                                  ResourceUpdateQueue* queue,
-                                  bool* did_paint_content,
-                                  bool* need_more_updates);
-  bool UpdateLayers(Layer* root_layer, ResourceUpdateQueue* queue);
+  bool DoUpdateLayers(Layer* root_layer);
   void UpdateHudLayer();
-  void TriggerPrepaint();
 
   void ReduceMemoryUsage();
-
-  void PrioritizeTextures(
-      const RenderSurfaceLayerList& render_surface_layer_list);
-  void SetPrioritiesForSurfaces(size_t surface_memory_bytes);
-  void SetPrioritiesForLayers(const RenderSurfaceLayerList& update_list);
-  size_t CalculateMemoryForRenderSurfaces(
-      const RenderSurfaceLayerList& update_list);
 
   bool AnimateLayersRecursive(Layer* current, base::TimeTicks time);
 
@@ -411,8 +381,6 @@ class CC_EXPORT LayerTreeHost {
   bool needs_full_tree_sync_;
   bool needs_meta_info_recomputation_;
 
-  base::CancelableClosure prepaint_callback_;
-
   LayerTreeHostClient* client_;
   scoped_ptr<Proxy> proxy_;
 
@@ -424,9 +392,6 @@ class CC_EXPORT LayerTreeHost {
 
   scoped_refptr<Layer> root_layer_;
   scoped_refptr<HeadsUpDisplayLayer> hud_layer_;
-
-  scoped_ptr<PrioritizedResourceManager> contents_texture_manager_;
-  scoped_ptr<PrioritizedResource> surface_memory_placeholder_;
 
   base::WeakPtr<InputHandler> input_handler_weak_ptr_;
   base::WeakPtr<TopControlsManager> top_controls_manager_weak_ptr_;
@@ -454,9 +419,6 @@ class CC_EXPORT LayerTreeHost {
 
   SkColor background_color_;
   bool has_transparent_background_;
-
-  typedef ScopedPtrVector<PrioritizedResource> TextureList;
-  size_t partial_texture_update_requests_;
 
   scoped_ptr<AnimationRegistrar> animation_registrar_;
 

@@ -40,7 +40,7 @@ MojoRendererService::MojoRendererService(
   scoped_refptr<MediaLog> media_log(new MediaLog());
   RendererConfig* renderer_config = RendererConfig::Get();
   audio_renderer_sink_ = renderer_config->GetAudioRendererSink();
-  video_renderer_sink_ = renderer_config->GetVideoRendererSink();
+  video_renderer_sink_ = renderer_config->GetVideoRendererSink(task_runner);
 
   scoped_ptr<AudioRenderer> audio_renderer(new AudioRendererImpl(
       task_runner, audio_renderer_sink_.get(),
@@ -149,11 +149,13 @@ void MojoRendererService::UpdateMediaTime(bool force) {
 }
 
 void MojoRendererService::CancelPeriodicMediaTimeUpdates() {
+  DVLOG(2) << __FUNCTION__;
   UpdateMediaTime(false);
-  time_update_timer_.Reset();
+  time_update_timer_.Stop();
 }
 
 void MojoRendererService::SchedulePeriodicMediaTimeUpdates() {
+  DVLOG(2) << __FUNCTION__;
   UpdateMediaTime(true);
   time_update_timer_.Start(
       FROM_HERE,

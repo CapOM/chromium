@@ -119,17 +119,26 @@ IPC_MESSAGE_CONTROL5(ServiceWorkerHostMsg_RegisterServiceWorker,
                      GURL /* scope */,
                      GURL /* script_url */)
 
+IPC_MESSAGE_CONTROL2(ServiceWorkerHostMsg_UpdateServiceWorker,
+                     int /* provider_id */,
+                     int64 /* registration_id */)
+
 IPC_MESSAGE_CONTROL4(ServiceWorkerHostMsg_UnregisterServiceWorker,
                      int /* thread_id */,
                      int /* request_id */,
                      int /* provider_id */,
-                     GURL /* scope (url pattern) */)
+                     int64 /* registration_id */)
 
 IPC_MESSAGE_CONTROL4(ServiceWorkerHostMsg_GetRegistration,
                      int /* thread_id */,
                      int /* request_id */,
                      int /* provider_id */,
                      GURL /* document_url */)
+
+IPC_MESSAGE_CONTROL3(ServiceWorkerHostMsg_GetRegistrations,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     int /* provider_id */)
 
 IPC_MESSAGE_CONTROL3(ServiceWorkerHostMsg_GetRegistrationForReady,
                      int /* thread_id */,
@@ -144,15 +153,16 @@ IPC_MESSAGE_CONTROL3(
     std::vector<content::TransferredMessagePort> /* sent_message_ports */)
 
 // Informs the browser of a new ServiceWorkerProvider in the child process,
-// |provider_id| is unique within its child process.
-// |render_frame_id| identifies the frame associated with the provider, it will
-// it will be MSG_ROUTING_NONE if the context is a worker instead of a document.
-// |provider_type| identifies whether this provider is for ServiceWorker
-// controllees (documents and SharedWorkers) or for controllers
-// (ServiceWorkers).
+// |provider_id| is unique within its child process. When this provider is
+// created for a document, |route_id| is the frame ID of it. When this provider
+// is created for a Shared Worker, |route_id| is the Shared Worker route ID.
+// When this provider is created for a Service Worker, |route_id| is
+// MSG_ROUTING_NONE. |provider_type| identifies whether this provider is for
+// Service Worker controllees (documents and Shared Workers) or for controllers
+// (Service Workers).
 IPC_MESSAGE_CONTROL3(ServiceWorkerHostMsg_ProviderCreated,
                      int /* provider_id */,
-                     int /* render_frame_id */,
+                     int /* route_id */,
                      content::ServiceWorkerProviderType /* provider_type */)
 
 // Informs the browser of a ServiceWorkerProvider being destroyed.
@@ -310,6 +320,13 @@ IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_DidGetRegistration,
                      content::ServiceWorkerRegistrationObjectInfo,
                      content::ServiceWorkerVersionAttributes)
 
+// Response to ServiceWorkerHostMsg_GetRegistrations.
+IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_DidGetRegistrations,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     std::vector<content::ServiceWorkerRegistrationObjectInfo>,
+                     std::vector<content::ServiceWorkerVersionAttributes>)
+
 // Response to ServiceWorkerHostMsg_GetRegistrationForReady.
 IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_DidGetRegistrationForReady,
                      int /* thread_id */,
@@ -336,6 +353,14 @@ IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_ServiceWorkerUnregistrationError,
 // Sent when any kind of registration error occurs during a
 // GetRegistration handler above.
 IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_ServiceWorkerGetRegistrationError,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     blink::WebServiceWorkerError::ErrorType /* code */,
+                     base::string16 /* message */)
+
+// Sent when any kind of registration error occurs during a
+// GetRegistrations handler above.
+IPC_MESSAGE_CONTROL4(ServiceWorkerMsg_ServiceWorkerGetRegistrationsError,
                      int /* thread_id */,
                      int /* request_id */,
                      blink::WebServiceWorkerError::ErrorType /* code */,

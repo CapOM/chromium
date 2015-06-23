@@ -20,14 +20,12 @@
 #include "chrome/browser/autocomplete/autocomplete_classifier.h"
 #include "chrome/browser/autocomplete/autocomplete_classifier_factory.h"
 #include "chrome/browser/autocomplete/chrome_autocomplete_scheme_classifier.h"
-#include "chrome/browser/autocomplete/history_url_provider.h"
 #include "chrome/browser/bookmarks/bookmark_model_factory.h"
 #include "chrome/browser/bookmarks/bookmark_stats.h"
 #include "chrome/browser/chrome_notification_types.h"
 #include "chrome/browser/command_updater.h"
 #include "chrome/browser/extensions/api/omnibox/omnibox_api.h"
 #include "chrome/browser/net/predictor.h"
-#include "chrome/browser/omnibox/omnibox_log.h"
 #include "chrome/browser/predictors/autocomplete_action_predictor.h"
 #include "chrome/browser/predictors/autocomplete_action_predictor_factory.h"
 #include "chrome/browser/prerender/prerender_field_trial.h"
@@ -56,7 +54,9 @@
 #include "components/metrics/proto/omnibox_event.pb.h"
 #include "components/omnibox/autocomplete_match_type.h"
 #include "components/omnibox/autocomplete_provider.h"
+#include "components/omnibox/history_url_provider.h"
 #include "components/omnibox/keyword_provider.h"
+#include "components/omnibox/omnibox_log.h"
 #include "components/omnibox/search_provider.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_prepopulate_data.h"
@@ -297,11 +297,6 @@ AutocompleteMatch OmniboxEditModel::CurrentMatch(
 }
 
 bool OmniboxEditModel::UpdatePermanentText() {
-  SearchProvider* search_provider =
-      autocomplete_controller()->search_provider();
-  if (search_provider && delegate_->CurrentPageExists())
-    search_provider->set_current_page_url(delegate_->GetURL());
-
   // When there's new permanent text, and the user isn't interacting with the
   // omnibox, we want to revert the edit to show the new text.  We could simply
   // define "interacting" as "the omnibox has focus", but we still allow updates
@@ -545,6 +540,7 @@ void OmniboxEditModel::SetInputInProgress(bool in_progress) {
 
 void OmniboxEditModel::Revert() {
   SetInputInProgress(false);
+  input_.Clear();
   paste_state_ = NONE;
   InternalSetUserText(base::string16());
   keyword_.clear();
@@ -606,8 +602,8 @@ void OmniboxEditModel::StartAutocomplete(
           (has_selected_text && inline_autocomplete_text_.empty()) ||
           (paste_state_ != NONE),
       is_keyword_selected(),
-      is_keyword_selected() || allow_exact_keyword_match_,
-      true, ChromeAutocompleteSchemeClassifier(profile_));
+      is_keyword_selected() || allow_exact_keyword_match_, true, false,
+      ChromeAutocompleteSchemeClassifier(profile_));
 
   omnibox_controller_->StartAutocomplete(input_);
 }
@@ -664,17 +660,17 @@ void OmniboxEditModel::AcceptInput(WindowOpenDisposition disposition,
     // "foodnetwork.com".  At the time of writing, this behavior matches
     // Internet Explorer, but not Firefox.
     input_ = AutocompleteInput(
-      has_temporary_text_ ?
-          UserTextFromDisplayText(view_->GetText())  : input_.text(),
-      input_.cursor_position(), "com", GURL(),
-      input_.current_page_classification(),
-      input_.prevent_inline_autocomplete(), input_.prefer_keyword(),
-      input_.allow_exact_keyword_match(), input_.want_asynchronous_matches(),
-      ChromeAutocompleteSchemeClassifier(profile_));
+        has_temporary_text_ ? UserTextFromDisplayText(view_->GetText())
+                            : input_.text(),
+        input_.cursor_position(), "com", GURL(),
+        input_.current_page_classification(),
+        input_.prevent_inline_autocomplete(), input_.prefer_keyword(),
+        input_.allow_exact_keyword_match(), input_.want_asynchronous_matches(),
+        input_.from_omnibox_focus(),
+        ChromeAutocompleteSchemeClassifier(profile_));
     AutocompleteMatch url_match(
         autocomplete_controller()->history_url_provider()->SuggestExactInput(
-            input_.text(), input_.canonicalized_url(), false));
-
+            input_, input_.canonicalized_url(), false));
 
     if (url_match.destination_url.is_valid()) {
       // We have a valid URL, we use this newly generated AutocompleteMatch.
@@ -753,11 +749,17 @@ void OmniboxEditModel::OpenMatch(AutocompleteMatch match,
   base::string16 input_text(pasted_text);
   if (input_text.empty())
       input_text = user_input_in_progress_ ? user_text_ : permanent_text_;
+  // Create a dummy AutocompleteInput for use in calling SuggestExactInput()
+  // to create an alternate navigational match.
+  AutocompleteInput alternate_input(
+      input_text, base::string16::npos, std::string(), delegate_->GetURL(),
+      ClassifyPage(), false, false, true, true, false,
+      ChromeAutocompleteSchemeClassifier(profile_));
   scoped_ptr<OmniboxNavigationObserver> observer(
       new OmniboxNavigationObserver(
           profile_, input_text, match,
           autocomplete_controller()->history_url_provider()->SuggestExactInput(
-              input_text, alternate_nav_url,
+              alternate_input, alternate_nav_url,
               AutocompleteInput::HasHTTPScheme(input_text))));
 
   base::TimeDelta elapsed_time_since_last_change_to_default_match(
@@ -1009,15 +1011,14 @@ void OmniboxEditModel::OnSetFocus(bool control_down) {
   // off).
   // TODO(hfung): Remove this when crbug/271590 is fixed.
   if (delegate_->CurrentPageExists() && !user_input_in_progress_) {
-    // TODO(jered): We may want to merge this into Start() and just call that
-    // here rather than having a special entry point for zero-suggest.  Note
-    // that we avoid PermanentURL() here because it's not guaranteed to give us
-    // the actual underlying current URL, e.g. if we're on the NTP and the
+    // We avoid PermanentURL() here because it's not guaranteed to give us the
+    // actual underlying current URL, e.g. if we're on the NTP and the
     // |permanent_text_| is empty.
-    autocomplete_controller()->OnOmniboxFocused(AutocompleteInput(
-        permanent_text_, base::string16::npos, std::string(),
-        delegate_->GetURL(), ClassifyPage(), false, false, true, true,
-        ChromeAutocompleteSchemeClassifier(profile_)));
+    input_ = AutocompleteInput(permanent_text_, base::string16::npos,
+                               std::string(), delegate_->GetURL(),
+                               ClassifyPage(), false, false, true, true, true,
+                               ChromeAutocompleteSchemeClassifier(profile_));
+    autocomplete_controller()->Start(input_);
   }
 
   if (user_input_in_progress_ || !in_revert_)

@@ -19,6 +19,7 @@
 #include "cc/test/geometry_test_utils.h"
 #include "cc/test/layer_tree_test.h"
 #include "cc/test/test_shared_bitmap_manager.h"
+#include "cc/test/test_task_graph_runner.h"
 #include "cc/trees/layer_tree_impl.h"
 #include "ui/gfx/geometry/point_conversions.h"
 #include "ui/gfx/geometry/size_conversions.h"
@@ -680,101 +681,89 @@ TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor1_ScrollChild_DirectRenderer) {
   device_scale_factor_ = 1.f;
   scroll_child_layer_ = true;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor1_ScrollChild_DelegatingRenderer) {
   device_scale_factor_ = 1.f;
   scroll_child_layer_ = true;
-  RunTest(true, true, true);
+  RunTest(true, true);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor15_ScrollChild_DirectRenderer) {
   device_scale_factor_ = 1.5f;
   scroll_child_layer_ = true;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor15_ScrollChild_DelegatingRenderer) {
   device_scale_factor_ = 1.5f;
   scroll_child_layer_ = true;
-  RunTest(true, true, true);
+  RunTest(true, true);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor2_ScrollChild_DirectRenderer) {
   device_scale_factor_ = 2.f;
   scroll_child_layer_ = true;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor2_ScrollChild_DelegatingRenderer) {
   device_scale_factor_ = 2.f;
   scroll_child_layer_ = true;
-  RunTest(true, true, true);
+  RunTest(true, true);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor1_ScrollRootScrollLayer_DirectRenderer) {
   device_scale_factor_ = 1.f;
   scroll_child_layer_ = false;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor1_ScrollRootScrollLayer_DelegatingRenderer) {
   device_scale_factor_ = 1.f;
   scroll_child_layer_ = false;
-  RunTest(true, true, true);
+  RunTest(true, true);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor15_ScrollRootScrollLayer_DirectRenderer) {
   device_scale_factor_ = 1.5f;
   scroll_child_layer_ = false;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor15_ScrollRootScrollLayer_DelegatingRenderer) {
   device_scale_factor_ = 1.5f;
   scroll_child_layer_ = false;
-  RunTest(true, true, true);
+  RunTest(true, true);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor2_ScrollRootScrollLayer_DirectRenderer) {
   device_scale_factor_ = 2.f;
   scroll_child_layer_ = false;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestCaseWithChild,
        DeviceScaleFactor2_ScrollRootScrollLayer_DelegatingRenderer) {
   device_scale_factor_ = 2.f;
   scroll_child_layer_ = false;
-  RunTest(true, true, true);
+  RunTest(true, true);
 }
 
-class ImplSidePaintingScrollTest : public LayerTreeHostScrollTest {
+class LayerTreeHostScrollTestSimple : public LayerTreeHostScrollTest {
  public:
-  void InitializeSettings(LayerTreeSettings* settings) override {
-    settings->impl_side_painting = true;
-  }
-
-  void DrawLayersOnThread(LayerTreeHostImpl* impl) override {
-    if (impl->pending_tree())
-      impl->SetNeedsRedraw();
-  }
-};
-
-class ImplSidePaintingScrollTestSimple : public ImplSidePaintingScrollTest {
- public:
-  ImplSidePaintingScrollTestSimple()
+  LayerTreeHostScrollTestSimple()
       : initial_scroll_(10, 20),
         main_thread_scroll_(40, 5),
         impl_thread_scroll1_(2, -1),
@@ -827,7 +816,8 @@ class ImplSidePaintingScrollTestSimple : public ImplSidePaintingScrollTest {
   }
 
   void DrawLayersOnThread(LayerTreeHostImpl* impl) override {
-    ImplSidePaintingScrollTest::DrawLayersOnThread(impl);
+    if (impl->pending_tree())
+      impl->SetNeedsRedraw();
 
     LayerImpl* root = impl->active_tree()->root_layer();
     LayerImpl* scroll_layer = root->children()[0];
@@ -896,16 +886,16 @@ class ImplSidePaintingScrollTestSimple : public ImplSidePaintingScrollTest {
   int num_scrolls_;
 };
 
-MULTI_THREAD_TEST_F(ImplSidePaintingScrollTestSimple);
+// This tests scrolling on the impl side which is only possible with a thread.
+MULTI_THREAD_TEST_F(LayerTreeHostScrollTestSimple);
 
 // This test makes sure that layers pick up scrolls that occur between
 // beginning a commit and finishing a commit (aka scroll deltas not
 // included in sent scroll delta) still apply to layers that don't
 // push properties.
-class ImplSidePaintingScrollTestImplOnlyScroll
-    : public ImplSidePaintingScrollTest {
+class LayerTreeHostScrollTestImplOnlyScroll : public LayerTreeHostScrollTest {
  public:
-  ImplSidePaintingScrollTestImplOnlyScroll()
+  LayerTreeHostScrollTestImplOnlyScroll()
       : initial_scroll_(20, 10), impl_thread_scroll_(-2, 3), impl_scale_(2.f) {}
 
   void SetupTree() override {
@@ -998,7 +988,8 @@ class ImplSidePaintingScrollTestImplOnlyScroll
   }
 
   void DrawLayersOnThread(LayerTreeHostImpl* impl) override {
-    ImplSidePaintingScrollTest::DrawLayersOnThread(impl);
+    if (impl->pending_tree())
+      impl->SetNeedsRedraw();
 
     LayerImpl* root = impl->active_tree()->root_layer();
     LayerImpl* scroll_layer = root->children()[0];
@@ -1036,7 +1027,8 @@ class ImplSidePaintingScrollTestImplOnlyScroll
   float impl_scale_;
 };
 
-MULTI_THREAD_TEST_F(ImplSidePaintingScrollTestImplOnlyScroll);
+// This tests scrolling on the impl side which is only possible with a thread.
+MULTI_THREAD_TEST_F(LayerTreeHostScrollTestImplOnlyScroll);
 
 class LayerTreeHostScrollTestScrollZeroMaxScrollOffset
     : public LayerTreeHostScrollTest {
@@ -1138,13 +1130,14 @@ TEST(LayerTreeHostFlingTest, DidStopFlingingThread) {
       impl_thread.task_runner().get(), &received_stop_flinging);
   FakeLayerTreeHostClient client(FakeLayerTreeHostClient::DIRECT_3D);
 
-  ASSERT_TRUE(impl_thread.task_runner().get());
-  scoped_ptr<SharedBitmapManager> shared_bitmap_manager(
-      new TestSharedBitmapManager());
+  ASSERT_TRUE(impl_thread.task_runner());
+  TestSharedBitmapManager shared_bitmap_manager;
+  TestTaskGraphRunner task_graph_runner;
 
   LayerTreeHost::InitParams params;
   params.client = &client;
-  params.shared_bitmap_manager = shared_bitmap_manager.get();
+  params.shared_bitmap_manager = &shared_bitmap_manager;
+  params.task_graph_runner = &task_graph_runner;
   params.settings = &settings;
   params.main_task_runner = base::ThreadTaskRunnerHandle::Get();
   scoped_ptr<LayerTreeHost> layer_tree_host =
@@ -1245,12 +1238,12 @@ class LayerTreeHostScrollTestLayerStructureChange
 };
 
 TEST_F(LayerTreeHostScrollTestLayerStructureChange, ScrollDestroyLayer) {
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostScrollTestLayerStructureChange, ScrollDestroyWholeTree) {
   scroll_destroy_whole_tree_ = true;
-  RunTest(true, false, true);
+  RunTest(true, false);
 }
 
 }  // namespace

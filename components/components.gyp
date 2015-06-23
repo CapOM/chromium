@@ -93,6 +93,7 @@
         'cdm.gypi',
         'devtools_discovery.gypi',
         'devtools_http_handler.gypi',
+        'message_port.gypi',
         'navigation_interception.gypi',
         'power.gypi',
         'safe_json_parser.gypi',
@@ -100,7 +101,6 @@
         'web_cache.gypi',
         'web_contents_delegate_android.gypi',
         'web_modal.gypi',
-        'webui_generator.gypi',
       ],
     }],
     ['OS == "ios"', {

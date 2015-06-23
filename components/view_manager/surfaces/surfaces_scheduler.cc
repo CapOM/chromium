@@ -80,6 +80,7 @@ void SurfacesScheduler::ScheduledActionAnimate() {
 }
 
 void SurfacesScheduler::ScheduledActionCommit() {
+  scheduler_->NotifyReadyToActivate();
 }
 
 void SurfacesScheduler::ScheduledActionActivateSyncTree() {
@@ -93,9 +94,6 @@ void SurfacesScheduler::ScheduledActionPrepareTiles() {
 }
 
 void SurfacesScheduler::ScheduledActionInvalidateOutputSurface() {
-}
-
-void SurfacesScheduler::DidAnticipatedDrawTimeChange(base::TimeTicks time) {
 }
 
 base::TimeDelta SurfacesScheduler::DrawDurationEstimate() {

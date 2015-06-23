@@ -51,6 +51,13 @@ public class ExternalNavigationDelegateImpl implements ExternalNavigationDelegat
     }
 
     /**
+     * @return The activity that this delegate is associated with.
+     */
+    protected final Activity getActivity() {
+        return mActivity;
+    }
+
+    /**
      * Retrieve the best activity for the given intent. If a default activity is provided,
      * choose the default one. Otherwise, return the Intent picker if there are more than one
      * capable activities. If the intent is pdf type, return the platform pdf viewer if
@@ -251,7 +258,7 @@ public class ExternalNavigationDelegateImpl implements ExternalNavigationDelegat
 
         LoadUrlParams loadUrlParams = new LoadUrlParams(url, PageTransition.AUTO_TOPLEVEL);
         if (!TextUtils.isEmpty(referrerUrl)) {
-            Referrer referrer = new Referrer(referrerUrl, 0 /* WebReferrerPolicyAlways */);
+            Referrer referrer = new Referrer(referrerUrl, Referrer.REFERRER_POLICY_ALWAYS);
             loadUrlParams.setReferrer(referrer);
         }
         tab.loadUrl(loadUrlParams);
@@ -263,7 +270,7 @@ public class ExternalNavigationDelegateImpl implements ExternalNavigationDelegat
         int transitionType = PageTransition.LINK;
         LoadUrlParams loadUrlParams = new LoadUrlParams(url, transitionType);
         if (!TextUtils.isEmpty(referrerUrl)) {
-            Referrer referrer = new Referrer(referrerUrl, 0 /* WebReferrerPolicyAlways */);
+            Referrer referrer = new Referrer(referrerUrl, Referrer.REFERRER_POLICY_ALWAYS);
             loadUrlParams.setReferrer(referrer);
         }
         if (tab != null) {

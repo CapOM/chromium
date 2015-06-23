@@ -88,7 +88,9 @@ class SyncBackendHostImpl
       scoped_ptr<syncer::SyncManagerFactory> sync_manager_factory,
       scoped_ptr<syncer::UnrecoverableErrorHandler> unrecoverable_error_handler,
       const base::Closure& report_unrecoverable_error_function,
-      syncer::NetworkResources* network_resources) override;
+      syncer::NetworkResources* network_resources,
+      scoped_ptr<syncer::SyncEncryptionHandler::NigoriState> saved_nigori_state)
+      override;
   void UpdateCredentials(const syncer::SyncCredentials& credentials) override;
   void StartSyncingWithServer() override;
   void SetEncryptionPassphrase(const std::string& passphrase,
@@ -279,7 +281,8 @@ class SyncBackendHostImpl
       syncer::PassphraseType type,
       base::Time explicit_passphrase_time);
 
-  void HandleStopSyncingPermanentlyOnFrontendLoop();
+  void HandleLocalSetPassphraseEncryptionOnFrontendLoop(
+      const syncer::SyncEncryptionHandler::NigoriState& nigori_state);
 
   // Dispatched to from OnConnectionStatusChange to handle updating
   // frontend UI components.
@@ -361,4 +364,3 @@ class SyncBackendHostImpl
 }  // namespace browser_sync
 
 #endif  // CHROME_BROWSER_SYNC_GLUE_SYNC_BACKEND_HOST_IMPL_H_
-

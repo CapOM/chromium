@@ -9,6 +9,7 @@
 
 #include "base/callback.h"
 #include "base/files/file_path.h"
+#include "base/id_map.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/weak_ptr.h"
 #include "content/common/cache_storage/cache_storage_types.h"
@@ -28,6 +29,7 @@ class QuotaManagerProxy;
 
 namespace content {
 
+class CacheStorageBlobToDiskCache;
 class CacheMetadata;
 class CacheStorageScheduler;
 class TestCacheStorageCache;
@@ -102,9 +104,7 @@ class CONTENT_EXPORT CacheStorageCache
   friend class base::RefCounted<CacheStorageCache>;
   friend class TestCacheStorageCache;
 
-  class BlobReader;
   struct KeysContext;
-  struct MatchContext;
   struct PutContext;
 
   // The backend progresses from uninitialized, to open, to closed, and cannot
@@ -117,6 +117,8 @@ class CONTENT_EXPORT CacheStorageCache
 
   using Entries = std::vector<disk_cache::Entry*>;
   using ScopedBackendPtr = scoped_ptr<disk_cache::Backend>;
+  using BlobToDiskCacheIDMap =
+      IDMap<CacheStorageBlobToDiskCache, IDMapOwnPointer>;
 
   CacheStorageCache(
       const GURL& origin,
@@ -131,12 +133,14 @@ class CONTENT_EXPORT CacheStorageCache
   // Match callbacks
   void MatchImpl(scoped_ptr<ServiceWorkerFetchRequest> request,
                  const ResponseCallback& callback);
-  void MatchDidOpenEntry(scoped_ptr<MatchContext> match_context, int rv);
-  void MatchDidReadMetadata(scoped_ptr<MatchContext> match_context,
+  void MatchDidOpenEntry(scoped_ptr<ServiceWorkerFetchRequest> request,
+                         const ResponseCallback& callback,
+                         scoped_ptr<disk_cache::Entry*> entry_ptr,
+                         int rv);
+  void MatchDidReadMetadata(scoped_ptr<ServiceWorkerFetchRequest> request,
+                            const ResponseCallback& callback,
+                            disk_cache::ScopedEntryPtr entry,
                             scoped_ptr<CacheMetadata> headers);
-  void MatchDidReadResponseBodyData(scoped_ptr<MatchContext> match_context,
-                                    int rv);
-  void MatchDoneWithBody(scoped_ptr<MatchContext> match_context);
 
   // Puts the request and response object in the cache. The response body (if
   // present) is stored in the cache, but not the request body. Returns OK on
@@ -146,12 +150,14 @@ class CONTENT_EXPORT CacheStorageCache
   void PutImpl(scoped_ptr<PutContext> put_context);
   void PutDidDelete(scoped_ptr<PutContext> put_context,
                     CacheStorageError delete_error);
-  void PutDidCreateEntry(scoped_ptr<PutContext> put_context, int rv);
+  void PutDidCreateEntry(scoped_ptr<disk_cache::Entry*> entry_ptr,
+                         scoped_ptr<PutContext> put_context,
+                         int rv);
   void PutDidWriteHeaders(scoped_ptr<PutContext> put_context,
                           int expected_bytes,
                           int rv);
   void PutDidWriteBlobToCache(scoped_ptr<PutContext> put_context,
-                              scoped_ptr<BlobReader> blob_reader,
+                              BlobToDiskCacheIDMap::KeyType blob_to_cache_key,
                               disk_cache::ScopedEntryPtr entry,
                               bool success);
 
@@ -212,6 +218,9 @@ class CONTENT_EXPORT CacheStorageCache
   BackendState backend_state_;
   scoped_ptr<CacheStorageScheduler> scheduler_;
   bool initializing_;
+
+  // Owns the elements of the list
+  BlobToDiskCacheIDMap active_blob_to_disk_cache_writers_;
 
   // Whether or not to store data in disk or memory.
   bool memory_only_;

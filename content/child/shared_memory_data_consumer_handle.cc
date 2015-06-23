@@ -6,12 +6,12 @@
 
 #include <algorithm>
 #include <deque>
-#include <vector>
 
 #include "base/bind.h"
 #include "base/message_loop/message_loop.h"
 #include "base/single_thread_task_runner.h"
 #include "base/synchronization/lock.h"
+#include "base/thread_task_runner_handle.h"
 #include "content/public/child/fixed_received_data.h"
 
 namespace content {
@@ -23,8 +23,7 @@ class DelegateThreadSafeReceivedData final
  public:
   explicit DelegateThreadSafeReceivedData(
       scoped_ptr<RequestPeer::ReceivedData> data)
-      : data_(data.Pass()),
-        task_runner_(base::MessageLoop::current()->task_runner()) {}
+      : data_(data.Pass()), task_runner_(base::ThreadTaskRunnerHandle::Get()) {}
   ~DelegateThreadSafeReceivedData() override {
     if (!task_runner_->BelongsToCurrentThread()) {
       // Delete the data on the original thread.
@@ -50,33 +49,36 @@ using Result = blink::WebDataConsumerHandle::Result;
 class SharedMemoryDataConsumerHandle::Context final
     : public base::RefCountedThreadSafe<Context> {
  public:
-  Context()
+  explicit Context(const base::Closure& on_reader_detached)
       : result_(Ok),
         first_offset_(0),
         client_(nullptr),
-        is_reader_active_(true) {}
+        writer_task_runner_(base::ThreadTaskRunnerHandle::Get()),
+        on_reader_detached_(on_reader_detached),
+        is_on_reader_detached_valid_(!on_reader_detached_.is_null()),
+        is_handle_active_(true),
+        is_two_phase_read_in_progress_(false) {}
 
   bool IsEmpty() const { return queue_.empty(); }
-  void Clear() {
+  void ClearIfNecessary() {
+    if (!is_handle_locked() && !is_handle_active()) {
+      // No one is interested in the contents.
+      if (is_on_reader_detached_valid_) {
+        // We post a task even in the writer thread in order to avoid a
+        // reentrance problem as calling |on_reader_detached_| may manipulate
+        // the context synchronously.
+        writer_task_runner_->PostTask(FROM_HERE, on_reader_detached_);
+      }
+      Clear();
+    }
+  }
+  void ClearQueue() {
     for (auto& data : queue_) {
       delete data;
     }
     queue_.clear();
     first_offset_ = 0;
-    client_ = nullptr;
   }
-  void Notify() {
-    // Note that this function is not protected by |lock_| (actually it
-    // shouldn't be) but |notification_task_runner_| is thread-safe.
-
-    if (notification_task_runner_->BelongsToCurrentThread()) {
-      NotifyImmediately();
-    } else {
-      notification_task_runner_->PostTask(
-          FROM_HERE, base::Bind(&Context::NotifyImmediately, this));
-    }
-  }
-
   RequestPeer::ThreadSafeReceivedData* Top() { return queue_.front(); }
   void Push(scoped_ptr<RequestPeer::ThreadSafeReceivedData> data) {
     queue_.push_back(data.release());
@@ -84,18 +86,59 @@ class SharedMemoryDataConsumerHandle::Context final
   size_t first_offset() const { return first_offset_; }
   Result result() const { return result_; }
   void set_result(Result r) { result_ = r; }
-  Client* client() { return client_; }
-  void SetClient(Client* client) {
-    if (client) {
-      notification_task_runner_ = base::MessageLoop::current()->task_runner();
-      client_ = client;
-    } else {
-      notification_task_runner_ = nullptr;
-      client_ = nullptr;
+  void AcquireReaderLock(Client* client) {
+    DCHECK(!notification_task_runner_);
+    DCHECK(!client_);
+    notification_task_runner_ = base::ThreadTaskRunnerHandle::Get();
+    client_ = client;
+    if (client && !(IsEmpty() && result() == Ok)) {
+      // We cannot notify synchronously because the user doesn't have the reader
+      // yet.
+      notification_task_runner_->PostTask(
+          FROM_HERE, base::Bind(&Context::NotifyInternal, this, false));
     }
   }
-  bool is_reader_active() const { return is_reader_active_; }
-  void set_is_reader_active(bool b) { is_reader_active_ = b; }
+  void ReleaseReaderLock() {
+    DCHECK(notification_task_runner_);
+    notification_task_runner_ = nullptr;
+    client_ = nullptr;
+  }
+  void PostNotify() {
+    auto runner = notification_task_runner_;
+    if (!runner)
+      return;
+    // We don't re-post the task when the runner changes while waiting for
+    // this task because in this case a new reader is obtained and
+    // notification is already done at the reader creation time if necessary.
+    runner->PostTask(FROM_HERE,
+                     base::Bind(&Context::NotifyInternal, this, false));
+  }
+  void Notify() { NotifyInternal(true); }
+  // This function doesn't work in the destructor if |on_reader_detached_| is
+  // not null.
+  void ResetOnReaderDetached() {
+    if (on_reader_detached_.is_null()) {
+      DCHECK(!is_on_reader_detached_valid_);
+      return;
+    }
+    is_on_reader_detached_valid_ = false;
+    if (writer_task_runner_->BelongsToCurrentThread()) {
+      // We can reset the closure immediately.
+      on_reader_detached_.Reset();
+    } else {
+      // We need to reset |on_reader_detached_| on the right thread because it
+      // might lead to the object destruction.
+      writer_task_runner_->PostTask(
+          FROM_HERE, base::Bind(&Context::ResetOnReaderDetachedWithLock, this));
+    }
+  }
+  bool is_handle_locked() const { return notification_task_runner_; }
+  bool IsReaderBoundToCurrentThread() const {
+    return notification_task_runner_ &&
+           notification_task_runner_->BelongsToCurrentThread();
+  }
+  bool is_handle_active() const { return is_handle_active_; }
+  void set_is_handle_active(bool b) { is_handle_active_ = b; }
   void Consume(size_t s) {
     first_offset_ += s;
     auto top = Top();
@@ -105,20 +148,59 @@ class SharedMemoryDataConsumerHandle::Context final
       first_offset_ = 0;
     }
   }
+  bool is_two_phase_read_in_progress() const {
+    return is_two_phase_read_in_progress_;
+  }
+  void set_is_two_phase_read_in_progress(bool b) {
+    is_two_phase_read_in_progress_ = b;
+  }
   base::Lock& lock() { return lock_; }
 
  private:
-  friend class base::RefCountedThreadSafe<Context>;
-  ~Context() {
-    // This is necessary because the queue stores raw pointers.
-    Clear();
+  void NotifyInternal(bool repost) {
+    // Note that this function is not protected by |lock_|.
+
+    auto runner = notification_task_runner_;
+    if (!runner)
+      return;
+
+    if (runner->BelongsToCurrentThread()) {
+      // It is safe to access member variables without lock because |client_|
+      // is bound to the current thread.
+      if (client_)
+        client_->didGetReadable();
+      return;
+    }
+    if (repost) {
+      // We don't re-post the task when the runner changes while waiting for
+      // this task because in this case a new reader is obtained and
+      // notification is already done at the reader creation time if necessary.
+      runner->PostTask(FROM_HERE,
+                       base::Bind(&Context::NotifyInternal, this, false));
+    }
+  }
+  void Clear() {
+    for (auto& data : queue_) {
+      delete data;
+    }
+    queue_.clear();
+    first_offset_ = 0;
+    client_ = nullptr;
+    // Note this doesn't work in the destructor if |on_reader_detached_| is not
+    // null. We have an assert in the destructor.
+    ResetOnReaderDetached();
+  }
+  void ResetOnReaderDetachedWithLock() {
+    base::AutoLock lock(lock_);
+    ResetOnReaderDetached();
   }
 
-  void NotifyImmediately() {
-    // As we can assume that all reader-side methods are called on this
-    // thread (see WebDataConsumerHandle comments), we don't need to lock.
-    if (client_)
-      client_->didGetReadable();
+  friend class base::RefCountedThreadSafe<Context>;
+  ~Context() {
+    DCHECK(on_reader_detached_.is_null());
+
+    // This is necessary because the queue stores raw pointers.
+    Clear();
   }
 
   base::Lock lock_;
@@ -131,7 +213,15 @@ class SharedMemoryDataConsumerHandle::Context final
   size_t first_offset_;
   Client* client_;
   scoped_refptr<base::SingleThreadTaskRunner> notification_task_runner_;
-  bool is_reader_active_;
+  scoped_refptr<base::SingleThreadTaskRunner> writer_task_runner_;
+  base::Closure on_reader_detached_;
+  // We need this boolean variable to remember if |on_reader_detached_| is
+  // callable because we need to reset |on_reader_detached_| only on the writer
+  // thread and hence |on_reader_detached_.is_null()| is untrustworthy on
+  // other threads.
+  bool is_on_reader_detached_valid_;
+  bool is_handle_active_;
+  bool is_two_phase_read_in_progress_;
 
   DISALLOW_COPY_AND_ASSIGN(Context);
 };
@@ -144,6 +234,8 @@ SharedMemoryDataConsumerHandle::Writer::Writer(
 
 SharedMemoryDataConsumerHandle::Writer::~Writer() {
   Close();
+  base::AutoLock lock(context_->lock());
+  context_->ResetOnReaderDetached();
 }
 
 void SharedMemoryDataConsumerHandle::Writer::AddData(
@@ -156,12 +248,12 @@ void SharedMemoryDataConsumerHandle::Writer::AddData(
   bool needs_notification = false;
   {
     base::AutoLock lock(context_->lock());
-    if (!context_->is_reader_active()) {
+    if (!context_->is_handle_active() && !context_->is_handle_locked()) {
       // No one is interested in the data.
       return;
     }
 
-    needs_notification = context_->client() && context_->IsEmpty();
+    needs_notification = context_->IsEmpty();
     scoped_ptr<RequestPeer::ThreadSafeReceivedData> data_to_pass;
     if (mode_ == kApplyBackpressure) {
       data_to_pass =
@@ -172,8 +264,12 @@ void SharedMemoryDataConsumerHandle::Writer::AddData(
     context_->Push(data_to_pass.Pass());
   }
 
-  if (needs_notification)
+  if (needs_notification) {
+    // We CAN issue the notification synchronously if the associated reader
+    // lives in this thread, because this function cannot be called in the
+    // client's callback.
     context_->Notify();
+  }
 }
 
 void SharedMemoryDataConsumerHandle::Writer::Close() {
@@ -183,34 +279,72 @@ void SharedMemoryDataConsumerHandle::Writer::Close() {
     base::AutoLock lock(context_->lock());
     if (context_->result() == Ok) {
       context_->set_result(Done);
-      needs_notification = context_->client() && context_->IsEmpty();
+      context_->ResetOnReaderDetached();
+      needs_notification = context_->IsEmpty();
     }
   }
-  if (needs_notification)
-    context_->Notify();
+  if (needs_notification) {
+    // We cannot issue the notification synchronously because this function can
+    // be called in the client's callback.
+    context_->PostNotify();
+  }
 }
 
-SharedMemoryDataConsumerHandle::SharedMemoryDataConsumerHandle(
-    BackpressureMode mode,
-    scoped_ptr<Writer>* writer)
-    : context_(new Context) {
-  writer->reset(new Writer(context_, mode));
+void SharedMemoryDataConsumerHandle::Writer::Fail() {
+  bool needs_notification = false;
+  {
+    base::AutoLock lock(context_->lock());
+    if (context_->result() == Ok) {
+      // TODO(yhirano): Use an appropriate error code other than
+      // UnexpectedError.
+      context_->set_result(UnexpectedError);
+
+      if (context_->is_two_phase_read_in_progress()) {
+        // If we are in two-phase read session, we cannot discard the data. We
+        // will clear the queue at the end of the session.
+      } else {
+        context_->ClearQueue();
+      }
+
+      context_->ResetOnReaderDetached();
+      needs_notification = true;
+    }
+  }
+  if (needs_notification) {
+    // We cannot issue the notification synchronously because this function can
+    // be called in the client's callback.
+    context_->PostNotify();
+  }
 }
 
-SharedMemoryDataConsumerHandle::~SharedMemoryDataConsumerHandle() {
+SharedMemoryDataConsumerHandle::ReaderImpl::ReaderImpl(
+    scoped_refptr<Context> context,
+    Client* client)
+    : context_(context) {
   base::AutoLock lock(context_->lock());
-  context_->set_is_reader_active(false);
-  context_->Clear();
+  DCHECK(!context_->is_handle_locked());
+  context_->AcquireReaderLock(client);
 }
 
-Result SharedMemoryDataConsumerHandle::read(void* data,
-                                            size_t size,
-                                            Flags flags,
-                                            size_t* read_size_to_return) {
+SharedMemoryDataConsumerHandle::ReaderImpl::~ReaderImpl() {
+  base::AutoLock lock(context_->lock());
+  context_->ReleaseReaderLock();
+  context_->ClearIfNecessary();
+}
+
+Result SharedMemoryDataConsumerHandle::ReaderImpl::read(
+    void* data,
+    size_t size,
+    Flags flags,
+    size_t* read_size_to_return) {
   base::AutoLock lock(context_->lock());
 
   size_t total_read_size = 0;
   *read_size_to_return = 0;
+
+  if (context_->result() == Ok && context_->is_two_phase_read_in_progress())
+    context_->set_result(UnexpectedError);
+
   if (context_->result() != Ok && context_->result() != Done)
     return context_->result();
 
@@ -229,13 +363,17 @@ Result SharedMemoryDataConsumerHandle::read(void* data,
   return total_read_size ? Ok : context_->result() == Done ? Done : ShouldWait;
 }
 
-Result SharedMemoryDataConsumerHandle::beginRead(const void** buffer,
-                                                 Flags flags,
-                                                 size_t* available) {
+Result SharedMemoryDataConsumerHandle::ReaderImpl::beginRead(
+    const void** buffer,
+    Flags flags,
+    size_t* available) {
   *buffer = nullptr;
   *available = 0;
 
   base::AutoLock lock(context_->lock());
+
+  if (context_->result() == Ok && context_->is_two_phase_read_in_progress())
+    context_->set_result(UnexpectedError);
 
   if (context_->result() != Ok && context_->result() != Done)
     return context_->result();
@@ -243,6 +381,7 @@ Result SharedMemoryDataConsumerHandle::beginRead(const void** buffer,
   if (context_->IsEmpty())
     return context_->result() == Done ? Done : ShouldWait;
 
+  context_->set_is_two_phase_read_in_progress(true);
   const auto& top = context_->Top();
   *buffer = top->payload() + context_->first_offset();
   *available = top->length() - context_->first_offset();
@@ -250,32 +389,55 @@ Result SharedMemoryDataConsumerHandle::beginRead(const void** buffer,
   return Ok;
 }
 
-Result SharedMemoryDataConsumerHandle::endRead(size_t read_size) {
+Result SharedMemoryDataConsumerHandle::ReaderImpl::endRead(size_t read_size) {
   base::AutoLock lock(context_->lock());
 
-  if (context_->IsEmpty())
+  if (!context_->is_two_phase_read_in_progress())
     return UnexpectedError;
 
-  context_->Consume(read_size);
+  context_->set_is_two_phase_read_in_progress(false);
+  if (context_->result() != Ok && context_->result() != Done) {
+    // We have an error, so we can discard the stored data.
+    context_->ClearQueue();
+  } else {
+    context_->Consume(read_size);
+  }
+
   return Ok;
 }
 
-void SharedMemoryDataConsumerHandle::registerClient(Client* client) {
-  bool needs_notification = false;
-  {
-    base::AutoLock lock(context_->lock());
-
-    context_->SetClient(client);
-    needs_notification = !context_->IsEmpty();
-  }
-  if (needs_notification)
-    context_->Notify();
+SharedMemoryDataConsumerHandle::SharedMemoryDataConsumerHandle(
+    BackpressureMode mode,
+    scoped_ptr<Writer>* writer)
+    : SharedMemoryDataConsumerHandle(mode, base::Closure(), writer) {
 }
 
-void SharedMemoryDataConsumerHandle::unregisterClient() {
-  base::AutoLock lock(context_->lock());
+SharedMemoryDataConsumerHandle::SharedMemoryDataConsumerHandle(
+    BackpressureMode mode,
+    const base::Closure& on_reader_detached,
+    scoped_ptr<Writer>* writer)
+    : context_(new Context(on_reader_detached)) {
+  writer->reset(new Writer(context_, mode));
+}
 
-  context_->SetClient(nullptr);
+SharedMemoryDataConsumerHandle::~SharedMemoryDataConsumerHandle() {
+  base::AutoLock lock(context_->lock());
+  context_->set_is_handle_active(false);
+  context_->ClearIfNecessary();
+}
+
+scoped_ptr<blink::WebDataConsumerHandle::Reader>
+SharedMemoryDataConsumerHandle::ObtainReader(Client* client) {
+  return make_scoped_ptr(obtainReaderInternal(client));
+}
+
+SharedMemoryDataConsumerHandle::ReaderImpl*
+SharedMemoryDataConsumerHandle::obtainReaderInternal(Client* client) {
+  return new ReaderImpl(context_, client);
+}
+
+const char* SharedMemoryDataConsumerHandle::debugName() const {
+  return "SharedMemoryDataConsumerHandle";
 }
 
 }  // namespace content

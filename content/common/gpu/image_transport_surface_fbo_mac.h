@@ -47,7 +47,7 @@ class ImageTransportSurfaceFBO
         const gfx::Size& pixel_size, float scale_factor) = 0;
 
     // Swap buffers, or post sub-buffer.
-    virtual void SwapBuffers() = 0;
+    virtual void SwapBuffers(const gfx::Rect& dirty_rect) = 0;
 
     // Indicate that the backbuffer will be written to.
     virtual void WillWriteToBackbuffer() = 0;
@@ -89,6 +89,8 @@ class ImageTransportSurfaceFBO
                        float scale_factor);
   void SetRendererID(int renderer_id);
 
+  const gpu::gles2::FeatureInfo* GetFeatureInfo() const;
+
  protected:
   // ImageTransportSurface implementation
   void OnBufferPresented(
@@ -107,7 +109,7 @@ class ImageTransportSurfaceFBO
   void DestroyFramebuffer();
   void AllocateOrResizeFramebuffer(
       const gfx::Size& pixel_size, float scale_factor);
-  bool SwapBuffersInternal();
+  bool SwapBuffersInternal(const gfx::Rect& dirty_rect);
 
   scoped_ptr<StorageProvider> storage_provider_;
 

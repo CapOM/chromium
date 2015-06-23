@@ -14,7 +14,6 @@
 #include <limits>
 #include <map>
 #include <string>
-#include <vector>
 
 #include "base/basictypes.h"
 #include "base/compiler_specific.h"
@@ -36,9 +35,8 @@ enum SpdyMajorVersion {
   SPDY2 = 2,
   SPDY_MIN_VERSION = SPDY2,
   SPDY3 = 3,
-  SPDY4 = 4,
-  HTTP2 = SPDY4,
-  SPDY_MAX_VERSION = SPDY4
+  HTTP2 = 4,
+  SPDY_MAX_VERSION = HTTP2
 };
 
 // A SPDY stream id is a 31 bit entity.
@@ -845,11 +843,7 @@ class NET_EXPORT_PRIVATE SpdyGoAwayIR : public SpdyFrameIR {
 class NET_EXPORT_PRIVATE SpdyHeadersIR : public SpdyFrameWithNameValueBlockIR {
  public:
   explicit SpdyHeadersIR(SpdyStreamId stream_id)
-      : SpdyFrameWithNameValueBlockIR(stream_id),
-        has_priority_(false),
-        priority_(0),
-        padded_(false),
-        padding_payload_len_(0) {}
+      : SpdyFrameWithNameValueBlockIR(stream_id) {}
 
   void Visit(SpdyFrameVisitor* visitor) const override;
 
@@ -857,7 +851,10 @@ class NET_EXPORT_PRIVATE SpdyHeadersIR : public SpdyFrameWithNameValueBlockIR {
   void set_has_priority(bool has_priority) { has_priority_ = has_priority; }
   uint32 priority() const { return priority_; }
   void set_priority(SpdyPriority priority) { priority_ = priority; }
-
+  SpdyStreamId parent_stream_id() const { return parent_stream_id_; }
+  void set_parent_stream_id(SpdyStreamId id) { parent_stream_id_ = id; }
+  bool exclusive() const { return exclusive_; }
+  void set_exclusive(bool exclusive) { exclusive_ = exclusive; }
   bool padded() const { return padded_; }
   int padding_payload_len() const { return padding_payload_len_; }
   void set_padding_len(int padding_len) {
@@ -869,12 +866,13 @@ class NET_EXPORT_PRIVATE SpdyHeadersIR : public SpdyFrameWithNameValueBlockIR {
   }
 
  private:
-  bool has_priority_;
+  bool has_priority_ = false;
   // 31-bit priority.
-  uint32 priority_;
-
-  bool padded_;
-  int padding_payload_len_;
+  uint32 priority_ = 0;
+  SpdyStreamId parent_stream_id_ = 0;
+  bool exclusive_ = false;
+  bool padded_ = false;
+  int padding_payload_len_ = 0;
 
   DISALLOW_COPY_AND_ASSIGN(SpdyHeadersIR);
 };
@@ -962,38 +960,26 @@ class NET_EXPORT_PRIVATE SpdyContinuationIR
   DISALLOW_COPY_AND_ASSIGN(SpdyContinuationIR);
 };
 
-// TODO(bnc): Add probability.
-// TODO(bnc): Separate (protocol, port, host, max_age, probability) tuple into
-// struct, have a vector of that struct.  A single HTTP/1.1 header field or
-// HTTP/2 or QUIC frame can define multiple such tuples.
 class NET_EXPORT_PRIVATE SpdyAltSvcIR : public SpdyFrameWithStreamIdIR {
  public:
   explicit SpdyAltSvcIR(SpdyStreamId stream_id);
+  ~SpdyAltSvcIR() override;
 
   std::string origin() const { return origin_; }
-  const SpdyAltSvcWireFormat::AlternativeService& altsvc() const {
-    return altsvc_;
+  const SpdyAltSvcWireFormat::AlternativeServiceVector& altsvc_vector() const {
+    return altsvc_vector_;
   }
-  SpdyProtocolId protocol_id() const { return altsvc_.protocol_id; }
-  std::string host() const { return altsvc_.host; }
-  uint16 port() const { return altsvc_.port; }
-  uint32 max_age() const { return altsvc_.max_age; }
-  double p() const { return altsvc_.p; }
 
-  void set_origin(std::string origin) { origin_ = origin; }
-  void set_protocol_id(SpdyProtocolId protocol_id) {
-    altsvc_.protocol_id = protocol_id;
+  void set_origin(const std::string origin) { origin_ = origin; }
+  void add_altsvc(const SpdyAltSvcWireFormat::AlternativeService& altsvc) {
+    altsvc_vector_.push_back(altsvc);
   }
-  void set_host(std::string host) { altsvc_.host = host; }
-  void set_port(uint16 port) { altsvc_.port = port; }
-  void set_max_age(uint32 max_age) { altsvc_.max_age = max_age; }
-  void set_p(double p) { altsvc_.p = p; }
 
   void Visit(SpdyFrameVisitor* visitor) const override;
 
  private:
   std::string origin_;
-  SpdyAltSvcWireFormat::AlternativeService altsvc_;
+  SpdyAltSvcWireFormat::AlternativeServiceVector altsvc_vector_;
   DISALLOW_COPY_AND_ASSIGN(SpdyAltSvcIR);
 };
 

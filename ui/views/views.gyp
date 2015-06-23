@@ -481,6 +481,8 @@
       'test/menu_runner_test_api.h',
       'test/slider_test_api.cc',
       'test/slider_test_api.h',
+      'test/scoped_views_test_helper.cc',
+      'test/scoped_views_test_helper.h',
       'test/test_views.cc',
       'test/test_views.h',
       'test/test_views_delegate.h',
@@ -622,6 +624,11 @@
         '../resources/ui_resources.gyp:ui_resources',
         '../strings/ui_strings.gyp:ui_strings',
       ],
+      'all_dependent_settings': {
+        'defines': [
+          'TOOLKIT_VIEWS=1',
+        ],
+      },
       'export_dependent_settings': [
         '../accessibility/accessibility.gyp:ax_gen',
       ],
@@ -890,8 +897,6 @@
           # views_unittests not yet compiling on Mac. http://crbug.com/378134
           'sources!': [
             'bubble/bubble_window_targeter_unittest.cc',
-            'controls/button/custom_button_unittest.cc',
-            'controls/menu/menu_controller_unittest.cc',
             'controls/native/native_view_host_unittest.cc',
             'focus/focus_manager_unittest.cc',
             'ime/input_method_bridge_unittest.cc',

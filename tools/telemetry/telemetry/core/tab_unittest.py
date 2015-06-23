@@ -11,10 +11,10 @@ from telemetry.core.platform import tracing_options
 from telemetry.core import util
 from telemetry.core import video
 from telemetry import decorators
-from telemetry.image_processing import image_util
-from telemetry.image_processing import rgba_color
 from telemetry.timeline import model
 from telemetry.unittest_util import tab_test_case
+from telemetry.util import image_util
+from telemetry.util import rgba_color
 
 
 def _IsDocumentVisible(tab):
@@ -119,6 +119,7 @@ class TabTest(tab_test_case.TabTestCase):
     self.assertTrue(found_video_start_event)
 
   @decorators.Enabled('has tabs')
+  @decorators.Disabled('mac')  # crbug.com/499207.
   def testGetRendererThreadFromTabId(self):
     self.assertEquals(self._tab.url, 'about:blank')
     # Create 3 tabs. The third tab is closed before we call

@@ -21,9 +21,6 @@ public class AwShellApplication extends ContentApplication {
 
     private static final String TAG = "AwShellApplication";
     /** The minimum set of .pak files the test runner needs. */
-    private static final String[] MANDATORY_PAKS = { "icudtl.dat",
-                                                     "natives_blob.bin",
-                                                     "snapshot_blob.bin" };
 
     @Override
     public void onCreate() {
@@ -49,8 +46,7 @@ public class AwShellApplication extends ContentApplication {
 
     @Override
     protected void initializeLibraryDependencies() {
-        ResourceExtractor.setMandatoryPaksToExtract(MANDATORY_PAKS);
-        ResourceExtractor.setExtractImplicitLocaleForTesting(false);
+        ResourceExtractor.setMandatoryPaksToExtract(0);
     }
 
     @Override

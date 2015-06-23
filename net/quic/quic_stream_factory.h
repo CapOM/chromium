@@ -55,9 +55,12 @@ class NET_EXPORT_PRIVATE QuicStreamRequest {
   ~QuicStreamRequest();
 
   // For http, |is_https| is false.
+  // |cert_verify_flags| is bitwise OR'd of CertVerifier::VerifyFlags and it is
+  // passed to CertVerifier::Verify.
   int Request(const HostPortPair& host_port_pair,
               bool is_https,
               PrivacyMode privacy_mode,
+              int cert_verify_flags,
               base::StringPiece origin_host,
               base::StringPiece method,
               const BoundNetLog& net_log,
@@ -130,15 +133,19 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   int Create(const HostPortPair& host_port_pair,
              bool is_https,
              PrivacyMode privacy_mode,
+             int cert_verify_flags,
              base::StringPiece origin_host,
              base::StringPiece method,
              const BoundNetLog& net_log,
              QuicStreamRequest* request);
 
-  // Returns false if |packet_loss_rate| is less than |packet_loss_threshold_|
-  // otherwise it returns true and closes the session and marks QUIC as recently
-  // broken for the port of the session. Increments
-  // |number_of_lossy_connections_| by port.
+  // If |packet_loss_rate| is greater than or equal to |packet_loss_threshold_|
+  // it marks QUIC as recently broken for the port of the session. Increments
+  // |number_of_lossy_connections_| by port. If |number_of_lossy_connections_|
+  // is greater than or equal to |max_number_of_lossy_connections_| then it
+  // disables QUIC. If QUIC is disabled then it closes the connection.
+  //
+  // Returns true if QUIC is disabled for the port of the session.
   bool OnHandshakeConfirmed(QuicClientSession* session, float packet_loss_rate);
 
   // Returns true if QUIC is disabled for this port.
@@ -240,6 +247,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   // Creates a job which doesn't wait for server config to be loaded from the
   // disk cache. This job is started via a PostTask.
   void CreateAuxilaryJob(const QuicServerId server_id,
+                         int cert_verify_flags,
                          bool server_and_origin_have_same_host,
                          bool is_post,
                          const BoundNetLog& net_log);
@@ -253,6 +261,7 @@ class NET_EXPORT_PRIVATE QuicStreamFactory
   bool HasActiveSession(const QuicServerId& server_id) const;
   bool HasActiveJob(const QuicServerId& server_id) const;
   int CreateSession(const QuicServerId& server_id,
+                    int cert_verify_flags,
                     scoped_ptr<QuicServerInfo> quic_server_info,
                     const AddressList& address_list,
                     base::TimeTicks dns_resolution_end_time,

@@ -28,6 +28,7 @@
 #include "extensions/renderer/object_backed_native_handler.h"
 #include "extensions/renderer/script_context.h"
 #include "extensions/renderer/script_context_set.h"
+#include "extensions/renderer/v8_helpers.h"
 #include "third_party/WebKit/public/web/WebDocument.h"
 #include "third_party/WebKit/public/web/WebLocalFrame.h"
 #include "third_party/WebKit/public/web/WebScopedMicrotaskSuppression.h"
@@ -50,6 +51,9 @@ using content::RenderThread;
 using content::V8ValueConverter;
 
 namespace extensions {
+
+using v8_helpers::ToV8String;
+using v8_helpers::ToV8StringUnsafe;
 
 namespace {
 
@@ -119,28 +123,72 @@ class GCCallback : public base::SupportsWeakPtr<GCCallback> {
   DISALLOW_COPY_AND_ASSIGN(GCCallback);
 };
 
-struct ExtensionData {
-  struct PortData {
-    int ref_count;  // how many contexts have a handle to this port
-    PortData() : ref_count(0) {}
-  };
-  std::map<int, PortData> ports;  // port ID -> data
+// Tracks every reference between ScriptContexts and Ports, by ID.
+class PortTracker {
+ public:
+  PortTracker() {}
+  ~PortTracker() {}
+
+  // Returns true if |context| references |port_id|.
+  bool HasReference(ScriptContext* context, int port_id) const {
+    auto ports = contexts_to_ports_.find(context);
+    return ports != contexts_to_ports_.end() &&
+           ports->second.count(port_id) > 0;
+  }
+
+  // Marks |context| and |port_id| as referencing each other.
+  void AddReference(ScriptContext* context, int port_id) {
+    contexts_to_ports_[context].insert(port_id);
+  }
+
+  // Removes the references between |context| and |port_id|.
+  // Returns true if a reference was removed, false if the reference didn't
+  // exist to be removed.
+  bool RemoveReference(ScriptContext* context, int port_id) {
+    auto ports = contexts_to_ports_.find(context);
+    if (ports == contexts_to_ports_.end() ||
+        ports->second.erase(port_id) == 0) {
+      return false;
+    }
+    if (ports->second.empty())
+      contexts_to_ports_.erase(context);
+    return true;
+  }
+
+  // Returns true if this tracker has any reference to |port_id|.
+  bool HasPort(int port_id) const {
+    for (auto it : contexts_to_ports_) {
+      if (it.second.count(port_id) > 0)
+        return true;
+    }
+    return false;
+  }
+
+  // Deletes all references to |port_id|.
+  void DeletePort(int port_id) {
+    for (auto it = contexts_to_ports_.begin();
+         it != contexts_to_ports_.end();) {
+      if (it->second.erase(port_id) > 0 && it->second.empty())
+        contexts_to_ports_.erase(it++);
+      else
+        ++it;
+    }
+  }
+
+  // Gets every port ID that has a reference to |context|.
+  std::set<int> GetPortsForContext(ScriptContext* context) const {
+    auto ports = contexts_to_ports_.find(context);
+    return ports == contexts_to_ports_.end() ? std::set<int>() : ports->second;
+  }
+
+ private:
+  // Maps ScriptContexts to the port IDs that have a reference to it.
+  std::map<ScriptContext*, std::set<int>> contexts_to_ports_;
+
+  DISALLOW_COPY_AND_ASSIGN(PortTracker);
 };
 
-base::LazyInstance<ExtensionData> g_extension_data = LAZY_INSTANCE_INITIALIZER;
-
-bool HasPortData(int port_id) {
-  return g_extension_data.Get().ports.find(port_id) !=
-         g_extension_data.Get().ports.end();
-}
-
-ExtensionData::PortData& GetPortData(int port_id) {
-  return g_extension_data.Get().ports[port_id];
-}
-
-void ClearPortData(int port_id) {
-  g_extension_data.Get().ports.erase(port_id);
-}
+base::LazyInstance<PortTracker> g_port_tracker = LAZY_INSTANCE_INITIALIZER;
 
 const char kPortClosedError[] = "Attempting to use a disconnected port object";
 const char kReceivingEndDoesntExistError[] =
@@ -167,13 +215,22 @@ class ExtensionImpl : public ObjectBackedNativeHandler {
     // TODO(fsamuel, kalman): Move BindToGC out of messaging natives.
     RouteFunction("BindToGC",
                   base::Bind(&ExtensionImpl::BindToGC, base::Unretained(this)));
+
+    // Observe |context| so that port references to it can be cleared.
+    context->AddInvalidationObserver(base::Bind(
+        &ExtensionImpl::OnContextInvalidated, weak_ptr_factory_.GetWeakPtr()));
   }
 
   ~ExtensionImpl() override {}
 
  private:
+  void OnContextInvalidated() {
+    for (int port_id : g_port_tracker.Get().GetPortsForContext(context()))
+      ReleasePort(port_id);
+  }
+
   void ClearPortDataAndNotifyDispatcher(int port_id) {
-    ClearPortData(port_id);
+    g_port_tracker.Get().DeletePort(port_id);
     dispatcher_->ClearPortData(port_id);
   }
 
@@ -186,10 +243,11 @@ class ExtensionImpl : public ObjectBackedNativeHandler {
     // Arguments are (int32 port_id, string message).
     CHECK(args.Length() == 2 && args[0]->IsInt32() && args[1]->IsString());
 
-    int port_id = args[0]->Int32Value();
-    if (!HasPortData(port_id)) {
-      args.GetIsolate()->ThrowException(v8::Exception::Error(
-          v8::String::NewFromUtf8(args.GetIsolate(), kPortClosedError)));
+    int port_id = args[0].As<v8::Int32>()->Value();
+    if (!g_port_tracker.Get().HasPort(port_id)) {
+      v8::Local<v8::String> error_message =
+          ToV8StringUnsafe(args.GetIsolate(), kPortClosedError);
+      args.GetIsolate()->ThrowException(v8::Exception::Error(error_message));
       return;
     }
 
@@ -206,12 +264,12 @@ class ExtensionImpl : public ObjectBackedNativeHandler {
     CHECK(args[0]->IsInt32());
     CHECK(args[1]->IsBoolean());
 
-    int port_id = args[0]->Int32Value();
-    if (!HasPortData(port_id))
+    int port_id = args[0].As<v8::Int32>()->Value();
+    if (!g_port_tracker.Get().HasPort(port_id))
       return;
 
     // Send via the RenderThread because the RenderFrame might be closing.
-    bool notify_browser = args[1]->BooleanValue();
+    bool notify_browser = args[1].As<v8::Boolean>()->Value();
     if (notify_browser) {
       content::RenderThread::Get()->Send(
           new ExtensionHostMsg_CloseChannel(port_id, std::string()));
@@ -227,8 +285,8 @@ class ExtensionImpl : public ObjectBackedNativeHandler {
     CHECK_EQ(1, args.Length());
     CHECK(args[0]->IsInt32());
 
-    int port_id = args[0]->Int32Value();
-    ++GetPortData(port_id).ref_count;
+    int port_id = args[0].As<v8::Int32>()->Value();
+    g_port_tracker.Get().AddReference(context(), port_id);
   }
 
   // The frame a port lived in has been destroyed.  When there are no more
@@ -237,13 +295,14 @@ class ExtensionImpl : public ObjectBackedNativeHandler {
   void PortRelease(const v8::FunctionCallbackInfo<v8::Value>& args) {
     // Arguments are (int32 port_id).
     CHECK(args.Length() == 1 && args[0]->IsInt32());
-    ReleasePort(args[0]->Int32Value());
+    ReleasePort(args[0].As<v8::Int32>()->Value());
   }
 
-  // Implementation of both the PortRelease native handler call, and callback
-  // when contexts are invalidated to release their ports.
+  // Releases the reference to |port_id| for this context, and clears all port
+  // data if there are no more references.
   void ReleasePort(int port_id) {
-    if (HasPortData(port_id) && --GetPortData(port_id).ref_count == 0) {
+    if (g_port_tracker.Get().RemoveReference(context(), port_id) &&
+        !g_port_tracker.Get().HasPort(port_id)) {
       // Send via the RenderThread because the RenderFrame might be closing.
       content::RenderThread::Get()->Send(
           new ExtensionHostMsg_CloseChannel(port_id, std::string()));
@@ -263,7 +322,7 @@ class ExtensionImpl : public ObjectBackedNativeHandler {
   void BindToGC(const v8::FunctionCallbackInfo<v8::Value>& args) {
     CHECK(args.Length() == 3 && args[0]->IsObject() && args[1]->IsFunction() &&
           args[2]->IsInt32());
-    int port_id = args[2]->Int32Value();
+    int port_id = args[2].As<v8::Int32>()->Value();
     base::Closure fallback = base::Bind(&base::DoNothing);
     if (port_id >= 0) {
       fallback = base::Bind(&ExtensionImpl::ReleasePort,
@@ -308,6 +367,7 @@ void DispatchOnConnectToScriptContext(
   v8::Local<v8::Value> tab = v8::Null(isolate);
   v8::Local<v8::Value> tls_channel_id_value = v8::Undefined(isolate);
   v8::Local<v8::Value> guest_process_id = v8::Undefined(isolate);
+  v8::Local<v8::Value> guest_render_frame_routing_id = v8::Undefined(isolate);
 
   if (extension) {
     if (!source->tab.empty() && !extension->is_platform_app())
@@ -317,39 +377,50 @@ void DispatchOnConnectToScriptContext(
         ExternallyConnectableInfo::Get(extension);
     if (externally_connectable &&
         externally_connectable->accepts_tls_channel_id) {
-      tls_channel_id_value = v8::String::NewFromUtf8(isolate,
-                                                     tls_channel_id.c_str(),
-                                                     v8::String::kNormalString,
-                                                     tls_channel_id.size());
+      v8::Local<v8::String> v8_tls_channel_id;
+      if (ToV8String(isolate, tls_channel_id.c_str(), &v8_tls_channel_id))
+        tls_channel_id_value = v8_tls_channel_id;
     }
 
-    if (info.guest_process_id != content::ChildProcessHost::kInvalidUniqueID)
+    if (info.guest_process_id != content::ChildProcessHost::kInvalidUniqueID) {
       guest_process_id = v8::Integer::New(isolate, info.guest_process_id);
+      guest_render_frame_routing_id =
+          v8::Integer::New(isolate, info.guest_render_frame_routing_id);
+    }
+  }
+
+  v8::Local<v8::String> v8_channel_name;
+  v8::Local<v8::String> v8_source_id;
+  v8::Local<v8::String> v8_target_extension_id;
+  v8::Local<v8::String> v8_source_url_spec;
+  if (!ToV8String(isolate, channel_name.c_str(), &v8_channel_name) ||
+      !ToV8String(isolate, info.source_id.c_str(), &v8_source_id) ||
+      !ToV8String(isolate, target_extension_id.c_str(),
+                  &v8_target_extension_id) ||
+      !ToV8String(isolate, source_url_spec.c_str(), &v8_source_url_spec)) {
+    NOTREACHED() << "dispatchOnConnect() passed non-string argument";
+    return;
   }
 
   v8::Local<v8::Value> arguments[] = {
       // portId
       v8::Integer::New(isolate, target_port_id),
       // channelName
-      v8::String::NewFromUtf8(isolate, channel_name.c_str(),
-                              v8::String::kNormalString, channel_name.size()),
+      v8_channel_name,
       // sourceTab
       tab,
       // source_frame_id
       v8::Integer::New(isolate, source->frame_id),
       // guestProcessId
       guest_process_id,
+      // guestRenderFrameRoutingId
+      guest_render_frame_routing_id,
       // sourceExtensionId
-      v8::String::NewFromUtf8(isolate, info.source_id.c_str(),
-                              v8::String::kNormalString, info.source_id.size()),
+      v8_source_id,
       // targetExtensionId
-      v8::String::NewFromUtf8(isolate, target_extension_id.c_str(),
-                              v8::String::kNormalString,
-                              target_extension_id.size()),
+      v8_target_extension_id,
       // sourceUrl
-      v8::String::NewFromUtf8(isolate, source_url_spec.c_str(),
-                              v8::String::kNormalString,
-                              source_url_spec.size()),
+      v8_source_url_spec,
       // tlsChannelId
       tls_channel_id_value,
   };
@@ -360,7 +431,7 @@ void DispatchOnConnectToScriptContext(
 
   if (!retval.IsEmpty()) {
     CHECK(retval->IsBoolean());
-    *port_created |= retval->BooleanValue();
+    *port_created |= retval.As<v8::Boolean>()->Value();
   } else {
     LOG(ERROR) << "Empty return value from dispatchOnConnect.";
   }
@@ -380,15 +451,15 @@ void DeliverMessageToScriptContext(const Message& message,
       script_context->module_system()->CallModuleMethod("messaging", "hasPort",
                                                         1, &port_id_handle);
 
-  CHECK(!has_port.IsEmpty());
-  if (!has_port->BooleanValue())
+  CHECK(!has_port.IsEmpty() && has_port->IsBoolean());
+  if (!has_port.As<v8::Boolean>()->Value())
     return;
 
+  v8::Local<v8::String> v8_data;
+  if (!ToV8String(isolate, message.data.c_str(), &v8_data))
+    return;
   std::vector<v8::Local<v8::Value>> arguments;
-  arguments.push_back(v8::String::NewFromUtf8(isolate,
-                                              message.data.c_str(),
-                                              v8::String::kNormalString,
-                                              message.data.size()));
+  arguments.push_back(v8_data);
   arguments.push_back(port_id_handle);
 
   scoped_ptr<blink::WebScopedUserGesture> web_user_gesture;
@@ -415,9 +486,11 @@ void DispatchOnDisconnectToScriptContext(int port_id,
 
   std::vector<v8::Local<v8::Value>> arguments;
   arguments.push_back(v8::Integer::New(isolate, port_id));
-  if (!error_message.empty()) {
-    arguments.push_back(
-        v8::String::NewFromUtf8(isolate, error_message.c_str()));
+  v8::Local<v8::String> v8_error_message;
+  if (!error_message.empty())
+    ToV8String(isolate, error_message.c_str(), &v8_error_message);
+  if (!v8_error_message.IsEmpty()) {
+    arguments.push_back(v8_error_message);
   } else {
     arguments.push_back(v8::Null(isolate));
   }
@@ -442,13 +515,9 @@ void MessagingBindings::DispatchOnConnect(
     const ExtensionMsg_ExternalConnectionInfo& info,
     const std::string& tls_channel_id,
     content::RenderFrame* restrict_to_render_frame) {
-  // TODO(robwu): ScriptContextSet.ForEach should accept RenderFrame*.
-  content::RenderView* restrict_to_render_view =
-      restrict_to_render_frame ? restrict_to_render_frame->GetRenderView()
-                               : NULL;
   bool port_created = false;
   context_set.ForEach(
-      info.target_id, restrict_to_render_view,
+      info.target_id, restrict_to_render_frame,
       base::Bind(&DispatchOnConnectToScriptContext, target_port_id,
                  channel_name, &source, info, tls_channel_id, &port_created));
 
@@ -466,12 +535,8 @@ void MessagingBindings::DeliverMessage(
     int target_port_id,
     const Message& message,
     content::RenderFrame* restrict_to_render_frame) {
-  // TODO(robwu): ScriptContextSet.ForEach should accept RenderFrame*.
-  content::RenderView* restrict_to_render_view =
-      restrict_to_render_frame ? restrict_to_render_frame->GetRenderView()
-                               : NULL;
   context_set.ForEach(
-      restrict_to_render_view,
+      restrict_to_render_frame,
       base::Bind(&DeliverMessageToScriptContext, message, target_port_id));
 }
 
@@ -481,12 +546,8 @@ void MessagingBindings::DispatchOnDisconnect(
     int port_id,
     const std::string& error_message,
     content::RenderFrame* restrict_to_render_frame) {
-  // TODO(robwu): ScriptContextSet.ForEach should accept RenderFrame*.
-  content::RenderView* restrict_to_render_view =
-      restrict_to_render_frame ? restrict_to_render_frame->GetRenderView()
-                               : NULL;
   context_set.ForEach(
-      restrict_to_render_view,
+      restrict_to_render_frame,
       base::Bind(&DispatchOnDisconnectToScriptContext, port_id, error_message));
 }
 

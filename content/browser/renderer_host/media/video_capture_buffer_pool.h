@@ -8,6 +8,7 @@
 #include <map>
 
 #include "base/basictypes.h"
+#include "base/files/file.h"
 #include "base/memory/ref_counted.h"
 #include "base/memory/shared_memory.h"
 #include "base/process/process.h"
@@ -51,8 +52,10 @@ class CONTENT_EXPORT VideoCaptureBufferPool
     virtual ~BufferHandle() {}
     virtual size_t size() const = 0;
     virtual void* data() = 0;
-    virtual gfx::GpuMemoryBufferType GetType() = 0;
     virtual ClientBuffer AsClientBuffer() = 0;
+#if defined(OS_POSIX)
+    virtual base::FileDescriptor AsPlatformFile() = 0;
+#endif
   };
 
   explicit VideoCaptureBufferPool(int count);
@@ -98,6 +101,10 @@ class CONTENT_EXPORT VideoCaptureBufferPool
   // effectively is the opposite of HoldForConsumers(). Once the consumers are
   // done, a buffer is returned to the pool for reuse.
   void RelinquishConsumerHold(int buffer_id, int num_clients);
+
+  // Returns a snapshot of the current number of buffers in-use divided by the
+  // maximum |count_|.
+  double GetBufferPoolUtilization() const;
 
  private:
   class GpuMemoryBufferTracker;
@@ -164,7 +171,7 @@ class CONTENT_EXPORT VideoCaptureBufferPool
   const int count_;
 
   // Protects everything below it.
-  base::Lock lock_;
+  mutable base::Lock lock_;
 
   // The ID of the next buffer.
   int next_buffer_id_;

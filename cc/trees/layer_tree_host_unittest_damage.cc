@@ -7,7 +7,6 @@
 #include "base/bind.h"
 #include "base/callback.h"
 #include "base/location.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/time/time.h"
 #include "cc/layers/solid_color_layer.h"
 #include "cc/test/fake_content_layer_client.h"
@@ -236,7 +235,7 @@ class LayerTreeHostDamageTestNoDamageDoesNotSwap
   int did_swap_and_succeed_;
 };
 
-SINGLE_AND_MULTI_THREAD_IMPL_TEST_F(LayerTreeHostDamageTestNoDamageDoesNotSwap);
+SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostDamageTestNoDamageDoesNotSwap);
 
 class LayerTreeHostDamageTestForcedFullDamage : public LayerTreeHostDamageTest {
   void BeginTest() override { PostSetNeedsCommitToMainThread(); }
@@ -332,7 +331,7 @@ class LayerTreeHostDamageTestForcedFullDamage : public LayerTreeHostDamageTest {
   gfx::Rect child_damage_rect_;
 };
 
-SINGLE_AND_MULTI_THREAD_IMPL_TEST_F(LayerTreeHostDamageTestForcedFullDamage);
+SINGLE_AND_MULTI_THREAD_TEST_F(LayerTreeHostDamageTestForcedFullDamage);
 
 class LayerTreeHostScrollbarDamageTest : public LayerTreeHostDamageTest {
   void SetupTree() override {

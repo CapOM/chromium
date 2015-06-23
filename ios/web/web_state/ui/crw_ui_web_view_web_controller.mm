@@ -24,6 +24,7 @@
 #include "ios/web/net/request_group_util.h"
 #include "ios/web/public/url_scheme_util.h"
 #include "ios/web/public/web_client.h"
+#import "ios/web/public/web_state/ui/crw_web_view_content_view.h"
 #import "ios/web/ui_web_view_util.h"
 #include "ios/web/web_state/frame_info.h"
 #import "ios/web/web_state/js/crw_js_invoke_parameter_queue.h"
@@ -439,9 +440,9 @@ const size_t kMaxMessageQueueSize = 262144;
 #pragma mark -
 #pragma mark Testing-Only Methods
 
-- (void)injectWebView:(id)webView {
-  [super injectWebView:webView];
-  [self setWebView:webView];
+- (void)injectWebViewContentView:(CRWWebViewContentView*)webViewContentView {
+  [super injectWebViewContentView:webViewContentView];
+  [self setWebView:static_cast<UIWebView*>(webViewContentView.webView)];
 }
 
 #pragma mark CRWJSInjectionEvaluatorMethods
@@ -781,20 +782,8 @@ const size_t kMaxMessageQueueSize = 262144;
   [super webPageChanged];
 }
 
-- (CGFloat)absoluteZoomScaleForScrollState:
-    (const web::PageScrollState&)scrollState {
-  CGFloat zoomScale = NAN;
-  if (scrollState.IsZoomScaleValid()) {
-    if (scrollState.IsZoomScaleLegacyFormat())
-      zoomScale = scrollState.zoom_scale();
-    else
-      zoomScale = scrollState.zoom_scale() / scrollState.minimum_zoom_scale();
-  }
-  return zoomScale;
-}
-
-- (void)applyWebViewScrollZoomScaleFromScrollState:
-    (const web::PageScrollState&)scrollState {
+- (void)applyWebViewScrollZoomScaleFromZoomState:
+    (const web::PageZoomState&)zoomState {
   // A UIWebView's scroll view uses zoom scales in a non-standard way.  The
   // scroll view's |zoomScale| property is always equal to 1.0, and the
   // |minimumZoomScale| and |maximumZoomScale| properties are adjusted
@@ -803,11 +792,11 @@ const size_t kMaxMessageQueueSize = 262144;
   // 2.0 will update the zoom to twice its initial scale). The maximum-scale or
   // minimum-scale meta tags of a page may have changed since the state was
   // recorded, so clamp the zoom scale to the current range if necessary.
-  DCHECK(scrollState.IsZoomScaleValid());
-  CGFloat zoomScale = scrollState.IsZoomScaleLegacyFormat()
-                          ? scrollState.zoom_scale()
+  DCHECK(zoomState.IsValid());
+  CGFloat zoomScale = zoomState.IsLegacyFormat()
+                          ? zoomState.zoom_scale()
                           : self.webScrollView.minimumZoomScale /
-                                scrollState.minimum_zoom_scale();
+                                zoomState.minimum_zoom_scale();
   if (zoomScale < self.webScrollView.minimumZoomScale)
     zoomScale = self.webScrollView.minimumZoomScale;
   if (zoomScale > self.webScrollView.maximumZoomScale)

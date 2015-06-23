@@ -8,7 +8,7 @@
 
 #include "base/location.h"
 #include "base/memory/scoped_ptr.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/metrics/sparse_histogram.h"
 #include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
@@ -178,9 +178,8 @@ void SuggestionsService::UndoBlacklistURL(
 // static
 bool SuggestionsService::GetBlacklistedUrl(const net::URLFetcher& request,
                                            GURL* url) {
-  bool is_blacklist_request = StartsWithASCII(request.GetOriginalURL().spec(),
-                                              kSuggestionsBlacklistURLPrefix,
-                                              true);
+  bool is_blacklist_request = base::StartsWithASCII(
+      request.GetOriginalURL().spec(), kSuggestionsBlacklistURLPrefix, true);
   if (!is_blacklist_request) return false;
 
   // Extract the blacklisted URL from the blacklist request.

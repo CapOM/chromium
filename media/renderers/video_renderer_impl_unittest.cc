@@ -60,7 +60,7 @@ class VideoRendererImplTest : public testing::TestWithParam<bool> {
         base::Bind(&MockCB::FrameReceived, base::Unretained(&mock_cb_)),
         message_loop_.task_runner()));
 
-    renderer_.reset(new VideoRendererImpl(message_loop_.message_loop_proxy(),
+    renderer_.reset(new VideoRendererImpl(message_loop_.task_runner(),
                                           null_video_sink_.get(),
                                           decoders.Pass(), true,
                                           nullptr,  // gpu_factories
@@ -712,6 +712,38 @@ TEST_P(VideoRendererImplTest, RenderingStartedThenStopped) {
   EXPECT_EQ(4u, last_pipeline_statistics_.video_frames_decoded);
 
   AdvanceTimeInMs(30);
+  WaitForEnded();
+  Destroy();
+}
+
+TEST_P(VideoRendererImplTest, StartPlayingFromThenFlushThenEOS) {
+  // This test is only for the new rendering path.
+  if (!GetParam())
+    return;
+
+  Initialize();
+  QueueFrames("0 30 60 90");
+
+  WaitableMessageLoopEvent event;
+  EXPECT_CALL(mock_cb_, FrameReceived(HasTimestamp(0)));
+  EXPECT_CALL(mock_cb_, BufferingStateChange(BUFFERING_HAVE_ENOUGH))
+      .WillOnce(RunClosure(event.GetClosure()));
+  StartPlayingFrom(0);
+  event.RunAndWait();
+
+  // Cycle ticking so that we get a non-null reference time.
+  time_source_.StartTicking();
+  time_source_.StopTicking();
+
+  // Flush and simulate a seek past EOS, where some error prevents the decoder
+  // from returning any frames.
+  EXPECT_CALL(mock_cb_, BufferingStateChange(BUFFERING_HAVE_NOTHING));
+  Flush();
+
+  StartPlayingFrom(200);
+  WaitForPendingRead();
+  SatisfyPendingReadWithEndOfStream();
+  EXPECT_CALL(mock_cb_, BufferingStateChange(BUFFERING_HAVE_ENOUGH));
   WaitForEnded();
   Destroy();
 }

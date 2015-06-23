@@ -74,6 +74,7 @@
 <translation id="8551886023433311834">Melkein ajan tasalla! Viimeistele päivitys käynnistämällä laite uudelleen.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/> - Google Chrome</translation>
 <translation id="1073391069195728457">Chrome – ilmoitukset</translation>
+<translation id="6368805772029492593">Google Chrome lisää suojausta salaamalla tietosi.</translation>
 <translation id="7339898014177206373">Uusi ikkuna</translation>
 <translation id="3282568296779691940">Kirjaudu Chromeen</translation>
 <translation id="3089968997497233615">Google Chromesta on saatavillaa uusi, turvallisempi versio.</translation>
@@ -166,7 +167,6 @@ Jos kirjaudut silti sisään, Chrome-tiedot, kuten kirjanmerkit, historia ja ase
 <translation id="2290095356545025170">Haluatko varmasti poistaa Google Chromen?</translation>
 <translation id="4273752058983339720">Google Chrome on asetettu käynnistymään automaattisesti tietokoneen käynnistämisen yhteydessä.</translation>
 <translation id="2316129865977710310">Ei kiitos</translation>
-<translation id="415994390253732730">Käyttäytyykö Chrome omituisesti?</translation>
 <translation id="1104959162601287462">Tietoja &amp;Chrome-käyttöjärjestelmästä</translation>
 <translation id="5328989068199000832">Google Chrome Binaries</translation>
 <translation id="7626032353295482388">Tervetuloa Chromeen</translation>
@@ -219,13 +219,13 @@ Jos kirjaudut silti sisään, Chrome-tiedot, kuten kirjanmerkit, historia ja ase
 <translation id="5566025111015594046">Google Chrome (saapuva mDNS)</translation>
 <translation id="6113794647360055231">Chrome on nyt entistä parempi</translation>
 <translation id="2588322182880276190">Chrome-logo</translation>
+<translation id="4519152997629025674">Google Chrome voi käyttää <ph name="BEGIN_LINK"/>verkkopalveluita<ph name="END_LINK"/> selauskokemuksen parantamiseen. Voit halutessasi poistaa palvelut käytöstä.</translation>
 <translation id="4367618624832907428">Google Chrome ei voi näyttää verkkosivua, koska tietokoneesi ei ole yhteydessä internetiin.</translation>
 <translation id="174539241580958092">Google Chrome ei voinut synkronoida tietoja kirjautumisvirheen vuoksi.</translation>
 <translation id="8255190535488645436">Google Chrome käyttää kameraasi ja mikrofoniasi.</translation>
 <translation id="7396375882099008034">Salli verkon käyttö Chromelle palomuurin tai virustorjunnan asetuksissa.</translation>
 <translation id="9102715433345326100">Tämä tiedosto on haitallinen, ja Chrome on estänyt sen.</translation>
 <translation id="8205111949707227942">Valinnainen: lähetä automaattisesti käyttötilastoja ja virheraportteja Googlelle Chrome-käyttöjärjestelmän kehittämiseksi.</translation>
-<translation id="487887346205285304">Käyttäytyykö Chrome omituisesti?</translation>
 <translation id="3622797965165704966">Nyt voit helpommin käyttää Chromea Google-tililläsi ja jaetuilla tietokoneilla.</translation>
 <translation id="7196020411877309443">Miksi minulle näytetään tämä ilmoitus?</translation>
 <translation id="2769762047821873045">Google Chrome ei ole oletusselain.</translation>

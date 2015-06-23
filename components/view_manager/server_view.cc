@@ -118,10 +118,7 @@ void ServerView::SetBounds(const gfx::Rect& bounds) {
 }
 
 const ServerView* ServerView::GetRoot() const {
-  const ServerView* view = this;
-  while (view && view->parent())
-    view = view->parent();
-  return view;
+  return delegate_->GetRootView(this);
 }
 
 std::vector<const ServerView*> ServerView::GetChildren() const {
@@ -194,13 +191,14 @@ void ServerView::SetProperty(const std::string& name,
                     OnViewSharedPropertyChanged(this, name, value));
 }
 
-bool ServerView::IsDrawn(const ServerView* root) const {
-  if (!root->visible_)
+bool ServerView::IsDrawn() const {
+  const ServerView* root = delegate_->GetRootView(this);
+  if (!root || !root->visible())
     return false;
   const ServerView* view = this;
-  while (view && view != root && view->visible_)
-    view = view->parent_;
-  return view == root;
+  while (view && view != root && view->visible())
+    view = view->parent();
+  return root == view;
 }
 
 void ServerView::SetSurfaceId(cc::SurfaceId surface_id) {

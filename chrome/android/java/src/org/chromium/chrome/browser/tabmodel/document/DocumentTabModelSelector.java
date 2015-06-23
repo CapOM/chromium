@@ -18,11 +18,13 @@ import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.ApplicationStatus.ActivityStateListener;
 import org.chromium.base.ThreadUtils;
+import org.chromium.base.VisibleForTesting;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.UrlConstants;
 import org.chromium.chrome.browser.document.DocumentUtils;
 import org.chromium.chrome.browser.document.PendingDocumentData;
 import org.chromium.chrome.browser.tabmodel.OffTheRecordTabModel.OffTheRecordTabModelDelegate;
+import org.chromium.chrome.browser.tabmodel.TabCreatorManager;
 import org.chromium.chrome.browser.tabmodel.TabModel;
 import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorBase;
@@ -35,9 +37,17 @@ import org.chromium.content_public.browser.LoadUrlParams;
  */
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
 public class DocumentTabModelSelector extends TabModelSelectorBase
-        implements ActivityStateListener {
+        implements ActivityStateListener, TabCreatorManager {
     public static final String PREF_PACKAGE = "com.google.android.apps.chrome.document";
     public static final String PREF_IS_INCOGNITO_SELECTED = "is_incognito_selected";
+
+    /**
+     * Overrides Delegates used by the DocumentTabModels.
+     */
+    private static final Object ACTIVITY_DELEGATE_FOR_TESTS_LOCK = new Object();
+    private static final Object STORAGE_DELEGATE_FOR_TESTS_LOCK = new Object();
+    private static ActivityDelegate sActivityDelegateForTests;
+    private static StorageDelegate sStorageDelegateForTests;
 
     /**
      * ID of the Tab to prioritize when initializing the TabState.
@@ -50,9 +60,15 @@ public class DocumentTabModelSelector extends TabModelSelectorBase
     private final ActivityDelegate mActivityDelegate;
 
     /**
+     * Interacts with the file system.
+     */
+    private final StorageDelegate mStorageDelegate;
+
+    /**
      * Creates new Tabs.
      */
-    private final TabDelegate mTabDelegate;
+    private final TabDelegate mRegularTabDelegate;
+    private final TabDelegate mIncognitoTabDelegate;
 
     /**
      * TabModel that keeps track of regular tabs. This is always not null.
@@ -78,17 +94,25 @@ public class DocumentTabModelSelector extends TabModelSelectorBase
         sPrioritizedTabId = prioritizedTabId;
     }
 
-    public DocumentTabModelSelector(ActivityDelegate activityDelegate, TabDelegate tabDelegate) {
-        mActivityDelegate = activityDelegate;
-        mTabDelegate = tabDelegate;
+    public DocumentTabModelSelector(ActivityDelegate activityDelegate,
+            StorageDelegate storageDelegate, TabDelegate regularTabDelegate,
+            TabDelegate incognitoTabDelegate) {
+        mActivityDelegate =
+                sActivityDelegateForTests == null ? activityDelegate : sActivityDelegateForTests;
+        mStorageDelegate =
+                sStorageDelegateForTests == null ? storageDelegate : sStorageDelegateForTests;
+        mRegularTabDelegate = regularTabDelegate;
+        mIncognitoTabDelegate = incognitoTabDelegate;
 
+        final Context context = ApplicationStatus.getApplicationContext();
         mRegularTabModel = new DocumentTabModelImpl(
-                activityDelegate, tabDelegate, false, sPrioritizedTabId);
+                mActivityDelegate, mStorageDelegate, this, false, sPrioritizedTabId, context);
         mIncognitoTabModel = new OffTheRecordDocumentTabModel(new OffTheRecordTabModelDelegate() {
             @Override
             public TabModel createTabModel() {
-                DocumentTabModel incognitoModel = new DocumentTabModelImpl(
-                        mActivityDelegate, mTabDelegate, true, sPrioritizedTabId);
+                DocumentTabModel incognitoModel = new DocumentTabModelImpl(mActivityDelegate,
+                        mStorageDelegate, DocumentTabModelSelector.this, true, sPrioritizedTabId,
+                        context);
                 if (mRegularTabModel.isNativeInitialized()) {
                     incognitoModel.initializeNative();
                 }
@@ -105,12 +129,16 @@ public class DocumentTabModelSelector extends TabModelSelectorBase
         initializeTabIdCounter();
 
         // Re-select the previously selected TabModel.
-        Context context = ApplicationStatus.getApplicationContext();
         SharedPreferences prefs = context.getSharedPreferences(PREF_PACKAGE, Context.MODE_PRIVATE);
         boolean startIncognito = prefs.getBoolean(PREF_IS_INCOGNITO_SELECTED, false);
         initialize(startIncognito, mRegularTabModel, mIncognitoTabModel);
 
         ApplicationStatus.registerStateListenerForAllActivities(this);
+    }
+
+    @Override
+    public TabDelegate getTabCreator(boolean incognito) {
+        return incognito ? mIncognitoTabDelegate : mRegularTabDelegate;
     }
 
     private void initializeTabIdCounter() {
@@ -156,19 +184,8 @@ public class DocumentTabModelSelector extends TabModelSelectorBase
     @Override
     public Tab openNewTab(LoadUrlParams loadUrlParams, TabLaunchType type, Tab parent,
             boolean incognito) {
-        PendingDocumentData params = null;
-        if (loadUrlParams.getPostData() != null
-                || loadUrlParams.getVerbatimHeaders() != null
-                || loadUrlParams.getReferrer() != null) {
-            params = new PendingDocumentData();
-            params.postData = loadUrlParams.getPostData();
-            params.extraHeaders = loadUrlParams.getVerbatimHeaders();
-            params.referrer = loadUrlParams.getReferrer();
-        }
-
-        Activity parentActivity =
-                parent == null ? null : parent.getWindowAndroid().getActivity().get();
-        mTabDelegate.createTabInForeground(parentActivity, incognito, loadUrlParams, params);
+        TabDelegate delegate = getTabCreator(incognito);
+        delegate.createNewTab(loadUrlParams, type, parent);
         return null;
     }
 
@@ -240,5 +257,27 @@ public class DocumentTabModelSelector extends TabModelSelectorBase
     public static Uri createDocumentDataString(int id, String initialUrl) {
         return new Uri.Builder().scheme(UrlConstants.DOCUMENT_SCHEME).authority(String.valueOf(id))
                 .query(initialUrl).build();
+    }
+
+    /**
+     * Overrides the regular ActivityDelegate in the constructor.  MUST be called before the
+     * DocumentTabModelSelector instance is created to take effect.
+     */
+    @VisibleForTesting
+    public static void setActivityDelegateForTests(ActivityDelegate delegate) {
+        synchronized (ACTIVITY_DELEGATE_FOR_TESTS_LOCK) {
+            sActivityDelegateForTests = delegate;
+        }
+    }
+
+    /**
+     * Overrides the regular StorageDelegate in the constructor.  MUST be called before the
+     * DocumentTabModelSelector instance is created to take effect.
+     */
+    @VisibleForTesting
+    public static void setStorageDelegateForTests(StorageDelegate delegate) {
+        synchronized (STORAGE_DELEGATE_FOR_TESTS_LOCK) {
+            sStorageDelegateForTests = delegate;
+        }
     }
 }

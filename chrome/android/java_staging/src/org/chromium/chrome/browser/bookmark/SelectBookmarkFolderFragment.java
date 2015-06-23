@@ -21,10 +21,9 @@ import android.widget.Button;
 import android.widget.ListView;
 import android.widget.TextView;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeBrowserProvider.BookmarkNode;
 import org.chromium.chrome.browser.ChromeBrowserProvider.Type;
 import org.chromium.chrome.browser.ChromeBrowserProviderClient;
@@ -271,7 +270,7 @@ public class SelectBookmarkFolderFragment extends AsyncTaskFragment implements O
             final FolderListEntry entry = getItem(position);
 
             BitmapDrawable icon = TintedDrawable.constructTintedDrawable(
-                    getResources(), R.drawable.eb_others);
+                    getResources(), R.drawable.eb_folder);
             ApiCompatibilityUtils.setCompoundDrawablesRelativeWithIntrinsicBounds(
                     view, icon, null, null, null);
 

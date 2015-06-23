@@ -15,15 +15,18 @@
 #include "base/base_paths.h"
 #include "base/bind.h"
 #include "base/command_line.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
 #include "base/prefs/pref_service.h"
 #include "base/process/process_info.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/threading/thread.h"
 #include "base/threading/thread_restrictions.h"
 #include "base/time/time.h"
@@ -177,6 +180,8 @@
 #include "content/public/browser/render_process_host.h"
 #include "content/public/browser/render_view_host.h"
 #include "content/public/browser/render_widget_host_view.h"
+#include "content/public/browser/security_style_explanation.h"
+#include "content/public/browser/security_style_explanations.h"
 #include "content/public/browser/site_instance.h"
 #include "content/public/browser/user_metrics.h"
 #include "content/public/browser/web_contents.h"
@@ -1160,7 +1165,7 @@ void Browser::TabStripEmpty() {
   // Note: This will be called several times if TabStripEmpty is called several
   //       times. This is because it does not close the window if tabs are
   //       still present.
-  base::MessageLoop::current()->PostTask(
+  base::ThreadTaskRunnerHandle::Get()->PostTask(
       FROM_HERE, base::Bind(&Browser::CloseFrame, weak_factory_.GetWeakPtr()));
 
   // Instant may have visible WebContents that need to be detached before the
@@ -1302,8 +1307,59 @@ bool Browser::CanDragEnter(content::WebContents* source,
 }
 
 content::SecurityStyle Browser::GetSecurityStyle(
-    const WebContents* web_contents) {
-  return ConnectionSecurityHelper::GetSecurityStyleForWebContents(web_contents);
+    WebContents* web_contents,
+    content::SecurityStyleExplanations* security_style_explanations) {
+  connection_security::SecurityInfo security_info;
+  connection_security::GetSecurityInfoForWebContents(web_contents,
+                                                     &security_info);
+
+  if (security_info.security_style == content::SECURITY_STYLE_UNKNOWN)
+    return security_info.security_style;
+
+  if (security_info.sha1_deprecation_status ==
+      connection_security::DEPRECATED_SHA1_BROKEN) {
+    security_style_explanations->broken_explanations.push_back(
+        content::SecurityStyleExplanation(
+            l10n_util::GetStringUTF8(IDS_BROKEN_SHA1),
+            l10n_util::GetStringUTF8(IDS_BROKEN_SHA1_DESCRIPTION)));
+  } else if (security_info.sha1_deprecation_status ==
+             connection_security::DEPRECATED_SHA1_WARNING) {
+    security_style_explanations->warning_explanations.push_back(
+        content::SecurityStyleExplanation(
+            l10n_util::GetStringUTF8(IDS_WARNING_SHA1),
+            l10n_util::GetStringUTF8(IDS_WARNING_SHA1_DESCRIPTION)));
+  }
+
+  if (security_info.mixed_content_status ==
+      connection_security::RAN_MIXED_CONTENT) {
+    security_style_explanations->broken_explanations.push_back(
+        content::SecurityStyleExplanation(
+            l10n_util::GetStringUTF8(IDS_ACTIVE_MIXED_CONTENT),
+            l10n_util::GetStringUTF8(IDS_ACTIVE_MIXED_CONTENT_DESCRIPTION)));
+  } else if (security_info.mixed_content_status ==
+             connection_security::DISPLAYED_MIXED_CONTENT) {
+    security_style_explanations->warning_explanations.push_back(
+        content::SecurityStyleExplanation(
+            l10n_util::GetStringUTF8(IDS_PASSIVE_MIXED_CONTENT),
+            l10n_util::GetStringUTF8(IDS_PASSIVE_MIXED_CONTENT_DESCRIPTION)));
+  }
+
+  if (net::IsCertStatusError(security_info.cert_status)) {
+    base::string16 error_string = base::UTF8ToUTF16(net::ErrorToString(
+        net::MapCertStatusToNetError(security_info.cert_status)));
+
+    content::SecurityStyleExplanation explanation(
+        l10n_util::GetStringUTF8(IDS_CERTIFICATE_CHAIN_ERROR),
+        l10n_util::GetStringFUTF8(
+            IDS_CERTIFICATE_CHAIN_ERROR_DESCRIPTION_FORMAT, error_string));
+
+    if (net::IsCertStatusMinorError(security_info.cert_status))
+      security_style_explanations->warning_explanations.push_back(explanation);
+    else
+      security_style_explanations->broken_explanations.push_back(explanation);
+  }
+
+  return security_info.security_style;
 }
 
 bool Browser::IsMouseLocked() const {
@@ -2191,10 +2247,9 @@ void Browser::ScheduleUIUpdate(WebContents* source,
 
   if (!chrome_updater_factory_.HasWeakPtrs()) {
     // No task currently scheduled, start another.
-    base::MessageLoop::current()->PostDelayedTask(
-        FROM_HERE,
-        base::Bind(&Browser::ProcessPendingUIUpdates,
-                   chrome_updater_factory_.GetWeakPtr()),
+    base::ThreadTaskRunnerHandle::Get()->PostDelayedTask(
+        FROM_HERE, base::Bind(&Browser::ProcessPendingUIUpdates,
+                              chrome_updater_factory_.GetWeakPtr()),
         base::TimeDelta::FromMilliseconds(kUIUpdateCoalescingTimeMS));
   }
 }

@@ -9,6 +9,7 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
+#include "base/command_line.h"
 #include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
@@ -25,6 +26,7 @@
 #include "content/public/browser/desktop_media_id.h"
 #include "content/public/common/media_stream_request.h"
 #include "media/base/bind_to_current_loop.h"
+#include "media/base/media_switches.h"
 #include "media/video/capture/video_capture_device.h"
 #include "media/video/capture/video_capture_device_factory.h"
 
@@ -76,7 +78,9 @@ void ConsolidateCaptureFormats(media::VideoCaptureFormats* formats) {
 // The maximum number of buffers in the capture pipeline. See
 // VideoCaptureController ctor comments for more details.
 const int kMaxNumberOfBuffers = 3;
-const int kMaxNumberOfBuffersForTabCapture = 5;
+// TODO(miu): The value for tab capture should be determined programmatically.
+// http://crbug.com/460318
+const int kMaxNumberOfBuffersForTabCapture = 10;
 
 // Used for logging capture events.
 // Elements in this enum should not be deleted or rearranged; the only
@@ -321,6 +325,13 @@ void VideoCaptureManager::HandleQueuedStartRequest() {
   DCHECK(entry_it != devices_.end());
   DeviceEntry* entry =  (*entry_it);
 
+  media::VideoCaptureParams params = request->params();
+#if defined(OS_LINUX)
+  params.use_native_gpu_memory_buffers =
+      base::CommandLine::ForCurrentProcess()->HasSwitch(
+          switches::kUseNativeGpuMemoryBuffersForCapture);
+#endif
+
   DVLOG(3) << "HandleQueuedStartRequest, Post start to device thread, device = "
            << entry->id << " start id = " << entry->serial_id;
   base::PostTaskAndReplyWithResult(
@@ -332,7 +343,7 @@ void VideoCaptureManager::HandleQueuedStartRequest() {
           request->session_id(),
           entry->id,
           entry->stream_type,
-          request->params(),
+          params,
           base::Passed(entry->video_capture_controller()->NewDeviceClient(
               device_task_runner_))),
       base::Bind(&VideoCaptureManager::OnDeviceStarted, this,

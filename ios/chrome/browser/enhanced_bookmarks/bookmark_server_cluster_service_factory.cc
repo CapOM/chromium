@@ -9,6 +9,7 @@
 #include "components/enhanced_bookmarks/bookmark_server_cluster_service.h"
 #include "components/keyed_service/ios/browser_state_dependency_manager.h"
 #include "components/signin/core/browser/signin_manager.h"
+#include "components/signin/ios/browser/profile_oauth2_token_service_ios.h"
 #include "ios/chrome/browser/application_context.h"
 #include "ios/chrome/browser/browser_state/browser_state_otr_helper.h"
 #include "ios/chrome/browser/enhanced_bookmarks/enhanced_bookmark_model_factory.h"
@@ -36,9 +37,8 @@ BookmarkServerClusterServiceFactory::BookmarkServerClusterServiceFactory()
     : BrowserStateKeyedServiceFactory(
           "BookmarkServerClusterService",
           BrowserStateDependencyManager::GetInstance()) {
-  ios::KeyedServiceProvider* provider =
-      ios::GetChromeBrowserProvider()->GetKeyedServiceProvider();
-  DependsOn(provider->GetProfileOAuth2TokenServiceFactory());
+  ios::KeyedServiceProvider* provider = ios::GetKeyedServiceProvider();
+  DependsOn(provider->GetProfileOAuth2TokenServiceIOSFactory());
   DependsOn(provider->GetSigninManagerFactory());
   DependsOn(EnhancedBookmarkModelFactory::GetInstance());
   DependsOn(provider->GetSyncServiceFactory());
@@ -47,21 +47,21 @@ BookmarkServerClusterServiceFactory::BookmarkServerClusterServiceFactory()
 BookmarkServerClusterServiceFactory::~BookmarkServerClusterServiceFactory() {
 }
 
-KeyedService* BookmarkServerClusterServiceFactory::BuildServiceInstanceFor(
+scoped_ptr<KeyedService>
+BookmarkServerClusterServiceFactory::BuildServiceInstanceFor(
     web::BrowserState* context) const {
   DCHECK(!context->IsOffTheRecord());
   ios::ChromeBrowserState* browser_state =
       ios::ChromeBrowserState::FromBrowserState(context);
-  ios::KeyedServiceProvider* provider =
-      ios::GetChromeBrowserProvider()->GetKeyedServiceProvider();
-  return new BookmarkServerClusterService(
+  ios::KeyedServiceProvider* provider = ios::GetKeyedServiceProvider();
+  return make_scoped_ptr(new BookmarkServerClusterService(
       GetApplicationContext()->GetApplicationLocale(),
       browser_state->GetRequestContext(),
-      provider->GetProfileOAuth2TokenServiceForBrowserState(browser_state),
+      provider->GetProfileOAuth2TokenServiceIOSForBrowserState(browser_state),
       provider->GetSigninManagerForBrowserState(browser_state),
       EnhancedBookmarkModelFactory::GetForBrowserState(browser_state),
       provider->GetSyncServiceForBrowserState(browser_state),
-      browser_state->GetPrefs());
+      browser_state->GetPrefs()));
 }
 
 web::BrowserState* BookmarkServerClusterServiceFactory::GetBrowserStateToUse(

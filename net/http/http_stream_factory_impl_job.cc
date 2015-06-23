@@ -9,17 +9,21 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
+#include "base/location.h"
 #include "base/logging.h"
 #include "base/metrics/histogram_macros.h"
 #include "base/profiler/scoped_tracker.h"
+#include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "base/strings/stringprintf.h"
+#include "base/thread_task_runner_handle.h"
 #include "base/values.h"
 #include "build/build_config.h"
 #include "net/base/connection_type_histograms.h"
 #include "net/base/net_util.h"
+#include "net/cert/cert_verifier.h"
 #include "net/http/http_basic_stream.h"
 #include "net/http/http_network_session.h"
 #include "net/http/http_proxy_client_socket.h"
@@ -214,10 +218,9 @@ void HttpStreamFactoryImpl::Job::Resume(Job* job) {
   // We know we're blocked if the next_state_ is STATE_WAIT_FOR_JOB_COMPLETE.
   // Unblock |this|.
   if (next_state_ == STATE_WAIT_FOR_JOB_COMPLETE) {
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE,
-        base::Bind(&HttpStreamFactoryImpl::Job::OnIOComplete,
-                   ptr_factory_.GetWeakPtr(), OK));
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
+        FROM_HERE, base::Bind(&HttpStreamFactoryImpl::Job::OnIOComplete,
+                              ptr_factory_.GetWeakPtr(), OK));
   }
 }
 
@@ -485,7 +488,7 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
   DCHECK(result == OK || waiting_job_ == NULL);
 
   if (IsPreconnecting()) {
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&HttpStreamFactoryImpl::Job::OnPreconnectsComplete,
                    ptr_factory_.GetWeakPtr()));
@@ -497,7 +500,7 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
     GetSSLInfo();
 
     next_state_ = STATE_WAITING_USER_ACTION;
-    base::MessageLoop::current()->PostTask(
+    base::ThreadTaskRunnerHandle::Get()->PostTask(
         FROM_HERE,
         base::Bind(&HttpStreamFactoryImpl::Job::OnCertificateErrorCallback,
                    ptr_factory_.GetWeakPtr(), result, ssl_info_));
@@ -516,7 +519,7 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
       next_state_ = STATE_WAITING_USER_ACTION;
       ProxyClientSocket* proxy_socket =
           static_cast<ProxyClientSocket*>(connection_->socket());
-      base::MessageLoop::current()->PostTask(
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
           FROM_HERE,
           base::Bind(&Job::OnNeedsProxyAuthCallback, ptr_factory_.GetWeakPtr(),
                      *proxy_socket->GetConnectResponseInfo(),
@@ -525,7 +528,7 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
     }
 
     case ERR_SSL_CLIENT_AUTH_CERT_NEEDED:
-      base::MessageLoop::current()->PostTask(
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
           FROM_HERE,
           base::Bind(&Job::OnNeedsClientAuthCallback, ptr_factory_.GetWeakPtr(),
                      connection_->ssl_error_response_info().cert_request_info));
@@ -538,12 +541,11 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
 
       ProxyClientSocket* proxy_socket =
           static_cast<ProxyClientSocket*>(connection_->socket());
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&Job::OnHttpsProxyTunnelResponseCallback,
-                     ptr_factory_.GetWeakPtr(),
-                     *proxy_socket->GetConnectResponseInfo(),
-                     proxy_socket->CreateConnectResponseStream()));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&Job::OnHttpsProxyTunnelResponseCallback,
+                                ptr_factory_.GetWeakPtr(),
+                                *proxy_socket->GetConnectResponseInfo(),
+                                proxy_socket->CreateConnectResponseStream()));
       return ERR_IO_PENDING;
     }
 
@@ -552,19 +554,17 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
       MaybeMarkAlternativeServiceBroken();
       next_state_ = STATE_DONE;
       if (new_spdy_session_.get()) {
-        base::MessageLoop::current()->PostTask(
-            FROM_HERE,
-            base::Bind(&Job::OnNewSpdySessionReadyCallback,
-                       ptr_factory_.GetWeakPtr()));
+        base::ThreadTaskRunnerHandle::Get()->PostTask(
+            FROM_HERE, base::Bind(&Job::OnNewSpdySessionReadyCallback,
+                                  ptr_factory_.GetWeakPtr()));
       } else if (stream_factory_->for_websockets_) {
         DCHECK(websocket_stream_);
-        base::MessageLoop::current()->PostTask(
-            FROM_HERE,
-            base::Bind(&Job::OnWebSocketHandshakeStreamReadyCallback,
-                       ptr_factory_.GetWeakPtr()));
+        base::ThreadTaskRunnerHandle::Get()->PostTask(
+            FROM_HERE, base::Bind(&Job::OnWebSocketHandshakeStreamReadyCallback,
+                                  ptr_factory_.GetWeakPtr()));
       } else {
         DCHECK(stream_.get());
-        base::MessageLoop::current()->PostTask(
+        base::ThreadTaskRunnerHandle::Get()->PostTask(
             FROM_HERE,
             base::Bind(&Job::OnStreamReadyCallback, ptr_factory_.GetWeakPtr()));
       }
@@ -581,10 +581,9 @@ int HttpStreamFactoryImpl::Job::RunLoop(int result) {
         // alternative service) couple as invalid.
         MaybeMarkAlternativeServiceBroken();
       }
-      base::MessageLoop::current()->PostTask(
-          FROM_HERE,
-          base::Bind(&Job::OnStreamFailedCallback, ptr_factory_.GetWeakPtr(),
-                     result));
+      base::ThreadTaskRunnerHandle::Get()->PostTask(
+          FROM_HERE, base::Bind(&Job::OnStreamFailedCallback,
+                                ptr_factory_.GetWeakPtr(), result));
       return ERR_IO_PENDING;
   }
 }
@@ -672,8 +671,7 @@ int HttpStreamFactoryImpl::Job::DoStart() {
                  &alternative_service_, priority_));
 
   // Don't connect to restricted ports.
-  if (!IsPortAllowedForScheme(server_.port(), request_info_.url.scheme(),
-                              PORT_OVERRIDES_ALLOWED)) {
+  if (!IsPortAllowedForScheme(server_.port(), request_info_.url.scheme())) {
     if (waiting_job_) {
       waiting_job_->Resume(this);
       waiting_job_ = NULL;
@@ -806,19 +804,55 @@ int HttpStreamFactoryImpl::Job::DoInitConnection() {
     DCHECK(session_->params().enable_quic_for_proxies);
   }
 
+  if (proxy_info_.is_https() || proxy_info_.is_quic()) {
+    InitSSLConfig(proxy_info_.proxy_server().host_port_pair(),
+                  &proxy_ssl_config_, /*is_proxy=*/true);
+    // Disable revocation checking for HTTPS proxies since the revocation
+    // requests are probably going to need to go through the proxy too.
+    proxy_ssl_config_.rev_checking_enabled = false;
+  }
+  if (using_ssl_) {
+    InitSSLConfig(server_, &server_ssl_config_, /*is_proxy=*/false);
+  }
+
   if (using_quic_) {
     if (proxy_info_.is_quic() && !request_info_.url.SchemeIs("http")) {
       NOTREACHED();
       // TODO(rch): support QUIC proxies for HTTPS urls.
       return ERR_NOT_IMPLEMENTED;
     }
-    HostPortPair destination = proxy_info_.is_quic()
-                                   ? proxy_info_.proxy_server().host_port_pair()
-                                   : server_;
-    bool secure_quic = using_ssl_ || proxy_info_.is_quic();
+    HostPortPair destination;
+    std::string origin_host;
+    bool secure_quic;
+    SSLConfig* ssl_config;
+    if (proxy_info_.is_quic()) {
+      // A proxy's certificate is expected to be valid for the proxy hostname.
+      destination = proxy_info_.proxy_server().host_port_pair();
+      origin_host = destination.host();
+      secure_quic = true;
+      ssl_config = &proxy_ssl_config_;
+    } else {
+      // The certificate of a QUIC alternative server is expected to be valid
+      // for the origin of the request (in addition to being valid for the
+      // server itself).
+      destination = server_;
+      origin_host = origin_url_.host();
+      secure_quic = using_ssl_;
+      ssl_config = &server_ssl_config_;
+    }
+    // TODO(rtenneti): Move the cert_verify_flags code into SSLConfig class.
+    int flags = 0;
+    if (ssl_config->rev_checking_enabled)
+      flags |= CertVerifier::VERIFY_REV_CHECKING_ENABLED;
+    if (ssl_config->verify_ev_cert)
+      flags |= CertVerifier::VERIFY_EV_CERT;
+    if (ssl_config->cert_io_enabled)
+      flags |= CertVerifier::VERIFY_CERT_IO_ENABLED;
+    if (ssl_config->rev_checking_required_local_anchors)
+      flags |= CertVerifier::VERIFY_REV_CHECKING_REQUIRED_LOCAL_ANCHORS;
     int rv = quic_request_.Request(
-        destination, secure_quic, request_info_.privacy_mode,
-        origin_url_.host(), request_info_.method, net_log_, io_callback_);
+        destination, secure_quic, request_info_.privacy_mode, flags,
+        origin_host, request_info_.method, net_log_, io_callback_);
     if (rv == OK) {
       using_existing_quic_session_ = true;
     } else {
@@ -869,18 +903,6 @@ int HttpStreamFactoryImpl::Job::DoInitConnection() {
     establishing_tunnel_ = using_ssl_;
 
   const bool expect_spdy = IsSpdyAlternative();
-
-  if (proxy_info_.is_https()) {
-    InitSSLConfig(proxy_info_.proxy_server().host_port_pair(),
-                  &proxy_ssl_config_,
-                  true /* is a proxy server */);
-    // Disable revocation checking for HTTPS proxies since the revocation
-    // requests are probably going to need to go through the proxy too.
-    proxy_ssl_config_.rev_checking_enabled = false;
-  }
-  if (using_ssl_) {
-    InitSSLConfig(server_, &server_ssl_config_, false /* not a proxy server */);
-  }
 
   base::WeakPtr<HttpServerProperties> http_server_properties =
       session_->http_server_properties();

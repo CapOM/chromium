@@ -31,8 +31,6 @@
 <translation id="2297568595583585744">Statusa tekne</translation>
 <translation id="2248649616066688669">Varat turpināt izmantot Chromebook datoru, kamēr tas ir pievienots ārējam displejam, pat ja datora displejs ir aizvērts.</translation>
 <translation id="2946640296642327832">Iespējot Bluetooth</translation>
-<translation id="478959186716341421">Notiek apraide</translation>
-<translation id="5537725057119320332">Apraidīt</translation>
 <translation id="6459472438155181876">Paplašina ekrānu uz: <ph name="DISPLAY_NAME"/></translation>
 <translation id="8206859287963243715">Mobilais tālrunis</translation>
 <translation id="6596816719288285829">IP adrese</translation>
@@ -40,6 +38,7 @@
 <translation id="1812696562331527143">Ievades metode ir mainīta uz <ph name="INPUT_METHOD_ID"/>*(<ph name="BEGIN_LINK"/>trešā puse<ph name="END_LINK"/>).
 Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="6043994281159824495">Izrakstīties tagad</translation>
+<translation id="5168181903108465623">Pieejamas apraides ierīces</translation>
 <translation id="2127372758936585790">Lādētājs ar mazu strāvas padevi</translation>
 <translation id="3799026279081545374">Iespējams, uzlādes ierīce ir bojāta. Ja dzīvojat ASV, lūdzu, zvaniet 866-628-1371, lai saņemtu palīdzību vai pieprasītu ierīces aizstāšanu. Ja dzīvojat Lielbritānijā, lūdzu, zvaniet 0800-026-0613. Ja dzīvojat Īrijā, lūdzu, zvaniet 1-800-832-664. Ja dzīvojat Kanādā, lūdzu, zvaniet 866-628-1372. Ja dzīvojat Austrālijā, lūdzu, zvaniet 1-800-067-460.</translation>
 <translation id="3891340733213178823">Lai izrakstītos, divas reizes nospiediet taustiņu kombināciju Ctrl+Shift+Q.</translation>
@@ -73,7 +72,6 @@ Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="2509468283778169019">Funkcija Caps Lock ir ieslēgta</translation>
 <translation id="3892641579809465218">Iekšējais displejs</translation>
 <translation id="7823564328645135659">Pēc jūsu iestatījumu sinhronizēšanas valoda ir mainīta no <ph name="FROM_LOCALE"/> uz <ph name="TO_LOCALE"/>.</translation>
-<translation id="7113420380180868673">Notiek $1 apraide</translation>
 <translation id="3606978283550408104">Savienojums ar Braila displeju ir izveidots.</translation>
 <translation id="8654520615680304441">Ieslēgt Wi-Fi...</translation>
 <translation id="4421231901400348175">Ekrāna pārvaldības koplietošana ar <ph name="HELPER_NAME"/>, izmantojot attālo palīdzību.</translation>
@@ -98,8 +96,8 @@ Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="3626637461649818317">Atlikums: <ph name="PERCENTAGE"/>%</translation>
 <translation id="9089416786594320554">Ievades metodes</translation>
 <translation id="2700058918926273959">Atlikušais laiks līdz šīs sesijas beigām: <ph name="SESSION_TIME_REMAINING"/>. Jūs tiksiet izrakstīts.</translation>
-<translation id="5807965672380739016">Apraidīt darbvirsmu uz šo vietu:</translation>
 <translation id="6247708409970142803"><ph name="PERCENTAGE"/>%</translation>
+<translation id="1963814843110128691">Apraida $1 uz $2</translation>
 <translation id="3963445509666917109">Skaļrunis (iekšējais)</translation>
 <translation id="1747827819627189109">Ekrāna tastatūra iespējota</translation>
 <translation id="2208323208084708176">Vienots darbvirsmas režīms</translation>
@@ -119,7 +117,6 @@ Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="8528322925433439945">Mobilās ierīces...</translation>
 <translation id="3157169093162779309">Iespējot rotācijas bloķēšanu</translation>
 <translation id="8428213095426709021">Iestatījumi</translation>
-<translation id="6592705765268910579">Nezināms saņēmējs</translation>
 <translation id="2372145515558759244">Notiek lietotņu sinhronizēšana...</translation>
 <translation id="1987317783729300807">Konti</translation>
 <translation id="8456362689280298700"><ph name="HOUR"/>:<ph name="MINUTE"/> jālādē</translation>
@@ -184,6 +181,7 @@ Lai to pārslēgtu, nospiediet taustiņu kombināciju Shift+Alt.</translation>
 <translation id="6785414152754474415">Akumulatora uzlādes līmenis: <ph name="PERCENTAGE"/>%; uzlāde tiek turpināta.</translation>
 <translation id="4895488851634969361">Akumulators ir pilnībā uzlādēts.</translation>
 <translation id="615957422585914272">Rādīt ekrāna tastatūru</translation>
+<translation id="8443356412772935865">Apraida ekrānu uz $1</translation>
 <translation id="5947494881799873997">Atjaunot</translation>
 <translation id="7593891976182323525">Meklēt vai Shift</translation>
 <translation id="7649070708921625228">Palīdzība</translation>
@@ -192,9 +190,11 @@ Lai atceltu tā funkcionalitāti, nospiediet Meklēt vai Shift.</translation>
 <translation id="397105322502079400">Aprēķina...</translation>
 <translation id="1013923882670373915">Bluetooth ierīce “<ph name="DEVICE_NAME"/>” vēlas saņemt atļauju, lai izveidotu savienojumu pārī. Lūdzu, ierīcē ievadiet šo PIN: <ph name="PINCODE"/>.</translation>
 <translation id="2819276065543622893">Jūs tagad tiksiet izrakstīts.</translation>
+<translation id="4961318399572185831">Ekrāna apraide</translation>
 <translation id="5507786745520522457">Iestatīt mobilos datus</translation>
 <translation id="6165508094623778733">Uzziniet vairāk</translation>
 <translation id="7168224885072002358">Iepriekšējā izšķirtspēja tiks atgriezta pēc <ph name="TIMEOUT_SECONDS"/></translation>
+<translation id="5927132638760172455">Apraide uz nezināmu saņēmēju</translation>
 <translation id="743058460480092004">Kamera un mikrofons tiek lietoti.</translation>
 <translation id="6550675742724504774">Opcijas</translation>
 <translation id="6406704438230478924">altgr</translation>
@@ -212,7 +212,6 @@ Lai atceltu tā funkcionalitāti, nospiediet Alt+Meklēt vai Shift.</translation
 <translation id="3009178788565917040">Izvade</translation>
 <translation id="3147142846278915599">Palaišanas programma (notiek lietotņu sinhronizēšana...)</translation>
 <translation id="6911468394164995108">Pievienoties citam...</translation>
-<translation id="4373966964907728675">Notiek darbvirsmas apraide</translation>
 <translation id="3678715477168044796"><ph name="DISPLAY_NAME"/>: <ph name="ANNOTATION"/></translation>
 <translation id="412065659894267608">Līdz pilnīgai uzlādei atlikušais laiks: <ph name="HOUR"/> h <ph name="MINUTE"/> min</translation>
 <translation id="3077734595579995578">shift</translation>

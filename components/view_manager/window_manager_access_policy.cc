@@ -61,7 +61,7 @@ bool WindowManagerAccessPolicy::CanChangeViewVisibility(
     const ServerView* view) const {
   // The WindowManager can change the visibility of the root too.
   return view->id().connection_id == connection_id_ ||
-         view->id() == RootViewId();
+      (view->GetRoot() == view);
 }
 
 bool WindowManagerAccessPolicy::CanSetViewSurfaceId(

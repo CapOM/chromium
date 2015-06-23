@@ -142,10 +142,8 @@ class CC_EXPORT TextureLayer : public Layer {
   void SetNeedsDisplayRect(const gfx::Rect& dirty_rect) override;
 
   void SetLayerTreeHost(LayerTreeHost* layer_tree_host) override;
-  bool Update(ResourceUpdateQueue* queue,
-              const OcclusionTracker<Layer>* occlusion) override;
+  bool Update() override;
   void PushPropertiesTo(LayerImpl* layer) override;
-  SimpleEnclosedRegion VisibleContentOpaqueRegion() const override;
 
  protected:
   TextureLayer(const LayerSettings& settings, TextureLayerClient* client);

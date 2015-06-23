@@ -12,6 +12,7 @@
 #include "base/strings/utf_string_conversions.h"
 #include "components/metrics/proto/omnibox_input_type.pb.h"
 #include "components/omnibox/autocomplete_match.h"
+#include "components/omnibox/autocomplete_provider_client.h"
 #include "components/omnibox/autocomplete_provider_listener.h"
 #include "components/omnibox/keyword_extensions_delegate.h"
 #include "components/search_engines/template_url.h"
@@ -69,12 +70,12 @@ void ScopedEndExtensionKeywordMode::StayInKeywordMode() {
 
 }  // namespace
 
-KeywordProvider::KeywordProvider(
-    AutocompleteProviderListener* listener,
-    TemplateURLService* model)
+KeywordProvider::KeywordProvider(AutocompleteProviderClient* client,
+                                 AutocompleteProviderListener* listener)
     : AutocompleteProvider(AutocompleteProvider::TYPE_KEYWORD),
       listener_(listener),
-      model_(model) {
+      model_(client->GetTemplateURLService()),
+      extensions_delegate_(client->GetKeywordExtensionsDelegate(this)) {
 }
 
 // static
@@ -138,7 +139,7 @@ const TemplateURL* KeywordProvider::GetSubstitutingTemplateURLForInput(
     // of the original input.
     if (input->cursor_position() != base::string16::npos &&
         !remaining_input.empty() &&
-        EndsWith(input->text(), remaining_input, true)) {
+        base::EndsWith(input->text(), remaining_input, true)) {
       int offset = input->text().length() - input->cursor_position();
       // The cursor should never be past the last character or before the
       // first character.
@@ -199,8 +200,7 @@ AutocompleteMatch KeywordProvider::CreateVerbatimMatch(
 }
 
 void KeywordProvider::Start(const AutocompleteInput& input,
-                            bool minimal_changes,
-                            bool called_due_to_focus) {
+                            bool minimal_changes) {
   // This object ensures we end keyword mode if we exit the function without
   // toggling keyword mode to on.
   ScopedEndExtensionKeywordMode keyword_mode_toggle(extensions_delegate_.get());
@@ -216,7 +216,7 @@ void KeywordProvider::Start(const AutocompleteInput& input,
       extensions_delegate_->IncrementInputId();
   }
 
-  if (called_due_to_focus)
+  if (input.from_omnibox_focus())
     return;
 
   // Split user input into a keyword and some query input.

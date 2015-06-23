@@ -9,9 +9,11 @@
 #include "components/omnibox/autocomplete_match.h"
 #include "components/omnibox/autocomplete_scheme_classifier.h"
 #include "components/omnibox/keyword_provider.h"
+#include "components/omnibox/mock_autocomplete_provider_client.h"
 #include "components/search_engines/search_engines_switches.h"
 #include "components/search_engines/template_url.h"
 #include "components/search_engines/template_url_service.h"
+#include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
 #include "url/gurl.h"
 
@@ -61,7 +63,7 @@ class KeywordProviderTest : public testing::Test {
   static const TemplateURLService::Initializer kTestData[];
 
   scoped_refptr<KeywordProvider> kw_provider_;
-  scoped_ptr<TemplateURLService> model_;
+  scoped_ptr<MockAutocompleteProviderClient> client_;
 };
 
 // static
@@ -77,12 +79,15 @@ const TemplateURLService::Initializer KeywordProviderTest::kTestData[] = {
 };
 
 void KeywordProviderTest::SetUp() {
-  model_.reset(new TemplateURLService(kTestData, arraysize(kTestData)));
-  kw_provider_ = new KeywordProvider(NULL, model_.get());
+  scoped_ptr<TemplateURLService> template_url_service(
+      new TemplateURLService(kTestData, arraysize(kTestData)));
+  client_.reset(new MockAutocompleteProviderClient());
+  client_->set_template_url_service(template_url_service.Pass());
+  kw_provider_ = new KeywordProvider(client_.get(), nullptr);
 }
 
 void KeywordProviderTest::TearDown() {
-  model_.reset();
+  client_.reset();
   kw_provider_ = NULL;
 }
 
@@ -93,11 +98,11 @@ void KeywordProviderTest::RunTest(TestData<ResultType>* keyword_cases,
   ACMatches matches;
   for (int i = 0; i < num_cases; ++i) {
     SCOPED_TRACE(keyword_cases[i].input);
-    AutocompleteInput input(keyword_cases[i].input, base::string16::npos,
-                            std::string(), GURL(),
-                            metrics::OmniboxEventProto::INVALID_SPEC, true,
-                            false, true, true, TestingSchemeClassifier());
-    kw_provider_->Start(input, false, false);
+    AutocompleteInput input(
+        keyword_cases[i].input, base::string16::npos, std::string(), GURL(),
+        metrics::OmniboxEventProto::INVALID_SPEC, true, false, true, true,
+        false, TestingSchemeClassifier());
+    kw_provider_->Start(input, false);
     EXPECT_TRUE(kw_provider_->done());
     matches = kw_provider_->matches();
     ASSERT_EQ(keyword_cases[i].num_results, matches.size());
@@ -274,14 +279,19 @@ TEST_F(KeywordProviderTest, AddKeyword) {
   data.SetKeyword(keyword);
   data.SetURL("http://www.google.com/foo?q={searchTerms}");
   TemplateURL* template_url = new TemplateURL(data);
-  model_->Add(template_url);
-  ASSERT_TRUE(template_url == model_->GetTemplateURLForKeyword(keyword));
+  client_->GetTemplateURLService()->Add(template_url);
+  ASSERT_TRUE(
+      template_url ==
+      client_->GetTemplateURLService()->GetTemplateURLForKeyword(keyword));
 }
 
 TEST_F(KeywordProviderTest, RemoveKeyword) {
+  TemplateURLService* template_url_service = client_->GetTemplateURLService();
   base::string16 url(ASCIIToUTF16("http://aaaa/?aaaa=1&b={searchTerms}&c"));
-  model_->Remove(model_->GetTemplateURLForKeyword(ASCIIToUTF16("aaaa")));
-  ASSERT_TRUE(model_->GetTemplateURLForKeyword(ASCIIToUTF16("aaaa")) == NULL);
+  template_url_service->Remove(
+      template_url_service->GetTemplateURLForKeyword(ASCIIToUTF16("aaaa")));
+  ASSERT_TRUE(template_url_service->GetTemplateURLForKeyword(
+                  ASCIIToUTF16("aaaa")) == NULL);
 }
 
 TEST_F(KeywordProviderTest, GetKeywordForInput) {
@@ -335,13 +345,14 @@ TEST_F(KeywordProviderTest, GetSubstitutingTemplateURLForInput) {
       base::string16::npos },
   };
   for (size_t i = 0; i < arraysize(cases); i++) {
-    AutocompleteInput input(
-        ASCIIToUTF16(cases[i].text), cases[i].cursor_position, std::string(),
-        GURL(), metrics::OmniboxEventProto::INVALID_SPEC, false, false,
-        cases[i].allow_exact_keyword_match, true, TestingSchemeClassifier());
+    AutocompleteInput input(ASCIIToUTF16(cases[i].text),
+                            cases[i].cursor_position, std::string(), GURL(),
+                            metrics::OmniboxEventProto::INVALID_SPEC, false,
+                            false, cases[i].allow_exact_keyword_match, true,
+                            false, TestingSchemeClassifier());
     const TemplateURL* url =
-        KeywordProvider::GetSubstitutingTemplateURLForInput(model_.get(),
-                                                            &input);
+        KeywordProvider::GetSubstitutingTemplateURLForInput(
+            client_->GetTemplateURLService(), &input);
     if (cases[i].expected_url.empty())
       EXPECT_FALSE(url);
     else
@@ -371,8 +382,8 @@ TEST_F(KeywordProviderTest, ExtraQueryParams) {
 TEST_F(KeywordProviderTest, DoesNotProvideMatchesOnFocus) {
   AutocompleteInput input(ASCIIToUTF16("aaa"), base::string16::npos,
                           std::string(), GURL(),
-                          metrics::OmniboxEventProto::INVALID_SPEC, true,
-                          false, true, true, TestingSchemeClassifier());
-  kw_provider_->Start(input, false, true);
+                          metrics::OmniboxEventProto::INVALID_SPEC, true, false,
+                          true, true, true, TestingSchemeClassifier());
+  kw_provider_->Start(input, false);
   ASSERT_TRUE(kw_provider_->matches().empty());
 }

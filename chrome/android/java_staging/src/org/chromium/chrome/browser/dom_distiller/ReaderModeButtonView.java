@@ -10,8 +10,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 
-import com.google.android.apps.chrome.R;
-
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.banners.SwipableOverlayView;
 import org.chromium.content.browser.ContentViewCore;
 
@@ -65,16 +64,20 @@ public class ReaderModeButtonView extends SwipableOverlayView {
             @Override
             public void onClick(View v) {
                 mReaderModeButtonViewDelegate.onSwipeAway();
-                dismiss(true);
             }
         });
         this.setClickable(true);
     }
 
+    // Expose dismiss to other classes in this package.
+    @Override
+    protected boolean dismiss(boolean horizontally) {
+        return super.dismiss(horizontally);
+    }
+
     @Override
     protected void onViewClicked() {
         mReaderModeButtonViewDelegate.onClick();
-        dismiss(true);
     }
 
     @Override

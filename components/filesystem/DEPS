@@ -2,4 +2,5 @@ include_rules = [
   "+mojo/application",
   "+mojo/platform_handle",
   "+mojo/public",
+  "+mojo/util",
 ]

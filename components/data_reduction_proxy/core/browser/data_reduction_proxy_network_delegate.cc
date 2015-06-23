@@ -6,7 +6,7 @@
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
-#include "base/metrics/histogram.h"
+#include "base/metrics/histogram_macros.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/time/time.h"
 #include "components/data_reduction_proxy/core/browser/data_reduction_proxy_bypass_stats.h"
@@ -175,15 +175,14 @@ void DataReductionProxyNetworkDelegate::OnBeforeSendProxyHeadersInternal(
     const net::ProxyInfo& proxy_info,
     net::HttpRequestHeaders* headers) {
   DCHECK(data_reduction_proxy_config_);
-  DCHECK(request);
 
   // TODO(bengr): Investigate a better approach to update the network
   // quality so that state of Lo-Fi is stored per page.
   net::NetworkQualityEstimator* network_quality_estimator = nullptr;
-  if (request->context())
+  if (request && request->context())
     network_quality_estimator = request->context()->network_quality_estimator();
 
-  if (request->load_flags() & net::LOAD_MAIN_FRAME) {
+  if (request && ((request->load_flags() & net::LOAD_MAIN_FRAME) != 0)) {
     data_reduction_proxy_config_->UpdateLoFiStatusOnMainFrameRequest(
         ((request->load_flags() & net::LOAD_BYPASS_CACHE) != 0),
         network_quality_estimator);
@@ -303,7 +302,7 @@ void OnResolveProxyHandler(const GURL& url,
   }
 
   if ((load_flags & net::LOAD_BYPASS_DATA_REDUCTION_PROXY) &&
-      DataReductionProxyParams::IsIncludedInCriticalPathBypassFieldTrial()) {
+      params::IsIncludedInCriticalPathBypassFieldTrial()) {
     if (!result->is_empty() && !result->is_direct() &&
         config->IsDataReductionProxy(result->proxy_server().host_port_pair(),
                                      NULL)) {

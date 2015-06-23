@@ -7,13 +7,16 @@
 namespace switches {
 
 #if defined(OS_MACOSX) && !defined(OS_IOS)
-// Enable use of cross-process CALayers to display content directly from the
+// Disable use of cross-process CALayers to display content directly from the
 // GPU process on Mac.
 const char kDisableRemoteCoreAnimation[] = "disable-remote-core-animation";
 
-// Force all windows to render via a layer-backed view bound to an
-// NSOpenGLContext.
-const char kEnableNSGLSurfaces[] = "enable-ns-gl-surfaces";
+// Disable using the private NSCGLSurface API to draw content.
+const char kDisableNSCGLSurfaceApi[] = "disable-ns-cgl-surface-api";
+
+// Force all content to draw via the private NSCGLSurface API, even when there
+// exist performance, stability, or correctness reasons not to.
+const char kForceNSCGLSurfaceApi[] = "force-ns-cgl-surface-api";
 #endif
 
 // Disables use of DWM composition for top level windows.
@@ -21,9 +24,6 @@ const char kDisableDwmComposition[] = "disable-dwm-composition";
 
 // Disables large icons on the New Tab page.
 const char kDisableIconNtp[] = "disable-icon-ntp";
-
-// Disables an experimental focus manager to track text input clients.
-const char kDisableTextInputFocusManager[] = "disable-text-input-focus-manager";
 
 // Disables touch adjustment.
 const char kDisableTouchAdjustment[] = "disable-touch-adjustment";
@@ -43,9 +43,6 @@ const char kEnableIconNtp[] = "enable-icon-ntp";
 // Enables a zoomed popup bubble that allows the user to select a link.
 const char kEnableLinkDisambiguationPopup[] =
     "enable-link-disambiguation-popup";
-
-// Enables an experimental focus manager to track text input clients.
-const char kEnableTextInputFocusManager[] = "enable-text-input-focus-manager";
 
 // Enables touch event based drag and drop.
 const char kEnableTouchDragDrop[] = "enable-touch-drag-drop";

@@ -18,6 +18,8 @@ group("android") {
 
 executable("mandoline_runner") {
   deps = [
+    ":jni_headers",
+    "//mandoline/ui/browser/public/interfaces",
     "//mojo/common",
     "//mojo/environment:chromium",
     "//mojo/runner:mojo_runner_lib",
@@ -25,6 +27,7 @@ executable("mandoline_runner") {
 
   sources = [
     "../core_services_initialization.cc",
+    "mandoline_activity.cc",
     "mandoline_context_init.cc",
   ]
 
@@ -49,25 +52,23 @@ copy_ex("copy_mandoline_assets") {
   clear_dir = true
   dest = mandoline_assets_dir
   deps = [
+    "//components/devtools_service",
     "//components/html_viewer",
-    "//components/view_manager",
-    "//components/view_manager/surfaces",
     "//mandoline/services/core_services",
     "//mojo/runner:bootstrap",
     "//mojo/runner:bootstrap_java",
-    "//mojo/services/network",
   ]
   sources = [
-    "$root_out_dir/core_services.mojo",
     "$root_out_dir/lib.stripped/libbootstrap.so",
-    "$root_out_dir/network_service.mojo",
     "$root_out_dir/obj/mojo/runner/bootstrap_java.dex.jar",
-    "$root_out_dir/surfaces_service.mojo",
   ]
 
   # Directories can't be specified as sources so pass manually to the script.
-  args =
-      [ "--files=" + rebase_path("$root_out_dir/html_viewer", root_build_dir) ]
+  args = [
+    "--files=" + rebase_path("$root_out_dir/core_services", root_build_dir),
+    "--files=" + rebase_path("$root_out_dir/devtools_service", root_build_dir),
+    "--files=" + rebase_path("$root_out_dir/html_viewer", root_build_dir),
+  ]
 
   if (use_aura) {
     deps += [
@@ -75,9 +76,10 @@ copy_ex("copy_mandoline_assets") {
       "//mandoline/ui/omnibox",
     ]
 
-    args +=
-        [ "--files=" + rebase_path("$root_out_dir/browser", root_build_dir) ] +
-        [ "--files=" + rebase_path("$root_out_dir/omnibox", root_build_dir) ]
+    args += [
+      "--files=" + rebase_path("$root_out_dir/browser", root_build_dir),
+      "--files=" + rebase_path("$root_out_dir/omnibox", root_build_dir),
+    ]
   }
 }
 
@@ -86,6 +88,22 @@ generate_mojo_shell_assets_list("build_mandoline_assets") {
     ":copy_mandoline_assets",
   ]
   dir = mandoline_assets_dir
+}
+
+android_library("java") {
+  java_files = [ "apk/src/org/chromium/mandoline/MandolineActivity.java" ]
+
+  deps = [
+    "//mojo/runner:java",
+    "//base:base_java",
+  ]
+}
+
+generate_jni("jni_headers") {
+  sources = [
+    "apk/src/org/chromium/mandoline/MandolineActivity.java",
+  ]
+  jni_package = "mandoline"
 }
 
 android_resources("mandoline_apk_resources") {
@@ -105,11 +123,12 @@ android_apk("mandoline_apk") {
   deps = [
     ":build_mandoline_assets",
     ":copy_mandoline_runner",
+    ":java",
     ":mandoline_apk_resources",
     "//mojo/runner:java",
     "//mojo/runner:resources",
     "//base:base_java",
-    "//components/view_manager:view_manager_java",
     "//third_party/android_tools:google_play_services_default_resources",
+    "//ui/platform_window/android:platform_window_java",
   ]
 }

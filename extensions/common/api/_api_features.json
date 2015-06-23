@@ -152,6 +152,7 @@
         "chrome://extensions-frame/*",
         "chrome://extensions/*",
         "chrome://chrome-signin/*",
+        "chrome://media-router/*",
         "chrome://oobe/*"
       ]
     },
@@ -167,6 +168,11 @@
   "hid": {
     "dependencies": ["permission:hid"],
     "contexts": ["blessed_extension"]
+  },
+  "hid.getUserSelectedDevices": {
+    "contexts": ["blessed_extension"],
+    "channel": "dev",
+    "dependencies": ["permission:hid"]
   },
   "idle": {
     "dependencies": ["permission:idle"],
@@ -404,7 +410,11 @@
     "channel": "stable",
     "internal": true,
     "contexts": ["webui"],
-    "matches": ["chrome://chrome-signin/*", "chrome://oobe/*"]
+    "matches": [
+      "chrome://chrome-signin/*",
+      "chrome://media-router/*",
+      "chrome://oobe/*"
+    ]
   }],
   "webViewInternal": [{
     "internal": true,
@@ -414,7 +424,11 @@
     "internal": true,
     "channel": "dev",
     "contexts": ["webui"],
-    "matches": ["chrome://chrome-signin/*", "chrome://oobe/*"]
+    "matches": [
+      "chrome://chrome-signin/*",
+      "chrome://media-router/*",
+      "chrome://oobe/*"
+    ]
   }],
   "webViewRequest": [{
     "dependencies": ["permission:webview"],
@@ -422,6 +436,10 @@
   }, {
     "channel": "stable",
     "contexts": ["webui"],
-    "matches": ["chrome://chrome-signin/*", "chrome://oobe/*"]
+    "matches": [
+      "chrome://chrome-signin/*",
+      "chrome://media-router/*",
+      "chrome://oobe/*"
+    ]
   }]
 }

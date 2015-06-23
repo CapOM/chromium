@@ -75,9 +75,10 @@ class BrowsingDataRemover
     REMOVE_CHANNEL_IDS = 1 << 12,
     REMOVE_CONTENT_LICENSES = 1 << 13,
     REMOVE_SERVICE_WORKERS = 1 << 14,
-#if defined(OS_ANDROID)
     REMOVE_APP_BANNER_DATA = 1 << 15,
-#endif
+    // REMOVE_NOCHECKS intentionally does not check if the Profile's prohibited
+    // from deleting history or downloads.
+    REMOVE_NOCHECKS = 1 << 16,
     // The following flag is used only in tests. In normal usage, hosted app
     // data is controlled by the REMOVE_COOKIES flag, applied to the
     // protected-web origin.
@@ -91,9 +92,7 @@ class BrowsingDataRemover
                        REMOVE_PLUGIN_DATA |
                        REMOVE_SERVICE_WORKERS |
                        REMOVE_WEBSQL |
-#if defined(OS_ANDROID)
                        REMOVE_APP_BANNER_DATA |
-#endif
                        REMOVE_CHANNEL_IDS,
 
     // Includes all the available remove options. Meant to be used by clients
@@ -104,6 +103,11 @@ class BrowsingDataRemover
                  REMOVE_HISTORY |
                  REMOVE_PASSWORDS |
                  REMOVE_CONTENT_LICENSES,
+
+    // Includes all available remove options. Meant to be used when the Profile
+    // is scheduled to be deleted, and all possible data should be wiped from
+    // disk as soon as possible.
+    REMOVE_WIPE_PROFILE = REMOVE_ALL | REMOVE_NOCHECKS,
   };
 
   // When BrowsingDataRemover successfully removes data, a notification of type

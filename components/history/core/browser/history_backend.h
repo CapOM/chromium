@@ -42,10 +42,10 @@ class SingleThreadTaskRunner;
 namespace history {
 class CommitLaterTask;
 struct DownloadRow;
+class HistoryBackendClient;
 class HistoryBackendDBBaseTest;
 class HistoryBackendObserver;
 class HistoryBackendTest;
-class HistoryClient;
 class HistoryDatabase;
 struct HistoryDatabaseParams;
 struct HistoryDetails;
@@ -171,7 +171,8 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   // may be null.
   //
   // This constructor is fast and does no I/O, so can be called at any time.
-  HistoryBackend(Delegate* delegate, HistoryClient* history_client,
+  HistoryBackend(Delegate* delegate,
+                 scoped_ptr<HistoryBackendClient> backend_client,
                  scoped_refptr<base::SequencedTaskRunner> task_runner);
 
   // Must be called after creation but before any objects are created. If this
@@ -484,6 +485,8 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest,
                            SetFaviconMappingsForPageAndRedirects);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest,
+                           SetFaviconMappingsForPageAndRedirectsWithFragment);
+  FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest,
                            SetFaviconMappingsForPageDuplicates);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, SetFaviconsDeleteBitmaps);
   FRIEND_TEST_ALL_PREFIXES(HistoryBackendTest, SetFaviconsReplaceBitmapData);
@@ -693,8 +696,16 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
       favicon_base::IconType icon_type,
       const std::vector<favicon_base::FaviconID>& icon_ids);
 
+  // Maps the favicon ids in |icon_ids| to URLs in |page_urls| for |icon_type|.
+  // Returns true if the function changed at least one of the |page_urls|
+  // mappings.
+  bool SetFaviconMappingsForPages(
+      const std::vector<GURL>& page_urls,
+      favicon_base::IconType icon_type,
+      const std::vector<favicon_base::FaviconID>& icon_ids);
+
   // Maps the favicon ids in |icon_ids| to |page_url| for |icon_type|.
-  // Returns true if the function changed some of |page_url|'s mappings.
+  // Returns true if the function changed at least one of |page_url|'s mappings.
   bool SetFaviconMappingsForPage(
       const GURL& page_url,
       favicon_base::IconType icon_type,
@@ -751,10 +762,6 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
 
   // Deletes the FTS index database files, which are no longer used.
   void DeleteFTSIndexDatabases();
-
-  // Returns the HistoryClient, blocking until the bookmarks are loaded. This
-  // may return null during testing.
-  HistoryClient* GetHistoryClient();
 
   // Data ----------------------------------------------------------------------
 
@@ -813,10 +820,7 @@ class HistoryBackend : public base::RefCountedThreadSafe<HistoryBackend>,
   std::list<QueuedHistoryDBTask*> queued_history_db_tasks_;
 
   // Used to determine if a URL is bookmarked; may be null.
-  //
-  // Use GetHistoryClient to access this, which makes sure the bookmarks are
-  // loaded before returning.
-  HistoryClient* history_client_;
+  scoped_ptr<HistoryBackendClient> backend_client_;
 
   scoped_refptr<base::SequencedTaskRunner> task_runner_;
 

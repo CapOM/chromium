@@ -19,8 +19,6 @@
 #include "net/url_request/url_fetcher_delegate.h"
 
 class AutocompleteProviderListener;
-class Profile;
-class TemplateURLService;
 
 namespace base {
 class ListValue;
@@ -49,17 +47,14 @@ class ZeroSuggestProvider : public BaseSearchProvider,
                             public net::URLFetcherDelegate {
  public:
   // Creates and returns an instance of this provider.
-  static ZeroSuggestProvider* Create(AutocompleteProviderListener* listener,
-                                     TemplateURLService* template_url_service,
-                                     Profile* profile);
+  static ZeroSuggestProvider* Create(AutocompleteProviderClient* client,
+                                     AutocompleteProviderListener* listener);
 
   // Registers a preference used to cache zero suggest results.
   static void RegisterProfilePrefs(user_prefs::PrefRegistrySyncable* registry);
 
   // AutocompleteProvider:
-  void Start(const AutocompleteInput& input,
-             bool minimal_changes,
-             bool called_due_to_focus) override;
+  void Start(const AutocompleteInput& input, bool minimal_changes) override;
   void Stop(bool clear_cached_results,
             bool due_to_user_inactivity) override;
   void DeleteMatch(const AutocompleteMatch& match) override;
@@ -69,9 +64,8 @@ class ZeroSuggestProvider : public BaseSearchProvider,
   void ResetSession() override;
 
  private:
-  ZeroSuggestProvider(AutocompleteProviderListener* listener,
-                      TemplateURLService* template_url_service,
-                      Profile* profile);
+  ZeroSuggestProvider(AutocompleteProviderClient* client,
+                      AutocompleteProviderListener* listener);
 
   ~ZeroSuggestProvider() override;
 
@@ -133,7 +127,6 @@ class ZeroSuggestProvider : public BaseSearchProvider,
   void MaybeUseCachedSuggestions();
 
   AutocompleteProviderListener* listener_;
-  Profile* profile_;
 
   // The URL for which a suggestion fetch is pending.
   std::string current_query_;

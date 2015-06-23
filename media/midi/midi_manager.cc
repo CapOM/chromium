@@ -6,7 +6,6 @@
 
 #include "base/bind.h"
 #include "base/message_loop/message_loop.h"
-#include "base/message_loop/message_loop_proxy.h"
 #include "base/trace_event/trace_event.h"
 
 namespace media {
@@ -60,7 +59,7 @@ void MidiManager::StartSession(MidiManagerClient* client) {
     if (session_needs_initialization) {
       TRACE_EVENT0("midi", "MidiManager::StartInitialization");
       session_thread_runner_ =
-          base::MessageLoop::current()->message_loop_proxy();
+          base::MessageLoop::current()->task_runner();
       StartInitialization();
     }
     if (too_many_pending_clients_exist) {

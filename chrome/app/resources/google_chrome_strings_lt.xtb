@@ -80,6 +80,7 @@ Kai kurios funkcijos gali būti nepasiekiamos ir nuostatų pakeitimai nebus išs
 <translation id="8551886023433311834">Beveik įdiegta naujausia versija! Paleiskite įrenginį iš naujo, kad būtų užbaigtas naujinimas.</translation>
 <translation id="6169866489629082767"><ph name="PAGE_TITLE"/>– „Google Chrome“</translation>
 <translation id="1073391069195728457">„Chrome“ – pranešimai</translation>
+<translation id="6368805772029492593">Kad būtų papildomai užtikrintas saugumas, „Google Chrome“ užšifruos jūsų duomenis.</translation>
 <translation id="7339898014177206373">Naujas langas</translation>
 <translation id="3282568296779691940">Prisijungti prie „Chrome“</translation>
 <translation id="3089968997497233615">Galima nauja, saugesnė „Google Chrome“ versija.</translation>
@@ -176,7 +177,6 @@ Prisijungus bet kuriuo būdu, „Chrome“ informacija, pvz., žymės, istorija 
 <translation id="2290095356545025170">Ar tikrai norite pašalinti „Google Chrome“?</translation>
 <translation id="4273752058983339720">„Google Chrome“ sukonfigūruota taip, kad paleidus kompiuterį automatiškai paleidžiama ir „Google Chrome“.</translation>
 <translation id="2316129865977710310">Ačiū, ne</translation>
-<translation id="415994390253732730">„Chrome“ elgsena keista?</translation>
 <translation id="1104959162601287462">Apie „&amp;Chrome“ OS</translation>
 <translation id="5328989068199000832">„Google Chrome“ dvejetainės programos</translation>
 <translation id="7626032353295482388">Sveiki, tai „Chrome“</translation>
@@ -229,6 +229,7 @@ Prisijungus bet kuriuo būdu, „Chrome“ informacija, pvz., žymės, istorija 
 <translation id="5566025111015594046">„Google Chrome“ (mDNS-In)</translation>
 <translation id="6113794647360055231">„Chrome“ dabar dar tobulesnė</translation>
 <translation id="2588322182880276190">„Chrome“ logotipas</translation>
+<translation id="4519152997629025674">„Google Chrome“ gali naudoti <ph name="BEGIN_LINK"/>žiniatinklio paslaugas<ph name="END_LINK"/>, kad būtų pagerintas naršymas. Pasirinktinai galite bet kada neleisti teikti šių paslaugų.</translation>
 <translation id="4367618624832907428">„Google Chrome“ nepavyksta pateikti tinklalapio, nes kompiuteris neprijungtas prie interneto.</translation>
 <translation id="174539241580958092">„Google Chrome“ negali sinchronizuoti duomenų, nes prisijungiant įvyko klaida.</translation>
 <translation id="8255190535488645436">„Google Chrome“ naudoja jūsų fotoaparatą ir mikrofoną.</translation>
@@ -236,7 +237,6 @@ Prisijungus bet kuriuo būdu, „Chrome“ informacija, pvz., žymės, istorija 
         programos nustatymuose.</translation>
 <translation id="9102715433345326100">Šis failas yra kenkėjiškas, todėl „Chrome“ jį užblokavo.</translation>
 <translation id="8205111949707227942">Pasirenkama: padėkite tobulinti „Chrome“ OS automatiškai siųsdami „Google“ naudojimo statistiką ir strigčių ataskaitas.</translation>
-<translation id="487887346205285304">„Chrome“ elgsena keista?</translation>
 <translation id="3622797965165704966">Dabar galite lengviau naudoti „Chrome“ naudodami „Google“ paskyrą ir bendrinamus kompiuterius.</translation>
 <translation id="7196020411877309443">Kodėl tai matau?</translation>
 <translation id="2769762047821873045">„Google Chrome“ nėra numatytoji naršyklė.</translation>

@@ -434,15 +434,18 @@ FileManager.prototype = /** @struct */ {
         this.selectionHandler_);
     this.sortMenuController_ = new SortMenuController(
         this.ui_.sortButton,
+        this.ui_.sortButtonToggleRipple,
         assert(this.directoryModel_.getFileList()));
     this.gearMenuController_ = new GearMenuController(
         this.ui_.gearButton,
+        this.ui_.gearButtonToggleRipple,
         this.ui_.gearMenu,
         this.directoryModel_,
         this.commandHandler);
     this.toolbarController_ = new ToolbarController(
         this.ui_.toolbar,
         this.ui_.dialogNavigationList,
+        this.ui_.listContainer,
         assert(this.ui_.locationLine),
         this.selectionHandler_,
         this.directoryModel_);
@@ -745,10 +748,8 @@ FileManager.prototype = /** @struct */ {
     // Show the window as soon as the UI pre-initialization is done.
     if (this.dialogType == DialogType.FULL_PAGE && !util.runningInBrowser()) {
       chrome.app.window.current().show();
-      setTimeout(callback, 100);  // Wait until the animation is finished.
-    } else {
-      callback();
     }
+    callback();
   };
 
   /**

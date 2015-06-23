@@ -14,12 +14,11 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.ApplicationStatus;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.EmptyTabObserver;
 import org.chromium.chrome.browser.ShortcutHelper;
 import org.chromium.chrome.browser.Tab;
@@ -27,7 +26,7 @@ import org.chromium.chrome.browser.TabObserver;
 import org.chromium.chrome.browser.UrlUtilities;
 import org.chromium.chrome.browser.document.DocumentUtils;
 import org.chromium.chrome.browser.fullscreen.ChromeFullscreenManager;
-import org.chromium.chrome.browser.ssl.ConnectionSecurityHelperSecurityLevel;
+import org.chromium.chrome.browser.ssl.ConnectionSecurityLevel;
 import org.chromium.chrome.browser.util.FeatureUtilities;
 import org.chromium.content.browser.ScreenOrientationProvider;
 import org.chromium.content_public.browser.LoadUrlParams;
@@ -307,9 +306,8 @@ public class WebappActivity extends FullScreenActivity {
         if (!TextUtils.isEmpty(url)) {
             boolean isSameWebsite =
                     UrlUtilities.sameDomainOrHost(mWebappInfo.uri().toString(), url, true);
-            visible = !isSameWebsite
-                    || securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_ERROR
-                    || securityLevel == ConnectionSecurityHelperSecurityLevel.SECURITY_WARNING;
+            visible = !isSameWebsite || securityLevel == ConnectionSecurityLevel.SECURITY_ERROR
+                    || securityLevel == ConnectionSecurityLevel.SECURITY_WARNING;
         }
 
         return visible;

@@ -1041,8 +1041,6 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
   settings->setMultiTargetTapNotificationEnabled(
       switches::IsLinkDisambiguationPopupEnabled());
 
-  settings->setDeferredImageDecodingEnabled(
-      prefs.deferred_image_decoding_enabled);
   WebRuntimeFeatures::enableImageColorProfiles(
       prefs.image_color_profiles_enabled);
   settings->setShouldRespectImageOrientation(
@@ -1066,8 +1064,29 @@ void RenderView::ApplyWebPreferences(const WebPreferences& prefs,
 
   settings->setSelectionIncludesAltImageText(true);
 
+// This change has both Chrome + blink components. The #if-guard allows us
+// to do this in two steps.
+#ifdef CLEANUP_V8_CACHE_OPTIONS_GUARD
+  // Proper solution:
   settings->setV8CacheOptions(
       static_cast<WebSettings::V8CacheOptions>(prefs.v8_cache_options));
+#else
+  // Temporary solution, while not all changes are in:
+  switch (prefs.v8_cache_options) {
+    case V8_CACHE_OPTIONS_DEFAULT:
+      settings->setV8CacheOptions(WebSettings::V8CacheOptionsDefault);
+      break;
+    case V8_CACHE_OPTIONS_NONE:
+      settings->setV8CacheOptions(WebSettings::V8CacheOptionsNone);
+      break;
+    case V8_CACHE_OPTIONS_PARSE:
+      settings->setV8CacheOptions(WebSettings::V8CacheOptionsParseMemory);
+      break;
+    case V8_CACHE_OPTIONS_CODE:
+      settings->setV8CacheOptions(WebSettings::V8CacheOptionsHeuristics);
+      break;
+  }
+#endif  // CLEANUP_V8_CACHE_OPTIONS_GUARD
 
   settings->setImageAnimationPolicy(
       static_cast<WebSettings::ImageAnimationPolicy>(prefs.animation_policy));
@@ -1550,7 +1569,23 @@ WebView* RenderViewImpl::createView(WebLocalFrame* creator,
   params.opener_render_frame_id =
       RenderFrameImpl::FromWebFrame(creator)->GetRoutingID();
   params.opener_url = creator->document().url();
-  params.opener_top_level_frame_url = creator->top()->document().url();
+
+  // The browser process uses the top frame's URL for a content settings check
+  // to determine whether the popup is allowed.  If the top frame is remote,
+  // its URL is not available, so use its replicated origin instead.
+  //
+  // TODO(alexmos): This works fine for regular origins but may break path
+  // matching for file URLs with OOP subframes that open popups.  This should
+  // be fixed by either moving this lookup to the browser process or removing
+  // path-based matching for file URLs from content settings.  See
+  // https://crbug.com/466297.
+  if (creator->top()->isWebLocalFrame()) {
+    params.opener_top_level_frame_url = creator->top()->document().url();
+  } else {
+    params.opener_top_level_frame_url =
+        GURL(creator->top()->securityOrigin().toString());
+  }
+
   GURL security_url(creator->document().securityOrigin().toString());
   if (!security_url.is_valid())
     security_url = GURL();
@@ -2011,6 +2046,11 @@ void RenderViewImpl::requestPointerUnlock() {
 bool RenderViewImpl::isPointerLocked() {
   return mouse_lock_dispatcher_->IsMouseLockedTo(
       webwidget_mouse_lock_target_.get());
+}
+
+void RenderViewImpl::onMouseDown(const WebNode& mouse_down_node) {
+  FOR_EACH_OBSERVER(
+      RenderViewObserver, observers_, OnMouseDown(mouse_down_node));
 }
 
 void RenderViewImpl::didHandleGestureEvent(
@@ -3086,10 +3126,6 @@ bool RenderViewImpl::WillHandleGestureEvent(
   return false;
 }
 
-void RenderViewImpl::DidHandleMouseEvent(const WebMouseEvent& event) {
-  FOR_EACH_OBSERVER(RenderViewObserver, observers_, DidHandleMouseEvent(event));
-}
-
 bool RenderViewImpl::HasTouchEventHandlersAt(const gfx::Point& point) const {
   if (!webview())
     return false;
@@ -3553,7 +3589,7 @@ void RenderViewImpl::LaunchAndroidContentIntent(const GURL& intent,
     return;
 
   // Remove the content highlighting if any.
-  scheduleComposite();
+  ScheduleComposite();
 
   if (!intent.is_empty())
     Send(new ViewHostMsg_StartContentIntent(routing_id_, intent));
@@ -3596,7 +3632,7 @@ void RenderViewImpl::OnEnableViewSourceMode() {
   main_frame->enableViewSourceMode(true);
 }
 
-#if defined(OS_ANDROID) || defined(TOOLKIT_VIEWS)
+#if defined(OS_ANDROID) || defined(USE_AURA)
 bool RenderViewImpl::didTapMultipleTargets(
     const WebSize& inner_viewport_offset,
     const WebRect& touch_rect,
@@ -3682,7 +3718,7 @@ bool RenderViewImpl::didTapMultipleTargets(
 
   return handled;
 }
-#endif  // defined(OS_ANDROID) || defined(TOOLKIT_VIEWS)
+#endif  // defined(OS_ANDROID) || defined(USE_AURA)
 
 unsigned RenderViewImpl::GetLocalSessionHistoryLengthForTesting() const {
   return history_list_length_;

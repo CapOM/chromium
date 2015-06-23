@@ -86,7 +86,6 @@
                 '../android_webview/android_webview.gyp:android_webview_apk',
                 '../android_webview/android_webview.gyp:system_webview_apk',
                 '../android_webview/android_webview_shell.gyp:android_webview_shell_apk',
-                '../android_webview/android_webview_telemetry_shell.gyp:android_webview_telemetry_shell_apk',
                 '../chrome/android/chrome_apk.gyp:chrome_public_apk',
                 '../chrome/chrome.gyp:chrome_shell_apk',
                 '../chrome/chrome.gyp:chrome_sync_shell_apk',
@@ -161,6 +160,7 @@
           'dependencies': [
             '../device/bluetooth/bluetooth.gyp:*',
             '../device/device_tests.gyp:*',
+            '../gpu/skia_runner/skia_runner.gyp:*',
           ],
         }],
         ['use_openssl==0 and (OS=="mac" or OS=="ios" or OS=="win")', {

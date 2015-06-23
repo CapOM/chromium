@@ -42,10 +42,15 @@ class View;
 namespace html_viewer {
 
 class AxProviderImpl;
+class DevToolsAgentImpl;
 class Setup;
 class WebLayerTreeViewImpl;
 
 // A view for a single HTML document.
+//
+// HTMLDocument is deleted in one of two ways:
+// . When the View the HTMLDocument is embedded in is destroyed.
+// . Explicitly by way of Destroy().
 class HTMLDocument : public blink::WebViewClient,
                      public blink::WebFrameClient,
                      public mojo::ViewManagerDelegate,
@@ -53,6 +58,8 @@ class HTMLDocument : public blink::WebViewClient,
                      public mojo::InterfaceFactory<mojo::AxProvider>,
                      public mojo::InterfaceFactory<mandoline::FrameTreeClient> {
  public:
+  using DeleteCallback = base::Callback<void(HTMLDocument*)>;
+
   // Load a new HTMLDocument with |response|.
   // |html_document_app| is the application this app was created in, and
   // |connection| the specific connection triggering this new instance.
@@ -60,8 +67,11 @@ class HTMLDocument : public blink::WebViewClient,
   HTMLDocument(mojo::ApplicationImpl* html_document_app,
                mojo::ApplicationConnection* connection,
                mojo::URLResponsePtr response,
-               Setup* setup);
-  ~HTMLDocument() override;
+               Setup* setup,
+               const DeleteCallback& delete_callback);
+
+  // Deletes this object.
+  void Destroy();
 
  private:
   // Data associated with a child iframe.
@@ -71,6 +81,8 @@ class HTMLDocument : public blink::WebViewClient,
   };
 
   using FrameToViewMap = std::map<blink::WebLocalFrame*, ChildFrameData>;
+
+  ~HTMLDocument() override;
 
   // Updates the size and scale factor of the webview and related classes from
   // |root_|.
@@ -97,6 +109,7 @@ class HTMLDocument : public blink::WebViewClient,
       const blink::WebString& frameName,
       blink::WebSandboxFlags sandboxFlags);
   virtual void frameDetached(blink::WebFrame* frame);
+  virtual void frameDetached(blink::WebFrame* frame, DetachType type);
   virtual blink::WebCookieJar* cookieJar(blink::WebLocalFrame* frame);
   virtual blink::WebNavigationPolicy decidePolicyForNavigation(
       const NavigationPolicyInfo& info);
@@ -125,6 +138,8 @@ class HTMLDocument : public blink::WebViewClient,
       const mojo::ViewportMetrics& new_metrics) override;
   void OnViewDestroyed(mojo::View* view) override;
   void OnViewInputEvent(mojo::View* view, const mojo::EventPtr& event) override;
+  void OnViewFocusChanged(mojo::View* gained_focus,
+                          mojo::View* lost_focus) override;
 
   // mojo::InterfaceFactory<mojo::AxProvider>
   void Create(mojo::ApplicationConnection* connection,
@@ -140,6 +155,9 @@ class HTMLDocument : public blink::WebViewClient,
   // Converts a WebLocalFrame to a WebRemoteFrame. Used once we know the
   // url of a frame to trigger the navigation.
   void ConvertLocalFrameToRemoteFrame(blink::WebLocalFrame* frame);
+
+  // Updates the focus state of |web_view_| based on the focus state of |root_|.
+  void UpdateFocus();
 
   scoped_ptr<mojo::AppRefCount> app_refcount_;
   mojo::ApplicationImpl* html_document_app_;
@@ -166,6 +184,10 @@ class HTMLDocument : public blink::WebViewClient,
 
   FrameTreeManager frame_tree_manager_;
   mojo::Binding<mandoline::FrameTreeClient> frame_tree_manager_binding_;
+
+  scoped_ptr<DevToolsAgentImpl> devtools_agent_;
+
+  DeleteCallback delete_callback_;
 
   DISALLOW_COPY_AND_ASSIGN(HTMLDocument);
 };

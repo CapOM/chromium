@@ -10,11 +10,19 @@
 #include "base/threading/thread.h"
 #include "components/html_viewer/discardable_memory_allocator.h"
 #include "components/resource_provider/public/cpp/resource_loader.h"
+#include "components/view_manager/gles2/mojo_gpu_memory_buffer_manager.h"
+#include "components/view_manager/gles2/raster_thread_helper.h"
 #include "ui/gfx/geometry/size.h"
 
 namespace mojo {
 class ApplicationImpl;
 class Shell;
+}
+
+namespace ui {
+namespace mojo {
+class UIInit;
+}
 }
 
 namespace scheduler {
@@ -24,7 +32,6 @@ class RendererScheduler;
 namespace html_viewer {
 
 class BlinkPlatformImpl;
-class UISetup;
 class MediaFactory;
 
 // Setup encapsulates the necessary state needed by HTMLViewer. Some objects
@@ -58,6 +65,14 @@ class Setup {
     return compositor_thread_.task_runner();
   }
 
+  gles2::RasterThreadHelper* raster_thread_helper() {
+    return &raster_thread_helper_;
+  }
+
+  gles2::MojoGpuMemoryBufferManager* gpu_memory_buffer_manager() {
+    return &gpu_memory_buffer_manager_;
+  }
+
   MediaFactory* media_factory() { return media_factory_.get(); }
 
  private:
@@ -77,7 +92,7 @@ class Setup {
 
   gfx::Size screen_size_in_pixels_;
 
-  scoped_ptr<UISetup> ui_setup_;
+  scoped_ptr<ui::mojo::UIInit> ui_init_;
 
   // Skia requires that we have one of these. Unlike the one used in chrome,
   // this doesn't use purgable shared memory. Instead, it tries to free the
@@ -90,6 +105,8 @@ class Setup {
   scoped_ptr<scheduler::RendererScheduler> renderer_scheduler_;
   scoped_ptr<BlinkPlatformImpl> blink_platform_;
   base::Thread compositor_thread_;
+  gles2::RasterThreadHelper raster_thread_helper_;
+  gles2::MojoGpuMemoryBufferManager gpu_memory_buffer_manager_;
   scoped_ptr<MediaFactory> media_factory_;
 
   DISALLOW_COPY_AND_ASSIGN(Setup);

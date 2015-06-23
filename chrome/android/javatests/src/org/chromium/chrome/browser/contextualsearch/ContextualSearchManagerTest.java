@@ -17,19 +17,18 @@ import android.test.suitebuilder.annotation.SmallTest;
 import android.text.TextUtils;
 import android.view.KeyEvent;
 
-import com.google.android.apps.chrome.R;
-
 import org.chromium.base.ThreadUtils;
 import org.chromium.base.test.util.CommandLineFlags;
 import org.chromium.base.test.util.Feature;
 import org.chromium.base.test.util.Restriction;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.ChromeSwitches;
 import org.chromium.chrome.browser.ChromeTabbedActivity;
-import org.chromium.chrome.browser.CompositorChromeActivity;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanel.PanelState;
 import org.chromium.chrome.browser.compositor.bottombar.contextualsearch.ContextualSearchPanelDelegate;
+import org.chromium.chrome.browser.gsa.GSAContextDisplaySelection;
 import org.chromium.chrome.browser.omnibox.UrlBar;
 import org.chromium.chrome.browser.tabmodel.EmptyTabModelSelectorObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorObserver;
@@ -79,10 +78,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
     protected void setUp() throws Exception {
         super.setUp();
 
-        ChromeActivity activity = getActivity();
-        if (activity instanceof CompositorChromeActivity) {
-            mManager = ((CompositorChromeActivity) activity).getContextualSearchManager();
-        }
+        mManager = getActivity().getContextualSearchManager();
 
         if (mManager != null) {
             mFakeServer = new ContextualSearchFakeServer(mManager);
@@ -1494,7 +1490,7 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         assertTrue(CriteriaHelper.pollForCriteria(new Criteria() {
             @Override
             public boolean isSatisfied() {
-                if (((CompositorChromeActivity) getActivity())
+                if (getActivity()
                         .getAppMenuHandler().isAppMenuShowing() == isVisible) return true;
                 return false;
             }
@@ -1669,5 +1665,97 @@ public class ContextualSearchManagerTest extends ChromeActivityTestCaseBase<Chro
         // An open should reset the counter.
         clickToExpandAndClosePanel();
         assertEquals(0, mPolicy.getTapCount());
+    }
+
+    // --------------------------------------------------------------------------------------------
+    // Calls to ContextualSearchObserver.
+    // --------------------------------------------------------------------------------------------
+    private static class TestContextualSearchObserver implements ContextualSearchObserver {
+        public int hideCount;
+
+        @Override
+        public void onShowContextualSearch(GSAContextDisplaySelection selectionContext) {}
+
+        @Override
+        public void onHideContextualSearch() {
+            hideCount++;
+        }
+    }
+
+    /**
+     * Tests that ContextualSearchObserver gets notified when user brings up contextual search
+     * panel via long press and then dismisses the panel by tapping on the base page.
+     */
+    @SmallTest
+    @Feature({"ContextualSearch"})
+    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    public void testNotifyObserverHideAfterLongPress()
+            throws InterruptedException, TimeoutException {
+        TestContextualSearchObserver observer = new TestContextualSearchObserver();
+        mManager.addObserver(observer);
+        longPressNode("states");
+        assertEquals(0, observer.hideCount);
+
+        tapBasePage();
+        waitForPanelToCloseAndAssert();
+        assertEquals(1, observer.hideCount);
+    }
+
+    /**
+     * Tests that ContextualSearchObserver gets notified when user brings up contextual search
+     * panel via tap and then dismisses the panel by tapping on the base page.
+     */
+    @SmallTest
+    @Feature({"ContextualSearch"})
+    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    public void testNotifyObserverHideAfterTap() throws InterruptedException, TimeoutException {
+        TestContextualSearchObserver observer = new TestContextualSearchObserver();
+        mManager.addObserver(observer);
+        clickWordNode("states");
+        assertEquals(0, observer.hideCount);
+
+        tapBasePage();
+        waitForPanelToCloseAndAssert();
+        assertEquals(1, observer.hideCount);
+    }
+
+    private void assertWaitForSelectActionBarVisible(final boolean visible)
+            throws InterruptedException {
+        assertTrue(CriteriaHelper.pollForUIThreadCriteria(new Criteria() {
+            @Override
+            public boolean isSatisfied() {
+                return visible == getActivity().getActivityTab().getContentViewCore()
+                        .isSelectActionBarShowing();
+            }
+        }));
+    }
+
+    /**
+     * Tests that ContextualSearchObserver gets notified when user brings up contextual search
+     * panel via long press and then dismisses the panel by tapping copy (hide select action mode).
+     */
+    @SmallTest
+    @Feature({"ContextualSearch"})
+    @Restriction({RESTRICTION_TYPE_PHONE, RESTRICTION_TYPE_NON_LOW_END_DEVICE})
+    public void testNotifyObserverHideOnClearSelectionAfterTap()
+            throws InterruptedException, TimeoutException {
+        TestContextualSearchObserver observer = new TestContextualSearchObserver();
+        mManager.addObserver(observer);
+        longPressNode("states");
+        assertEquals(0, observer.hideCount);
+
+        // Dismiss select action mode.
+        final ContentViewCore contentViewCore = getActivity().getActivityTab().getContentViewCore();
+        assertWaitForSelectActionBarVisible(true);
+        ThreadUtils.runOnUiThreadBlocking(new Runnable() {
+            @Override
+            public void run() {
+                contentViewCore.hideSelectActionMode();
+            }
+        });
+        assertWaitForSelectActionBarVisible(false);
+
+        waitForPanelToCloseAndAssert();
+        assertEquals(1, observer.hideCount);
     }
 }

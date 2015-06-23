@@ -6,13 +6,10 @@ package org.chromium.chrome.browser.contextualsearch;
 
 import android.app.Activity;
 import android.os.Handler;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.ViewTreeObserver.OnGlobalFocusChangeListener;
-
-import com.google.android.apps.chrome.R;
 
 import org.chromium.base.ActivityState;
 import org.chromium.base.ApplicationStatus;
@@ -20,6 +17,7 @@ import org.chromium.base.ApplicationStatus.ActivityStateListener;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.SysUtils;
 import org.chromium.base.VisibleForTesting;
+import org.chromium.chrome.R;
 import org.chromium.chrome.browser.ChromeActivity;
 import org.chromium.chrome.browser.Tab;
 import org.chromium.chrome.browser.WebContentsFactory;
@@ -42,8 +40,6 @@ import org.chromium.chrome.browser.tabmodel.TabModel.TabLaunchType;
 import org.chromium.chrome.browser.tabmodel.TabModelObserver;
 import org.chromium.chrome.browser.tabmodel.TabModelSelector;
 import org.chromium.chrome.browser.tabmodel.TabModelSelectorTabObserver;
-import org.chromium.chrome.browser.widget.findinpage.FindToolbarManager;
-import org.chromium.chrome.browser.widget.findinpage.FindToolbarObserver;
 import org.chromium.components.navigation_interception.InterceptNavigationDelegate;
 import org.chromium.components.navigation_interception.NavigationParams;
 import org.chromium.components.web_contents_delegate_android.WebContentsDelegateAndroid;
@@ -51,7 +47,6 @@ import org.chromium.content.browser.ContentView;
 import org.chromium.content.browser.ContentViewCore;
 import org.chromium.content.browser.ContextualSearchClient;
 import org.chromium.content_public.browser.GestureStateListener;
-import org.chromium.content_public.browser.JavaScriptCallback;
 import org.chromium.content_public.browser.LoadUrlParams;
 import org.chromium.content_public.browser.WebContents;
 import org.chromium.content_public.browser.WebContentsObserver;
@@ -78,13 +73,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     private static final String TAG = "ContextualSearch";
 
     private static final String CONTAINS_WORD_PATTERN = "(\\w|\\p{L}|\\p{N})+";
-
-    // Constants related to the first-run flow.
-    private static final String FIRST_RUN_URL_PREFIX = "chrome://contextual-search-promo/";
-    private static final String FIRST_RUN_FLOW_URL = FIRST_RUN_URL_PREFIX + "promo.html";
-    private static final String FIRST_RUN_OPTIN_URL = FIRST_RUN_FLOW_URL + "#optin";
-    private static final String FIRST_RUN_OPTOUT_URL = FIRST_RUN_FLOW_URL + "#optout";
-    private static final String FIRST_RUN_LEARN_MORE_URL = FIRST_RUN_FLOW_URL + "#learn-more";
 
     // Max selection length must be limited or the entire request URL can go past the 2K limit.
     private static final int MAX_SELECTION_LENGTH = 100;
@@ -114,8 +102,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     private final WebContentsDelegateAndroid mWebContentsDelegate;
     private ContextualSearchContentViewDelegate mSearchContentViewDelegate;
     private final ContextualSearchTabPromotionDelegate mTabPromotionDelegate;
-    private final FindToolbarObserver mFindToolbarObserver;
-    private FindToolbarManager mFindToolbarManager;
     private TabModelSelectorTabObserver mTabModelSelectorTabObserver;
     private TabModelObserver mTabModelObserver;
     private boolean mIsSearchContentViewShowing;
@@ -132,6 +118,12 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
     private boolean mIsShowingPromo;
     private boolean mDidLogPromoOutcome;
+
+    /**
+     * Whether contextual search manager is currently promoting a tab. We should be ignoring hide
+     * requests when mIsPromotingTab is set to true.
+     */
+    private boolean mIsPromotingToTab;
 
     private ContextualSearchNetworkCommunicator mNetworkCommunicator;
     private ContextualSearchPanelDelegate mSearchPanelDelegate;
@@ -216,13 +208,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
             }
         };
 
-        mFindToolbarObserver = new FindToolbarObserver() {
-            @Override
-            public void onFindToolbarShown() {
-                hideContextualSearch(StateChangeReason.UNKNOWN);
-            }
-        };
-
         final View controlContainer = mActivity.findViewById(R.id.control_container);
         mOnFocusChangeListener = new OnGlobalFocusChangeListener() {
             @Override
@@ -242,16 +227,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
                 hideContextualSearch(StateChangeReason.UNKNOWN);
             }
         };
-    }
-
-    /**
-     * Sets the manager in charge of find in page.
-     * @param manager A {@link FindToolbarManager} instance.
-     */
-    public void setFindToolbarManager(FindToolbarManager manager) {
-        assert manager != null;
-        mFindToolbarManager = manager;
-        mFindToolbarManager.addObserver(mFindToolbarObserver);
     }
 
     /**
@@ -292,9 +267,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     @Override
     public void setContextualSearchPanelDelegate(ContextualSearchPanelDelegate delegate) {
         mSearchPanelDelegate = delegate;
-
-        boolean shouldHide = nativeShouldHidePromoHeader(mNativeContextualSearchManagerPtr);
-        mSearchPanelDelegate.setShouldHidePromoHeader(shouldHide);
     }
 
     /**
@@ -339,8 +311,8 @@ public class ContextualSearchManager extends ContextualSearchObservable
     }
 
     @Override
-    public boolean isOptOutPromoAvailable() {
-        return mPolicy.isOptOutPromoAvailable();
+    public boolean isPromoAvailable() {
+        return mPolicy.isPromoAvailable();
     }
 
     /**
@@ -396,6 +368,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
         mIsShowingPromo = false;
         mSearchPanelDelegate.setIsPromoActive(false);
+        notifyHideContextualSearch();
     }
 
     /**
@@ -412,10 +385,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
      */
     public void onOrientationChange() {
         if (!mIsInitialized) return;
-
-        // NOTE(pedrosimonetti): Invalidates the existing height. This is to prevent keeping
-        // the wrong height for a short period after rotating the device.
-        mSearchPanelDelegate.setPromoContentHeight(0.f);
         hideContextualSearch(StateChangeReason.UNKNOWN);
     }
 
@@ -474,9 +443,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
         boolean isTap = mSelectionController.getSelectionType() == SelectionType.TAP;
         boolean didRequestSurroundings = false;
-        if (mPolicy.isOptInPromoAvailable()) {
-            showFirstRunFlow();
-        } else if (isTap && mPolicy.shouldPreviousTapResolve(
+        if (isTap && mPolicy.shouldPreviousTapResolve(
                 mNetworkCommunicator.getBasePageUrl())) {
             mNetworkCommunicator.startSearchTermResolutionRequest(
                     mSelectionController.getSelectedText());
@@ -489,6 +456,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
             getContextualSearchControl().setCentralText(mSelectionController.getSelectedText());
             if (shouldPrefetch) loadSearchUrl();
         }
+
         if (!didRequestSurroundings) {
             // Gather surrounding text for Icing integration, which will make the selection and
             // a shorter version of the surroundings available for Conversational Search.
@@ -508,10 +476,11 @@ public class ContextualSearchManager extends ContextualSearchObservable
         // it's registered as closed.
         mSearchPanelDelegate.peekPanel(stateChangeReason);
 
-        // Note: now that the contextual search has properly started, set the first run involvement.
-        if (mPolicy.isOptOutPromoAvailable()) {
+        // Note: now that the contextual search has properly started, set the promo involvement.
+        if (mPolicy.isPromoAvailable()) {
             mIsShowingPromo = true;
             mDidLogPromoOutcome = false;
+            mSearchPanelDelegate.setIsPromoActive(true);
             mSearchPanelDelegate.setDidSearchInvolvePromo();
         }
 
@@ -530,11 +499,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     }
 
     @Override
-    public void continueSearchTermResolutionRequest() {
-        nativeContinueSearchTermResolutionRequest(mNativeContextualSearchManagerPtr);
-    }
-
-    @Override
     @Nullable public URL getBasePageUrl() {
         ContentViewCore baseContentViewCore = getBaseContentView();
         if (baseContentViewCore == null) return null;
@@ -543,24 +507,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
             return new URL(baseContentViewCore.getWebContents().getUrl());
         } catch (MalformedURLException e) {
             return null;
-        }
-    }
-
-    /**
-     * Loads the first-run flow in the search content view and sets the text on the contextual
-     * search bar.
-     */
-    private void showFirstRunFlow() {
-        mIsShowingPromo = true;
-        mDidLogPromoOutcome = false;
-        getContextualSearchControl().setFirstRunText(mSelectionController.getSelectedText());
-        loadUrl(FIRST_RUN_FLOW_URL);
-        mSearchPanelDelegate.setIsPromoActive(true);
-        // Saved in the case a search needs to be made after first run.
-        if (mSelectionController.getSelectionType() == SelectionType.TAP) {
-            nativeGatherSurroundingText(mNativeContextualSearchManagerPtr,
-                    mSelectionController.getSelectedText(), ALWAYS_USE_RESOLVED_SEARCH_TERM,
-                    getBaseContentView(), mPolicy.maySendBasePageUrl());
         }
     }
 
@@ -634,7 +580,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
      */
     private void stopListeningForHideNotifications() {
         if (mTabModelSelectorTabObserver != null) mTabModelSelectorTabObserver.destroy();
-        if (mFindToolbarManager != null) mFindToolbarManager.removeObserver(mFindToolbarObserver);
 
         TabModelSelector selector = mActivity.getTabModelSelector();
         if (selector != null) {
@@ -770,7 +715,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     private void loadSearchUrl() {
         mLoadedSearchUrlTimeMs = System.currentTimeMillis();
         mNetworkCommunicator.loadUrl(mSearchRequest.getSearchUrl());
-        mSearchPanelDelegate.setIsPromoActive(false);
         mDidLoadResolvedSearchRequest = true;
 
         // TODO(pedrosimonetti): If the user taps on a word and quickly after that taps on the
@@ -826,36 +770,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     }
 
     /**
-     * Called when the Search content view navigates to a specific URL related to the first run
-     * flow.
-     * @param url The new URL that is being navigated to.
-     */
-    private void onFirstRunNavigation(String url) {
-        if (FIRST_RUN_OPTIN_URL.equals(url)) {
-            mSearchPanelDelegate.setIsPromoActive(false);
-            mSearchPanelDelegate.animateAfterFirstRunSuccess();
-            PrefServiceBridge.getInstance().setContextualSearchState(true);
-            logPromoOutcome();
-            String selection = mSelectionController.getSelectedText();
-            if (mSelectionController.getSelectionType() == SelectionType.LONG_PRESS) {
-                mSearchRequest = new ContextualSearchRequest(selection);
-                loadSearchUrl();
-                getContextualSearchControl().setCentralText(selection);
-            } else {
-                mNetworkCommunicator.continueSearchTermResolutionRequest();
-            }
-        } else if (FIRST_RUN_OPTOUT_URL.equals(url)) {
-            PrefServiceBridge.getInstance().setContextualSearchState(false);
-            logPromoOutcome();
-            mSearchPanelDelegate.closePanel(StateChangeReason.OPTOUT, true);
-            mSearchPanelDelegate.setIsPromoActive(false);
-        } else if (FIRST_RUN_LEARN_MORE_URL.equals(url)) {
-            openContextualSearchLearnMore();
-            mSearchPanelDelegate.setIsPromoActive(false);
-        }
-    }
-
-    /**
      * Called when the Search content view navigates to a contextual search request URL.
      * This navigation could be for a prefetch when the panel is still closed, or
      * a load of a user-visible search result.
@@ -889,13 +803,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
                 mDidLoadResolvedSearchRequest = false;
             }
         }
-    }
-
-    /**
-     * Opens the Contextual Search "Learn More" experience.
-     */
-    private void openContextualSearchLearnMore() {
-        openUrlInNewTab(mActivity.getString(R.string.contextual_search_learn_more_url));
     }
 
     @Override
@@ -974,22 +881,16 @@ public class ContextualSearchManager extends ContextualSearchObservable
                     public void didFinishLoad(long frameId, String validatedUrl,
                             boolean isMainFrame) {
                         onSearchResultsLoaded();
-                        boolean shouldClearHistory = mSearchRequest != null
-                                && mSearchRequest.getHasFailed();
-                        if (validatedUrl.equals(FIRST_RUN_FLOW_URL)) {
-                            extractFirstRunFlowContentHeight();
-                        } else if (mIsShowingPromo
-                                && !validatedUrl.startsWith(FIRST_RUN_URL_PREFIX)) {
-                            shouldClearHistory = true;
-                        }
+
                         // Any time we place a page in a ContentViewCore, clear history if needed.
-                        // This prevents the First Run Flow URL or error URLs from
-                        // appearing in the Tab's history stack.
+                        // This prevents error URLs from appearing in the Tab's history stack.
                         // Also please note that clearHistory() will not
                         // clear the current entry (search results page in this case),
                         // and it will not work properly if there are pending navigations.
                         // That's why we need to clear the history here, after the navigation
                         // is completed.
+                        boolean shouldClearHistory =
+                                mSearchRequest != null && mSearchRequest.getHasFailed();
                         if (shouldClearHistory && mSearchContentViewCore != null) {
                             mSearchContentViewCore.getWebContents().getNavigationController()
                                     .clearHistory();
@@ -1004,17 +905,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
     @Override
     public void handleDidNavigateMainFrame(String url, int httpResultCode) {
-        if (url.startsWith(FIRST_RUN_URL_PREFIX)) {
-            // Navigation should not be done inside this WebContentsObserver,
-            // and since FirstRun may navigate, we need to delay that navigation.
-            final String firstRunUrl = url;
-            new Handler().post(new Runnable() {
-                @Override
-                public void run() {
-                    onFirstRunNavigation(firstRunUrl);
-                }
-            });
-        } else if (shouldPromoteSearchNavigation()) {
+        if (shouldPromoteSearchNavigation()) {
             onExternalNavigation(url);
         } else {
             // Could be just prefetching, check if that failed.
@@ -1059,25 +950,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
             mDidPromoteSearchNavigation = true;
             mSearchPanelDelegate.maximizePanelThenPromoteToTab(StateChangeReason.SERP_NAVIGATION);
         }
-    }
-
-    /**
-     * Grab the content height from the first run flow and store it.
-     */
-    private void extractFirstRunFlowContentHeight() {
-        mSearchContentViewCore.getWebContents().evaluateJavaScript("getContentHeight()",
-                new JavaScriptCallback() {
-                    @Override
-                    public void handleJavaScriptResult(String result) {
-                        try {
-                            mSearchPanelDelegate.setPromoContentHeight(
-                                    Float.parseFloat(result));
-                        } catch (NumberFormatException e) {
-                            Log.w(TAG, "Could not extract first-run content height, using "
-                                    + "default value.");
-                        }
-                    }
-                });
     }
 
     @Override
@@ -1129,6 +1001,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
 
     @Override
     public void promoteToTab(boolean shouldFocusOmnibox) {
+        mIsPromotingToTab = true;
         // If the request object is null that means that a Contextual Search has just started
         // and the Search Term Resolution response hasn't arrived yet. In this case, promoting
         // the Panel to a Tab will result in creating a new tab with URL about:blank. To prevent
@@ -1136,9 +1009,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
         // to search for.
         if (mSearchRequest != null
                 && mSearchContentViewCore != null
-                && mSearchContentViewCore.getWebContents() != null
-                && !mSearchContentViewCore.getWebContents().getUrl().equals(FIRST_RUN_FLOW_URL)) {
-            mSelectionController.clearSelection();
+                && mSearchContentViewCore.getWebContents() != null) {
             nativeReleaseWebContents(mNativeContextualSearchManagerPtr);
             mSearchContentViewDelegate.releaseContextualSearchContentViewCore();
             if (!mTabPromotionDelegate.createContextualSearchTab(mSearchContentViewCore)) {
@@ -1169,6 +1040,7 @@ public class ContextualSearchManager extends ContextualSearchObservable
                 });
             }
         }
+        mIsPromotingToTab = false;
     }
 
     @Override
@@ -1338,15 +1210,17 @@ public class ContextualSearchManager extends ContextualSearchObservable
     }
 
     @Override
-    public void handleSelectionModification(String selection, float x, float y) {
-        if (mSearchPanelDelegate.isShowing()) {
-            getContextualSearchControl().setCentralText(selection);
+    public void handleSelectionDismissal() {
+        if (mSearchPanelDelegate.isShowing() && !mIsPromotingToTab) {
+            hideContextualSearch(StateChangeReason.CLEARED_SELECTION);
         }
     }
 
     @Override
-    public void onClearSelection() {
-        notifyHideContextualSearch();
+    public void handleSelectionModification(String selection, float x, float y) {
+        if (mSearchPanelDelegate.isShowing()) {
+            getContextualSearchControl().setCentralText(selection);
+        }
     }
 
     // --------------------------------------------------------------------------------------------
@@ -1361,8 +1235,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     private native void nativeGatherSurroundingText(long nativeContextualSearchManager,
             String selection, boolean useResolvedSearchTerm, ContentViewCore baseContentViewCore,
             boolean maySendBasePageUrl);
-    private native void nativeContinueSearchTermResolutionRequest(
-            long nativeContextualSearchManager);
     private native void nativeRemoveLastSearchVisit(
             long nativeContextualSearchManager, String searchUrl, long searchUrlTimeMs);
     private native void nativeSetWebContents(long nativeContextualSearchManager,
@@ -1371,7 +1243,6 @@ public class ContextualSearchManager extends ContextualSearchObservable
     private native void nativeReleaseWebContents(long nativeContextualSearchManager);
     private native void nativeDestroyWebContentsFromContentViewCore(
             long nativeContextualSearchManager, ContentViewCore contentViewCore);
-    private native boolean nativeShouldHidePromoHeader(long nativeContextualSearchManager);
     private native void nativeSetInterceptNavigationDelegate(long nativeContextualSearchManager,
             InterceptNavigationDelegate delegate, WebContents webContents);
 }

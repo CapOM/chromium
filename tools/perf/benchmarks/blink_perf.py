@@ -122,20 +122,7 @@ class _BlinkPerfFullFrameMeasurement(_BlinkPerfMeasurement):
     assert 'content-shell' in options.browser_type
     options.AppendExtraBrowserArgs(['--expose-internals-for-testing'])
 
-
-class BlinkPerfAnimation(perf_benchmark.PerfBenchmark):
-  tag = 'animation'
-  test = _BlinkPerfMeasurement
-
-  @classmethod
-  def Name(cls):
-    return 'blink_perf.animation'
-
-  def CreatePageSet(self, options):
-    path = os.path.join(BLINK_PERF_BASE_DIR, 'Animation')
-    return CreatePageSetFromPath(path, SKIPPED_FILE)
-
-
+@benchmark.Disabled  # http://crbug.com/500958
 class BlinkPerfBindings(perf_benchmark.PerfBenchmark):
   tag = 'bindings'
   test = _BlinkPerfMeasurement

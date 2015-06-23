@@ -234,15 +234,16 @@ void InterstitialPageImpl::Show() {
   (*g_web_contents_to_interstitial_page)[web_contents_] = this;
 
   if (new_navigation_) {
-    NavigationEntryImpl* entry = new NavigationEntryImpl;
+    scoped_ptr<NavigationEntryImpl> entry =
+        make_scoped_ptr(new NavigationEntryImpl);
     entry->SetURL(url_);
     entry->SetVirtualURL(url_);
     entry->set_page_type(PAGE_TYPE_INTERSTITIAL);
 
     // Give delegates a chance to set some states on the navigation entry.
-    delegate_->OverrideEntry(entry);
+    delegate_->OverrideEntry(entry.get());
 
-    controller_->SetTransientEntry(entry);
+    controller_->SetTransientEntry(entry.Pass());
   }
 
   DCHECK(!render_view_host_);
@@ -252,6 +253,8 @@ void InterstitialPageImpl::Show() {
   std::string data_url = "data:text/html;charset=utf-8," +
                          net::EscapePath(delegate_->GetHTMLContents());
   frame_tree_.root()->current_frame_host()->NavigateToURL(GURL(data_url));
+  frame_tree_.root()->current_frame_host()->SetAccessibilityMode(
+      GetAccessibilityMode());
 
   notification_registrar_.Add(this, NOTIFICATION_NAV_ENTRY_PENDING,
       Source<NavigationController>(controller_));

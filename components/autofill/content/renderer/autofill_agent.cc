@@ -97,9 +97,8 @@ void GetDataListSuggestions(const WebInputElement& element,
   }
   for (WebOptionElement option = options.firstItem().to<WebOptionElement>();
        !option.isNull(); option = options.nextItem().to<WebOptionElement>()) {
-    if (!StartsWith(option.value(), prefix, false) ||
-        option.value() == prefix ||
-        !element.isValidValue(option.value()))
+    if (!base::StartsWith(option.value(), prefix, false) ||
+        option.value() == prefix || !element.isValidValue(option.value()))
       continue;
 
     values->push_back(option.value());
@@ -156,11 +155,14 @@ AutofillAgent::AutofillAgent(content::RenderFrame* render_frame,
       has_shown_autofill_popup_for_current_edit_(false),
       ignore_text_changes_(false),
       is_popup_possibly_visible_(false),
+      is_generation_popup_possibly_visible_(false),
       weak_ptr_factory_(this) {
   render_frame->GetWebFrame()->setAutofillClient(this);
 
   // This owns itself, and will delete itself when |render_frame| is destructed
-  // (same as AutofillAgent).
+  // (same as AutofillAgent). This object must be constructed after
+  // AutofillAgent so that password generation UI is shown before password
+  // manager UI (see https://crbug.com/498545).
   new PageClickTracker(render_frame, this);
 }
 
@@ -280,6 +282,7 @@ void AutofillAgent::FocusChangeComplete() {
 
   if (!focused_element.isNull() && password_generation_agent_ &&
       password_generation_agent_->FocusedNodeHasChanged(focused_element)) {
+    is_generation_popup_possibly_visible_ = true;
     is_popup_possibly_visible_ = true;
   }
 }
@@ -485,7 +488,8 @@ void AutofillAgent::AcceptDataListSuggestion(
   if (input_element->isMultiple() && input_element->isEmailField()) {
     std::vector<base::string16> parts;
 
-    base::SplitStringDontTrim(input_element->editingValue(), ',', &parts);
+    base::SplitStringDontTrim(
+        base::StringPiece16(input_element->editingValue()), ',', &parts);
     if (parts.size() == 0)
       parts.push_back(base::string16());
 
@@ -657,12 +661,18 @@ void AutofillAgent::ShowSuggestions(const WebFormControlElement& element,
 
   element_ = element;
   if (IsAutofillableInputElement(input_element) &&
-      (password_autofill_agent_->ShowSuggestions(
-           *input_element, options.show_full_suggestion_list) ||
-       options.show_password_suggestions_only)) {
+      password_autofill_agent_->ShowSuggestions(
+          *input_element, options.show_full_suggestion_list,
+          is_generation_popup_possibly_visible_)) {
     is_popup_possibly_visible_ = true;
     return;
   }
+
+  if (is_generation_popup_possibly_visible_)
+    return;
+
+  if (options.show_password_suggestions_only)
+    return;
 
   // Password field elements should only have suggestions shown by the password
   // autofill agent.
@@ -753,6 +763,7 @@ void AutofillAgent::HidePopup() {
   if (!is_popup_possibly_visible_)
     return;
   is_popup_possibly_visible_ = false;
+  is_generation_popup_possibly_visible_ = false;
   Send(new AutofillHostMsg_HidePopup(routing_id()));
 }
 

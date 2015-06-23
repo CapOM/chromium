@@ -880,7 +880,7 @@
         }],
 
         # Whether PPAPI is enabled.
-        ['OS=="android" or OS=="ios" or embedded==1', {
+        ['OS=="android" or OS=="ios" or (embedded==1 and chromecast==0)', {
           'enable_plugins%': 0,
         }, {
           'enable_plugins%': 1,
@@ -983,15 +983,6 @@
             'enable_mdns%' : 1,
         }],
 
-        # Turns on compiler optimizations in V8 in Debug build, except
-        # on android_clang, where we're hitting a weird linker error.
-        # TODO(dpranke): http://crbug.com/266155 .
-        ['OS=="android"', {
-          'v8_optimized_debug%': 1,
-        }, {
-          'v8_optimized_debug%': 2,
-        }],
-
         # Disable various features by default on embedded.
         ['embedded==1', {
           'remoting%': 0,
@@ -1012,11 +1003,14 @@
         }],
 
         ['sysroot!=""', {
-          'pkg-config': '<(DEPTH)/build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
+          'pkg-config': '<(chroot_cmd) <(DEPTH)/build/linux/pkg-config-wrapper "<(sysroot)" "<(target_arch)" "<(system_libdir)"',
         }, {
           'pkg-config': 'pkg-config'
         }],
       ],
+
+      # WebVR support disabled until platform implementations have been added
+      'enable_webvr%': 0,
 
       # Setting this to '0' will cause V8's startup snapshot to be
       # embedded in the binary instead of being a external files.
@@ -1219,7 +1213,6 @@
     'enable_service_discovery%' : '<(enable_service_discovery)',
     'enable_wifi_bootstrapping%': '<(enable_wifi_bootstrapping)',
     'enable_hangout_services_extension%' : '<(enable_hangout_services_extension)',
-    'v8_optimized_debug%': '<(v8_optimized_debug)',
     'proprietary_codecs%': '<(proprietary_codecs)',
     'use_goma%': '<(use_goma)',
     'gomadir%': '<(gomadir)',
@@ -1232,6 +1225,10 @@
     'mac_views_browser%': '<(mac_views_browser)',
     'android_app_version_name%': '<(android_app_version_name)',
     'android_app_version_code%': '<(android_app_version_code)',
+    'enable_webvr%': '<(enable_webvr)',
+
+    # Turns on compiler optimizations in V8 in Debug build.
+    'v8_optimized_debug%': 1,
 
     # Use system protobuf instead of bundled one.
     'use_system_protobuf%': 0,
@@ -1331,7 +1328,7 @@
     # Control which version of clang to use when building for iOS.  If set to
     # '1', uses the version of clang that ships with Xcode.  If set to '0', uses
     # the version of clang that ships with the Chromium source.  This variable
-    # is automatically set to '1' when using the Xcode generator.
+    # is automatically set to '1' in Official builds.
     'clang_xcode%': 0,
 
     # These two variables can be set in GYP_DEFINES while running
@@ -2096,7 +2093,11 @@
           # TODO(eugenebut): Remove enable_coverage check once
           # libclang_rt.profile_ios.a is bundled with Chromium's clang.
           # http://crbug.com/450379
-          ['buildtype=="Official" or enable_coverage', {
+          #
+          # TODO(sdefresne): Remove xcodebuild version check onces clang ToT
+          # supports "nullable" and related. https://crbug.com/499448
+          ['buildtype=="Official" or enable_coverage or '
+            '<!(xcodebuild -version|awk \'/Xcode/{print ($2 >= 7.0)}\')==1', {
             'clang_xcode%': 1,
           }],
         ],
@@ -2663,9 +2664,6 @@
       ['component=="shared_library"', {
         'defines': ['COMPONENT_BUILD'],
       }],
-      ['toolkit_views==1', {
-        'defines': ['TOOLKIT_VIEWS=1'],
-      }],
       ['ui_compositor_image_transport==1', {
         'defines': ['UI_COMPOSITOR_IMAGE_TRANSPORT'],
       }],
@@ -2892,8 +2890,7 @@
                 # override WarnAsError.
                 # Also, disable various noisy warnings that have low value.
                 'AdditionalOptions': [
-                  '/analyze',
-                  '/WX-',
+                  '/analyze:WX-',
                   '/wd6011',  # Dereferencing NULL pointer
                   '/wd6312',  # Possible infinite loop: use of the constant
                     # EXCEPTION_CONTINUE_EXECUTION in the exception-filter
@@ -3028,6 +3025,9 @@
       }],
       ['v8_use_external_startup_data==1', {
        'defines': ['V8_USE_EXTERNAL_STARTUP_DATA'],
+      }],
+      ['enable_webvr==1', {
+        'defines': ['ENABLE_WEBVR'],
       }],
 
       # SAFE_BROWSING_SERVICE - browser manages a safe-browsing service.
@@ -3228,9 +3228,14 @@
           'IntermediateDirectory': '$(OutDir)\\obj\\$(ProjectName)',
           'CharacterSet': '1',
         },
-        # Add the default import libs.
         'msvs_settings':{
+          'VCCompilerTool': {
+            'AdditionalOptions': [
+              '/bigobj',
+            ],
+          },
           'VCLinkerTool': {
+            # Add the default import libs.
             'AdditionalDependencies': [
               'kernel32.lib',
               'gdi32.lib',
@@ -3688,7 +3693,6 @@
             'cflags': [
               '-O>(debug_optimize)',
               '-g',
-              '-gdwarf-4',
             ],
             'conditions' : [
               ['OS=="android" and target_arch!="mipsel" and target_arch!="mips64el"', {
@@ -3818,14 +3822,6 @@
               }, {
                 'cflags': ['-fno-unwind-tables', '-fno-asynchronous-unwind-tables'],
                 'defines': ['NO_UNWIND_TABLES'],
-              }],
-              ['clang==1', {
-                # Non-unique section names appears to make linker dead stripping
-                # less effective. See http://crbug.com/483026#c20
-                # TODO(hans): Remove this if resolved upstream.
-                'cflags': [
-                  '-funique-section-names',
-                ],
               }],
             ],
           },
@@ -4787,6 +4783,7 @@
               '-pthread',  # Not supported by Android toolchain.
             ],
             'ldflags': [
+              '-Wl,--build-id=sha1',
               '-Wl,--no-undefined',
               '--sysroot=<(android_ndk_sysroot)',
               '-nostdlib',
@@ -5342,6 +5339,9 @@
             ['clang_xcode==1', {
               'WARNING_CFLAGS': [
                 '-Wno-unknown-warning-option',
+                # It's not possible to achieve nullability completeness before
+                # all builders are running Xcode 7. crbug.com/499809
+                '-Wno-nullability-completeness',
               ],
             }],
 
@@ -5763,6 +5763,17 @@
               'VCCLCompilerTool': {
                 'AdditionalOptions': [
                   '-fmsc-version=1900',
+                ],
+              },
+            }],
+            ['clang==1 and "<!(python <(DEPTH)/build/win/use_ansi_codes.py)"=="True"', {
+              'VCCLCompilerTool': {
+                'AdditionalOptions': [
+                  # cmd.exe doesn't understand ANSI escape codes by default,
+                  # so only enable them if something emulating them is around.
+                  '-fansi-escape-codes',
+                  # Also see http://crbug.com/110262
+                  '-fcolor-diagnostics',
                 ],
               },
             }],

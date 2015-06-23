@@ -19,7 +19,7 @@
 #include "content/child/request_extra_data.h"
 #include "content/child/request_info.h"
 #include "content/child/shared_memory_received_data_factory.h"
-#include "content/child/site_isolation_policy.h"
+#include "content/child/site_isolation_stats_gatherer.h"
 #include "content/child/sync_load_response.h"
 #include "content/child/threaded_data_provider.h"
 #include "content/common/inter_process_time_ticks_converter.h"
@@ -161,11 +161,10 @@ void ResourceDispatcher::OnReceivedResponse(
   ResourceResponseInfo renderer_response_info;
   ToResourceResponseInfo(*request_info, response_head, &renderer_response_info);
   request_info->site_isolation_metadata =
-      SiteIsolationPolicy::OnReceivedResponse(request_info->frame_origin,
-                                              request_info->response_url,
-                                              request_info->resource_type,
-                                              request_info->origin_pid,
-                                              renderer_response_info);
+      SiteIsolationStatsGatherer::OnReceivedResponse(
+          request_info->frame_origin, request_info->response_url,
+          request_info->resource_type, request_info->origin_pid,
+          renderer_response_info);
   request_info->peer->OnReceivedResponse(renderer_response_info);
 }
 
@@ -239,39 +238,25 @@ void ResourceDispatcher::OnReceivedData(int request_id,
     const char* data_ptr = data_start + data_offset;
 
     // Check whether this response data is compliant with our cross-site
-    // document blocking policy. We only do this for the first packet.
-    std::string alternative_data;
+    // document blocking policy. We only do this for the first chunk of data.
     if (request_info->site_isolation_metadata.get()) {
-      request_info->blocked_response = SiteIsolationPolicy::ShouldBlockResponse(
-          request_info->site_isolation_metadata, data_ptr, data_length,
-          &alternative_data);
+      SiteIsolationStatsGatherer::OnReceivedFirstChunk(
+          request_info->site_isolation_metadata, data_ptr, data_length);
       request_info->site_isolation_metadata.reset();
     }
 
-    // When the response is blocked we may have any alternative data to
-    // send to the renderer.
-    // When |alternative_data| is zero-sized, we do not call peer's callback.
-    if (!request_info->blocked_response || !alternative_data.empty()) {
-      if (request_info->threaded_data_provider) {
-        // TODO(yhirano): Use |alternative_data| when it is not null.
-        // A threaded data provider will take care of its own ACKing, as the
-        // data may be processed later on another thread.
-        send_ack = false;
-        request_info->threaded_data_provider->OnReceivedDataOnForegroundThread(
-            data_ptr, data_length, encoded_data_length);
-      } else {
-        scoped_ptr<RequestPeer::ReceivedData> data;
-        if (!alternative_data.empty()) {
-          data = make_scoped_ptr(new FixedReceivedData(
-              alternative_data.data(), alternative_data.size(),
-              alternative_data.size()));
-        } else {
-          data = factory->Create(data_offset, data_length, encoded_data_length);
-          // |data| takes care of ACKing.
-          send_ack = false;
-        }
-        request_info->peer->OnReceivedData(data.Pass());
-      }
+    if (request_info->threaded_data_provider) {
+      // A threaded data provider will take care of its own ACKing, as the data
+      // may be processed later on another thread.
+      send_ack = false;
+      request_info->threaded_data_provider->OnReceivedDataOnForegroundThread(
+          data_ptr, data_length, encoded_data_length);
+    } else {
+      scoped_ptr<RequestPeer::ReceivedData> data =
+          factory->Create(data_offset, data_length, encoded_data_length);
+      // |data| takes care of ACKing.
+      send_ack = false;
+      request_info->peer->OnReceivedData(data.Pass());
     }
 
     UMA_HISTOGRAM_TIMES("ResourceDispatcher.OnReceivedDataTime",
@@ -316,7 +301,7 @@ void ResourceDispatcher::OnReceivedRedirect(
     if (!request_info)
       return;
     // We update the response_url here so that we can send it to
-    // SiteIsolationPolicy later when OnReceivedResponse is called.
+    // SiteIsolationStatsGatherer later when OnReceivedResponse is called.
     request_info->response_url = redirect_info.new_url;
     request_info->pending_redirect_message.reset(
         new ResourceHostMsg_FollowRedirect(request_id));
@@ -486,7 +471,6 @@ ResourceDispatcher::PendingRequestInfo::PendingRequestInfo()
       resource_type(RESOURCE_TYPE_SUB_RESOURCE),
       is_deferred(false),
       download_to_file(false),
-      blocked_response(false),
       buffer_size(0) {
 }
 
@@ -506,8 +490,8 @@ ResourceDispatcher::PendingRequestInfo::PendingRequestInfo(
       frame_origin(frame_origin),
       response_url(request_url),
       download_to_file(download_to_file),
-      request_start(base::TimeTicks::Now()),
-      blocked_response(false) {}
+      request_start(base::TimeTicks::Now()) {
+}
 
 ResourceDispatcher::PendingRequestInfo::~PendingRequestInfo() {
   if (threaded_data_provider)

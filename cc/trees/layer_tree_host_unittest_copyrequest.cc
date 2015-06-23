@@ -123,25 +123,25 @@ class LayerTreeHostCopyRequestTestMultipleRequests
 TEST_F(LayerTreeHostCopyRequestTestMultipleRequests,
        DISABLED_GLRenderer_RunSingleThread) {
   use_gl_renderer_ = true;
-  RunTest(false, false, false);
+  RunTest(false, false);
 }
 
 TEST_F(LayerTreeHostCopyRequestTestMultipleRequests,
-       GLRenderer_RunMultiThread_MainThreadPainting) {
+       GLRenderer_RunMultiThread) {
   use_gl_renderer_ = true;
-  RunTest(true, false, false);
+  RunTest(true, false);
 }
 
 TEST_F(LayerTreeHostCopyRequestTestMultipleRequests,
        SoftwareRenderer_RunSingleThread) {
   use_gl_renderer_ = false;
-  RunTest(false, false, false);
+  RunTest(false, false);
 }
 
 TEST_F(LayerTreeHostCopyRequestTestMultipleRequests,
-       SoftwareRenderer_RunMultiThread_MainThreadPainting) {
+       SoftwareRenderer_RunMultiThread) {
   use_gl_renderer_ = false;
-  RunTest(true, false, false);
+  RunTest(true, false);
 }
 
 class LayerTreeHostCopyRequestTestLayerDestroyed
@@ -332,7 +332,7 @@ class LayerTreeHostCopyRequestTestInHiddenSubtree
   scoped_refptr<FakePictureLayer> copy_layer_;
 };
 
-SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_IMPL_TEST_F(
+SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_TEST_F(
     LayerTreeHostCopyRequestTestInHiddenSubtree);
 
 class LayerTreeHostTestHiddenSurfaceNotAllocatedForSubtreeCopyRequest
@@ -513,11 +513,24 @@ class LayerTreeHostTestAsyncTwoReadbacksWithoutDraw
 
   void CopyOutputCallback(scoped_ptr<CopyOutputResult> result) {
     EXPECT_TRUE(layer_tree_host()->proxy()->IsMainThread());
-    EXPECT_EQ(copy_layer_->bounds().ToString(), result->size().ToString());
-    ++callback_count_;
 
-    if (callback_count_ == 2)
-      EndTest();
+    // The first frame can't be drawn.
+    switch (callback_count_) {
+      case 0:
+        EXPECT_TRUE(result->IsEmpty());
+        EXPECT_EQ(gfx::Size(), result->size());
+        break;
+      case 1:
+        EXPECT_FALSE(result->IsEmpty());
+        EXPECT_EQ(copy_layer_->bounds().ToString(), result->size().ToString());
+        EndTest();
+        break;
+      default:
+        NOTREACHED();
+        break;
+    }
+
+    ++callback_count_;
   }
 
   void AfterTest() override { EXPECT_TRUE(saw_copy_request_); }
@@ -529,7 +542,7 @@ class LayerTreeHostTestAsyncTwoReadbacksWithoutDraw
   scoped_refptr<FakePictureLayer> copy_layer_;
 };
 
-SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_IMPL_TEST_F(
+SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_TEST_F(
     LayerTreeHostTestAsyncTwoReadbacksWithoutDraw);
 
 class LayerTreeHostCopyRequestTestLostOutputSurface
@@ -657,7 +670,7 @@ class LayerTreeHostCopyRequestTestLostOutputSurface
   scoped_ptr<CopyOutputResult> result_;
 };
 
-SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_IMPL_TEST_F(
+SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_TEST_F(
     LayerTreeHostCopyRequestTestLostOutputSurface);
 
 class LayerTreeHostCopyRequestTestCountTextures
@@ -765,7 +778,7 @@ class LayerTreeHostCopyRequestTestCreatesTexture
   }
 };
 
-SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_IMPL_TEST_F(
+SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_TEST_F(
     LayerTreeHostCopyRequestTestCreatesTexture);
 
 class LayerTreeHostCopyRequestTestProvideTexture
@@ -818,7 +831,7 @@ class LayerTreeHostCopyRequestTestProvideTexture
   unsigned sync_point_;
 };
 
-SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_IMPL_TEST_F(
+SINGLE_AND_MULTI_THREAD_DIRECT_RENDERER_TEST_F(
     LayerTreeHostCopyRequestTestProvideTexture);
 
 class LayerTreeHostCopyRequestTestDestroyBeforeCopy
@@ -1012,10 +1025,9 @@ class LayerTreeHostCopyRequestTestMultipleDrawsHiddenCopyRequest
 
     bool saw_root = false;
     bool saw_child = false;
-    for (LayerIterator<LayerImpl> it = LayerIterator<LayerImpl>::Begin(
-             frame_data->render_surface_layer_list);
-         it != LayerIterator<LayerImpl>::End(
-                   frame_data->render_surface_layer_list);
+    for (LayerIterator it =
+             LayerIterator::Begin(frame_data->render_surface_layer_list);
+         it != LayerIterator::End(frame_data->render_surface_layer_list);
          ++it) {
       if (it.represents_itself()) {
         if (*it == root)

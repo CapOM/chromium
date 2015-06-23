@@ -123,8 +123,10 @@ class CastCastView : public views::View, public views::ButtonListener {
       const CastConfigDelegate::ReceiversAndActivites& receivers_activities);
 
   // Overridden from views::View.
+  int GetHeightForWidth(int width) const override;
   void Layout() override;
-  // Overridden from views::ButtonListener
+
+  // Overridden from views::ButtonListener.
   void ButtonPressed(views::Button* sender, const ui::Event& event) override;
 
   CastConfigDelegate* cast_config_delegate_;
@@ -171,6 +173,18 @@ CastCastView::CastCastView(CastConfigDelegate* cast_config_delegate)
 }
 
 CastCastView::~CastCastView() {
+}
+
+int CastCastView::GetHeightForWidth(int width) const {
+  // We are reusing the cached label_->bounds() calculation which was
+  // done inside of Layout(). Due to the way this object is initialized,
+  // Layout() will always get initially invoked with the dummy text
+  // (which will compute the proper label width) and then when we know
+  // the cast receiver we will update the label text, which will cause
+  // this method to get invoked.
+  return std::max(views::View::GetHeightForWidth(width),
+                  GetInsets().height() +
+                      label_->GetHeightForWidth(label_->bounds().width()));
 }
 
 void CastCastView::Layout() {
@@ -220,6 +234,8 @@ void CastCastView::UpdateLabelCallback(
         label_->SetText(
             l10n_util::GetStringUTF16(IDS_ASH_STATUS_TRAY_CAST_CAST_UNKNOWN));
       }
+
+      PreferredSizeChanged();
       Layout();
       break;
     }
@@ -230,6 +246,8 @@ void CastCastView::ButtonPressed(views::Button* sender,
                                  const ui::Event& event) {
   DCHECK(sender == stop_button_);
   cast_config_delegate_->StopCasting();
+  Shell::GetInstance()->metrics()->RecordUserMetricsAction(
+      ash::UMA_STATUS_AREA_CAST_STOP_CAST);
 }
 
 // This view by itself does very little. It acts as a front-end for managing
@@ -251,6 +269,7 @@ class CastDuplexView : public views::View {
 
  private:
   // Overridden from views::View.
+  void ChildPreferredSizeChanged(views::View* child) override;
   void Layout() override;
 
   // Only one of |select_view_| or |cast_view_| will be displayed at any given
@@ -297,6 +316,10 @@ void CastDuplexView::ActivateSelectView() {
   InvalidateLayout();
 }
 
+void CastDuplexView::ChildPreferredSizeChanged(views::View* child) {
+  PreferredSizeChanged();
+}
+
 void CastDuplexView::Layout() {
   views::View::Layout();
 
@@ -331,7 +354,7 @@ CastTrayView::CastTrayView(SystemTrayItem* tray_item)
   CreateImageView();
 
   image_view()->SetImage(ui::ResourceBundle::GetSharedInstance()
-                             .GetImageNamed(IDR_AURA_UBER_TRAY_CAST_STATUS)
+                             .GetImageNamed(IDR_AURA_UBER_TRAY_SCREENSHARE)
                              .ToImageSkia());
 }
 
@@ -504,6 +527,8 @@ void CastDetailedView::OnViewClicked(views::View* sender) {
     auto it = receiver_activity_map_.find(sender);
     if (it != receiver_activity_map_.end()) {
       cast_config_delegate_->CastToReceiver(it->second);
+      Shell::GetInstance()->metrics()->RecordUserMetricsAction(
+          ash::UMA_STATUS_AREA_DETAILED_CAST_VIEW_LAUNCH_CAST);
     }
   }
 }
@@ -563,32 +588,39 @@ bool TrayCast::HasCastExtension() {
          cast_config_delegate_->HasCastExtension();
 }
 
-void TrayCast::TryActivateSelectViewCallback(
+void TrayCast::UpdateCachedReceiverState(
     const CastConfigDelegate::ReceiversAndActivites& receivers_activities) {
-  default_->SetVisible(!receivers_activities.empty());
+  has_cast_receivers_ = !receivers_activities.empty();
+  if (default_)
+    default_->SetVisible(has_cast_receivers_);
 }
 
 void TrayCast::UpdatePrimaryView() {
-  if (HasCastExtension() == false) {
-    if (default_)
-      default_->SetVisible(false);
-    if (tray_)
-      tray_->SetVisible(false);
-  } else {
+  if (HasCastExtension()) {
     if (default_) {
       if (is_casting_) {
         default_->ActivateCastView();
       } else {
         default_->ActivateSelectView();
-        // We only want to show the Select view if we have a device to cast to.
+
+        // We only want to show the select view if we have a receiver we can
+        // cast to. To prevent showing the tray item and then hiding it some
+        // short time after, we cache if we have any receivers. We set our
+        // default visibility to true if we do have a receiver, false otherwise.
+        default_->SetVisible(has_cast_receivers_);
         cast_config_delegate_->GetReceiversAndActivities(
-            base::Bind(&TrayCast::TryActivateSelectViewCallback,
+            base::Bind(&TrayCast::UpdateCachedReceiverState,
                        weak_ptr_factory_.GetWeakPtr()));
       }
     }
 
     if (tray_)
       tray_->SetVisible(is_casting_);
+  } else {
+    if (default_)
+      default_->SetVisible(false);
+    if (tray_)
+      tray_->SetVisible(false);
   }
 }
 

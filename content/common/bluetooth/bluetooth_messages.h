@@ -112,10 +112,11 @@ IPC_MESSAGE_CONTROL3(BluetoothMsg_RequestDeviceSuccess,
                      content::BluetoothDevice /* device */)
 
 // Informs the renderer that the device request |request_id| failed.
-IPC_MESSAGE_CONTROL3(BluetoothMsg_RequestDeviceError,
+IPC_MESSAGE_CONTROL4(BluetoothMsg_RequestDeviceError,
                      int /* thread_id */,
                      int /* request_id */,
-                     content::BluetoothError /* result */)
+                     content::BluetoothError /* result */,
+                     std::string /* error_message */)
 
 // Informs the renderer that the connection request |request_id| succeeded.
 IPC_MESSAGE_CONTROL3(BluetoothMsg_ConnectGATTSuccess,
@@ -124,10 +125,11 @@ IPC_MESSAGE_CONTROL3(BluetoothMsg_ConnectGATTSuccess,
                      std::string /* device_instance_id */)
 
 // Informs the renderer that the connection request |request_id| failed.
-IPC_MESSAGE_CONTROL3(BluetoothMsg_ConnectGATTError,
+IPC_MESSAGE_CONTROL4(BluetoothMsg_ConnectGATTError,
                      int /* thread_id */,
                      int /* request_id */,
-                     content::BluetoothError /* result */)
+                     content::BluetoothError /* result */,
+                     std::string /* error_message */)
 
 // Informs the renderer that primary service request |request_id| succeeded.
 IPC_MESSAGE_CONTROL3(BluetoothMsg_GetPrimaryServiceSuccess,
@@ -136,10 +138,37 @@ IPC_MESSAGE_CONTROL3(BluetoothMsg_GetPrimaryServiceSuccess,
                      std::string /* service_instance_id */)
 
 // Informs the renderer that the primary service request |request_id| failed.
-IPC_MESSAGE_CONTROL3(BluetoothMsg_GetPrimaryServiceError,
+IPC_MESSAGE_CONTROL4(BluetoothMsg_GetPrimaryServiceError,
                      int /* thread_id */,
                      int /* request_id */,
-                     content::BluetoothError /* result */)
+                     content::BluetoothError /* result */,
+                     std::string /* error_message */)
+
+// Informs the renderer that characteristic request |request_id| succeeded.
+IPC_MESSAGE_CONTROL3(BluetoothMsg_GetCharacteristicSuccess,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     std::string /* characteristic_instance_id */)
+
+// Informs the renderer that the characteristic request |request_id| failed.
+IPC_MESSAGE_CONTROL4(BluetoothMsg_GetCharacteristicError,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     content::BluetoothError /* result */,
+                     std::string /* error_message */)
+
+// Informs the renderer that the value has been read.
+IPC_MESSAGE_CONTROL3(BluetoothMsg_ReadCharacteristicValueSuccess,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     std::vector<uint8_t> /* value */)
+
+// Informs the renderer that an error occurred while reading the value.
+IPC_MESSAGE_CONTROL4(BluetoothMsg_ReadCharacteristicValueError,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     content::BluetoothError /* result */,
+                     std::string /* error_message */)
 
 // Messages sent from the renderer to the browser.
 
@@ -166,3 +195,16 @@ IPC_MESSAGE_CONTROL4(BluetoothHostMsg_GetPrimaryService,
                      int /* request_id */,
                      std::string /* device_instance_id */,
                      std::string /* service_uuid */)
+
+// Gets a GATT Characteristic within a GATT Service.
+IPC_MESSAGE_CONTROL4(BluetoothHostMsg_GetCharacteristic,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     std::string /* service_instance_id */,
+                     std::string /* characteristic_uuid */)
+
+// Reads the characteristics value from a bluetooth device.
+IPC_MESSAGE_CONTROL3(BluetoothHostMsg_ReadValue,
+                     int /* thread_id */,
+                     int /* request_id */,
+                     std::string /* characteristic_instance_id */)

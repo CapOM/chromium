@@ -10,6 +10,8 @@
 #include "components/view_manager/connection_manager.h"
 #include "components/view_manager/connection_manager_delegate.h"
 #include "components/view_manager/display_manager.h"
+#include "components/view_manager/display_manager_factory.h"
+#include "components/view_manager/gles2/gpu_state.h"
 #include "components/view_manager/ids.h"
 #include "components/view_manager/public/cpp/types.h"
 #include "components/view_manager/public/cpp/util.h"
@@ -171,15 +173,14 @@ class TestConnectionManagerDelegate : public ConnectionManagerDelegate {
 
 // -----------------------------------------------------------------------------
 
-// Empty implementation of DisplayManager.
+// Empty implementation of nisplayManager.
 class TestDisplayManager : public DisplayManager {
  public:
   TestDisplayManager() {}
   ~TestDisplayManager() override {}
 
   // DisplayManager:
-  void Init(ConnectionManager* connection_manager,
-            EventDispatcher* event_dispatcher) override {}
+  void Init(DisplayManagerDelegate* delegate) override {}
   void SchedulePaint(const ServerView* view, const gfx::Rect& bounds) override {
   }
   void SetViewportSize(const gfx::Size& size) override {}
@@ -191,6 +192,22 @@ class TestDisplayManager : public DisplayManager {
   mojo::ViewportMetrics display_metrices_;
 
   DISALLOW_COPY_AND_ASSIGN(TestDisplayManager);
+};
+
+// Factory that dispenses TestDisplayManagers.
+class TestDisplayManagerFactory : public DisplayManagerFactory {
+ public:
+  TestDisplayManagerFactory() {}
+  ~TestDisplayManagerFactory() {}
+  DisplayManager* CreateDisplayManager(
+      bool is_headless,
+      mojo::ApplicationImpl* app_impl,
+      const scoped_refptr<gles2::GpuState>& gpu_state9) override {
+    return new TestDisplayManager();
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(TestDisplayManagerFactory);
 };
 
 mojo::EventPtr CreatePointerDownEvent(int x, int y) {
@@ -242,10 +259,12 @@ class ViewManagerServiceTest : public testing::Test {
  protected:
   // testing::Test:
   void SetUp() override {
-    connection_manager_.reset(new ConnectionManager(
-        &delegate_, scoped_ptr<DisplayManager>(new TestDisplayManager)));
+    DisplayManager::set_factory_for_testing(&display_manager_factory_);
+    connection_manager_.reset(
+        new ConnectionManager(&delegate_, true /* is_headless */, nullptr,
+                              scoped_refptr<gles2::GpuState>(nullptr)));
     scoped_ptr<ViewManagerServiceImpl> service(new ViewManagerServiceImpl(
-        connection_manager_.get(), kInvalidConnectionId, RootViewId()));
+        connection_manager_.get(), kInvalidConnectionId, RootViewId(0)));
     scoped_ptr<TestClientConnection> client_connection(
         new TestClientConnection(service.Pass()));
     wm_client_ = client_connection->client();
@@ -260,6 +279,7 @@ class ViewManagerServiceTest : public testing::Test {
   // TestViewManagerClient that is used for the WM connection.
   TestViewManagerClient* wm_client_;
 
+  TestDisplayManagerFactory display_manager_factory_;
   TestConnectionManagerDelegate delegate_;
   scoped_ptr<ConnectionManager> connection_manager_;
   base::MessageLoop message_loop_;
@@ -476,7 +496,8 @@ TEST_F(ViewManagerServiceTest, FocusOnPointer) {
   EXPECT_TRUE(wm_connection()->SetViewVisibility(embed_view_id, true));
   EXPECT_TRUE(
       wm_connection()->AddView(*(wm_connection()->root()), embed_view_id));
-  connection_manager()->root()->SetBounds(gfx::Rect(0, 0, 100, 100));
+  connection_manager()->view_manager_root()->root_view()->SetBounds(
+      gfx::Rect(0, 0, 100, 100));
   mojo::URLRequestPtr request(mojo::URLRequest::New());
   wm_connection()->EmbedAllowingReembed(embed_view_id, request.Pass(),
                                         mojo::Callback<void(bool)>());
@@ -500,7 +521,8 @@ TEST_F(ViewManagerServiceTest, FocusOnPointer) {
   connection1_client->tracker()->changes()->clear();
   wm_client()->tracker()->changes()->clear();
 
-  connection_manager()->ProcessEvent(CreatePointerDownEvent(21, 22));
+  connection_manager()->OnEvent(connection_manager()->view_manager_root(),
+                                CreatePointerDownEvent(21, 22));
   // Focus should go to child1. This results in notifying both the window
   // manager and client connection being notified.
   EXPECT_EQ(v1, connection_manager()->GetFocusedView());
@@ -512,35 +534,39 @@ TEST_F(ViewManagerServiceTest, FocusOnPointer) {
       "Focused id=2,1",
       ChangesToDescription1(*connection1_client->tracker()->changes())[0]);
 
-  connection_manager()->ProcessEvent(CreatePointerUpEvent(21, 22));
+  connection_manager()->OnEvent(connection_manager()->view_manager_root(),
+                                CreatePointerUpEvent(21, 22));
   wm_client()->tracker()->changes()->clear();
   connection1_client->tracker()->changes()->clear();
 
   // Press outside of the embedded view. Focus should go to the root. Notice
   // the client1 doesn't see who has focus as the focused view (root) isn't
   // visible to it.
-  connection_manager()->ProcessEvent(CreatePointerDownEvent(61, 22));
-  EXPECT_EQ(connection_manager()->root(),
+  connection_manager()->OnEvent(connection_manager()->view_manager_root(),
+                                CreatePointerDownEvent(61, 22));
+  EXPECT_EQ(connection_manager()->view_manager_root()->root_view(),
             connection_manager()->GetFocusedView());
   ASSERT_GE(wm_client()->tracker()->changes()->size(), 1u);
-  EXPECT_EQ("Focused id=0,1",
+  EXPECT_EQ("Focused id=0,2",
             ChangesToDescription1(*wm_client()->tracker()->changes())[0]);
   ASSERT_GE(connection1_client->tracker()->changes()->size(), 1u);
   EXPECT_EQ(
       "Focused id=null",
       ChangesToDescription1(*connection1_client->tracker()->changes())[0]);
 
-  connection_manager()->ProcessEvent(CreatePointerUpEvent(21, 22));
+  connection_manager()->OnEvent(connection_manager()->view_manager_root(),
+                                CreatePointerUpEvent(21, 22));
   wm_client()->tracker()->changes()->clear();
   connection1_client->tracker()->changes()->clear();
 
   // Press in the same location. Should not get a focus change event (only input
   // event).
-  connection_manager()->ProcessEvent(CreatePointerDownEvent(61, 22));
-  EXPECT_EQ(connection_manager()->root(),
+  connection_manager()->OnEvent(connection_manager()->view_manager_root(),
+                                CreatePointerDownEvent(61, 22));
+  EXPECT_EQ(connection_manager()->view_manager_root()->root_view(),
             connection_manager()->GetFocusedView());
   ASSERT_EQ(wm_client()->tracker()->changes()->size(), 1u);
-  EXPECT_EQ("InputEvent view=0,1 event_action=4",
+  EXPECT_EQ("InputEvent view=0,2 event_action=4",
             ChangesToDescription1(*wm_client()->tracker()->changes())[0]);
   EXPECT_TRUE(connection1_client->tracker()->changes()->empty());
   ;

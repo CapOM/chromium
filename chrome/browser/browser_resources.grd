@@ -24,10 +24,6 @@
         <structure name="IDR_APP_LIST_START_PAGE_HTML" file="resources\app_list\start_page.html" flattenhtml="true" type="chrome_html" />
         <structure name="IDR_APP_LIST_START_PAGE_JS" file="resources\app_list\start_page.js" flattenhtml="true" type="chrome_html" />
       </if>
-      <if expr="is_android">
-        <structure name="IDR_CONTEXTUAL_SEARCH_PROMO_CSS" file="resources\contextual_search\promo.css" flattenhtml="true" type="chrome_html" />
-        <structure name="IDR_CONTEXTUAL_SEARCH_PROMO_HTML" file="resources\contextual_search\promo.html" flattenhtml="true" type="chrome_html" />
-      </if>
       <if expr="not is_android">
         <structure name="IDR_DOWNLOADS_CSS" file="resources\downloads\downloads.css" flattenhtml="true" type="chrome_html" />
         <structure name="IDR_DOWNLOADS_HTML" file="resources\downloads\downloads.html" flattenhtml="true" allowexternalscript="true" type="chrome_html" />
@@ -73,6 +69,7 @@
         <structure name="IDR_CUSTOM_ELEMENTS_OOBE_JS" file="resources\chromeos\login\custom_elements_oobe.js" flattenhtml="true" type="chrome_html" />
         <structure name="IDR_CUSTOM_ELEMENTS_LOGIN_HTML" file="resources\chromeos\login\custom_elements_login.html" flattenhtml="true" type="chrome_html" />
         <structure name="IDR_CUSTOM_ELEMENTS_LOGIN_JS" file="resources\chromeos\login\custom_elements_login.js" flattenhtml="true" type="chrome_html" />
+        <structure name="IDR_POLYMER_CONFIG_JS" file="resources\chromeos\login\polymer_config.js" flattenhtml="true" type="chrome_html" />
       </if>
       <structure name="IDR_READER_OUT_OF_DATE_HTML" file="resources\reader_out_of_date.html" flattenhtml="true" type="chrome_html" />
       <structure name="IDR_SECURITY_INTERSTITIAL_UI_HTML" file="resources\security_warnings\interstitial_ui.html" flattenhtml="true" type="chrome_html" />
@@ -109,10 +106,6 @@
       </if>
       <if expr="enable_app_list">
         <include name="IDR_CHROME_APP_MANIFEST" file="resources\chrome_app\manifest.json" type="BINDATA" />
-      </if>
-      <if expr="is_android">
-        <include name="IDR_CONTEXTUAL_SEARCH_PROMO_JS" file="resources\contextual_search\promo.js" flattenhtml="true" type="BINDATA" />
-        <include name="IDR_CONTEXTUAL_SEARCH_PROMO_HEADER_SVG" file="resources\contextual_search\header.svg" type="BINDATA" />
       </if>
       <if expr="not is_android and not is_ios">
         <include name="IDR_COPRESENCE_CSS" file="resources\copresence.css" type="BINDATA" />
@@ -316,7 +309,6 @@
         <include name="IDR_NFC_DEBUG_CSS" file="resources\chromeos\nfc_debug.css" type="BINDATA" />
         <include name="IDR_NFC_DEBUG_JS" file="resources\chromeos\nfc_debug.js" type="BINDATA" />
         <include name="IDR_ECHO_MANIFEST" file="resources\chromeos\echo\manifest.json" type="BINDATA" />
-        <include name="IDR_OFFLINE_APP_LOAD_HTML" file="resources\chromeos\offline_app_load.html" flattenhtml="true" type="BINDATA" />
         <include name="IDR_OFFLINE_NET_LOAD_HTML" file="resources\chromeos\offline_net_load.html" flattenhtml="true" type="BINDATA" />
         <include name="IDR_MERGE_SESSION_LOAD_HTML" file="resources\chromeos\merge_session_load.html" flattenhtml="true" type="BINDATA" />
         <include name="IDR_OS_CREDITS_HTML" file="resources\chromeos\about_os_credits.html" flattenhtml="true" type="BINDATA" />

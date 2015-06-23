@@ -309,7 +309,7 @@ void NativeWidgetMac::StackBelow(gfx::NativeView native_view) {
   NOTIMPLEMENTED();
 }
 
-void NativeWidgetMac::SetShape(gfx::NativeRegion shape) {
+void NativeWidgetMac::SetShape(SkRegion* shape) {
   NOTIMPLEMENTED();
 }
 
@@ -493,7 +493,9 @@ void NativeWidgetMac::SetCursor(gfx::NativeCursor cursor) {
 }
 
 bool NativeWidgetMac::IsMouseEventsEnabled() const {
-  NOTIMPLEMENTED();
+  // On platforms with touch, mouse events get disabled and calls to this method
+  // can affect hover states. Since there is no touch on desktop Mac, this is
+  // always true. Touch on Mac is tracked in http://crbug.com/445520.
   return true;
 }
 

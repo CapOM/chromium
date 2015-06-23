@@ -11,24 +11,40 @@
 
 namespace offline_pages {
 
-OfflinePageModel::OfflinePageModel(scoped_ptr<OfflinePageMetadataStore> store)
-    : store_(store.Pass()) {
+OfflinePageModel::OfflinePageModel(scoped_ptr<OfflinePageMetadataStore> store,
+                                   OfflinePageArchiver* archiver)
+    : store_(store.Pass()),
+      archiver_(archiver) {
+  DCHECK(archiver);
 }
 
 OfflinePageModel::~OfflinePageModel() {
 }
 
 void OfflinePageModel::Shutdown() {
+}
+
+void OfflinePageModel::OnCreateArchiveDone(
+    OfflinePageArchiver::Request* request,
+    OfflinePageArchiver::ArchiverResult result,
+    const base::FilePath& file_path) {
+  // TODO(fgorski): Match request against one of the expected requests
+  // TODO(fgorski): Create an entry in the offline pages metadata store for that
+  //                request.
+}
+
+void OfflinePageModel::SavePage(const GURL& url,
+                                OfflinePageModel::Client* client) {
   NOTIMPLEMENTED();
 }
 
-void OfflinePageModel::SavePageOffline(const GURL& url) {
+void OfflinePageModel::DeletePage(const GURL& url,
+                                  OfflinePageModel::Client* client) {
   NOTIMPLEMENTED();
 }
 
-std::vector<OfflinePageItem> OfflinePageModel::GetAllOfflinePages() {
+void OfflinePageModel::LoadAllPages(OfflinePageModel::Client* client) {
   NOTIMPLEMENTED();
-  return std::vector<OfflinePageItem>();
 }
 
 OfflinePageMetadataStore* OfflinePageModel::GetStoreForTesting() {

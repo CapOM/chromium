@@ -5,8 +5,15 @@
 #include "ios/chrome/browser/browser_state/browser_state_keyed_service_factories.h"
 
 #include "ios/chrome/browser/dom_distiller/dom_distiller_service_factory.h"
+#include "ios/chrome/browser/enhanced_bookmarks/bookmark_image_service_factory.h"
+#include "ios/chrome/browser/enhanced_bookmarks/bookmark_server_cluster_service_factory.h"
+#include "ios/chrome/browser/enhanced_bookmarks/enhanced_bookmark_model_factory.h"
+#include "ios/chrome/browser/favicon/favicon_service_factory.h"
+#include "ios/chrome/browser/history/top_sites_factory.h"
 #include "ios/chrome/browser/suggestions/suggestions_service_factory.h"
+#include "ios/chrome/browser/sync/sync_setup_service_factory.h"
 #include "ios/chrome/browser/translate/translate_accept_languages_factory.h"
+#include "ios/public/provider/chrome/browser/keyed_service_provider.h"
 
 // This method gets the instance of each ServiceFactory. We do this so that
 // each ServiceFactory initializes itself and registers its dependencies with
@@ -18,7 +25,16 @@
 // TODO(erg): This needs to be something else. I don't think putting every
 // FooServiceFactory here will scale or is desirable long term.
 void EnsureBrowserStateKeyedServiceFactoriesBuilt() {
-  TranslateAcceptLanguagesFactory::GetInstance();
+  BookmarkImageServiceFactory::GetInstance();
   dom_distiller::DomDistillerServiceFactory::GetInstance();
+  enhanced_bookmarks::BookmarkServerClusterServiceFactory::GetInstance();
+  enhanced_bookmarks::EnhancedBookmarkModelFactory::GetInstance();
+  ios::FaviconServiceFactory::GetInstance();
+  ios::TopSitesFactory::GetInstance();
   suggestions::SuggestionsServiceFactory::GetInstance();
+  SyncSetupServiceFactory::GetInstance();
+  TranslateAcceptLanguagesFactory::GetInstance();
+
+  if (ios::GetKeyedServiceProvider())
+    ios::GetKeyedServiceProvider()->AssertKeyedFactoriesBuilt();
 }

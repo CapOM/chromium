@@ -12,8 +12,10 @@
 #include "base/stl_util.h"
 #include "base/strings/string_util.h"
 #include "base/thread_task_runner_handle.h"
+#include "components/devtools_service/public/cpp/switches.h"
 #include "components/html_viewer/blink_input_events_type_converters.h"
 #include "components/html_viewer/blink_url_request_type_converters.h"
+#include "components/html_viewer/devtools_agent_impl.h"
 #include "components/html_viewer/media_factory.h"
 #include "components/html_viewer/setup.h"
 #include "components/html_viewer/web_layer_tree_view_impl.h"
@@ -65,6 +67,11 @@ const char kOOPIF[] = "oopifs";
 
 bool EnableOOPIFs() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(kOOPIF);
+}
+
+bool EnableRemoteDebugging() {
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(
+      devtools_service::kRemoteDebuggingPort);
 }
 
 // WebRemoteFrameClient implementation used for OOPIFs.
@@ -146,7 +153,8 @@ bool CanNavigateLocally(blink::WebFrame* frame,
 HTMLDocument::HTMLDocument(mojo::ApplicationImpl* html_document_app,
                            mojo::ApplicationConnection* connection,
                            URLResponsePtr response,
-                           Setup* setup)
+                           Setup* setup,
+                           const DeleteCallback& delete_callback)
     : app_refcount_(
           html_document_app->app_lifetime_helper()->CreateAppRefCount()),
       html_document_app_(html_document_app),
@@ -156,7 +164,8 @@ HTMLDocument::HTMLDocument(mojo::ApplicationImpl* html_document_app,
       root_(nullptr),
       view_manager_client_factory_(html_document_app->shell(), this),
       setup_(setup),
-      frame_tree_manager_binding_(&frame_tree_manager_) {
+      frame_tree_manager_binding_(&frame_tree_manager_),
+      delete_callback_(delete_callback) {
   connection->AddService(
       static_cast<mojo::InterfaceFactory<mandoline::FrameTreeClient>*>(this));
   connection->AddService(
@@ -167,7 +176,20 @@ HTMLDocument::HTMLDocument(mojo::ApplicationImpl* html_document_app,
     Load(response_.Pass());
 }
 
+void HTMLDocument::Destroy() {
+  // See comment in header for a description of lifetime.
+  if (root_) {
+    // Deleting the ViewManager calls back to OnViewManagerDestroyed() and
+    // triggers deletion.
+    delete root_->view_manager();
+  } else {
+    delete this;
+  }
+}
+
 HTMLDocument::~HTMLDocument() {
+  delete_callback_.Run(this);
+
   STLDeleteElements(&ax_providers_);
   STLDeleteElements(&ax_provider_requests_);
 
@@ -181,6 +203,7 @@ void HTMLDocument::OnEmbed(View* root) {
   DCHECK(!setup_->is_headless());
   root_ = root;
   root_->AddObserver(this);
+  UpdateFocus();
 
   InitSetupAndLoadIfNecessary();
 }
@@ -214,8 +237,19 @@ void HTMLDocument::Load(URLResponsePtr response) {
   touch_handler_.reset(new TouchHandler(web_view_));
   web_layer_tree_view_impl_->set_widget(web_view_);
   ConfigureSettings(web_view_->settings());
-  web_view_->setMainFrame(
-      blink::WebLocalFrame::create(blink::WebTreeScopeType::Document, this));
+
+  blink::WebLocalFrame* main_frame =
+      blink::WebLocalFrame::create(blink::WebTreeScopeType::Document, this);
+  web_view_->setMainFrame(main_frame);
+
+  // TODO(yzshen): http://crbug.com/498986 Creating DevToolsAgentImpl instances
+  // causes html_viewer_apptests flakiness currently. Before we fix that we
+  // cannot enable remote debugging (which is required by Telemetry tests) on
+  // the bots.
+  if (EnableRemoteDebugging()) {
+    devtools_agent_.reset(
+        new DevToolsAgentImpl(main_frame, html_document_app_->shell()));
+  }
 
   GURL url(response->url);
 
@@ -228,6 +262,7 @@ void HTMLDocument::Load(URLResponsePtr response) {
   web_request.setExtraData(extra_data);
 
   web_view_->mainFrame()->loadRequest(web_request);
+  UpdateFocus();
 }
 
 void HTMLDocument::ConvertLocalFrameToRemoteFrame(blink::WebLocalFrame* frame) {
@@ -272,7 +307,7 @@ blink::WebStorageNamespace* HTMLDocument::createSessionStorageNamespace() {
 void HTMLDocument::initializeLayerTreeView() {
   if (setup_->is_headless()) {
     web_layer_tree_view_impl_.reset(new WebLayerTreeViewImpl(
-        setup_->compositor_thread(), nullptr, nullptr));
+        setup_->compositor_thread(), nullptr, nullptr, nullptr, nullptr));
     return;
   }
 
@@ -287,7 +322,9 @@ void HTMLDocument::initializeLayerTreeView() {
   mojo::GpuPtr gpu_service;
   html_document_app_->ConnectToService(request2.Pass(), &gpu_service);
   web_layer_tree_view_impl_.reset(new WebLayerTreeViewImpl(
-      setup_->compositor_thread(), surface.Pass(), gpu_service.Pass()));
+      setup_->compositor_thread(), setup_->gpu_memory_buffer_manager(),
+      setup_->raster_thread_helper()->task_graph_runner(), surface.Pass(),
+      gpu_service.Pass()));
 }
 
 blink::WebLayerTreeView* HTMLDocument::layerTreeView() {
@@ -326,8 +363,16 @@ blink::WebFrame* HTMLDocument::createChildFrame(
 }
 
 void HTMLDocument::frameDetached(blink::WebFrame* frame) {
+  frameDetached(frame, DetachType::Remove);
+}
+
+void HTMLDocument::frameDetached(blink::WebFrame* frame, DetachType type) {
+  DCHECK(type == DetachType::Remove);
   if (frame->parent())
     frame->parent()->removeChild(frame);
+
+  if (devtools_agent_ && frame == devtools_agent_->frame())
+    devtools_agent_.reset();
 
   // |frame| is invalid after here.
   frame->close();
@@ -341,6 +386,13 @@ blink::WebCookieJar* HTMLDocument::cookieJar(blink::WebLocalFrame* frame) {
 
 blink::WebNavigationPolicy HTMLDocument::decidePolicyForNavigation(
     const NavigationPolicyInfo& info) {
+  // TODO(yzshen): Remove this check once the browser is able to navigate an
+  // existing html_viewer instance and about:blank page support is ready.
+  if (devtools_agent_ && devtools_agent_->frame() == info.frame &&
+      devtools_agent_->handling_page_navigate_request()) {
+    return info.defaultPolicy;
+  }
+
   std::string frame_name = info.frame ? info.frame->assignedName().utf8() : "";
   if (info.frame->parent() && EnableOOPIFs()) {
     mojo::View* view = frame_to_view_[info.frame].view;
@@ -439,6 +491,19 @@ void HTMLDocument::OnViewInputEvent(View* view, const mojo::EventPtr& event) {
       event.To<scoped_ptr<blink::WebInputEvent>>();
   if (web_event)
     web_view_->handleInputEvent(*web_event);
+}
+
+void HTMLDocument::OnViewFocusChanged(mojo::View* gained_focus,
+                                      mojo::View* lost_focus) {
+  UpdateFocus();
+}
+
+void HTMLDocument::UpdateFocus() {
+  if (!web_view_)
+    return;
+  bool is_focused = root_ && root_->HasFocus();
+  web_view_->setFocus(is_focused);
+  web_view_->setIsActive(is_focused);
 }
 
 }  // namespace html_viewer

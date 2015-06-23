@@ -20,6 +20,7 @@
 #include "base/strings/string_util.h"
 #include "base/trace_event/trace_event.h"
 #include "build/build_config.h"
+#include "components/devtools_service/public/cpp/switches.h"
 #include "components/devtools_service/public/interfaces/devtools_service.mojom.h"
 #include "mojo/application/public/cpp/application_connection.h"
 #include "mojo/application/public/cpp/application_delegate.h"
@@ -61,23 +62,25 @@ bool ConfigureURLMappings(const base::CommandLine& command_line,
 
   // Configure the resolution of unknown mojo: URLs.
   GURL base_url;
-  if (command_line.HasSwitch(switches::kOrigin))
+  if (command_line.HasSwitch(switches::kOrigin)) {
     base_url = GURL(command_line.GetSwitchValueASCII(switches::kOrigin));
-  else
+  } else if (!command_line.HasSwitch(switches::kUseUpdater)) {
     // Use the shell's file root if the base was not specified.
     base_url = context->ResolveShellFileURL("");
+  }
 
-  if (!base_url.is_valid())
-    return false;
+  if (base_url.is_valid())
+    resolver->SetMojoBaseURL(base_url);
 
-  resolver->SetMojoBaseURL(base_url);
-
-  // The network service must be loaded from the filesystem.
+  // The network service and updater must be loaded from the filesystem.
   // This mapping is done before the command line URL mapping are processed, so
   // that it can be overridden.
+  resolver->AddURLMapping(GURL("mojo:network_service"),
+                          context->ResolveShellFileURL(
+                              "file:network_service/network_service.mojo"));
   resolver->AddURLMapping(
-      GURL("mojo:network_service"),
-      context->ResolveShellFileURL("file:network_service.mojo"));
+      GURL("mojo:updater"),
+      context->ResolveShellFileURL("file:updater/updater.mojo"));
 
   // Command line URL mapping.
   std::vector<URLResolver::OriginMapping> origin_mappings =
@@ -174,15 +177,16 @@ void InitNativeOptions(shell::ApplicationManager* manager,
 
 void InitDevToolsServiceIfNeeded(shell::ApplicationManager* manager,
                                  const base::CommandLine& command_line) {
-  if (!command_line.HasSwitch(switches::kRemoteDebuggingPort))
+  if (!command_line.HasSwitch(devtools_service::kRemoteDebuggingPort))
     return;
 
   std::string port_str =
-      command_line.GetSwitchValueASCII(switches::kRemoteDebuggingPort);
+      command_line.GetSwitchValueASCII(devtools_service::kRemoteDebuggingPort);
   unsigned port;
   if (!base::StringToUint(port_str, &port) || port > 65535) {
-    LOG(ERROR) << "Invalid value for switch " << switches::kRemoteDebuggingPort
-               << ": '" << port_str << "' is not a valid port number.";
+    LOG(ERROR) << "Invalid value for switch "
+               << devtools_service::kRemoteDebuggingPort << ": '" << port_str
+               << "' is not a valid port number.";
     return;
   }
 
@@ -272,7 +276,7 @@ bool Context::Init() {
 
   EnsureEmbedderIsInitialized();
   task_runners_.reset(
-      new TaskRunners(base::MessageLoop::current()->message_loop_proxy()));
+      new TaskRunners(base::MessageLoop::current()->task_runner()));
 
   // TODO(vtl): Probably these failures should be checked before |Init()|, and
   // this function simply shouldn't fail.
