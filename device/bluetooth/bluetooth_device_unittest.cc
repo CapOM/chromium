@@ -89,7 +89,9 @@ TEST_F(BluetoothTest, DeviceProperties) {
   EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1801")));
 
   // TODO(scheib): Test with a device with no name, causing
-  // BluetoothDevice::GetAddressWithLocalizedDeviceTypeName().
+  // BluetoothDevice::GetAddressWithLocalizedDeviceTypeName() to run, which
+  // requires string resources to be loaded. For that, something like
+  // InitSharedInstance must be run. See unittest files that call that.
 }
 #endif
 
