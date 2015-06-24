@@ -29,7 +29,7 @@ final class ChromeBluetoothDevice {
 
     private long mNativeBluetoothDeviceAndroid;
     private final Wrappers.BluetoothDeviceWrapper mDevice;
-    private List<ParcelUuid> mUuidsFromScan;
+    private final List<ParcelUuid> mUuidsFromScan;
 
     /**
      * Constructs a ChromeBluetoothDevice wrapping device, and associate
