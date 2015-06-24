@@ -90,7 +90,7 @@ bool BluetoothDeviceAndroid::IsConnecting() const {
 }
 
 BluetoothDevice::UUIDList BluetoothDeviceAndroid::GetUUIDs() const {
-  int number_of_uuids = Java_ChromeBluetoothDevice_cacheUuidsAndReturnCount(
+  int number_of_uuids = Java_ChromeBluetoothDevice_getUuidsCount(
       AttachCurrentThread(), j_device_.obj());
   BluetoothDevice::UUIDList uuids;
   uuids.reserve(number_of_uuids);
@@ -100,7 +100,6 @@ BluetoothDevice::UUIDList BluetoothDeviceAndroid::GetUUIDs() const {
             AttachCurrentThread(), j_device_.obj(), i));
     uuids.push_back(BluetoothUUID(uuid_string));
   }
-  Java_ChromeBluetoothDevice_clearUuids(AttachCurrentThread(), j_device_.obj());
   return uuids;
 }
 

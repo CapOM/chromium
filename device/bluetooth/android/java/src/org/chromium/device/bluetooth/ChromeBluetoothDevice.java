@@ -14,6 +14,8 @@ import org.chromium.base.CalledByNative;
 import org.chromium.base.JNINamespace;
 import org.chromium.base.Log;
 
+import java.util.List;
+
 /**
  * Exposes android.bluetooth.BluetoothDevice as necessary for C++
  * device::BluetoothDeviceAndroid.
@@ -27,7 +29,7 @@ final class ChromeBluetoothDevice {
 
     private long mNativeBluetoothDeviceAndroid;
     private final Wrappers.BluetoothDeviceWrapper mDevice;
-    private ParcelUuid[] mUuids;
+    private List<ParcelUuid> mUuidsFromScan;
 
     /**
      * Constructs a ChromeBluetoothDevice wrapping device, and associate
@@ -36,9 +38,10 @@ final class ChromeBluetoothDevice {
      * Calls adapter.onDeviceAdded to ensure objects are owned.
      */
     public ChromeBluetoothDevice(
-            Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter) {
-        mDevice = device;
+            Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter, List<ParcelUuid> uuidsFromScan) {
         mNativeBluetoothDeviceAndroid = nativeInit();
+        mDevice = device;
+        mUuidsFromScan = uuidsFromScan;
         Log.v(TAG, "ChromeBluetoothDevice created.");
         adapter.onDeviceAdded(this);
     }
@@ -70,29 +73,20 @@ final class ChromeBluetoothDevice {
     }
 
     // Implements BluetoothAdapterAndroid::GetUUIDs.
-    // Caches UUID array and returns number of UUIDs.
+    // Returns number of UUIDs found when scanning.
     @CalledByNative
-    private int cacheUuidsAndReturnCount() {
-        mUuids = mDevice.getUuids();
-        if (mUuids == null) {
-            Log.d(TAG, "getUuids returned null.");
+    private int getUuidsCount() {
+        if (mUuidsFromScan == null) {
             return 0;
         }
-        return mUuids.length;
+        return mUuidsFromScan.size();
     }
 
     // Implements BluetoothAdapterAndroid::GetUUIDs.
     // Returns one UUID String from the array of UUIDs.
     @CalledByNative
     private String getUuid(int i) {
-        return mUuids[i].toString();
-    }
-
-    // Implements BluetoothAdapterAndroid::GetUUIDs.
-    // Clears UUID array.
-    @CalledByNative
-    private void clearUuids() {
-        mUuids = null;
+        return mUuidsFromScan.get(i).toString();
     }
 
     // Implements BluetoothAdapterAndroid::GetDeviceName.

@@ -241,7 +241,7 @@ final class ChromeBluetoothAdapter {
                 Log.v(TAG, "  uuids not in ScanResult.");
             }
 
-            new ChromeBluetoothDevice(result.getDevice(), ChromeBluetoothAdapter.this);
+            new ChromeBluetoothDevice(result.getDevice(), ChromeBluetoothAdapter.this, uuids);
         }
 
         @Override
