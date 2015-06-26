@@ -7,13 +7,14 @@
 #include <vector>
 
 #include "base/lazy_instance.h"
+#include "base/strings/stringprintf.h"
 #include "chrome/browser/extensions/extension_service.h"
 #include "chrome/common/extensions/api/mdns.h"
+#include "content/public/browser/render_frame_host.h"
 #include "content/public/browser/render_process_host.h"
-#include "content/public/browser/render_view_host.h"
+#include "content/public/browser/web_contents.h"
 #include "extensions/browser/extension_host.h"
 #include "extensions/browser/extension_registry.h"
-#include "extensions/common/extension_messages.h"
 
 namespace extensions {
 
@@ -145,8 +146,8 @@ void MDnsAPI::OnDnsSdEvent(const std::string& service_type,
   }
 
   scoped_ptr<base::ListValue> results = mdns::OnServiceList::Create(args);
-  scoped_ptr<Event> event(
-      new Event(mdns::OnServiceList::kEventName, results.Pass()));
+  scoped_ptr<Event> event(new Event(
+      events::UNKNOWN, mdns::OnServiceList::kEventName, results.Pass()));
   event->restrict_to_browser_context = browser_context_;
   event->filter_info.SetServiceType(service_type);
 
@@ -207,19 +208,17 @@ void MDnsAPI::WriteToConsole(const std::string& service_type,
   std::string logged_message(std::string("[chrome.mdns] ") + message);
 
   // Log to the consoles of the background pages for those extensions.
+  // TODO(devlin): It's a little weird to log to the background pages,
+  // especially when it might be dormant. We should probably just log to a place
+  // like the ErrorConsole instead.
   for (const std::string& extension_id : extension_ids) {
     extensions::ExtensionHost* host =
         extensions::ProcessManager::Get(browser_context_)
         ->GetBackgroundHostForExtension(extension_id);
-    if (!host)
-      continue;
-    content::RenderViewHost* rvh = host->render_view_host();
-    if (!rvh)
-      continue;
-    rvh->Send(new ExtensionMsg_AddMessageToConsole(
-        rvh->GetRoutingID(),
-        level,
-        logged_message));
+    content::RenderFrameHost* rfh =
+        host ? host->host_contents()->GetMainFrame() : nullptr;
+    if (rfh)
+      rfh->AddMessageToConsole(level, logged_message);
   }
 }
 

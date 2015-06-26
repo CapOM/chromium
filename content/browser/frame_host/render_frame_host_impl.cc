@@ -771,12 +771,14 @@ void RenderFrameHostImpl::OnDidFailProvisionalLoadWithError(
 void RenderFrameHostImpl::OnDidFailLoadWithError(
     const GURL& url,
     int error_code,
-    const base::string16& error_description) {
+    const base::string16& error_description,
+    bool was_ignored_by_handler) {
   GURL validated_url(url);
   GetProcess()->FilterURL(false, &validated_url);
 
   frame_tree_node_->navigator()->DidFailLoadWithError(
-      this, validated_url, error_code, error_description);
+      this, validated_url, error_code, error_description,
+      was_ignored_by_handler);
 }
 
 // Called when the renderer navigates.  For every frame loaded, we'll get this
@@ -1047,8 +1049,12 @@ void RenderFrameHostImpl::OnBeforeUnloadACK(
   render_view_host_->StopHangMonitorTimeout();
   send_before_unload_start_time_ = base::TimeTicks();
 
+  // PlzNavigate: if the ACK is for a navigation, send it to the Navigator to
+  // have the current navigation stop/proceed. Otherwise, send it to the
+  // RenderFrameHostManager which handles closing.
   if (base::CommandLine::ForCurrentProcess()->HasSwitch(
-      switches::kEnableBrowserSideNavigation)) {
+          switches::kEnableBrowserSideNavigation) &&
+      unload_ack_is_for_navigation_) {
     // TODO(clamy): see if before_unload_end_time should be transmitted to the
     // Navigator.
     frame_tree_node_->navigator()->OnBeforeUnloadACK(

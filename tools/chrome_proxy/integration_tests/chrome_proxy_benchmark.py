@@ -180,7 +180,7 @@ class ChromeProxyClientConfig(ChromeProxyBenchmark):
     return 'chrome_proxy_benchmark.client_config.synthetic'
 
 
-@benchmark.Enabled(desktop)
+@benchmark.Enabled('desktop')
 class ChromeProxyVideoDirect(benchmark.Benchmark):
   tag = 'video'
   test = measurements.ChromeProxyVideoValidation
@@ -191,7 +191,7 @@ class ChromeProxyVideoDirect(benchmark.Benchmark):
     return 'chrome_proxy_benchmark.video.direct'
 
 
-@benchmark.Enabled(desktop)
+@benchmark.Enabled('desktop')
 class ChromeProxyVideoProxied(benchmark.Benchmark):
   tag = 'video'
   test = measurements.ChromeProxyVideoValidation
@@ -202,7 +202,7 @@ class ChromeProxyVideoProxied(benchmark.Benchmark):
     return 'chrome_proxy_benchmark.video.proxied'
 
 
-@benchmark.Enabled(desktop)
+@benchmark.Enabled('desktop')
 class ChromeProxyVideoCompare(benchmark.Benchmark):
   """Comparison of direct and proxied video fetches.
 
@@ -217,3 +217,28 @@ class ChromeProxyVideoCompare(benchmark.Benchmark):
   @classmethod
   def Name(cls):
     return 'chrome_proxy_benchmark.video.compare'
+
+@benchmark.Enabled('desktop')
+class ChromeProxyVideoFrames(benchmark.Benchmark):
+  """Check for video frames similar to original video."""
+
+  tag = 'video'
+  test = measurements.ChromeProxyInstrumentedVideoValidation
+  page_set = pagesets.VideoFramePageSet
+
+  @classmethod
+  def Name(cls):
+    return 'chrome_proxy_benchmark.video.frames'
+
+@benchmark.Enabled('desktop')
+class ChromeProxyVideoAudio(benchmark.Benchmark):
+  """Check that audio is similar to original video."""
+
+  tag = 'video'
+  test = measurements.ChromeProxyInstrumentedVideoValidation
+  page_set = pagesets.VideoAudioPageSet
+
+  @classmethod
+  def Name(cls):
+    return 'chrome_proxy_benchmark.video.audio'
+

@@ -81,6 +81,9 @@
         "test": "crypto_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "events_unittests"
       },
       {
@@ -96,6 +99,9 @@
         "test": "gcm_unit_tests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "gfx_unittests"
       },
       {
@@ -325,6 +331,9 @@
         "test": "device_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "events_unittests"
       },
       {
@@ -340,6 +349,9 @@
         "test": "gcm_unit_tests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "gfx_unittests"
       },
       {
@@ -380,6 +392,9 @@
         "test": "media_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "message_center_unittests"
       },
       {
@@ -694,6 +709,9 @@
         "test": "device_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "events_unittests"
       },
       {
@@ -709,6 +727,9 @@
         "test": "gcm_unit_tests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "gfx_unittests"
       },
       {
@@ -749,6 +770,9 @@
         "test": "media_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "message_center_unittests"
       },
       {
@@ -943,6 +967,9 @@
         "test": "crypto_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "events_unittests"
       },
       {
@@ -1340,6 +1367,9 @@
         "test": "crypto_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "events_unittests"
       },
       {
@@ -1355,6 +1385,9 @@
         "test": "gcm_unit_tests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "gfx_unittests"
       },
       {

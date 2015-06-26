@@ -1117,8 +1117,9 @@ enum HistogramValue {
   EXTENSIONVIEWINTERNAL_PARSESRC,
   HID_GETUSERSELECTEDDEVICES,
   FILESYSTEMPROVIDERINTERNAL_GETACTIONSREQUESTEDSUCCESS,
-  // Last entry: Add new entries above and ensure to update
-  // tools/metrics/histograms/histograms.xml.
+  WEBSTOREPRIVATE_SHOWPERMISSIONPROMPTFORDELEGATEDBUNDLEINSTALL,
+  // Last entry: Add new entries above, then run:
+  // python tools/metrics/histograms/update_extension_histograms.py
   ENUM_BOUNDARY
 };
 

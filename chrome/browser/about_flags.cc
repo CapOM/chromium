@@ -234,6 +234,18 @@ const Experiment::Choice kDataReductionProxyLoFiChoices[] = {
         data_reduction_proxy::switches::kDataReductionProxyLoFiValueDisabled}
 };
 
+const Experiment::Choice kMaxTilesForInterestAreaChoices[] = {
+  { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
+  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_SHORT,
+    cc::switches::kMaxTilesForInterestArea, "64"},
+  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_TALL,
+    cc::switches::kMaxTilesForInterestArea, "128"},
+  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_GRANDE,
+    cc::switches::kMaxTilesForInterestArea, "256"},
+  { IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_VENTI,
+    cc::switches::kMaxTilesForInterestArea, "512"}
+};
+
 const Experiment::Choice kShowSavedCopyChoices[] = {
   { IDS_GENERIC_EXPERIMENT_CHOICE_DEFAULT, "", "" },
   { IDS_FLAGS_ENABLE_SHOW_SAVED_COPY_PRIMARY,
@@ -1129,6 +1141,12 @@ const Experiment kExperiments[] = {
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableDelegatedRenderer,
                                switches::kDisableDelegatedRenderer)},
 #endif
+    {"max-tiles-for-interest-area",
+     IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_NAME,
+     IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_DESCRIPTION,
+     kOsAll,
+     MULTI_VALUE_TYPE(kMaxTilesForInterestAreaChoices)
+    },
     {"enable-offer-store-unmasked-wallet-cards",
      IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS,
      IDS_FLAGS_ENABLE_OFFER_STORE_UNMASKED_WALLET_CARDS_DESCRIPTION,
@@ -1502,12 +1520,6 @@ const Experiment kExperiments[] = {
      ENABLE_DISABLE_VALUE_TYPE(
          autofill::switches::kEnableSingleClickAutofill,
          autofill::switches::kDisableSingleClickAutofill)},
-    {"enable-permissions-bubbles",
-     IDS_FLAGS_ENABLE_PERMISSIONS_BUBBLES_NAME,
-     IDS_FLAGS_ENABLE_PERMISSIONS_BUBBLES_DESCRIPTION,
-     kOsCrOS | kOsMac | kOsWin | kOsLinux,
-     ENABLE_DISABLE_VALUE_TYPE(switches::kEnablePermissionsBubbles,
-                               switches::kDisablePermissionsBubbles)},
     {"enable-site-engagement-service",
      IDS_FLAGS_ENABLE_SITE_ENGAGEMENT_SERVICE_NAME,
      IDS_FLAGS_ENABLE_SITE_ENGAGEMENT_SERVICE_DESCRIPTION,
@@ -1792,12 +1804,12 @@ const Experiment kExperiments[] = {
     {"disable-delay-agnostic-aec",
      IDS_FLAGS_DISABLE_DELAY_AGNOSTIC_AEC_NAME,
      IDS_FLAGS_DISABLE_DELAY_AGNOSTIC_AEC_DESCRIPTION,
-     kOsDesktop,
+     kOsWin | kOsLinux | kOsCrOS,
      SINGLE_VALUE_TYPE(switches::kDisableDelayAgnosticAec)},
     {"enable-delay-agnostic-aec",
      IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_NAME,
      IDS_FLAGS_ENABLE_DELAY_AGNOSTIC_AEC_DESCRIPTION,
-     kOsDesktop,
+     kOsMac,
      SINGLE_VALUE_TYPE(switches::kEnableDelayAgnosticAec)},
     {"mark-non-secure-as",  // FLAGS:RECORD_UMA
      IDS_MARK_NON_SECURE_AS_NAME,
@@ -1896,14 +1908,19 @@ const Experiment kExperiments[] = {
      kOsAll,
      SINGLE_VALUE_TYPE(switches::kEnableMediaRouter)},
 #endif  // defined(ENABLE_MEDIA_ROUTER)
-// Since kEnableLauncherSearchProviderApi is not available when app list is
-// disabled, flag guard enable-launcher-search-provider-api.
+// Since kDisableDriveSearchInAppLauncher and kDisableLauncherSearchProviderAPI
+// are not available when app list is disabled, flag guard them.
 #if defined(ENABLE_APP_LIST)
-    {"enable-launcher-search-provider-api",
-     IDS_FLAGS_ENABLE_LAUNCHER_SEARCH_PROVIDER_API,
-     IDS_FLAGS_ENABLE_LAUNCHER_SEARCH_PROVIDER_API_DESCRIPTION,
+    {"disable-drive-search-in-app-launcher",
+     IDS_FLAGS_DISABLE_DRIVE_SEARCH_IN_APP_LAUNCHER,
+     IDS_FLAGS_DISABLE_DRIVE_SEARCH_IN_APP_LAUNCHER_DESCRIPTION,
      kOsCrOS,
-     SINGLE_VALUE_TYPE(app_list::switches::kEnableLauncherSearchProviderApi)},
+     SINGLE_VALUE_TYPE(app_list::switches::kDisableDriveSearchInAppLauncher)},
+    {"disable-launcher-search-provider-api",
+     IDS_FLAGS_DISABLE_LAUNCHER_SEARCH_PROVIDER_API,
+     IDS_FLAGS_DISABLE_LAUNCHER_SEARCH_PROVIDER_API_DESCRIPTION,
+     kOsCrOS,
+     SINGLE_VALUE_TYPE(app_list::switches::kDisableLauncherSearchProviderApi)},
 #endif  // defined(ENABLE_APP_LIST)
 #if defined(OS_CHROMEOS)
     {"disable-mtp-write-support",
@@ -1985,6 +2002,12 @@ const Experiment kExperiments[] = {
      kOsMac,
      ENABLE_DISABLE_VALUE_TYPE(switches::kEnableMacViewsNativeAppWindows,
                                switches::kDisableMacViewsNativeAppWindows)},
+    {"app-window-cycling",
+     IDS_FLAGS_APP_WINDOW_CYCLING_NAME,
+     IDS_FLAGS_APP_WINDOW_CYCLING_DESCRIPTION,
+     kOsMac,
+     ENABLE_DISABLE_VALUE_TYPE(switches::kEnableAppWindowCycling,
+                               switches::kDisableAppWindowCycling)},
 #endif
 #if defined(ENABLE_WEBVR)
     {"enable-webvr",
@@ -2126,8 +2149,9 @@ bool SkipConditionalExperiment(const Experiment& experiment,
 #endif
 
   // data-reduction-proxy-lo-fi is only available for Chromium builds and
-  // the Canary/Dev channel.
+  // the Canary/Dev/Beta channels.
   if (!strcmp("data-reduction-proxy-lo-fi", experiment.internal_name) &&
+      channel != chrome::VersionInfo::CHANNEL_BETA &&
       channel != chrome::VersionInfo::CHANNEL_DEV &&
       channel != chrome::VersionInfo::CHANNEL_CANARY &&
       channel != chrome::VersionInfo::CHANNEL_UNKNOWN) {

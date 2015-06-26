@@ -4,14 +4,18 @@
 
 #include "net/base/network_quality_estimator.h"
 
+#include <float.h>
+#include <algorithm>
+#include <cmath>
 #include <limits>
 #include <string>
+#include <vector>
 
 #include "base/logging.h"
 #include "base/metrics/histogram.h"
+#include "base/strings/string_number_conversions.h"
 #include "net/base/load_timing_info.h"
 #include "net/base/net_util.h"
-#include "net/base/network_quality.h"
 #include "net/url_request/url_request.h"
 #include "url/gurl.h"
 
@@ -20,26 +24,117 @@ namespace {
 // Maximum number of observations that can be held in the ObservationBuffer.
 const size_t kMaximumObservationsBufferSize = 500;
 
+// Half life (in seconds) for computing time weighted percentiles.
+// Every |kHalfLifeSeconds|, the weight of all observations reduces by half.
+// Lowering the half life would reduce the weight of older values faster.
+// TODO(tbansal): |kHalfLifeSeconds| should be configured through field trial
+// in the NetworkQualityEstimator constructor.
+const int kHalfLifeSeconds = 60;
+
+// Name of the different connection types. Used for matching the connection
+// type to the variation parameters. Names must be in the same order as
+// NetworkChangeNotifier::ConnectionType enum.
+const char* const kConnectionTypeNames[] =
+    {"Unknown", "Ethernet", "WiFi", "2G", "3G", "4G", "None", "Bluetooth"};
+
+// Suffix of the name of the variation parameter that contains the default RTT
+// observation (in milliseconds). Complete name of the variation parameter
+// would be |ConnectionType|.|kDefaultRTTMsecObservationSuffix| where
+// |ConnectionType| is from |kConnectionTypeNames|. For example, variation
+// parameter for Wi-Fi would be "WiFi.DefaultMedianRTTMsec".
+const char kDefaultRTTMsecObservationSuffix[] = ".DefaultMedianRTTMsec";
+
+// Suffix of the name of the variation parameter that contains the default
+// downstream throughput observation (in Kbps).  Complete name of the variation
+// parameter would be |ConnectionType|.|kDefaultKbpsObservationSuffix| where
+// |ConnectionType| is from |kConnectionTypeNames|. For example, variation
+// parameter for Wi-Fi would be "WiFi.DefaultMedianKbps".
+const char kDefaultKbpsObservationSuffix[] = ".DefaultMedianKbps";
+
 }  // namespace
 
 namespace net {
 
-NetworkQualityEstimator::NetworkQualityEstimator()
-    : NetworkQualityEstimator(false, false) {
+NetworkQualityEstimator::NetworkQualityEstimator(
+    const std::map<std::string, std::string>& variation_params)
+    : NetworkQualityEstimator(variation_params, false, false) {
 }
 
 NetworkQualityEstimator::NetworkQualityEstimator(
+    const std::map<std::string, std::string>& variation_params,
     bool allow_local_host_requests_for_tests,
     bool allow_smaller_responses_for_tests)
     : allow_localhost_requests_(allow_local_host_requests_for_tests),
       allow_small_responses_(allow_smaller_responses_for_tests),
       last_connection_change_(base::TimeTicks::Now()),
       current_connection_type_(NetworkChangeNotifier::GetConnectionType()),
-      fastest_rtt_since_last_connection_change_(base::TimeDelta::Max()),
-      peak_kbps_since_last_connection_change_(0) {
+      fastest_rtt_since_last_connection_change_(NetworkQuality::InvalidRTT()),
+      peak_kbps_since_last_connection_change_(
+          NetworkQuality::kInvalidThroughput) {
   static_assert(kMinRequestDurationMicroseconds > 0,
                 "Minimum request duration must be > 0");
+  static_assert(kHalfLifeSeconds > 0, "Half life duration must be > 0");
+  static_assert(arraysize(kConnectionTypeNames) ==
+                    NetworkChangeNotifier::CONNECTION_LAST + 1,
+                "ConnectionType name count should match");
+
+  ObtainOperatingParams(variation_params);
+  AddDefaultEstimates();
   NetworkChangeNotifier::AddConnectionTypeObserver(this);
+}
+
+void NetworkQualityEstimator::ObtainOperatingParams(
+    const std::map<std::string, std::string>& variation_params) {
+  DCHECK(thread_checker_.CalledOnValidThread());
+
+  for (size_t i = 0; i < arraysize(kConnectionTypeNames); ++i) {
+    int32_t variations_value = kMinimumRTTVariationParameterMsec - 1;
+    // Name of the parameter that holds the RTT value for this connection type.
+    std::string rtt_parameter_name =
+        std::string(kConnectionTypeNames[i])
+            .append(kDefaultRTTMsecObservationSuffix);
+    auto it = variation_params.find(rtt_parameter_name);
+    if (it != variation_params.end() && !it->second.empty() &&
+        base::StringToInt(it->second, &variations_value) &&
+        variations_value >= kMinimumRTTVariationParameterMsec) {
+      default_observations_[i] =
+          NetworkQuality(base::TimeDelta::FromMilliseconds(variations_value),
+                         default_observations_[i].downstream_throughput_kbps());
+    }
+
+    variations_value = kMinimumThroughputVariationParameterKbps - 1;
+    // Name of the parameter that holds the Kbps value for this connection
+    // type.
+    std::string kbps_parameter_name =
+        std::string(kConnectionTypeNames[i])
+            .append(kDefaultKbpsObservationSuffix);
+    it = variation_params.find(kbps_parameter_name);
+    if (it != variation_params.end() && !it->second.empty() &&
+        base::StringToInt(it->second, &variations_value) &&
+        variations_value >= kMinimumThroughputVariationParameterKbps) {
+      default_observations_[i] =
+          NetworkQuality(default_observations_[i].rtt(), variations_value);
+    }
+  }
+}
+
+void NetworkQualityEstimator::AddDefaultEstimates() {
+  DCHECK(thread_checker_.CalledOnValidThread());
+
+  if (default_observations_[current_connection_type_].rtt() !=
+      NetworkQuality::InvalidRTT()) {
+    rtt_msec_observations_.AddObservation(Observation(
+        default_observations_[current_connection_type_].rtt().InMilliseconds(),
+        base::TimeTicks::Now()));
+  }
+
+  if (default_observations_[current_connection_type_]
+          .downstream_throughput_kbps() != NetworkQuality::kInvalidThroughput) {
+    kbps_observations_.AddObservation(
+        Observation(default_observations_[current_connection_type_]
+                        .downstream_throughput_kbps(),
+                    base::TimeTicks::Now()));
+  }
 }
 
 NetworkQualityEstimator::~NetworkQualityEstimator() {
@@ -88,7 +183,6 @@ void NetworkQualityEstimator::NotifyDataReceived(
     // headers were received.
     base::TimeDelta observed_rtt = headers_received_time - request_start_time;
     DCHECK_GE(observed_rtt, base::TimeDelta());
-
     if (observed_rtt < fastest_rtt_since_last_connection_change_)
       fastest_rtt_since_last_connection_change_ = observed_rtt;
 
@@ -111,7 +205,7 @@ void NetworkQualityEstimator::NotifyDataReceived(
                     since_request_start.InSecondsF();
     DCHECK_GE(kbps_f, 0.0);
 
-    // Check overflow errors. This may happen if the kbpsF is more than
+    // Check overflow errors. This may happen if the kbps_f is more than
     // 2 * 10^9 (= 2000 Gbps).
     if (kbps_f >= std::numeric_limits<int32_t>::max())
       kbps_f = std::numeric_limits<int32_t>::max() - 1;
@@ -135,7 +229,8 @@ void NetworkQualityEstimator::NotifyDataReceived(
 void NetworkQualityEstimator::OnConnectionTypeChanged(
     NetworkChangeNotifier::ConnectionType type) {
   DCHECK(thread_checker_.CalledOnValidThread());
-  if (fastest_rtt_since_last_connection_change_ != base::TimeDelta::Max()) {
+  if (fastest_rtt_since_last_connection_change_ !=
+      NetworkQuality::InvalidRTT()) {
     switch (current_connection_type_) {
       case NetworkChangeNotifier::CONNECTION_UNKNOWN:
         UMA_HISTOGRAM_TIMES("NQE.FastestRTT.Unknown",
@@ -175,7 +270,8 @@ void NetworkQualityEstimator::OnConnectionTypeChanged(
     }
   }
 
-  if (peak_kbps_since_last_connection_change_) {
+  if (peak_kbps_since_last_connection_change_ !=
+      NetworkQuality::kInvalidThroughput) {
     switch (current_connection_type_) {
       case NetworkChangeNotifier::CONNECTION_UNKNOWN:
         UMA_HISTOGRAM_COUNTS("NQE.PeakKbps.Unknown",
@@ -216,11 +312,13 @@ void NetworkQualityEstimator::OnConnectionTypeChanged(
   }
 
   last_connection_change_ = base::TimeTicks::Now();
-  peak_kbps_since_last_connection_change_ = 0;
-  fastest_rtt_since_last_connection_change_ = base::TimeDelta::Max();
+  peak_kbps_since_last_connection_change_ = NetworkQuality::kInvalidThroughput;
+  fastest_rtt_since_last_connection_change_ = NetworkQuality::InvalidRTT();
   kbps_observations_.Clear();
   rtt_msec_observations_.Clear();
   current_connection_type_ = type;
+
+  AddDefaultEstimates();
 }
 
 NetworkQuality NetworkQualityEstimator::GetPeakEstimate() const {
@@ -228,6 +326,15 @@ NetworkQuality NetworkQualityEstimator::GetPeakEstimate() const {
 
   return NetworkQuality(fastest_rtt_since_last_connection_change_,
                         peak_kbps_since_last_connection_change_);
+}
+
+bool NetworkQualityEstimator::GetEstimate(NetworkQuality* median) const {
+  if (kbps_observations_.Size() == 0 || rtt_msec_observations_.Size() == 0) {
+    *median = NetworkQuality();
+    return false;
+  }
+  *median = GetEstimate(50);
+  return true;
 }
 
 size_t NetworkQualityEstimator::GetMaximumObservationBufferSizeForTests()
@@ -251,9 +358,12 @@ NetworkQualityEstimator::Observation::Observation(int32_t value,
 NetworkQualityEstimator::Observation::~Observation() {
 }
 
-NetworkQualityEstimator::ObservationBuffer::ObservationBuffer() {
+NetworkQualityEstimator::ObservationBuffer::ObservationBuffer()
+    : weight_multiplier_per_second_(exp(log(0.5) / kHalfLifeSeconds)) {
   static_assert(kMaximumObservationsBufferSize > 0U,
                 "Minimum size of observation buffer must be > 0");
+  DCHECK_GE(weight_multiplier_per_second_, 0.0);
+  DCHECK_LE(weight_multiplier_per_second_, 1.0);
 }
 
 NetworkQualityEstimator::ObservationBuffer::~ObservationBuffer() {
@@ -277,6 +387,79 @@ size_t NetworkQualityEstimator::ObservationBuffer::Size() const {
 void NetworkQualityEstimator::ObservationBuffer::Clear() {
   observations_.clear();
   DCHECK(observations_.empty());
+}
+
+NetworkQuality NetworkQualityEstimator::GetEstimate(int percentile) const {
+  DCHECK(thread_checker_.CalledOnValidThread());
+  DCHECK_GE(percentile, 0);
+  DCHECK_LE(percentile, 100);
+  DCHECK_GT(kbps_observations_.Size(), 0U);
+  DCHECK_GT(rtt_msec_observations_.Size(), 0U);
+
+  // RTT observations are sorted by duration from shortest to longest, thus
+  // a higher percentile RTT will have a longer RTT than a lower percentile.
+  // Throughput observations are sorted by kbps from slowest to fastest,
+  // thus a higher percentile throughput will be faster than a lower one.
+  return NetworkQuality(base::TimeDelta::FromMilliseconds(
+                            rtt_msec_observations_.GetPercentile(percentile)),
+                        kbps_observations_.GetPercentile(100 - percentile));
+}
+
+void NetworkQualityEstimator::ObservationBuffer::ComputeWeightedObservations(
+    std::vector<WeightedObservation>& weighted_observations,
+    double* total_weight) const {
+  weighted_observations.clear();
+  double total_weight_observations = 0.0;
+  base::TimeTicks now = base::TimeTicks::Now();
+
+  for (const auto& observation : observations_) {
+    base::TimeDelta time_since_sample_taken = now - observation.timestamp;
+    double weight =
+        pow(weight_multiplier_per_second_, time_since_sample_taken.InSeconds());
+    weight = std::max(DBL_MIN, std::min(1.0, weight));
+
+    weighted_observations.push_back(
+        WeightedObservation(observation.value, weight));
+    total_weight_observations += weight;
+  }
+
+  // Sort the samples by value in ascending order.
+  std::sort(weighted_observations.begin(), weighted_observations.end());
+  *total_weight = total_weight_observations;
+}
+
+int32_t NetworkQualityEstimator::ObservationBuffer::GetPercentile(
+    int percentile) const {
+  DCHECK(!observations_.empty());
+
+  // Stores WeightedObservation in increasing order of value.
+  std::vector<WeightedObservation> weighted_observations;
+
+  // Total weight of all observations in |weighted_observations|.
+  double total_weight = 0.0;
+
+  ComputeWeightedObservations(weighted_observations, &total_weight);
+  DCHECK(!weighted_observations.empty());
+  DCHECK_GT(total_weight, 0.0);
+  DCHECK_EQ(observations_.size(), weighted_observations.size());
+
+  double desired_weight = percentile / 100.0 * total_weight;
+
+  double cumulative_weight_seen_so_far = 0.0;
+  for (const auto& weighted_observation : weighted_observations) {
+    cumulative_weight_seen_so_far += weighted_observation.weight;
+
+    // TODO(tbansal): Consider interpolating between observations.
+    if (cumulative_weight_seen_so_far >= desired_weight)
+      return weighted_observation.value;
+  }
+
+  // Computation may reach here due to floating point errors. This may happen
+  // if |percentile| was 100 (or close to 100), and |desired_weight| was
+  // slightly larger than |total_weight| (due to floating point errors).
+  // In this case, we return the highest |value| among all observations.
+  // This is same as value of the last observation in the sorted vector.
+  return weighted_observations.at(weighted_observations.size() - 1).value;
 }
 
 }  // namespace net

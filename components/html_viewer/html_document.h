@@ -5,19 +5,16 @@
 #ifndef COMPONENTS_HTML_VIEWER_HTML_DOCUMENT_H_
 #define COMPONENTS_HTML_VIEWER_HTML_DOCUMENT_H_
 
-#include <map>
 #include <set>
 
 #include "base/callback.h"
 #include "base/macros.h"
 #include "components/html_viewer/ax_provider_impl.h"
-#include "components/html_viewer/frame_tree_manager.h"
 #include "components/html_viewer/touch_handler.h"
 #include "components/view_manager/public/cpp/view_manager_client_factory.h"
 #include "components/view_manager/public/cpp/view_manager_delegate.h"
 #include "components/view_manager/public/cpp/view_observer.h"
 #include "mandoline/services/navigation/public/interfaces/navigation.mojom.h"
-#include "mandoline/tab/public/interfaces/frame_tree.mojom.h"
 #include "mojo/application/public/cpp/app_lifetime_helper.h"
 #include "mojo/application/public/cpp/interface_factory.h"
 #include "mojo/application/public/cpp/lazy_interface_ptr.h"
@@ -55,8 +52,7 @@ class HTMLDocument : public blink::WebViewClient,
                      public blink::WebFrameClient,
                      public mojo::ViewManagerDelegate,
                      public mojo::ViewObserver,
-                     public mojo::InterfaceFactory<mojo::AxProvider>,
-                     public mojo::InterfaceFactory<mandoline::FrameTreeClient> {
+                     public mojo::InterfaceFactory<mojo::AxProvider> {
  public:
   using DeleteCallback = base::Callback<void(HTMLDocument*)>;
 
@@ -79,8 +75,6 @@ class HTMLDocument : public blink::WebViewClient,
     mojo::View* view;
     blink::WebTreeScopeType scope;
   };
-
-  using FrameToViewMap = std::map<blink::WebLocalFrame*, ChildFrameData>;
 
   ~HTMLDocument() override;
 
@@ -145,11 +139,6 @@ class HTMLDocument : public blink::WebViewClient,
   void Create(mojo::ApplicationConnection* connection,
               mojo::InterfaceRequest<mojo::AxProvider> request) override;
 
-  // mojo::InterfaceFactory<mandoline::FrameTreeClient>
-  void Create(
-      mojo::ApplicationConnection* connection,
-      mojo::InterfaceRequest<mandoline::FrameTreeClient> request) override;
-
   void Load(mojo::URLResponsePtr response);
 
   // Converts a WebLocalFrame to a WebRemoteFrame. Used once we know the
@@ -179,11 +168,6 @@ class HTMLDocument : public blink::WebViewClient,
   Setup* setup_;
 
   scoped_ptr<TouchHandler> touch_handler_;
-
-  FrameToViewMap frame_to_view_;
-
-  FrameTreeManager frame_tree_manager_;
-  mojo::Binding<mandoline::FrameTreeClient> frame_tree_manager_binding_;
 
   scoped_ptr<DevToolsAgentImpl> devtools_agent_;
 

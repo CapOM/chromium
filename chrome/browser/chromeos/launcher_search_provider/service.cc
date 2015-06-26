@@ -6,12 +6,14 @@
 
 #include "base/memory/scoped_vector.h"
 #include "base/strings/utf_string_conversions.h"
+#include "chrome/browser/chromeos/file_manager/app_id.h"
 #include "chrome/browser/chromeos/launcher_search_provider/service_factory.h"
 #include "chrome/browser/ui/app_list/search/launcher_search/launcher_search_provider.h"
 #include "chrome/browser/ui/app_list/search/launcher_search/launcher_search_result.h"
 #include "extensions/browser/extension_registry.h"
 #include "extensions/common/extension_set.h"
 #include "extensions/common/permissions/permissions_data.h"
+#include "ui/app_list/app_list_switches.h"
 
 namespace api_launcher_search_provider =
     extensions::api::launcher_search_provider;
@@ -59,6 +61,7 @@ void Service::OnQueryStarted(app_list::LauncherSearchProvider* provider,
     event_router->DispatchEventToExtension(
         extension_id,
         make_scoped_ptr(new extensions::Event(
+            extensions::events::UNKNOWN,
             api_launcher_search_provider::OnQueryStarted::kEventName,
             api_launcher_search_provider::OnQueryStarted::Create(
                 query_id_, query, max_result))));
@@ -77,6 +80,7 @@ void Service::OnQueryEnded() {
     event_router->DispatchEventToExtension(
         extension_id,
         make_scoped_ptr(new extensions::Event(
+            extensions::events::UNKNOWN,
             api_launcher_search_provider::OnQueryEnded::kEventName,
             api_launcher_search_provider::OnQueryEnded::Create(query_id_))));
   }
@@ -94,6 +98,7 @@ void Service::OnOpenResult(const ExtensionId& extension_id,
   event_router->DispatchEventToExtension(
       extension_id,
       make_scoped_ptr(new extensions::Event(
+          extensions::events::UNKNOWN,
           api_launcher_search_provider::OnOpenResult::kEventName,
           api_launcher_search_provider::OnOpenResult::Create(item_id))));
 }
@@ -164,8 +169,16 @@ void Service::CacheListenerExtensionIds() {
         extension->permissions_data();
     const bool has_permission = permission_data->HasAPIPermission(
         extensions::APIPermission::kLauncherSearchProvider);
-    if (has_permission)
-      cached_listener_extension_ids_->insert(extension->id());
+    if (has_permission) {
+      // If extension id is file manager, it can be added only when drive search
+      // is enabled. For other extensions, it can be added only when launcher
+      // search provider API is enabled.
+      if ((extension->id() == file_manager::kFileManagerAppId &&
+           app_list::switches::IsDriveSearchEnabled()) ||
+          (extension->id() != file_manager::kFileManagerAppId &&
+           app_list::switches::IsLauncherSearchProviderApiEnabled()))
+        cached_listener_extension_ids_->insert(extension->id());
+    }
   }
 }
 

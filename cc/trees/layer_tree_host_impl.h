@@ -399,7 +399,6 @@ class CC_EXPORT LayerTreeHostImpl
   ManagedMemoryPolicy ActualManagedMemoryPolicy() const;
 
   size_t memory_allocation_limit_bytes() const;
-  int memory_allocation_priority_cutoff() const;
 
   void SetViewportSize(const gfx::Size& device_viewport_size);
   gfx::Size device_viewport_size() const { return device_viewport_size_; }
@@ -710,7 +709,6 @@ class CC_EXPORT LayerTreeHostImpl
 
   bool pinch_gesture_active_;
   bool pinch_gesture_end_should_clear_scrolling_layer_;
-  gfx::Point previous_pinch_anchor_;
 
   scoped_ptr<TopControlsManager> top_controls_manager_;
 

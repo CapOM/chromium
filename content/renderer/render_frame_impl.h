@@ -97,7 +97,6 @@ class PepperPluginInstanceImpl;
 class PermissionDispatcher;
 class PresentationDispatcher;
 class PushMessagingDispatcher;
-class RenderCdmFactory;
 class RendererAccessibility;
 class RendererCdmManager;
 class RendererMediaPlayerManager;
@@ -157,8 +156,17 @@ class CONTENT_EXPORT RenderFrameImpl
 
   // Used by content_layouttest_support to hook into the creation of
   // RenderFrameImpls.
-  using CreateRenderFrameImplFunction = RenderFrameImpl* (*)(RenderViewImpl*,
-                                                             int32);
+  struct CreateParams {
+    CreateParams(RenderViewImpl* render_view, int32 routing_id)
+        : render_view(render_view), routing_id(routing_id) {}
+    ~CreateParams() {}
+
+    RenderViewImpl* render_view;
+    int32 routing_id;
+  };
+
+  using CreateRenderFrameImplFunction =
+      RenderFrameImpl* (*)(const CreateParams&);
   static void InstallCreateHook(
       CreateRenderFrameImplFunction create_render_frame_impl);
 
@@ -338,6 +346,8 @@ class CONTENT_EXPORT RenderFrameImpl
                        const gfx::Range& range) override;
   void EnsureMojoBuiltinsAreAvailable(v8::Isolate* isolate,
                                       v8::Local<v8::Context> context) override;
+  void AddMessageToConsole(ConsoleMessageLevel level,
+                           const std::string& message) override;
 
   // blink::WebFrameClient implementation:
   blink::WebPluginPlaceholder* createPluginPlaceholder(
@@ -542,12 +552,6 @@ class CONTENT_EXPORT RenderFrameImpl
   void DidPause(blink::WebMediaPlayer* player) override;
   void PlayerGone(blink::WebMediaPlayer* player) override;
 
-  // TODO(nasko): Make all tests in RenderViewImplTest friends and then move
-  // this back to private member.
-  void OnNavigate(const CommonNavigationParams& common_params,
-                  const StartNavigationParams& start_params,
-                  const RequestNavigationParams& request_params);
-
   // Make this frame show an empty, unscriptable page.
   // TODO(nasko): Remove this method once swapped out state is no longer used.
   void NavigateToSwappedOutURL();
@@ -565,13 +569,13 @@ class CONTENT_EXPORT RenderFrameImpl
       scoped_ptr<NavigationParams> navigation_params);
 
  protected:
-  RenderFrameImpl(RenderViewImpl* render_view, int32 routing_id);
+  explicit RenderFrameImpl(const CreateParams& params);
 
  private:
   friend class RenderFrameImplTest;
   friend class RenderFrameObserver;
-  friend class RenderViewImplTest;
   friend class RendererAccessibilityTest;
+  friend class TestRenderFrame;
   FRIEND_TEST_ALL_PREFIXES(ExternalPopupMenuDisplayNoneTest, SelectItem);
   FRIEND_TEST_ALL_PREFIXES(ExternalPopupMenuRemoveTest, RemoveOnChange);
   FRIEND_TEST_ALL_PREFIXES(ExternalPopupMenuTest, NormalCase);
@@ -618,6 +622,9 @@ class CONTENT_EXPORT RenderFrameImpl
   //
   // The documentation for these functions should be in
   // content/common/*_messages.h for the message that the function is handling.
+  void OnNavigate(const CommonNavigationParams& common_params,
+                  const StartNavigationParams& start_params,
+                  const RequestNavigationParams& request_params);
   void OnBeforeUnload();
   void OnSwapOut(int proxy_routing_id,
                  bool is_loading,
@@ -807,7 +814,7 @@ class CONTENT_EXPORT RenderFrameImpl
 
   media::MediaPermission* GetMediaPermission();
 
-#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+#if defined(ENABLE_MOJO_MEDIA)
   mojo::ServiceProvider* GetMediaServiceProvider();
 
   // Called when a connection error happened on |media_service_provider_|.
@@ -921,7 +928,7 @@ class CONTENT_EXPORT RenderFrameImpl
   // The media permission dispatcher attached to this frame, lazily initialized.
   MediaPermissionDispatcher* media_permission_dispatcher_;
 
-#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+#if defined(ENABLE_MOJO_MEDIA)
   // The media service provider attached to this frame, lazily initialized.
   mojo::ServiceProviderPtr media_service_provider_;
 #endif
@@ -944,7 +951,7 @@ class CONTENT_EXPORT RenderFrameImpl
 #endif
 
   // The CDM factory attached to this frame, lazily initialized.
-  RenderCdmFactory* cdm_factory_;
+  scoped_ptr<media::CdmFactory> cdm_factory_;
 
 #if defined(VIDEO_HOLE)
   // Whether or not this RenderFrameImpl contains a media player. Used to

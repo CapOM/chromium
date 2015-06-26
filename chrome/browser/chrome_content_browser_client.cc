@@ -84,6 +84,7 @@
 #include "chrome/common/chrome_constants.h"
 #include "chrome/common/chrome_paths.h"
 #include "chrome/common/chrome_switches.h"
+#include "chrome/common/chrome_version_info.h"
 #include "chrome/common/env_vars.h"
 #include "chrome/common/logging_chrome.h"
 #include "chrome/common/pepper_permission_util.h"
@@ -124,6 +125,7 @@
 #include "content/public/browser/web_contents.h"
 #include "content/public/common/child_process_host.h"
 #include "content/public/common/content_descriptors.h"
+#include "content/public/common/sandbox_type.h"
 #include "content/public/common/service_registry.h"
 #include "content/public/common/url_utils.h"
 #include "content/public/common/web_preferences.h"
@@ -168,6 +170,7 @@
 #include "chrome/common/descriptors_android.h"
 #include "components/crash/browser/crash_dump_manager_android.h"
 #include "components/service_tab_launcher/browser/android/service_tab_launcher.h"
+#include "ui/base/resource/resource_bundle_android.h"
 #elif defined(OS_POSIX)
 #include "chrome/browser/chrome_browser_main_posix.h"
 #endif
@@ -1183,6 +1186,9 @@ void MaybeAppendBlinkSettingsSwitchForFieldTrial(
     // Keys: backgroundHtmlParserOutstandingTokenLimit
     //       backgroundHtmlParserPendingTokenLimit
     "BackgroundHtmlParserTokenLimits",
+
+    // Keys: doHtmlPreloadScanning
+    "HtmlPreloadScanning",
 
     // Keys: lowPriorityIframes
     "LowPriorityIFrames",
@@ -2270,37 +2276,27 @@ void ChromeContentBrowserClient::GetAdditionalFileSystemBackends(
   }
 }
 
-#if defined(OS_POSIX) && !defined(OS_MACOSX)
+#if defined(OS_ANDROID)
 void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
     const base::CommandLine& command_line,
     int child_process_id,
-    FileDescriptorInfo* mappings) {
-#if defined(OS_ANDROID)
-  base::FilePath data_path;
-  PathService::Get(ui::DIR_RESOURCE_PAKS_ANDROID, &data_path);
-  DCHECK(!data_path.empty());
+    FileDescriptorInfo* mappings,
+    std::map<int, base::MemoryMappedFile::Region>* regions) {
+  int fd = ui::GetMainAndroidPackFd(
+      &(*regions)[kAndroidUIResourcesPakDescriptor]);
+  mappings->Share(kAndroidUIResourcesPakDescriptor, fd);
+
+  fd = ui::GetCommonResourcesPackFd(
+      &(*regions)[kAndroidChrome100PercentPakDescriptor]);
+  mappings->Share(kAndroidChrome100PercentPakDescriptor, fd);
 
   int flags = base::File::FLAG_OPEN | base::File::FLAG_READ;
-  base::FilePath chrome_resources_pak =
-      data_path.AppendASCII("chrome_100_percent.pak");
-  base::File file(chrome_resources_pak, flags);
-  DCHECK(file.IsValid());
-  mappings->Transfer(kAndroidChrome100PercentPakDescriptor,
-                     base::ScopedFD(file.TakePlatformFile()));
-
   const std::string locale = GetApplicationLocale();
   base::FilePath locale_pak = ResourceBundle::GetSharedInstance().
       GetLocaleFilePath(locale, false);
-  file.Initialize(locale_pak, flags);
+  base::File file(locale_pak, flags);
   DCHECK(file.IsValid());
   mappings->Transfer(kAndroidLocalePakDescriptor,
-                     base::ScopedFD(file.TakePlatformFile()));
-
-  base::FilePath resources_pack_path;
-  PathService::Get(chrome::FILE_RESOURCES_PACK, &resources_pack_path);
-  file.Initialize(resources_pack_path, flags);
-  DCHECK(file.IsValid());
-  mappings->Transfer(kAndroidUIResourcesPakDescriptor,
                      base::ScopedFD(file.TakePlatformFile()));
 
   if (breakpad::IsCrashReporterEnabled()) {
@@ -2318,18 +2314,70 @@ void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
   base::FilePath app_data_path;
   PathService::Get(base::DIR_ANDROID_APP_DATA, &app_data_path);
   DCHECK(!app_data_path.empty());
-#else
+}
+#elif defined(OS_POSIX) && !defined(OS_MACOSX)
+void ChromeContentBrowserClient::GetAdditionalMappedFilesForChildProcess(
+    const base::CommandLine& command_line,
+    int child_process_id,
+    FileDescriptorInfo* mappings) {
   int crash_signal_fd = GetCrashSignalFD(command_line);
   if (crash_signal_fd >= 0) {
     mappings->Share(kCrashDumpSignal, crash_signal_fd);
   }
-#endif  // defined(OS_ANDROID)
 }
-#endif  // defined(OS_POSIX) && !defined(OS_MACOSX)
+#endif  // defined(OS_ANDROID)
 
 #if defined(OS_WIN)
 const wchar_t* ChromeContentBrowserClient::GetResourceDllName() {
   return chrome::kBrowserResourcesDll;
+}
+
+base::string16 ChromeContentBrowserClient::GetAppContainerSidForSandboxType(
+    int sandbox_type) const {
+  base::string16 sid;
+
+#if defined(GOOGLE_CHROME_BUILD)
+  const chrome::VersionInfo::Channel channel =
+      chrome::VersionInfo::GetChannel();
+
+  // It's possible to have a SxS installation running at the same time as a
+  // non-SxS so isolate them from each other.
+  if (channel == chrome::VersionInfo::CHANNEL_CANARY) {
+    sid.assign(
+        L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
+        L"924012150-");
+  } else {
+    sid.assign(
+        L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
+        L"924012149-");
+  }
+#else
+  sid.assign(
+      L"S-1-15-2-3251537155-1984446955-2931258699-841473695-1938553385-"
+      L"924012148-");
+#endif
+
+  // TODO(wfh): Add support for more process types here. crbug.com/499523
+  switch (sandbox_type) {
+    case content::SANDBOX_TYPE_RENDERER:
+      return sid + L"129201922";
+    case content::SANDBOX_TYPE_UTILITY:
+      return base::string16();
+    case content::SANDBOX_TYPE_GPU:
+      return base::string16();
+    case content::SANDBOX_TYPE_PPAPI:
+      return base::string16();
+#if !defined(DISABLE_NACL)
+    case PROCESS_TYPE_NACL_LOADER:
+      return base::string16();
+    case PROCESS_TYPE_NACL_BROKER:
+      return base::string16();
+#endif
+  }
+
+  // Should never reach here.
+  CHECK(0);
+  return base::string16();
 }
 
 void ChromeContentBrowserClient::PreSpawnRenderer(

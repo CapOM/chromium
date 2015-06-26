@@ -78,7 +78,6 @@ GLES2Implementation::GLES2Implementation(
       chromium_framebuffer_multisample_(kUnknownExtensionStatus),
       pack_alignment_(4),
       unpack_alignment_(4),
-      unpack_flip_y_(false),
       unpack_row_length_(0),
       unpack_image_height_(0),
       unpack_skip_rows_(0),
@@ -1600,9 +1599,6 @@ void GLES2Implementation::PixelStorei(GLenum pname, GLint param) {
     case GL_UNPACK_SKIP_IMAGES:
         unpack_skip_images_ = param;
         return;
-    case GL_UNPACK_FLIP_Y_CHROMIUM:
-        unpack_flip_y_ = (param != 0);
-        break;
     case GL_PACK_REVERSE_ROW_ORDER_ANGLE:
         pack_reverse_row_order_ =
             IsAnglePackReverseRowOrderAvailable() ? (param != 0) : false;
@@ -2098,23 +2094,15 @@ void CopyRectToBuffer(
     uint32 height,
     uint32 unpadded_row_size,
     uint32 pixels_padded_row_size,
-    bool flip_y,
     void* buffer,
     uint32 buffer_padded_row_size) {
   const int8* source = static_cast<const int8*>(pixels);
   int8* dest = static_cast<int8*>(buffer);
-  if (flip_y || pixels_padded_row_size != buffer_padded_row_size) {
-    if (flip_y) {
-      dest += buffer_padded_row_size * (height - 1);
-    }
+  if (pixels_padded_row_size != buffer_padded_row_size) {
     // the last row is copied unpadded at the end
     for (; height > 1; --height) {
       memcpy(dest, source, buffer_padded_row_size);
-      if (flip_y) {
-        dest -= buffer_padded_row_size;
-      } else {
-        dest += buffer_padded_row_size;
-      }
+      dest += buffer_padded_row_size;
       source += pixels_padded_row_size;
     }
     memcpy(dest, source, unpadded_row_size);
@@ -2231,7 +2219,7 @@ void GLES2Implementation::TexImage2D(
 
   if (buffer_pointer) {
     CopyRectToBuffer(
-        pixels, height, unpadded_row_size, src_padded_row_size, unpack_flip_y_,
+        pixels, height, unpadded_row_size, src_padded_row_size,
         buffer_pointer, padded_row_size);
     helper_->TexImage2D(
         target, level, internalformat, width, height, format, type,
@@ -2360,9 +2348,8 @@ void GLES2Implementation::TexImage3D(
       // Only the last row of the last image is unpadded.
       uint32 src_unpadded_row_size =
           (z == depth - 1) ? unpadded_row_size : src_padded_row_size;
-      // TODO(zmo): Ignore flip_y flag for now.
       CopyRectToBuffer(
-          pixels, height, src_unpadded_row_size, src_padded_row_size, false,
+          pixels, height, src_unpadded_row_size, src_padded_row_size,
           buffer_pointer, padded_row_size);
       pixels = reinterpret_cast<const int8*>(pixels) +
           src_padded_row_size * src_height;
@@ -2572,7 +2559,6 @@ void GLES2Implementation::TexSubImage2DImpl(
   DCHECK_GT(width, 0);
 
   const int8* source = reinterpret_cast<const int8*>(pixels);
-  GLint original_yoffset = yoffset;
   // Transfer by rows.
   while (height) {
     unsigned int desired_size =
@@ -2589,10 +2575,9 @@ void GLES2Implementation::TexSubImage2DImpl(
     num_rows = std::min(num_rows, height);
     CopyRectToBuffer(
         source, num_rows, unpadded_row_size, pixels_padded_row_size,
-        unpack_flip_y_, buffer->address(), buffer_padded_row_size);
-    GLint y = unpack_flip_y_ ? original_yoffset + height - num_rows : yoffset;
+        buffer->address(), buffer_padded_row_size);
     helper_->TexSubImage2D(
-        target, level, xoffset, y, width, num_rows, format, type,
+        target, level, xoffset, yoffset, width, num_rows, format, type,
         buffer->shm_id(), buffer->offset(), internal);
     buffer->Release();
     yoffset += num_rows;
@@ -2656,7 +2641,6 @@ void GLES2Implementation::TexSubImage3DImpl(
       my_depth = 1;
     }
 
-    // TODO(zmo): Ignore flip_y flag for now.
     if (num_images > 0) {
       int8* buffer_pointer = reinterpret_cast<int8*>(buffer->address());
       uint32 src_height =
@@ -2671,7 +2655,7 @@ void GLES2Implementation::TexSubImage3DImpl(
           my_unpadded_row_size = pixels_padded_row_size;
         CopyRectToBuffer(
             source + ii * image_size_src, my_height, my_unpadded_row_size,
-            pixels_padded_row_size, false, buffer_pointer + ii * image_size_dst,
+            pixels_padded_row_size, buffer_pointer + ii * image_size_dst,
             buffer_padded_row_size);
       }
     } else {
@@ -2682,7 +2666,7 @@ void GLES2Implementation::TexSubImage3DImpl(
         my_unpadded_row_size = pixels_padded_row_size;
       CopyRectToBuffer(
           source, my_height, my_unpadded_row_size, pixels_padded_row_size,
-          false, buffer->address(), buffer_padded_row_size);
+          buffer->address(), buffer_padded_row_size);
     }
     helper_->TexSubImage3D(
         target, level, xoffset, yoffset + row_index, zoffset + depth_index,
@@ -3121,7 +3105,6 @@ const GLubyte* GLES2Implementation::GetStringHelper(GLenum name) {
     switch (name) {
       case GL_EXTENSIONS:
         str += std::string(str.empty() ? "" : " ") +
-            "GL_CHROMIUM_flipy "
             "GL_EXT_unpack_subimage "
             "GL_CHROMIUM_map_sub";
         if (capabilities_.image)
@@ -4802,8 +4785,7 @@ void GLES2Implementation::BeginQueryEXT(GLenum target, GLuint id) {
                  << ", " << id << ")");
 
   // if any outstanding queries INV_OP
-  QueryMap::iterator it = current_queries_.find(target);
-  if (it != current_queries_.end()) {
+  if (query_tracker_->GetCurrentQuery(target)) {
     SetGLError(
         GL_INVALID_OPERATION, "glBeginQueryEXT", "query already in progress");
     return;
@@ -4821,26 +4803,8 @@ void GLES2Implementation::BeginQueryEXT(GLenum target, GLuint id) {
     return;
   }
 
-  // if id does not have an object
-  QueryTracker::Query* query = query_tracker_->GetQuery(id);
-  if (!query) {
-    query = query_tracker_->CreateQuery(id, target);
-    if (!query) {
-      SetGLError(GL_OUT_OF_MEMORY,
-                 "glBeginQueryEXT",
-                 "transfer buffer allocation failed");
-      return;
-    }
-  } else if (query->target() != target) {
-    SetGLError(
-        GL_INVALID_OPERATION, "glBeginQueryEXT", "target does not match");
-    return;
-  }
-
-  current_queries_[target] = query;
-
-  query->Begin(this);
-  CheckGLError();
+  if (query_tracker_->BeginQuery(id, target, this))
+    CheckGLError();
 }
 
 void GLES2Implementation::EndQueryEXT(GLenum target) {
@@ -4852,16 +4816,8 @@ void GLES2Implementation::EndQueryEXT(GLenum target) {
     return;
   }
 
-  QueryMap::iterator it = current_queries_.find(target);
-  if (it == current_queries_.end()) {
-    SetGLError(GL_INVALID_OPERATION, "glEndQueryEXT", "no active query");
-    return;
-  }
-
-  QueryTracker::Query* query = it->second;
-  query->End(this);
-  current_queries_.erase(it);
-  CheckGLError();
+  if (query_tracker_->EndQuery(target, this))
+    CheckGLError();
 }
 
 void GLES2Implementation::GetQueryivEXT(
@@ -4876,13 +4832,8 @@ void GLES2Implementation::GetQueryivEXT(
     SetGLErrorInvalidEnum("glGetQueryivEXT", pname, "pname");
     return;
   }
-  QueryMap::iterator it = current_queries_.find(target);
-  if (it != current_queries_.end()) {
-    QueryTracker::Query* query = it->second;
-    *params = query->id();
-  } else {
-    *params = 0;
-  }
+  QueryTracker::Query* query = query_tracker_->GetCurrentQuery(target);
+  *params = query ? query->id() : 0;
   GPU_CLIENT_LOG("  " << *params);
   CheckGLError();
 }
@@ -4900,8 +4851,7 @@ void GLES2Implementation::GetQueryObjectuivEXT(
     return;
   }
 
-  QueryMap::iterator it = current_queries_.find(query->target());
-  if (it != current_queries_.end()) {
+  if (query->Active()) {
     SetGLError(
         GL_INVALID_OPERATION,
         "glQueryObjectuivEXT", "query active. Did you to call glEndQueryEXT?");

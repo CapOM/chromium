@@ -116,9 +116,8 @@ void DesktopNotificationService::RequestNotificationPermission(
     }
   }
   if (IsExtensionWithPermissionOrSuggestInConsole(
-          extensions::APIPermission::kNotifications,
-          extension,
-          web_contents->GetRenderViewHost())) {
+          extensions::APIPermission::kNotifications, extension,
+          web_contents->GetMainFrame())) {
     result_callback.Run(CONTENT_SETTING_ALLOW);
     return;
   }
@@ -268,6 +267,7 @@ void DesktopNotificationService::FirePermissionLevelChangedEvent(
   args->Append(new base::StringValue(
       extensions::api::notifications::ToString(permission)));
   scoped_ptr<extensions::Event> event(new extensions::Event(
+      extensions::events::UNKNOWN,
       extensions::api::notifications::OnPermissionLevelChanged::kEventName,
       args.Pass()));
   extensions::EventRouter::Get(profile_)

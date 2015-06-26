@@ -854,6 +854,15 @@
     ],
     'chrome_browser_tests_media_router_sources': [
       'browser/ui/webui/media_router/media_router_dialog_controller_browsertest.cc',
+      'test/data/webui/media_router/media_router_elements_browsertest.js',
+      'test/media_router/media_router_base_browsertest.cc',
+      'test/media_router/media_router_base_browsertest.h',
+      'test/media_router/media_router_e2e_browsertest.cc',
+      'test/media_router/media_router_e2e_browsertest.h',
+      'test/media_router/media_router_integration_browsertest.cc',
+      'test/media_router/media_router_integration_browsertest.h',
+      'test/media_router/test_media_sinks_observer.cc',
+      'test/media_router/test_media_sinks_observer.h',
     ],
     # Javascript sources. These are combined with the .cc files in the GYP build
     # and are handled by a rule, but in the GN build they're in a separate
@@ -958,6 +967,7 @@
       'browser/task_manager/task_manager_browsertest_util.cc',
       'browser/ui/autofill/autofill_popup_controller_interactive_uitest.cc',
       'browser/ui/browser_focus_uitest.cc',
+      'browser/ui/cocoa/apps/app_shim_menu_controller_mac_interactive_uitest.mm',
       'browser/ui/cocoa/apps/quit_with_apps_controller_mac_interactive_uitest.mm',
       'browser/ui/cocoa/extensions/browser_action_button_interactive_uitest.mm',
       'browser/ui/cocoa/panels/panel_cocoa_browsertest.mm',
@@ -2439,7 +2449,10 @@
         }],
         ['enable_media_router==1', {
           'sources': [ '<@(chrome_browser_tests_media_router_sources)' ],
-          'dependencies': [ 'browser/media/router/media_router.gyp:media_router_test_support' ],
+          'dependencies': [
+            'browser/media/router/media_router.gyp:media_router_test_support',
+            'test/media_router/media_router_tests.gypi:media_router_integration_test_files'
+          ],
           'conditions': [
             ['toolkit_views==0', {
               'sources!': [ 'browser/ui/views/media_router/media_router_ui_browsertest.cc' ],
@@ -3072,7 +3085,10 @@
           },
           'dependencies': [
             'chrome_java',
+            '../base/base.gyp:base_java',
+            '../base/base.gyp:base_java_test_support',
             '../content/content_shell_and_tests.gyp:content_java_test_support',
+            '../net/net.gyp:net_java',
             '../net/net.gyp:net_java_test_support',
             '../sync/sync.gyp:sync_java',
             '../sync/sync.gyp:sync_java_test_support',

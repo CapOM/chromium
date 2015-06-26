@@ -32,7 +32,7 @@ const char* kRasterizationFeatureName = "rasterization";
 const char* kMultipleRasterThreadsFeatureName = "multiple_raster_threads";
 
 const int kMinRasterThreads = 1;
-const int kMaxRasterThreads = 16;
+const int kMaxRasterThreads = 4;
 
 const int kMinMSAASampleCount = 0;
 
@@ -198,6 +198,13 @@ int NumberOfRendererRasterThreads() {
       !IsZeroCopyUploadEnabled() && !IsOneCopyUploadEnabled();
   if (async_uploads_is_used)
     --num_raster_threads;
+
+#if defined(OS_ANDROID)
+  // Limit the number of raster threads to 1 on Android.
+  // TODO(reveman): Remove this when we have a better mechanims to prevent
+  // pre-paint raster work from slowing down non-raster work. crbug.com/504515
+  num_raster_threads = 1;
+#endif
 
   const base::CommandLine& command_line =
       *base::CommandLine::ForCurrentProcess();

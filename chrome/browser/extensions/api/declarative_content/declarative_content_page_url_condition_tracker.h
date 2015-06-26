@@ -69,9 +69,6 @@ class DeclarativeContentPageUrlConditionTracker {
   void GetMatches(content::WebContents* contents,
                   std::set<url_matcher::URLMatcherConditionSet::ID>* matches);
 
-  // Called by PerWebContentsTracker on web contents destruction.
-  void DeletePerWebContentsTracker(content::WebContents* tracker);
-
   // Returns true if this object retains no allocated data. Only for debugging.
   bool IsEmpty() const;
 
@@ -108,6 +105,9 @@ class DeclarativeContentPageUrlConditionTracker {
 
     DISALLOW_COPY_AND_ASSIGN(PerWebContentsTracker);
   };
+
+  // Called by PerWebContentsTracker on web contents destruction.
+  void DeletePerWebContentsTracker(content::WebContents* tracker);
 
   void UpdateMatchesForAllTrackers();
 

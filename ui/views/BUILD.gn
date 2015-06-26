@@ -33,6 +33,7 @@ component("views") {
     "//ui/native_theme",
     "//ui/resources",
     "//ui/strings",
+    "//ui/views/resources",
     "//url",
   ]
 
@@ -47,6 +48,7 @@ component("views") {
     "//ui/events/platform",
     "//ui/gfx",
     "//ui/gfx/geometry",
+    "//ui/views/resources",
   ]
 
   if (use_x11 && !is_chromeos) {
@@ -266,7 +268,6 @@ test("views_unittests") {
     sources -= [
       "bubble/bubble_window_targeter_unittest.cc",
       "controls/native/native_view_host_unittest.cc",
-      "focus/focus_manager_unittest.cc",
       "ime/input_method_bridge_unittest.cc",
       "widget/window_reorderer_unittest.cc",
     ]

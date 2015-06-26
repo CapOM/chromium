@@ -8,16 +8,12 @@ import android.content.Context;
 
 import org.chromium.base.BaseChromiumApplication;
 import org.chromium.base.PathUtils;
-import org.chromium.base.ResourceExtractor;
 
 /**
  * Application for testing the Chromium Linker
  */
 public class ChromiumLinkerTestApplication extends BaseChromiumApplication {
 
-    private static final String[] MANDATORY_PAK_FILES = new String[] {
-        "content_shell.pak",
-    };
     private static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "chromium_linker_test";
 
     @Override
@@ -27,7 +23,6 @@ public class ChromiumLinkerTestApplication extends BaseChromiumApplication {
     }
 
     public static void initializeApplicationParameters(Context context) {
-        ResourceExtractor.setMandatoryPaksToExtract(0, MANDATORY_PAK_FILES);
         PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, context);
     }
 

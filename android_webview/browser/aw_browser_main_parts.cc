@@ -26,7 +26,9 @@
 #include "ui/base/l10n/l10n_util.h"
 #include "ui/base/layout.h"
 #include "ui/base/resource/resource_bundle.h"
+#include "ui/base/resource/resource_bundle_android.h"
 #include "ui/base/ui_base_paths.h"
+#include "ui/gl/gl_surface.h"
 
 namespace android_webview {
 
@@ -57,19 +59,20 @@ int AwBrowserMainParts::PreCreateThreads() {
   // fail) just to create the ResourceBundle instance. We should refactor
   // ResourceBundle/GetApplicationLocale to not require an instance to be
   // initialized.
+  ui::SetLocalePaksStoredInApk(true);
   ui::ResourceBundle::InitSharedInstanceWithLocale(
       base::android::GetDefaultLocale(),
       NULL,
       ui::ResourceBundle::DO_NOT_LOAD_COMMON_RESOURCES);
-  std::string locale =
-      "assets/" + l10n_util::GetApplicationLocale(std::string()) + ".pak";
-  int pak_fd = base::android::OpenApkAsset(locale, &pak_region);
+  std::string locale = l10n_util::GetApplicationLocale(std::string());
+  std::string pak_path = ui::GetPathForAndroidLocalePakWithinApk(locale);
+  int pak_fd = base::android::OpenApkAsset(pak_path, &pak_region);
   if (pak_fd != -1) {
     ui::ResourceBundle::CleanupSharedInstance();
     ui::ResourceBundle::InitSharedInstanceWithPakFileRegion(
         base::File(pak_fd), pak_region);
   } else {
-    LOG(WARNING) << "Failed to load " << locale << ".pak from the apk too. "
+    LOG(WARNING) << "Failed to load " << locale << ".pak from the apk. "
                     "Bringing up WebView without any locale";
   }
 
@@ -102,6 +105,8 @@ void AwBrowserMainParts::PreMainMessageLoopRun() {
 
   media::SetMediaClientAndroid(
       new AwMediaClientAndroid(AwResource::GetConfigKeySystemUuidMapping()));
+
+  gfx::GLSurface::InitializeOneOff();
 
   // This is needed for WebView Classic backwards compatibility
   // See crbug.com/298495

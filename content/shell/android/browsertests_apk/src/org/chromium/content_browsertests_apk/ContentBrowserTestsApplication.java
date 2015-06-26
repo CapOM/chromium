@@ -8,16 +8,12 @@ import android.content.Context;
 
 import org.chromium.base.BaseChromiumApplication;
 import org.chromium.base.PathUtils;
-import org.chromium.base.ResourceExtractor;
 
 /**
  * A basic content browser tests {@link android.app.Application}.
  */
 public class ContentBrowserTestsApplication extends BaseChromiumApplication {
 
-    private static final String[] MANDATORY_PAK_FILES = new String[] {
-        "content_shell.pak",
-    };
     static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "content_shell";
 
     @Override
@@ -27,7 +23,6 @@ public class ContentBrowserTestsApplication extends BaseChromiumApplication {
     }
 
     public static void initializeApplicationParameters(Context context) {
-        ResourceExtractor.setMandatoryPaksToExtract(0, MANDATORY_PAK_FILES);
         PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, context);
     }
 

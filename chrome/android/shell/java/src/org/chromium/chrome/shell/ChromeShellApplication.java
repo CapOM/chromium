@@ -19,6 +19,7 @@ import org.chromium.chrome.browser.smartcard.EmptyPKCS11AuthenticationManager;
 import org.chromium.chrome.browser.smartcard.PKCS11AuthenticationManager;
 import org.chromium.chrome.browser.sync.SyncController;
 import org.chromium.chrome.shell.preferences.ChromeShellPreferences;
+import org.chromium.ui.base.ResourceBundle;
 
 import java.util.ArrayList;
 
@@ -29,10 +30,6 @@ import java.util.ArrayList;
 public class ChromeShellApplication extends ChromiumApplication {
 
     private static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "chromeshell";
-    private static final String[] CHROME_MANDATORY_PAKS = {
-        "resources.pak",
-        "chrome_100_percent.pak",
-    };
     private static final String COMMAND_LINE_FILE = "/data/local/tmp/chrome-shell-command-line";
 
     private static final String SESSIONS_UUID_PREF_KEY = "chromium.sync.sessions.id";
@@ -62,7 +59,8 @@ public class ChromeShellApplication extends ChromiumApplication {
 
     @Override
     protected void initializeLibraryDependencies() {
-        ResourceExtractor.setMandatoryPaksToExtract(R.array.locale_paks, CHROME_MANDATORY_PAKS);
+        ResourceBundle.initializeLocalePaks(this, R.array.locale_paks);
+        ResourceExtractor.setResourcesToExtract(ResourceBundle.getActiveLocaleResources());
         PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, this);
     }
 
