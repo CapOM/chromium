@@ -1107,10 +1107,11 @@ void AccessibilityManager::PostLoadChromeVox(Profile* profile) {
     CHECK(event_router);
 
     scoped_ptr<base::ListValue> event_args(new base::ListValue());
-    scoped_ptr<extensions::Event> event(
-        new extensions::Event(extensions::api::accessibility_private::
-                                  OnIntroduceChromeVox::kEventName,
-                              event_args.Pass()));
+    scoped_ptr<extensions::Event> event(new extensions::Event(
+        extensions::events::ACCESSIBILITY_PRIVATE_ON_INTRODUCE_CHROME_VOX,
+        extensions::api::accessibility_private::OnIntroduceChromeVox::
+            kEventName,
+        event_args.Pass()));
     event_router->DispatchEventWithLazyListener(
         extension_misc::kChromeVoxExtensionId, event.Pass());
   }

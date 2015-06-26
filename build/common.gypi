@@ -416,8 +416,10 @@
       # Web speech is enabled by default. Set to 0 to disable.
       'enable_web_speech%': 1,
 
-      # 'Ok Google' hotwording is enabled by default. Set to 0 to disable.
-      'enable_hotwording%': 1,
+      # 'Ok Google' hotwording is disabled by default in open source builds. Set
+      # to 1 to enable. (This will download a closed-source NaCl module at
+      # startup.) Chrome-branded builds have this enabled by default.
+      'enable_hotwording%': 0,
 
       # Notifications are compiled in by default. Set to 0 to disable.
       'notifications%' : 1,
@@ -687,6 +689,9 @@
       'use_lto%': 0,
       'use_lto_o2%': 0,
 
+      # Allowed level of identical code folding in the gold linker.
+      'gold_icf_level%': 'all',
+
       # Libxkbcommon usage.
       'use_xkbcommon%': 0,
 
@@ -834,6 +839,10 @@
 
         ['buildtype=="Official"', {
           'enable_prod_wallet_service%': 1,
+        }],
+
+        ['branding=="Chrome"', {
+          'enable_hotwording%': 1,
         }],
 
         ['OS=="android"', {
@@ -1218,6 +1227,7 @@
     'gomadir%': '<(gomadir)',
     'use_lto%': '<(use_lto)',
     'use_lto_o2%': '<(use_lto_o2)',
+    'gold_icf_level%': '<(gold_icf_level)',
     'video_hole%': '<(video_hole)',
     'v8_use_external_startup_data%': '<(v8_use_external_startup_data)',
     'cfi_vptr%': '<(cfi_vptr)',
@@ -1817,6 +1827,7 @@
         'enable_mpeg2ts_stream_parser%': 1,
         'ffmpeg_branding%': 'ChromeOS',
         'ozone_platform_ozonex%': 1,
+        'use_custom_freetype%': 0,
         'use_playready%': 0,
         'conditions': [
           ['target_arch=="arm"', {
@@ -2196,19 +2207,6 @@
         'clang%': 1,
         'use_allocator%': 'none',
         'use_sanitizer_options%': 1,
-      }],
-
-      # Allowed level of identical code folding in the gold linker.
-      ['OS=="linux" and target_arch=="x64"', {
-        # --icf=safe disables much more folding on x86_64 than elsewhere, see
-        # http://crbug.com/492177.  Turning it on saves over 12 MB of binary
-        # size, but it seems to regress cold startup time by over a second
-        # (see http://crbug.com/492809).
-        # TODO(thakis): Check if disabling ICF would inmprove android cold start
-        # times by several seconds too.
-        'gold_icf_level%': 'safe',
-      }, {
-        'gold_icf_level%': 'all',
       }],
 
       ['OS=="linux" and asan==0 and msan==0 and lsan==0 and tsan==0', {

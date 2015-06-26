@@ -179,7 +179,8 @@
 #include "content/renderer/media/crypto/renderer_cdm_manager.h"
 #endif
 
-#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+#if defined(ENABLE_MOJO_MEDIA)
+#include "media/mojo/services/mojo_cdm_factory.h"
 #include "media/mojo/services/mojo_renderer_factory.h"
 #include "mojo/application/public/interfaces/shell.mojom.h"
 #include "third_party/mojo/src/mojo/public/cpp/bindings/interface_request.h"
@@ -517,11 +518,12 @@ RenderFrameImpl::CreateRenderFrameImplFunction g_create_render_frame_impl =
 RenderFrameImpl* RenderFrameImpl::Create(RenderViewImpl* render_view,
                                          int32 routing_id) {
   DCHECK(routing_id != MSG_ROUTING_NONE);
+  CreateParams params(render_view, routing_id);
 
   if (g_create_render_frame_impl)
-    return g_create_render_frame_impl(render_view, routing_id);
+    return g_create_render_frame_impl(params);
   else
-    return new RenderFrameImpl(render_view, routing_id);
+    return new RenderFrameImpl(params);
 }
 
 // static
@@ -617,12 +619,12 @@ void RenderFrameImpl::InstallCreateHook(
 }
 
 // RenderFrameImpl ----------------------------------------------------------
-RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
+RenderFrameImpl::RenderFrameImpl(const CreateParams& params)
     : frame_(NULL),
       is_subframe_(false),
       is_local_root_(false),
-      render_view_(render_view->AsWeakPtr()),
-      routing_id_(routing_id),
+      render_view_(params.render_view->AsWeakPtr()),
+      routing_id_(params.routing_id),
       is_swapped_out_(false),
       render_frame_proxy_(NULL),
       is_detaching_(false),
@@ -644,7 +646,6 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
 #if defined(ENABLE_BROWSER_CDMS)
       cdm_manager_(NULL),
 #endif
-      cdm_factory_(NULL),
 #if defined(VIDEO_HOLE)
       contains_media_player_(false),
 #endif
@@ -681,6 +682,8 @@ RenderFrameImpl::RenderFrameImpl(RenderViewImpl* render_view, int routing_id)
 RenderFrameImpl::~RenderFrameImpl() {
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, RenderFrameGone());
   FOR_EACH_OBSERVER(RenderFrameObserver, observers_, OnDestruct());
+
+  base::trace_event::TraceLog::GetInstance()->RemoveProcessLabel(routing_id_);
 
 #if defined(VIDEO_HOLE)
   if (contains_media_player_)
@@ -1349,8 +1352,7 @@ void RenderFrameImpl::OnCSSInsertRequest(const std::string& css) {
 
 void RenderFrameImpl::OnAddMessageToConsole(ConsoleMessageLevel level,
                                             const std::string& message) {
-  if (devtools_agent_)
-    devtools_agent_->AddMessageToConsole(level, message);
+  AddMessageToConsole(level, message);
 }
 
 void RenderFrameImpl::OnJavaScriptExecuteRequest(
@@ -1893,6 +1895,12 @@ void RenderFrameImpl::EnsureMojoBuiltinsAreAvailable(
       ServiceRegistryJsWrapper::Create(isolate, &service_registry_).ToV8());
 }
 
+void RenderFrameImpl::AddMessageToConsole(ConsoleMessageLevel level,
+                                          const std::string& message) {
+  if (devtools_agent_)
+    devtools_agent_->AddMessageToConsole(level, message);
+}
+
 // blink::WebFrameClient implementation ----------------------------------------
 
 blink::WebPluginPlaceholder* RenderFrameImpl::createPluginPlaceholder(
@@ -1975,7 +1983,7 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
       base::Bind(&GetSharedMainThreadContext3D), GetMediaPermission(),
       initial_cdm);
 
-#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+#if defined(ENABLE_MOJO_MEDIA)
   scoped_ptr<media::RendererFactory> media_renderer_factory(
       new media::MojoRendererFactory(GetMediaServiceProvider()));
 #else
@@ -1988,7 +1996,7 @@ blink::WebMediaPlayer* RenderFrameImpl::createMediaPlayer(
         media_log, render_thread->GetGpuFactories(),
         *render_thread->GetAudioHardwareConfig()));
   }
-#endif  // defined(ENABLE_MEDIA_MOJO_RENDERER)
+#endif  // defined(ENABLE_MOJO_MEDIA)
 
   return new media::WebMediaPlayerImpl(
       frame, client, weak_factory_.GetWeakPtr(), media_renderer_factory.Pass(),
@@ -2057,9 +2065,10 @@ blink::WebServiceWorkerProvider* RenderFrameImpl::createServiceWorkerProvider(
   ServiceWorkerNetworkProvider* provider =
       ServiceWorkerNetworkProvider::FromDocumentState(
           DocumentState::FromDataSource(frame->dataSource()));
+  DCHECK(provider);
   return new WebServiceWorkerProviderImpl(
       ChildThreadImpl::current()->thread_safe_sender(),
-      provider ? provider->context() : NULL);
+      provider->context());
 }
 
 void RenderFrameImpl::didAccessInitialDocument(blink::WebLocalFrame* frame) {
@@ -2458,9 +2467,14 @@ void RenderFrameImpl::didCreateDataSource(blink::WebLocalFrame* frame,
   // exists).
   if (!ServiceWorkerNetworkProvider::FromDocumentState(
           DocumentState::FromDataSource(datasource))) {
+    ServiceWorkerProviderType provider_type =
+        SERVICE_WORKER_PROVIDER_FOR_WINDOW;
+    if ((frame->effectiveSandboxFlags() & blink::WebSandboxFlags::Origin) ==
+        blink::WebSandboxFlags::Origin) {
+      provider_type = SERVICE_WORKER_PROVIDER_FOR_SANDBOXED_FRAME;
+    }
     scoped_ptr<ServiceWorkerNetworkProvider> network_provider(
-        new ServiceWorkerNetworkProvider(routing_id_,
-                                         SERVICE_WORKER_PROVIDER_FOR_WINDOW));
+        new ServiceWorkerNetworkProvider(routing_id_, provider_type));
     ServiceWorkerNetworkProvider::AttachToDocumentState(
         DocumentState::FromDataSource(datasource),
         network_provider.Pass());
@@ -2846,7 +2860,8 @@ void RenderFrameImpl::didFailLoad(blink::WebLocalFrame* frame,
   Send(new FrameHostMsg_DidFailLoadWithError(routing_id_,
                                              failed_request.url(),
                                              error.reason,
-                                             error_description));
+                                             error_description,
+                                             error.wasIgnoredByHandler));
 }
 
 void RenderFrameImpl::didFinishLoad(blink::WebLocalFrame* frame) {
@@ -3667,6 +3682,8 @@ bool RenderFrameImpl::isControlledByServiceWorker(WebDataSource& data_source) {
   ServiceWorkerNetworkProvider* provider =
       ServiceWorkerNetworkProvider::FromDocumentState(
           DocumentState::FromDataSource(&data_source));
+  if (!provider->context())
+    return false;
   return provider->context()->controller_handle_id() !=
       kInvalidServiceWorkerHandleId;
 }
@@ -3675,8 +3692,7 @@ int64_t RenderFrameImpl::serviceWorkerID(WebDataSource& data_source) {
   ServiceWorkerNetworkProvider* provider =
       ServiceWorkerNetworkProvider::FromDocumentState(
           DocumentState::FromDataSource(&data_source));
-
-  if (provider->context()->controller())
+  if (provider->context() && provider->context()->controller())
     return provider->context()->controller()->version_id();
   return kInvalidServiceWorkerVersionId;
 }
@@ -4777,6 +4793,7 @@ void RenderFrameImpl::SendFailedProvisionalLoad(
       &params.error_description);
   params.url = error.unreachableURL;
   params.showing_repost_interstitial = show_repost_interstitial;
+  params.was_ignored_by_handler = error.wasIgnoredByHandler;
   Send(new FrameHostMsg_DidFailProvisionalLoadWithError(routing_id_, params));
 }
 
@@ -4879,19 +4896,21 @@ WebMediaPlayer* RenderFrameImpl::CreateAndroidWebMediaPlayer(
     WebMediaPlayerClient* client,
     media::MediaPermission* media_permission,
     blink::WebContentDecryptionModule* initial_cdm) {
-  GpuChannelHost* gpu_channel_host =
-      RenderThreadImpl::current()->EstablishGpuChannelSync(
-          CAUSE_FOR_GPU_LAUNCH_VIDEODECODEACCELERATOR_INITIALIZE);
-  if (!gpu_channel_host) {
-    LOG(ERROR) << "Failed to establish GPU channel for media player";
-    return NULL;
-  }
 
   scoped_refptr<StreamTextureFactory> stream_texture_factory;
   if (SynchronousCompositorFactory* factory =
           SynchronousCompositorFactory::GetInstance()) {
     stream_texture_factory = factory->CreateStreamTextureFactory(routing_id_);
   } else {
+    GpuChannelHost* gpu_channel_host =
+        RenderThreadImpl::current()->EstablishGpuChannelSync(
+            CAUSE_FOR_GPU_LAUNCH_VIDEODECODEACCELERATOR_INITIALIZE);
+
+    if (!gpu_channel_host) {
+      LOG(ERROR) << "Failed to establish GPU channel for media player";
+      return NULL;
+    }
+
     scoped_refptr<cc_blink::ContextProviderWebContext> context_provider =
         RenderThreadImpl::current()->SharedMainThreadContextProvider();
 
@@ -4925,7 +4944,7 @@ media::MediaPermission* RenderFrameImpl::GetMediaPermission() {
   return media_permission_dispatcher_;
 }
 
-#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+#if defined(ENABLE_MOJO_MEDIA)
 mojo::ServiceProvider* RenderFrameImpl::GetMediaServiceProvider() {
   if (!media_service_provider_) {
     mojo::InterfacePtr<mojo::Shell> shell_ptr;
@@ -4964,16 +4983,21 @@ media::CdmFactory* RenderFrameImpl::GetCdmFactory() {
 
   if (!cdm_factory_) {
     DCHECK(frame_);
-    cdm_factory_ = new RenderCdmFactory(
+
+#if defined(ENABLE_MEDIA_MOJO_RENDERER)
+    cdm_factory_.reset(new media::MojoCdmFactory(GetMediaServiceProvider()));
+#else
+    cdm_factory_.reset(new RenderCdmFactory(
 #if defined(ENABLE_PEPPER_CDMS)
-        base::Bind(&PepperCdmWrapperImpl::Create, frame_),
+        base::Bind(&PepperCdmWrapperImpl::Create, frame_)
 #elif defined(ENABLE_BROWSER_CDMS)
-        cdm_manager_,
+        cdm_manager_
 #endif
-        this);
+        ));
+#endif  //  defined(ENABLE_MEDIA_MOJO_RENDERER)
   }
 
-  return cdm_factory_;
+  return cdm_factory_.get();
 }
 
 }  // namespace content

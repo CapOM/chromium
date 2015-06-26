@@ -25,9 +25,6 @@ namespace chromeos {
 namespace file_system_provider {
 namespace operations {
 
-// Checks whether the passed name is valid or not.
-bool ValidateName(const std::string& name, bool root_entry);
-
 // Bridge between fileapi get actions operation and providing extension's get
 // actions request. Created per request.
 class GetActions : public Operation {

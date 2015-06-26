@@ -23,11 +23,10 @@ import org.chromium.base.TraceEvent;
 import org.chromium.base.library_loader.LibraryLoader;
 import org.chromium.base.library_loader.LibraryProcessType;
 import org.chromium.base.library_loader.ProcessInitException;
-import org.chromium.chrome.browser.child_accounts.ChildAccountService;
+import org.chromium.chrome.browser.childaccounts.ChildAccountService;
 import org.chromium.chrome.browser.externalauth.ExternalAuthUtils;
 import org.chromium.chrome.browser.feedback.EmptyFeedbackReporter;
 import org.chromium.chrome.browser.feedback.FeedbackReporter;
-import org.chromium.chrome.browser.firstrun.FirstRunActivity;
 import org.chromium.chrome.browser.help.HelpAndFeedback;
 import org.chromium.chrome.browser.init.InvalidStartupDialog;
 import org.chromium.chrome.browser.net.spdyproxy.DataReductionProxySettings;
@@ -43,6 +42,7 @@ import org.chromium.chrome.browser.services.AndroidEduOwnerCheckCallback;
 import org.chromium.chrome.browser.smartcard.PKCS11AuthenticationManager;
 import org.chromium.content.app.ContentApplication;
 import org.chromium.content.browser.BrowserStartupController;
+import org.chromium.ui.base.ActivityWindowAndroid;
 
 /**
  * Basic application functionality that should be shared among all browser applications that use
@@ -77,14 +77,11 @@ public abstract class ChromiumApplication extends ContentApplication {
 
     /**
      * Returns the class name of the Settings activity.
+     *
+     * TODO(newt): delete this when ChromeShell is deleted.
      */
-    public abstract String getSettingsActivityName();
-
-    /**
-     * Returns the class name of the FirstRun activity.
-     */
-    public String getFirstRunActivityName() {
-        return FirstRunActivity.class.getName();
+    public String getSettingsActivityName() {
+        return Preferences.class.getName();
     }
 
     /**
@@ -313,5 +310,12 @@ public abstract class ChromiumApplication extends ContentApplication {
      */
     public HelpAndFeedback createHelpAndFeedback() {
         return new HelpAndFeedback();
+    }
+
+    /**
+     * @return A new ActivityWindowAndroid instance.
+     */
+    public ActivityWindowAndroid createActivityWindowAndroid(Activity activity) {
+        return new ActivityWindowAndroid(activity, true);
     }
 }

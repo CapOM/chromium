@@ -35,7 +35,6 @@
 #include "cc/layers/layer_iterator.h"
 #include "cc/layers/painted_scrollbar_layer.h"
 #include "cc/layers/render_surface.h"
-#include "cc/resources/prioritized_resource_manager.h"
 #include "cc/resources/ui_resource_request.h"
 #include "cc/scheduler/begin_frame_source.h"
 #include "cc/trees/draw_property_utils.h"
@@ -731,6 +730,7 @@ bool LayerTreeHost::DoUpdateLayers(Layer* root_layer) {
   LayerTreeHostCommon::CalcDrawPropsMainInputs inputs(
       root_layer, device_viewport_size(), gfx::Transform(),
       device_scale_factor_, page_scale_factor_, page_scale_layer,
+      inner_viewport_scroll_layer_.get(), outer_viewport_scroll_layer_.get(),
       elastic_overscroll_, overscroll_elasticity_layer_.get(),
       GetRendererCapabilities().max_texture_size, settings_.can_use_lcd_text,
       settings_.layers_always_allowed_lcd_text, can_render_to_separate_surface,
@@ -753,9 +753,10 @@ bool LayerTreeHost::DoUpdateLayers(Layer* root_layer) {
     TRACE_EVENT0(TRACE_DISABLED_BY_DEFAULT("cc.debug.cdp-perf"),
                  "LayerTreeHostCommon::ComputeVisibleRectsWithPropertyTrees");
     BuildPropertyTreesAndComputeVisibleRects(
-        root_layer, page_scale_layer, page_scale_factor_, device_scale_factor_,
-        gfx::Rect(device_viewport_size_), identity_transform, &property_trees_,
-        &update_layer_list);
+        root_layer, page_scale_layer, inner_viewport_scroll_layer_.get(),
+        outer_viewport_scroll_layer_.get(), page_scale_factor_,
+        device_scale_factor_, gfx::Rect(device_viewport_size_),
+        identity_transform, &property_trees_, &update_layer_list);
   }
 
   for (const auto& layer : update_layer_list)

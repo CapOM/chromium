@@ -1356,8 +1356,8 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           <message name="IDS_PRINT" desc="In Title Case: The text label of the Print... menu item. Opens a dialog box to select print settings">
             &amp;Print...
           </message>
-          <message name="IDS_MORE_TOOLS_MENU" desc="The text label of the Tools submenu for touch">
-            More too&amp;ls
+          <message name="IDS_MORE_TOOLS_MENU" desc="In Title Case: The text label of the Tools submenu for touch">
+            More Too&amp;ls
           </message>
           <message name="IDS_ZOOM_MENU" desc="In Title Case: The text label of the Zoom submenu">
             &amp;Zoom
@@ -1580,7 +1580,7 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
           Get H&amp;elp
         </message>
         <message name="IDS_HELP_MENU" desc="The text label of the Help sub-menu item">
-          H&amp;elp
+          H&amp;elp and about
         </message>
         <message name="IDS_EXIT" desc="The text label of the Exit menu item">
           E&amp;xit
@@ -1620,8 +1620,8 @@ Psst! Incognito mode <ph name="SHORTCUT_KEY">$1<ex>(Ctrl+Shift+N)</ex></ph> may 
         <message name="IDS_GET_HELP" desc="The text label of the Get Help menu item">
           Get H&amp;elp
         </message>
-        <message name="IDS_HELP_MENU" desc="The text label of the Help sub-menu item">
-          H&amp;elp
+        <message name="IDS_HELP_MENU" desc="In Title Case: The text label of the Help sub-menu item">
+          H&amp;elp and About
         </message>
         <message name="IDS_EXIT" desc="In Title Case: The text label of the Exit menu item">
           E&amp;xit
@@ -4283,6 +4283,15 @@ Even if you have downloaded files from this website before, the website might ha
       <message name="IDS_EXTENSION_BUNDLE_INSTALL_PROMPT_TITLE_EXTENSION_APPS" desc="Titlebar of the extension and app bundle installation prompt. Asks the user if they want to install the set of apps and extensions.">
         "<ph name="BUNDLE_NAME">$1<ex>My Awesome Bundle</ex></ph>" adds these apps and extensions:
       </message>
+      <message name="IDS_EXTENSION_BUNDLE_DELEGATED_INSTALL_PROMPT_TITLE_EXTENSIONS" desc="First bold line in the content area of the extension bundle installation prompt. Asks the user if they want to install the set of extensions.">
+        "<ph name="BUNDLE_NAME">$1<ex>My Awesome Bundle</ex></ph>" adds these extensions for <ph name="USER_NAME">$2<ex>Wallace</ex></ph>:
+      </message>
+      <message name="IDS_EXTENSION_BUNDLE_DELEGATED_INSTALL_PROMPT_TITLE_APPS" desc="First bold line in the content area of the app bundle installation prompt. Asks the user if they want to install the set of apps.">
+        "<ph name="BUNDLE_NAME">$1<ex>My Awesome Bundle</ex></ph>" adds these apps for <ph name="USER_NAME">$2<ex>Wallace</ex></ph>:
+      </message>
+      <message name="IDS_EXTENSION_BUNDLE_DELEGATED_INSTALL_PROMPT_TITLE_EXTENSION_APPS" desc="First bold line in the content area of the extension and app bundle installation prompt. Asks the user if they want to install the set of apps and extensions.">
+        "<ph name="BUNDLE_NAME">$1<ex>My Awesome Bundle</ex></ph>" adds these apps and extensions for <ph name="USER_NAME">$2<ex>Wallace</ex></ph>:
+      </message>
       <message name="IDS_EXTENSION_UNINSTALL_PROMPT_HEADING" desc="First bold line in the content area of the extension or app uninstallation prompt. Asks the user if they want to uninstall a particular extension or app.">
         Remove "<ph name="EXTENSION_NAME">$1<ex>Gmail Checker</ex></ph>"?
       </message>
@@ -6434,11 +6443,17 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_SYNC_APP_LIST_DESCRIPTION" desc="Description for the flag to enable syncing the app list.">
         Enable App Launcher sync. This also enables Folders where available (non OSX).
       </message>
-      <message name="IDS_FLAGS_ENABLE_LAUNCHER_SEARCH_PROVIDER_API" desc="Name of the flag to enable launcher search provider api.">
-        Enable Launcher Search Provider API.
+      <message name="IDS_FLAGS_DISABLE_DRIVE_SEARCH_IN_APP_LAUNCHER" desc="Name of the flag to disable drive search in app launcher.">
+        Disable Drive search in Chrome App Launcher.
       </message>
-      <message name="IDS_FLAGS_ENABLE_LAUNCHER_SEARCH_PROVIDER_API_DESCRIPTION" desc="Description for the flag to enable launcher search provider api.">
-        This API allows extensions to listen queries of the Chrome Launcher and return their search results to it.
+      <message name="IDS_FLAGS_DISABLE_DRIVE_SEARCH_IN_APP_LAUNCHER_DESCRIPTION" desc="Description for the flag to disable drive search in app launcher.">
+        Files from Drive will no longer show up when searching in the Chrome App Launcher.
+      </message>
+      <message name="IDS_FLAGS_DISABLE_LAUNCHER_SEARCH_PROVIDER_API" desc="Name of the flag to disable launcher search provider api.">
+        Disable the public Launcher Search Provider API.
+      </message>
+      <message name="IDS_FLAGS_DISABLE_LAUNCHER_SEARCH_PROVIDER_API_DESCRIPTION" desc="Description for the flag to disable launcher search provider api.">
+        Disable the public version of the Launcher Search Provider API. This API allows apps/extensions to listen to searches in the Chrome App Launcher and respond with search results. This flag does not affect Drive search.
       </message>
       <if expr="is_macosx">
         <message name="IDS_FLAGS_ENABLE_AVFOUNDATION_NAME" desc="Name of the flag to enable Mac AVFoundation.">
@@ -6540,6 +6555,24 @@ Keep your key file in a safe place. You will need it to create new versions of y
       </message>
       <message name="IDS_FLAGS_ENABLE_ZERO_COPY_DESCRIPTION" desc="Description of about:flags option for zero-copy rasterizer.">
         If enabled, raster threads write directly to GPU memory associated with tiles.
+      </message>
+      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_NAME" desc="Name of about:flags option for maximum tiles for interest area.">
+        Maximum tiles for interest area
+      </message>
+      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_DESCRIPTION" desc="Description of about:flags option for maximum tiles for interest area.">
+        Specify the maximum tiles for interest area.
+      </message>
+      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_SHORT" desc="">
+        64
+      </message>
+      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_TALL" desc="">
+        128
+      </message>
+      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_GRANDE" desc="">
+        256
+      </message>
+      <message name="IDS_FLAGS_MAX_TILES_FOR_INTEREST_AREA_VENTI" desc="">
+        512
       </message>
       <message name="IDS_FLAGS_TAB_CAPTURE_UPSCALE_QUALITY_NAME" desc="">
         Tab capture upscaling quality.
@@ -6756,12 +6789,6 @@ Keep your key file in a safe place. You will need it to create new versions of y
       <message name="IDS_FLAGS_ENABLE_ENHANCED_BOOKMARKS_DESCRIPTION" desc="Description of about:flags option to enable Enhanced Bookmarks extension.">
         Provides an off switch for enhanced bookmarks experiment
       </message>
-      <message name="IDS_FLAGS_ENABLE_PERMISSIONS_BUBBLES_NAME" desc="Title for the flag to enable showing permissions requests in bubbles.">
-        Use Bubbles for Permission Requests
-      </message>
-      <message name="IDS_FLAGS_ENABLE_PERMISSIONS_BUBBLES_DESCRIPTION" desc="Description for the flag to enable showing permissions requests in bubbles.">
-        Show content permission requests (e.g. notifications, quota, camera use, microphone use) in bubbles instead of info bars.
-      </message>
       <message name="IDS_FLAGS_ENABLE_SITE_ENGAGEMENT_SERVICE_NAME" desc="Title for the flag to enable the site engagement service.">
         Enable Site Engagement Service
       </message>
@@ -6935,6 +6962,12 @@ Keep your key file in a safe place. You will need it to create new versions of y
         </message>
         <message name="IDS_FLAGS_MAC_VIEWS_NATIVE_APP_WINDOWS_DESCRIPTION" desc="Description of flag to enable or disable toolkit-views Chrome App windows on Mac.">
           Controls whether to use Toolkit-Views based Chrome App windows.
+        </message>
+        <message name="IDS_FLAGS_APP_WINDOW_CYCLING_NAME" desc="Name of the flag to enable or disable custom Cmd+` App window cycling on Mac.">
+          Custom Window Cycling for Chrome Apps.
+        </message>
+        <message name="IDS_FLAGS_APP_WINDOW_CYCLING_DESCRIPTION" desc="Description of flag to enable or disable custom Cmd+` App window cycling on Mac.">
+          Changes the behavior of Cmd+` when a Chrome App becomes active. When enabled, Chrome Apps will not be cycled when Cmd+` is pressed from a browser window, and browser windows will not be cycled when a Chrome App is active.
         </message>
       </if>
 
@@ -12403,7 +12436,10 @@ Some features may be unavailable.  Please check that the profile exists and you 
         Block
       </message>
 
-      <if expr="use_title_case">
+      <if expr="use_titlecase">
+        <message name="IDS_HISTORY_RECENT_TABS_MENU" desc="In Title Case: The title of the History and Recent Tabs menu in the wrench menu.">
+          History and Recent Tabs
+        </message>
         <message name="IDS_RECENT_TABS_MENU" desc="In Title Case: The title of the Recent Tabs menu in the wrench menu.">
           Recent Tabs
         </message>
@@ -12413,8 +12449,14 @@ Some features may be unavailable.  Please check that the profile exists and you 
         <message name="IDS_RECENTLY_CLOSED_WINDOW" desc="In Title Case: Title of recently closed windows in Recent Tabs menu. [ICU_Syntax]">
           {NUM_TABS, plural, =1 {1 Tab} other {# Tabs}}
         </message>
+        <message name="IDS_RECENT_TABS_NO_DEVICE_TABS" desc="In Title Case: The label in the Recent Tabs menu in the wrench menu when there's no tabs from other devices.">
+          No Tabs From Other Devices
+        </message>
       </if>
-      <if expr="not use_title_case">
+      <if expr="not use_titlecase">
+        <message name="IDS_HISTORY_RECENT_TABS_MENU" desc="The title of the History and Recent Tabs menu in the wrench menu.">
+          History and recent tabs
+        </message>
         <message name="IDS_RECENT_TABS_MENU" desc="The title of the Recent Tabs menu in the wrench menu.">
           Recent tabs
         </message>
@@ -12424,11 +12466,11 @@ Some features may be unavailable.  Please check that the profile exists and you 
         <message name="IDS_RECENTLY_CLOSED_WINDOW" desc="Title of recently closed windows in Recent Tabs menu. [ICU_Syntax]">
           {NUM_TABS, plural, =1 {1 tab} other {# tabs}}
         </message>
+        <message name="IDS_RECENT_TABS_NO_DEVICE_TABS" desc="The label in the Recent Tabs menu in the wrench menu when there's no tabs from other devices.">
+          No tabs from other devices
+        </message>
       </if>
 
-      <message name="IDS_RECENT_TABS_NO_DEVICE_TABS" desc="The label in the Recent Tabs menu in the wrench menu when there's no tabs from other devices.">
-        No tabs from other devices
-      </message>
       <message name="IDS_RECENT_TABS_MORE" desc="The label in the Recent Tabs menu in the wrench menu to open the other devices and history page.">
         More...
       </message>

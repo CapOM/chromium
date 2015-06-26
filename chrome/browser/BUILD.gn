@@ -20,8 +20,10 @@ if (is_desktop_linux) {
 }
 
 declare_args() {
-  # 'Ok Google' hotwording is enabled.
-  enable_hotwording = true
+  # 'Ok Google' hotwording is disabled by default in open source builds. Set to
+  # true to enable. (This will download a closed-source NaCl module at startup.)
+  # Chrome-branded builds have this enabled by default.
+  enable_hotwording = is_chrome_branded
 }
 
 about_credits_file = "$target_gen_dir/about_credits.html"
@@ -127,7 +129,6 @@ source_set("browser") {
     "//components/password_manager/core/browser",
     "//components/password_manager/core/common",
     "//components/policy:policy_component",
-    "//components/precache/core",
     "//components/query_parser",
     "//components/rappor",
     "//components/renderer_context_menu",
@@ -263,8 +264,7 @@ source_set("browser") {
       "//components/navigation_interception",
       "//components/password_manager/content/browser",
       "//components/plugins/common",
-      "//components/precache/content",
-      "//components/safe_json_parser",
+      "//components/safe_json",
       "//components/sessions",
       "//components/storage_monitor",
       "//components/translate/content/browser",
@@ -642,8 +642,9 @@ source_set("browser") {
       ":jni_headers",
       "//components/cdm/browser",
       "//components/enhanced_bookmarks",
+      "//components/precache/content",
+      "//components/precache/core",
       "//components/resources:components_resources",
-      "//components/resources/enhanced_bookmarks:enhanced_bookmarks_resources",
       "//components/service_tab_launcher",
       "//components/web_contents_delegate_android",
       "//third_party/android_opengl/etc1",

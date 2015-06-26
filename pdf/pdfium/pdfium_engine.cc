@@ -472,7 +472,7 @@ void FormatStringWithHyphens(base::string16* text) {
       current_hyphen_position = HyphenPosition();
       current_hyphen_position.position = i;
       current_hyphen_position_is_valid = true;
-    } else if (IsWhitespace(current_char)) {
+    } else if (base::IsUnicodeWhitespace(current_char)) {
       if (current_hyphen_position_is_valid) {
         if (current_char != L'\r' && current_char != L'\n')
           current_hyphen_position.next_whitespace_position = i;
@@ -499,7 +499,7 @@ void FormatStringWithHyphens(base::string16* text) {
   // Adobe Reader also get rid of trailing spaces right before a CRLF.
   static const base::char16 kSpaceCrCn[] = {L' ', L'\r', L'\n', L'\0'};
   static const base::char16 kCrCn[] = {L'\r', L'\n', L'\0'};
-  ReplaceSubstringsAfterOffset(text, 0, kSpaceCrCn, kCrCn);
+  base::ReplaceSubstringsAfterOffset(text, 0, kSpaceCrCn, kCrCn);
 }
 
 // Replace CR/LF with just LF on POSIX.

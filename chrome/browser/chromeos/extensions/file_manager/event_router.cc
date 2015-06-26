@@ -95,10 +95,11 @@ bool IsRecoveryToolRunning(Profile* profile) {
 
 // Sends an event named |event_name| with arguments |event_args| to extensions.
 void BroadcastEvent(Profile* profile,
+                    extensions::events::HistogramValue histogram_value,
                     const std::string& event_name,
                     scoped_ptr<base::ListValue> event_args) {
-  extensions::EventRouter::Get(profile)->BroadcastEvent(
-      make_scoped_ptr(new extensions::Event(event_name, event_args.Pass())));
+  extensions::EventRouter::Get(profile)->BroadcastEvent(make_scoped_ptr(
+      new extensions::Event(histogram_value, event_name, event_args.Pass())));
 }
 
 // Sends an event named |event_name| with arguments |event_args| to an extension
@@ -109,7 +110,8 @@ void DispatchEventToExtension(Profile* profile,
                               scoped_ptr<base::ListValue> event_args) {
   extensions::EventRouter::Get(profile)->DispatchEventToExtension(
       extension_id,
-      make_scoped_ptr(new extensions::Event(event_name, event_args.Pass())));
+      make_scoped_ptr(new extensions::Event(extensions::events::UNKNOWN,
+                                            event_name, event_args.Pass())));
 }
 
 file_manager_private::MountCompletedStatus
@@ -180,6 +182,8 @@ CopyProgressTypeToCopyProgressStatusType(
       return file_manager_private::COPY_PROGRESS_STATUS_TYPE_END_COPY_ENTRY;
     case storage::FileSystemOperation::PROGRESS:
       return file_manager_private::COPY_PROGRESS_STATUS_TYPE_PROGRESS;
+    case storage::FileSystemOperation::ERROR_COPY_ENTRY:
+      return file_manager_private::COPY_PROGRESS_STATUS_TYPE_ERROR;
   }
   NOTREACHED();
   return file_manager_private::COPY_PROGRESS_STATUS_TYPE_NONE;
@@ -295,6 +299,7 @@ class DeviceEventRouterImpl : public DeviceEventRouter {
     event.device_path = device_path;
 
     BroadcastEvent(profile_,
+                   extensions::events::FILE_MANAGER_PRIVATE_ON_DEVICE_CHANGED,
                    file_manager_private::OnDeviceChanged::kEventName,
                    file_manager_private::OnDeviceChanged::Create(event));
   }
@@ -324,9 +329,11 @@ class JobEventRouterImpl : public JobEventRouter {
     return file_manager::util::ConvertDrivePathToFileSystemUrl(profile_, path,
                                                                id);
   }
-  void BroadcastEvent(const std::string& event_name,
+  void BroadcastEvent(extensions::events::HistogramValue histogram_value,
+                      const std::string& event_name,
                       scoped_ptr<base::ListValue> event_args) override {
-    ::file_manager::BroadcastEvent(profile_, event_name, event_args.Pass());
+    ::file_manager::BroadcastEvent(profile_, histogram_value, event_name,
+                                   event_args.Pass());
   }
 
  private:
@@ -527,10 +534,10 @@ void EventRouter::OnCopyCompleted(int copy_id,
     status.error.reset(new std::string(FileErrorToErrorName(error)));
   }
 
-  BroadcastEvent(
-      profile_,
-      file_manager_private::OnCopyProgress::kEventName,
-      file_manager_private::OnCopyProgress::Create(copy_id, status));
+  BroadcastEvent(profile_,
+                 extensions::events::FILE_MANAGER_PRIVATE_ON_COPY_PROGRESS,
+                 file_manager_private::OnCopyProgress::kEventName,
+                 file_manager_private::OnCopyProgress::Create(copy_id, status));
 }
 
 void EventRouter::OnCopyProgress(
@@ -544,10 +551,19 @@ void EventRouter::OnCopyProgress(
   file_manager_private::CopyProgressStatus status;
   status.type = CopyProgressTypeToCopyProgressStatusType(type);
   status.source_url.reset(new std::string(source_url.spec()));
-  if (type == storage::FileSystemOperation::END_COPY_ENTRY)
+  if (type == storage::FileSystemOperation::END_COPY_ENTRY ||
+      type == storage::FileSystemOperation::ERROR_COPY_ENTRY)
     status.destination_url.reset(new std::string(destination_url.spec()));
+  if (type == storage::FileSystemOperation::ERROR_COPY_ENTRY)
+    status.error.reset(
+        new std::string(FileErrorToErrorName(base::File::FILE_ERROR_FAILED)));
   if (type == storage::FileSystemOperation::PROGRESS)
     status.size.reset(new double(size));
+
+  // Discard error progress since current JS code cannot handle this properly.
+  // TODO(yawano): Remove this after JS side is implemented correctly.
+  if (type == storage::FileSystemOperation::ERROR_COPY_ENTRY)
+    return;
 
   // Should not skip events other than TYPE_PROGRESS.
   const bool always =
@@ -555,10 +571,10 @@ void EventRouter::OnCopyProgress(
   if (!ShouldSendProgressEvent(always, &last_copy_progress_event_))
     return;
 
-  BroadcastEvent(
-      profile_,
-      file_manager_private::OnCopyProgress::kEventName,
-      file_manager_private::OnCopyProgress::Create(copy_id, status));
+  BroadcastEvent(profile_,
+                 extensions::events::FILE_MANAGER_PRIVATE_ON_COPY_PROGRESS,
+                 file_manager_private::OnCopyProgress::kEventName,
+                 file_manager_private::OnCopyProgress::Create(copy_id, status));
 }
 
 void EventRouter::OnWatcherManagerNotification(
@@ -579,7 +595,8 @@ void EventRouter::DefaultNetworkChanged(const chromeos::NetworkState* network) {
   }
 
   BroadcastEvent(
-      profile_,
+      profile_, extensions::events::
+                    FILE_MANAGER_PRIVATE_ON_DRIVE_CONNECTION_STATUS_CHANGED,
       file_manager_private::OnDriveConnectionStatusChanged::kEventName,
       file_manager_private::OnDriveConnectionStatusChanged::Create());
 }
@@ -591,7 +608,7 @@ void EventRouter::OnFileManagerPrefsChanged() {
   }
 
   BroadcastEvent(
-      profile_,
+      profile_, extensions::events::FILE_MANAGER_PRIVATE_ON_PREFERENCES_CHANGED,
       file_manager_private::OnPreferencesChanged::kEventName,
       file_manager_private::OnPreferencesChanged::Create());
 }
@@ -680,10 +697,10 @@ void EventRouter::OnDriveSyncError(drive::file_system::DriveSyncErrorType type,
   }
   event.file_url = util::ConvertDrivePathToFileSystemUrl(
       profile_, drive_path, kFileManagerAppId).spec();
-  BroadcastEvent(
-      profile_,
-      file_manager_private::OnDriveSyncError::kEventName,
-      file_manager_private::OnDriveSyncError::Create(event));
+  BroadcastEvent(profile_,
+                 extensions::events::FILE_MANAGER_PRIVATE_ON_DRIVE_SYNC_ERROR,
+                 file_manager_private::OnDriveSyncError::kEventName,
+                 file_manager_private::OnDriveSyncError::Create(event));
 }
 
 void EventRouter::OnRefreshTokenInvalid() {
@@ -691,7 +708,8 @@ void EventRouter::OnRefreshTokenInvalid() {
 
   // Raise a DriveConnectionStatusChanged event to notify the status offline.
   BroadcastEvent(
-      profile_,
+      profile_, extensions::events::
+                    FILE_MANAGER_PRIVATE_ON_DRIVE_CONNECTION_STATUS_CHANGED,
       file_manager_private::OnDriveConnectionStatusChanged::kEventName,
       file_manager_private::OnDriveConnectionStatusChanged::Create());
 }
@@ -701,7 +719,8 @@ void EventRouter::OnReadyToSendRequests() {
 
   // Raise a DriveConnectionStatusChanged event to notify the status online.
   BroadcastEvent(
-      profile_,
+      profile_, extensions::events::
+                    FILE_MANAGER_PRIVATE_ON_DRIVE_CONNECTION_STATUS_CHANGED,
       file_manager_private::OnDriveConnectionStatusChanged::kEventName,
       file_manager_private::OnDriveConnectionStatusChanged::Create());
 }
@@ -899,6 +918,7 @@ void EventRouter::DispatchMountCompletedEvent(
   event.should_notify =
       ShouldShowNotificationForVolume(profile_, *device_event_router_, volume);
   BroadcastEvent(profile_,
+                 extensions::events::FILE_MANAGER_PRIVATE_ON_MOUNT_COMPLETED,
                  file_manager_private::OnMountCompleted::kEventName,
                  file_manager_private::OnMountCompleted::Create(event));
 }

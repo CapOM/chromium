@@ -6,7 +6,6 @@ package org.chromium.content_shell_apk;
 
 import org.chromium.base.CommandLine;
 import org.chromium.base.PathUtils;
-import org.chromium.base.ResourceExtractor;
 import org.chromium.content.app.ContentApplication;
 
 /**
@@ -16,9 +15,6 @@ import org.chromium.content.app.ContentApplication;
 public class ContentShellApplication extends ContentApplication {
 
     public static final String COMMAND_LINE_FILE = "/data/local/tmp/content-shell-command-line";
-    private static final String[] MANDATORY_PAK_FILES = new String[] {
-        "content_shell.pak",
-    };
     private static final String PRIVATE_DATA_DIRECTORY_SUFFIX = "content_shell";
 
     @Override
@@ -28,7 +24,6 @@ public class ContentShellApplication extends ContentApplication {
 
     @Override
     protected void initializeLibraryDependencies() {
-        ResourceExtractor.setMandatoryPaksToExtract(0, MANDATORY_PAK_FILES);
         PathUtils.setPrivateDataDirectorySuffix(PRIVATE_DATA_DIRECTORY_SUFFIX, this);
     }
 

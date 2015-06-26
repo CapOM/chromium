@@ -19,9 +19,8 @@
 #include "cc/output/output_surface.h"
 #include "cc/output/swap_promise.h"
 #include "cc/quads/draw_quad.h"
-#include "cc/resources/prioritized_resource_manager.h"
 #include "cc/scheduler/commit_earlyout_reason.h"
-#include "cc/scheduler/delay_based_time_source.h"
+#include "cc/scheduler/compositor_timing_history.h"
 #include "cc/scheduler/scheduler.h"
 #include "cc/trees/blocking_task_runner.h"
 #include "cc/trees/layer_tree_host.h"
@@ -113,8 +112,8 @@ ThreadProxy::CompositorThreadOnly::CompositorThreadOnly(
           base::Bind(&ThreadProxy::RenewTreePriority, base::Unretained(proxy)),
           base::TimeDelta::FromMilliseconds(
               kSmoothnessTakesPriorityExpirationDelay * 1000)),
-      timing_history(rendering_stats_instrumentation),
       external_begin_frame_source(external_begin_frame_source.Pass()),
+      rendering_stats_instrumentation(rendering_stats_instrumentation),
       weak_factory(proxy) {
 }
 
@@ -653,8 +652,6 @@ void ThreadProxy::ScheduledActionSendBeginMainFrame() {
       impl().layer_tree_host_impl->ProcessScrollDeltas();
   begin_main_frame_state->memory_allocation_limit_bytes =
       impl().layer_tree_host_impl->memory_allocation_limit_bytes();
-  begin_main_frame_state->memory_allocation_priority_cutoff =
-      impl().layer_tree_host_impl->memory_allocation_priority_cutoff();
   begin_main_frame_state->evicted_ui_resources =
       impl().layer_tree_host_impl->EvictedUIResourcesExist();
   // TODO(vmpstr): This needs to be fixed if
@@ -668,7 +665,6 @@ void ThreadProxy::ScheduledActionSendBeginMainFrame() {
                  base::Passed(&begin_main_frame_state)));
   devtools_instrumentation::DidRequestMainThreadFrame(
       impl().layer_tree_host_id);
-  impl().timing_history.DidBeginMainFrame();
 }
 
 void ThreadProxy::SendBeginMainFrameNotExpectedSoon() {
@@ -923,8 +919,6 @@ void ThreadProxy::ScheduledActionCommit() {
   SetInputThrottledUntilCommitOnImplThread(false);
 
   impl().next_frame_is_newly_committed_frame = true;
-
-  impl().timing_history.DidCommit();
 }
 
 void ThreadProxy::ScheduledActionActivateSyncTree() {
@@ -948,7 +942,6 @@ DrawResult ThreadProxy::DrawSwapInternal(bool forced_draw) {
   DCHECK(IsImplThread());
   DCHECK(impl().layer_tree_host_impl.get());
 
-  impl().timing_history.DidStartDrawing();
   base::AutoReset<bool> mark_inside(&impl().inside_draw, true);
 
   if (impl().layer_tree_host_impl->pending_tree()) {
@@ -1000,9 +993,6 @@ DrawResult ThreadProxy::DrawSwapInternal(bool forced_draw) {
         base::Bind(&ThreadProxy::DidCommitAndDrawFrame, main_thread_weak_ptr_));
   }
 
-  if (result == DRAW_SUCCESS)
-    impl().timing_history.DidFinishDrawing();
-
   DCHECK_NE(INVALID_RESULT, result);
   return result;
 }
@@ -1034,18 +1024,6 @@ void ThreadProxy::ScheduledActionInvalidateOutputSurface() {
   TRACE_EVENT0("cc", "ThreadProxy::ScheduledActionInvalidateOutputSurface");
   DCHECK(impl().layer_tree_host_impl->output_surface());
   impl().layer_tree_host_impl->output_surface()->Invalidate();
-}
-
-base::TimeDelta ThreadProxy::DrawDurationEstimate() {
-  return impl().timing_history.DrawDurationEstimate();
-}
-
-base::TimeDelta ThreadProxy::BeginMainFrameToCommitDurationEstimate() {
-  return impl().timing_history.BeginMainFrameToCommitDurationEstimate();
-}
-
-base::TimeDelta ThreadProxy::CommitToActivateDurationEstimate() {
-  return impl().timing_history.CommitToActivateDurationEstimate();
 }
 
 void ThreadProxy::DidFinishImplFrame() {
@@ -1082,11 +1060,18 @@ void ThreadProxy::InitializeImplOnImplThread(CompletionEvent* completion) {
   DCHECK(IsImplThread());
   impl().layer_tree_host_impl =
       layer_tree_host()->CreateLayerTreeHostImpl(this);
+
   SchedulerSettings scheduler_settings(
       layer_tree_host()->settings().ToSchedulerSettings());
+
+  scoped_ptr<CompositorTimingHistory> compositor_timing_history(
+      new CompositorTimingHistory(impl().rendering_stats_instrumentation));
+
   impl().scheduler = Scheduler::Create(
       this, scheduler_settings, impl().layer_tree_host_id,
-      ImplThreadTaskRunner(), impl().external_begin_frame_source.get());
+      ImplThreadTaskRunner(), impl().external_begin_frame_source.get(),
+      compositor_timing_history.Pass());
+
   impl().scheduler->SetVisible(impl().layer_tree_host_impl->visible());
   impl_thread_weak_ptr_ = impl().weak_factory.GetWeakPtr();
   completion->Signal();
@@ -1145,7 +1130,6 @@ void ThreadProxy::LayerTreeHostClosedOnImplThread(CompletionEvent* completion) {
 
 ThreadProxy::BeginMainFrameAndCommitState::BeginMainFrameAndCommitState()
     : memory_allocation_limit_bytes(0),
-      memory_allocation_priority_cutoff(0),
       evicted_ui_resources(false) {}
 
 ThreadProxy::BeginMainFrameAndCommitState::~BeginMainFrameAndCommitState() {}
@@ -1250,7 +1234,6 @@ void ThreadProxy::DidActivateSyncTree() {
     impl().completion_event_for_commit_held_on_tree_activation = NULL;
   }
 
-  impl().timing_history.DidActivateSyncTree();
   impl().last_processed_begin_main_frame_args =
       impl().last_begin_main_frame_args;
 }

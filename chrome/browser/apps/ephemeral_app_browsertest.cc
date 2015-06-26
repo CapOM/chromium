@@ -426,7 +426,8 @@ class EphemeralAppBrowserTest : public EphemeralAppTestBase {
 
     scoped_ptr<base::ListValue> args(new base::ListValue());
     args->Append(dummy_alarm.ToValue().release());
-    scoped_ptr<Event> event(new Event(alarms::OnAlarm::kEventName,
+    scoped_ptr<Event> event(new Event(extensions::events::ALARMS_ON_ALARM,
+                                      alarms::OnAlarm::kEventName,
                                       args.Pass()));
 
     event_router->DispatchEventToExtension(app_id, event.Pass());

@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include <deque>
+#include <map>
 
 #include "base/gtest_prod_util.h"
 #include "base/macros.h"
@@ -15,10 +16,9 @@
 #include "base/time/time.h"
 #include "net/base/net_export.h"
 #include "net/base/network_change_notifier.h"
+#include "net/base/network_quality.h"
 
 namespace net {
-
-class NetworkQuality;
 
 // NetworkQualityEstimator provides network quality estimates (quality of the
 // full paths to all origins that have been connected to).
@@ -32,7 +32,10 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
     : public NetworkChangeNotifier::ConnectionTypeObserver {
  public:
   // Creates a new NetworkQualityEstimator.
-  NetworkQualityEstimator();
+  // |variation_params| is the map containing all field trial parameters
+  // related to NetworkQualityEstimator field trial.
+  explicit NetworkQualityEstimator(
+      const std::map<std::string, std::string>& variation_params);
 
   ~NetworkQualityEstimator() override;
 
@@ -40,6 +43,14 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // current network.
   // Virtualized for testing.
   virtual NetworkQuality GetPeakEstimate() const;
+
+  // Sets |median| to the estimate of median network quality. The estimated
+  // quality is computed using a weighted median algorithm that assigns higher
+  // weight to the recent observations. |median| must not be nullptr. Returns
+  // true only if an estimate of the network quality is available (enough
+  // observations must be available to make an estimate). Virtualized for
+  // testing.
+  virtual bool GetEstimate(NetworkQuality* median) const;
 
   // Notifies NetworkQualityEstimator that a response has been received.
   // |cumulative_prefilter_bytes_read| is the count of the bytes received prior
@@ -56,11 +67,17 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest,
                            TestPeakKbpsFastestRTTUpdates);
   FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest, TestAddObservation);
+  FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest, ObtainOperatingParams);
   FRIEND_TEST_ALL_PREFIXES(URLRequestTestHTTP, NetworkQualityEstimator);
+  FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest,
+                           PercentileSameTimestamps);
+  FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest,
+                           PercentileDifferentTimestamps);
+  FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest, ComputedPercentiles);
 
   // Records the round trip time or throughput observation, along with the time
   // the observation was made.
-  struct Observation {
+  struct NET_EXPORT_PRIVATE Observation {
     Observation(int32_t value, base::TimeTicks timestamp);
 
     ~Observation();
@@ -72,8 +89,34 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
     const base::TimeTicks timestamp;
   };
 
+  // Holds an observation and its weight.
+  struct WeightedObservation {
+    WeightedObservation(int32_t value, double weight)
+        : value(value), weight(weight) {}
+    WeightedObservation(const WeightedObservation& other)
+        : WeightedObservation(other.value, other.weight) {}
+
+    WeightedObservation& operator=(const WeightedObservation& other) {
+      value = other.value;
+      weight = other.weight;
+      return *this;
+    }
+
+    // Required for sorting the samples in the ascending order of values.
+    bool operator<(const WeightedObservation& other) const {
+      return (value < other.value);
+    }
+
+    // Value of the sample.
+    int32_t value;
+
+    // Weight of the sample. This is computed based on how much time has passed
+    // since the sample was taken.
+    double weight;
+  };
+
   // Stores observations sorted by time.
-  class ObservationBuffer {
+  class NET_EXPORT_PRIVATE ObservationBuffer {
    public:
     ObservationBuffer();
 
@@ -89,12 +132,32 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
     // Clears the observations stored in this buffer.
     void Clear();
 
+    // Returns the |percentile| value of the observations in this buffer.
+    int32_t GetPercentile(int percentile) const;
+
    private:
     FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest, StoreObservations);
+    FRIEND_TEST_ALL_PREFIXES(NetworkQualityEstimatorTest,
+                             ObtainOperatingParams);
+
+    // Computes the weighted observations and stores them in
+    // |weighted_observations| sorted by ascending |WeightedObservation.value|.
+    // Sets |total_weight| to the total weight of all observations. Should be
+    // called only when there is at least one observation in the buffer.
+    void ComputeWeightedObservations(
+        std::vector<WeightedObservation>& weighted_observations,
+        double* total_weight) const;
 
     // Holds observations sorted by time, with the oldest observation at the
     // front of the queue.
     std::deque<Observation> observations_;
+
+    // The factor by which the weight of an observation reduces every second.
+    // For example, if an observation is 6 seconds old, its weight would be:
+    //     weight_multiplier_per_second_ ^ 6
+    // Calculated from |kHalfLifeSeconds| by solving the following equation:
+    //     weight_multiplier_per_second_ ^ kHalfLifeSeconds = 0.5
+    const double weight_multiplier_per_second_;
 
     DISALLOW_COPY_AND_ASSIGN(ObservationBuffer);
   };
@@ -107,10 +170,19 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // throughput is computed.
   static const int kMinRequestDurationMicroseconds = 1000;
 
+  // Minimum valid value of the variation parameter that holds RTT (in
+  // milliseconds) values.
+  static const int kMinimumRTTVariationParameterMsec = 1;
+
+  // Minimum valid value of the variation parameter that holds throughput (in
+  // kbps) values.
+  static const int kMinimumThroughputVariationParameterKbps = 1;
+
   // Construct a NetworkQualityEstimator instance allowing for test
-  // configuration.
-  // Registers for network type change notifications so estimates can be kept
-  // network specific.
+  // configuration. Registers for network type change notifications so estimates
+  // can be kept network specific.
+  // |variation_params| is the map containing all field trial parameters for the
+  // network quality estimator field trial.
   // |allow_local_host_requests_for_tests| should only be true when testing
   // against local HTTP server and allows the requests to local host to be
   // used for network quality estimation.
@@ -118,8 +190,18 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // against local HTTP server and allows the responses smaller than
   // |kMinTransferSizeInBytes| or shorter than |kMinRequestDurationMicroseconds|
   // to be used for network quality estimation.
-  NetworkQualityEstimator(bool allow_local_host_requests_for_tests,
-                          bool allow_smaller_responses_for_tests);
+  NetworkQualityEstimator(
+      const std::map<std::string, std::string>& variation_params,
+      bool allow_local_host_requests_for_tests,
+      bool allow_smaller_responses_for_tests);
+
+  // Obtains operating parameters from the field trial parameters.
+  void ObtainOperatingParams(
+      const std::map<std::string, std::string>& variation_params);
+
+  // Adds the default median RTT and downstream throughput estimate for the
+  // current connection type to the observation buffer.
+  void AddDefaultEstimates();
 
   // Returns the maximum size of the observation buffer.
   // Used for testing.
@@ -132,6 +214,14 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // NetworkChangeNotifier::ConnectionTypeObserver implementation.
   void OnConnectionTypeChanged(
       NetworkChangeNotifier::ConnectionType type) override;
+
+  // Returns an estimate of network quality at the specified |percentile|.
+  // |percentile| must be between 0 and 100 (both inclusive) with higher
+  // percentiles indicating less performant networks. For example, if
+  // |percentile| is 90, then the network is expected to be faster than the
+  // returned estimate with 0.9 probability. Similarly, network is expected to
+  // be slower than the returned estimate with 0.1 probability.
+  NetworkQuality GetEstimate(int percentile) const;
 
   // Determines if the requests to local host can be used in estimating the
   // network quality. Set to true only for tests.
@@ -159,11 +249,17 @@ class NET_EXPORT_PRIVATE NetworkQualityEstimator
   // 2) The transfer time includes at least one RTT while no bytes are read.
   int32_t peak_kbps_since_last_connection_change_;
 
-  // Buffer that holds Kbps observations.
+  // Buffer that holds Kbps observations sorted by timestamp.
   ObservationBuffer kbps_observations_;
 
-  // Buffer that holds RTT (in milliseconds) observations.
+  // Buffer that holds RTT (in milliseconds) observations sorted by timestamp.
   ObservationBuffer rtt_msec_observations_;
+
+  // Default network quality observations obtained from the network quality
+  // estimator field trial parameters. The observations are indexed by
+  // ConnectionType.
+  NetworkQuality
+      default_observations_[NetworkChangeNotifier::CONNECTION_LAST + 1];
 
   base::ThreadChecker thread_checker_;
 

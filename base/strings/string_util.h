@@ -377,16 +377,6 @@ BASE_EXPORT bool EndsWith(const string16& str,
                           const string16& search,
                           bool case_sensitive);
 
-}  // namespace base
-
-#if defined(OS_WIN)
-#include "base/strings/string_util_win.h"
-#elif defined(OS_POSIX)
-#include "base/strings/string_util_posix.h"
-#else
-#error Define string operations appropriately for your platform
-#endif
-
 // Determines the type of ASCII character, independent of locale (the C
 // library versions will change based on locale).
 template <typename Char>
@@ -409,20 +399,15 @@ inline bool IsHexDigit(Char c) {
          (c >= 'a' && c <= 'f');
 }
 
-template <typename Char>
-inline char HexDigitToInt(Char c) {
-  DCHECK(IsHexDigit(c));
-  if (c >= '0' && c <= '9')
-    return static_cast<char>(c - '0');
-  if (c >= 'A' && c <= 'F')
-    return static_cast<char>(c - 'A' + 10);
-  if (c >= 'a' && c <= 'f')
-    return static_cast<char>(c - 'a' + 10);
-  return 0;
-}
+// Returns the integer corresponding to the given hex character. For example:
+//    '4' -> 4
+//    'a' -> 10
+//    'B' -> 11
+// Assumes the input is a valid hex character. DCHECKs in debug builds if not.
+BASE_EXPORT char HexDigitToInt(wchar_t c);
 
-// Returns true if it's a whitespace character.
-inline bool IsWhitespace(wchar_t c) {
+// Returns true if it's a Unicode whitespace character.
+inline bool IsUnicodeWhitespace(wchar_t c) {
   return wcschr(base::kWhitespaceWide, c) != NULL;
 }
 
@@ -430,20 +415,20 @@ inline bool IsWhitespace(wchar_t c) {
 // appropriate for use in any UI; use of FormatBytes and friends in ui/base is
 // highly recommended instead. TODO(avi): Figure out how to get callers to use
 // FormatBytes instead; remove this.
-BASE_EXPORT base::string16 FormatBytesUnlocalized(int64 bytes);
+BASE_EXPORT string16 FormatBytesUnlocalized(int64 bytes);
 
 // Starting at |start_offset| (usually 0), replace the first instance of
 // |find_this| with |replace_with|.
 BASE_EXPORT void ReplaceFirstSubstringAfterOffset(
     base::string16* str,
     size_t start_offset,
-    const base::string16& find_this,
-    const base::string16& replace_with);
+    StringPiece16 find_this,
+    StringPiece16 replace_with);
 BASE_EXPORT void ReplaceFirstSubstringAfterOffset(
     std::string* str,
     size_t start_offset,
-    const std::string& find_this,
-    const std::string& replace_with);
+    StringPiece find_this,
+    StringPiece replace_with);
 
 // Starting at |start_offset| (usually 0), look through |str| and replace all
 // instances of |find_this| with |replace_with|.
@@ -454,12 +439,23 @@ BASE_EXPORT void ReplaceFirstSubstringAfterOffset(
 BASE_EXPORT void ReplaceSubstringsAfterOffset(
     base::string16* str,
     size_t start_offset,
-    const base::string16& find_this,
-    const base::string16& replace_with);
-BASE_EXPORT void ReplaceSubstringsAfterOffset(std::string* str,
-                                              size_t start_offset,
-                                              const std::string& find_this,
-                                              const std::string& replace_with);
+    StringPiece16 find_this,
+    StringPiece16 replace_with);
+BASE_EXPORT void ReplaceSubstringsAfterOffset(
+    std::string* str,
+    size_t start_offset,
+    StringPiece find_this,
+    StringPiece replace_with);
+
+}  // namespace base
+
+#if defined(OS_WIN)
+#include "base/strings/string_util_win.h"
+#elif defined(OS_POSIX)
+#include "base/strings/string_util_posix.h"
+#else
+#error Define string operations appropriately for your platform
+#endif
 
 // Reserves enough memory in |str| to accommodate |length_with_null| characters,
 // sets the size of |str| to |length_with_null - 1| characters, and returns a
@@ -496,7 +492,7 @@ inline typename string_type::value_type* WriteInto(string_type* str,
 // |delimiters|.  Each field is added to the |tokens| vector.  Returns the
 // number of tokens found.
 //
-// DEPRECATED. Use SplitStringUsingSet for new code (these just forward).
+// DEPRECATED. Use base::SplitString for new code (these just forward).
 // TODO(brettw) convert callers and delete these forwarders.
 BASE_EXPORT size_t Tokenize(const base::string16& str,
                             const base::string16& delimiters,

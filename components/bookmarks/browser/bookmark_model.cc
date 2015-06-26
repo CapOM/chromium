@@ -144,7 +144,7 @@ void BookmarkModel::Load(
       new BookmarkExpandedStateTracker(this, pref_service));
 
   // Load the bookmarks. BookmarkStorage notifies us when done.
-  store_ .reset(new BookmarkStorage(this, profile_path, io_task_runner.get()));
+  store_.reset(new BookmarkStorage(this, profile_path, io_task_runner.get()));
   store_->LoadBookmarks(CreateLoadDetails(accept_languages), ui_task_runner);
 }
 
@@ -435,10 +435,6 @@ void BookmarkModel::SetNodeSyncTransactionVersion(
 }
 
 void BookmarkModel::OnFaviconChanged(const std::set<GURL>& urls) {
-  // Ignore events if |Load| has not been called yet.
-  if (!store_)
-    return;
-
   // Prevent the observers from getting confused for multiple favicon loads.
   for (std::set<GURL>::const_iterator i = urls.begin(); i != urls.end(); ++i) {
     std::vector<const BookmarkNode*> nodes;

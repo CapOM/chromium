@@ -62,13 +62,6 @@ using mojo::WeakBindToRequest;
 namespace html_viewer {
 namespace {
 
-// Switch to enable out of process iframes.
-const char kOOPIF[] = "oopifs";
-
-bool EnableOOPIFs() {
-  return base::CommandLine::ForCurrentProcess()->HasSwitch(kOOPIF);
-}
-
 bool EnableRemoteDebugging() {
   return base::CommandLine::ForCurrentProcess()->HasSwitch(
       devtools_service::kRemoteDebuggingPort);
@@ -133,8 +126,7 @@ mojo::Target WebNavigationPolicyToNavigationTarget(
 bool CanNavigateLocally(blink::WebFrame* frame,
                         const blink::WebURLRequest& request) {
   // For now, we just load child frames locally.
-  // TODO(sky): this can be removed once we transition to oopifs.
-  if (!EnableOOPIFs() && frame->parent())
+  if (frame->parent())
     return true;
 
   // If we have extraData() it means we already have the url response
@@ -164,10 +156,7 @@ HTMLDocument::HTMLDocument(mojo::ApplicationImpl* html_document_app,
       root_(nullptr),
       view_manager_client_factory_(html_document_app->shell(), this),
       setup_(setup),
-      frame_tree_manager_binding_(&frame_tree_manager_),
       delete_callback_(delete_callback) {
-  connection->AddService(
-      static_cast<mojo::InterfaceFactory<mandoline::FrameTreeClient>*>(this));
   connection->AddService(
       static_cast<InterfaceFactory<mojo::AxProvider>*>(this));
   connection->AddService(&view_manager_client_factory_);
@@ -225,12 +214,6 @@ void HTMLDocument::Create(mojo::ApplicationConnection* connection,
   }
 }
 
-void HTMLDocument::Create(
-    mojo::ApplicationConnection* connection,
-    mojo::InterfaceRequest<mandoline::FrameTreeClient> request) {
-  frame_tree_manager_binding_.Bind(request.Pass());
-}
-
 void HTMLDocument::Load(URLResponsePtr response) {
   DCHECK(!web_view_);
   web_view_ = blink::WebView::create(this);
@@ -263,15 +246,6 @@ void HTMLDocument::Load(URLResponsePtr response) {
 
   web_view_->mainFrame()->loadRequest(web_request);
   UpdateFocus();
-}
-
-void HTMLDocument::ConvertLocalFrameToRemoteFrame(blink::WebLocalFrame* frame) {
-  mojo::View* view = frame_to_view_[frame].view;
-  // TODO(sky): this leaks. Fix it.
-  blink::WebRemoteFrame* remote_frame = blink::WebRemoteFrame::create(
-      frame_to_view_[frame].scope, new RemoteFrameClientImpl(view));
-  remote_frame->initializeFromFrame(frame);
-  frame->swap(remote_frame);
 }
 
 void HTMLDocument::UpdateWebviewSizeFromViewSize() {
@@ -347,18 +321,6 @@ blink::WebFrame* HTMLDocument::createChildFrame(
     blink::WebSandboxFlags sandboxFlags) {
   blink::WebLocalFrame* child_frame = blink::WebLocalFrame::create(scope, this);
   parent->appendChild(child_frame);
-  if (EnableOOPIFs()) {
-    // Create the view that will house the frame now. We embed only once we know
-    // the url.
-    mojo::View* child_frame_view = root_->view_manager()->CreateView();
-    child_frame_view->SetVisible(true);
-    root_->AddChild(child_frame_view);
-
-    ChildFrameData child_frame_data;
-    child_frame_data.view = child_frame_view;
-    child_frame_data.scope = scope;
-    frame_to_view_[child_frame] = child_frame_data;
-  }
   return child_frame;
 }
 
@@ -394,19 +356,6 @@ blink::WebNavigationPolicy HTMLDocument::decidePolicyForNavigation(
   }
 
   std::string frame_name = info.frame ? info.frame->assignedName().utf8() : "";
-  if (info.frame->parent() && EnableOOPIFs()) {
-    mojo::View* view = frame_to_view_[info.frame].view;
-    mojo::URLRequestPtr url_request = mojo::URLRequest::From(info.urlRequest);
-    view->EmbedAllowingReembed(url_request.Pass());
-    // TODO(sky): I tried swapping the frame types here, but that resulted in
-    // the view never getting sized. Figure out why.
-    // TODO(sky): there are timing conditions here, and we should only do this
-    // once.
-    base::MessageLoop::current()->PostTask(
-        FROM_HERE, base::Bind(&HTMLDocument::ConvertLocalFrameToRemoteFrame,
-                              base::Unretained(this), info.frame));
-    return blink::WebNavigationPolicyIgnore;
-  }
 
   if (CanNavigateLocally(info.frame, info.urlRequest))
     return info.defaultPolicy;

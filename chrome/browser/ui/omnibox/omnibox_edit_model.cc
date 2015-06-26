@@ -752,7 +752,10 @@ void OmniboxEditModel::OpenMatch(AutocompleteMatch match,
   // Create a dummy AutocompleteInput for use in calling SuggestExactInput()
   // to create an alternate navigational match.
   AutocompleteInput alternate_input(
-      input_text, base::string16::npos, std::string(), delegate_->GetURL(),
+      input_text, base::string16::npos, std::string(),
+      // Somehow we can occasionally get here with no active tab.  It's not
+      // clear why this happens.
+      delegate_->CurrentPageExists() ? delegate_->GetURL() : GURL(),
       ClassifyPage(), false, false, true, true, false,
       ChromeAutocompleteSchemeClassifier(profile_));
   scoped_ptr<OmniboxNavigationObserver> observer(
@@ -1466,7 +1469,7 @@ bool OmniboxEditModel::CreatedKeywordSearchByInsertingSpaceInMiddle(
     return false;
   size_t space_position = caret_position - 1;
   if (!IsSpaceCharForAcceptingKeyword(new_text[space_position]) ||
-      IsWhitespace(new_text[space_position - 1]) ||
+      base::IsUnicodeWhitespace(new_text[space_position - 1]) ||
       new_text.compare(0, space_position, old_text, 0, space_position) ||
       !new_text.compare(space_position, new_text.length() - space_position,
                         old_text, space_position,
