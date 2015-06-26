@@ -18,39 +18,27 @@ namespace {
 
 const char kFieldTrialName[] = "EnhancedBookmarks";
 
+#if !defined(OS_ANDROID)
+
 bool GetBookmarksExperimentExtensionID(std::string* extension_id) {
   *extension_id = variations::GetVariationParamValue(
       kFieldTrialName, "id");
   if (extension_id->empty())
     return false;
 
-#if defined(OS_ANDROID) || defined(OS_IOS)
+#if defined(OS_IOS)
   return true;
 #else
   const extensions::FeatureProvider* feature_provider =
       extensions::FeatureProvider::GetPermissionFeatures();
   extensions::Feature* feature = feature_provider->GetFeature("metricsPrivate");
   return feature && feature->IsIdInWhitelist(*extension_id);
-#endif  // defined(OS_ANDROID) || defined(OS_IOS)
+#endif  // defined(OS_IOS)
 }
+
+#endif  // !defined(OS_ANDROID)
 
 }  // namespace
-
-#if defined(OS_ANDROID)
-bool IsEnhancedBookmarkImageFetchingEnabled(const PrefService* user_prefs) {
-  if (IsEnhancedBookmarksEnabled())
-    return true;
-
-  // Salient images are collected from visited bookmarked pages even if the
-  // enhanced bookmark feature is turned off. This is to have some images
-  // available so that in the future, when the feature is turned on, the user
-  // experience is not a big list of flat colors. However as a precautionary
-  // measure it is possible to disable this collection of images from finch.
-  std::string disable_fetching = variations::GetVariationParamValue(
-      kFieldTrialName, "DisableImagesFetching");
-  return disable_fetching.empty();
-}
-#endif  // defined(OS_ANDROID)
 
 bool IsEnhancedBookmarksEnabled() {
   std::string extension_id;
@@ -76,7 +64,11 @@ bool IsEnhancedBookmarksEnabled(std::string* extension_id) {
   if (opt_out)
     return false;
 
+#if defined(OS_ANDROID)
+  return true;
+#else
   return GetBookmarksExperimentExtensionID(extension_id);
+#endif  // defined(OS_ANDROID)
 }
 
 bool IsEnableDomDistillerSet() {

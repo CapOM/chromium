@@ -27,7 +27,6 @@ import android.provider.Browser;
 import android.text.Editable;
 import android.text.Selection;
 import android.text.TextUtils;
-import android.util.Log;
 import android.util.Pair;
 import android.view.HapticFeedbackConstants;
 import android.view.InputDevice;
@@ -47,6 +46,7 @@ import org.chromium.base.ApiCompatibilityUtils;
 import org.chromium.base.CalledByNative;
 import org.chromium.base.CommandLine;
 import org.chromium.base.JNINamespace;
+import org.chromium.base.Log;
 import org.chromium.base.ObserverList;
 import org.chromium.base.ObserverList.RewindableIterator;
 import org.chromium.base.TraceEvent;
@@ -101,7 +101,7 @@ public class ContentViewCore implements
         AccessibilityStateChangeListener, ScreenOrientationObserver,
         SystemCaptioningBridge.SystemCaptioningBridgeListener {
 
-    private static final String TAG = "ContentViewCore";
+    private static final String TAG = "cr.ContentViewCore";
 
     // Used to avoid enabling zooming in / out if resulting zooming will
     // produce little visible difference.
@@ -259,7 +259,7 @@ public class ContentViewCore implements
                             scaledWidth, (int) (height * scale), leftMargin, topMargin);
                 view.setLayoutParams(lp);
             } else {
-                Log.e(TAG, "Unknown layout " + containerView.getClass().getName());
+                Log.e(TAG, "Unknown layout %s", containerView.getClass().getName());
             }
         }
 
@@ -309,7 +309,7 @@ public class ContentViewCore implements
 
         @Override
         public void didFailLoad(boolean isProvisionalLoad, boolean isMainFrame, int errorCode,
-                String description, String failingUrl) {
+                String description, String failingUrl, boolean wasIgnoredByHandler) {
             // Navigation that fails the provisional load will have the strong binding removed
             // here. One for which the provisional load is commited will have the strong binding
             // removed in navigationEntryCommitted() below.
@@ -661,6 +661,14 @@ public class ContentViewCore implements
      */
     public WebContents getWebContents() {
         return mWebContents;
+    }
+
+    /**
+     * @return The WindowAndroid associated with this ContentViewCore.
+     */
+    public WindowAndroid getWindowAndroid() {
+        if (mNativeContentViewCore == 0) return null;
+        return nativeGetJavaWindowAndroid(mNativeContentViewCore);
     }
 
     /**
@@ -3060,9 +3068,6 @@ public class ContentViewCore implements
         if (potentiallyActiveFlingCount > 0) updateGestureStateListener(GestureEventType.FLING_END);
     }
 
-    private native long nativeInit(WebContents webContents, ViewAndroidDelegate viewAndroidDelegate,
-            long windowAndroidPtr, HashSet<Object> retainedObjectSet);
-    private static native ContentViewCore nativeFromWebContentsAndroid(WebContents webContents);
     ContentVideoViewClient getContentVideoViewClient() {
         return getContentViewClient().getContentVideoViewClient();
     }
@@ -3108,7 +3113,12 @@ public class ContentViewCore implements
         mContextualSearchClient = contextualSearchClient;
     }
 
+    private native long nativeInit(WebContents webContents, ViewAndroidDelegate viewAndroidDelegate,
+            long windowAndroidPtr, HashSet<Object> retainedObjectSet);
+    private static native ContentViewCore nativeFromWebContentsAndroid(WebContents webContents);
+
     private native WebContents nativeGetWebContentsAndroid(long nativeContentViewCoreImpl);
+    private native WindowAndroid nativeGetJavaWindowAndroid(long nativeContentViewCoreImpl);
 
     private native void nativeOnJavaContentViewCoreDestroyed(long nativeContentViewCoreImpl);
 

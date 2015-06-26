@@ -56,7 +56,11 @@ void HttpServerPropertiesImpl::InitializeAlternativeServiceServers(
   // Keep all the broken ones since those don't get persisted.
   for (AlternativeServiceMap::iterator it = alternative_service_map_.begin();
        it != alternative_service_map_.end();) {
-    if (IsAlternativeServiceBroken(it->second.alternative_service)) {
+    AlternativeService alternative_service(it->second.alternative_service);
+    if (alternative_service.host.empty()) {
+      alternative_service.host = it->first.host();
+    }
+    if (IsAlternativeServiceBroken(alternative_service)) {
       ++it;
     } else {
       it = alternative_service_map_.Erase(it);
@@ -278,15 +282,6 @@ void HttpServerPropertiesImpl::SetAlternativeService(
     const HostPortPair& origin,
     const AlternativeService& alternative_service,
     double alternative_probability) {
-  AlternativeService complete_alternative_service(alternative_service);
-  if (complete_alternative_service.host.empty()) {
-    complete_alternative_service.host = origin.host();
-  }
-  if (IsAlternativeServiceBroken(complete_alternative_service)) {
-    DVLOG(1) << "Ignore alternative service since it is known to be broken.";
-    return;
-  }
-
   const AlternativeServiceInfo alternative_service_info(
       alternative_service, alternative_probability);
   AlternativeServiceMap::const_iterator it =
@@ -315,6 +310,8 @@ void HttpServerPropertiesImpl::SetAlternativeService(
 
 void HttpServerPropertiesImpl::MarkAlternativeServiceBroken(
     const AlternativeService& alternative_service) {
+  // Empty host means use host of origin, callers are supposed to substitute.
+  DCHECK(!alternative_service.host.empty());
   if (alternative_service.protocol == UNINITIALIZED_ALTERNATE_PROTOCOL) {
     LOG(DFATAL) << "Trying to mark unknown alternate protocol broken.";
     return;
@@ -374,21 +371,7 @@ void HttpServerPropertiesImpl::ClearAlternativeService(
   if (it == alternative_service_map_.end()) {
     return;
   }
-  AlternativeService alternative_service(it->second.alternative_service);
-  if (alternative_service.host.empty()) {
-    alternative_service.host = origin.host();
-  }
   alternative_service_map_.Erase(it);
-
-  // The following is temporary to keep the existing semantics, which is that if
-  // there is a broken alternative service in the mapping, then this method
-  // leaves it in a non-broken, but recently broken state.
-  //
-  // TODO(bnc):
-  //  1. Verify and document the class invariant that no broken alternative
-  //     service can be in the mapping.
-  //  2. Remove the rest of this method as it will be moot.
-  broken_alternative_services_.erase(alternative_service);
 }
 
 const AlternativeServiceMap& HttpServerPropertiesImpl::alternative_service_map()

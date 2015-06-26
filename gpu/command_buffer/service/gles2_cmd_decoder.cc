@@ -11,12 +11,10 @@
 #include <list>
 #include <map>
 #include <queue>
-#include <stack>
-#include <string>
-#include <vector>
 
 #include "base/at_exit.h"
 #include "base/bind.h"
+#include "base/callback.h"
 #include "base/callback_helpers.h"
 #include "base/command_line.h"
 #include "base/memory/scoped_ptr.h"
@@ -62,6 +60,8 @@
 #include "gpu/command_buffer/service/vertex_array_manager.h"
 #include "gpu/command_buffer/service/vertex_attrib_manager.h"
 #include "third_party/smhasher/src/City.h"
+#include "ui/gfx/geometry/size.h"
+#include "ui/gl/gl_context.h"
 #include "ui/gl/gl_fence.h"
 #include "ui/gl/gl_image.h"
 #include "ui/gl/gl_implementation.h"
@@ -1889,13 +1889,6 @@ class GLES2DecoderImpl : public GLES2Decoder,
   // Util to help with GL.
   GLES2Util util_;
 
-  // unpack flip y as last set by glPixelStorei
-  bool unpack_flip_y_;
-
-  // unpack (un)premultiply alpha as last set by glPixelStorei
-  bool unpack_premultiply_alpha_;
-  bool unpack_unpremultiply_alpha_;
-
   // The buffer we bind to attrib 0 since OpenGL requires it (ES does not).
   GLuint attrib_0_buffer_id_;
 
@@ -2508,9 +2501,6 @@ GLES2DecoderImpl::GLES2DecoderImpl(ContextGroup* group)
       group_(group),
       logger_(&debug_marker_manager_),
       state_(group_->feature_info(), this, &logger_),
-      unpack_flip_y_(false),
-      unpack_premultiply_alpha_(false),
-      unpack_unpremultiply_alpha_(false),
       attrib_0_buffer_id_(0),
       attrib_0_buffer_matches_value_(true),
       attrib_0_size_(0),
@@ -5290,24 +5280,6 @@ bool GLES2DecoderImpl::GetHelper(
         } else {
           *params = 0;
         }
-      }
-      return true;
-    case GL_UNPACK_FLIP_Y_CHROMIUM:
-      *num_written = 1;
-      if (params) {
-        params[0] = unpack_flip_y_;
-      }
-      return true;
-    case GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM:
-      *num_written = 1;
-      if (params) {
-        params[0] = unpack_premultiply_alpha_;
-      }
-      return true;
-    case GL_UNPACK_UNPREMULTIPLY_ALPHA_CHROMIUM:
-      *num_written = 1;
-      if (params) {
-        params[0] = unpack_unpremultiply_alpha_;
       }
       return true;
     case GL_BIND_GENERATES_RESOURCE_CHROMIUM:
@@ -8497,15 +8469,6 @@ error::Error GLES2DecoderImpl::HandlePixelStorei(uint32 immediate_data_size,
             return error::kNoError;
         }
         break;
-    case GL_UNPACK_FLIP_Y_CHROMIUM:
-        unpack_flip_y_ = (param != 0);
-        return error::kNoError;
-    case GL_UNPACK_PREMULTIPLY_ALPHA_CHROMIUM:
-        unpack_premultiply_alpha_ = (param != 0);
-        return error::kNoError;
-    case GL_UNPACK_UNPREMULTIPLY_ALPHA_CHROMIUM:
-        unpack_unpremultiply_alpha_ = (param != 0);
-        return error::kNoError;
     default:
         break;
   }
@@ -12033,12 +11996,6 @@ void GLES2DecoderImpl::DoCopyTextureCHROMIUM(
     GLboolean unpack_unmultiply_alpha) {
   TRACE_EVENT0("gpu", "GLES2DecoderImpl::DoCopyTextureCHROMIUM");
 
-  // TODO(zmo): Get rid of the following three lines when we begin to pass
-  // in meaningful data to these three arguments in blink.
-  unpack_flip_y = unpack_flip_y_;
-  unpack_premultiply_alpha = unpack_premultiply_alpha_;
-  unpack_unmultiply_alpha = unpack_unpremultiply_alpha_;
-
   TextureRef* source_texture_ref = GetTexture(source_id);
   TextureRef* dest_texture_ref = GetTexture(dest_id);
   Texture* source_texture = source_texture_ref->texture();
@@ -12202,12 +12159,6 @@ void GLES2DecoderImpl::DoCopySubTextureCHROMIUM(
     GLboolean unpack_premultiply_alpha,
     GLboolean unpack_unmultiply_alpha) {
   TRACE_EVENT0("gpu", "GLES2DecoderImpl::DoCopySubTextureCHROMIUM");
-
-  // TODO(zmo): Get rid of the following three lines when we begin to pass
-  // in meaningful data to these three arguments in blink.
-  unpack_flip_y = unpack_flip_y_;
-  unpack_premultiply_alpha = unpack_premultiply_alpha_;
-  unpack_unmultiply_alpha = unpack_unpremultiply_alpha_;
 
   TextureRef* source_texture_ref = GetTexture(source_id);
   TextureRef* dest_texture_ref = GetTexture(dest_id);

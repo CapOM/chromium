@@ -1,7 +1,11 @@
 {
   "Android GN": {
     "additional_compile_targets": [
+      "chrome_public_apk",
+      "chrome_public_test_apk",
       "chrome_shell_apk",
+      "chrome_shell_test_apk",
+      "content_shell_apk",
       "mandoline:all"
     ],
     "gtest_tests": [
@@ -54,7 +58,12 @@
   },
   "Android GN (dbg)": {
     "additional_compile_targets": [
+      "chrome_public_apk",
+      "chrome_public_test_apk",
       "chrome_shell_apk",
+      "chrome_shell_test_apk",
+      "content_shell_apk",
+      "content_shell_test_apk",
       "mandoline:all"
     ]
   },
@@ -103,6 +112,12 @@
         "test": "cast_shell_browser_test"
       },
       {
+        "args": [
+          "--gtest_filter=-OutOfProcessPPAPITest.TrueTypeFont:OutOfProcessPPAPITest.BrowserFont"
+        ],
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "content_browsertests"
       },
       {
@@ -118,6 +133,9 @@
         "test": "crypto_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "gpu_unittests"
       },
       {
@@ -127,12 +145,18 @@
         "test": "jingle_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "media_unittests"
       },
       {
         "test": "midi_unittests"
       },
       {
+        "swarming": {
+          "can_use_on_swarming_builders": true
+        },
         "test": "net_unittests"
       },
       {

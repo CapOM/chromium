@@ -1259,6 +1259,18 @@ scoped_refptr<media::GpuVideoAcceleratorFactories>
 RenderThreadImpl::GetGpuFactories() {
   DCHECK(IsMainThread());
 
+  const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
+
+#if defined(OS_ANDROID)
+  if (SynchronousCompositorFactory::GetInstance()) {
+    if (!cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode)) {
+      DLOG(WARNING) << "Accelerated video decoding is not explicitly disabled, "
+                       "but is not supported by in-process rendering";
+    }
+    return NULL;
+  }
+#endif
+
   scoped_refptr<GpuChannelHost> gpu_channel_host = GetGpuChannel();
   scoped_refptr<media::GpuVideoAcceleratorFactories> gpu_factories;
   scoped_refptr<base::SingleThreadTaskRunner> media_task_runner =
@@ -1282,7 +1294,6 @@ RenderThreadImpl::GetGpuFactories() {
         GPU_VIDEO_ACCELERATOR_CONTEXT);
   }
   if (gpu_va_context_provider_.get()) {
-    const base::CommandLine* cmd_line = base::CommandLine::ForCurrentProcess();
     bool enable_video_accelerator =
         !cmd_line->HasSwitch(switches::kDisableAcceleratedVideoDecode);
     std::string image_texture_target_string =
@@ -1707,19 +1718,15 @@ void RenderThreadImpl::OnSetWebKitSharedTimersSuspended(bool suspend) {
 
 #if defined(OS_MACOSX)
 void RenderThreadImpl::OnUpdateScrollbarTheme(
-    float initial_button_delay,
-    float autoscroll_button_delay,
-    bool jump_on_track_click,
-    blink::ScrollerStyle preferred_scroller_style,
-    bool redraw) {
+    const ViewMsg_UpdateScrollbarTheme_Params& params) {
   EnsureWebKitInitialized();
   static_cast<WebScrollbarBehaviorImpl*>(
       blink_platform_impl_->scrollbarBehavior())
-      ->set_jump_on_track_click(jump_on_track_click);
-  blink::WebScrollbarTheme::updateScrollbars(initial_button_delay,
-                                             autoscroll_button_delay,
-                                             preferred_scroller_style,
-                                             redraw);
+      ->set_jump_on_track_click(params.jump_on_track_click);
+
+  blink::WebScrollbarTheme::updateScrollbars(
+      params.initial_button_delay, params.autoscroll_button_delay,
+      params.preferred_scroller_style, params.redraw);
 }
 #endif
 

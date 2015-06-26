@@ -60,7 +60,6 @@
 #include "cc/raster/tile_task_worker_pool.h"
 #include "cc/raster/zero_copy_tile_task_worker_pool.h"
 #include "cc/resources/memory_history.h"
-#include "cc/resources/prioritized_resource_manager.h"
 #include "cc/resources/resource_pool.h"
 #include "cc/resources/ui_resource_bitmap.h"
 #include "cc/scheduler/delay_based_time_source.h"
@@ -157,6 +156,16 @@ size_t GetMaxStagingResourceCount() {
   return 32;
 }
 
+size_t GetDefaultMemoryAllocationLimit() {
+  // TODO(ccameron): (http://crbug.com/137094) This 64MB default is a straggler
+  // from the old texture manager and is just to give us a default memory
+  // allocation before we get a callback from the GPU memory manager. We
+  // should probaby either:
+  // - wait for the callback before rendering anything instead
+  // - push this into the GPU memory manager somehow.
+  return 64 * 1024 * 1024;
+}
+
 }  // namespace
 
 LayerTreeHostImpl::FrameData::FrameData() : has_no_damage(false) {
@@ -207,7 +216,7 @@ LayerTreeHostImpl::LayerTreeHostImpl(
       settings_(settings),
       visible_(true),
       cached_managed_memory_policy_(
-          PrioritizedResourceManager::DefaultMemoryAllocationLimit(),
+          GetDefaultMemoryAllocationLimit(),
           gpu::MemoryAllocation::CUTOFF_ALLOW_EVERYTHING,
           ManagedMemoryPolicy::kDefaultNumResourcesLimit),
       pinch_gesture_active_(false),
@@ -1016,10 +1025,10 @@ DrawResult LayerTreeHostImpl::PrepareToDraw(FrameData* frame) {
   bool ok = active_tree_->UpdateDrawProperties(update_lcd_text);
   DCHECK(ok) << "UpdateDrawProperties failed during draw";
 
-  // This will cause NotifyTileStateChanged() to be called for any visible tiles
-  // that completed, which will add damage to the frame for them so they appear
-  // as part of the current frame being drawn.
-  tile_manager_->UpdateVisibleTiles(global_tile_state_);
+  // This will cause NotifyTileStateChanged() to be called for any tiles that
+  // completed, which will add damage for visible tiles to the frame for them so
+  // they appear as part of the current frame being drawn.
+  tile_manager_->Flush();
 
   frame->render_surface_layer_list = &active_tree_->RenderSurfaceLayerList();
   frame->render_passes.clear();
@@ -1897,6 +1906,9 @@ void LayerTreeHostImpl::ActivateSyncTree() {
     active_tree_->ProcessUIResourceRequestQueue();
   }
 
+  // bounds_delta isn't a pushed property, so the newly-pushed property tree
+  // won't already account for current bounds_delta values.
+  active_tree_->UpdatePropertyTreesForBoundsDelta();
   active_tree_->DidBecomeActive();
   ActivateAnimations();
   client_->RenewTreePriority();
@@ -1983,11 +1995,6 @@ ManagedMemoryPolicy LayerTreeHostImpl::ActualManagedMemoryPolicy() const {
 
 size_t LayerTreeHostImpl::memory_allocation_limit_bytes() const {
   return ActualManagedMemoryPolicy().bytes_limit_when_visible;
-}
-
-int LayerTreeHostImpl::memory_allocation_priority_cutoff() const {
-  return ManagedMemoryPolicy::PriorityCutoffToValue(
-      ActualManagedMemoryPolicy().priority_cutoff_when_visible);
 }
 
 void LayerTreeHostImpl::ReleaseTreeResources() {
@@ -2918,7 +2925,6 @@ bool LayerTreeHostImpl::HandleMouseOverScrollbar(LayerImpl* layer_impl,
 
 void LayerTreeHostImpl::PinchGestureBegin() {
   pinch_gesture_active_ = true;
-  previous_pinch_anchor_ = gfx::Point();
   client_->RenewTreePriority();
   pinch_gesture_end_should_clear_scrolling_layer_ = !CurrentlyScrollingLayer();
   if (active_tree_->OuterViewportScrollLayer()) {
@@ -2943,36 +2949,7 @@ void LayerTreeHostImpl::PinchGestureUpdate(float magnify_delta,
   // the pinch update.
   active_tree_->SetRootLayerScrollOffsetDelegate(NULL);
 
-  // Keep the center-of-pinch anchor specified by (x, y) in a stable
-  // position over the course of the magnify.
-  float page_scale = active_tree_->current_page_scale_factor();
-  gfx::PointF previous_scale_anchor = gfx::ScalePoint(anchor, 1.f / page_scale);
-  active_tree_->SetPageScaleOnActiveTree(page_scale * magnify_delta);
-  page_scale = active_tree_->current_page_scale_factor();
-  gfx::PointF new_scale_anchor = gfx::ScalePoint(anchor, 1.f / page_scale);
-  gfx::Vector2dF move = previous_scale_anchor - new_scale_anchor;
-
-  // Scale back to viewport space since that's the coordinate space ScrollBy
-  // uses.
-  move.Scale(page_scale);
-
-  previous_pinch_anchor_ = anchor;
-
-  // If clamping the inner viewport scroll offset causes a change, it should
-  // be accounted for from the intended move.
-  move -= InnerViewportScrollLayer()->ClampScrollToMaxScrollOffset();
-
-  if (settings().invert_viewport_scroll_order) {
-    viewport()->Pan(move);
-  } else {
-    gfx::Point viewport_point;
-    bool is_wheel_event = false;
-    bool affect_top_controls = false;
-    viewport()->ScrollBy(move,
-                         viewport_point,
-                         is_wheel_event,
-                         affect_top_controls);
-  }
+  viewport()->PinchUpdate(magnify_delta, anchor);
 
   active_tree_->SetRootLayerScrollOffsetDelegate(
       root_layer_scroll_offset_delegate_);
@@ -2988,6 +2965,7 @@ void LayerTreeHostImpl::PinchGestureEnd() {
     pinch_gesture_end_should_clear_scrolling_layer_ = false;
     ClearCurrentlyScrollingLayer();
   }
+  viewport()->PinchEnd();
   top_controls_manager_->PinchEnd();
   client_->SetNeedsCommitOnImplThread();
   // When a pinch ends, we may be displaying content cached at incorrect scales,

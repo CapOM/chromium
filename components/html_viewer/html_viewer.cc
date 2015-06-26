@@ -12,6 +12,7 @@
 #include "base/stl_util.h"
 #include "base/strings/utf_string_conversions.h"
 #include "components/html_viewer/html_document.h"
+#include "components/html_viewer/html_document_oopif.h"
 #include "components/html_viewer/setup.h"
 #include "mojo/application/public/cpp/application_connection.h"
 #include "mojo/application/public/cpp/application_delegate.h"
@@ -40,6 +41,16 @@ using mojo::URLLoaderPtr;
 using mojo::URLResponsePtr;
 
 namespace html_viewer {
+namespace {
+
+// Switch to enable out of process iframes.
+const char kOOPIF[] = "oopifs";
+
+bool EnableOOPIFs() {
+  return base::CommandLine::ForCurrentProcess()->HasSwitch(kOOPIF);
+}
+
+}  // namespace
 
 class HTMLViewer;
 
@@ -68,6 +79,12 @@ class HTMLDocumentApplicationDelegate : public mojo::ApplicationDelegate {
     std::set<HTMLDocument*> documents(documents_);
     for (HTMLDocument* doc : documents)
       doc->Destroy();
+    DCHECK(documents_.empty());
+
+    std::set<HTMLDocumentOOPIF*> documents2(documents2_);
+    for (HTMLDocumentOOPIF* doc : documents2)
+      doc->Destroy();
+    DCHECK(documents2_.empty());
   }
 
   // Callback from the quit closure. We key off this rather than
@@ -116,16 +133,29 @@ class HTMLDocumentApplicationDelegate : public mojo::ApplicationDelegate {
     documents_.erase(document);
   }
 
+  void OnHTMLDocumentDeleted2(HTMLDocumentOOPIF* document) {
+    DCHECK(documents2_.count(document) > 0);
+    documents2_.erase(document);
+  }
+
   void OnResponseReceived(URLLoaderPtr loader,
                           mojo::ApplicationConnection* connection,
                           URLResponsePtr response) {
     // HTMLDocument is destroyed when the hosting view is destroyed, or
     // explicitly from our destructor.
-    HTMLDocument* document = new HTMLDocument(
-        &app_, connection, response.Pass(), setup_,
-        base::Bind(&HTMLDocumentApplicationDelegate::OnHTMLDocumentDeleted,
-                   base::Unretained(this)));
-    documents_.insert(document);
+    if (EnableOOPIFs()) {
+      HTMLDocumentOOPIF* document = new HTMLDocumentOOPIF(
+          &app_, connection, response.Pass(), setup_,
+          base::Bind(&HTMLDocumentApplicationDelegate::OnHTMLDocumentDeleted2,
+                     base::Unretained(this)));
+      documents2_.insert(document);
+    } else {
+      HTMLDocument* document = new HTMLDocument(
+          &app_, connection, response.Pass(), setup_,
+          base::Bind(&HTMLDocumentApplicationDelegate::OnHTMLDocumentDeleted,
+                     base::Unretained(this)));
+      documents_.insert(document);
+    }
   }
 
   mojo::ApplicationImpl app_;
@@ -140,6 +170,10 @@ class HTMLDocumentApplicationDelegate : public mojo::ApplicationDelegate {
   // As we create HTMLDocuments they are added here. They are removed when the
   // HTMLDocument is deleted.
   std::set<HTMLDocument*> documents_;
+
+  // As we create HTMLDocuments they are added here. They are removed when the
+  // HTMLDocument is deleted.
+  std::set<HTMLDocumentOOPIF*> documents2_;
 
   DISALLOW_COPY_AND_ASSIGN(HTMLDocumentApplicationDelegate);
 };

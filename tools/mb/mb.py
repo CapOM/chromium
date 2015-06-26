@@ -13,6 +13,7 @@ from __future__ import print_function
 
 import argparse
 import ast
+import errno
 import json
 import os
 import pipes
@@ -339,13 +340,20 @@ class MetaBuildWrapper(object):
         gn_labels.append(ninja_targets_to_labels[target])
 
       gn_runtime_deps_path = self.ToAbsPath(path, 'runtime_deps')
+
+      # Since GN hasn't run yet, the build directory may not even exist.
+      self.MaybeMakeDirectory(self.ToAbsPath(path))
+
       self.WriteFile(gn_runtime_deps_path, '\n'.join(gn_labels) + '\n')
       cmd.append('--runtime-deps-list-file=%s' % gn_runtime_deps_path)
 
     ret, _, _ = self.Run(cmd)
 
     for target in swarming_targets:
-      deps_path = self.ToAbsPath(path, target + '.runtime_deps')
+      if sys.platform == 'win32':
+        deps_path = self.ToAbsPath(path, target + '.exe.runtime_deps')
+      else:
+        deps_path = self.ToAbsPath(path, target + '.runtime_deps')
       if not self.Exists(deps_path):
           raise MBErr('did not generate %s' % deps_path)
 
@@ -367,9 +375,9 @@ class MetaBuildWrapper(object):
         {
           'args': [
             '--isolated',
-            self.ToSrcRelPath('%s/%s.isolated' % (path, target)),
+            self.ToSrcRelPath('%s%s%s.isolated' % (path, os.sep, target)),
             '--isolate',
-            self.ToSrcRelPath('%s/%s.isolate' % (path, target)),
+            self.ToSrcRelPath('%s%s%s.isolate' % (path, os.sep, target)),
           ],
           'dir': self.chromium_src_dir,
           'version': 1,
@@ -434,54 +442,6 @@ class MetaBuildWrapper(object):
       self.Print()
 
     return ret
-
-  def RunGNIsolate(self, vals):
-    build_path = self.args.path[0]
-    inp = self.ReadInputJSON(['targets'])
-    if self.args.verbose:
-      self.Print()
-      self.Print('isolate input:')
-      self.PrintJSON(inp)
-      self.Print()
-    output_path = self.args.output_path[0]
-
-    for target in inp['targets']:
-      runtime_deps_path = self.ToAbsPath(build_path, target + '.runtime_deps')
-
-      if not self.Exists(runtime_deps_path):
-        self.WriteFailureAndRaise('"%s" does not exist' % runtime_deps_path,
-                                  output_path)
-
-      command, extra_files = self.GetIsolateCommand(target, vals)
-
-      runtime_deps = self.ReadFile(runtime_deps_path).splitlines()
-
-
-      isolate_path = self.ToAbsPath(build_path, target + '.isolate')
-      self.WriteFile(isolate_path,
-        pprint.pformat({
-          'variables': {
-            'command': command,
-            'files': sorted(runtime_deps + extra_files),
-            'read_only': 1,
-          }
-        }) + '\n')
-
-      self.WriteJSON(
-        {
-          'args': [
-            '--isolated',
-            self.ToSrcRelPath('%s/%s.isolated' % (build_path, target)),
-            '--isolate',
-            self.ToSrcRelPath('%s/%s.isolate' % (build_path, target)),
-          ],
-          'dir': self.chromium_src_dir,
-          'version': 1,
-        },
-        isolate_path + 'd.gen.json',
-      )
-
-    return 0
 
   def GetIsolateCommand(self, target, vals):
     extra_files = []
@@ -552,7 +512,7 @@ class MetaBuildWrapper(object):
     """Returns a relative path from the top of the repo."""
     # TODO: Support normal paths in addition to source-absolute paths.
     assert(path.startswith('//'))
-    return path[2:]
+    return path[2:].replace('/', os.sep)
 
   def ParseGYPConfigPath(self, path):
     rpath = self.ToSrcRelPath(path)
@@ -737,6 +697,13 @@ class MetaBuildWrapper(object):
   def Exists(self, path):
     # This function largely exists so it can be overridden for testing.
     return os.path.exists(path)
+
+  def MaybeMakeDirectory(self, path):
+    try:
+      os.makedirs(path)
+    except OSError, e:
+      if e.errno != errno.EEXIST:
+        raise
 
   def ReadFile(self, path):
     # This function largely exists so it can be overriden for testing.

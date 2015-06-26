@@ -1381,8 +1381,10 @@ void TraceLog::UpdateCategoryGroupEnabledFlag(size_t category_index) {
       event_callback_trace_config_.IsCategoryGroupEnabled(category_group))
     enabled_flag |= ENABLED_FOR_EVENT_CALLBACK;
 #if defined(OS_WIN)
-  if (base::trace_event::TraceEventETWExport::isETWExportEnabled())
+  if (base::trace_event::TraceEventETWExport::IsCategoryGroupEnabled(
+          category_group)) {
     enabled_flag |= ENABLED_FOR_ETW_EXPORT;
+  }
 #endif
 
   g_category_group_enabled[category_index] = enabled_flag;
@@ -1769,6 +1771,17 @@ void TraceLog::SetEventCallbackDisabled() {
 // 4. If any thread hasn't finish its flush in time, finish the flush.
 void TraceLog::Flush(const TraceLog::OutputCallback& cb,
                      bool use_worker_thread) {
+  FlushInternal(cb, use_worker_thread, false);
+}
+
+void TraceLog::CancelTracing(const OutputCallback& cb) {
+  SetDisabled();
+  FlushInternal(cb, false, true);
+}
+
+void TraceLog::FlushInternal(const TraceLog::OutputCallback& cb,
+                             bool use_worker_thread,
+                             bool discard_events) {
   use_worker_thread_ = use_worker_thread;
   if (IsEnabled()) {
     // Can't flush when tracing is enabled because otherwise PostTask would
@@ -1812,17 +1825,17 @@ void TraceLog::Flush(const TraceLog::OutputCallback& cb,
   if (thread_message_loop_task_runners.size()) {
     for (size_t i = 0; i < thread_message_loop_task_runners.size(); ++i) {
       thread_message_loop_task_runners[i]->PostTask(
-          FROM_HERE,
-          Bind(&TraceLog::FlushCurrentThread, Unretained(this), generation));
+          FROM_HERE, Bind(&TraceLog::FlushCurrentThread, Unretained(this),
+                          generation, discard_events));
     }
     flush_task_runner_->PostDelayedTask(
-        FROM_HERE,
-        Bind(&TraceLog::OnFlushTimeout, Unretained(this), generation),
+        FROM_HERE, Bind(&TraceLog::OnFlushTimeout, Unretained(this), generation,
+                        discard_events),
         TimeDelta::FromMilliseconds(kThreadFlushTimeoutMs));
     return;
   }
 
-  FinishFlush(generation);
+  FinishFlush(generation, discard_events);
 }
 
 // Usually it runs on a different thread.
@@ -1852,7 +1865,7 @@ void TraceLog::ConvertTraceEventsToTraceFormat(
   flush_output_callback.Run(json_events_str_ptr, false);
 }
 
-void TraceLog::FinishFlush(int generation) {
+void TraceLog::FinishFlush(int generation, bool discard_events) {
   scoped_ptr<TraceBuffer> previous_logged_events;
   OutputCallback flush_output_callback;
   TraceEvent::ArgumentFilterPredicate argument_filter_predicate;
@@ -1877,6 +1890,14 @@ void TraceLog::FinishFlush(int generation) {
     }
   }
 
+  if (discard_events) {
+    if (!flush_output_callback.is_null()) {
+      scoped_refptr<RefCountedString> empty_result = new RefCountedString;
+      flush_output_callback.Run(empty_result, false);
+    }
+    return;
+  }
+
   if (use_worker_thread_ &&
       WorkerPool::PostTask(
           FROM_HERE, Bind(&TraceLog::ConvertTraceEventsToTraceFormat,
@@ -1892,7 +1913,7 @@ void TraceLog::FinishFlush(int generation) {
 }
 
 // Run in each thread holding a local event buffer.
-void TraceLog::FlushCurrentThread(int generation) {
+void TraceLog::FlushCurrentThread(int generation, bool discard_events) {
   {
     AutoLock lock(lock_);
     if (!CheckGeneration(generation) || !flush_task_runner_) {
@@ -1910,10 +1931,11 @@ void TraceLog::FlushCurrentThread(int generation) {
     return;
 
   flush_task_runner_->PostTask(
-      FROM_HERE, Bind(&TraceLog::FinishFlush, Unretained(this), generation));
+      FROM_HERE, Bind(&TraceLog::FinishFlush, Unretained(this), generation,
+                      discard_events));
 }
 
-void TraceLog::OnFlushTimeout(int generation) {
+void TraceLog::OnFlushTimeout(int generation, bool discard_events) {
   {
     AutoLock lock(lock_);
     if (!CheckGeneration(generation) || !flush_task_runner_) {
@@ -1932,7 +1954,7 @@ void TraceLog::OnFlushTimeout(int generation) {
       LOG(WARNING) << "Thread: " << (*it)->thread_name();
     }
   }
-  FinishFlush(generation);
+  FinishFlush(generation, discard_events);
 }
 
 void TraceLog::FlushButLeaveBufferIntact(
@@ -2051,8 +2073,10 @@ TraceEventHandle TraceLog::AddTraceEventWithThreadIdAndTimestamp(
       } else {
         // This is a thread id that we've seen before, but potentially with a
         // new name.
-        std::vector<StringPiece> existing_names;
-        Tokenize(existing_name->second, ",", &existing_names);
+        std::vector<StringPiece> existing_names =
+            base::SplitStringPiece(existing_name->second, ",",
+                                   base::KEEP_WHITESPACE,
+                                   base::SPLIT_WANT_NONEMPTY);
         bool found = std::find(existing_names.begin(),
                                existing_names.end(),
                                new_name) != existing_names.end();

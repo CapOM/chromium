@@ -92,9 +92,9 @@
                 '../remoting/remoting.gyp:remoting_apk',
               ],
             }],
-            ['target_arch == "arm" or target_arch == "arm64"', {
+            # TODO: Enable packed relocations for x64. See: b/20532404
+            ['target_arch != "x64"', {
               'dependencies': [
-                # The relocation packer is currently used only for ARM or ARM64.
                 '../third_party/android_platform/relocation_packer.gyp:android_relocation_packer_unittests#host',
               ],
             }],
@@ -1387,7 +1387,7 @@
           'target_name': 'chromoting_swarm_tests',
           'type': 'none',
           'dependencies': [
-            '../testing/chromoting/integration_tests.gyp:chromoting_integration_tests_run',
+            '../testing/chromoting/integration_tests.gyp:*',
           ],
         }, # target_name: chromoting_swarm_tests
       ]

@@ -46,6 +46,7 @@ void ExtensionDictionaryEventRouter::DispatchLoadedEventIfLoaded() {
   scoped_ptr<base::ListValue> args(new base::ListValue());
   // The router will only send the event to extensions that are listening.
   scoped_ptr<extensions::Event> event(new extensions::Event(
+      extensions::events::INPUT_METHOD_PRIVATE_ON_DICTIONARY_LOADED,
       extensions::InputMethodAPI::kOnDictionaryLoaded, args.Pass()));
   event->restrict_to_browser_context = context_;
   router->BroadcastEvent(event.Pass());
@@ -79,6 +80,7 @@ void ExtensionDictionaryEventRouter::OnCustomDictionaryChanged(
 
   // The router will only send the event to extensions that are listening.
   scoped_ptr<extensions::Event> event(new extensions::Event(
+      extensions::events::INPUT_METHOD_PRIVATE_ON_DICTIONARY_CHANGED,
       extensions::InputMethodAPI::kOnDictionaryChanged, args.Pass()));
   event->restrict_to_browser_context = context_;
   router->BroadcastEvent(event.Pass());

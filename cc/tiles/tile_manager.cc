@@ -46,6 +46,7 @@ class RasterTaskImpl : public RasterTask {
       float contents_scale,
       TileResolution tile_resolution,
       int layer_id,
+      uint64_t source_prepare_tiles_id,
       const void* tile,
       uint64_t new_content_id,
       uint64_t previous_content_id,
@@ -62,6 +63,7 @@ class RasterTaskImpl : public RasterTask {
         contents_scale_(contents_scale),
         tile_resolution_(tile_resolution),
         layer_id_(layer_id),
+        source_prepare_tiles_id_(source_prepare_tiles_id),
         tile_(tile),
         new_content_id_(new_content_id),
         previous_content_id_(previous_content_id),
@@ -72,7 +74,8 @@ class RasterTaskImpl : public RasterTask {
 
   // Overridden from Task:
   void RunOnWorkerThread() override {
-    TRACE_EVENT0("cc", "RasterizerTaskImpl::RunOnWorkerThread");
+    TRACE_EVENT1("cc", "RasterizerTaskImpl::RunOnWorkerThread",
+                 "source_prepare_tiles_id", source_prepare_tiles_id_);
 
     DCHECK(raster_source_.get());
     DCHECK(raster_buffer_);
@@ -136,6 +139,7 @@ class RasterTaskImpl : public RasterTask {
   float contents_scale_;
   TileResolution tile_resolution_;
   int layer_id_;
+  uint64_t source_prepare_tiles_id_;
   const void* tile_;
   uint64_t new_content_id_;
   uint64_t previous_content_id_;
@@ -152,13 +156,16 @@ class RasterTaskImpl : public RasterTask {
 class ImageDecodeTaskImpl : public ImageDecodeTask {
  public:
   ImageDecodeTaskImpl(SkPixelRef* pixel_ref,
+                      uint64_t source_prepare_tiles_id,
                       const base::Callback<void(bool was_canceled)>& reply)
       : pixel_ref_(skia::SharePtr(pixel_ref)),
+        source_prepare_tiles_id_(source_prepare_tiles_id),
         reply_(reply) {}
 
   // Overridden from Task:
   void RunOnWorkerThread() override {
-    TRACE_EVENT0("cc", "ImageDecodeTaskImpl::RunOnWorkerThread");
+    TRACE_EVENT1("cc", "ImageDecodeTaskImpl::RunOnWorkerThread",
+                 "source_prepare_tiles_id", source_prepare_tiles_id_);
 
     devtools_instrumentation::ScopedImageDecodeTask image_decode_task(
         pixel_ref_.get());
@@ -181,6 +188,7 @@ class ImageDecodeTaskImpl : public ImageDecodeTask {
 
  private:
   skia::RefPtr<SkPixelRef> pixel_ref_;
+  uint64_t source_prepare_tiles_id_;
   const base::Callback<void(bool was_canceled)> reply_;
 
   DISALLOW_COPY_AND_ASSIGN(ImageDecodeTaskImpl);
@@ -242,25 +250,15 @@ TileManager::TileManager(
       all_tiles_that_need_to_be_rasterized_are_scheduled_(true),
       did_check_for_completed_tasks_since_last_schedule_tasks_(true),
       did_oom_on_last_assign_(false),
-      ready_to_activate_check_notifier_(
-          task_runner_.get(),
-          base::Bind(&TileManager::CheckIfReadyToActivate,
-                     base::Unretained(this))),
-      ready_to_draw_check_notifier_(
-          task_runner_.get(),
-          base::Bind(&TileManager::CheckIfReadyToDraw, base::Unretained(this))),
-      all_tile_tasks_completed_check_notifier_(
-          task_runner_.get(),
-          base::Bind(&TileManager::CheckIfAllTileTasksCompleted,
-                     base::Unretained(this))),
       more_tiles_need_prepare_check_notifier_(
           task_runner_.get(),
           base::Bind(&TileManager::CheckIfMoreTilesNeedToBePrepared,
                      base::Unretained(this))),
-      did_notify_ready_to_activate_(false),
-      did_notify_ready_to_draw_(false),
-      did_notify_all_tile_tasks_completed_(false),
-      has_scheduled_tile_tasks_(false) {
+      signals_check_notifier_(task_runner_.get(),
+                              base::Bind(&TileManager::CheckAndIssueSignals,
+                                         base::Unretained(this))),
+      has_scheduled_tile_tasks_(false),
+      prepare_tiles_count_(0u) {
   tile_task_runner_->SetClient(this);
 }
 
@@ -340,7 +338,8 @@ void TileManager::DidFinishRunningTileTasks(TaskSet task_set) {
         // TODO(ericrk): We should find a better way to safely handle re-entrant
         // notifications than always having to schedule a new task.
         // http://crbug.com/498439
-        all_tile_tasks_completed_check_notifier_.Schedule();
+        signals_.all_tile_tasks_completed = true;
+        signals_check_notifier_.Schedule();
         return;
       }
 
@@ -348,10 +347,13 @@ void TileManager::DidFinishRunningTileTasks(TaskSet task_set) {
       return;
     }
     case REQUIRED_FOR_ACTIVATION:
-      ready_to_activate_check_notifier_.Schedule();
+      signals_.ready_to_activate = true;
+      signals_check_notifier_.Schedule();
       return;
+
     case REQUIRED_FOR_DRAW:
-      ready_to_draw_check_notifier_.Schedule();
+      signals_.ready_to_draw = true;
+      signals_check_notifier_.Schedule();
       return;
   }
 
@@ -360,8 +362,12 @@ void TileManager::DidFinishRunningTileTasks(TaskSet task_set) {
 
 void TileManager::PrepareTiles(
     const GlobalStateThatImpactsTilePriority& state) {
-  TRACE_EVENT0("cc", "TileManager::PrepareTiles");
+  ++prepare_tiles_count_;
 
+  TRACE_EVENT1("cc", "TileManager::PrepareTiles", "prepare_tiles_id",
+               prepare_tiles_count_);
+
+  signals_.reset();
   global_state_ = state;
 
   // We need to call CheckForCompletedTasks() once in-between each call
@@ -391,10 +397,6 @@ void TileManager::PrepareTiles(
   // Schedule tile tasks.
   ScheduleTasks(tiles_that_need_to_be_rasterized);
 
-  did_notify_ready_to_activate_ = false;
-  did_notify_ready_to_draw_ = false;
-  did_notify_all_tile_tasks_completed_ = false;
-
   TRACE_EVENT_INSTANT1("cc", "DidPrepareTiles", TRACE_EVENT_SCOPE_THREAD,
                        "state", BasicStateAsValue());
 
@@ -403,21 +405,16 @@ void TileManager::PrepareTiles(
                         resource_pool_->acquired_memory_usage_bytes());
 }
 
-void TileManager::UpdateVisibleTiles(
-    const GlobalStateThatImpactsTilePriority& state) {
-  TRACE_EVENT0("cc", "TileManager::UpdateVisibleTiles");
+void TileManager::Flush() {
+  TRACE_EVENT0("cc", "TileManager::Flush");
 
   tile_task_runner_->CheckForCompletedTasks();
 
   did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
 
-  TRACE_EVENT_INSTANT1(
-      "cc",
-      "DidUpdateVisibleTiles",
-      TRACE_EVENT_SCOPE_THREAD,
-      "stats",
-      RasterTaskCompletionStatsAsValue(update_visible_tiles_stats_));
-  update_visible_tiles_stats_ = RasterTaskCompletionStats();
+  TRACE_EVENT_INSTANT1("cc", "DidFlush", TRACE_EVENT_SCOPE_THREAD, "stats",
+                       RasterTaskCompletionStatsAsValue(flush_stats_));
+  flush_stats_ = RasterTaskCompletionStats();
 }
 
 scoped_refptr<base::trace_event::ConvertableToTraceFormat>
@@ -686,10 +683,9 @@ scoped_refptr<ImageDecodeTask> TileManager::CreateImageDecodeTask(
     Tile* tile,
     SkPixelRef* pixel_ref) {
   return make_scoped_refptr(new ImageDecodeTaskImpl(
-      pixel_ref,
+      pixel_ref, prepare_tiles_count_,
       base::Bind(&TileManager::OnImageDecodeTaskCompleted,
-                 base::Unretained(this),
-                 tile->layer_id(),
+                 base::Unretained(this), tile->layer_id(),
                  base::Unretained(pixel_ref))));
 }
 
@@ -742,8 +738,8 @@ scoped_refptr<RasterTask> TileManager::CreateRasterTask(
       const_resource, prioritized_tile.raster_source(), tile->content_rect(),
       tile->invalidated_content_rect(), tile->contents_scale(),
       prioritized_tile.priority().resolution, tile->layer_id(),
-      static_cast<const void*>(tile), tile->id(), tile->invalidated_id(),
-      resource_content_id, tile->source_frame_number(),
+      prepare_tiles_count_, static_cast<const void*>(tile), tile->id(),
+      tile->invalidated_id(), resource_content_id, tile->source_frame_number(),
       tile->use_picture_analysis(),
       base::Bind(&TileManager::OnRasterTaskCompleted, base::Unretained(this),
                  tile->id(), base::Passed(&resource)),
@@ -783,7 +779,7 @@ void TileManager::OnRasterTaskCompleted(
   tile->raster_task_ = nullptr;
 
   if (was_canceled) {
-    ++update_visible_tiles_stats_.canceled_count;
+    ++flush_stats_.canceled_count;
     resource_pool_->ReleaseResource(resource.Pass(), tile->invalidated_id());
     return;
   }
@@ -797,7 +793,7 @@ void TileManager::UpdateTileDrawInfo(
     const RasterSource::SolidColorAnalysis& analysis) {
   TileDrawInfo& draw_info = tile->draw_info();
 
-  ++update_visible_tiles_stats_.completed_count;
+  ++flush_stats_.completed_count;
 
   if (analysis.is_solid_color) {
     draw_info.set_solid_color(analysis.solid_color);
@@ -813,6 +809,9 @@ void TileManager::UpdateTileDrawInfo(
     draw_info.contents_swizzled_ =
         tile_task_runner_->GetResourceRequiresSwizzle();
   }
+  DCHECK(draw_info.IsReadyToDraw());
+  draw_info.set_was_ever_ready_to_draw();
+
   client_->NotifyTileStateChanged(tile);
 }
 
@@ -863,6 +862,7 @@ bool TileManager::AreRequiredTilesReadyToDraw(
 #endif
   return true;
 }
+
 bool TileManager::IsReadyToActivate() const {
   TRACE_EVENT0("cc", "TileManager::IsReadyToActivate");
   return AreRequiredTilesReadyToDraw(
@@ -875,58 +875,43 @@ bool TileManager::IsReadyToDraw() const {
       RasterTilePriorityQueue::Type::REQUIRED_FOR_DRAW);
 }
 
-void TileManager::CheckIfReadyToActivate() {
-  TRACE_EVENT0("cc", "TileManager::CheckIfReadyToActivate");
-
+void TileManager::CheckAndIssueSignals() {
+  TRACE_EVENT0("cc", "TileManager::CheckAndIssueSignals");
   tile_task_runner_->CheckForCompletedTasks();
   did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
 
-  if (did_notify_ready_to_activate_)
-    return;
-  if (!IsReadyToActivate())
-    return;
+  // Ready to activate.
+  if (signals_.ready_to_activate && !signals_.did_notify_ready_to_activate) {
+    signals_.ready_to_activate = false;
+    if (IsReadyToActivate()) {
+      TRACE_EVENT0("cc",
+                   "TileManager::CheckAndIssueSignals - ready to activate");
+      signals_.did_notify_ready_to_activate = true;
+      client_->NotifyReadyToActivate();
+    }
+  }
 
-  TRACE_EVENT0("cc", "TileManager::NotifyReadyToActivate");
-  // Set this to true before NotifyReadyToActivate, to ensure correct behavior
-  // with regards to re-entrant code.
-  did_notify_ready_to_activate_ = true;
-  client_->NotifyReadyToActivate();
-}
+  // Ready to draw.
+  if (signals_.ready_to_draw && !signals_.did_notify_ready_to_draw) {
+    signals_.ready_to_draw = false;
+    if (IsReadyToDraw()) {
+      TRACE_EVENT0("cc", "TileManager::CheckAndIssueSignals - ready to draw");
+      signals_.did_notify_ready_to_draw = true;
+      client_->NotifyReadyToDraw();
+    }
+  }
 
-void TileManager::CheckIfReadyToDraw() {
-  TRACE_EVENT0("cc", "TileManager::CheckIfReadyToDraw");
-
-  tile_task_runner_->CheckForCompletedTasks();
-  did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
-
-  if (did_notify_ready_to_draw_)
-    return;
-  if (!IsReadyToDraw())
-    return;
-
-  TRACE_EVENT0("cc", "TileManager::NotifyReadyToDraw");
-  // Set this to true before NotifyReadyToDraw, to ensure correct behavior with
-  // regards to re-entrant code.
-  did_notify_ready_to_draw_ = true;
-  client_->NotifyReadyToDraw();
-}
-
-void TileManager::CheckIfAllTileTasksCompleted() {
-  TRACE_EVENT0("cc", "TileManager::CheckIfAllTileTasksCompleted");
-
-  tile_task_runner_->CheckForCompletedTasks();
-  did_check_for_completed_tasks_since_last_schedule_tasks_ = true;
-
-  if (did_notify_all_tile_tasks_completed_)
-    return;
-  if (has_scheduled_tile_tasks_)
-    return;
-
-  TRACE_EVENT0("cc", "TileManager::NotifyAllTileTasksCompleted");
-  // Set this to true before NotifyAllTileTasksCompleted, to ensure correct
-  // behavior with regards to re-entrant code.
-  did_notify_all_tile_tasks_completed_ = true;
-  client_->NotifyAllTileTasksCompleted();
+  // All tile tasks completed.
+  if (signals_.all_tile_tasks_completed &&
+      !signals_.did_notify_all_tile_tasks_completed) {
+    signals_.all_tile_tasks_completed = false;
+    if (!has_scheduled_tile_tasks_) {
+      TRACE_EVENT0(
+          "cc", "TileManager::CheckAndIssueSignals - all tile tasks completed");
+      signals_.did_notify_all_tile_tasks_completed = true;
+      client_->NotifyAllTileTasksCompleted();
+    }
+  }
 }
 
 void TileManager::CheckIfMoreTilesNeedToBePrepared() {
@@ -960,7 +945,8 @@ void TileManager::CheckIfMoreTilesNeedToBePrepared() {
 
   resource_pool_->ReduceResourceUsage();
 
-  all_tile_tasks_completed_check_notifier_.Schedule();
+  signals_.all_tile_tasks_completed = true;
+  signals_check_notifier_.Schedule();
 
   // We don't reserve memory for required-for-activation tiles during
   // accelerated gestures, so we just postpone activation when we don't
@@ -998,7 +984,8 @@ void TileManager::CheckIfMoreTilesNeedToBePrepared() {
   DCHECK(IsReadyToActivate());
   // TODO(ericrk): Investigate why we need to schedule this (not just call it
   // inline). http://crbug.com/498439
-  ready_to_activate_check_notifier_.Schedule();
+  signals_.ready_to_activate = true;
+  signals_check_notifier_.Schedule();
 }
 
 TileManager::MemoryUsage::MemoryUsage() : memory_bytes_(0), resource_count_(0) {
@@ -1061,6 +1048,19 @@ TileManager::MemoryUsage TileManager::MemoryUsage::operator-(
 bool TileManager::MemoryUsage::Exceeds(const MemoryUsage& limit) const {
   return memory_bytes_ > limit.memory_bytes_ ||
          resource_count_ > limit.resource_count_;
+}
+
+TileManager::Signals::Signals() {
+  reset();
+}
+
+void TileManager::Signals::reset() {
+  ready_to_activate = false;
+  did_notify_ready_to_activate = false;
+  ready_to_draw = false;
+  did_notify_ready_to_draw = false;
+  all_tile_tasks_completed = false;
+  did_notify_all_tile_tasks_completed = false;
 }
 
 }  // namespace cc

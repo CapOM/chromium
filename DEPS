@@ -30,15 +30,15 @@ vars = {
   # Use this googlecode_url variable only if there is an internal mirror for it.
   # If you do not know, use the full path while defining your new deps entry.
   'googlecode_url': 'http://%s.googlecode.com/svn',
-  'webkit_revision': '336ca2bc10719ae076d6c35462f86db8e32fb785', # from svn revision 197671
+  'webkit_revision': 'f09bb0999d58ce25b520d0e73fbaac93ba0a6633', # from svn revision 197850
   'chromium_git': 'https://chromium.googlesource.com',
   'libvpx_revision': 'db3f34772338a7e02fc5a7fb9da4d72de68e71b9',
   'sfntly_revision': '1bdaae8fc788a5ac8936d68bf24f37d977a13dac',
-  'skia_revision': 'b607767703ff7898611cf88c1218d5d69535e984',
+  'skia_revision': 'b4022965a280dd1ed64d6103dd29e2189abe6e00',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling V8
   # and whatever else without interference from each other.
-  'v8_revision': '2814c22bb3668cf06cd4002bd921f8e70d0f6111',
+  'v8_revision': 'c69f7357ff92ac7f88e336bdb6a3106706a9e165',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling swarming_client
   # and whatever else without interference from each other.
@@ -46,7 +46,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling ANGLE
   # and whatever else without interference from each other.
-  'angle_revision': '9bbfdd63f56ebc70f03b67e7bad8bc64c799b8fa',
+  'angle_revision': '6e56faae632e67390afb2dd897b4559f25de36f4',
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling build tools
   # and whatever else without interference from each other.
@@ -82,7 +82,7 @@ vars = {
   # Three lines of non-changing comments so that
   # the commit queue can handle CLs rolling NaCl
   # and whatever else without interference from each other.
-  'nacl_revision': '8191c1a953ca5896c715cb21e7a24d8c092f925f',
+  'nacl_revision': '66c300e071cf3e1c1fb98f9a3e15bb02b4388d72',
 }
 
 # Only these hosts are allowed for dependencies in this DEPS file.
@@ -126,7 +126,7 @@ deps = {
    Var('chromium_git') + '/chromium/blink.git' + '@' +  Var('webkit_revision'),
 
   'src/third_party/icu':
-   Var('chromium_git') + '/chromium/deps/icu.git' + '@' + '00af1a4e512477e48ba3d5efc97adbc95462685e',
+   Var('chromium_git') + '/chromium/deps/icu.git' + '@' + 'c3f79166089e5360c09e3053fce50e6e296c3204',
 
   'src/third_party/libexif/sources':
    Var('chromium_git') + '/chromium/deps/libexif/sources.git' + '@' + 'ed98343daabd7b4497f97fda972e132e6877c48a',
@@ -186,10 +186,10 @@ deps = {
    Var('chromium_git') + '/chromium/deps/libvpx.git' + '@' +  Var('libvpx_revision'),
 
   'src/third_party/ffmpeg':
-   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + 'bb04e2faf4f1419aca19004f67f78375678b70e1',
+   Var('chromium_git') + '/chromium/third_party/ffmpeg.git' + '@' + '408c4b08fab5cbaa284847f8c573fe939cada87c',
 
   'src/third_party/libjingle/source/talk':
-    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '8c44aaca8597349a70c7e05bace3a846df0a4f38', # commit position 9490
+    Var('chromium_git') + '/external/webrtc/trunk/talk.git' + '@' + '43e07261572def56f12dfcc088b78bcb7c73ba2b', # commit position 9496
 
   'src/third_party/usrsctp/usrsctplib':
     Var('chromium_git') + '/external/usrsctplib.git' + '@' + '36444a999739e9e408f8f587cb4c3ffeef2e50ac', # from svn revision 9215
@@ -213,7 +213,7 @@ deps = {
    Var('chromium_git') + '/native_client/src/third_party/scons-2.0.1.git' + '@' + '1c1550e17fc26355d08627fbdec13d8291227067',
 
   'src/third_party/webrtc':
-    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + '81e601bac2f042b8afd584e6839f575e2fcbd152', # commit position 9489
+    Var('chromium_git') + '/external/webrtc/trunk/webrtc.git' + '@' + 'bed70b2c7bf7e36953a26a3250c6fdf691359ce7', # commit position 9497
 
   'src/third_party/openmax_dl':
     Var('chromium_git') + '/external/webrtc/deps/third_party/openmax.git' + '@' +  Var('openmax_dl_revision'),
@@ -222,7 +222,7 @@ deps = {
     Var('chromium_git') + '/external/github.com/open-source-parsers/jsoncpp.git' + '@' + 'f572e8e42e22cfcf5ab0aea26574f408943edfa4', # from svn 248
 
   'src/third_party/libyuv':
-    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + 'a0fca88b1dbaf28658500bfe04bb9f7fbb3b22f2', # from svn revision 1434
+    Var('chromium_git') + '/libyuv/libyuv.git' + '@' + '6dde4f14bd3b3d1777a371feabbe8130bc043dfa', # from svn revision 1437
 
   'src/third_party/smhasher/src':
     Var('chromium_git') + '/external/smhasher.git' + '@' + 'e87738e57558e0ec472b2fc3a643b838e5b6e88f',
@@ -269,7 +269,7 @@ deps = {
     Var('chromium_git') + '/external/py_trace_event.git' + '@' + 'dd463ea9e2c430de2b9e53dea57a77b4c3ac9b30',
 
   'src/third_party/dom_distiller_js/dist':
-    Var('chromium_git') + '/external/github.com/chromium/dom-distiller-dist.git' + '@' + 'f93cf9c2817926a92f4f347b20fa840a1998d5f3',
+    Var('chromium_git') + '/external/github.com/chromium/dom-distiller-dist.git' + '@' + '81e5b59da2a7a0a518b90b5ded58670322c98128',
 }
 
 

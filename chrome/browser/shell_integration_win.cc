@@ -73,8 +73,8 @@ base::string16 GetProfileIdFromPath(const base::FilePath& profile_path) {
 
   // Generate profile_id from sanitized basenames.
   for (size_t i = 0; i < basenames.length(); ++i) {
-    if (IsAsciiAlpha(basenames[i]) ||
-        IsAsciiDigit(basenames[i]) ||
+    if (base::IsAsciiAlpha(basenames[i]) ||
+        base::IsAsciiDigit(basenames[i]) ||
         basenames[i] == L'.')
       profile_id += basenames[i];
   }
@@ -219,10 +219,10 @@ base::string16 GetAppForProtocolUsingRegistry(const GURL& url) {
                                                     url_spec.length() - 1);
   base::string16 application_to_launch;
   if (cmd_key.ReadValue(NULL, &application_to_launch) == ERROR_SUCCESS) {
-    ReplaceSubstringsAfterOffset(&application_to_launch,
-                                 0,
-                                 L"%1",
-                                 parameters);
+    base::ReplaceSubstringsAfterOffset(&application_to_launch,
+                                       0,
+                                       L"%1",
+                                       parameters);
     return application_to_launch;
   }
   return base::string16();
