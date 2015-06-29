@@ -27,6 +27,10 @@ import java.util.List;
 /**
  * Wrapper classes around android.bluetooth.* classes that provide an
  * indirection layer enabling fake implementations when running tests.
+ *
+ * Each Wrapper base class accepts an Android API object and passes through
+ * calls to it. When under test, Fake subclasses override all methods that
+ * pass through to the Android object and instead provide fake implementations.
  */
 @JNINamespace("device")
 @TargetApi(Build.VERSION_CODES.LOLLIPOP)
@@ -34,14 +38,13 @@ class Wrappers {
     private static final String TAG = "cr.Bluetooth";
 
     /**
-     * Wraps android.bluetooth.BluetoothAdapter, pasing through to a provided
-     * object. This indirection enables fake implementations when running tests.
+     * Wraps android.bluetooth.BluetoothAdapter.
      */
     static class BluetoothAdapterWrapper {
         private final BluetoothAdapter mAdapter;
         protected final BluetoothLeScannerWrapper mScanner;
 
-        /***
+        /**
          * Creates a BluetoothAdapterWrapper using the default
          * android.bluetooth.BluetoothAdapter. May fail if the default adapter
          * is not available or if the application does not have sufficient
@@ -81,7 +84,6 @@ class Wrappers {
                 Log.i(TAG, "BluetoothAdapterWrapper.create failed: Default adapter not found.");
                 return null;
             } else {
-                Log.i(TAG, "BluetoothAdapterWrapper created with default adapter.");
                 return new BluetoothAdapterWrapper(
                         adapter, new BluetoothLeScannerWrapper(adapter.getBluetoothLeScanner()));
             }

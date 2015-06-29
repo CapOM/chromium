@@ -9,8 +9,6 @@
 #include "base/android/scoped_java_ref.h"
 #include "device/bluetooth/bluetooth_export.h"
 
-using base::android::ScopedJavaLocalRef;
-
 namespace device {
 
 // Bindings into Java methods in org.chromium.device.bluetooth.Wrappers classes:
@@ -19,7 +17,7 @@ namespace device {
 bool WrappersRegisterJNI(JNIEnv* env);
 
 // Calls Java: BluetoothAdapterWrapper.createWithDefaultAdapter().
-DEVICE_BLUETOOTH_EXPORT ScopedJavaLocalRef<jobject>
+DEVICE_BLUETOOTH_EXPORT base::android::ScopedJavaLocalRef<jobject>
 BluetoothAdapterWrapper_CreateWithDefaultAdapter();
 
 }  // namespace device
