@@ -16,6 +16,9 @@ class BluetoothAdapter;
 
 // A test fixture for Bluetooth that abstracts platform specifics for creating
 // and controlling fake low level objects.
+//
+// Subclasses on each platform implement this, are then typedef-ed to
+// BluetoothTest.
 class BluetoothTestBase : public testing::Test {
  public:
   BluetoothTestBase();

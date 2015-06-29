@@ -20,8 +20,6 @@ using device::BluetoothDevice;
 
 namespace device {
 
-typedef BluetoothTestAndroid BluetoothTest;
-
 class TestBluetoothAdapter : public BluetoothAdapter {
  public:
   TestBluetoothAdapter() {
@@ -402,6 +400,7 @@ TEST(BluetoothAdapterTest, GetMergedDiscoveryFilterAllFields) {
   adapter->CleanupSessions();
 }
 
+// TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructDefaultAdapter) {
   InitWithDefaultAdapter();
@@ -420,6 +419,7 @@ TEST_F(BluetoothTest, ConstructDefaultAdapter) {
 }
 #endif
 
+// TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructWithoutDefaultAdapter) {
   InitWithoutDefaultAdapter();
@@ -432,6 +432,7 @@ TEST_F(BluetoothTest, ConstructWithoutDefaultAdapter) {
 }
 #endif
 
+// TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, ConstructFakeAdapter) {
   InitWithFakeAdapter();
