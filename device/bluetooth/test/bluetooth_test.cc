@@ -21,24 +21,12 @@ void BluetoothTestBase::Callback() {
   ++callback_count_;
 }
 
-void BluetoothTestBase::DiscoverySessionCallback(
-    scoped_ptr<BluetoothDiscoverySession> discovery_session) {
-  ++callback_count_;
-  discovery_sessions_.push_back(discovery_session.release());
-}
-
 void BluetoothTestBase::ErrorCallback() {
   ++error_callback_count_;
 }
 
 base::Closure BluetoothTestBase::GetCallback() {
   return base::Bind(&BluetoothTestBase::Callback, base::Unretained(this));
-}
-
-BluetoothAdapter::DiscoverySessionCallback
-BluetoothTestBase::GetDiscoverySessionCallback() {
-  return base::Bind(&BluetoothTestBase::DiscoverySessionCallback,
-                    base::Unretained(this));
 }
 
 BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {

@@ -36,17 +36,12 @@ class BluetoothTestBase : public testing::Test {
   // that can be controlled by this test fixture.
   virtual void InitWithFakeAdapter(){};
 
-  // Create a fake device and discover it.
-  virtual void DiscoverANewDevice(){};
-
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();
-  void DiscoverySessionCallback(scoped_ptr<BluetoothDiscoverySession>);
   void ErrorCallback();
 
   // Accessors to get callbacks bound to this fixture:
   base::Closure GetCallback();
-  BluetoothAdapter::DiscoverySessionCallback GetDiscoverySessionCallback();
   BluetoothAdapter::ErrorCallback GetErrorCallback();
 
   // A Message loop is required by some implementations that will PostTasks and
@@ -54,10 +49,8 @@ class BluetoothTestBase : public testing::Test {
   base::MessageLoop message_loop_;
 
   scoped_refptr<BluetoothAdapter> adapter_;
-  ScopedVector<BluetoothDiscoverySession> discovery_sessions_;
   int callback_count_ = 0;
   int error_callback_count_ = 0;
-  bool run_message_loop_to_wait_for_callbacks_ = true;
 };
 
 }  // namespace device

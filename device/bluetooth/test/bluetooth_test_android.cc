@@ -43,9 +43,4 @@ void BluetoothTestAndroid::InitWithFakeAdapter() {
       BluetoothAdapterAndroid::Create(j_fake_bluetooth_adapter_.obj()).get();
 }
 
-void BluetoothTestAndroid::DiscoverANewDevice() {
-  Java_FakeBluetoothAdapter_discoverANewDevice(AttachCurrentThread(),
-                                               j_fake_bluetooth_adapter_.obj());
-}
-
 }  // namespace device
