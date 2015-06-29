@@ -36,9 +36,11 @@ void BluetoothTestAndroid::InitWithoutDefaultAdapter() {
 }
 
 void BluetoothTestAndroid::InitWithFakeAdapter() {
+  j_fake_bluetooth_adapter_.Reset(
+      Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
+
   adapter_ = adapter_android_ =
-      BluetoothAdapterAndroid::Create(
-          Java_FakeBluetoothAdapter_create(AttachCurrentThread()).obj()).get();
+      BluetoothAdapterAndroid::Create(j_fake_bluetooth_adapter_.obj()).get();
 }
 
 void BluetoothTestAndroid::DiscoverANewDevice() {
