@@ -41,8 +41,7 @@ final class ChromeBluetoothAdapter {
 
     // Implements BluetoothAdapterAndroid::Create.
     // 'Object' type must be used because inner class Wrappers.BluetoothAdapterWrapper reference is
-    // not handled by jni_generator.py JavaToJni.
-    // FILE AN ISSUE.
+    // not handled by jni_generator.py JavaToJni. http://crbug.com/505554
     @CalledByNative
     public static ChromeBluetoothAdapter create(Object adapterWrapper) {
         return new ChromeBluetoothAdapter((Wrappers.BluetoothAdapterWrapper) adapterWrapper);
