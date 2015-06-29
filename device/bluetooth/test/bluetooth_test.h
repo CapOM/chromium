@@ -36,21 +36,7 @@ class BluetoothTestBase : public testing::Test {
   // that can be controlled by this test fixture.
   virtual void InitWithFakeAdapter(){};
 
-  // Callbacks that increment |callback_count_|, |error_callback_count_|:
-  void Callback();
-  void ErrorCallback();
-
-  // Accessors to get callbacks bound to this fixture:
-  base::Closure GetCallback();
-  BluetoothAdapter::ErrorCallback GetErrorCallback();
-
-  // A Message loop is required by some implementations that will PostTasks and
-  // by base::RunLoop().RunUntilIdle() use in this fixuture.
-  base::MessageLoop message_loop_;
-
   scoped_refptr<BluetoothAdapter> adapter_;
-  int callback_count_ = 0;
-  int error_callback_count_ = 0;
 };
 
 }  // namespace device

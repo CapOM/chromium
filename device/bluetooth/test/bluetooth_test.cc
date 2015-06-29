@@ -17,20 +17,4 @@ BluetoothTestBase::BluetoothTestBase() {
 BluetoothTestBase::~BluetoothTestBase() {
 }
 
-void BluetoothTestBase::Callback() {
-  ++callback_count_;
-}
-
-void BluetoothTestBase::ErrorCallback() {
-  ++error_callback_count_;
-}
-
-base::Closure BluetoothTestBase::GetCallback() {
-  return base::Bind(&BluetoothTestBase::Callback, base::Unretained(this));
-}
-
-BluetoothAdapter::ErrorCallback BluetoothTestBase::GetErrorCallback() {
-  return base::Bind(&BluetoothTestBase::ErrorCallback, base::Unretained(this));
-}
-
 }  // namespace device
