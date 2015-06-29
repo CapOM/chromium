@@ -444,6 +444,7 @@ TEST_F(BluetoothTest, ConstructFakeAdapter) {
 }
 #endif
 
+// TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
 TEST_F(BluetoothTest, DiscoverySession) {
   InitWithFakeAdapter();
