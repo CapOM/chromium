@@ -27,7 +27,6 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   void InitWithFakeAdapter() override;
 
   scoped_refptr<BluetoothAdapterAndroid> adapter_android_;
-  base::android::ScopedJavaGlobalRef<jobject> j_fake_bluetooth_adapter_;
 };
 
 // Defines common test fixture name. Use TEST_F(BluetoothTest, YourTestName).
