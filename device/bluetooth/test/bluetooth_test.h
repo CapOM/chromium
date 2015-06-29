@@ -7,6 +7,7 @@
 
 #include "base/memory/ref_counted.h"
 #include "base/message_loop/message_loop.h"
+#include "device/bluetooth/bluetooth_adapter.h"
 #include "device/bluetooth/bluetooth_discovery_session.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
@@ -17,7 +18,7 @@ class BluetoothAdapter;
 // A test fixture for Bluetooth that abstracts platform specifics for creating
 // and controlling fake low level objects.
 //
-// Subclasses on each platform implement this, are then typedef-ed to
+// Subclasses on each platform implement this, and are then typedef-ed to
 // BluetoothTest.
 class BluetoothTestBase : public testing::Test {
  public:
@@ -27,13 +28,13 @@ class BluetoothTestBase : public testing::Test {
   // Initializes the BluetoothAdapter |adapter_| with the system adapter.
   virtual void InitWithDefaultAdapter(){};
 
-  // Initializes the BluetoothAdapter |adapter_| forcing the system adapter to
-  // be ignored as if it did not exist. This enables tests for when an adapter
-  // is not present on the system.
+  // Initializes the BluetoothAdapter |adapter_| with the system adapter forced
+  // to be ignored as if it did not exist. This enables tests for when an
+  // adapter is not present on the system.
   virtual void InitWithoutDefaultAdapter(){};
 
-  // Initializes the BluetoothAdapter |adapter_| with a fake system adapter
-  // that can be controlled by this test fixture.
+  // Initializes the BluetoothAdapter |adapter_| with a fake adapter that can be
+  // controlled by this test fixture.
   virtual void InitWithFakeAdapter(){};
 
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
