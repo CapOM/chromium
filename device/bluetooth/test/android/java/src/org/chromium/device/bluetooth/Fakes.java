@@ -36,7 +36,7 @@ class Fakes {
          */
         @CalledByNative("FakeBluetoothAdapter")
         public static FakeBluetoothAdapter create() {
-            Log.i(TAG, "FakeBluetoothAdapter created.");
+            Log.v(TAG, "FakeBluetoothAdapter created.");
             return new FakeBluetoothAdapter();
         }
 
