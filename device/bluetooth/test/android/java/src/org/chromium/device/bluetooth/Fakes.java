@@ -41,15 +41,6 @@ class Fakes {
             mFakeScanner = (FakeBluetoothLeScanner) mScanner;
         }
 
-        /**
-         * Creates and discovers a new device.
-         */
-        @CalledByNative("FakeBluetoothAdapter")
-        public void discoverANewDevice() {
-            mFakeScanner.mCallback.onScanResultWrapper(ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                    new FakeScanResult(new FakeBluetoothDevice()));
-        }
-
         // -----------------------------------------------------------------------------------------
         // BluetoothAdapterWrapper overrides:
 

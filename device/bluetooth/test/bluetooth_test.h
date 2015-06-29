@@ -36,9 +36,6 @@ class BluetoothTestBase : public testing::Test {
   // that can be controlled by this test fixture.
   virtual void InitWithFakeAdapter(){};
 
-  // Create a fake device and discover it.
-  virtual void DiscoverANewDevice(){};
-
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();
   void DiscoverySessionCallback(scoped_ptr<BluetoothDiscoverySession>);
