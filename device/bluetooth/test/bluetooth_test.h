@@ -6,6 +6,8 @@
 #define DEVICE_BLUETOOTH_TEST_BLUETOOTH_TEST_H_
 
 #include "base/memory/ref_counted.h"
+#include "base/message_loop/message_loop.h"
+#include "device/bluetooth/bluetooth_discovery_session.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace device {

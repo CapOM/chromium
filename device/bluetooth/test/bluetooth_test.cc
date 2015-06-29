@@ -4,6 +4,11 @@
 
 #include "device/bluetooth/test/bluetooth_test.h"
 
+#include "base/bind.h"
+#include "base/logging.h"
+#include "base/run_loop.h"
+#include "device/bluetooth/bluetooth_adapter.h"
+
 namespace device {
 
 BluetoothTestBase::BluetoothTestBase() {
