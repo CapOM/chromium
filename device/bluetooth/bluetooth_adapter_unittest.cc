@@ -19,8 +19,6 @@ using device::BluetoothDevice;
 
 namespace device {
 
-typedef BluetoothTestAndroid BluetoothTest;
-
 class TestBluetoothAdapter : public BluetoothAdapter {
  public:
   TestBluetoothAdapter() {
