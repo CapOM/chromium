@@ -27,7 +27,6 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   void InitWithFakeAdapter() override;
   void DiscoverANewDevice() override;
 
-  scoped_refptr<BluetoothAdapterAndroid> adapter_android_;
   base::android::ScopedJavaGlobalRef<jobject> j_fake_bluetooth_adapter_;
 };
 

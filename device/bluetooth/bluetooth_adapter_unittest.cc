@@ -417,7 +417,7 @@ TEST_F(BluetoothTest, ConstructDefaultAdapter) {
   EXPECT_FALSE(adapter_->IsDiscoverable());
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
-#endif
+#endif  // defined(OS_ANDROID)
 
 // TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
@@ -430,7 +430,7 @@ TEST_F(BluetoothTest, ConstructWithoutDefaultAdapter) {
   EXPECT_FALSE(adapter_->IsDiscoverable());
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
-#endif
+#endif  // defined(OS_ANDROID)
 
 // TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
@@ -443,7 +443,7 @@ TEST_F(BluetoothTest, ConstructFakeAdapter) {
   EXPECT_FALSE(adapter_->IsDiscoverable());
   EXPECT_FALSE(adapter_->IsDiscovering());
 }
-#endif
+#endif  // defined(OS_ANDROID)
 
 // TODO(scheib): Enable BluetoothTest fixture tests on all platforms.
 #if defined(OS_ANDROID)
@@ -469,7 +469,7 @@ TEST_F(BluetoothTest, DiscoverySession) {
   EXPECT_FALSE(adapter_->IsDiscovering());
   EXPECT_FALSE(discovery_sessions_[0]->IsActive());
 }
-#endif
+#endif  // defined(OS_ANDROID)
 
 #if defined(OS_ANDROID)
 // Discovers a device.

@@ -38,13 +38,13 @@ final class ChromeBluetoothAdapter {
 
     /**
      * Constructs a ChromeBluetoothAdapter.
-     * @param nativeBluetoothAdapterAndroid Is the paired C++
+     * @param nativeBluetoothAdapterAndroid Is the associated C++
      *                                      BluetoothAdapterAndroid pointer value.
      * @param adapterWrapper Wraps the default android.bluetooth.BluetoothAdapter,
      *                       but may be either null if an adapter is not available
      *                       or a fake for testing.
      */
-    private ChromeBluetoothAdapter(
+    public ChromeBluetoothAdapter(
             long nativeBluetoothAdapterAndroid, Wrappers.BluetoothAdapterWrapper adapterWrapper) {
         mNativeBluetoothAdapterAndroid = nativeBluetoothAdapterAndroid;
         mAdapter = adapterWrapper;
@@ -78,7 +78,7 @@ final class ChromeBluetoothAdapter {
     // 'Object' type must be used because inner class Wrappers.BluetoothAdapterWrapper reference is
     // not handled by jni_generator.py JavaToJni. http://crbug.com/505554
     @CalledByNative
-    public static ChromeBluetoothAdapter create(
+    private static ChromeBluetoothAdapter create(
             long nativeBluetoothAdapterAndroid, Object adapterWrapper) {
         return new ChromeBluetoothAdapter(
                 nativeBluetoothAdapterAndroid, (Wrappers.BluetoothAdapterWrapper) adapterWrapper);
@@ -143,12 +143,11 @@ final class ChromeBluetoothAdapter {
             return true;
         }
 
-        if (startScan()) {
-            return true;
-        } else {
+        if (!startScan()) {
             mNumDiscoverySessions--;
             return false;
         }
+        return true;
     }
 
     // Implements BluetoothAdapterAndroid::RemoveDiscoverySession.
@@ -165,9 +164,9 @@ final class ChromeBluetoothAdapter {
         if (mNumDiscoverySessions == 0) {
             Log.d(TAG, "removeDiscoverySession: Now 0 sessions. Stopping scan.");
             return stopScan();
-        } else {
-            Log.d(TAG, "removeDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
         }
+
+        Log.d(TAG, "removeDiscoverySession: Now %d sessions.", mNumDiscoverySessions);
         return true;
     }
 

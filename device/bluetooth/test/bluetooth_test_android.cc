@@ -26,20 +26,20 @@ void BluetoothTestAndroid::SetUp() {
 }
 
 void BluetoothTestAndroid::InitWithDefaultAdapter() {
-  adapter_ = adapter_android_ =
+  adapter_ =
       BluetoothAdapterAndroid::Create(
           BluetoothAdapterWrapper_CreateWithDefaultAdapter().obj()).get();
 }
 
 void BluetoothTestAndroid::InitWithoutDefaultAdapter() {
-  adapter_ = adapter_android_ = BluetoothAdapterAndroid::Create(NULL).get();
+  adapter_ = BluetoothAdapterAndroid::Create(NULL).get();
 }
 
 void BluetoothTestAndroid::InitWithFakeAdapter() {
   j_fake_bluetooth_adapter_.Reset(
       Java_FakeBluetoothAdapter_create(AttachCurrentThread()));
 
-  adapter_ = adapter_android_ =
+  adapter_ =
       BluetoothAdapterAndroid::Create(j_fake_bluetooth_adapter_.obj()).get();
 }
 
