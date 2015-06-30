@@ -485,6 +485,6 @@ TEST_F(BluetoothTest, DiscoverDevice) {
   BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
   EXPECT_TRUE(device);
 }
-#endif
+#endif  // defined(OS_ANDROID)
 
 }  // namespace device
