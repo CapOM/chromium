@@ -25,8 +25,6 @@ class BluetoothTestAndroid : public BluetoothTestBase {
   void InitWithDefaultAdapter() override;
   void InitWithoutDefaultAdapter() override;
   void InitWithFakeAdapter() override;
-
-  scoped_refptr<BluetoothAdapterAndroid> adapter_android_;
 };
 
 // Defines common test fixture name. Use TEST_F(BluetoothTest, YourTestName).
