@@ -466,6 +466,6 @@ TEST_F(BluetoothTest, DiscoverySession) {
   EXPECT_FALSE(adapter_->IsDiscovering());
   EXPECT_FALSE(discovery_sessions_[0]->IsActive());
 }
-#endif
+#endif  // defined(OS_ANDROID)
 
 }  // namespace device
