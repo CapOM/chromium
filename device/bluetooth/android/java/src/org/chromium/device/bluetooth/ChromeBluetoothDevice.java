@@ -32,18 +32,29 @@ final class ChromeBluetoothDevice {
     private final List<ParcelUuid> mUuidsFromScan;
 
     /**
-     * Constructs a ChromeBluetoothDevice wrapping device, and associate
-     * device::BluetoothDeviceAndroid.
+     * Constructs a ChromeBluetoothDevice and an associated C++
+     * BluetoothDeviceAndroid. Adds new device to adapter.
      *
-     * Calls adapter.onDeviceAdded to ensure objects are owned.
+     * The C++ object lifetime is owned by the C++ BluetoothAdapterAndroid, and the
+     * Java objects references are held by C++ objects.
+     *
+     * @param  device         Wrapper of android.bluetooth.BluetoothDevice.
+     * @param  uuidsFromScan  Are cached to report Device's advertised UUIDs.
+     * @param  adapter        Informed via onDeviceAdded of new device to maintain
+     *                        object ownership.
      */
-    public ChromeBluetoothDevice(
-            Wrappers.BluetoothDeviceWrapper device, ChromeBluetoothAdapter adapter, List<ParcelUuid> uuidsFromScan) {
+    public static void CreateAndAddToAdapter(Wrappers.BluetoothDeviceWrapper device,
+            List<ParcelUuid> uuidsFromScan, ChromeBluetoothAdapter adapter) {
+        ChromeBluetoothDevice chromeBluetoothDevice =
+                new ChromeBluetoothDevice(device, uuidsFromScan);
+        adapter.onDeviceAdded(chromeBluetoothDevice);
+    }
+
+    private ChromeBluetoothDevice(Wrappers.BluetoothDeviceWrapper device, List<ParcelUuid> uuidsFromScan) {
         mNativeBluetoothDeviceAndroid = nativeInit();
         mDevice = device;
         mUuidsFromScan = uuidsFromScan;
         Log.v(TAG, "ChromeBluetoothDevice created.");
-        adapter.onDeviceAdded(this);
     }
 
     @CalledByNative

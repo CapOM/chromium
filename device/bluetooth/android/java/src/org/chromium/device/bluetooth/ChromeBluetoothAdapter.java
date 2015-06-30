@@ -67,7 +67,8 @@ final class ChromeBluetoothAdapter {
     // ---------------------------------------------------------------------------------------------
     // Methods:
 
-    public void onDeviceAdded(ChromeBluetoothDevice device) {
+    // Add device to adapter, taking ownership of C++ object.
+    void onDeviceAdded(ChromeBluetoothDevice device) {
         nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, device);
     }
 
@@ -230,16 +231,11 @@ final class ChromeBluetoothAdapter {
             Log.v(TAG, "onScanResult %d %s %s", callbackType, result.getDevice().getAddress(),
                     result.getDevice().getName());
 
-            List<ParcelUuid> uuids = result.getScanRecord_getServiceUuids();
-            if (uuids != null && uuids.size() > 0) {
-                for (ParcelUuid uuid : uuids) {
-                    Log.v(TAG, "  uuid %s", uuid.toString());
-                }
-            } else {
-                Log.v(TAG, "  uuids not in ScanResult.");
-            }
+            // TODO CHECK THAT DEVICE ISN'T ALREADY KNOWN.
 
-            new ChromeBluetoothDevice(result.getDevice(), ChromeBluetoothAdapter.this, uuids);
+            List<ParcelUuid> uuids = result.getScanRecord_getServiceUuids();
+            ChromeBluetoothDevice.CreateAndAddToAdapter(
+                    result.getDevice(), uuids, ChromeBluetoothAdapter.this);
         }
 
         @Override
