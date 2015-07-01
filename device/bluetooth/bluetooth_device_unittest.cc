@@ -74,7 +74,7 @@ TEST_F(BluetoothTest, DeviceProperties) {
   base::RunLoop().RunUntilIdle();
   DiscoverLowEnergyDevice(1);
   base::RunLoop().RunUntilIdle();
-  BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
+  BluetoothDevice* device = observer.last_device();
   ASSERT_TRUE(device);
   EXPECT_EQ(0x1F00u, device->GetBluetoothClass());
   EXPECT_EQ("A1:B2:C3:DD:DD:DD", device->GetAddress());
@@ -87,12 +87,32 @@ TEST_F(BluetoothTest, DeviceProperties) {
   BluetoothDevice::UUIDList uuids = device->GetUUIDs();
   EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1800")));
   EXPECT_TRUE(ContainsValue(uuids, BluetoothUUID("1801")));
-
-  // TODO(scheib): Test with a device with no name, causing
-  // BluetoothDevice::GetAddressWithLocalizedDeviceTypeName() to run, which
-  // requires string resources to be loaded. For that, something like
-  // InitSharedInstance must be run. See unittest files that call that.
 }
-#endif
+#endif  // defined(OS_ANDROID)
+
+#if defined(OS_ANDROID)
+// Device with no advertised Service UUIDs.
+TEST_F(BluetoothTest, DeviceNoUUIDs) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  DiscoverLowEnergyDevice(3);
+  base::RunLoop().RunUntilIdle();
+  BluetoothDevice* device = observer.last_device();
+  ASSERT_TRUE(device);
+  BluetoothDevice::UUIDList uuids = device->GetUUIDs();
+  EXPECT_EQ(0u, uuids.size());
+}
+#endif  // defined(OS_ANDROID)
+
+// TODO(scheib): Test with a device with no name, causing
+// BluetoothDevice::GetAddressWithLocalizedDeviceTypeName() to run, which
+// requires string resources to be loaded. For that, something like
+// InitSharedInstance must be run. See unittest files that call that. It will
+// also require build configuration to generate string resources into a .pak
+// file.
 
 }  // namespace device

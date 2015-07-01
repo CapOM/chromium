@@ -58,7 +58,8 @@ class Fakes {
 
                     mFakeScanner.mCallback.onScanResultWrapper(
                             ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                            new FakeScanResult(new FakeBluetoothDevice(), uuids));
+                            new FakeScanResult(
+                                    new FakeBluetoothDevice("FakeBluetoothDevice"), uuids));
                     break;
                 }
                 case 2: {
@@ -68,7 +69,15 @@ class Fakes {
 
                     mFakeScanner.mCallback.onScanResultWrapper(
                             ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                            new FakeScanResult(new FakeBluetoothDevice(), uuids));
+                            new FakeScanResult(
+                                    new FakeBluetoothDevice("FakeBluetoothDevice"), uuids));
+                    break;
+                }
+                case 3: {
+                    ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>(0);
+                    mFakeScanner.mCallback.onScanResultWrapper(
+                            ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
+                            new FakeScanResult(new FakeBluetoothDevice(""), uuids));
                     break;
                 }
             }
@@ -161,10 +170,11 @@ class Fakes {
      */
     static class FakeBluetoothDevice extends Wrappers.BluetoothDeviceWrapper {
         private final String mAddress = "A1:B2:C3:DD:DD:DD";
-        private String mName = "FakeBluetoothDevice";
+        private String mName;
 
-        public FakeBluetoothDevice() {
+        public FakeBluetoothDevice(String name) {
             super(null);
+            mName = name;
         }
 
         @Override
