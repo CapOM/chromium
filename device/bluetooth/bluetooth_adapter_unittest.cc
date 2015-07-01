@@ -481,7 +481,25 @@ TEST_F(BluetoothTest, DiscoverDevice) {
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
   base::RunLoop().RunUntilIdle();
-  DiscoverANewLowEnergyDevice();
+  DiscoverLowEnergyDevice(1);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(1, observer.device_added_count());
+  BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
+  EXPECT_TRUE(device);
+}
+#endif  // defined(OS_ANDROID)
+
+#if defined(OS_ANDROID)
+// Discovers the same device multiple times.
+TEST_F(BluetoothTest, DiscoverDeviceTwice) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  // Start discovery and find a device.
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  DiscoverLowEnergyDevice(1);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(1, observer.device_added_count());
   BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
@@ -489,15 +507,44 @@ TEST_F(BluetoothTest, DiscoverDevice) {
 
   // Find the same device again. This should not create a new device object.
   observer.Reset();
-  DiscoverANewLowEnergyDevice();
+  DiscoverLowEnergyDevice(1);
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(0, observer.device_added_count());
+  EXPECT_EQ(0, observer.device_changed_count());
+  EXPECT_EQ(1u, adapter_->GetDevices().size());
+}
+#endif  // defined(OS_ANDROID)
+
+#if defined(OS_ANDROID)
+// Discovers a device, and then again with new Service UUIDs.
+TEST_F(BluetoothTest, DiscoverDeviceWithUpdatedUUIDs) {
+  InitWithFakeAdapter();
+  TestBluetoothAdapterObserver observer(adapter_);
+
+  // Start discovery and find a device.
+  adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
+                                  GetErrorCallback());
+  base::RunLoop().RunUntilIdle();
+  DiscoverLowEnergyDevice(1);
+  base::RunLoop().RunUntilIdle();
+  BluetoothDevice* device = observer.last_device();
+
+  // Check the initial UUIDs:
+  EXPECT_TRUE(ContainsValue(device->GetUUIDs(), BluetoothUUID("1800")));
+  EXPECT_FALSE(ContainsValue(device->GetUUIDs(), BluetoothUUID("1802")));
+
+  // Discover same device again with updated UUIDs:
+  observer.Reset();
+  DiscoverLowEnergyDevice(2);
   base::RunLoop().RunUntilIdle();
   EXPECT_EQ(0, observer.device_added_count());
   EXPECT_EQ(1, observer.device_changed_count());
-  BluetoothDevice* device2 =
-      adapter_->GetDevice(observer.last_device_address());
-  EXPECT_EQ(device, device2);
   EXPECT_EQ(1u, adapter_->GetDevices().size());
-  // TEST UUIDS have been updated.
+  EXPECT_EQ(device, observer.last_device());
+
+  // Expect new UUIDs:
+  EXPECT_FALSE(ContainsValue(device->GetUUIDs(), BluetoothUUID("1800")));
+  EXPECT_TRUE(ContainsValue(device->GetUUIDs(), BluetoothUUID("1802")));
 }
 #endif  // defined(OS_ANDROID)
 

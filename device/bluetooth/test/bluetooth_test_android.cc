@@ -43,9 +43,9 @@ void BluetoothTestAndroid::InitWithFakeAdapter() {
       BluetoothAdapterAndroid::Create(j_fake_bluetooth_adapter_.obj()).get();
 }
 
-void BluetoothTestAndroid::DiscoverANewLowEnergyDevice() {
-  Java_FakeBluetoothAdapter_discoverANewLowEnergyDevice(
-      AttachCurrentThread(), j_fake_bluetooth_adapter_.obj());
+void BluetoothTestAndroid::DiscoverLowEnergyDevice(int device_ordinal) {
+  Java_FakeBluetoothAdapter_discoverLowEnergyDevice(
+      AttachCurrentThread(), j_fake_bluetooth_adapter_.obj(), device_ordinal);
 }
 
 }  // namespace device

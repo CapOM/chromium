@@ -49,7 +49,6 @@ final class ChromeBluetoothDevice {
     // Implements BluetoothDeviceAndroid::UpdateAdvertisedUUIDs.
     @CalledByNative
     private boolean updateAdvertisedUUIDs(List<ParcelUuid> uuidsFromScan) {
-        assert false;
         if (mUuidsFromScan != null && mUuidsFromScan.equals(uuidsFromScan)) {
             return false;
         }

@@ -49,9 +49,29 @@ class Fakes {
          * Creates and discovers a new device.
          */
         @CalledByNative("FakeBluetoothAdapter")
-        public void discoverANewLowEnergyDevice() {
-            mFakeScanner.mCallback.onScanResultWrapper(ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
-                    new FakeScanResult(new FakeBluetoothDevice()));
+        public void discoverLowEnergyDevice(int device_ordinal) {
+            switch (device_ordinal) {
+                case 1: {
+                    ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>(2);
+                    uuids.add(ParcelUuid.fromString("00001800-0000-1000-8000-00805f9b34fb"));
+                    uuids.add(ParcelUuid.fromString("00001801-0000-1000-8000-00805f9b34fb"));
+
+                    mFakeScanner.mCallback.onScanResultWrapper(
+                            ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
+                            new FakeScanResult(new FakeBluetoothDevice(), uuids));
+                    break;
+                }
+                case 2: {
+                    ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>(2);
+                    uuids.add(ParcelUuid.fromString("00001802-0000-1000-8000-00805f9b34fb"));
+                    uuids.add(ParcelUuid.fromString("00001803-0000-1000-8000-00805f9b34fb"));
+
+                    mFakeScanner.mCallback.onScanResultWrapper(
+                            ScanSettings.CALLBACK_TYPE_ALL_MATCHES,
+                            new FakeScanResult(new FakeBluetoothDevice(), uuids));
+                    break;
+                }
+            }
         }
 
         // -----------------------------------------------------------------------------------------
@@ -117,10 +137,12 @@ class Fakes {
      */
     static class FakeScanResult extends Wrappers.ScanResultWrapper {
         private final FakeBluetoothDevice mDevice;
+        private final ArrayList<ParcelUuid> mUuids;
 
-        FakeScanResult(FakeBluetoothDevice device) {
+        FakeScanResult(FakeBluetoothDevice device, ArrayList<ParcelUuid> uuids) {
             super(null);
             mDevice = device;
+            mUuids = uuids;
         }
 
         @Override
@@ -130,10 +152,7 @@ class Fakes {
 
         @Override
         public List<ParcelUuid> getScanRecord_getServiceUuids() {
-            ArrayList<ParcelUuid> uuids = new ArrayList<ParcelUuid>(2);
-            uuids.add(ParcelUuid.fromString("00001800-0000-1000-8000-00805f9b34fb"));
-            uuids.add(ParcelUuid.fromString("00001801-0000-1000-8000-00805f9b34fb"));
-            return uuids;
+            return mUuids;
         }
     }
 

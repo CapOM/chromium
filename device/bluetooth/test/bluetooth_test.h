@@ -38,7 +38,10 @@ class BluetoothTestBase : public testing::Test {
   virtual void InitWithFakeAdapter(){};
 
   // Create a fake Low Energy device and discover it.
-  virtual void DiscoverANewLowEnergyDevice(){};
+  // |device_ordinal| selects between multiple fake device data sets to produce.
+  //   1: Basic device with simple default values.
+  //   2: Same as 1, but with different advertised Service UUIDs.
+  virtual void DiscoverLowEnergyDevice(int device_ordinal){};
 
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();
