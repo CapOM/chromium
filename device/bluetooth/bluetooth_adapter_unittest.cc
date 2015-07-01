@@ -477,13 +477,27 @@ TEST_F(BluetoothTest, DiscoverDevice) {
   InitWithFakeAdapter();
   TestBluetoothAdapterObserver observer(adapter_);
 
+  // Start discovery and find a device.
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
   base::RunLoop().RunUntilIdle();
   DiscoverANewLowEnergyDevice();
   base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(1, observer.device_added_count());
   BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
   EXPECT_TRUE(device);
+
+  // Find the same device again. This should not create a new device object.
+  observer.Reset();
+  DiscoverANewLowEnergyDevice();
+  base::RunLoop().RunUntilIdle();
+  EXPECT_EQ(0, observer.device_added_count());
+  EXPECT_EQ(1, observer.device_changed_count());
+  BluetoothDevice* device2 =
+      adapter_->GetDevice(observer.last_device_address());
+  EXPECT_EQ(device, device2);
+  EXPECT_EQ(1u, adapter_->GetDevices().size());
+  // TEST UUIDS have been updated.
 }
 #endif  // defined(OS_ANDROID)
 
