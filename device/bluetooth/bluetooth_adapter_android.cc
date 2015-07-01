@@ -132,22 +132,32 @@ void BluetoothAdapterAndroid::OnScanFailed(JNIEnv* env, jobject obj) {
   MarkDiscoverySessionsAsInactive();
 }
 
-void BluetoothAdapterAndroid::OnDeviceAdded(JNIEnv* env,
-                                            jobject obj,
-                                            jobject chrome_bluetooth_device) {
-  BluetoothDeviceAndroid* device =
-      BluetoothDeviceAndroid::FromJavaObject(chrome_bluetooth_device);
-
-  const std::string& address = device->GetAddress();
-  if (devices_.count(address) == 0) {
-    devices_[address] = device;
-
+void BluetoothAdapterAndroid::CreateOrUpdateDeviceOnScan(
+    JNIEnv* env,
+    jobject obj,
+    const jstring& jaddress,
+    jobject bluetooth_device_wrapper,
+    jobject advertised_uuids) {
+  std::string address = ConvertJavaStringToUTF8(env, jaddress);
+  BluetoothDevice*& device = devices_[address];
+  if (!device) {
+    device = BluetoothDeviceAndroid::Create(bluetooth_device_wrapper);
+    static_cast<BluetoothDeviceAndroid*>(device)
+        ->UpdateAdvertisedUUIDs(advertised_uuids);
     FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
                       DeviceAdded(this, device));
+
+    DCHECK_EQ(devices_[address]->GetAddress(), address);
+    // TEST
   } else {
-    LOG(WARNING) << "Redundant device found";  // TODO??? Need this log? Common?
-    // TODO(scheib): Refactor to check first before constructing everything?
-    delete device;
+    DCHECK_EQ(device->GetAddress(), address);
+
+    static_cast<BluetoothDeviceAndroid*>(device)
+        ->UpdateAdvertisedUUIDs(advertised_uuids);
+    // MOVE THIS TO UPDATE AND ONLY IF DIFFERENT. MAYBE UPDATE SERVICE?
+    FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
+                      DeviceChanged(this, device));
+    // TEST
   }
 }
 

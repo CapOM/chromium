@@ -16,14 +16,24 @@ namespace device {
 class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
     : public BluetoothDevice {
  public:
-  // Obtain a C++ BluetoothDeviceAndroid from a Java BluetoothDevice |obj|.
-  static BluetoothDeviceAndroid* FromJavaObject(jobject obj);
+  // Create a BluetoothDeviceAndroid instance and associated Java
+  // ChromeBluetoothDevice using the provided |java_bluetooth_device_wrapper|.
+  //
+  // The ChromeBluetoothDevice instance will hold a Java reference
+  // to |java_bluetooth_device_wrapper|.
+  //
+  // TODO(scheib): Return a scoped_ptr<>, but then adapter will need to handle
+  // this correctly.
+  static BluetoothDeviceAndroid* Create(jobject java_bluetooth_device_wrapper);
 
-  BluetoothDeviceAndroid(JNIEnv* env, jobject obj);
   ~BluetoothDeviceAndroid() override;
 
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
+
+  // Updates advertised UUIDs discovered during a scan, caching them to be
+  // returned in GetUUIDs().
+  void UpdateAdvertisedUUIDs(jobject advertised_uuids);
 
   // BluetoothDevice:
   uint32 GetBluetoothClass() const override;
@@ -67,6 +77,8 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
       const ConnectErrorCallback& error_callback) override;
 
  protected:
+  BluetoothDeviceAndroid();
+
   // BluetoothDevice:
   std::string GetDeviceName() const override;
 

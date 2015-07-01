@@ -480,7 +480,7 @@ TEST_F(BluetoothTest, DiscoverDevice) {
   adapter_->StartDiscoverySession(GetDiscoverySessionCallback(),
                                   GetErrorCallback());
   base::RunLoop().RunUntilIdle();
-  DiscoverANewDevice();
+  DiscoverANewLowEnergyDevice();
   base::RunLoop().RunUntilIdle();
   BluetoothDevice* device = adapter_->GetDevice(observer.last_device_address());
   EXPECT_TRUE(device);

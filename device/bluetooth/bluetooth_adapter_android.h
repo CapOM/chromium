@@ -85,8 +85,13 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
   // Handles a scan error event by invalidating all discovery sessions.
   void OnScanFailed(JNIEnv* env, jobject obj);
 
-  // Adds a newly discovered device, taking ownership.
-  void OnDeviceAdded(JNIEnv* env, jobject obj, jobject chrome_bluetooth_device);
+  // Creates or updates device with advertised UUID information when a device is
+  // discovered during a scan.
+  void CreateOrUpdateDeviceOnScan(JNIEnv* env,
+                                  jobject obj,
+                                  const jstring& address,
+                                  jobject bluetooth_device_wrapper,
+                                  jobject advertised_uuids);
 
  protected:
   BluetoothAdapterAndroid();

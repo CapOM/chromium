@@ -37,8 +37,8 @@ class BluetoothTestBase : public testing::Test {
   // controlled by this test fixture.
   virtual void InitWithFakeAdapter(){};
 
-  // Create a fake device and discover it.
-  virtual void DiscoverANewDevice(){};
+  // Create a fake Low Energy device and discover it.
+  virtual void DiscoverANewLowEnergyDevice(){};
 
   // Callbacks that increment |callback_count_|, |error_callback_count_|:
   void Callback();

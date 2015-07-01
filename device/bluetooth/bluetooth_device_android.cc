@@ -12,25 +12,22 @@ using base::android::AttachCurrentThread;
 
 namespace device {
 
-// Create a BluetoothDeviceAndroid instance and return pointer for
-// an already created org.chromium.device.bluetooth.BluetoothDevice |obj|.
-static jlong Init(JNIEnv* env, jobject obj) {
-  return reinterpret_cast<intptr_t>(new BluetoothDeviceAndroid(env, obj));
-}
+BluetoothDeviceAndroid* BluetoothDeviceAndroid::Create(
+    jobject java_bluetooth_device_wrapper) {
+  BluetoothDeviceAndroid* device = new BluetoothDeviceAndroid();
 
-// static
-BluetoothDeviceAndroid* BluetoothDeviceAndroid::FromJavaObject(jobject obj) {
-  CHECK(obj);
-  return reinterpret_cast<BluetoothDeviceAndroid*>(
-      Java_ChromeBluetoothDevice_getNativePointer(AttachCurrentThread(), obj));
-}
+  device->j_device_.Reset(Java_ChromeBluetoothDevice_create(
+      AttachCurrentThread(), java_bluetooth_device_wrapper));
 
-BluetoothDeviceAndroid::BluetoothDeviceAndroid(JNIEnv* env, jobject obj) {
-  CHECK(obj);
-  j_device_.Reset(env, obj);
+  return device;
 }
 
 BluetoothDeviceAndroid::~BluetoothDeviceAndroid() {
+}
+
+void BluetoothDeviceAndroid::UpdateAdvertisedUUIDs(jobject advertised_uuids) {
+  Java_ChromeBluetoothDevice_updateAdvertisedUUIDs(
+      AttachCurrentThread(), j_device_.obj(), advertised_uuids);
 }
 
 // static
@@ -188,6 +185,9 @@ void BluetoothDeviceAndroid::CreateGattConnection(
     const GattConnectionCallback& callback,
     const ConnectErrorCallback& error_callback) {
   NOTIMPLEMENTED();
+}
+
+BluetoothDeviceAndroid::BluetoothDeviceAndroid() {
 }
 
 std::string BluetoothDeviceAndroid::GetDeviceName() const {

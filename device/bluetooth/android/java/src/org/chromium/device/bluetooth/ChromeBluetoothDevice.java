@@ -27,63 +27,50 @@ import java.util.List;
 final class ChromeBluetoothDevice {
     private static final String TAG = "cr.Bluetooth";
 
-    private long mNativeBluetoothDeviceAndroid;
     private final Wrappers.BluetoothDeviceWrapper mDevice;
-    private final List<ParcelUuid> mUuidsFromScan;
+    private List<ParcelUuid> mUuidsFromScan;
 
-    /**
-     * Constructs a ChromeBluetoothDevice and an associated C++
-     * BluetoothDeviceAndroid. Adds new device to adapter.
-     *
-     * The C++ object lifetime is owned by the C++ BluetoothAdapterAndroid, and the
-     * Java objects references are held by C++ objects.
-     *
-     * @param  device         Wrapper of android.bluetooth.BluetoothDevice.
-     * @param  uuidsFromScan  Are cached to report Device's advertised UUIDs.
-     * @param  adapter        Informed via onDeviceAdded of new device to maintain
-     *                        object ownership.
-     */
-    public static void CreateAndAddToAdapter(Wrappers.BluetoothDeviceWrapper device,
-            List<ParcelUuid> uuidsFromScan, ChromeBluetoothAdapter adapter) {
-        ChromeBluetoothDevice chromeBluetoothDevice =
-                new ChromeBluetoothDevice(device, uuidsFromScan);
-        adapter.onDeviceAdded(chromeBluetoothDevice);
-    }
-
-    private ChromeBluetoothDevice(Wrappers.BluetoothDeviceWrapper device, List<ParcelUuid> uuidsFromScan) {
-        mNativeBluetoothDeviceAndroid = nativeInit();
-        mDevice = device;
-        mUuidsFromScan = uuidsFromScan;
+    private ChromeBluetoothDevice(Wrappers.BluetoothDeviceWrapper deviceWrapper) {
+        mDevice = deviceWrapper;
         Log.v(TAG, "ChromeBluetoothDevice created.");
-    }
-
-    @CalledByNative
-    private long getNativePointer() {
-        return mNativeBluetoothDeviceAndroid;
     }
 
     // ---------------------------------------------------------------------------------------------
     // BluetoothDeviceAndroid methods implemented in java:
 
-    // Implements BluetoothAdapterAndroid::GetBluetoothClass.
+    // Implements BluetoothDeviceAndroid::Create.
+    // 'Object' type must be used because inner class Wrappers.BluetoothDeviceWrapper reference is
+    // not handled by jni_generator.py JavaToJni. http://crbug.com/505554
+    @CalledByNative
+    private static ChromeBluetoothDevice create(Object deviceWrapper) {
+        return new ChromeBluetoothDevice((Wrappers.BluetoothDeviceWrapper) deviceWrapper);
+    }
+
+    // Implements BluetoothDeviceAndroid::UpdateAdvertisedUUIDs.
+    @CalledByNative
+    private void updateAdvertisedUUIDs(List<ParcelUuid> uuidsFromScan) {
+        mUuidsFromScan = uuidsFromScan;
+    }
+
+    // Implements BluetoothDeviceAndroid::GetBluetoothClass.
     @CalledByNative
     private int getBluetoothClass() {
         return mDevice.getBluetoothClass_getDeviceClass();
     }
 
-    // Implements BluetoothAdapterAndroid::GetAddress.
+    // Implements BluetoothDeviceAndroid::GetAddress.
     @CalledByNative
     private String getAddress() {
         return mDevice.getAddress();
     }
 
-    // Implements BluetoothAdapterAndroid::IsPaired.
+    // Implements BluetoothDeviceAndroid::IsPaired.
     @CalledByNative
     private boolean isPaired() {
         return mDevice.getBondState() == BluetoothDevice.BOND_BONDED;
     }
 
-    // Implements BluetoothAdapterAndroid::GetUUIDs.
+    // Implements BluetoothDeviceAndroid::GetUUIDs.
     // Returns number of UUIDs found when scanning.
     @CalledByNative
     private int getUuidsCount() {
@@ -93,22 +80,16 @@ final class ChromeBluetoothDevice {
         return mUuidsFromScan.size();
     }
 
-    // Implements BluetoothAdapterAndroid::GetUUIDs.
+    // Implements BluetoothDeviceAndroid::GetUUIDs.
     // Returns one UUID String from the array of UUIDs.
     @CalledByNative
     private String getUuid(int i) {
         return mUuidsFromScan.get(i).toString();
     }
 
-    // Implements BluetoothAdapterAndroid::GetDeviceName.
+    // Implements BluetoothDeviceAndroid::GetDeviceName.
     @CalledByNative
     private String getDeviceName() {
         return mDevice.getName();
     }
-
-    // ---------------------------------------------------------------------------------------------
-    // bluetooth_device_android.cc C++ methods declared for access from java:
-
-    // Binds to Init().
-    private native long nativeInit();
 }

@@ -65,14 +65,6 @@ final class ChromeBluetoothAdapter {
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Methods:
-
-    // Add device to adapter, taking ownership of C++ object.
-    void onDeviceAdded(ChromeBluetoothDevice device) {
-        nativeOnDeviceAdded(mNativeBluetoothAdapterAndroid, device);
-    }
-
-    // ---------------------------------------------------------------------------------------------
     // BluetoothAdapterAndroid methods implemented in java:
 
     // Implements BluetoothAdapterAndroid::Create.
@@ -231,11 +223,10 @@ final class ChromeBluetoothAdapter {
             Log.v(TAG, "onScanResult %d %s %s", callbackType, result.getDevice().getAddress(),
                     result.getDevice().getName());
 
-            // TODO CHECK THAT DEVICE ISN'T ALREADY KNOWN.
-
             List<ParcelUuid> uuids = result.getScanRecord_getServiceUuids();
-            ChromeBluetoothDevice.CreateAndAddToAdapter(
-                    result.getDevice(), uuids, ChromeBluetoothAdapter.this);
+
+            nativeCreateOrUpdateDeviceOnScan(mNativeBluetoothAdapterAndroid,
+                    result.getDevice().getAddress(), result.getDevice(), uuids);
         }
 
         @Override
@@ -252,7 +243,9 @@ final class ChromeBluetoothAdapter {
     // Binds to BluetoothAdapterAndroid::OnScanFailed.
     private native void nativeOnScanFailed(long nativeBluetoothAdapterAndroid);
 
-    // Binds to BluetoothAdapterAndroid::OnDeviceAdded.
-    private native void nativeOnDeviceAdded(
-            long nativeBluetoothAdapterAndroid, ChromeBluetoothDevice device);
+    // Binds to BluetoothAdapterAndroid::GetChromeBluetoothDevice.
+    // 'Object' type must be used because inner class Wrappers.BluetoothDeviceWrapper reference is
+    // not handled by jni_generator.py JavaToJni. http://crbug.com/505554
+    private native void nativeCreateOrUpdateDeviceOnScan(long nativeBluetoothAdapterAndroid,
+            String jaddress, Object bluetooth_device_wrapper, List<ParcelUuid> advertised_uuids);
 }
