@@ -138,26 +138,19 @@ void BluetoothAdapterAndroid::CreateOrUpdateDeviceOnScan(
     const jstring& jaddress,
     jobject bluetooth_device_wrapper,
     jobject advertised_uuids) {
-  std::string address = ConvertJavaStringToUTF8(env, jaddress);
-  BluetoothDevice*& device = devices_[address];
+  BluetoothDevice*& device = devices_[ConvertJavaStringToUTF8(env, jaddress)];
   if (!device) {
     device = BluetoothDeviceAndroid::Create(bluetooth_device_wrapper);
     static_cast<BluetoothDeviceAndroid*>(device)
         ->UpdateAdvertisedUUIDs(advertised_uuids);
     FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
                       DeviceAdded(this, device));
-
-    DCHECK_EQ(devices_[address]->GetAddress(), address);
-    // TEST
   } else {
-    DCHECK_EQ(device->GetAddress(), address);
-
-    static_cast<BluetoothDeviceAndroid*>(device)
-        ->UpdateAdvertisedUUIDs(advertised_uuids);
-    // MOVE THIS TO UPDATE AND ONLY IF DIFFERENT. MAYBE UPDATE SERVICE?
-    FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
-                      DeviceChanged(this, device));
-    // TEST
+    if (static_cast<BluetoothDeviceAndroid*>(device)
+            ->UpdateAdvertisedUUIDs(advertised_uuids)) {
+      FOR_EACH_OBSERVER(BluetoothAdapter::Observer, observers_,
+                        DeviceChanged(this, device));
+    }
   }
 }
 

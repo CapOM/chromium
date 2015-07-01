@@ -31,9 +31,9 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // Register C++ methods exposed to Java using JNI.
   static bool RegisterJNI(JNIEnv* env);
 
-  // Updates advertised UUIDs discovered during a scan, caching them to be
-  // returned in GetUUIDs().
-  void UpdateAdvertisedUUIDs(jobject advertised_uuids);
+  // Updates cached copy of advertised UUIDs discovered during a scan.
+  // Returns true if new UUIDs differed from cached values.
+  bool UpdateAdvertisedUUIDs(jobject advertised_uuids);
 
   // BluetoothDevice:
   uint32 GetBluetoothClass() const override;
