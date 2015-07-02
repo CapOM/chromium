@@ -29,7 +29,7 @@ namespace device {
 // BluetoothAdapterAndroid is reference counted, and owns the lifetime of the
 // Java class BluetoothAdapter via j_adapter_. A tree of additional C++ objects
 // (Devices, Services, Characteristics, Descriptors) are also owned, with each
-// C++ object owning its paired Java class.
+// C++ object owning its associated Java class.
 class DEVICE_BLUETOOTH_EXPORT BluetoothAdapterAndroid final
     : public BluetoothAdapter {
  public:

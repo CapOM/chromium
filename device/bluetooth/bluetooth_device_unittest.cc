@@ -108,8 +108,8 @@ TEST_F(BluetoothTest, DeviceNoUUIDs) {
 }
 #endif  // defined(OS_ANDROID)
 
-// TODO(scheib): Test with a device with no name, causing
-// BluetoothDevice::GetAddressWithLocalizedDeviceTypeName() to run, which
+// TODO(scheib): Test with a device with no name. http://crbug.com/506415
+// BluetoothDevice::GetAddressWithLocalizedDeviceTypeName() will run, which
 // requires string resources to be loaded. For that, something like
 // InitSharedInstance must be run. See unittest files that call that. It will
 // also require build configuration to generate string resources into a .pak

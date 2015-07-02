@@ -11,8 +11,6 @@ namespace device {
 
 // Test implementation of BluetoothAdapter::Observer counting method calls and
 // caching last reported values.
-//
-// Many methods will quit any active message loop.
 class TestBluetoothAdapterObserver : public BluetoothAdapter::Observer {
  public:
   TestBluetoothAdapterObserver(scoped_refptr<BluetoothAdapter> adapter);

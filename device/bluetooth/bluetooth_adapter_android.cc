@@ -158,7 +158,13 @@ BluetoothAdapterAndroid::BluetoothAdapterAndroid() : weak_ptr_factory_(this) {
 }
 
 BluetoothAdapterAndroid::~BluetoothAdapterAndroid() {
+
+
+
   // TODO(scheib): Delete devices_.
+
+
+
   Java_ChromeBluetoothAdapter_onBluetoothAdapterAndroidDestruction(
       AttachCurrentThread(), j_adapter_.obj());
 }
