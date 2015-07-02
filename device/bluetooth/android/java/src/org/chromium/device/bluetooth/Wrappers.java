@@ -219,9 +219,5 @@ class Wrappers {
         public String getName() {
             return mDevice.getName();
         }
-
-        public ParcelUuid[] getUuids() {
-            return mDevice.getUuids();
-        }
     }
 }

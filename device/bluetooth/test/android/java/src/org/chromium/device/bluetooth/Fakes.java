@@ -196,13 +196,5 @@ class Fakes {
         public String getName() {
             return mName;
         }
-
-        @Override
-        public ParcelUuid[] getUuids() {
-            ParcelUuid[] uuids = new ParcelUuid[2];
-            uuids[0] = ParcelUuid.fromString("00001800-0000-1000-8000-00805f9b34fb");
-            uuids[1] = ParcelUuid.fromString("00001801-0000-1000-8000-00805f9b34fb");
-            return uuids;
-        }
     }
 }
