@@ -23,7 +23,7 @@ class DEVICE_BLUETOOTH_EXPORT BluetoothDeviceAndroid final
   // to |java_bluetooth_device_wrapper|.
   //
   // TODO(scheib): Return a scoped_ptr<>, but then adapter will need to handle
-  // this correctly.
+  // this correctly. http://crbug.com/506416
   static BluetoothDeviceAndroid* Create(jobject java_bluetooth_device_wrapper);
 
   ~BluetoothDeviceAndroid() override;
